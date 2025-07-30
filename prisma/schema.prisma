@@ -1,0 +1,43 @@
+// Configuración del generador y base de datos
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Enumeración de roles de usuario
+enum UserRole {
+  ADMIN        // Control total del sistema
+  CAJA         // Gestión financiera y documentos
+  MATRIZADOR   // Creación y gestión de documentos
+  RECEPCION    // Entrega de documentos
+  ARCHIVO      // Gestión de archivo y documentos históricos
+}
+
+// Modelo principal de usuarios
+model User {
+  id          Int      @id @default(autoincrement())
+  email       String   @unique
+  password    String
+  firstName   String
+  lastName    String
+  role        UserRole
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lastLogin   DateTime?
+  
+  @@map("users")
+}
+
+// Modelo básico para verificar conexión
+model TestConnection {
+  id        Int      @id @default(autoincrement())
+  message   String   @default("Conexión exitosa")
+  createdAt DateTime @default(now())
+  
+  @@map("test_connection")
+}

@@ -1,0 +1,30 @@
+{
+  "name": "notaria-segura",
+  "version": "1.0.0",
+  "description": "Sistema de trazabilidad documental notarial",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "install:all": "npm install && npm run install:frontend && npm run install:backend",
+    "install:frontend": "cd frontend && npm install",
+    "install:backend": "cd backend && npm install",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && npm run dev",
+    "build:frontend": "cd frontend && npm run build",
+    "start:backend": "cd backend && npm start"
+  },
+  "keywords": [
+    "notaria",
+    "trazabilidad",
+    "documentos",
+    "whatsapp"
+  ],
+  "author": "Notaría Segura",
+  "license": "PRIVATE",
+  "dependencies": {
+    "@prisma/client": "^6.13.0"
+  }
+}

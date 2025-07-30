@@ -1,0 +1,95 @@
+/* Variables de colores oficiales del proyecto */
+:root {
+  --primary-blue: #468BE6;      /* Botones principales */
+  --secondary-blue: #93BFEF;    /* Fondos, paneles */
+  --dark-blue: #1A5799;        /* Navegación */
+  --light-background: #E9F5FF;  /* Fondo general */
+  --text-primary: #1F1F1F;     /* Texto principal */
+}
+
+/* Reset y configuración base */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Roboto', 'Helvetica', 'Arial', sans-serif;
+  background-color: var(--light-background);
+  color: var(--text-primary);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Estilos globales para la aplicación */
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Configuración de Material UI personalizada */
+.MuiCssBaseline-root {
+  background-color: var(--light-background) !important;
+}
+
+/* Enlaces */
+a {
+  color: var(--primary-blue);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--dark-blue);
+  text-decoration: underline;
+}
+
+/* Utilidades de texto */
+.text-primary {
+  color: var(--text-primary);
+}
+
+.text-blue {
+  color: var(--primary-blue);
+}
+
+.text-dark-blue {
+  color: var(--dark-blue);
+}
+
+/* Utilidades de fondo */
+.bg-light {
+  background-color: var(--light-background);
+}
+
+.bg-primary {
+  background-color: var(--primary-blue);
+}
+
+.bg-secondary {
+  background-color: var(--secondary-blue);
+}
+
+.bg-dark {
+  background-color: var(--dark-blue);
+}
+
+/* Scrollbar personalizado */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--light-background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--secondary-blue);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-blue);
+}
