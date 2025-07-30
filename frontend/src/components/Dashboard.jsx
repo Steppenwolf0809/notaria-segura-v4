@@ -20,6 +20,8 @@ import {
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import ThemeToggle from './ThemeToggle';
+import CajaDashboard from './CajaDashboard';
+import MatrizadorDashboard from './MatrizadorDashboard';
 
 /**
  * Componente Dashboard principal
@@ -91,6 +93,128 @@ const Dashboard = () => {
     return null;
   }
 
+  // Mostrar dashboard específico según rol
+  if (user.role === 'CAJA') {
+    return (
+      <Box sx={{ flexGrow: 1 }}>
+        {/* App Bar */}
+        <AppBar 
+          position="static" 
+          sx={{ 
+            bgcolor: 'primary.main',
+            boxShadow: 2
+          }}
+        >
+          <Toolbar>
+            <DashboardIcon sx={{ mr: 2 }} />
+            <Typography 
+              variant="h6" 
+              component="div" 
+              sx={{ flexGrow: 1 }}
+            >
+              Notaría Segura - CAJA
+            </Typography>
+            
+            {/* User Info */}
+            <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
+              <Avatar
+                sx={{
+                  bgcolor: getUserRoleColor(),
+                  width: 32,
+                  height: 32,
+                  mr: 1,
+                  fontSize: '0.875rem'
+                }}
+              >
+                {getUserInitials()}
+              </Avatar>
+              <Typography variant="body2">
+                {getFullName()}
+              </Typography>
+            </Box>
+
+            {/* Theme Toggle */}
+            <ThemeToggle />
+
+            {/* Logout Button */}
+            <IconButton
+              color="inherit"
+              onClick={handleLogout}
+              title="Cerrar Sesión"
+              sx={{ ml: 1 }}
+            >
+              <LogoutIcon />
+            </IconButton>
+          </Toolbar>
+        </AppBar>
+
+        {/* Dashboard de CAJA */}
+        <CajaDashboard />
+      </Box>
+    );
+  }
+
+  if (user.role === 'MATRIZADOR') {
+    return (
+      <Box sx={{ flexGrow: 1 }}>
+        {/* App Bar */}
+        <AppBar 
+          position="static" 
+          sx={{ 
+            bgcolor: 'primary.main',
+            boxShadow: 2
+          }}
+        >
+          <Toolbar>
+            <DashboardIcon sx={{ mr: 2 }} />
+            <Typography 
+              variant="h6" 
+              component="div" 
+              sx={{ flexGrow: 1 }}
+            >
+              Notaría Segura - MATRIZADOR
+            </Typography>
+            
+            {/* User Info */}
+            <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
+              <Avatar
+                sx={{
+                  bgcolor: getUserRoleColor(),
+                  width: 32,
+                  height: 32,
+                  mr: 1,
+                  fontSize: '0.875rem'
+                }}
+              >
+                {getUserInitials()}
+              </Avatar>
+              <Typography variant="body2">
+                {getFullName()}
+              </Typography>
+            </Box>
+
+            {/* Theme Toggle */}
+            <ThemeToggle />
+
+            {/* Logout Button */}
+            <IconButton
+              color="inherit"
+              onClick={handleLogout}
+              title="Cerrar Sesión"
+              sx={{ ml: 1 }}
+            >
+              <LogoutIcon />
+            </IconButton>
+          </Toolbar>
+        </AppBar>
+
+        {/* Dashboard del MATRIZADOR */}
+        <MatrizadorDashboard />
+      </Box>
+    );
+  }
+
+  // Dashboard por defecto para otros roles (ADMIN, RECEPCION, ARCHIVO)
   return (
     <Box sx={{ flexGrow: 1 }}>
       {/* App Bar */}

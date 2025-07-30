@@ -17,6 +17,23 @@ enum UserRole {
   ARCHIVO      // Gestión de archivo y documentos históricos
 }
 
+// Enumeración de tipos de documento
+enum DocumentType {
+  PROTOCOLO
+  DILIGENCIA
+  CERTIFICACION
+  ARRENDAMIENTO
+  OTROS
+}
+
+// Enumeración de estados de documento
+enum DocumentStatus {
+  PENDIENTE
+  EN_PROCESO
+  LISTO
+  ENTREGADO
+}
+
 // Modelo principal de usuarios
 model User {
   id          Int      @id @default(autoincrement())
@@ -29,8 +46,43 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   lastLogin   DateTime?
+
+  // Relaciones con documentos
+  documents         Document[] @relation("AssignedDocuments")   // Documentos asignados (matrizador)
+  createdDocuments  Document[] @relation("CreatedDocuments")    // Documentos creados (caja)
   
   @@map("users")
+}
+
+// Modelo de documentos
+model Document {
+  id                      String         @id @default(uuid())
+  protocolNumber          String         @unique   // Código notarial extraído del XML
+  clientName              String                   // Nombre del cliente
+  clientPhone             String?                  // CELULAR del cliente para WhatsApp
+  clientEmail             String?                  // Email del cliente
+  documentType            DocumentType             // Tipo de documento detectado
+  status                  DocumentStatus @default(PENDIENTE)
+  verificationCode        String?                  // Código de 4 dígitos para entrega
+  
+  // Relaciones
+  assignedToId            Int?                     // FK al matrizador asignado
+  assignedTo              User?          @relation("AssignedDocuments", fields: [assignedToId], references: [id])
+  createdById             Int                      // FK al usuario de caja que creó
+  createdBy               User           @relation("CreatedDocuments", fields: [createdById], references: [id])
+  
+  // Información extraída del XML
+  actoPrincipalDescripcion String                  // Descripción del acto principal detectado
+  actoPrincipalValor       Float                   // Valor del acto principal
+  totalFactura             Float                   // Total de la factura XML
+  matrizadorName           String                  // Nombre del matrizador del XML
+  itemsSecundarios         Json?                   // Array de items ignorados para auditoría
+  xmlOriginal              String?                 // XML completo opcional
+  
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+  
+  @@map("documents")
 }
 
 // Modelo básico para verificar conexión

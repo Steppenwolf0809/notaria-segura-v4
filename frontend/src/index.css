@@ -7,6 +7,17 @@
   --text-primary: #1F1F1F;     /* Texto principal */
 }
 
+/* Variables para modo oscuro enterprise */
+[data-theme="dark"] {
+  --primary-blue: #3b82f6;      /* Botones principales oscuro */
+  --secondary-blue: #60a5fa;    /* Fondos, paneles oscuro */
+  --dark-blue: #1d4ed8;        /* Navegación oscuro */
+  --light-background: #0f1419;  /* Fondo general oscuro */
+  --text-primary: #f8fafc;     /* Texto principal oscuro */
+  --card-background: #1e2530;   /* Fondo de cards oscuro */
+  --border-color: #334155;      /* Bordes oscuros */
+}
+
 /* Reset y configuración base */
 * {
   box-sizing: border-box;
@@ -31,9 +42,11 @@ body {
 }
 
 /* Configuración de Material UI personalizada */
+/* COMENTADO: Interfiere con tema enterprise
 .MuiCssBaseline-root {
   background-color: var(--light-background) !important;
 }
+*/
 
 /* Enlaces */
 a {
