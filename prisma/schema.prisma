@@ -1,4 +1,3 @@
-// Configuración del generador y base de datos
 generator client {
   provider = "prisma-client-js"
 }
@@ -78,11 +77,65 @@ model Document {
   matrizadorName           String                  // Nombre del matrizador del XML
   itemsSecundarios         Json?                   // Array de items ignorados para auditoría
   xmlOriginal              String?                 // XML completo opcional
+
+  // Agrupación de documentos
+  documentGroupId       String?    // ID del grupo (compartido entre documentos agrupados)
+  isGrouped            Boolean @default(false)
+  groupLeaderId        String?    // ID del documento "líder" del grupo
+  groupPosition        Int?       // Posición en el grupo (1=líder, 2,3,4...)
+  
+  // Código de verificación grupal
+  groupVerificationCode String?   // MISMO código para todos los del grupo
+  
+  // Estados de agrupación
+  groupCreatedAt       DateTime?
+  groupCreatedBy       String?    // ID del matrizador que creó el grupo
+  
+  // Control de entrega grupal
+  groupDeliveredAt     DateTime?  // Cuando se entregó el grupo completo
+  groupDeliveredTo     String?    // Quien recibió el grupo
+  individualDelivered  Boolean @default(false) // Si se entregó individualmente
+
+  documentGroup         DocumentGroup? @relation(fields: [documentGroupId], references: [id])
   
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt
   
   @@map("documents")
+}
+
+// Modelo para gestionar grupos
+model DocumentGroup {
+  id                   String @id @default(uuid())
+  groupCode           String @unique // Código único del grupo
+  verificationCode    String @unique // Código de 4 dígitos compartido
+  
+  // Información del cliente
+  clientName          String
+  clientPhone         String
+  clientEmail         String?
+  
+  // Estados del grupo
+  status              GroupStatus @default(IN_PROCESS) // IN_PROCESS, READY, DELIVERED
+  documentsCount      Int
+  
+  // Control de notificaciones
+  notificationSent    Boolean @default(false)
+  notificationSentAt  DateTime?
+  
+  // Metadatos
+  createdBy           String    // ID del matrizador
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  // Relación con documentos
+  documents          Document[]
+}
+
+enum GroupStatus {
+  IN_PROCESS
+  READY  
+  DELIVERED
 }
 
 // Modelo básico para verificar conexión

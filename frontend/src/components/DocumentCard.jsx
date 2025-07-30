@@ -20,10 +20,15 @@ import {
   AttachMoney as MoneyIcon,
   Assignment as AssignmentIcon,
   CheckCircle as CheckCircleIcon,
-  ExpandLess as ExpandLessIcon
+  ExpandLess as ExpandLessIcon,
+  Group as GroupIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import documentService from '../services/document-service.js';
+import GroupingDetector from './grouping/GroupingDetector.jsx';
+import DocumentGroupingModal from './grouping/DocumentGroupingModal.jsx';
+import useDocumentStore from '../store/document-store.js';
 
 /**
  * Tarjeta de documento para dashboard del matrizador
@@ -32,6 +37,28 @@ import { es } from 'date-fns/locale';
 const DocumentCard = ({ document, onStatusChange }) => {
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showGroupingModal, setShowGroupingModal] = useState(false);
+  const [groupableDocuments, setGroupableDocuments] = useState([]);
+  const fetchDocuments = useDocumentStore((state) => state.fetchMyDocuments);
+
+  const handleGroupDocuments = (groupableDocs, autoCreate = false) => {
+    // Asegurarse de que no haya duplicados
+    const uniqueDocs = Array.from(new Map(groupableDocs.map(doc => [doc.id, doc])).values());
+    setGroupableDocuments(uniqueDocs);
+    setShowGroupingModal(true);
+  };
+  
+  const handleCreateGroup = async (groupData) => {
+    try {
+      await documentService.createDocumentGroup(groupData);
+      // Actualizar lista de documentos
+      if(onStatusChange) onStatusChange(null, null, true); // Pasar un tercer argumento para indicar refresco
+      await fetchDocuments(); // Para refrescar el store global
+    } catch (error) {
+      console.error('Error creating group:', error);
+      throw error; // Re-lanzar para que el modal muestre el error
+    }
+  };
 
   /**
    * Obtiene el color del chip según el tipo de documento
@@ -123,8 +150,8 @@ const DocumentCard = ({ document, onStatusChange }) => {
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        // Removido bgcolor ya que el tema enterprise lo maneja automáticamente
-        // Las cards ahora usan la configuración enterprise del tema
+        border: document.isGrouped ? '2px solid' : 'none',
+        borderColor: document.isGrouped ? 'primary.main' : 'transparent',
       }}
     >
       <CardContent sx={{ flexGrow: 1, p: 2 }}>
@@ -143,6 +170,18 @@ const DocumentCard = ({ document, onStatusChange }) => {
             variant={document.status === 'LISTO' ? 'filled' : 'outlined'}
           />
         </Box>
+
+        {/* Indicador de grupo */}
+        {document.isGrouped && (
+          <Chip 
+            icon={<GroupIcon />} 
+            label="Parte de un grupo" 
+            size="small"
+            color="primary"
+            variant="outlined"
+            sx={{ mb: 2 }}
+          />
+        )}
 
         {/* Información del cliente */}
         <Box sx={{ mb: 2 }}>
@@ -257,6 +296,17 @@ const DocumentCard = ({ document, onStatusChange }) => {
           </Collapse>
         </Box>
 
+        {/* Detector de agrupación */}
+        {document.status === 'EN_PROCESO' && !document.isGrouped && (
+          <Box sx={{ mt: 2 }}>
+            <GroupingDetector
+              document={document}
+              onGroupDocuments={handleGroupDocuments}
+              isVisible={true}
+            />
+          </Box>
+        )}
+
         {/* Botón de acción */}
         {document.status === 'EN_PROCESO' && onStatusChange && (
           <Box sx={{ mt: 2 }}>
@@ -267,16 +317,20 @@ const DocumentCard = ({ document, onStatusChange }) => {
               onClick={handleMarkAsReady}
               disabled={loading}
               startIcon={<CheckCircleIcon />}
-              sx={{
-                // Removido estilos manuales - el tema enterprise maneja los colores automáticamente
-                // Los botones success ahora usan gradientes y colores enterprise
-              }}
             >
               {loading ? 'Marcando...' : 'Marcar como Listo'}
             </Button>
           </Box>
         )}
       </CardContent>
+
+      {/* Modal de agrupación */}
+      <DocumentGroupingModal
+        open={showGroupingModal}
+        onClose={() => setShowGroupingModal(false)}
+        groupableDocuments={groupableDocuments}
+        onCreateGroup={handleCreateGroup}
+      />
     </Card>
   );
 };

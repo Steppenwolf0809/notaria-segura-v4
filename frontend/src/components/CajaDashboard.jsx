@@ -39,6 +39,7 @@ import {
 } from '@mui/icons-material';
 import { useDropzone } from 'react-dropzone';
 import useDocumentStore from '../store/document-store';
+import { toast } from 'react-toastify';
 
 /**
  * Dashboard donde CAJA sube XMLs, crea documentos y asigna matrizadores
@@ -64,7 +65,6 @@ const CajaDashboard = () => {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [selectedMatrizador, setSelectedMatrizador] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
   const [refreshing, setRefreshing] = useState(false);
 
   /**
@@ -93,15 +93,17 @@ const CajaDashboard = () => {
 
     // Verificar que es un archivo XML
     if (!file.name.toLowerCase().endsWith('.xml')) {
-      setSuccessMessage('Error: Solo se permiten archivos XML');
+      toast.error('Error: Solo se permiten archivos XML');
       return;
     }
 
     const result = await uploadXmlDocument(file);
     if (result.success) {
-      setSuccessMessage(`XML procesado exitosamente: ${result.data.document.protocolNumber}`);
+      toast.success(`XML procesado exitosamente: ${result.data.document.protocolNumber}`);
       // Recargar documentos para mostrar el nuevo
       await fetchAllDocuments();
+    } else {
+      toast.error(result.error || 'Ocurrió un error al procesar el XML');
     }
   }, [uploadXmlDocument, fetchAllDocuments]);
 
@@ -148,10 +150,19 @@ const CajaDashboard = () => {
   const handleAssignDocument = async () => {
     if (!selectedDocument || !selectedMatrizador) return;
 
-    const success = await assignDocument(selectedDocument.id, selectedMatrizador);
-    if (success) {
-      setSuccessMessage('Documento asignado exitosamente');
-      handleCloseAssignDialog();
+    try {
+      const success = await assignDocument(selectedDocument.id, selectedMatrizador);
+      if (success) {
+        toast.success('Documento asignado exitosamente');
+        handleCloseAssignDialog();
+        // No necesitamos fetchAllDocuments() porque el store ya actualiza localmente
+      } else {
+        // El error ya está en el store, solo mostramos mensaje genérico
+        toast.error('Error al asignar el documento');
+      }
+    } catch (error) {
+      console.error('Error in handleAssignDocument:', error);
+      toast.error('Error inesperado al asignar el documento');
     }
   };
 
@@ -550,14 +561,6 @@ const CajaDashboard = () => {
           </Button>
         </DialogActions>
       </Dialog>
-
-      {/* Snackbar para mensajes de éxito */}
-      <Snackbar
-        open={!!successMessage}
-        autoHideDuration={4000}
-        onClose={() => setSuccessMessage('')}
-        message={successMessage}
-      />
     </Box>
   );
 };

@@ -99,11 +99,8 @@ const Dashboard = () => {
       <Box sx={{ flexGrow: 1 }}>
         {/* App Bar */}
         <AppBar 
-          position="static" 
-          sx={{ 
-            bgcolor: 'primary.main',
-            boxShadow: 2
-          }}
+          position="static"
+          color="primary" // Usar color primario del tema
         >
           <Toolbar>
             <DashboardIcon sx={{ mr: 2 }} />
@@ -160,10 +157,7 @@ const Dashboard = () => {
         {/* App Bar */}
         <AppBar 
           position="static" 
-          sx={{ 
-            bgcolor: 'primary.main',
-            boxShadow: 2
-          }}
+          color="primary" // Usar color primario del tema
         >
           <Toolbar>
             <DashboardIcon sx={{ mr: 2 }} />
@@ -220,10 +214,7 @@ const Dashboard = () => {
       {/* App Bar */}
       <AppBar 
         position="static" 
-        sx={{ 
-          bgcolor: 'primary.main',
-          boxShadow: 2
-        }}
+        color="primary" // Usar color primario del tema
       >
         <Toolbar>
           <DashboardIcon sx={{ mr: 2 }} />

@@ -238,6 +238,44 @@ const documentService = {
         error: errorMessage
       };
     }
+  },
+
+  // --- MÉTODOS DE AGRUPACIÓN ---
+
+  async detectGroupableDocuments(clientData) {
+    try {
+      const response = await api.post('/documents/detect-groupable', clientData);
+      // El backend ya devuelve un objeto con { success, groupableDocuments, canGroup }
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.message || 'Error detectando documentos agrupables';
+      console.error(message, error);
+      throw new Error(message);
+    }
+  },
+
+  async createDocumentGroup(groupData) {
+    try {
+      const response = await api.post('/documents/create-group', groupData);
+      // El backend devuelve { success, message, group, verificationCode }
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.message || 'Error creando el grupo de documentos';
+      console.error(message, error);
+      throw new Error(message);
+    }
+  },
+
+  async deliverDocumentGroup(deliveryData) {
+    try {
+      const response = await api.post('/documents/deliver-group', deliveryData);
+      // El backend devuelve { success, message, group }
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.message || 'Error entregando el grupo de documentos';
+      console.error(message, error);
+      throw new Error(message);
+    }
   }
 };
 
