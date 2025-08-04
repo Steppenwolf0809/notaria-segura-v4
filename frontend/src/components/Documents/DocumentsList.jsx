@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Box,
   Card,
@@ -41,6 +41,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import useDocumentStore from '../../store/document-store';
 import useStats from '../../hooks/useStats';
+import useDebounce from '../../hooks/useDebounce';
 import DocumentDetailModal from './DocumentDetailModal';
 
 /**
@@ -52,7 +53,8 @@ const DocumentsList = () => {
   const { basicStats, utils } = useStats();
 
   // Estados para filtros y búsqueda
-  const [searchTerm, setSearchTerm] = useState('');
+  // SEPARACIÓN DE ESTADOS: inputValue (inmediato) vs searchTerm (debounced)
+  const [inputValue, setInputValue] = useState(''); // Estado local del input - actualización inmediata
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [dateRange, setDateRange] = useState('');
@@ -63,21 +65,25 @@ const DocumentsList = () => {
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
 
+  // DEBOUNCING: Solo buscar después de que el usuario pause por 400ms
+  const debouncedSearchTerm = useDebounce(inputValue, 400);
+
   /**
    * Filtrar y buscar documentos
+   * MEJORA: Usar debouncedSearchTerm en lugar de searchTerm directo
    */
   const filteredDocuments = useMemo(() => {
     let filtered = [...documents];
 
-    // Búsqueda por texto
-    if (searchTerm.trim()) {
-      const searchLower = searchTerm.toLowerCase();
+    // Búsqueda por texto con debouncing - solo buscar si tiene al menos 2 caracteres
+    if (debouncedSearchTerm.trim() && debouncedSearchTerm.length >= 2) {
+      const searchLower = debouncedSearchTerm.toLowerCase();
       filtered = filtered.filter(doc =>
         doc.clientName?.toLowerCase().includes(searchLower) ||
         doc.protocolNumber?.toLowerCase().includes(searchLower) ||
         doc.actoPrincipalDescripcion?.toLowerCase().includes(searchLower) ||
         doc.documentType?.toLowerCase().includes(searchLower) ||
-        doc.clientPhone?.includes(searchTerm) ||
+        doc.clientPhone?.includes(debouncedSearchTerm) ||
         doc.clientEmail?.toLowerCase().includes(searchLower)
       );
     }
@@ -138,7 +144,7 @@ const DocumentsList = () => {
     });
 
     return filtered;
-  }, [documents, searchTerm, statusFilter, typeFilter, dateRange, sortField, sortDirection]);
+  }, [documents, debouncedSearchTerm, statusFilter, typeFilter, dateRange, sortField, sortDirection]);
 
   /**
    * Documentos paginados
@@ -158,9 +164,10 @@ const DocumentsList = () => {
 
   /**
    * Limpiar todos los filtros
+   * MEJORA: Limpiar inputValue en lugar de searchTerm
    */
   const clearFilters = () => {
-    setSearchTerm('');
+    setInputValue(''); // Limpiar el input local
     setStatusFilter('');
     setTypeFilter('');
     setDateRange('');
@@ -315,21 +322,21 @@ const DocumentsList = () => {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ alignItems: 'center' }}>
-            {/* Búsqueda global */}
+            {/* Búsqueda global - MEJORADA con estado separado */}
             <TextField
               fullWidth
               placeholder="Buscar por cliente, protocolo, descripción, teléfono..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
                     <SearchIcon />
                   </InputAdornment>
                 ),
-                endAdornment: searchTerm && (
+                endAdornment: inputValue && (
                   <InputAdornment position="end">
-                    <IconButton onClick={() => setSearchTerm('')} size="small">
+                    <IconButton onClick={() => setInputValue('')} size="small">
                       <ClearIcon />
                     </IconButton>
                   </InputAdornment>

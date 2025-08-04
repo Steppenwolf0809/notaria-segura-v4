@@ -1,133 +1,50 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   Box,
   Typography,
-  TextField,
-  Button,
-  Card,
-  CardContent,
-  InputAdornment,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Chip
+  Button
 } from '@mui/material';
 import {
-  Search as SearchIcon,
   ViewModule as ViewModuleIcon,
-  ViewList as ViewListIcon,
-  FilterList as FilterIcon
+  ViewList as ViewListIcon
 } from '@mui/icons-material';
 import KanbanView from './Documents/KanbanView';
 import ListView from './Documents/ListView';
+import SearchAndFilters from './Documents/SearchAndFilters';
+import useDebounce from '../hooks/useDebounce';
 
 /**
  * Componente principal de Gestión de Documentos
- * Incluye toggle Kanban/Lista y vistas separadas - EXACTO AL PROTOTIPO
- */
+  */
 const GestionDocumentos = () => {
   const [viewMode, setViewMode] = useState('kanban'); // 'kanban' | 'list'
-  const [searchTerm, setSearchTerm] = useState('');
+  
+  // SEPARACIÓN DE ESTADOS: inputValue (inmediato) vs searchTerm (debounced)
+  const [inputValue, setInputValue] = useState(''); // Estado local del input
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  
+  // DEBOUNCING: Solo buscar después de que el usuario pause por 400ms
+  const debouncedSearchTerm = useDebounce(inputValue, 400);
 
   /**
-   * Componente de búsqueda y filtros - EXACTO AL PROTOTIPO
+   * Handlers memoizados para evitar re-renders
    */
-  const SearchAndFilters = () => (
-    <Card sx={{ mb: 3 }}>
-      <CardContent sx={{ pb: 2 }}>
-        <Box sx={{ 
-          display: 'flex', 
-          flexDirection: { xs: 'column', md: 'row' },
-          gap: 2,
-          alignItems: { md: 'center' }
-        }}>
-          {/* Campo de búsqueda */}
-          <TextField
-            placeholder="Buscar por cliente, código o tipo..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            sx={{ flex: 1 }}
-            size="small"
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon color="action" />
-                </InputAdornment>
-              ),
-            }}
-          />
+  const handleInputChange = useCallback((e) => {
+    setInputValue(e.target.value);
+  }, []);
 
-          {/* Filtro por estado */}
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel>Estado</InputLabel>
-            <Select
-              value={statusFilter}
-              label="Estado"
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <MenuItem value="">Todos</MenuItem>
-              <MenuItem value="EN_PROCESO">En Proceso</MenuItem>
-              <MenuItem value="LISTO">Listo para Entrega</MenuItem>
-              <MenuItem value="ENTREGADO">Entregado</MenuItem>
-            </Select>
-          </FormControl>
+  const handleClearInput = useCallback(() => {
+    setInputValue('');
+  }, []);
 
-          {/* Filtro por tipo */}
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel>Tipo</InputLabel>
-            <Select
-              value={typeFilter}
-              label="Tipo"
-              onChange={(e) => setTypeFilter(e.target.value)}
-            >
-              <MenuItem value="">Todos</MenuItem>
-              <MenuItem value="CERTIFICACIONES">Certificaciones</MenuItem>
-              <MenuItem value="PROTOCOLO">Protocolo</MenuItem>
-              <MenuItem value="COMPRAVENTA">Compraventa</MenuItem>
-            </Select>
-          </FormControl>
+  const handleStatusFilterChange = useCallback((e) => {
+    setStatusFilter(e.target.value);
+  }, []);
 
-
-        </Box>
-
-        {/* Filtros activos */}
-        {(statusFilter || typeFilter || searchTerm) && (
-          <Box sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-            {searchTerm && (
-              <Chip
-                label={`Búsqueda: "${searchTerm}"`}
-                onDelete={() => setSearchTerm('')}
-                size="small"
-                color="primary"
-                variant="outlined"
-              />
-            )}
-            {statusFilter && (
-              <Chip
-                label={`Estado: ${statusFilter}`}
-                onDelete={() => setStatusFilter('')}
-                size="small"
-                color="primary"
-                variant="outlined"
-              />
-            )}
-            {typeFilter && (
-              <Chip
-                label={`Tipo: ${typeFilter}`}
-                onDelete={() => setTypeFilter('')}
-                size="small"
-                color="primary"
-                variant="outlined"
-              />
-            )}
-          </Box>
-        )}
-      </CardContent>
-    </Card>
-  );
+  const handleTypeFilterChange = useCallback((e) => {
+    setTypeFilter(e.target.value);
+  }, []);
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -195,14 +112,23 @@ const GestionDocumentos = () => {
         </Box>
 
         {/* Búsqueda y filtros */}
-        <SearchAndFilters />
+        <SearchAndFilters
+          inputValue={inputValue}
+          onInputChange={handleInputChange}
+          onInputClear={handleClearInput}
+          statusFilter={statusFilter}
+          onStatusFilterChange={handleStatusFilterChange}
+          typeFilter={typeFilter}
+          onTypeFilterChange={handleTypeFilterChange}
+          debouncedSearchTerm={debouncedSearchTerm}
+        />
       </Box>
 
       {/* Vista Kanban - HORIZONTAL */}
       {viewMode === 'kanban' && (
         <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
           <KanbanView 
-            searchTerm={searchTerm}
+            searchTerm={debouncedSearchTerm}
             statusFilter={statusFilter}
             typeFilter={typeFilter}
           />
@@ -213,7 +139,7 @@ const GestionDocumentos = () => {
       {viewMode === 'list' && (
         <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
           <ListView 
-            searchTerm={searchTerm}
+            searchTerm={debouncedSearchTerm}
             statusFilter={statusFilter}
             typeFilter={typeFilter}
           />

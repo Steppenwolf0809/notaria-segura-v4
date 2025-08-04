@@ -48,7 +48,8 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
    */
   const filteredAndSortedDocuments = useMemo(() => {
     let filtered = documents.filter(doc => {
-      const matchesSearch = !searchTerm || 
+      // CORRECCIÓN: Solo buscar si el término tiene al menos 2 caracteres
+      const matchesSearch = !searchTerm || searchTerm.length < 2 || 
         doc.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         doc.protocolNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         doc.documentType?.toLowerCase().includes(searchTerm.toLowerCase());

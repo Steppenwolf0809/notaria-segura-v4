@@ -86,7 +86,8 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
    */
   const filterDocuments = (docs) => {
     return docs.filter(doc => {
-      const matchesSearch = !searchTerm || 
+      // CORRECCIÓN: Solo buscar si el término tiene al menos 2 caracteres
+      const matchesSearch = !searchTerm || searchTerm.length < 2 || 
         doc.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         doc.protocolNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         doc.documentType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -592,17 +593,20 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
     
     return (
       <Box sx={{ 
-        mb: 3, 
+        mb: 2, // Reducido de 3 a 2
         bgcolor: 'background.paper', 
-        p: 3, 
-        borderRadius: 2, 
-        boxShadow: 1
+        px: 3, // Cambiado padding horizontal
+        py: 1.5, // Padding vertical reducido
+        borderRadius: 1, // Reducido de 2 a 1
+        boxShadow: 0, // Eliminada la sombra
+        border: 1,
+        borderColor: 'divider'
       }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-          <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.primary' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 500, color: 'text.secondary' }}>
             📊 Progreso del Día
           </Typography>
-          <Typography variant="h6" sx={{ color: 'primary.main', fontWeight: 600 }}>
+          <Typography variant="subtitle2" sx={{ color: 'primary.main', fontWeight: 600 }}>
             {porcentajeCompletado.toFixed(0)}%
           </Typography>
         </Box>
@@ -610,24 +614,24 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
         <Box sx={{ 
           width: '100%', 
           bgcolor: 'action.disabled', 
-          borderRadius: '8px', 
-          height: 8,
-          mb: 2
+          borderRadius: '4px', // Reducido
+          height: 6, // Reducido de 8 a 6
+          mb: 1 // Reducido
         }}>
           <Box sx={{
             bgcolor: 'success.main',
-            height: 8,
-            borderRadius: '8px',
+            height: 6, // Reducido
+            borderRadius: '4px', // Reducido
             width: `${porcentajeCompletado}%`,
             transition: 'width 0.3s ease'
           }} />
         </Box>
         
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>
             {enProceso} en proceso • {listos} listos • {entregados} entregados
           </Typography>
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>
             Total: {totalDocuments}
           </Typography>
         </Box>

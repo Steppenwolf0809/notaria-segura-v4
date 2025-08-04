@@ -39,6 +39,7 @@ import {
 } from '@mui/icons-material';
 import { useDropzone } from 'react-dropzone';
 import useDocumentStore from '../store/document-store';
+import useDebounce from '../hooks/useDebounce';
 import { toast } from 'react-toastify';
 
 /**
@@ -61,11 +62,15 @@ const CajaDashboard = () => {
   } = useDocumentStore();
 
   // Estados locales
-  const [searchTerm, setSearchTerm] = useState('');
+  // SEPARACIÓN DE ESTADOS: inputValue (inmediato) vs searchTerm (debounced)
+  const [inputValue, setInputValue] = useState(''); // Estado local del input
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [selectedMatrizador, setSelectedMatrizador] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+
+  // DEBOUNCING: Solo buscar después de que el usuario pause por 400ms
+  const debouncedSearchTerm = useDebounce(inputValue, 400);
 
   /**
    * Cargar datos al montar el componente
@@ -204,9 +209,11 @@ const CajaDashboard = () => {
   };
 
   /**
-   * Filtrar documentos según búsqueda
+   * Filtrar documentos según búsqueda - MEJORADO con debouncing
    */
-  const filteredDocuments = searchTerm ? searchDocuments(searchTerm) : documents;
+  const filteredDocuments = debouncedSearchTerm && debouncedSearchTerm.length >= 2 
+    ? searchDocuments(debouncedSearchTerm) 
+    : documents;
 
   /**
    * Estadísticas de documentos
@@ -372,17 +379,17 @@ const CajaDashboard = () => {
         <TextField
           fullWidth
           placeholder="Buscar por cliente, protocolo, tipo o acto principal..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
                 <SearchIcon />
               </InputAdornment>
             ),
-            endAdornment: searchTerm && (
+            endAdornment: inputValue && (
               <InputAdornment position="end">
-                <IconButton onClick={() => setSearchTerm('')} size="small">
+                <IconButton onClick={() => setInputValue('')} size="small">
                   <CloseIcon />
                 </IconButton>
               </InputAdornment>
@@ -492,7 +499,7 @@ const CajaDashboard = () => {
                   <TableRow>
                     <TableCell colSpan={8} sx={{ textAlign: 'center', py: 4 }}>
                       <Typography variant="body1" color="text.secondary">
-                        {searchTerm ? 'No se encontraron documentos' : 'No hay documentos creados'}
+                        {debouncedSearchTerm ? 'No se encontraron documentos' : 'No hay documentos creados'}
                       </Typography>
                     </TableCell>
                   </TableRow>
