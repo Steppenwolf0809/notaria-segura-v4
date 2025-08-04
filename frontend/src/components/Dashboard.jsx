@@ -21,7 +21,7 @@ import {
 import useAuth from '../hooks/use-auth';
 import ThemeToggle from './ThemeToggle';
 import CajaDashboard from './CajaDashboard';
-import MatrizadorDashboard from './MatrizadorDashboard';
+import MatrizadorCenter from './MatrizadorCenter';
 
 /**
  * Componente Dashboard principal
@@ -152,60 +152,7 @@ const Dashboard = () => {
   }
 
   if (user.role === 'MATRIZADOR') {
-    return (
-      <Box sx={{ flexGrow: 1 }}>
-        {/* App Bar */}
-        <AppBar 
-          position="static" 
-          color="primary" // Usar color primario del tema
-        >
-          <Toolbar>
-            <DashboardIcon sx={{ mr: 2 }} />
-            <Typography 
-              variant="h6" 
-              component="div" 
-              sx={{ flexGrow: 1 }}
-            >
-              Notaría Segura - MATRIZADOR
-            </Typography>
-            
-            {/* User Info */}
-            <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
-              <Avatar
-                sx={{
-                  bgcolor: getUserRoleColor(),
-                  width: 32,
-                  height: 32,
-                  mr: 1,
-                  fontSize: '0.875rem'
-                }}
-              >
-                {getUserInitials()}
-              </Avatar>
-              <Typography variant="body2">
-                {getFullName()}
-              </Typography>
-            </Box>
-
-            {/* Theme Toggle */}
-            <ThemeToggle />
-
-            {/* Logout Button */}
-            <IconButton
-              color="inherit"
-              onClick={handleLogout}
-              title="Cerrar Sesión"
-              sx={{ ml: 1 }}
-            >
-              <LogoutIcon />
-            </IconButton>
-          </Toolbar>
-        </AppBar>
-
-        {/* Dashboard del MATRIZADOR */}
-        <MatrizadorDashboard />
-      </Box>
-    );
+    return <MatrizadorCenter />;
   }
 
   // Dashboard por defecto para otros roles (ADMIN, RECEPCION, ARCHIVO)

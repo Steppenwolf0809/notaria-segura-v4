@@ -1,0 +1,114 @@
+/* Estilos adicionales para KanbanView - Optimizaciones de rendimiento */
+
+/* Optimizaciones para scroll en móviles */
+.kanban-container {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #94a3b8 #e2e8f0;
+}
+
+/* Animaciones optimizadas para tarjetas */
+.document-card {
+  will-change: transform, box-shadow;
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
+}
+
+.document-card.dragging {
+  opacity: 0.7;
+  transform: rotate(5deg) scale(1.05);
+  z-index: 1000;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25);
+}
+
+/* Estilos para columnas durante drag & drop */
+.kanban-column.drag-over-valid {
+  background-color: #f0f9ff;
+  border: 2px dashed #3b82f6;
+  transform: scale(1.02);
+}
+
+.kanban-column.drag-over-invalid {
+  background-color: #fef2f2;
+  border: 2px dashed #ef4444;
+  opacity: 0.6;
+}
+
+/* Responsive breakpoints específicos */
+@media (max-width: 768px) {
+  .kanban-container {
+    padding-bottom: 1rem;
+  }
+  
+  .kanban-column {
+    min-width: 280px;
+    max-width: 280px;
+  }
+  
+  .document-card {
+    font-size: 0.875rem;
+    padding: 0.75rem;
+  }
+  
+  .kanban-column-header {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .kanban-column {
+    min-width: 260px;
+    max-width: 260px;
+  }
+  
+  .document-card {
+    padding: 0.5rem;
+    font-size: 0.8rem;
+  }
+}
+
+/* Mejoras de accesibilidad */
+.document-card:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.kanban-column:focus-within {
+  box-shadow: 0 0 0 2px #3b82f6;
+}
+
+/* Optimizaciones de performance para animaciones */
+.smooth-transition {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.spring-animation {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Estados de hover optimizados */
+@media (hover: hover) {
+  .document-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  .kanban-column:hover .kanban-scrollbar::-webkit-scrollbar-thumb {
+    background: #64748b;
+  }
+}
+
+/* Reduce motion para usuarios con preferencias de accesibilidad */
+@media (prefers-reduced-motion: reduce) {
+  .document-card,
+  .kanban-column,
+  .smooth-transition,
+  .spring-animation {
+    transition: none;
+  }
+  
+  .document-card.dragging {
+    transform: none;
+    opacity: 0.8;
+  }
+}
