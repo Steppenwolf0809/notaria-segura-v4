@@ -168,7 +168,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
           <Table stickyHeader>
             <TableHead>
               <TableRow>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.50' }}>
+                <TableCell sx={{ fontWeight: 'bold' }}>
                   <TableSortLabel
                     active={orderBy === 'protocolNumber'}
                     direction={orderBy === 'protocolNumber' ? order : 'asc'}
@@ -177,7 +177,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
                     Código
                   </TableSortLabel>
                 </TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.50' }}>
+                <TableCell sx={{ fontWeight: 'bold' }}>
                   <TableSortLabel
                     active={orderBy === 'clientName'}
                     direction={orderBy === 'clientName' ? order : 'asc'}
@@ -186,7 +186,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
                     Cliente
                   </TableSortLabel>
                 </TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.50' }}>
+                <TableCell sx={{ fontWeight: 'bold' }}>
                   <TableSortLabel
                     active={orderBy === 'documentType'}
                     direction={orderBy === 'documentType' ? order : 'asc'}
@@ -195,7 +195,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
                     Tipo Documento
                   </TableSortLabel>
                 </TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.50' }}>
+                <TableCell sx={{ fontWeight: 'bold' }}>
                   <TableSortLabel
                     active={orderBy === 'status'}
                     direction={orderBy === 'status' ? order : 'asc'}
@@ -204,7 +204,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
                     Estado
                   </TableSortLabel>
                 </TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.50' }}>
+                <TableCell sx={{ fontWeight: 'bold' }}>
                   <TableSortLabel
                     active={orderBy === 'createdAt'}
                     direction={orderBy === 'createdAt' ? order : 'asc'}
@@ -213,10 +213,10 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
                     Fecha Ingreso
                   </TableSortLabel>
                 </TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.50' }}>
+                <TableCell sx={{ fontWeight: 'bold' }}>
                   Valor
                 </TableCell>
-                <TableCell sx={{ fontWeight: 'bold', bgcolor: 'grey.50' }} align="center">
+                <TableCell sx={{ fontWeight: 'bold' }} align="center">
                   Acciones
                 </TableCell>
               </TableRow>

@@ -160,10 +160,10 @@ const GestionDocumentos = () => {
             alignItems: 'center', 
             gap: 1, 
             p: 0.5, 
-            bgcolor: 'grey.100', 
+            bgcolor: 'action.hover', 
             borderRadius: 2,
             border: '1px solid',
-            borderColor: 'grey.300'
+            borderColor: 'divider'
           }}>
             <Button
               onClick={() => setViewMode('kanban')}
@@ -176,7 +176,7 @@ const GestionDocumentos = () => {
                 color: viewMode === 'kanban' ? 'white' : 'text.primary',
                 fontWeight: 'medium',
                 '&:hover': {
-                  bgcolor: viewMode === 'kanban' ? 'primary.dark' : 'grey.200'
+                  bgcolor: viewMode === 'kanban' ? 'primary.dark' : 'action.selected'
                 }
               }}
             >
@@ -193,7 +193,7 @@ const GestionDocumentos = () => {
                 color: viewMode === 'list' ? 'white' : 'text.primary',
                 fontWeight: 'medium',
                 '&:hover': {
-                  bgcolor: viewMode === 'list' ? 'primary.dark' : 'grey.200'
+                  bgcolor: viewMode === 'list' ? 'primary.dark' : 'action.selected'
                 }
               }}
             >

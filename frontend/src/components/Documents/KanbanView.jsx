@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback, memo } from 'react';
 import {
   Box,
   Card,
@@ -20,7 +20,10 @@ import {
 } from '@mui/icons-material';
 import useDocumentStore from '../../store/document-store';
 import useDragAndDrop from '../../hooks/useDragAndDrop';
+import usePagination from '../../hooks/usePagination';
 import DocumentDetailModal from './DocumentDetailModal';
+import LoadMoreButton from '../UI/LoadMoreButton';
+import { filterRecentlyDelivered, getDeliveryFilterNote, DELIVERY_FILTER_PERIODS } from '../../utils/dateUtils';
 import './KanbanView.css';
 
 /**
@@ -76,15 +79,21 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
 
   /**
    * Filtrar documentos por búsqueda y filtros
+   * MEJORA: Filtros completos igual que en ListView
    */
   const filterDocuments = (docs) => {
     return docs.filter(doc => {
       const matchesSearch = !searchTerm || 
         doc.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         doc.protocolNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        doc.documentType?.toLowerCase().includes(searchTerm.toLowerCase());
+        doc.documentType?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        doc.actoPrincipalDescripcion?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        doc.clientPhone?.includes(searchTerm) ||
+        doc.clientEmail?.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesType = !typeFilter || doc.documentType === typeFilter;
+      
+      // Nota: statusFilter no aplica aquí porque ya se filtra por columna en getFilteredDocuments
       
       return matchesSearch && matchesType;
     });
@@ -92,6 +101,7 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
 
   /**
    * Obtener documentos filtrados por columna
+   * MEJORA: Filtro temporal automático para columna ENTREGADO
    */
   const getFilteredDocuments = (status) => {
     // Si hay filtro de estado específico, solo mostrar esa columna
@@ -99,14 +109,22 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
       return [];
     }
     
-    const docs = getDocumentsByStatus(status);
+    let docs = getDocumentsByStatus(status);
+    
+    // FILTRO TEMPORAL AUTOMÁTICO: Solo para columna ENTREGADO
+    // Mostrar únicamente documentos entregados en los últimos 7 días
+    if (status === 'ENTREGADO') {
+      docs = filterRecentlyDelivered(docs, DELIVERY_FILTER_PERIODS.WEEK);
+    }
+    
     return filterDocuments(docs);
   };
 
   /**
    * Componente de tarjeta de documento - REDISEÑO COMPACTO Y ELEGANTE
+   * OPTIMIZACIÓN: Memoizado para evitar re-renders innecesarios
    */
-  const DocumentCard = ({ document, color, status }) => {
+  const DocumentCard = memo(({ document, color, status }) => {
     const cardStyle = getDraggedItemStyle(document);
     
     // Función para obtener información contextual según el estado
@@ -148,17 +166,17 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
         onDragEnd={handleDragEnd}
         onClick={() => openDetailModal(document)}
         sx={{
-          bgcolor: 'white',
+          bgcolor: 'background.paper',
           p: { xs: 2, md: 3 },
           borderRadius: 2,
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+          boxShadow: 1,
           borderLeft: `4px solid ${color}`,
           cursor: isDragging ? 'grabbing' : 'pointer',
           userSelect: 'none',
           mb: 2,
           fontSize: { xs: '0.875rem', md: '1rem' },
           '&:hover': {
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+            boxShadow: 3,
             transform: 'translateY(-2px)'
           },
           '&:active': {
@@ -214,9 +232,9 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
           <Chip
             label={document.documentType}
             size="small"
+            color="primary"
+            variant="outlined"
             sx={{ 
-              bgcolor: '#e0f2fe',
-              color: '#0277bd',
               fontSize: '0.7rem',
               height: 20,
               fontWeight: 500
@@ -226,9 +244,9 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
             <Chip
               label="Grupo"
               size="small"
+              color="secondary"
+              variant="outlined"
               sx={{ 
-                bgcolor: '#f3e8ff',
-                color: '#7c3aed',
                 fontSize: '0.7rem',
                 height: 20,
                 fontWeight: 500
@@ -240,7 +258,7 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
         {/* Valor - Solo si es relevante */}
         {document.actoPrincipalValor && document.actoPrincipalValor > 0 && (
           <Typography variant="subtitle2" sx={{ 
-            color: '#059669', 
+            color: 'success.main', 
             fontWeight: 600, 
             fontSize: '0.875rem',
             mb: 2
@@ -260,15 +278,31 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
         </Box>
       </Box>
     );
-  };
+  });
 
   /**
    * Componente de columna Kanban - EXACTO AL PROTOTIPO
+   * MEJORA: Con paginación "Cargar más"
+   * OPTIMIZACIÓN: Memoizado para mejor rendimiento
    */
-  const KanbanColumn = ({ column }) => {
-    const documents = getFilteredDocuments(column.id);
+  const KanbanColumn = memo(({ column }) => {
+    const allDocuments = getFilteredDocuments(column.id);
+    const {
+      visibleItems: documents,
+      hasMore,
+      remainingCount,
+      isLoading,
+      loadMore,
+      reset
+    } = usePagination(allDocuments, 10, 10);
+    
     const columnStyle = getColumnStyle(column.id, true);
     const isValidDropTarget = canDrop(column.id);
+
+    // Reiniciar paginación cuando cambien los filtros
+    React.useEffect(() => {
+      reset();
+    }, [searchTerm, statusFilter, typeFilter, reset]);
 
     return (
       <Paper
@@ -325,7 +359,7 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
             </Box>
             
             <Chip
-              label={documents.length}
+              label={`${documents.length}${allDocuments.length > documents.length ? `/${allDocuments.length}` : ''}`}
               size="small"
               sx={{ 
                 bgcolor: 'rgba(148, 163, 184, 0.1)',
@@ -393,7 +427,8 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
                 mb: 2,
                 lineHeight: 1
               }}>
-                {column.id === 'EN_PROCESO' ? '🎯' : column.id === 'LISTO' ? '✨' : '🎉'}
+                {(searchTerm || typeFilter) ? '🔍' : 
+                 (column.id === 'EN_PROCESO' ? '🎯' : column.id === 'LISTO' ? '✨' : '🎉')}
               </Typography>
               
               <Typography variant="subtitle2" sx={{ 
@@ -402,9 +437,11 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
                 mb: 1,
                 fontSize: '0.875rem'
               }}>
-                {column.id === 'EN_PROCESO' ? 'No hay documentos en proceso' :
+                {(searchTerm || typeFilter) ? 'Sin resultados para los filtros aplicados' :
+                 column.id === 'EN_PROCESO' ? 'No hay documentos en proceso' :
                  column.id === 'LISTO' ? 'Ningún documento listo' :
-                 'No hay documentos entregados'}
+                 column.id === 'ENTREGADO' ? 'No hay documentos entregados recientes' :
+                 'No hay documentos'}
               </Typography>
               
               <Typography variant="caption" sx={{ 
@@ -413,9 +450,11 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
                 maxWidth: 200,
                 lineHeight: 1.3
               }}>
-                {column.id === 'EN_PROCESO' ? 'Los nuevos documentos aparecerán aquí cuando se asignen' :
+                {(searchTerm || typeFilter) ? 'Prueba ajustando los filtros o realizando una búsqueda diferente' :
+                 column.id === 'EN_PROCESO' ? 'Los nuevos documentos aparecerán aquí cuando se asignen' :
                  column.id === 'LISTO' ? 'Los documentos listos para entregar se mostrarán aquí' :
-                 'Los documentos completados aparecerán en esta sección'}
+                 column.id === 'ENTREGADO' ? 'Los documentos entregados recientemente aparecerán aquí' :
+                 'Los documentos aparecerán en esta columna'}
               </Typography>
 
               {isDragging && isValidDropTarget && (
@@ -443,9 +482,42 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
             ))
           )}
         </Box>
+
+        {/* Botón Cargar Más */}
+        <LoadMoreButton
+          onLoadMore={loadMore}
+          hasMore={hasMore}
+          isLoading={isLoading}
+          remainingCount={remainingCount}
+          disabled={isDragging}
+        />
+
+        {/* Nota informativa para columna ENTREGADO */}
+        {column.id === 'ENTREGADO' && (
+          <Box sx={{ 
+            flexShrink: 0,
+            mt: 2,
+            pt: 2,
+            borderTop: '1px solid rgba(148, 163, 184, 0.2)',
+            textAlign: 'center'
+          }}>
+            <Typography variant="caption" sx={{ 
+              color: 'text.secondary',
+              fontSize: '0.75rem',
+              fontStyle: 'italic',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 0.5
+            }}>
+              <InfoIcon sx={{ fontSize: '0.875rem' }} />
+              {getDeliveryFilterNote(DELIVERY_FILTER_PERIODS.WEEK)}
+            </Typography>
+          </Box>
+        )}
       </Paper>
     );
-  };
+  });
 
   /**
    * Abrir modal de detalle
@@ -477,10 +549,10 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
     return (
       <Box sx={{ 
         mb: 3, 
-        bgcolor: 'white', 
+        bgcolor: 'background.paper', 
         p: 3, 
         borderRadius: 2, 
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)' 
+        boxShadow: 1
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
           <Typography variant="h6" sx={{ fontWeight: 600, color: 'text.primary' }}>
@@ -493,14 +565,13 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
         
         <Box sx={{ 
           width: '100%', 
-          bgcolor: '#e2e8f0', 
+          bgcolor: 'action.disabled', 
           borderRadius: '8px', 
           height: 8,
           mb: 2
         }}>
           <Box sx={{
-            bgcolor: 'linear-gradient(90deg, #10b981 0%, #059669 100%)',
-            background: porcentajeCompletado >= 100 ? '#10b981' : '#059669',
+            bgcolor: 'success.main',
             height: 8,
             borderRadius: '8px',
             width: `${porcentajeCompletado}%`,
