@@ -97,6 +97,57 @@ const useDocumentStore = create((set, get) => ({
   },
 
   /**
+   * CAJA: Subir múltiples XML y procesar automáticamente (LOTE)
+   * @param {File[]} xmlFiles - Array de archivos XML a procesar
+   * @returns {Promise<Object>} Resultado de la operación en lote
+   */
+  uploadXmlDocumentsBatch: async (xmlFiles) => {
+    set({ loading: true, error: null, uploadProgress: 0 });
+    
+    try {
+      const result = await documentService.uploadXmlDocumentsBatch(xmlFiles, (progress) => {
+        set({ uploadProgress: progress });
+      });
+      
+      if (result.success) {
+        // Recargar documentos después del procesamiento en lote
+        const currentDocuments = get().documents;
+        if (currentDocuments.length > 0) {
+          // Recargar todos los documentos para mostrar los nuevos
+          await get().fetchAllDocuments();
+        }
+        
+        set({ 
+          loading: false,
+          uploadProgress: 100
+        });
+        
+        // Limpiar progreso después de un tiempo
+        setTimeout(() => {
+          set({ uploadProgress: null });
+        }, 3000);
+        
+        return result;
+      } else {
+        set({ 
+          error: result.error, 
+          loading: false,
+          uploadProgress: null
+        });
+        return result;
+      }
+    } catch (error) {
+      console.error('Error in uploadXmlDocumentsBatch:', error);
+      set({ 
+        error: 'Error inesperado al subir archivos XML en lote', 
+        loading: false,
+        uploadProgress: null
+      });
+      return { success: false, error: 'Error inesperado al subir archivos XML en lote' };
+    }
+  },
+
+  /**
    * CAJA: Cargar todos los documentos para gestión
    * @returns {Promise<boolean>} True si se cargaron exitosamente
    */

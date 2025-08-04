@@ -24,6 +24,7 @@ import usePagination from '../../hooks/usePagination';
 import DocumentDetailModal from './DocumentDetailModal';
 import LoadMoreButton from '../UI/LoadMoreButton';
 import { filterRecentlyDelivered, getDeliveryFilterNote, DELIVERY_FILTER_PERIODS } from '../../utils/dateUtils';
+import { debugDragAndDrop } from '../../utils/debugDragAndDrop';
 import './KanbanView.css';
 
 /**
@@ -49,6 +50,16 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
 
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
+
+  // Debug para drag & drop
+  React.useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      setTimeout(() => {
+        console.log('🐛 Ejecutando diagnóstico Drag & Drop en KanbanView...');
+        debugDragAndDrop.runFullDiagnostic();
+      }, 3000);
+    }
+  }, []);
 
   /**
    * Configuración de columnas - EXACTA AL PROTOTIPO
@@ -165,10 +176,25 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
     
     return (
       <Box
-        draggable
-        onDragStart={(event) => handleDragStart(event, document)}
-        onDragEnd={handleDragEnd}
-        onClick={() => openDetailModal(document)}
+        draggable="true"
+        onDragStart={(event) => {
+          console.log('🎯 DRAG START detectado para:', document.protocolNumber);
+          // FORZAR configuración dataTransfer para compatibilidad
+          event.dataTransfer.effectAllowed = 'move';
+          event.dataTransfer.setData('text/plain', document.id);
+          event.dataTransfer.setData('application/json', JSON.stringify(document));
+          handleDragStart(event, document);
+        }}
+        onDragEnd={(event) => {
+          console.log('🏁 DRAG END detectado para:', document.protocolNumber);
+          handleDragEnd(event);
+        }}
+        onClick={(event) => {
+          // Solo abrir modal si no se está arrastrando
+          if (!isDragging) {
+            openDetailModal(document);
+          }
+        }}
         sx={{
           bgcolor: (theme) => theme.palette.mode === 'dark' 
             ? 'rgba(255, 255, 255, 0.05)' 
@@ -176,8 +202,9 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
           p: { xs: 2, md: 3 },
           borderRadius: 2,
           boxShadow: 1,
-          cursor: isDragging ? 'grabbing' : 'pointer',
+          cursor: isDragging ? 'grabbing' : 'grab',
           userSelect: 'none',
+          touchAction: 'none', // CRÍTICO: Prevenir interferencia en touch devices
           mb: 2,
           fontSize: { xs: '0.875rem', md: '1rem' },
           '&:hover': {
@@ -190,16 +217,29 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
           '&:active': {
             transform: 'scale(0.98)'
           },
-          transition: 'all 0.2s ease',
-          ...(isDragging && cardStyle && {
-            opacity: 0.7,
-            transform: 'rotate(5deg) scale(1.05)',
+          transition: isDragging ? 'none' : 'all 0.2s ease', // Sin transición durante drag
+          // Estilos de drag simplificados
+          ...(isDragging && {
+            opacity: 0.8,
             zIndex: 1000,
-            boxShadow: '0 8px 25px rgba(0,0,0,0.25)'
+            pointerEvents: 'none' // CRÍTICO: Permitir que eventos pasen a drop zones
           }),
           ...(!isDragging && cardStyle)
         }}
       >
+        {/* Indicador de drag */}
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'space-between', 
+          mb: 1,
+          fontSize: '0.75rem',
+          color: 'text.secondary'
+        }}>
+          <span>🎯 Arrastra para mover</span>
+          <DragIcon sx={{ fontSize: 16 }} />
+        </Box>
+
         {/* Header: Cliente + Indicador de estado + Indicadores de urgencia/grupo */}
         <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1, mr: 1 }}>
@@ -336,10 +376,27 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
 
     return (
       <Paper
-        onDragEnter={(e) => handleDragEnter(e, column.id)}
-        onDragOver={(e) => handleDragOver(e, column.id)}
-        onDragLeave={handleDragLeave}
-        onDrop={(e) => handleDrop(e, column.id)}
+        data-drop-zone={column.id}
+        data-column-id={column.id}
+        className="drop-zone"
+        onMouseUp={(e) => {
+          // IMPLEMENTACIÓN ALTERNATIVA: Drop basado en mouse up
+          if (isDragging) {
+            console.log('🎯 MOUSE DROP detectado en:', column.id, column.title);
+            handleDrop(e, column.id);
+          }
+        }}
+        onMouseEnter={(e) => {
+          if (isDragging) {
+            console.log('📥 MOUSE ENTER en:', column.id, column.title);
+            handleDragEnter(e, column.id);
+          }
+        }}
+        onMouseMove={(e) => {
+          if (isDragging) {
+            handleDragOver(e, column.id);
+          }
+        }}
         sx={{
           bgcolor: 'background.paper', // Respeta el tema actual
           border: 1,
@@ -353,11 +410,14 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
           display: 'flex',
           flexDirection: 'column',
           transition: 'all 0.3s ease',
+          position: 'relative', // Para z-index
+          zIndex: 1, // Asegurar que esté encima
           ...(isDragging && canDrop(column.id) && {
             bgcolor: '#f0f9ff',
             borderColor: '#3b82f6',
             borderStyle: 'dashed',
-            transform: 'scale(1.02)'
+            transform: 'scale(1.02)',
+            zIndex: 10
           }),
           ...(isDragging && !canDrop(column.id) && {
             bgcolor: '#fef2f2',
@@ -436,27 +496,57 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
 
         <Divider sx={{ mb: 2 }} />
 
-        {/* Lista de documentos con scroll */}
-        <Box sx={{ 
-          flexGrow: 1,
-          overflowY: 'auto',
-          pr: 1,
-          scrollBehavior: 'smooth',
-          '&::-webkit-scrollbar': {
-            width: 6,
-          },
-          '&::-webkit-scrollbar-track': {
-            background: '#e2e8f0',
-            borderRadius: 6,
-          },
-          '&::-webkit-scrollbar-thumb': {
-            background: '#94a3b8',
-            borderRadius: 6,
-            '&:hover': {
-              background: '#64748b',
+        {/* Lista de documentos con scroll - ZONA DE DROP ACTIVA */}
+        <Box 
+          sx={{ 
+            flexGrow: 1,
+            overflowY: 'auto',
+            pr: 1,
+            scrollBehavior: 'smooth',
+            position: 'relative',
+            minHeight: 200,
+
+            '&::-webkit-scrollbar': {
+              width: 6,
+            },
+            '&::-webkit-scrollbar-track': {
+              background: '#e2e8f0',
+              borderRadius: 6,
+            },
+            '&::-webkit-scrollbar-thumb': {
+              background: '#94a3b8',
+              borderRadius: 6,
+              '&:hover': {
+                background: '#64748b',
+              }
             }
-          }
-        }}>
+          }}
+          onDragEnter={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('📥 DRAG ENTER simple en:', column.id, column.title);
+            handleDragEnter(e, column.id);
+          }}
+          onDragOver={(e) => {
+            e.preventDefault(); // CRÍTICO para permitir drop
+            e.stopPropagation();
+            e.dataTransfer.dropEffect = 'move'; // Mostrar cursor de move
+            console.log('🔄 DRAG OVER simple en:', column.id, column.title);
+            handleDragOver(e, column.id);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('🎯 DROP simple en:', column.id, column.title);
+            handleDrop(e, column.id);
+          }}
+          onDragLeave={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('📤 DRAG LEAVE simple de:', column.id, column.title);
+            handleDragLeave(e);
+          }}
+        >
           {documents.length === 0 ? (
             <Box sx={{ 
               display: 'flex',

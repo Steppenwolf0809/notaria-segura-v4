@@ -40,7 +40,7 @@ import {
   Speed as SpeedIcon
 } from '@mui/icons-material';
 import DocumentCard from './DocumentCard';
-import KanbanBoard from './Documents/KanbanBoard';
+import KanbanView from './Documents/KanbanView';
 import DocumentsList from './Documents/DocumentsList';
 import NotificationsHistory from './Documents/NotificationsHistory';
 import useDocumentStore from '../store/document-store';
@@ -433,7 +433,7 @@ const MatrizadorDashboard = () => {
         );
       
       case 1: // Vista Kanban
-        return <KanbanBoard />;
+        return <KanbanView />;
       
       case 2: // Vista Lista
         return <DocumentsList />;

@@ -74,6 +74,71 @@ const documentService = {
   },
 
   /**
+   * CAJA: Subir múltiples XML y crear documentos automáticamente (LOTE)
+   * @param {File[]} xmlFiles - Array de archivos XML a procesar
+   * @param {Function} onProgress - Callback para progreso (opcional)
+   * @returns {Promise<Object>} Respuesta del servidor con resumen de procesamiento
+   */
+  async uploadXmlDocumentsBatch(xmlFiles, onProgress = null) {
+    try {
+      // Validar que se enviaron archivos
+      if (!xmlFiles || xmlFiles.length === 0) {
+        return {
+          success: false,
+          error: 'No se han seleccionado archivos para procesar'
+        };
+      }
+
+      // Validar límite de archivos
+      if (xmlFiles.length > 20) {
+        return {
+          success: false,
+          error: 'Máximo 20 archivos por lote. Seleccionó ' + xmlFiles.length
+        };
+      }
+
+      // Crear FormData para upload de múltiples archivos
+      const formData = new FormData();
+      xmlFiles.forEach((file, index) => {
+        // Validar que cada archivo sea XML
+        if (!file.name.toLowerCase().endsWith('.xml')) {
+          throw new Error(`El archivo "${file.name}" no es un XML válido`);
+        }
+        formData.append('xmlFiles', file);
+      });
+
+      // Llamar al callback de progreso si existe
+      if (onProgress) onProgress(25);
+
+      const response = await api.post('/documents/upload-xml-batch', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        },
+        timeout: 60000 // 60 segundos timeout para procesamiento en lote
+      });
+
+      if (onProgress) onProgress(100);
+      
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Error uploading XML documents batch:', error);
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Error al subir archivos XML en lote';
+      
+      return {
+        success: false,
+        error: errorMessage
+      };
+    }
+  },
+
+  /**
    * CAJA: Ver todos los documentos para gestión
    * @returns {Promise<Object>} Lista de todos los documentos
    */

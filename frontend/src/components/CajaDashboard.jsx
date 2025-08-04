@@ -41,6 +41,7 @@ import { useDropzone } from 'react-dropzone';
 import useDocumentStore from '../store/document-store';
 import useDebounce from '../hooks/useDebounce';
 import { toast } from 'react-toastify';
+import BatchUpload from './BatchUpload';
 
 /**
  * Dashboard donde CAJA sube XMLs, crea documentos y asigna matrizadores
@@ -322,6 +323,9 @@ const CajaDashboard = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Carga en Lote de Archivos XML */}
+      <BatchUpload />
 
       {/* Estadísticas */}
       <Card sx={{ mb: 4 }}>

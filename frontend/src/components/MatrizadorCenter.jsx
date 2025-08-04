@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Alert } from '@mui/material';
 import MatrizadorLayout from './MatrizadorLayout';
-import MatrizadorDashboardNew from './MatrizadorDashboardNew';
+import MatrizadorDashboard from './MatrizadorDashboard';
 import GestionDocumentos from './GestionDocumentos';
 import NotificationsHistory from './Documents/NotificationsHistory';
 import useDocumentStore from '../store/document-store';
@@ -16,7 +16,7 @@ import useDocumentStore from '../store/document-store';
  * - Vista Lista completa
  */
 const MatrizadorCenter = () => {
-  const [currentView, setCurrentView] = useState('dashboard');
+  const [currentView, setCurrentView] = useState('documents'); // Iniciar en documentos por defecto
   const { 
     documents, 
     loading, 
@@ -46,7 +46,7 @@ const MatrizadorCenter = () => {
   const renderContent = () => {
     switch (currentView) {
       case 'dashboard':
-        return <MatrizadorDashboardNew />;
+        return <MatrizadorDashboard />;
       
       case 'documents':
         return <GestionDocumentos />;
@@ -55,7 +55,7 @@ const MatrizadorCenter = () => {
         return <NotificationsHistory />;
       
       default:
-        return <MatrizadorDashboardNew />;
+        return <MatrizadorDashboard />;
     }
   };
 

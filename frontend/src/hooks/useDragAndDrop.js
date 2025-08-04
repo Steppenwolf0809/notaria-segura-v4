@@ -79,12 +79,13 @@ const useDragAndDrop = () => {
 
     const isValid = validTransitions[fromStatus]?.includes(toStatus) || false;
     
-    // Debug detallado
-    if (!isValid) {
+    // Debug detallado - SOLO durante eventos de drag reales, no durante render
+    if (!isValid && draggedItem) {
       console.log('⚠️ Movimiento no válido:', {
         from: fromStatus,
         to: toStatus,
-        allowedTransitions: validTransitions[fromStatus] || 'ninguna'
+        allowedTransitions: validTransitions[fromStatus] || 'ninguna',
+        context: 'durante drag real'
       });
     }
     
@@ -119,6 +120,12 @@ const useDragAndDrop = () => {
     // CRÍTICO: preventDefault es obligatorio para permitir drop
     event.preventDefault();
     event.stopPropagation();
+    
+    // CRÍTICO: No procesar si es la misma columna de origen
+    if (draggedItem && draggedItem.status === columnId) {
+      event.dataTransfer.dropEffect = 'none';
+      return; // SALIR inmediatamente para evitar validación innecesaria
+    }
     
     // Solo actualizar si realmente cambiamos de columna
     if (dragOverColumn !== columnId) {
@@ -265,6 +272,10 @@ const useDragAndDrop = () => {
     };
 
     if (dragOverColumn === columnId && draggedItem) {
+      // CRÍTICO: No validar si es la misma columna
+      if (draggedItem.status === columnId) {
+        return baseStyle; // Sin efectos visuales para misma columna
+      }
       const isValid = isValidTarget && isValidMove(draggedItem.status, columnId);
       
       if (isValid) {
@@ -331,6 +342,8 @@ const useDragAndDrop = () => {
    */
   const canDrop = useCallback((columnId) => {
     if (!draggedItem) return false;
+    // CRÍTICO: No permitir drop en la misma columna
+    if (draggedItem.status === columnId) return false;
     return isValidMove(draggedItem.status, columnId);
   }, [draggedItem, isValidMove]);
 
@@ -358,7 +371,7 @@ const useDragAndDrop = () => {
 
     // Estado de la operación
     isDragging: draggedItem !== null,
-    isValidDrop: (columnId) => draggedItem && isValidMove(draggedItem.status, columnId)
+    isValidDrop: (columnId) => draggedItem && draggedItem.status !== columnId && isValidMove(draggedItem.status, columnId)
   };
 };
 
