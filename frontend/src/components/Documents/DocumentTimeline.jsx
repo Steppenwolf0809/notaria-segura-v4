@@ -218,7 +218,9 @@ const DocumentTimeline = ({ history, loading, error }) => {
                 color={getEventColor(event.color)}
                 sx={{ 
                   boxShadow: 2,
-                  border: '2px solid white',
+                  border: (theme) => theme.palette.mode === 'dark' 
+                    ? '2px solid rgba(255, 255, 255, 0.1)' 
+                    : '2px solid white',
                   p: 1
                 }}
               >
@@ -274,7 +276,17 @@ const DocumentTimeline = ({ history, loading, error }) => {
       </MuiTimeline>
 
       {/* Footer con información adicional */}
-      <Box sx={{ mt: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+      <Box sx={{ 
+        mt: 3, 
+        p: 2, 
+        bgcolor: (theme) => theme.palette.mode === 'dark' 
+          ? 'rgba(255, 255, 255, 0.03)' 
+          : 'grey.50', 
+        borderRadius: 1,
+        border: (theme) => theme.palette.mode === 'dark' 
+          ? '1px solid rgba(255, 255, 255, 0.1)' 
+          : 'none'
+      }}>
         <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
           💡 Los eventos se actualizan automáticamente conforme cambia el estado del documento
         </Typography>

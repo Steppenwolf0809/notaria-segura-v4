@@ -169,7 +169,16 @@ const DocumentDetailModal = ({ open, onClose, document }) => {
       <DialogTitle sx={{ m: 0, p: 2, bgcolor: 'primary.main', color: 'white' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Avatar sx={{ bgcolor: 'white', color: 'primary.main', mr: 2 }}>
+            <Avatar sx={{ 
+              bgcolor: (theme) => theme.palette.mode === 'dark' 
+                ? 'rgba(255, 255, 255, 0.15)' 
+                : 'white', 
+              color: 'primary.main', 
+              mr: 2,
+              border: (theme) => theme.palette.mode === 'dark' 
+                ? '1px solid rgba(255, 255, 255, 0.2)' 
+                : 'none'
+            }}>
               <AssignmentIcon />
             </Avatar>
             <Box>
@@ -282,7 +291,17 @@ const DocumentDetailModal = ({ open, onClose, document }) => {
                       </Box>
                     )}
 
-                    <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+                    <Box sx={{ 
+                      mt: 2, 
+                      p: 2, 
+                      bgcolor: (theme) => theme.palette.mode === 'dark' 
+                        ? 'rgba(255, 255, 255, 0.05)' 
+                        : 'grey.50', 
+                      borderRadius: 1,
+                      border: (theme) => theme.palette.mode === 'dark' 
+                        ? '1px solid rgba(255, 255, 255, 0.1)' 
+                        : 'none'
+                    }}>
                       <Typography variant="body2" color="text.secondary">
                         <strong>Documento creado:</strong> {formatDate(document.createdAt)}
                       </Typography>
@@ -312,7 +331,16 @@ const DocumentDetailModal = ({ open, onClose, document }) => {
 
                     <Divider sx={{ my: 2 }} />
 
-                    <Box sx={{ p: 2, bgcolor: 'success.50', borderRadius: 1 }}>
+                    <Box sx={{ 
+                      p: 2, 
+                      bgcolor: (theme) => theme.palette.mode === 'dark' 
+                        ? 'rgba(34, 197, 94, 0.1)' 
+                        : 'success.50', 
+                      borderRadius: 1,
+                      border: (theme) => theme.palette.mode === 'dark' 
+                        ? '1px solid rgba(34, 197, 94, 0.2)' 
+                        : 'none'
+                    }}>
                       <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
                         Información del Documento:
                       </Typography>
@@ -342,7 +370,15 @@ const DocumentDetailModal = ({ open, onClose, document }) => {
                       <Grid container spacing={2}>
                         {document.itemsSecundarios.map((item, index) => (
                           <Grid item xs={12} sm={6} md={4} key={index}>
-                            <Paper sx={{ p: 2, bgcolor: 'grey.50' }}>
+                            <Paper sx={{ 
+                              p: 2, 
+                              bgcolor: (theme) => theme.palette.mode === 'dark' 
+                                ? 'rgba(255, 255, 255, 0.05)' 
+                                : 'grey.50',
+                              border: (theme) => theme.palette.mode === 'dark' 
+                                ? '1px solid rgba(255, 255, 255, 0.1)' 
+                                : 'none'
+                            }}>
                               <Typography variant="body2" sx={{ fontWeight: 'medium', mb: 1 }}>
                                 {item.descripcion}
                               </Typography>
@@ -374,7 +410,15 @@ const DocumentDetailModal = ({ open, onClose, document }) => {
       </DialogContent>
 
       {/* Acciones */}
-      <DialogActions sx={{ p: 3, bgcolor: 'grey.50' }}>
+      <DialogActions sx={{ 
+        p: 3, 
+        bgcolor: (theme) => theme.palette.mode === 'dark' 
+          ? 'rgba(255, 255, 255, 0.03)' 
+          : 'grey.50',
+        borderTop: (theme) => theme.palette.mode === 'dark' 
+          ? '1px solid rgba(255, 255, 255, 0.1)' 
+          : 'none'
+      }}>
         <Button
           onClick={onClose}
           variant="outlined"
