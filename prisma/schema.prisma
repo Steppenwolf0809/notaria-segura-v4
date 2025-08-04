@@ -49,6 +49,7 @@ model User {
   // Relaciones con documentos
   documents         Document[] @relation("AssignedDocuments")   // Documentos asignados (matrizador)
   createdDocuments  Document[] @relation("CreatedDocuments")    // Documentos creados (caja)
+  deliveredDocuments Document[] @relation("DeliveredDocuments") // Documentos entregados (recepción)
   
   @@map("users")
 }
@@ -95,6 +96,18 @@ model Document {
   groupDeliveredAt     DateTime?  // Cuando se entregó el grupo completo
   groupDeliveredTo     String?    // Quien recibió el grupo
   individualDelivered  Boolean @default(false) // Si se entregó individualmente
+
+  // CAMPOS ESPECÍFICOS DE RECEPCIÓN
+  codigoRetiro         String?    // Código de 4 dígitos para retiro (individual o grupal)
+  entregadoA           String?    // Nombre de quien retira el documento
+  cedulaReceptor       String?    // Cédula/Pasaporte de quien retira (opcional)
+  relacionTitular      String?    // Relación con titular: titular, abogado, empleado, tercero
+  verificacionManual   Boolean @default(false) // Cliente validado sin código
+  facturaPresenta      Boolean @default(false) // Cliente presentó factura de pago
+  fechaEntrega         DateTime?  // Fecha y hora de entrega
+  usuarioEntregaId     Int?       // ID del usuario de recepción que entregó
+  usuarioEntrega       User?      @relation("DeliveredDocuments", fields: [usuarioEntregaId], references: [id])
+  observacionesEntrega String?    // Observaciones adicionales de la entrega
 
   documentGroup         DocumentGroup? @relation(fields: [documentGroupId], references: [id])
   

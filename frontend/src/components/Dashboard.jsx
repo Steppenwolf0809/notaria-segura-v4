@@ -22,6 +22,7 @@ import useAuth from '../hooks/use-auth';
 import ThemeToggle from './ThemeToggle';
 import CajaDashboard from './CajaDashboard';
 import MatrizadorCenter from './MatrizadorCenter';
+import RecepcionCenter from './RecepcionCenter';
 
 /**
  * Componente Dashboard principal
@@ -155,7 +156,11 @@ const Dashboard = () => {
     return <MatrizadorCenter />;
   }
 
-  // Dashboard por defecto para otros roles (ADMIN, RECEPCION, ARCHIVO)
+  if (user.role === 'RECEPCION') {
+    return <RecepcionCenter />;
+  }
+
+  // Dashboard por defecto para otros roles (ADMIN, ARCHIVO)
   return (
     <Box sx={{ flexGrow: 1 }}>
       {/* App Bar */}
