@@ -218,9 +218,18 @@ const DocumentDetailModal = ({ open, onClose, document }) => {
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
               <Chip
                 label={document.documentType}
-                color="primary"
-                variant="outlined"
-                sx={{ fontSize: '1rem', p: 1 }}
+                sx={{ 
+                  fontSize: '1rem', 
+                  p: 1,
+                  bgcolor: (theme) => theme.palette.mode === 'dark'
+                    ? 'rgba(255, 255, 255, 0.1)'
+                    : 'rgb(226, 232, 240)',
+                  color: (theme) => theme.palette.mode === 'dark'
+                    ? 'rgba(255, 255, 255, 0.7)'
+                    : 'rgb(71, 85, 105)',
+                  border: 'none',
+                  borderRadius: '12px' // rounded-full
+                }}
               />
               <Chip
                 label={getStatusText(document.status)}

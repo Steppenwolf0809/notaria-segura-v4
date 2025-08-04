@@ -267,8 +267,16 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
                       <Chip
                         label={document.documentType}
                         size="small"
-                        variant="outlined"
-                        color="primary"
+                        sx={{
+                          bgcolor: (theme) => theme.palette.mode === 'dark'
+                            ? 'rgba(255, 255, 255, 0.1)'
+                            : 'rgb(226, 232, 240)',
+                          color: (theme) => theme.palette.mode === 'dark'
+                            ? 'rgba(255, 255, 255, 0.7)'
+                            : 'rgb(71, 85, 105)',
+                          border: 'none',
+                          borderRadius: '12px' // rounded-full
+                        }}
                       />
                     </TableCell>
                     <TableCell>

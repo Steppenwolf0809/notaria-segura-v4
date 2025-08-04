@@ -159,9 +159,18 @@ const DocumentCard = ({ document, onStatusChange }) => {
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Chip
             label={document.documentType}
-            color={getDocumentTypeColor(document.documentType)}
             size="small"
-            sx={{ fontWeight: 'bold' }}
+            sx={{ 
+              fontWeight: 500,
+              bgcolor: (theme) => theme.palette.mode === 'dark'
+                ? 'rgba(255, 255, 255, 0.1)'
+                : 'rgb(226, 232, 240)',
+              color: (theme) => theme.palette.mode === 'dark'
+                ? 'rgba(255, 255, 255, 0.7)'
+                : 'rgb(71, 85, 105)',
+              border: 'none',
+              borderRadius: '12px' // rounded-full
+            }}
           />
           <Chip
             label={getStatusText(document.status)}
@@ -177,9 +186,17 @@ const DocumentCard = ({ document, onStatusChange }) => {
             icon={<GroupIcon />} 
             label="Parte de un grupo" 
             size="small"
-            color="primary"
-            variant="outlined"
-            sx={{ mb: 2 }}
+            sx={{ 
+              mb: 2,
+              bgcolor: (theme) => theme.palette.mode === 'dark'
+                ? 'rgba(255, 255, 255, 0.1)'
+                : 'rgb(226, 232, 240)',
+              color: (theme) => theme.palette.mode === 'dark'
+                ? 'rgba(255, 255, 255, 0.7)'
+                : 'rgb(71, 85, 105)',
+              border: 'none',
+              borderRadius: '12px' // rounded-full
+            }}
           />
         )}
 

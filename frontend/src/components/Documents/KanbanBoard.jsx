@@ -35,6 +35,7 @@ const KanbanBoard = () => {
     handleDragStart,
     handleDragEnd,
     handleDragOver,
+    handleDragEnter,
     handleDragLeave,
     handleDrop,
     getColumnStyle,
@@ -98,7 +99,7 @@ const KanbanBoard = () => {
     return (
       <Card
         draggable
-        onDragStart={() => handleDragStart(document)}
+        onDragStart={(event) => handleDragStart(event, document)}
         onDragEnd={handleDragEnd}
         sx={{
           mb: 2,
@@ -180,6 +181,7 @@ const KanbanBoard = () => {
 
     return (
       <Paper
+        onDragEnter={(e) => handleDragEnter(e, column.id)}
         onDragOver={(e) => handleDragOver(e, column.id)}
         onDragLeave={handleDragLeave}
         onDrop={(e) => handleDrop(e, column.id)}

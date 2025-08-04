@@ -36,12 +36,15 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
     handleDragStart,
     handleDragEnd,
     handleDragOver,
+    handleDragEnter,
     handleDragLeave,
     handleDrop,
     getColumnStyle,
     getDraggedItemStyle,
+    getValidationMessage,
     canDrop,
-    isDragging
+    isDragging,
+    draggedItem
   } = useDragAndDrop();
 
   const [selectedDocument, setSelectedDocument] = useState(null);
@@ -162,20 +165,24 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
     return (
       <Box
         draggable
-        onDragStart={() => handleDragStart(document)}
+        onDragStart={(event) => handleDragStart(event, document)}
         onDragEnd={handleDragEnd}
         onClick={() => openDetailModal(document)}
         sx={{
-          bgcolor: 'background.paper',
+          bgcolor: (theme) => theme.palette.mode === 'dark' 
+            ? 'rgba(255, 255, 255, 0.05)' 
+            : 'rgb(248, 250, 252)', // Fondo sutil según tema
           p: { xs: 2, md: 3 },
           borderRadius: 2,
           boxShadow: 1,
-          borderLeft: `4px solid ${color}`,
           cursor: isDragging ? 'grabbing' : 'pointer',
           userSelect: 'none',
           mb: 2,
           fontSize: { xs: '0.875rem', md: '1rem' },
           '&:hover': {
+            bgcolor: (theme) => theme.palette.mode === 'dark'
+              ? 'rgba(255, 255, 255, 0.08)'
+              : 'white', // Hover adapta al tema
             boxShadow: 3,
             transform: 'translateY(-2px)'
           },
@@ -192,18 +199,28 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
           ...(!isDragging && cardStyle)
         }}
       >
-        {/* Header: Cliente + Indicadores de urgencia/grupo */}
+        {/* Header: Cliente + Indicador de estado + Indicadores de urgencia/grupo */}
         <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', mb: 2 }}>
-          <Typography variant="subtitle2" sx={{ 
-            fontWeight: 600, 
-            color: 'text.primary',
-            fontSize: '0.875rem',
-            lineHeight: 1.3,
-            flex: 1,
-            mr: 1
-          }}>
-            {document.clientName}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1, mr: 1 }}>
+            {/* Círculo indicador de estado */}
+            <Box sx={{ 
+              width: 8, 
+              height: 8, 
+              borderRadius: '50%', 
+              bgcolor: color,
+              flexShrink: 0,
+              mt: 0.5
+            }} />
+            <Typography variant="subtitle2" sx={{ 
+              fontWeight: 600, 
+              color: 'text.primary',
+              fontSize: '0.875rem',
+              lineHeight: 1.3,
+              flex: 1
+            }}>
+              {document.clientName}
+            </Typography>
+          </Box>
           
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             {document.isUrgent && (
@@ -232,24 +249,36 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
           <Chip
             label={document.documentType}
             size="small"
-            color="primary"
-            variant="outlined"
             sx={{ 
               fontSize: '0.7rem',
               height: 20,
-              fontWeight: 500
+              fontWeight: 500,
+              bgcolor: (theme) => theme.palette.mode === 'dark'
+                ? 'rgba(255, 255, 255, 0.1)'
+                : 'rgb(226, 232, 240)',
+              color: (theme) => theme.palette.mode === 'dark'
+                ? 'rgba(255, 255, 255, 0.7)'
+                : 'rgb(71, 85, 105)',
+              border: 'none',
+              borderRadius: '12px' // rounded-full
             }}
           />
           {document.isGrouped && (
             <Chip
               label="Grupo"
               size="small"
-              color="secondary"
-              variant="outlined"
               sx={{ 
                 fontSize: '0.7rem',
                 height: 20,
-                fontWeight: 500
+                fontWeight: 500,
+                bgcolor: (theme) => theme.palette.mode === 'dark'
+                  ? 'rgba(255, 255, 255, 0.1)'
+                  : 'rgb(226, 232, 240)',
+                color: (theme) => theme.palette.mode === 'dark'
+                  ? 'rgba(255, 255, 255, 0.7)'
+                  : 'rgb(71, 85, 105)',
+                border: 'none',
+                borderRadius: '12px' // rounded-full
               }}
             />
           )}
@@ -306,12 +335,14 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
 
     return (
       <Paper
+        onDragEnter={(e) => handleDragEnter(e, column.id)}
         onDragOver={(e) => handleDragOver(e, column.id)}
         onDragLeave={handleDragLeave}
         onDrop={(e) => handleDrop(e, column.id)}
         sx={{
-          bgcolor: column.bgColor,
-          border: `2px solid ${column.color}20`,
+          bgcolor: 'background.paper', // Respeta el tema actual
+          border: 1,
+          borderColor: 'divider', // Respeta el tema actual
           borderRadius: 2,
           p: { xs: 1.5, md: 2 },
           height: '100%',
@@ -385,6 +416,19 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
                   fontWeight: 500
                 }}
               />
+              {/* Mensaje explicativo para movimientos inválidos */}
+              {!isValidDropTarget && draggedItem && (
+                <Typography variant="caption" sx={{ 
+                  display: 'block',
+                  mt: 1,
+                  color: 'error.main',
+                  fontSize: '0.7rem',
+                  lineHeight: 1.2,
+                  fontStyle: 'italic'
+                }}>
+                  {getValidationMessage(draggedItem.status, column.id)}
+                </Typography>
+              )}
             </Box>
           )}
         </Box>
@@ -592,7 +636,12 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
   };
 
   return (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column',
+      bgcolor: 'background.default' // Respeta el tema actual
+    }}>
       {/* Indicador de progreso */}
       <ProgressIndicator />
       
