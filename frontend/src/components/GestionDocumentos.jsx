@@ -15,7 +15,6 @@ import {
 } from '@mui/material';
 import {
   Search as SearchIcon,
-  Add as AddIcon,
   ViewModule as ViewModuleIcon,
   ViewList as ViewListIcon,
   FilterList as FilterIcon
@@ -91,14 +90,7 @@ const GestionDocumentos = () => {
             </Select>
           </FormControl>
 
-          {/* Botón nuevo documento */}
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            sx={{ whiteSpace: 'nowrap' }}
-          >
-            Nuevo Documento
-          </Button>
+
         </Box>
 
         {/* Filtros activos */}
