@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Drawer,
@@ -14,21 +14,27 @@ import {
   ListItemText,
   Avatar,
   Button,
-  Container
+  Container,
+  Tooltip,
+  Switch
 } from '@mui/material';
 import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
   Assignment as DocumentsIcon,
   History as HistoryIcon,
-  Logout as LogoutIcon
+  Logout as LogoutIcon,
+  KeyboardDoubleArrowLeft as CollapseIcon,
+  KeyboardDoubleArrowRight as ExpandIcon,
+  Brightness4 as DarkModeIcon,
+  Brightness7 as LightModeIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
-import ThemeToggle from './ThemeToggle';
 import useThemeStore from '../store/theme-store';
 
-// Ancho del sidebar
+// Anchos del sidebar
 const DRAWER_WIDTH = 240;
+const COLLAPSED_DRAWER_WIDTH = 60;
 
 /**
  * Layout principal del Matrizador siguiendo exactamente el prototipo
@@ -37,14 +43,35 @@ const DRAWER_WIDTH = 240;
  */
 const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
-  const { isDarkMode } = useThemeStore();
+  const { isDarkMode, toggleTheme } = useThemeStore();
+
+  // Cargar estado del sidebar desde localStorage
+  useEffect(() => {
+    const savedCollapsed = localStorage.getItem('sidebar-collapsed');
+    if (savedCollapsed !== null) {
+      setSidebarCollapsed(JSON.parse(savedCollapsed));
+    }
+  }, []);
+
+  // Guardar estado del sidebar en localStorage
+  useEffect(() => {
+    localStorage.setItem('sidebar-collapsed', JSON.stringify(sidebarCollapsed));
+  }, [sidebarCollapsed]);
 
   /**
    * Toggle del drawer móvil
    */
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
+  };
+
+  /**
+   * Toggle del sidebar colapsable
+   */
+  const handleSidebarToggle = () => {
+    setSidebarCollapsed(!sidebarCollapsed);
   };
 
   /**
@@ -80,8 +107,7 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
   ];
 
   /**
-   * Contenido del drawer - ESTRUCTURA DEL PROTOTIPO
-   * MODIFICADO: Fondo azul oscuro solo en modo claro
+   * Contenido del drawer - ESTRUCTURA OPTIMIZADA CON COLAPSO
    */
   const drawer = (
     <Box sx={{ 
@@ -90,8 +116,9 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
       flexDirection: 'column',
       backgroundColor: !isDarkMode ? '#1A5799' : undefined,
       color: !isDarkMode ? '#ffffff' : undefined,
+      transition: 'all 0.3s ease',
     }}>
-      {/* Header del Sidebar */}
+      {/* Header del Sidebar con botón de colapso */}
       <Box sx={{ 
         p: 2, 
         bgcolor: !isDarkMode ? '#1A5799' : 'primary.main',
@@ -99,21 +126,46 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
         minHeight: '64px',
         display: 'flex',
         alignItems: 'center',
+        justifyContent: sidebarCollapsed ? 'center' : 'space-between',
         flexShrink: 0,
+        gap: 1,
       }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-          <Avatar sx={{ bgcolor: 'white', color: 'primary.main', mr: 1, fontSize: '1rem' }}>
-            PN
-          </Avatar>
-          <Box>
-            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', lineHeight: 1.2 }}>
-              ProNotary
-            </Typography>
-            <Typography variant="caption" sx={{ opacity: 0.9, lineHeight: 1 }}>
-              Matrizador
-            </Typography>
+        {!sidebarCollapsed && (
+          <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+            <Avatar sx={{ bgcolor: 'white', color: 'primary.main', mr: 1, fontSize: '1rem' }}>
+              ⚖️
+            </Avatar>
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 'bold', lineHeight: 1.2 }}>
+                ProNotary
+              </Typography>
+              <Typography variant="caption" sx={{ opacity: 0.9, lineHeight: 1 }}>
+                Matrizador
+              </Typography>
+            </Box>
           </Box>
-        </Box>
+        )}
+        {sidebarCollapsed && (
+          <Avatar sx={{ bgcolor: 'white', color: 'primary.main', fontSize: '1rem' }}>
+            ⚖️
+          </Avatar>
+        )}
+        <Tooltip title={sidebarCollapsed ? 'Expandir sidebar' : 'Colapsar sidebar'} placement="right">
+          <IconButton
+            onClick={handleSidebarToggle}
+            sx={{
+              color: 'white',
+              bgcolor: 'rgba(255, 255, 255, 0.1)',
+              '&:hover': {
+                bgcolor: 'rgba(255, 255, 255, 0.2)',
+              },
+              transition: 'all 0.2s ease',
+            }}
+            size="small"
+          >
+            {sidebarCollapsed ? <ExpandIcon /> : <CollapseIcon />}
+          </IconButton>
+        </Tooltip>
       </Box>
       
       <Divider sx={{ borderColor: !isDarkMode ? 'rgba(255, 255, 255, 0.2)' : undefined }} />
@@ -123,43 +175,55 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
         <List sx={{ px: 1, py: 2 }}>
           {navigationItems.map((item) => (
             <ListItem key={item.view} disablePadding sx={{ mb: 0.5 }}>
-              <ListItemButton
-                onClick={() => handleNavigation(item.view)}
-                sx={{
-                  borderRadius: 1,
-                  py: 1.5, // Botones más altos
-                  bgcolor: item.active 
-                    ? (!isDarkMode ? '#468BE6' : 'primary.main')
-                    : 'transparent',
-                  color: item.active 
-                    ? 'white' 
-                    : (!isDarkMode ? '#ffffff' : 'text.primary'),
-                  '&:hover': {
-                    bgcolor: item.active 
-                      ? (!isDarkMode ? '#1A5799' : 'primary.dark')
-                      : (!isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'action.hover')
-                  }
-                }}
+              <Tooltip 
+                title={sidebarCollapsed ? item.text : ''} 
+                placement="right"
+                disableHoverListener={!sidebarCollapsed}
               >
-                <ListItemIcon sx={{ 
-                  color: item.active 
-                    ? 'white' 
-                    : (!isDarkMode ? '#93BFEF' : 'primary.main'),
-                  minWidth: 40 
-                }}>
-                  {item.icon}
-                </ListItemIcon>
-                <ListItemText 
-                  primary={item.text}
-                  primaryTypographyProps={{
-                    variant: 'body2',
-                    fontWeight: item.active ? 'bold' : 'medium',
+                <ListItemButton
+                  onClick={() => handleNavigation(item.view)}
+                  sx={{
+                    borderRadius: 1,
+                    py: 1.5,
+                    px: sidebarCollapsed ? 1.5 : 2,
+                    bgcolor: item.active 
+                      ? (!isDarkMode ? '#468BE6' : 'primary.main')
+                      : 'transparent',
                     color: item.active 
                       ? 'white' 
-                      : (!isDarkMode ? '#ffffff' : 'inherit')
+                      : (!isDarkMode ? '#ffffff' : 'text.primary'),
+                    '&:hover': {
+                      bgcolor: item.active 
+                        ? (!isDarkMode ? '#1A5799' : 'primary.dark')
+                        : (!isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'action.hover')
+                    },
+                    justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                    transition: 'all 0.2s ease',
                   }}
-                />
-              </ListItemButton>
+                >
+                  <ListItemIcon sx={{ 
+                    color: item.active 
+                      ? 'white' 
+                      : (!isDarkMode ? '#93BFEF' : 'primary.main'),
+                    minWidth: sidebarCollapsed ? 'unset' : 40,
+                    justifyContent: 'center'
+                  }}>
+                    {item.icon}
+                  </ListItemIcon>
+                  {!sidebarCollapsed && (
+                    <ListItemText 
+                      primary={item.text}
+                      primaryTypographyProps={{
+                        variant: 'body2',
+                        fontWeight: item.active ? 'bold' : 'medium',
+                        color: item.active 
+                          ? 'white' 
+                          : (!isDarkMode ? '#ffffff' : 'inherit')
+                      }}
+                    />
+                  )}
+                </ListItemButton>
+              </Tooltip>
             </ListItem>
           ))}
         </List>
@@ -167,62 +231,153 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
 
       <Divider sx={{ borderColor: !isDarkMode ? 'rgba(255, 255, 255, 0.2)' : undefined }} />
 
-      {/* Usuario Info en el sidebar */}
-      <Box sx={{ p: 2, flexShrink: 0 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <Avatar
+      {/* Toggle de modo oscuro */}
+      <Box sx={{ px: 1, py: 1, flexShrink: 0 }}>
+        <Tooltip 
+          title={sidebarCollapsed ? (isDarkMode ? 'Modo Claro' : 'Modo Oscuro') : ''} 
+          placement="right"
+          disableHoverListener={!sidebarCollapsed}
+        >
+          <ListItemButton
+            onClick={toggleTheme}
             sx={{
-              bgcolor: !isDarkMode ? '#ffffff' : getUserRoleColor(),
-              color: !isDarkMode ? '#1A5799' : 'inherit',
-              width: 32,
-              height: 32,
-              mr: 1.5,
-              fontSize: '0.875rem'
+              borderRadius: 1,
+              py: 1.5,
+              px: sidebarCollapsed ? 1.5 : 2,
+              color: !isDarkMode ? '#ffffff' : 'text.primary',
+              '&:hover': {
+                bgcolor: !isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'action.hover'
+              },
+              justifyContent: sidebarCollapsed ? 'center' : 'space-between',
+              transition: 'all 0.2s ease',
             }}
           >
-            {getUserInitials()}
-          </Avatar>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography 
-              variant="body2" 
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: sidebarCollapsed ? 0 : 1.5 }}>
+              <Box sx={{ color: !isDarkMode ? '#93BFEF' : 'primary.main' }}>
+                {isDarkMode ? <LightModeIcon /> : <DarkModeIcon />}
+              </Box>
+              {!sidebarCollapsed && (
+                <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                  {isDarkMode ? 'Modo Claro' : 'Modo Oscuro'}
+                </Typography>
+              )}
+            </Box>
+            {!sidebarCollapsed && (
+              <Switch
+                checked={isDarkMode}
+                onChange={toggleTheme}
+                size="small"
+                sx={{
+                  '& .MuiSwitch-switchBase.Mui-checked': {
+                    color: 'white',
+                    '& + .MuiSwitch-track': {
+                      backgroundColor: '#f39c12',
+                    },
+                  },
+                }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            )}
+          </ListItemButton>
+        </Tooltip>
+      </Box>
+
+      <Divider sx={{ borderColor: !isDarkMode ? 'rgba(255, 255, 255, 0.2)' : undefined }} />
+
+      {/* Usuario Info en el sidebar */}
+      <Box sx={{ p: sidebarCollapsed ? 1 : 2, flexShrink: 0 }}>
+        {!sidebarCollapsed ? (
+          <>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <Avatar
+                sx={{
+                  bgcolor: !isDarkMode ? '#ffffff' : getUserRoleColor(),
+                  color: !isDarkMode ? '#1A5799' : 'inherit',
+                  width: 32,
+                  height: 32,
+                  mr: 1.5,
+                  fontSize: '0.875rem'
+                }}
+              >
+                {getUserInitials()}
+              </Avatar>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography 
+                  variant="body2" 
+                  sx={{ 
+                    fontWeight: 'medium',
+                    color: !isDarkMode ? '#ffffff' : 'inherit'
+                  }} 
+                  noWrap
+                >
+                  {user?.firstName}
+                </Typography>
+                <Typography 
+                  variant="caption" 
+                  sx={{
+                    color: !isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary'
+                  }}
+                  noWrap
+                >
+                  {user?.role}
+                </Typography>
+              </Box>
+            </Box>
+            
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<LogoutIcon />}
+              onClick={logout}
+              fullWidth
               sx={{ 
-                fontWeight: 'medium',
-                color: !isDarkMode ? '#ffffff' : 'inherit'
-              }} 
-              noWrap
-            >
-              {user?.firstName}
-            </Typography>
-            <Typography 
-              variant="caption" 
-              sx={{
-                color: !isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary'
+                fontSize: '0.75rem',
+                borderColor: !isDarkMode ? 'rgba(255, 255, 255, 0.5)' : 'inherit',
+                color: !isDarkMode ? '#ffffff' : 'inherit',
+                '&:hover': {
+                  borderColor: !isDarkMode ? '#ffffff' : 'inherit',
+                  backgroundColor: !isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'inherit'
+                }
               }}
-              noWrap
             >
-              {user?.role}
-            </Typography>
+              Cerrar Sesión
+            </Button>
+          </>
+        ) : (
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+            <Tooltip title={`${user?.firstName} - ${user?.role}`} placement="right">
+              <Avatar
+                sx={{
+                  bgcolor: !isDarkMode ? '#ffffff' : getUserRoleColor(),
+                  color: !isDarkMode ? '#1A5799' : 'inherit',
+                  width: 32,
+                  height: 32,
+                  fontSize: '0.875rem',
+                  cursor: 'pointer'
+                }}
+              >
+                {getUserInitials()}
+              </Avatar>
+            </Tooltip>
+            
+            <Tooltip title="Cerrar Sesión" placement="right">
+              <IconButton
+                onClick={logout}
+                size="small"
+                sx={{ 
+                  color: !isDarkMode ? '#ffffff' : 'inherit',
+                  border: `1px solid ${!isDarkMode ? 'rgba(255, 255, 255, 0.5)' : 'currentColor'}`,
+                  '&:hover': {
+                    borderColor: !isDarkMode ? '#ffffff' : 'inherit',
+                    backgroundColor: !isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'inherit'
+                  }
+                }}
+              >
+                <LogoutIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
           </Box>
-        </Box>
-        
-        <Button
-          variant="outlined"
-          size="small"
-          startIcon={<LogoutIcon />}
-          onClick={logout}
-          fullWidth
-          sx={{ 
-            fontSize: '0.75rem',
-            borderColor: !isDarkMode ? 'rgba(255, 255, 255, 0.5)' : 'inherit',
-            color: !isDarkMode ? '#ffffff' : 'inherit',
-            '&:hover': {
-              borderColor: !isDarkMode ? '#ffffff' : 'inherit',
-              backgroundColor: !isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'inherit'
-            }
-          }}
-        >
-          Cerrar Sesión
-        </Button>
+        )}
       </Box>
     </Box>
   );
@@ -233,9 +388,14 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
       <AppBar
         position="fixed"
         sx={{
-          width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` },
-          ml: { sm: `${DRAWER_WIDTH}px` },
+          width: { 
+            sm: `calc(100% - ${sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH}px)` 
+          },
+          ml: { 
+            sm: `${sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH}px` 
+          },
           zIndex: (theme) => theme.zIndex.drawer + 1,
+          transition: 'width 0.3s ease, margin-left 0.3s ease',
         }}
       >
         <Toolbar>
@@ -253,8 +413,8 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
             Centro de Control - Matrizador
           </Typography>
           
-          {/* Usuario info en header */}
-          <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
+          {/* Usuario info en header (solo nombre, el toggle se movió al sidebar) */}
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Typography variant="body2" sx={{ mr: 1, display: { xs: 'none', md: 'block' } }}>
               {getFullName()}
             </Typography>
@@ -269,15 +429,17 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
               {getUserInitials()}
             </Avatar>
           </Box>
-
-          <ThemeToggle />
         </Toolbar>
       </AppBar>
 
       {/* Sidebar Navigation */}
       <Box
         component="nav"
-        sx={{ width: { sm: DRAWER_WIDTH }, flexShrink: { sm: 0 } }}
+        sx={{ 
+          width: { sm: sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH }, 
+          flexShrink: { sm: 0 },
+          transition: 'width 0.3s ease'
+        }}
       >
         {/* Drawer móvil */}
         <Drawer
@@ -306,11 +468,12 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
             display: { xs: 'none', sm: 'block' },
             '& .MuiDrawer-paper': { 
               boxSizing: 'border-box', 
-              width: DRAWER_WIDTH,
+              width: sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH,
               backgroundColor: !isDarkMode ? '#1A5799' : undefined,
               height: '100vh',
               position: 'fixed',
               top: 0,
+              transition: 'width 0.3s ease',
             },
           }}
           open
@@ -324,9 +487,12 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
         component="main"
         sx={{
           flexGrow: 1,
-          width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` },
+          width: { 
+            sm: `calc(100% - ${sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH}px)` 
+          },
           minHeight: '100vh',
-          bgcolor: 'background.default'
+          bgcolor: 'background.default',
+          transition: 'width 0.3s ease'
         }}
       >
         <Toolbar />

@@ -7,18 +7,53 @@
   scrollbar-color: #94a3b8 #e2e8f0;
 }
 
-/* Animaciones optimizadas para tarjetas */
+/* Animaciones optimizadas para tarjetas PROFESIONALES */
 .document-card {
   will-change: transform, box-shadow;
   backface-visibility: hidden;
   transform-style: preserve-3d;
+  min-height: 180px; /* CORRECCIÓN: Altura para acomodar botón de agrupar */
+  max-height: 220px; /* CORRECCIÓN: Espacio para evitar overflow del botón */
+  overflow: hidden; /* CORRECCIÓN: Contenido siempre dentro */
 }
 
 .document-card.dragging {
-  opacity: 0.7;
-  transform: rotate(5deg) scale(1.05);
+  opacity: 0.8;
+  transform: rotate(2deg) scale(1.02);
   z-index: 1000;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+/* Estilos específicos para tarjetas profesionales */
+.document-card-professional {
+  padding: 16px !important; /* PROFESIONAL: Padding para legibilidad */
+  margin-bottom: 16px !important; /* PROFESIONAL: Separación adecuada */
+  min-height: 180px; /* CORRECCIÓN: Altura para acomodar botón de agrupar */
+  max-height: 220px; /* CORRECCIÓN: Espacio para evitar overflow del botón */
+  display: flex;
+  flex-direction: column;
+  gap: 10px; /* CORRECCIÓN: Gap reducido para optimizar espacio */
+  overflow: hidden; /* CORRECCIÓN: Contenido siempre dentro */
+}
+
+/* Mejoras de tipografía para legibilidad CORREGIDA */
+.document-card .client-name {
+  font-size: 0.85rem; /* CORRECCIÓN: Fuente más pequeña para evitar truncar */
+  font-weight: 600;
+  line-height: 1.2; /* CORRECCIÓN: Interlineado más compacto */
+  word-wrap: break-word; /* CORRECCIÓN: Permitir salto de línea */
+  max-height: 2.4em; /* CORRECCIÓN: Altura máxima para 2 líneas */
+  overflow: hidden; /* CORRECCIÓN: Ocultar exceso */
+}
+
+.document-card .document-info {
+  font-size: 0.8rem; /* FASE 1: Info secundaria legible */
+  line-height: 1.4;
+}
+
+.document-card .action-button {
+  min-height: 28px; /* FASE 1: Botones más grandes para touch */
+  font-size: 0.75rem;
 }
 
 /* Estilos para columnas durante drag & drop */
@@ -34,36 +69,64 @@
   opacity: 0.6;
 }
 
-/* Responsive breakpoints específicos */
+/* Responsive breakpoints específicos para diseño BALANCEADO */
 @media (max-width: 768px) {
   .kanban-container {
     padding-bottom: 1rem;
   }
   
   .kanban-column {
-    min-width: 280px;
-    max-width: 280px;
+    min-width: 300px; /* FASE 1: Columnas ligeramente más anchas */
+    max-width: 300px;
   }
   
   .document-card {
     font-size: 0.875rem;
-    padding: 0.75rem;
+    padding: 14px; /* FASE 1: Padding balanceado en móvil */
+    min-height: 140px; /* FASE 1: Altura mínima legible */
+    max-height: 160px;
   }
   
   .kanban-column-header {
     padding: 1rem;
   }
+  
+  /* Mejoras de usabilidad en tablet */
+  .document-card .action-button {
+    min-height: 32px; /* FASE 1: Botones más grandes en touch */
+    padding: 6px 12px;
+  }
 }
 
 @media (max-width: 480px) {
   .kanban-column {
-    min-width: 260px;
-    max-width: 260px;
+    min-width: 280px; /* FASE 1: Ancho mínimo para contenido */
+    max-width: 280px;
   }
   
   .document-card {
-    padding: 0.5rem;
+    padding: 12px; /* FASE 1: Padding mínimo legible */
     font-size: 0.8rem;
+    min-height: 130px; /* FASE 1: Altura mínima funcional */
+    max-height: 150px;
+    gap: 8px;
+  }
+  
+  /* Ajustes específicos para textos en móvil pequeño */
+  .document-card .client-name {
+    font-size: 0.9rem; /* FASE 1: Nombre principal legible en móvil */
+    line-height: 1.3;
+  }
+  
+  .document-card .document-info {
+    font-size: 0.75rem; /* FASE 1: Info secundaria legible */
+    line-height: 1.4;
+  }
+  
+  .document-card .action-button {
+    min-height: 36px; /* FASE 1: Botones extra grandes en móvil */
+    font-size: 0.8rem;
+    padding: 8px 12px;
   }
 }
 

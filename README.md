@@ -2,34 +2,111 @@
 
 Sistema de trazabilidad documental notarial moderno con automatización XML y notificaciones WhatsApp.
 
-## Stack Tecnológico
-- **Frontend**: React + Vite + MUI + Zustand
-- **Backend**: Node.js + Express + Prisma + PostgreSQL
-- **Comunicaciones**: Twilio WhatsApp API
-- **Deploy**: Railway
+## Descripción General
 
-## Estructura del Proyecto
-- `/frontend` - Aplicación React
-- `/backend` - API Node.js
-- `/prisma` - Base de datos PostgreSQL
+Notaría Segura es un sistema integral para la gestión y seguimiento de documentos en un entorno notarial. Permite la carga de documentos a través de archivos XML, la asignación de estos a diferentes roles de usuario (Caja, Matrizador, Recepción, Archivo), y el seguimiento del estado de cada documento a lo largo de su ciclo de vida. El sistema también incluye notificaciones por WhatsApp para mantener informados a los clientes sobre el estado de sus trámites.
 
-## Instalación
-```bash
-# Instalar dependencias
-npm install
+## Características Principales
 
-# Frontend
-cd frontend && npm install
+- **Gestión de Documentos por Roles**: Flujos de trabajo diferenciados para Caja, Matrizador, Recepción y Archivo.
+- **Carga de Documentos XML**: Carga individual y por lotes de documentos en formato XML.
+- **Trazabilidad Completa**: Seguimiento del estado de cada documento en tiempo real.
+- **Notificaciones por WhatsApp**: Envío de notificaciones a los clientes sobre el estado de sus documentos.
+- **Agrupación de Documentos**: Agrupación de documentos por cliente para una gestión más eficiente.
+- **Dashboard Kanban**: Visualización del flujo de trabajo mediante un tablero Kanban.
+- **Modo Oscuro**: Interfaz de usuario con tema oscuro y claro.
 
-# Backend  
-cd backend && npm install
+## Arquitectura del Proyecto
+
+El proyecto sigue una arquitectura cliente-servidor:
+
+- **Frontend**: Una aplicación de una sola página (SPA) construida con React, que consume la API del backend.
+- **Backend**: Una API RESTful construida con Node.js y Express, que gestiona la lógica de negocio y la comunicación con la base de datos.
+- **Base de Datos**: Una base de datos PostgreSQL gestionada con el ORM Prisma.
+
+### Stack Tecnológico
+
+- **Frontend**:
+  - React
+  - Vite
+  - Material-UI (MUI)
+  - Zustand (manejo de estado)
+  - Axios (cliente HTTP)
+- **Backend**:
+  - Node.js
+  - Express
+  - Prisma (ORM)
+  - PostgreSQL
+  - JSON Web Tokens (JWT) para autenticación
+  - Twilio (para notificaciones por WhatsApp)
+- **Herramientas de Desarrollo**:
+  - Nodemon (para recarga en caliente del servidor)
+  - ESLint (linting de código)
+
+## Estructura de Directorios
+
+```
+notaria-segura/
+├── backend/         # API de Node.js y Express
+│   ├── src/
+│   ├── prisma/
+│   └── ...
+├── frontend/        # Aplicación de React
+│   ├── src/
+│   └── ...
+├── .env             # Variables de entorno (no versionado)
+├── package.json     # Scripts y dependencias del workspace
+└── README.md        # Este archivo
 ```
 
-## Desarrollo
-```bash
-# Frontend (puerto 5173)
-cd frontend && npm run dev
+## Configuración y Puesta en Marcha
 
-# Backend (puerto 3000)
-cd backend && npm run dev
-``` 
+### Prerrequisitos
+
+- Node.js (v18 o superior)
+- npm (v9 o superior)
+- PostgreSQL
+
+### Pasos de Instalación
+
+1. **Clonar el repositorio**:
+   ```bash
+   git clone <URL_DEL_REPOSITORIO>
+   cd notaria-segura
+   ```
+
+2. **Instalar dependencias**:
+   Este comando instalará las dependencias tanto para el frontend como para el backend.
+   ```bash
+   npm run install:all
+   ```
+
+3. **Configurar variables de entorno**:
+   - **Backend**: Copia `backend/.env.example` a `backend/.env` y rellena las variables:
+     - `DATABASE_URL`: Cadena de conexión a tu base de datos PostgreSQL.
+     - `JWT_SECRET`: Un secreto para firmar los tokens JWT.
+     - `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_NUMBER`: Credenciales de Twilio.
+   - **Frontend**: Copia `frontend/.env.example` a `frontend/.env` y rellena la variable:
+     - `VITE_API_URL`: La URL de tu backend (p. ej., `http://localhost:3000/api`).
+
+4. **Aplicar las migraciones de la base de datos**:
+   ```bash
+   cd backend
+   npx prisma migrate dev
+   ```
+
+5. **Iniciar los servidores de desarrollo**:
+   - **Backend**:
+     ```bash
+     npm run dev:backend
+     ```
+   - **Frontend**:
+     ```bash
+     npm run dev:frontend
+     ```
+
+La aplicación frontend estará disponible en `http://localhost:5173` y el backend en `http://localhost:3000`.
+
+## Documentación de la API
+
+La documentación detallada de los endpoints de la API se encuentra en el archivo [`backend/API_DOCUMENTATION.md`](./backend/API_DOCUMENTATION.md).
