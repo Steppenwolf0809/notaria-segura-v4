@@ -34,7 +34,7 @@ import GroupingAlert from '../grouping/GroupingAlert';
  * Tabla completa con todas las funcionalidades
  */
 const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
-  const { documents, updateDocumentStatus } = useDocumentStore();
+  const { documents, updateDocumentStatus, updateDocument } = useDocumentStore();
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [page, setPage] = useState(0);
@@ -133,6 +133,29 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
   const closeDetailModal = () => {
     setDetailModalOpen(false);
     setSelectedDocument(null);
+  };
+
+  /**
+   * Manejar actualización de documento desde modal de detalle
+   */
+  const handleDocumentUpdated = (updatedData) => {
+    console.log('📝 Documento actualizado desde modal (ListView):', updatedData);
+    
+    // Si tenemos la estructura { document: documentData }
+    if (updatedData && updatedData.document) {
+      const updatedDocument = updatedData.document;
+      
+      // Actualizar el documento seleccionado para el modal
+      setSelectedDocument(prev => prev ? {
+        ...prev,
+        ...updatedDocument
+      } : null);
+      
+      // Actualizar documento en el store para que se refleje en la vista
+      updateDocument(updatedDocument.id, updatedDocument);
+      
+      console.log('🔄 Documento actualizado en vista Lista:', updatedDocument);
+    }
   };
 
   /**
@@ -395,6 +418,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
         open={detailModalOpen}
         onClose={closeDetailModal}
         document={selectedDocument}
+        onDocumentUpdated={handleDocumentUpdated}
       />
     </Box>
   );
