@@ -1,14 +1,15 @@
-# Dependencies
+# Dependencies - SOLO en carpetas específicas
+backend/node_modules/
+frontend/node_modules/
+prisma/node_modules/
 node_modules/
-*/node_modules/
 
-# Environment variables
-.env
-.env.local
+# Environment variables - MANTENER estructura pero permitir archivos necesarios
 .env.production
-*/.env
-*/.env.local
-*/.env.production
+.env.local
+backend/.env.production
+frontend/.env.production
+# Permitir .env de desarrollo para estructura, pero excluir solo los de producción
 
 # Build outputs
 dist/
