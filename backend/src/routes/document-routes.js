@@ -19,7 +19,10 @@ import {
   getEditableDocumentInfo,
   updateDocumentInfo,
   // 🔗 Nueva función para agrupación inteligente
-  createSmartDocumentGroup
+  createSmartDocumentGroup,
+  // 🔄 Sistema de confirmaciones y deshacer
+  undoDocumentStatusChange,
+  getUndoableChanges
 } from '../controllers/document-controller.js';
 
 const router = express.Router();
@@ -113,6 +116,15 @@ router.post('/deliver-group', authenticateToken, deliverDocumentGroup);
 
 // 🔗 NUEVA RUTA: Crear grupo inteligente basado en detección automática
 router.post('/create-smart-group', authenticateToken, createSmartDocumentGroup);
+
+// --- RUTAS DEL SISTEMA DE CONFIRMACIONES Y DESHACER ---
+// CONSERVADOR: Nuevas funcionalidades que mantienen compatibilidad total
+
+// POST /api/documents/undo-status-change - Deshacer último cambio de estado
+router.post('/undo-status-change', authenticateToken, undoDocumentStatusChange);
+
+// GET /api/documents/:id/undoable-changes - Obtener cambios deshacibles de un documento
+router.get('/:id/undoable-changes', authenticateToken, getUndoableChanges);
 
 // Obtener información detallada de un grupo
 // TODO: Implementar el método getGroupDetails en document-controller.js

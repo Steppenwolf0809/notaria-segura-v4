@@ -47,19 +47,23 @@ class DocumentGroupingService {
   async createDocumentGroup(documentIds, matrizadorId) {
     // Validar que todos los documentos:
     // 1. Pertenezcan al matrizador
-    // 2. Estén EN_PROCESO
+    // 2. No estén ya ENTREGADOS
     // 3. Sean del mismo cliente
+    // 4. No estén ya agrupados
     
     const documents = await prisma.document.findMany({
       where: { 
         id: { in: documentIds },
         assignedToId: matrizadorId,
-        status: 'EN_PROCESO'
+        status: { not: 'ENTREGADO' }, // Permitir EN_PROCESO y LISTO
+        isGrouped: false // No permitir re-agrupar
       }
     });
     
     if (documents.length !== documentIds.length) {
-      throw new Error('Algunos documentos no son válidos para agrupación');
+      const foundIds = documents.map(d => d.id);
+      const missingIds = documentIds.filter(id => !foundIds.includes(id));
+      throw new Error(`Algunos documentos no son válidos para agrupación. IDs no válidos: ${missingIds.join(', ')}`);
     }
     
     // Verificar mismo cliente

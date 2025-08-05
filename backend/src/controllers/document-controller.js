@@ -723,31 +723,74 @@ async function createDocumentGroup(req, res) {
       .createDocumentGroup(documentIds, matrizadorId);
     
     // Enviar notificación grupal si se solicita
-    if (req.body.sendNotification) {
-      /*
-      await WhatsAppService.sendGroupNotification({
-        phone: verifiedPhone,
-        group: result.group,
-        documents: result.documents,
-        customMessage: notificationMessage
-      });
-      */
-      
-      // Marcar notificación enviada
-      await prisma.documentGroup.update({
-        where: { id: result.group.id },
-        data: {
-          notificationSent: true,
-          notificationSentAt: new Date()
+    let whatsappSent = false;
+    let whatsappError = null;
+    
+    if (req.body.sendNotification && result.group.clientPhone) {
+      try {
+        // Importar el servicio de WhatsApp
+        const whatsappService = await import('../services/whatsapp-service.js');
+        
+        // Preparar datos del cliente
+        const cliente = {
+          nombre: result.group.clientName,
+          telefono: result.group.clientPhone
+        };
+        
+        // Enviar notificación grupal
+        const whatsappResult = await whatsappService.default.enviarGrupoDocumentosListo(
+          cliente,
+          result.documents,
+          result.group.verificationCode
+        );
+        
+        whatsappSent = whatsappResult.success;
+        
+        if (!whatsappResult.success) {
+          whatsappError = whatsappResult.error;
+          console.error('Error enviando WhatsApp grupal:', whatsappResult.error);
+        } else {
+          console.log('📱 Notificación grupal WhatsApp enviada exitosamente');
         }
-      });
+      } catch (error) {
+        console.error('Error en servicio WhatsApp grupal:', error);
+        whatsappError = error.message;
+      }
+      
+      // Marcar notificación enviada solo si fue exitosa
+      if (whatsappSent) {
+        await prisma.documentGroup.update({
+          where: { id: result.group.id },
+          data: {
+            notificationSent: true,
+            notificationSentAt: new Date()
+          }
+        });
+      }
     }
     
+    // Preparar mensaje de respuesta
+    let message = `Grupo creado con ${result.documents.length} documentos`;
+    if (req.body.sendNotification) {
+      if (whatsappSent) {
+        message += ' y notificación WhatsApp enviada';
+      } else if (result.group.clientPhone && whatsappError) {
+        message += ', pero falló la notificación WhatsApp';
+      } else if (!result.group.clientPhone) {
+        message += ' (sin teléfono para notificación WhatsApp)';
+      }
+    }
+
     res.json({
       success: true,
-      message: `Grupo creado con ${result.documents.length} documentos`,
+      message: message,
       group: result.group,
-      verificationCode: result.group.verificationCode
+      verificationCode: result.group.verificationCode,
+      whatsapp: {
+        sent: whatsappSent,
+        error: whatsappError,
+        phone: result.group.clientPhone
+      }
     });
     
   } catch (error) {
@@ -1622,6 +1665,268 @@ async function updateDocumentInfo(req, res) {
   }
 }
 
+/**
+ * ============================================================================
+ * SISTEMA DE CONFIRMACIONES Y DESHACER
+ * Implementación conservadora que mantiene auditoría completa
+ * ============================================================================
+ */
+
+/**
+ * Deshacer último cambio de estado de un documento
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+async function undoDocumentStatusChange(req, res) {
+  try {
+    const { documentId, changeId } = req.body;
+
+    if (!documentId) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID del documento es obligatorio'
+      });
+    }
+
+    // Buscar el documento actual
+    const document = await prisma.document.findUnique({
+      where: { id: documentId },
+      include: {
+        assignedTo: {
+          select: { firstName: true, lastName: true }
+        }
+      }
+    });
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Documento no encontrado'
+      });
+    }
+
+    // Verificar permisos - solo el usuario que hizo el cambio o ADMIN puede deshacer
+    let lastChangeEvent = null;
+    
+    if (changeId) {
+      // Buscar evento específico por ID
+      lastChangeEvent = await prisma.documentEvent.findUnique({
+        where: { id: changeId },
+        include: {
+          user: {
+            select: { firstName: true, lastName: true, role: true }
+          }
+        }
+      });
+    } else {
+      // Buscar último cambio de estado del documento
+      lastChangeEvent = await prisma.documentEvent.findFirst({
+        where: {
+          documentId: documentId,
+          eventType: 'STATUS_CHANGED'
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        include: {
+          user: {
+            select: { firstName: true, lastName: true, role: true }
+          }
+        }
+      });
+    }
+
+    if (!lastChangeEvent) {
+      return res.status(404).json({
+        success: false,
+        message: 'No se encontró el cambio de estado para deshacer'
+      });
+    }
+
+    // Verificar que el cambio no sea muy antiguo (máximo 10 minutos)
+    const changeTime = new Date(lastChangeEvent.createdAt);
+    const now = new Date();
+    const timeDifference = now - changeTime;
+    const maxUndoTime = 10 * 60 * 1000; // 10 minutos
+
+    if (timeDifference > maxUndoTime) {
+      return res.status(400).json({
+        success: false,
+        message: 'El cambio es muy antiguo para ser deshecho (máximo 10 minutos)'
+      });
+    }
+
+    // Verificar permisos
+    const isOwner = lastChangeEvent.userId === req.user.id;
+    const isAdmin = req.user.role === 'ADMIN';
+    
+    if (!isOwner && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo puedes deshacer tus propios cambios'
+      });
+    }
+
+    // Extraer estado anterior del detalle del evento
+    const eventDetails = lastChangeEvent.details;
+    const previousStatus = eventDetails.previousStatus;
+    
+    if (!previousStatus) {
+      return res.status(400).json({
+        success: false,
+        message: 'No se puede determinar el estado anterior'
+      });
+    }
+
+    // Verificar que el estado actual del documento coincida con el evento
+    if (document.status !== eventDetails.newStatus) {
+      return res.status(400).json({
+        success: false,
+        message: 'El estado del documento ha cambiado desde el último evento registrado'
+      });
+    }
+
+    // CONSERVADOR: Usar transacción para garantizar consistencia
+    const result = await prisma.$transaction(async (tx) => {
+      // Revertir estado del documento
+      const updatedDocument = await tx.document.update({
+        where: { id: documentId },
+        data: {
+          status: previousStatus,
+          // CONSERVADOR: Si se deshace un cambio a LISTO, limpiar código de verificación solo si se generó en ese cambio
+          ...(eventDetails.newStatus === 'LISTO' && eventDetails.verificationCodeGenerated && {
+            verificationCode: null
+          })
+        }
+      });
+
+      // Registrar evento de deshacer
+      const undoEvent = await tx.documentEvent.create({
+        data: {
+          documentId: documentId,
+          userId: req.user.id,
+          eventType: 'STATUS_UNDO',
+          description: `Cambio deshecho: ${eventDetails.newStatus} → ${previousStatus} por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
+          details: {
+            originalEventId: lastChangeEvent.id,
+            revertedFrom: eventDetails.newStatus,
+            revertedTo: previousStatus,
+            originalEventTime: lastChangeEvent.createdAt,
+            timeSinceChange: timeDifference,
+            undoneBy: {
+              id: req.user.id,
+              name: `${req.user.firstName} ${req.user.lastName}`,
+              role: req.user.role
+            },
+            originalChangedBy: {
+              id: lastChangeEvent.userId,
+              name: `${lastChangeEvent.user.firstName} ${lastChangeEvent.user.lastName}`,
+              role: lastChangeEvent.user.role
+            },
+            whatsappWasSent: eventDetails.whatsappSent || false,
+            verificationCodeCleared: eventDetails.newStatus === 'LISTO' && eventDetails.verificationCodeGenerated
+          },
+          ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown'
+        }
+      });
+
+      return { updatedDocument, undoEvent };
+    });
+
+    res.json({
+      success: true,
+      message: `Cambio deshecho exitosamente: ${eventDetails.newStatus} → ${previousStatus}`,
+      data: {
+        document: result.updatedDocument,
+        undo: {
+          revertedFrom: eventDetails.newStatus,
+          revertedTo: previousStatus,
+          originalEventId: lastChangeEvent.id,
+          undoEventId: result.undoEvent.id,
+          timeSinceOriginalChange: `${Math.round(timeDifference / 1000)} segundos`,
+          whatsappWasSent: eventDetails.whatsappSent || false,
+          note: eventDetails.whatsappSent ? 
+            'Nota: Se había enviado notificación WhatsApp que no puede ser revertida automáticamente' : null
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error deshaciendo cambio de estado:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor al deshacer cambio',
+      error: error.message
+    });
+  }
+}
+
+/**
+ * Obtener historial de cambios recientes deshacibles
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+async function getUndoableChanges(req, res) {
+  try {
+    const { documentId } = req.params;
+    
+    // Buscar cambios recientes (últimos 10 minutos) que pueden ser deshechos
+    const recentChanges = await prisma.documentEvent.findMany({
+      where: {
+        documentId: documentId,
+        eventType: 'STATUS_CHANGED',
+        createdAt: {
+          gte: new Date(Date.now() - 10 * 60 * 1000) // Últimos 10 minutos
+        }
+      },
+      include: {
+        user: {
+          select: { firstName: true, lastName: true, role: true }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      take: 5 // Máximo 5 cambios recientes
+    });
+
+    // Filtrar cambios que el usuario puede deshacer
+    const undoableChanges = recentChanges.filter(change => {
+      const isOwner = change.userId === req.user.id;
+      const isAdmin = req.user.role === 'ADMIN';
+      return isOwner || isAdmin;
+    });
+
+    res.json({
+      success: true,
+      data: {
+        undoableChanges: undoableChanges.map(change => ({
+          id: change.id,
+          description: change.description,
+          fromStatus: change.details.previousStatus,
+          toStatus: change.details.newStatus,
+          createdAt: change.createdAt,
+          canUndo: true,
+          timeRemaining: Math.max(0, 10 * 60 * 1000 - (Date.now() - new Date(change.createdAt).getTime())),
+          whatsappSent: change.details.whatsappSent || false,
+          changedBy: {
+            name: `${change.user.firstName} ${change.user.lastName}`,
+            role: change.user.role
+          }
+        }))
+      }
+    });
+
+  } catch (error) {
+    console.error('Error obteniendo cambios deshacibles:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+}
+
 export {
   uploadXmlDocument,
   uploadXmlDocumentsBatch,
@@ -1640,5 +1945,8 @@ export {
   getEditableDocumentInfo,
   updateDocumentInfo,
   // 🔗 Función de agrupación inteligente
-  createSmartDocumentGroup
+  createSmartDocumentGroup,
+  // 🔄 Sistema de confirmaciones y deshacer
+  undoDocumentStatusChange,
+  getUndoableChanges
 }; 

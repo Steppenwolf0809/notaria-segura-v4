@@ -228,10 +228,18 @@ const documentService = {
    * @returns {Promise<Object>} Documento actualizado
    */
   async updateDocumentStatus(documentId, newStatus) {
+    console.log('🌐 SERVICE: updateDocumentStatus iniciado:', {
+      documentId,
+      newStatus,
+      url: `/documents/${documentId}/status`
+    });
+    
     try {
-      const response = await api.put(`/documents/${documentId}/status`, {
-        status: newStatus
-      });
+      const requestBody = { status: newStatus };
+      console.log('📤 SERVICE: Enviando request al backend:', requestBody);
+      
+      const response = await api.put(`/documents/${documentId}/status`, requestBody);
+      console.log('📥 SERVICE: Respuesta del backend:', response.data);
       
       return {
         success: true,
@@ -239,7 +247,13 @@ const documentService = {
         message: response.data.message
       };
     } catch (error) {
-      console.error('Error updating document status:', error);
+      console.error('💥 SERVICE: Error updating document status:', error);
+      console.error('📊 SERVICE: Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
       
       const errorMessage = error.response?.data?.message || 
                           error.message || 
@@ -466,6 +480,67 @@ const documentService = {
         success: false,
         message: errorMessage,
         error: error.response?.data || error
+      };
+    }
+  },
+
+  // --- MÉTODOS DEL SISTEMA DE CONFIRMACIONES Y DESHACER ---
+  // CONSERVADOR: Nuevas funciones que extienden sin romper funcionalidad existente
+
+  /**
+   * Deshacer cambio de estado de un documento
+   * @param {Object} undoData - Datos para deshacer (documentId, changeId)
+   * @returns {Promise<Object>} Resultado de la operación de deshacer
+   */
+  async undoDocumentStatusChange(undoData) {
+    try {
+      const response = await api.post('/documents/undo-status-change', undoData);
+      
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Error undoing document status change:', error);
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Error al deshacer cambio de estado';
+      
+      return {
+        success: false,
+        error: errorMessage,
+        message: errorMessage
+      };
+    }
+  },
+
+  /**
+   * Obtener cambios deshacibles de un documento
+   * @param {string} documentId - ID del documento
+   * @returns {Promise<Object>} Lista de cambios deshacibles
+   */
+  async getUndoableChanges(documentId) {
+    try {
+      const response = await api.get(`/documents/${documentId}/undoable-changes`);
+      
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Error fetching undoable changes:', error);
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Error al obtener cambios deshacibles';
+      
+      return {
+        success: false,
+        error: errorMessage,
+        message: errorMessage
       };
     }
   }

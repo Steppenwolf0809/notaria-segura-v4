@@ -10,7 +10,9 @@ import {
   Divider,
   Tooltip,
   Paper,
-  Button
+  Button,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import {
   Schedule as ScheduleIcon,
@@ -28,8 +30,10 @@ import DocumentDetailModal from './DocumentDetailModal';
 import LoadMoreButton from '../UI/LoadMoreButton';
 import GroupingAlert from '../grouping/GroupingAlert';
 import QuickGroupingModal from '../grouping/QuickGroupingModal';
+// NUEVOS COMPONENTES: Sistema de confirmaciones y deshacer
+import ConfirmationModal from './ConfirmationModal';
+import UndoToast from './UndoToast';
 import { filterRecentlyDelivered, getDeliveryFilterNote, DELIVERY_FILTER_PERIODS } from '../../utils/dateUtils';
-import { debugDragAndDrop } from '../../utils/debugDragAndDrop';
 import './KanbanView.css';
 
 /**
@@ -37,7 +41,34 @@ import './KanbanView.css';
  * Columnas lado a lado con scroll horizontal si es necesario
  */
 const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
-  const { getDocumentsByStatus, documents } = useDocumentStore();
+  const { getDocumentsByStatus, documents, undoDocumentStatusChange, createDocumentGroup, updateDocument } = useDocumentStore();
+  
+  // Estados para modales y componentes
+  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  // 🔗 Estados para modal de agrupación rápida
+  const [showQuickGroupingModal, setShowQuickGroupingModal] = useState(false);
+  const [pendingGroupData, setPendingGroupData] = useState({ main: null, related: [] });
+  
+  // NUEVOS ESTADOS: Sistema de confirmaciones y deshacer
+  const [confirmationModalOpen, setConfirmationModalOpen] = useState(false);
+  const [confirmationData, setConfirmationData] = useState(null);
+  const [undoToastOpen, setUndoToastOpen] = useState(false);
+  const [lastChangeInfo, setLastChangeInfo] = useState(null);
+  const [isConfirmationLoading, setIsConfirmationLoading] = useState(false);
+  
+  // Estados para agrupación
+  const [groupingLoading, setGroupingLoading] = useState(false);
+  const [groupingSuccess, setGroupingSuccess] = useState(null);
+
+  // Callback para manejar requerimientos de confirmación
+  const handleConfirmationRequired = useCallback((data) => {
+    console.log('🎯 handleConfirmationRequired llamado con:', data);
+    setConfirmationData(data);
+    setConfirmationModalOpen(true);
+    console.log('✅ Modal de confirmación abierto');
+  }, []);
+
   const {
     handleDragStart,
     handleDragEnd,
@@ -51,23 +82,9 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
     canDrop,
     isDragging,
     draggedItem
-  } = useDragAndDrop();
+  } = useDragAndDrop(handleConfirmationRequired);
 
-  const [selectedDocument, setSelectedDocument] = useState(null);
-  const [detailModalOpen, setDetailModalOpen] = useState(false);
-  // 🔗 Estados para modal de agrupación rápida
-  const [showQuickGroupingModal, setShowQuickGroupingModal] = useState(false);
-  const [pendingGroupData, setPendingGroupData] = useState({ main: null, related: [] });
 
-  // Debug para drag & drop
-  React.useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      setTimeout(() => {
-        console.log('🐛 Ejecutando diagnóstico Drag & Drop en KanbanView...');
-        debugDragAndDrop.runFullDiagnostic();
-      }, 3000);
-    }
-  }, []);
 
   /**
    * Configuración de columnas - EXACTA AL PROTOTIPO
@@ -382,11 +399,32 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
             <Button
               variant="contained" size="small" fullWidth
               sx={{ fontSize: '0.7rem', minHeight: 28, bgcolor: '#17a2b8', '&:hover': { bgcolor: '#138496' } }}
-              onClick={(e) => {
+              onClick={async (e) => {
                 e.stopPropagation();
-                const simulatedRelated = Array.from({ length: related.count }, (_, i) => ({ id: `related-${document.id}-${i}`, protocolNumber: `${document.protocolNumber.slice(0, -2)}${String(i + 1).padStart(2, '0')}`, clientName: document.clientName, documentType: related.type, status: 'EN_PROCESO' }));
-                setPendingGroupData({ main: document, related: simulatedRelated });
-                setShowQuickGroupingModal(true);
+                
+                try {
+                  console.log('🔍 Detectando documentos reales para agrupar con:', document.clientName);
+                  
+                  // Buscar documentos reales del mismo cliente en todos los estados
+                  const relatedDocs = documents.filter(doc => 
+                    doc.id !== document.id && 
+                    doc.clientName === document.clientName &&
+                    !doc.isGrouped && // Solo documentos no agrupados
+                    doc.status !== 'ENTREGADO' // No incluir documentos ya entregados
+                  );
+                  
+                  console.log('📄 Documentos relacionados encontrados:', relatedDocs.length);
+                  
+                  if (relatedDocs.length > 0) {
+                    setPendingGroupData({ main: document, related: relatedDocs });
+                    setShowQuickGroupingModal(true);
+                  } else {
+                    console.warn('⚠️ No se encontraron documentos relacionados para agrupar');
+                    // Podrías mostrar un mensaje al usuario aquí
+                  }
+                } catch (error) {
+                  console.error('❌ Error detectando documentos relacionados:', error);
+                }
               }}
             >
               Agrupar
@@ -397,7 +435,7 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
     );
   });
 
-  const KanbanColumn = React.memo(({ column }) => {
+  const KanbanColumn = ({ column }) => {
     const filteredDocs = getFilteredDocuments(column.id);
     const { visibleItems: documents, hasMore, loadMore, remainingCount } = usePagination(filteredDocs, 10);
 
@@ -406,8 +444,11 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
         data-column-id={column.id}
         onDragEnter={(e) => handleDragEnter(e, column.id)}
         onDragOver={(e) => handleDragOver(e, column.id)}
-        onDrop={(e) => handleDrop(e, column.id)}
-        onDragLeave={handleDragLeave}
+        onDrop={(e) => {
+          console.log(`🎯 Drop en columna ${column.id}`);
+          handleDrop(e, column.id);
+        }}
+        onDragLeave={(e) => handleDragLeave(e, column.id)}
         sx={{
           bgcolor: 'background.default',
           border: 1,
@@ -452,7 +493,7 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
         <LoadMoreButton onLoadMore={loadMore} hasMore={hasMore} remainingCount={remainingCount} />
       </Paper>
     );
-  });
+  };
 
   const openDetailModal = (document) => {
     setSelectedDocument(document);
@@ -464,6 +505,113 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
     setSelectedDocument(null);
   };
 
+  /**
+   * Manejar actualización de documento desde modal de detalle
+   */
+  const handleDocumentUpdated = useCallback((updatedData) => {
+    console.log('📝 Documento actualizado desde modal:', updatedData);
+    
+    // Si tenemos la estructura { document: documentData }
+    if (updatedData && updatedData.document) {
+      const updatedDocument = updatedData.document;
+      
+      // Actualizar el documento seleccionado para el modal
+      setSelectedDocument(prev => prev ? {
+        ...prev,
+        ...updatedDocument
+      } : null);
+      
+      // Actualizar documento en el store para que se refleje en la vista
+      updateDocument(updatedDocument.id, updatedDocument);
+      
+      console.log('🔄 Documento actualizado en vista Kanban:', updatedDocument);
+    }
+  }, [updateDocument]);
+
+  // NUEVAS FUNCIONES: Sistema de confirmaciones y deshacer
+
+  /**
+   * Manejar confirmación de cambio de estado
+   */
+  const handleConfirmStatusChange = useCallback(async (modalData) => {
+    console.log('🎯 handleConfirmStatusChange iniciado con:', modalData);
+    console.log('🔍 confirmationData actual:', confirmationData);
+    setIsConfirmationLoading(true);
+    
+    try {
+      // La función onConfirm viene del confirmationData, no del modalData
+      if (confirmationData && confirmationData.onConfirm) {
+        console.log('🔄 Ejecutando confirmationData.onConfirm...');
+        // Ejecutar el cambio confirmado usando la función del hook
+        const result = await confirmationData.onConfirm(modalData);
+        console.log('📊 Resultado del onConfirm:', result);
+        
+        if (result.success) {
+          console.log('✅ Cambio confirmado exitoso');
+          // Cerrar modal de confirmación
+          setConfirmationModalOpen(false);
+          setConfirmationData(null);
+          
+          // Mostrar toast con opción de deshacer
+          if (result.changeInfo) {
+            setLastChangeInfo(result.changeInfo);
+            setUndoToastOpen(true);
+            console.log('📄 Toast de deshacer mostrado');
+          }
+        } else {
+          console.error('❌ Error ejecutando cambio confirmado:', result.error);
+        }
+      } else {
+        console.error('❌ No hay función onConfirm disponible');
+      }
+    } catch (error) {
+      console.error('💥 Error en confirmación:', error);
+    } finally {
+      setIsConfirmationLoading(false);
+      console.log('🏁 handleConfirmStatusChange finalizado');
+    }
+  }, [confirmationData]);
+
+  /**
+   * Cancelar confirmación de cambio de estado
+   */
+  const handleCancelConfirmation = useCallback(() => {
+    if (confirmationData?.onCancel) {
+      confirmationData.onCancel();
+    }
+    setConfirmationModalOpen(false);
+    setConfirmationData(null);
+    setIsConfirmationLoading(false);
+  }, [confirmationData]);
+
+  /**
+   * Manejar deshacer cambio
+   */
+  const handleUndo = useCallback(async (changeInfo) => {
+    try {
+      const result = await undoDocumentStatusChange(changeInfo);
+      
+      if (result.success) {
+        console.log('✅ Cambio deshecho exitosamente');
+        return result;
+      } else {
+        console.error('❌ Error deshaciendo cambio:', result.error);
+        throw new Error(result.error);
+      }
+    } catch (error) {
+      console.error('Error en deshacer:', error);
+      throw error;
+    }
+  }, [undoDocumentStatusChange]);
+
+  /**
+   * Cerrar toast de deshacer
+   */
+  const handleCloseUndoToast = useCallback(() => {
+    setUndoToastOpen(false);
+    setLastChangeInfo(null);
+  }, []);
+
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Box sx={{ flexGrow: 1, display: 'flex', gap: 2, overflowX: 'auto', p: 2 }}>
@@ -472,22 +620,122 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
         ))}
       </Box>
 
-      <DocumentDetailModal open={detailModalOpen} onClose={closeDetailModal} document={selectedDocument} />
+      <DocumentDetailModal open={detailModalOpen} onClose={closeDetailModal} document={selectedDocument} onDocumentUpdated={handleDocumentUpdated} />
 
       <QuickGroupingModal
         open={showQuickGroupingModal}
         onClose={() => setShowQuickGroupingModal(false)}
         mainDocument={pendingGroupData.main}
         relatedDocuments={pendingGroupData.related}
+        loading={groupingLoading}
         onConfirm={async (selectedDocumentIds) => {
           if (pendingGroupData.main && selectedDocumentIds.length > 0) {
-            const documentIds = [pendingGroupData.main.id, ...selectedDocumentIds];
-            // Aquí iría la lógica para crear el grupo
-            console.log('Confirmando agrupación desde Kanban:', documentIds);
+            setGroupingLoading(true);
+            
+            try {
+              const documentIds = [pendingGroupData.main.id, ...selectedDocumentIds];
+              console.log('🔗 Confirmando agrupación desde Kanban:', documentIds);
+              
+              const result = await createDocumentGroup(documentIds);
+              
+              if (result.success) {
+                // Mostrar mensaje de éxito
+                setGroupingSuccess({
+                  message: result.message || `Grupo creado exitosamente con ${documentIds.length} documentos`,
+                  verificationCode: result.verificationCode,
+                  documentCount: documentIds.length,
+                  whatsappSent: result.whatsapp?.sent || false,
+                  whatsappError: result.whatsapp?.error || null,
+                  clientPhone: result.whatsapp?.phone || null
+                });
+                
+                console.log('✅ Agrupación exitosa:', result);
+                
+                // Auto-ocultar después de 5 segundos
+                setTimeout(() => {
+                  setGroupingSuccess(null);
+                }, 5000);
+              } else {
+                console.error('❌ Error en agrupación:', result.error);
+                // El error se maneja en el store
+              }
+            } catch (error) {
+              console.error('❌ Error inesperado en agrupación:', error);
+            } finally {
+              setGroupingLoading(false);
+              setShowQuickGroupingModal(false);
+            }
+          } else {
+            setShowQuickGroupingModal(false);
           }
-          setShowQuickGroupingModal(false);
         }}
       />
+
+      {/* NUEVOS COMPONENTES: Sistema de confirmaciones y deshacer */}
+      
+      {/* Modal de confirmación para cambios críticos */}
+      <ConfirmationModal
+        open={confirmationModalOpen}
+        onClose={handleCancelConfirmation}
+        onConfirm={handleConfirmStatusChange}
+        document={confirmationData?.document}
+        currentStatus={confirmationData?.currentStatus}
+        newStatus={confirmationData?.newStatus}
+        isLoading={isConfirmationLoading}
+      />
+
+      {/* Toast con opción de deshacer */}
+      <UndoToast
+        open={undoToastOpen}
+        onClose={handleCloseUndoToast}
+        onUndo={handleUndo}
+        changeInfo={lastChangeInfo}
+        autoHideDelay={10000}
+      />
+
+      {/* Snackbar para éxito de agrupación */}
+      <Snackbar
+        open={!!groupingSuccess}
+        autoHideDuration={5000}
+        onClose={() => setGroupingSuccess(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert 
+          onClose={() => setGroupingSuccess(null)} 
+          severity="success" 
+          variant="filled"
+          sx={{ 
+            minWidth: 400,
+            '& .MuiAlert-message': {
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 0.5
+            }
+          }}
+        >
+          <Typography variant="body1" sx={{ fontWeight: 600 }}>
+            🔗 {groupingSuccess?.message}
+          </Typography>
+          {groupingSuccess?.verificationCode && (
+            <Typography variant="body2" sx={{ opacity: 0.9 }}>
+              📋 Código de verificación: <strong>{groupingSuccess.verificationCode}</strong>
+            </Typography>
+          )}
+          {groupingSuccess?.whatsappSent && (
+            <Typography variant="body2" sx={{ opacity: 0.9, color: 'success.main' }}>
+              📱 WhatsApp enviado a {groupingSuccess.clientPhone}
+            </Typography>
+          )}
+          {groupingSuccess?.whatsappError && (
+            <Typography variant="body2" sx={{ opacity: 0.9, color: 'warning.main' }}>
+              ⚠️ Error enviando WhatsApp: {groupingSuccess.whatsappError}
+            </Typography>
+          )}
+          <Typography variant="caption" sx={{ opacity: 0.8 }}>
+            Los documentos ahora aparecen como agrupados y LISTOS en el sistema
+          </Typography>
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

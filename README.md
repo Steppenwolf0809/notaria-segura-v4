@@ -107,6 +107,21 @@ notaria-segura/
 
 La aplicación frontend estará disponible en `http://localhost:5173` y el backend en `http://localhost:3000`.
 
-## Documentación de la API
+### Usuarios de Prueba
 
-La documentación detallada de los endpoints de la API se encuentra en el archivo [`backend/API_DOCUMENTATION.md`](./backend/API_DOCUMENTATION.md).
+Para empezar a probar la aplicación, puedes usar los siguientes usuarios:
+
+| Rol        | Email                  | Contraseña   |
+|------------|------------------------|--------------|
+| ADMIN      | admin@notaria.com      | admin123     |
+| CAJA       | caja@notaria.com       | caja123      |
+| MATRIZADOR | matrizador@notaria.com | matrizador123|
+| RECEPCION  | recepcion@notaria.com  | recepcion123 |
+| ARCHIVO    | archivo@notaria.com    | archivo123   |
+
+## Documentación Adicional
+
+- **[Documentación de la API](backend/API_DOCUMENTATION.md)**: Detalles de los endpoints del backend.
+- **[Guía de Configuración de Twilio](docs/TWILIO_SETUP_GUIDE.md)**: Cómo configurar las notificaciones de WhatsApp.
+- **[Documentación de Funcionalidades](docs/features/)**: Explicaciones detalladas de las características clave del sistema.
+- **[Notas de Desarrollo](docs/dev_notes/)**: Registro histórico de correcciones y mejoras.
