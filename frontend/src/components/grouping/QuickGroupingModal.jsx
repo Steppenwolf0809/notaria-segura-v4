@@ -20,10 +20,7 @@ import {
   Checkbox,
   Card,
   CardContent,
-  FormControl,
-  Select,
-  MenuItem,
-  InputLabel
+
 } from '@mui/material';
 import {
   Group as GroupIcon,
@@ -32,7 +29,6 @@ import {
   Close as CloseIcon,
   Warning as WarningIcon,
   Link as LinkIcon,
-  Notifications as NotificationIcon,
   Info as InfoIcon,
   Person as PersonIcon,
   Phone as PhoneIcon,
@@ -55,7 +51,7 @@ const QuickGroupingModal = ({
   const [selectedDocuments, setSelectedDocuments] = useState(
     new Set(relatedDocuments.map(doc => doc.id))
   );
-  const [notificationPolicy, setNotificationPolicy] = useState('automatica');
+
 
   // Debug del modal
   React.useEffect(() => {
@@ -77,7 +73,7 @@ const QuickGroupingModal = ({
       console.log('🔗 Ejecutando confirmación de agrupación...');
       if (onConfirm) {
         const selectedIds = Array.from(selectedDocuments);
-        await onConfirm(selectedIds, notificationPolicy);
+        await onConfirm(selectedIds);
       }
       console.log('✅ Agrupación confirmada exitosamente');
       onClose();
@@ -340,34 +336,7 @@ const QuickGroupingModal = ({
           </List>
         </Alert>
 
-        {/* Configuración de Notificación */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="h6" sx={{ 
-            color: (theme) => theme.palette.mode === 'dark' ? '#fff' : '#162840', 
-            mb: 1, 
-            fontSize: '1rem' 
-          }}>
-            <NotificationIcon sx={{ 
-              mr: 1, 
-              verticalAlign: 'middle',
-              color: (theme) => theme.palette.mode === 'dark' ? '#17a2b8' : '#162840'
-            }} />
-            Configuración de Notificación
-          </Typography>
-          
-          <FormControl fullWidth>
-            <InputLabel>Política de Notificación</InputLabel>
-            <Select
-              value={notificationPolicy}
-              onChange={(e) => setNotificationPolicy(e.target.value)}
-              label="Política de Notificación"
-            >
-              <MenuItem value="automatica">🔔 Notificar automáticamente</MenuItem>
-              <MenuItem value="no_notificar">🚫 No notificar</MenuItem>
-              <MenuItem value="entrega_inmediata">⚡ Entrega inmediata</MenuItem>
-            </Select>
-          </FormControl>
-        </Box>
+
 
         {/* Información del Proceso */}
         <Alert severity="success" sx={{ 

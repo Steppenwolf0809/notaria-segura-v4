@@ -933,13 +933,12 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
         onClose={() => setShowQuickGroupingModal(false)}
         mainDocument={pendingGroupData.main}
         relatedDocuments={pendingGroupData.related}
-        onConfirm={async (selectedDocumentIds, notificationPolicy) => {
+        onConfirm={async (selectedDocumentIds) => {
           if (pendingGroupData.main && selectedDocumentIds.length > 0) {
             const documentIds = [pendingGroupData.main.id, ...selectedDocumentIds];
             console.log('🔗 Confirmando agrupación desde Kanban:', {
               main: pendingGroupData.main.protocolNumber,
-              selectedIds: selectedDocumentIds,
-              notificationPolicy
+              selectedIds: selectedDocumentIds
             });
             
             // TODO: Aquí se puede implementar la creación de grupo para Kanban

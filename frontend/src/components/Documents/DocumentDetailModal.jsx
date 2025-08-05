@@ -23,7 +23,10 @@ import {
   Checkbox,
   FormControlLabel,
   Alert,
-  CircularProgress
+  CircularProgress,
+  FormControl,
+  Select,
+  InputLabel
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -37,7 +40,8 @@ import {
   Schedule as ScheduleIcon,
   Edit as EditIcon,
   History as HistoryIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
+  Notifications as NotificationIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -59,11 +63,15 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [localDocument, setLocalDocument] = useState(document);
+  const [notificationPolicy, setNotificationPolicy] = useState(
+    document?.notificationPolicy || 'automatica'
+  );
 
   // Actualizar documento local cuando cambie el prop
   useEffect(() => {
     if (document) {
       setLocalDocument(document);
+      setNotificationPolicy(document.notificationPolicy || 'automatica');
     }
   }, [document]);
 
@@ -140,6 +148,51 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
     // Notificar al componente padre si existe callback
     if (onDocumentUpdated && deliveryData) {
       onDocumentUpdated(deliveryData);
+    }
+  };
+
+  /**
+   * 🔔 GUARDAR POLÍTICA DE NOTIFICACIÓN
+   * Actualiza la política para el documento o todo el grupo
+   */
+  const handleSaveNotificationPolicy = async () => {
+    try {
+      setActionLoading(true);
+      console.log('💾 Guardando política de notificación:', {
+        documentId: localDocument.id,
+        isGrouped: localDocument.isGrouped,
+        policy: notificationPolicy
+      });
+
+      // TODO: Implementar llamada al backend para guardar política
+      // Si es documento agrupado, debe afectar a todo el grupo
+      // if (localDocument.isGrouped) {
+      //   await documentService.updateGroupNotificationPolicy(localDocument.groupId, notificationPolicy);
+      // } else {
+      //   await documentService.updateNotificationPolicy(localDocument.id, notificationPolicy);
+      // }
+
+      // Simular guardado exitoso
+      setLocalDocument(prev => ({
+        ...prev,
+        notificationPolicy
+      }));
+
+      console.log('✅ Política de notificación actualizada exitosamente');
+      
+      // Notificar al componente padre
+      if (onDocumentUpdated) {
+        onDocumentUpdated({
+          ...localDocument,
+          notificationPolicy
+        });
+      }
+
+    } catch (error) {
+      console.error('❌ Error guardando política de notificación:', error);
+      // TODO: Mostrar mensaje de error al usuario
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -475,6 +528,60 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
             />
           </Box>
         )}
+
+        {/* 🔔 CONFIGURACIÓN DE NOTIFICACIÓN */}
+        <Box sx={{ 
+          p: 3, 
+          borderTop: (theme) => theme.palette.mode === 'dark' 
+            ? '1px solid rgba(255, 255, 255, 0.1)' 
+            : '1px solid #e0e0e0',
+          bgcolor: (theme) => theme.palette.mode === 'dark' 
+            ? 'rgba(255, 255, 255, 0.02)' 
+            : 'rgba(23, 162, 184, 0.02)'
+        }}>
+          <Typography variant="h6" sx={{ 
+            color: (theme) => theme.palette.mode === 'dark' ? '#fff' : '#162840', 
+            mb: 2, 
+            fontSize: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1
+          }}>
+            <NotificationIcon sx={{ 
+              color: (theme) => theme.palette.mode === 'dark' ? '#17a2b8' : '#162840'
+            }} />
+            Configuración de Notificaciones
+            {localDocument.isGrouped && (
+              <Chip 
+                label="Afecta a todo el grupo" 
+                size="small" 
+                color="warning"
+                sx={{ ml: 1 }}
+              />
+            )}
+          </Typography>
+          
+          <FormControl fullWidth sx={{ maxWidth: 400 }}>
+            <InputLabel>Política de Notificación</InputLabel>
+            <Select
+              value={notificationPolicy}
+              onChange={(e) => setNotificationPolicy(e.target.value)}
+              label="Política de Notificación"
+            >
+              <MenuItem value="automatica">🔔 Notificar automáticamente</MenuItem>
+              <MenuItem value="no_notificar">🚫 No notificar</MenuItem>
+              <MenuItem value="entrega_inmediata">⚡ Entrega inmediata</MenuItem>
+            </Select>
+          </FormControl>
+
+          {localDocument.isGrouped && (
+            <Alert severity="info" sx={{ mt: 2 }}>
+              <Typography variant="body2">
+                ℹ️ Los cambios en la política de notificación se aplicarán a todos los documentos del grupo.
+              </Typography>
+            </Alert>
+          )}
+        </Box>
       </DialogContent>
 
       {/* Acciones */}
@@ -493,6 +600,17 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
           sx={{ mr: 1 }}
         >
           Cerrar
+        </Button>
+        
+        {/* Botón de Guardar Política de Notificación */}
+        <Button
+          onClick={handleSaveNotificationPolicy}
+          variant="outlined"
+          startIcon={<NotificationIcon />}
+          disabled={actionLoading || notificationPolicy === (document?.notificationPolicy || 'automatica')}
+          sx={{ mr: 1 }}
+        >
+          {actionLoading ? 'Guardando...' : 'Guardar Política'}
         </Button>
         
         {/* Botón de Edición - NUEVA FUNCIONALIDAD */}

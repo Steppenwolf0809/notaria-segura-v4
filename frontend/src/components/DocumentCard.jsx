@@ -69,15 +69,14 @@ const DocumentCard = ({ document, onStatusChange }) => {
    * 🔗 CREAR GRUPO INTELIGENTE DIRECTO
    * Usar la API optimizada de agrupación inteligente
    */
-  const handleCreateSmartGroup = async (documentIds, notificationPolicy = 'automatica') => {
+  const handleCreateSmartGroup = async (documentIds) => {
     try {
       setLoading(true);
       console.log('🔗 Creando grupo inteligente con documentos:', documentIds);
-      console.log('🔔 Política de notificación:', notificationPolicy);
       
       const response = await documentService.createSmartGroup({
         documentIds,
-        notificationPolicy
+        notificationPolicy: 'automatica' // Valor por defecto
       });
 
       if (response.success) {
@@ -417,9 +416,9 @@ const DocumentCard = ({ document, onStatusChange }) => {
         onClose={() => setShowQuickGroupingModal(false)}
         mainDocument={document}
         relatedDocuments={pendingGroupDocuments}
-        onConfirm={async (selectedDocumentIds, notificationPolicy) => {
+        onConfirm={async (selectedDocumentIds) => {
           const documentIds = [document.id, ...selectedDocumentIds];
-          await handleCreateSmartGroup(documentIds, notificationPolicy);
+          await handleCreateSmartGroup(documentIds);
         }}
         loading={loading}
       />
