@@ -476,7 +476,6 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
                 <TableCell sx={{ fontWeight: 600 }}>Estado</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Días</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Alerta</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Valor</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Fecha</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Acciones</TableCell>
               </TableRow>
@@ -535,12 +534,6 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
                   
                   <TableCell>
                     {renderAlerta(documento.alerta)}
-                  </TableCell>
-                  
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 500, color: 'success.main' }}>
-                      ${documento.totalFactura?.toFixed(2) || '0.00'}
-                    </Typography>
                   </TableCell>
                   
                   <TableCell>
