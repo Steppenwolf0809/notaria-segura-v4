@@ -23,6 +23,7 @@ import ThemeToggle from './ThemeToggle';
 import CajaDashboard from './CajaDashboard';
 import MatrizadorCenter from './MatrizadorCenter';
 import RecepcionCenter from './RecepcionCenter';
+import ArchivoCenter from './ArchivoCenter';
 
 /**
  * Componente Dashboard principal
@@ -45,7 +46,8 @@ const Dashboard = () => {
       ADMIN: 'Panel de Administración',
       CAJA: 'Gestión Financiera y Documentos', 
       MATRIZADOR: 'Creación y Gestión de Documentos',
-      RECEPCION: 'Entrega de Documentos'
+      RECEPCION: 'Entrega de Documentos',
+      ARCHIVO: 'Gestión de Archivo y Supervisión'
     };
     return roleMessages[user?.role] || 'Dashboard';
   };
@@ -160,7 +162,11 @@ const Dashboard = () => {
     return <RecepcionCenter />;
   }
 
-  // Dashboard por defecto para otros roles (ADMIN, ARCHIVO)
+  if (user.role === 'ARCHIVO') {
+    return <ArchivoCenter />;
+  }
+
+  // Dashboard por defecto para otros roles (ADMIN)
   return (
     <Box sx={{ flexGrow: 1 }}>
       {/* App Bar */}

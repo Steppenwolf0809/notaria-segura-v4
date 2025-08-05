@@ -94,7 +94,8 @@ const useAuthStore = create(
           ADMIN: '#ef4444',      // Rojo - Control total
           CAJA: '#22c55e',       // Verde - Gestión financiera  
           MATRIZADOR: '#3b82f6', // Azul - Creación documentos
-          RECEPCION: '#06b6d4'   // Cyan - Entrega documentos
+          RECEPCION: '#06b6d4',  // Cyan - Entrega documentos
+          ARCHIVO: '#9333ea'     // Púrpura - Archivo y supervisión
         };
         
         return roleColors[user.role] || '#6b7280';
