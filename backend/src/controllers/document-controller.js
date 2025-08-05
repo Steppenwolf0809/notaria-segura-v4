@@ -686,10 +686,18 @@ async function getAvailableMatrizadores(req, res) {
 }
 
 /**
- * Detectar documentos agrupables para un cliente
+ * Detectar documentos agrupables para un cliente - Matrizador, Recepción y Archivo
  */
 async function detectGroupableDocuments(req, res) {
   try {
+    // Validar roles autorizados para detectar agrupaciones
+    if (!['MATRIZADOR', 'RECEPCION', 'ARCHIVO', 'ADMIN'].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo usuarios MATRIZADOR, RECEPCION o ARCHIVO pueden detectar agrupaciones'
+      });
+    }
+
     const { clientName, clientPhone } = req.body;
     const matrizadorId = req.user.id;
     
@@ -711,10 +719,18 @@ async function detectGroupableDocuments(req, res) {
 }
 
 /**
- * Crear agrupación de documentos
+ * Crear agrupación de documentos - Matrizador, Recepción y Archivo
  */
 async function createDocumentGroup(req, res) {
   try {
+    // Validar roles autorizados para agrupar documentos
+    if (!['MATRIZADOR', 'RECEPCION', 'ARCHIVO', 'ADMIN'].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo usuarios MATRIZADOR, RECEPCION o ARCHIVO pueden crear grupos de documentos'
+      });
+    }
+
     const { documentIds, verifiedPhone, notificationMessage } = req.body;
     const matrizadorId = req.user.id;
     
@@ -928,54 +944,19 @@ async function uploadXmlDocumentsBatch(req, res) {
           parsedData.matrizadorName
         );
 
-        // 🔗 DETECCIÓN AUTOMÁTICA DE DOCUMENTOS RELACIONADOS
-        console.log(`🔍 Detectando documentos relacionados para: "${parsedData.clientName}"`);
-        let groupableDocuments = [];
-        let groupingSuggestion = null;
-        
-        if (parsedData.clientName && parsedData.clientPhone) {
-          try {
-            const groupingResult = await DocumentGroupingService.detectGroupableDocuments(
-              {
-                clientName: parsedData.clientName,
-                clientPhone: parsedData.clientPhone
-              },
-              assignmentResult.assigned ? assignmentResult.matrizador.id : null
-            );
-            
-            if (groupingResult && groupingResult.length > 0) {
-              groupableDocuments = groupingResult;
-              groupingSuggestion = {
-                canGroup: true,
-                count: groupingResult.length + 1, // +1 por el documento actual
-                clientName: parsedData.clientName,
-                clientPhone: parsedData.clientPhone,
-                suggestion: `Se detectaron ${groupingResult.length} documentos adicionales del mismo cliente que podrían agruparse`
-              };
-              console.log(`✨ Agrupación sugerida: ${groupingSuggestion.suggestion}`);
-            }
-          } catch (groupingError) {
-            console.warn('⚠️ Error en detección de agrupación:', groupingError.message);
-          }
-        }
+        // CAJA SOLO PROCESA XMLs - Sin detección de agrupación
+        // La agrupación es responsabilidad exclusiva del MATRIZADOR
+        console.log(`📄 Documento procesado: "${parsedData.protocolNumber}" para cliente "${parsedData.clientName}"`);
 
-        // Guardar resultado exitoso
+        // Guardar resultado exitoso (SIN información de agrupación)
         exitosos.push({
           archivo: archivo.originalname,
           protocolNumber: parsedData.protocolNumber,
           documentId: document.id,
           asignacionAutomatica: assignmentResult.assigned,
           matrizadorAsignado: assignmentResult.assigned ? assignmentResult.matrizador : null,
-          indice: i + 1,
-          // ✨ NUEVA INFORMACIÓN DE AGRUPACIÓN
-          groupingSuggestion,
-          groupableDocuments: groupableDocuments.map(doc => ({
-            id: doc.id,
-            protocolNumber: doc.protocolNumber,
-            documentType: doc.documentType,
-            status: doc.status,
-            createdAt: doc.createdAt
-          }))
+          indice: i + 1
+          // ❌ AGRUPACIÓN REMOVIDA - Solo para Matrizador
         });
 
         console.log(`✅ Archivo ${i + 1} procesado: ${archivo.originalname} (${parsedData.protocolNumber})`);
@@ -1042,11 +1023,11 @@ async function createSmartDocumentGroup(req, res) {
   try {
     const { documentIds, notificationPolicy = 'automatica', skipValidation = false } = req.body;
     
-    // Validar usuario CAJA
-    if (!['CAJA', 'ADMIN'].includes(req.user.role)) {
+    // Validar roles autorizados para agrupación inteligente
+    if (!['MATRIZADOR', 'RECEPCION', 'ARCHIVO', 'ADMIN'].includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: 'Solo usuarios CAJA o ADMIN pueden crear grupos inteligentes'
+        message: 'Solo usuarios MATRIZADOR, RECEPCION o ARCHIVO pueden crear grupos de documentos'
       });
     }
 

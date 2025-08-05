@@ -5,6 +5,7 @@ prisma/node_modules/
 node_modules/
 
 # Environment variables - MANTENER estructura pero permitir archivos necesarios
+.env
 .env.production
 .env.local
 backend/.env.production
