@@ -39,6 +39,7 @@ import {
 } from '@mui/icons-material';
 import archivoService from '../../services/archivo-service';
 import useAuth from '../../hooks/use-auth';
+import useDebounce from '../../hooks/useDebounce';
 
 /**
  * Componente de Supervisión General
@@ -62,6 +63,9 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
     alerta: 'TODAS'
   });
 
+  // Debounce para la búsqueda (500ms)
+  const debouncedSearch = useDebounce(filtros.search, 500);
+
   const { token } = useAuth();
 
   /**
@@ -76,7 +80,7 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
    */
   useEffect(() => {
     cargarDocumentos();
-  }, [filtros, page, rowsPerPage, token]);
+  }, [filtros.matrizador, filtros.estado, filtros.alerta, debouncedSearch, page, rowsPerPage, token]);
 
   /**
    * Cargar datos iniciales
@@ -117,6 +121,7 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
     try {
       const params = {
         ...filtros,
+        search: debouncedSearch, // Usar el search con debounce
         page: page + 1,
         limit: rowsPerPage
       };
@@ -127,6 +132,7 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
           delete params[key];
         }
       });
+
 
       const response = await archivoService.getSupervisionGeneral(token, params);
 
