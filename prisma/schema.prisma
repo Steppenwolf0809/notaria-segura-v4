@@ -51,6 +51,9 @@ model User {
   createdDocuments  Document[] @relation("CreatedDocuments")    // Documentos creados (caja)
   deliveredDocuments Document[] @relation("DeliveredDocuments") // Documentos entregados (recepción)
   
+  // Relación de auditoría - NUEVA FUNCIONALIDAD
+  documentEvents    DocumentEvent[]                            // Eventos de auditoría realizados por el usuario
+  
   @@map("users")
 }
 
@@ -61,6 +64,12 @@ model Document {
   clientName              String                   // Nombre del cliente
   clientPhone             String?                  // CELULAR del cliente para WhatsApp
   clientEmail             String?                  // Email del cliente
+  clientRuc               String?                  // Cédula o RUC del cliente para verificación
+  
+  // CAMPOS EDITABLES - Agregados para funcionalidad de edición
+  detalle_documento       String?                  // Descripción específica del trámite
+  comentarios_recepcion   String?                  // Notas especiales para recepción
+  
   documentType            DocumentType             // Tipo de documento detectado
   status                  DocumentStatus @default(PENDIENTE)
   verificationCode        String?                  // Código de 4 dígitos para entrega
@@ -111,6 +120,9 @@ model Document {
 
   documentGroup         DocumentGroup? @relation(fields: [documentGroupId], references: [id])
   
+  // Relación de auditoría - NUEVA FUNCIONALIDAD
+  events                DocumentEvent[]  // Historial de eventos del documento
+  
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt
   
@@ -149,6 +161,36 @@ enum GroupStatus {
   IN_PROCESS
   READY  
   DELIVERED
+}
+
+// MODELO DE AUDITORÍA - Registro de eventos de documentos
+model DocumentEvent {
+  id              String    @id @default(uuid())
+  documentId      String                          // FK al documento
+  userId          Int                             // FK al usuario que realizó la acción
+  eventType       EventType                      // Tipo de evento
+  description     String                         // Descripción del evento
+  details         Json?                          // Detalles adicionales del evento (campo anterior, nuevo valor, etc.)
+  ipAddress       String?                        // IP desde donde se realizó la acción
+  userAgent       String?                        // User agent del navegador
+  createdAt       DateTime  @default(now())
+  
+  // Relaciones
+  document        Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user            User      @relation(fields: [userId], references: [id])
+  
+  @@map("document_events")
+}
+
+// Tipos de eventos para auditoría
+enum EventType {
+  DOCUMENT_CREATED      // Documento creado desde XML
+  DOCUMENT_ASSIGNED     // Documento asignado a matrizador
+  STATUS_CHANGED        // Estado del documento cambiado
+  INFO_EDITED          // Información del documento editada (NUEVA FUNCIONALIDAD)
+  GROUP_CREATED        // Documento agrupado
+  GROUP_DELIVERED      // Grupo de documentos entregado
+  VERIFICATION_GENERATED // Código de verificación generado
 }
 
 // Modelo básico para verificar conexión

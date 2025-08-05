@@ -28,6 +28,8 @@ import { es } from 'date-fns/locale';
 import documentService from '../services/document-service.js';
 import GroupingDetector from './grouping/GroupingDetector.jsx';
 import DocumentGroupingModal from './grouping/DocumentGroupingModal.jsx';
+import GroupingAlert from './grouping/GroupingAlert.jsx';
+import QuickGroupingModal from './grouping/QuickGroupingModal.jsx';
 import useDocumentStore from '../store/document-store.js';
 
 /**
@@ -39,6 +41,9 @@ const DocumentCard = ({ document, onStatusChange }) => {
   const [loading, setLoading] = useState(false);
   const [showGroupingModal, setShowGroupingModal] = useState(false);
   const [groupableDocuments, setGroupableDocuments] = useState([]);
+  // 🔗 Estados para el nuevo modal de confirmación rápida
+  const [showQuickGroupingModal, setShowQuickGroupingModal] = useState(false);
+  const [pendingGroupDocuments, setPendingGroupDocuments] = useState([]);
   const fetchDocuments = useDocumentStore((state) => state.fetchMyDocuments);
 
   const handleGroupDocuments = (groupableDocs, autoCreate = false) => {
@@ -57,6 +62,46 @@ const DocumentCard = ({ document, onStatusChange }) => {
     } catch (error) {
       console.error('Error creating group:', error);
       throw error; // Re-lanzar para que el modal muestre el error
+    }
+  };
+
+  /**
+   * 🔗 CREAR GRUPO INTELIGENTE DIRECTO
+   * Usar la API optimizada de agrupación inteligente
+   */
+  const handleCreateSmartGroup = async (documentIds, notificationPolicy = 'automatica') => {
+    try {
+      setLoading(true);
+      console.log('🔗 Creando grupo inteligente con documentos:', documentIds);
+      console.log('🔔 Política de notificación:', notificationPolicy);
+      
+      const response = await documentService.createSmartGroup({
+        documentIds,
+        notificationPolicy
+      });
+
+      if (response.success) {
+        console.log('✅ Grupo inteligente creado exitosamente:', response.data);
+        // Actualizar documentos
+        if(onStatusChange) onStatusChange(null, null, true);
+        await fetchDocuments();
+        
+        // Cerrar modal
+        setShowQuickGroupingModal(false);
+        
+        // Mostrar notificación de éxito
+        alert(`✅ Grupo creado con ${documentIds.length} documentos. Se envió notificación WhatsApp.`);
+      } else {
+        console.error('❌ Error creando grupo:', response.message);
+        alert(`❌ Error: ${response.message}`);
+        throw new Error(response.message);
+      }
+    } catch (error) {
+      console.error('❌ Error creando grupo inteligente:', error);
+      alert('❌ Error creando grupo de documentos');
+      throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -200,6 +245,25 @@ const DocumentCard = ({ document, onStatusChange }) => {
           />
         )}
 
+        {/* 🔗 ALERTA DE AGRUPACIÓN INTELIGENTE */}
+        {!document.isGrouped && (
+          <GroupingAlert
+            document={document}
+            variant="standard"
+            onGroupAction={(groupableDocuments, currentDocument) => {
+              console.log('🔗 Abriendo modal de confirmación de agrupación:', {
+                current: currentDocument.protocolNumber,
+                groupable: groupableDocuments.map(d => d.protocolNumber)
+              });
+              // Abrir modal de confirmación
+              setPendingGroupDocuments(groupableDocuments);
+              setShowQuickGroupingModal(true);
+              console.log('🔗 Estado del modal cambiado a: true');
+            }}
+            showAutoButton={true}
+          />
+        )}
+
         {/* Información del cliente */}
         <Box sx={{ mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -271,9 +335,7 @@ const DocumentCard = ({ document, onStatusChange }) => {
                 <strong>Protocolo:</strong> {document.protocolNumber}
               </Typography>
               
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                <strong>Total Factura:</strong> {formatCurrency(document.totalFactura)}
-              </Typography>
+              {/* Total Factura removido - No corresponde al rol Matrizador */}
               
               <Typography variant="body2" color="text.secondary" gutterBottom>
                 <strong>Matrizador XML:</strong> {document.matrizadorName}
@@ -347,6 +409,19 @@ const DocumentCard = ({ document, onStatusChange }) => {
         onClose={() => setShowGroupingModal(false)}
         groupableDocuments={groupableDocuments}
         onCreateGroup={handleCreateGroup}
+      />
+
+      {/* 🔗 NUEVO MODAL DE CONFIRMACIÓN RÁPIDA */}
+      <QuickGroupingModal
+        open={showQuickGroupingModal}
+        onClose={() => setShowQuickGroupingModal(false)}
+        mainDocument={document}
+        relatedDocuments={pendingGroupDocuments}
+        onConfirm={async (selectedDocumentIds, notificationPolicy) => {
+          const documentIds = [document.id, ...selectedDocumentIds];
+          await handleCreateSmartGroup(documentIds, notificationPolicy);
+        }}
+        loading={loading}
       />
     </Card>
   );

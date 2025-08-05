@@ -247,7 +247,8 @@ const documentService = {
       
       return {
         success: false,
-        error: errorMessage
+        error: errorMessage,
+        message: errorMessage
       };
     }
   },
@@ -340,6 +341,132 @@ const documentService = {
       const message = error.response?.data?.message || 'Error entregando el grupo de documentos';
       console.error(message, error);
       throw new Error(message);
+    }
+  },
+
+  // --- MÉTODO DE ENTREGA COMPLETA ---
+  
+  /**
+   * Entregar documento con información completa
+   * @param {string} documentId - ID del documento
+   * @param {Object} deliveryData - Datos de entrega
+   * @returns {Promise<Object>} Documento entregado
+   */
+  async deliverDocument(documentId, deliveryData) {
+    try {
+      const response = await api.post(`/documents/${documentId}/deliver`, deliveryData);
+      
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Error delivering document:', error);
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Error al entregar documento';
+      
+      return {
+        success: false,
+        error: errorMessage,
+        message: errorMessage
+      };
+    }
+  },
+
+  // --- MÉTODOS DE EDICIÓN ---
+  // CONSERVADOR: Nuevas funciones siguiendo el patrón existente
+
+  /**
+   * Obtener información editable de un documento
+   * @param {string} documentId - ID del documento
+   * @returns {Promise<Object>} Información editable según permisos del usuario
+   */
+  async getEditableDocumentInfo(documentId) {
+    try {
+      const response = await api.get(`/documents/${documentId}/editable-info`);
+      
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Error fetching editable document info:', error);
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Error al obtener información editable';
+      
+      return {
+        success: false,
+        error: errorMessage,
+        message: errorMessage
+      };
+    }
+  },
+
+  /**
+   * Actualizar información de documento
+   * @param {string} documentId - ID del documento
+   * @param {Object} updateData - Datos a actualizar
+   * @returns {Promise<Object>} Documento actualizado
+   */
+  async updateDocumentInfo(documentId, updateData) {
+    try {
+      const response = await api.put(`/documents/${documentId}/update-info`, updateData);
+      
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Error updating document info:', error);
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Error al actualizar información del documento';
+      
+      // Extraer errores específicos si existen
+      const errors = error.response?.data?.errors || [errorMessage];
+      
+      return {
+        success: false,
+        error: errorMessage,
+        errors: errors,
+        message: errorMessage
+      };
+    }
+  },
+
+  /**
+   * 🔗 CREAR GRUPO INTELIGENTE DE DOCUMENTOS
+   * Función optimizada para crear grupos basados en detección automática
+   */
+  createSmartGroup: async (groupData) => {
+    try {
+      const response = await api.post('/documents/create-smart-group', groupData);
+      
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Error creating smart group:', error);
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Error creando grupo inteligente';
+      
+      return {
+        success: false,
+        message: errorMessage,
+        error: error.response?.data || error
+      };
     }
   }
 };

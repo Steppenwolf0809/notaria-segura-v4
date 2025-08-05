@@ -32,6 +32,7 @@ import {
 import { useDropzone } from 'react-dropzone';
 import useDocumentStore from '../store/document-store';
 import { toast } from 'react-toastify';
+import SmartGroupingModal from './grouping/SmartGroupingModal';
 
 /**
  * 📦 COMPONENTE DE CARGA EN LOTE DE XML
@@ -54,6 +55,9 @@ const BatchUpload = () => {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [showResults, setShowResults] = useState(false);
   const [batchResults, setBatchResults] = useState(null);
+  // 🔗 Estados para agrupación inteligente
+  const [showSmartGroupingModal, setShowSmartGroupingModal] = useState(false);
+  const [groupingSuggestions, setGroupingSuggestions] = useState([]);
 
   /**
    * Configuración de dropzone para múltiples archivos XML
@@ -139,10 +143,25 @@ const BatchUpload = () => {
       setShowResults(true);
 
       if (result.success) {
-        const { resumen } = result.data;
-        toast.success(
-          `Lote procesado: ${resumen.exitosos}/${resumen.totalArchivos} archivos exitosos (${resumen.porcentajeExito}%)`
+        const { resumen, exitosos } = result.data;
+        
+        // 🔗 DETECCIÓN AUTOMÁTICA DE AGRUPACIONES
+        const documentsWithGrouping = exitosos.filter(doc => 
+          doc.groupingSuggestion?.canGroup && 
+          doc.groupableDocuments?.length > 0
         );
+
+        if (documentsWithGrouping.length > 0) {
+          // Mostrar modal de agrupación inteligente
+          console.log(`✨ Detectadas ${documentsWithGrouping.length} oportunidades de agrupación`);
+          setGroupingSuggestions(documentsWithGrouping);
+          setShowSmartGroupingModal(true);
+        } else {
+          // No hay agrupaciones, mostrar toast normal
+          toast.success(
+            `Lote procesado: ${resumen.exitosos}/${resumen.totalArchivos} archivos exitosos (${resumen.porcentajeExito}%)`
+          );
+        }
         
         // Limpiar archivos seleccionados después del éxito
         setSelectedFiles([]);
@@ -164,6 +183,34 @@ const BatchUpload = () => {
   const closeResults = () => {
     setShowResults(false);
     setBatchResults(null);
+  };
+
+  /**
+   * 🔗 Manejar finalización de agrupación inteligente
+   */
+  const handleGroupingComplete = (results) => {
+    const { successful, failed } = results;
+    
+    if (successful > 0) {
+      toast.success(
+        `✨ Agrupación completada: ${successful} grupos creados exitosamente${failed > 0 ? `, ${failed} fallaron` : ''}`
+      );
+    } else {
+      toast.error('No se pudieron crear los grupos de documentos');
+    }
+    
+    // Recargar documentos para mostrar los grupos
+    fetchAllDocuments();
+  };
+
+  /**
+   * 🔗 Manejar saltar agrupación
+   */
+  const handleSkipGrouping = () => {
+    const { resumen } = batchResults;
+    toast.success(
+      `Lote procesado: ${resumen.exitosos}/${resumen.totalArchivos} archivos exitosos (${resumen.porcentajeExito}%) - Documentos mantenidos individuales`
+    );
   };
 
   /**
@@ -451,6 +498,15 @@ const BatchUpload = () => {
             </Button>
           </DialogActions>
         </Dialog>
+
+        {/* 🔗 MODAL DE AGRUPACIÓN INTELIGENTE */}
+        <SmartGroupingModal
+          open={showSmartGroupingModal}
+          onClose={() => setShowSmartGroupingModal(false)}
+          groupingSuggestions={groupingSuggestions}
+          onGroupingComplete={handleGroupingComplete}
+          onSkipGrouping={handleSkipGrouping}
+        />
       </CardContent>
     </Card>
   );

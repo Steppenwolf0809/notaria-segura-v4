@@ -28,6 +28,15 @@ import useDocumentStore from '../store/document-store';
 import useStats from '../hooks/useStats';
 
 /**
+ * 🚨 DEPRECATED - ARCHIVO REEMPLAZADO [ENERO 2025]
+ * 
+ * Este componente ha sido INTEGRADO en MatrizadorDashboard.jsx
+ * - Sus componentes visuales se extrajeron a /MatrizadorDashboard/
+ * - Su funcionalidad se integró en el dashboard principal
+ * - Mantener este archivo solo como referencia temporal
+ * 
+ * NO USAR ESTE COMPONENTE - Usar MatrizadorDashboard.jsx
+ * 
  * Dashboard Principal del Matrizador
  * Layout horizontal con KPIs exactamente como el prototipo
  */

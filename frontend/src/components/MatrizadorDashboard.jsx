@@ -46,8 +46,17 @@ import NotificationsHistory from './Documents/NotificationsHistory';
 import useDocumentStore from '../store/document-store';
 import useStats from '../hooks/useStats';
 import useDocuments from '../hooks/useDocuments';
+// Importar componentes visuales superiores
+import KPISection from './MatrizadorDashboard/KPISection';
+import WidgetsAtencion from './MatrizadorDashboard/WidgetsAtencion';
+import ProgresoGeneral from './MatrizadorDashboard/ProgresoGeneral';
 
 /**
+ * REFACTORIZACIÓN COMPLETADA [ENERO 2025]
+ * - Integrado diseño superior de MatrizadorDashboardNew.jsx
+ * - Mantenida toda funcionalidad original
+ * - KPIs y widgets ahora usan componentes visuales mejorados
+ * 
  * Dashboard ejecutivo mejorado para el rol Matrizador
  * Incluye KPIs, centro de control y navegación entre vistas
  */
@@ -104,6 +113,17 @@ const MatrizadorDashboard = () => {
    * Usar hooks mejorados
    */
   const { basicStats, advancedMetrics, kpiMetrics, alerts, utils } = useStats();
+
+  /**
+   * Enriquecer kpiMetrics con iconos para los nuevos componentes
+   */
+  const enhancedKpiMetrics = {
+    ...kpiMetrics,
+    totalActive: { ...kpiMetrics.totalActive, icon: AssignmentIcon },
+    inProgress: { ...kpiMetrics.inProgress, icon: ScheduleIcon },
+    readyForDelivery: { ...kpiMetrics.readyForDelivery, icon: CheckCircleIcon },
+    avgTime: { ...kpiMetrics.avgTime, icon: SpeedIcon }
+  };
   
   /**
    * Por ahora comentamos el hook avanzado para evitar bucles infinitos
@@ -132,149 +152,11 @@ const MatrizadorDashboard = () => {
   const readyDocs = getDocumentsByStatus('LISTO');
   const deliveredDocs = getDocumentsByStatus('ENTREGADO');
 
-  /**
-   * Componente KPI Card mejorado
-   */
-  const KPICard = ({ title, value, icon: Icon, color, trend, subtitle }) => (
-    <Card sx={{ height: '100%', background: `linear-gradient(135deg, ${color}15, ${color}05)` }}>
-      <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Box>
-            <Typography variant="h3" sx={{ fontWeight: 'bold', color, mb: 0.5 }}>
-              {value}
-            </Typography>
-            <Typography variant="subtitle1" sx={{ fontWeight: 'medium', color: 'text.primary' }}>
-              {title}
-            </Typography>
-            {subtitle && (
-              <Typography variant="body2" color="text.secondary">
-                {subtitle}
-              </Typography>
-            )}
-          </Box>
-          <Avatar sx={{ bgcolor: color, width: 56, height: 56 }}>
-            <Icon sx={{ fontSize: 28 }} />
-          </Avatar>
-        </Box>
-        {trend && (
-          <Box sx={{ mt: 2, display: 'flex', alignItems: 'center' }}>
-            <TrendingUpIcon sx={{ fontSize: 16, color: 'success.main', mr: 0.5 }} />
-            <Typography variant="caption" color="success.main">
-              {trend}
-            </Typography>
-          </Box>
-        )}
-      </CardContent>
-    </Card>
-  );
+  // KPICard component removed - now using superior visual components from KPISection
 
-  /**
-   * Widget de documentos que requieren atención
-   */
-  const AttentionWidget = () => (
-    <Card sx={{ height: '100%' }}>
-      <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <WarningIcon sx={{ color: 'warning.main', mr: 1 }} />
-          <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'warning.main' }}>
-            Requieren Atención
-          </Typography>
-          <Badge badgeContent={advancedMetrics.needAttention.length} color="warning" sx={{ ml: 1 }} />
-        </Box>
-        
-        {advancedMetrics.needAttention.length === 0 ? (
-          <Box sx={{ textAlign: 'center', py: 3 }}>
-            <CheckCircleIcon sx={{ fontSize: 48, color: 'success.light', mb: 1 }} />
-            <Typography variant="body2" color="text.secondary">
-              ¡Excelente! No hay documentos atrasados
-            </Typography>
-          </Box>
-        ) : (
-          <List dense>
-            {advancedMetrics.needAttention.slice(0, 3).map((doc) => (
-              <ListItem key={doc.id} sx={{ px: 0 }}>
-                <ListItemAvatar>
-                  <Avatar sx={{ bgcolor: 'warning.light', width: 32, height: 32 }}>
-                    <AccessTimeIcon sx={{ fontSize: 16 }} />
-                  </Avatar>
-                </ListItemAvatar>
-                <ListItemText
-                  primary={doc.clientName}
-                  secondary={`${doc.documentType} - ${Math.floor((new Date() - new Date(doc.createdAt)) / (1000 * 60 * 60 * 24))} días`}
-                  primaryTypographyProps={{ variant: 'body2', fontWeight: 'medium' }}
-                  secondaryTypographyProps={{ variant: 'caption' }}
-                />
-              </ListItem>
-            ))}
-            {advancedMetrics.needAttention.length > 3 && (
-              <ListItem sx={{ px: 0, justifyContent: 'center' }}>
-                <Typography variant="caption" color="text.secondary">
-                  +{advancedMetrics.needAttention.length - 3} documentos más
-                </Typography>
-              </ListItem>
-            )}
-          </List>
-        )}
-      </CardContent>
-    </Card>
-  );
+  // AttentionWidget component removed - now using superior visual components from WidgetsAtencion
 
-  /**
-   * Widget de actividad reciente
-   */
-  const RecentActivityWidget = () => (
-    <Card sx={{ height: '100%' }}>
-      <CardContent>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <NotificationsIcon sx={{ color: 'info.main', mr: 1 }} />
-          <Typography variant="h6" sx={{ fontWeight: 'bold', color: 'info.main' }}>
-            Actividad Reciente
-          </Typography>
-        </Box>
-        
-        <List dense>
-          {advancedMetrics.todayDocs.slice(0, 4).map((doc, index) => (
-            <ListItem key={doc.id} sx={{ px: 0 }}>
-              <ListItemAvatar>
-                <Avatar sx={{ 
-                  bgcolor: doc.status === 'LISTO' ? 'success.main' : 'info.main', 
-                  width: 32, 
-                  height: 32 
-                }}>
-                  {doc.status === 'LISTO' ? 
-                    <CheckCircleIcon sx={{ fontSize: 16 }} /> : 
-                    <AssignmentIcon sx={{ fontSize: 16 }} />
-                  }
-                </Avatar>
-              </ListItemAvatar>
-              <ListItemText
-                primary={`${doc.clientName}`}
-                secondary={`${doc.documentType} - Hoy`}
-                primaryTypographyProps={{ variant: 'body2', fontWeight: 'medium' }}
-                secondaryTypographyProps={{ variant: 'caption' }}
-              />
-              <ListItemSecondaryAction>
-                <Chip
-                  label={doc.status === 'LISTO' ? 'Completado' : 'En Proceso'}
-                  size="small"
-                  color={doc.status === 'LISTO' ? 'success' : 'info'}
-                  variant="outlined"
-                />
-              </ListItemSecondaryAction>
-            </ListItem>
-          ))}
-          
-          {advancedMetrics.todayDocs.length === 0 && (
-            <ListItem sx={{ px: 0, justifyContent: 'center', py: 3 }}>
-              <Typography variant="body2" color="text.secondary">
-                No hay actividad reciente hoy
-              </Typography>
-            </ListItem>
-          )}
-        </List>
-      </CardContent>
-    </Card>
-  );
+  // RecentActivityWidget component removed - now using superior visual components from WidgetsAtencion
 
   /**
    * Componente de skeleton para loading
@@ -358,77 +240,14 @@ const MatrizadorDashboard = () => {
       case 0: // Dashboard
         return (
           <Box>
-            {/* KPIs Principales */}
-            <Grid container spacing={3} sx={{ mb: 4 }}>
-              <Grid item xs={12} sm={6} md={3}>
-                <KPICard
-                  title={kpiMetrics.totalActive.label}
-                  value={kpiMetrics.totalActive.value}
-                  icon={AssignmentIcon}
-                  color="#3b82f6"
-                  subtitle="Documentos activos"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <KPICard
-                  title={kpiMetrics.inProgress.label}
-                  value={kpiMetrics.inProgress.value}
-                  icon={ScheduleIcon}
-                  color="#f59e0b"
-                  trend={kpiMetrics.inProgress.trend}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <KPICard
-                  title={kpiMetrics.readyForDelivery.label}
-                  value={kpiMetrics.readyForDelivery.value}
-                  icon={CheckCircleIcon}
-                  color="#10b981"
-                  trend={kpiMetrics.readyForDelivery.trend}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={3}>
-                <KPICard
-                  title={kpiMetrics.avgTime.label}
-                  value={kpiMetrics.avgTime.value}
-                  icon={SpeedIcon}
-                  color="#6366f1"
-                  subtitle="Tiempo de procesamiento"
-                />
-              </Grid>
-            </Grid>
+            {/* KPIs Principales - COMPONENTE VISUAL SUPERIOR */}
+            <KPISection kpiMetrics={enhancedKpiMetrics} loading={loading} />
 
-            {/* Widgets de Acción */}
-            <Grid container spacing={3} sx={{ mb: 4 }}>
-              <Grid item xs={12} md={6}>
-                <AttentionWidget />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <RecentActivityWidget />
-              </Grid>
-            </Grid>
+            {/* Widgets de Acción - COMPONENTES VISUALES SUPERIORES */}
+            <WidgetsAtencion advancedMetrics={advancedMetrics} loading={loading} />
 
-            {/* Progress Bar General */}
-            <Card sx={{ mb: 4 }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                    Progreso General
-                  </Typography>
-                  <Typography variant="h6" sx={{ color: 'success.main', fontWeight: 'bold' }}>
-                    {kpiMetrics.productivity.value}
-                  </Typography>
-                </Box>
-                <LinearProgress 
-                  variant="determinate" 
-                  value={kpiMetrics.productivity.numericValue} 
-                  sx={{ height: 8, borderRadius: 4 }}
-                />
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                  Documentos completados del total asignado
-                </Typography>
-              </CardContent>
-            </Card>
+            {/* Progress Bar General - COMPONENTE VISUAL SUPERIOR */}
+            <ProgresoGeneral kpiMetrics={enhancedKpiMetrics} loading={loading} />
           </Box>
         );
       

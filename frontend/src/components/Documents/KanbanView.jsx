@@ -23,6 +23,8 @@ import useDragAndDrop from '../../hooks/useDragAndDrop';
 import usePagination from '../../hooks/usePagination';
 import DocumentDetailModal from './DocumentDetailModal';
 import LoadMoreButton from '../UI/LoadMoreButton';
+import GroupingAlert from '../grouping/GroupingAlert';
+import QuickGroupingModal from '../grouping/QuickGroupingModal';
 import { filterRecentlyDelivered, getDeliveryFilterNote, DELIVERY_FILTER_PERIODS } from '../../utils/dateUtils';
 import { debugDragAndDrop } from '../../utils/debugDragAndDrop';
 import './KanbanView.css';
@@ -50,6 +52,9 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
 
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
+  // 🔗 Estados para modal de agrupación rápida
+  const [showQuickGroupingModal, setShowQuickGroupingModal] = useState(false);
+  const [pendingGroupData, setPendingGroupData] = useState({ main: null, related: [] });
 
   // Debug para drag & drop
   React.useEffect(() => {
@@ -183,18 +188,32 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
       return phone;
     };
 
-    // Función para obtener el estado de pago (simulado por ahora)
-    const getPaymentStatus = () => {
-      // Por ahora simulamos basado en el valor - en el futuro vendrá de la BD
-      if (document.actoPrincipalValor > 0) {
-        return { status: 'Pagado', icon: '💰', color: '#10b981' };
-      }
-      return { status: 'Pendiente', icon: '⏳', color: '#f59e0b' };
+    // NOTA: El Matrizador NO maneja información de pagos
+    // Esta función se removió porque no corresponde al rol Matrizador
+    
+    // Funciones para el estado de procesamiento (apropiadas para Matrizador)
+    const getStatusText = (status) => {
+      const statusTexts = {
+        'PENDIENTE': 'Pendiente',
+        'EN_PROCESO': 'En Proceso', 
+        'LISTO': 'Listo',
+        'ENTREGADO': 'Entregado'
+      };
+      return statusTexts[status] || status;
+    };
+
+    const getStatusColor = (status) => {
+      const statusColors = {
+        'PENDIENTE': 'warning',
+        'EN_PROCESO': 'info',
+        'LISTO': 'success', 
+        'ENTREGADO': 'default'
+      };
+      return statusColors[status] || 'default';
     };
 
     const contextInfo = getContextualInfo();
     const formattedPhone = formatPhone(document.clientPhone);
-    const paymentStatus = getPaymentStatus();
     
     return (
       <Box
@@ -350,7 +369,7 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
           </Box>
         )}
 
-        {/* 4. Fila de Estado: Valor + Estado de Pago + Fecha */}
+        {/* 4. Información Contextual para Matrizador */}
         <Box sx={{ 
           display: 'flex', 
           alignItems: 'center', 
@@ -363,28 +382,15 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
           borderRadius: 1,
           gap: 1
         }}>
-          {/* Valor */}
-          {document.actoPrincipalValor && document.actoPrincipalValor > 0 && (
-            <Typography variant="body2" sx={{ 
-              color: 'success.main', 
-              fontWeight: 700, 
-              fontSize: '0.8rem'
-            }}>
-              ${new Intl.NumberFormat('es-EC').format(document.actoPrincipalValor)}
-            </Typography>
-          )}
-          
-          {/* Estado de Pago */}
+          {/* Estado de Procesamiento */}
           <Chip
-            label={paymentStatus.status}
+            label={getStatusText(document.status)}
             size="small"
+            color={getStatusColor(document.status)}
             sx={{ 
               fontSize: '0.65rem',
               height: 18,
               fontWeight: 600,
-              bgcolor: paymentStatus.color + '20',
-              color: paymentStatus.color,
-              border: `1px solid ${paymentStatus.color}40`,
               borderRadius: '8px'
             }}
           />
@@ -434,6 +440,42 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
             />
           )}
         </Box>
+
+        {/* 🔗 ALERTA DE AGRUPACIÓN INTELIGENTE PARA KANBAN */}
+        {!document.isGrouped && (
+          <Box sx={{ mb: 1 }}>
+            <GroupingAlert
+              document={document}
+              variant="compact"
+              showAutoButton={true}
+              onGroupAction={(groupableDocuments, currentDocument) => {
+                console.log('🔗 Abriendo modal de agrupación desde Kanban:', {
+                  current: currentDocument.protocolNumber,
+                  groupable: groupableDocuments.map(d => d.protocolNumber)
+                });
+                // Abrir modal de confirmación
+                setPendingGroupData({
+                  main: currentDocument,
+                  related: groupableDocuments
+                });
+                setShowQuickGroupingModal(true);
+              }}
+              sx={{ 
+                fontSize: '0.75rem',
+                py: 0.5,
+                '.MuiAlert-message': { 
+                  py: 0.25,
+                  fontSize: '0.75rem' 
+                },
+                '.MuiButton-root': {
+                  fontSize: '0.7rem',
+                  py: 0.25,
+                  px: 1
+                }
+              }}
+            />
+          </Box>
+        )}
 
         {/* 6. Última Actividad (simulada por ahora) */}
         <Box sx={{ 
@@ -883,6 +925,28 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
         open={detailModalOpen}
         onClose={closeDetailModal}
         document={selectedDocument}
+      />
+
+      {/* 🔗 MODAL DE CONFIRMACIÓN DE AGRUPACIÓN RÁPIDA */}
+      <QuickGroupingModal
+        open={showQuickGroupingModal}
+        onClose={() => setShowQuickGroupingModal(false)}
+        mainDocument={pendingGroupData.main}
+        relatedDocuments={pendingGroupData.related}
+        onConfirm={async (selectedDocumentIds, notificationPolicy) => {
+          if (pendingGroupData.main && selectedDocumentIds.length > 0) {
+            const documentIds = [pendingGroupData.main.id, ...selectedDocumentIds];
+            console.log('🔗 Confirmando agrupación desde Kanban:', {
+              main: pendingGroupData.main.protocolNumber,
+              selectedIds: selectedDocumentIds,
+              notificationPolicy
+            });
+            
+            // TODO: Aquí se puede implementar la creación de grupo para Kanban
+            // Usar documentService.createSmartGroup si es necesario
+          }
+          setShowQuickGroupingModal(false);
+        }}
       />
     </Box>
   );

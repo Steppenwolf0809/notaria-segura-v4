@@ -27,6 +27,7 @@ import {
 } from '@mui/icons-material';
 import useDocumentStore from '../../store/document-store';
 import DocumentDetailModal from './DocumentDetailModal';
+import GroupingAlert from '../grouping/GroupingAlert';
 
 /**
  * Vista Lista - EXACTA AL PROTOTIPO
@@ -281,12 +282,21 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
                       />
                     </TableCell>
                     <TableCell>
-                      <Chip
-                        label={statusInfo.label}
-                        size="small"
-                        color={statusInfo.color}
-                        variant="filled"
-                      />
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                        <Chip
+                          label={statusInfo.label}
+                          size="small"
+                          color={statusInfo.color}
+                          variant="filled"
+                        />
+                        {/* 🔗 ALERTA DE AGRUPACIÓN COMPACTA */}
+                        {!document.isGrouped && (
+                          <GroupingAlert
+                            document={document}
+                            variant="chip"
+                          />
+                        )}
+                      </Box>
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2">

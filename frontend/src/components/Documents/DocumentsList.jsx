@@ -43,6 +43,7 @@ import useDocumentStore from '../../store/document-store';
 import useStats from '../../hooks/useStats';
 import useDebounce from '../../hooks/useDebounce';
 import DocumentDetailModal from './DocumentDetailModal';
+import GroupingAlert from '../grouping/GroupingAlert';
 
 /**
  * Componente DocumentsList - Vista de tabla con búsqueda y filtros avanzados
@@ -480,12 +481,21 @@ const DocumentsList = () => {
 
                   {/* Estado */}
                   <TableCell>
-                    <Chip
-                      label={getStatusText(document.status)}
-                      color={getStatusColor(document.status)}
-                      size="small"
-                      variant={document.status === 'LISTO' ? 'filled' : 'outlined'}
-                    />
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                      <Chip
+                        label={getStatusText(document.status)}
+                        color={getStatusColor(document.status)}
+                        size="small"
+                        variant={document.status === 'LISTO' ? 'filled' : 'outlined'}
+                      />
+                      {/* 🔗 ALERTA DE AGRUPACIÓN COMPACTA */}
+                      {!document.isGrouped && (
+                        <GroupingAlert
+                          document={document}
+                          variant="chip"
+                        />
+                      )}
+                    </Box>
                   </TableCell>
 
                   {/* Acto Principal */}

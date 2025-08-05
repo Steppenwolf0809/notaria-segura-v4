@@ -25,6 +25,7 @@ import {
 } from '@mui/icons-material';
 import archivoService from '../../services/archivo-service';
 import { getDeliveryFilterNote, DELIVERY_FILTER_PERIODS } from '../../utils/dateUtils';
+import GroupingAlert from '../grouping/GroupingAlert';
 
 /**
  * Vista Kanban para documentos de archivo
@@ -226,7 +227,7 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
             </Box>
 
             {/* Estado */}
-            <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1 }}>
               <Chip 
                 label={archivoService.formatearEstado(documento.status).texto}
                 color={getEstadoColor(documento.status)}
@@ -234,6 +235,16 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
                 sx={{ fontWeight: 600 }}
               />
             </Box>
+
+            {/* 🔗 ALERTA DE AGRUPACIÓN COMPACTA */}
+            {!documento.isGrouped && (
+              <Box sx={{ display: 'flex', justifyContent: 'center' }}>
+                <GroupingAlert
+                  document={documento}
+                  variant="chip"
+                />
+              </Box>
+            )}
           </CardContent>
         </Card>
   );

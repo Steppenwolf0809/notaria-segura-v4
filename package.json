@@ -25,6 +25,7 @@
   "author": "Notaría Segura",
   "license": "PRIVATE",
   "dependencies": {
-    "@prisma/client": "^6.13.0"
+    "@prisma/client": "^6.13.0",
+    "twilio": "^5.8.0"
   }
 }
