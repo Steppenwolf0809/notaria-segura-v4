@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Box,
   Card,
@@ -24,7 +24,8 @@ import {
   Tooltip,
   Paper,
   Button,
-  Grid
+  Grid,
+  CircularProgress
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -35,16 +36,23 @@ import {
   Phone as PhoneIcon,
   WhatsApp as WhatsAppIcon,
   CalendarToday as CalendarIcon,
-  Download as DownloadIcon
+  Download as DownloadIcon,
+  Code as CodeIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import notificationsService from '../../services/notifications-service';
+import WhatsAppPreviewModal from './WhatsAppPreviewModal';
+import useAuthStore from '../../store/auth-store';
 
 /**
  * Componente NotificationsHistory - Tabla de auditoría de notificaciones
  * Muestra historial completo de notificaciones enviadas con estados
  */
 const NotificationsHistory = () => {
+  // Obtener usuario actual del store de autenticación
+  const { user } = useAuthStore();
+  
   // Estados para filtros y paginación
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -53,15 +61,128 @@ const NotificationsHistory = () => {
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [loading, setLoading] = useState(false);
 
+  // Estados para datos reales
+  const [notifications, setNotifications] = useState([]);
+  const [totalNotifications, setTotalNotifications] = useState(0);
+  const [stats, setStats] = useState({
+    total: 0,
+    sent: 0,
+    failed: 0,
+    simulated: 0,
+    pending: 0
+  });
+
+  // Estados para modales
+  const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
+  const [selectedNotification, setSelectedNotification] = useState(null);
+
   /**
-   * Datos reales de notificaciones desde la base de datos
-   * DATOS SIMULADOS ELIMINADOS - Ahora muestra tabla vacía después del reset
+   * Cargar notificaciones desde el backend
    */
-  const realNotifications = useMemo(() => {
-    // Base de datos fue limpiada - no hay notificaciones reales
-    // Este array estará vacío hasta que se envíen notificaciones reales
-    return [];
-  }, []);
+  const loadNotifications = async () => {
+    setLoading(true);
+    console.log('🔄 NOTIFICACIONES: Iniciando carga de notificaciones...', {
+      page,
+      rowsPerPage,
+      searchTerm,
+      statusFilter,
+      user: user?.firstName
+    });
+    
+    try {
+      const response = await notificationsService.getNotifications({
+        page,
+        limit: rowsPerPage,
+        search: searchTerm,
+        status: statusFilter
+      });
+
+      console.log('📊 NOTIFICACIONES: Respuesta del backend:', response);
+
+      if (response.success) {
+        setNotifications(response.data.notifications || []);
+        setTotalNotifications(response.data.pagination?.total || 0);
+        setStats(response.data.stats || stats);
+        console.log('✅ NOTIFICACIONES: Datos cargados exitosamente:', {
+          notificationsCount: response.data.notifications?.length || 0,
+          total: response.data.pagination?.total || 0,
+          stats: response.data.stats
+        });
+      } else {
+        console.error('❌ NOTIFICACIONES: Error en respuesta:', response.message);
+        setNotifications([]);
+      }
+    } catch (error) {
+      console.error('💥 NOTIFICACIONES: Error de conexión:', error);
+      setNotifications([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Cargar datos al montar el componente y cuando cambien los filtros o el usuario
+  useEffect(() => {
+    if (user) {
+      loadNotifications();
+    }
+  }, [page, rowsPerPage, searchTerm, statusFilter, user?.id]);
+
+  // Usar las notificaciones reales en lugar del array vacío
+  const realNotifications = notifications;
+
+  /**
+   * Obtener icono del estado
+   */
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'SENT':
+        return <CheckCircleIcon />;
+      case 'FAILED':
+        return <ErrorIcon />;
+      case 'PENDING':
+        return <ScheduleIcon />;
+      case 'SIMULATED':
+        return <CodeIcon />;
+      default:
+        return <ScheduleIcon />;
+    }
+  };
+
+  /**
+   * Obtener color del estado
+   */
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'SENT':
+        return 'success';
+      case 'FAILED':
+        return 'error';
+      case 'PENDING':
+        return 'warning';
+      case 'SIMULATED':
+        return 'info';
+      default:
+        return 'default';
+    }
+  };
+
+  /**
+   * Obtener texto del estado
+   */
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'SENT':
+        return 'Enviado';
+      case 'FAILED':
+        return 'Fallido';
+      case 'PENDING':
+        return 'Pendiente';
+      case 'SIMULATED':
+        return 'Simulado';
+      default:
+        return status;
+    }
+  };
 
   /**
    * Filtrar notificaciones
@@ -119,47 +240,9 @@ const NotificationsHistory = () => {
     return filteredNotifications.slice(startIndex, startIndex + rowsPerPage);
   }, [filteredNotifications, page, rowsPerPage]);
 
-  /**
-   * Estadísticas rápidas
-   */
-  const stats = useMemo(() => {
-    const total = filteredNotifications.length;
-    const enviados = filteredNotifications.filter(n => n.estadoEnvio === 'enviado').length;
-    const fallidos = filteredNotifications.filter(n => n.estadoEnvio === 'fallido').length;
-    const pendientes = filteredNotifications.filter(n => n.estadoEnvio === 'pendiente').length;
-    
-    return {
-      total,
-      enviados,
-      fallidos,
-      pendientes,
-      tasaExito: total > 0 ? Math.round((enviados / total) * 100) : 0
-    };
-  }, [filteredNotifications]);
 
-  /**
-   * Obtener color del estado
-   */
-  const getStatusColor = (status) => {
-    const colors = {
-      enviado: 'success',
-      fallido: 'error',
-      pendiente: 'warning'
-    };
-    return colors[status] || 'default';
-  };
 
-  /**
-   * Obtener icono del estado
-   */
-  const getStatusIcon = (status) => {
-    const icons = {
-      enviado: <CheckCircleIcon />,
-      fallido: <ErrorIcon />,
-      pendiente: <ScheduleIcon />
-    };
-    return icons[status] || <ScheduleIcon />;
-  };
+
 
   /**
    * Formatear fecha
@@ -186,11 +269,7 @@ const NotificationsHistory = () => {
    * Refrescar datos
    */
   const handleRefresh = async () => {
-    setLoading(true);
-    // Simular carga
-    setTimeout(() => {
-      setLoading(false);
-    }, 1000);
+    await loadNotifications();
   };
 
   /**
@@ -206,6 +285,45 @@ const NotificationsHistory = () => {
   const handleRowsPerPageChange = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
+  };
+
+  /**
+   * Abrir modal de preview de WhatsApp
+   */
+  const handleWhatsAppPreview = (notification) => {
+    setSelectedNotification(notification);
+    setWhatsappModalOpen(true);
+  };
+
+  /**
+   * Cerrar modal de WhatsApp
+   */
+  const handleCloseWhatsAppModal = () => {
+    setWhatsappModalOpen(false);
+    setSelectedNotification(null);
+  };
+
+  /**
+   * Descargar mensaje como archivo de texto
+   */
+  const handleDownloadMessage = (notification) => {
+    const content = `Notificación WhatsApp - ${notification.clientName}\n\n` +
+                   `Fecha: ${formatDate(notification.createdAt)}\n` +
+                   `Cliente: ${notification.clientName}\n` +
+                   `Teléfono: ${notification.clientPhone}\n` +
+                   `Estado: ${getStatusText(notification.status)}\n` +
+                   `Documento: ${notification.document?.protocolNumber || 'Sin documento'}\n\n` +
+                   `Mensaje:\n${notification.messageBody}`;
+    
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `whatsapp-${notification.clientName}-${formatDate(notification.createdAt).replace(/[:/]/g, '-')}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -250,7 +368,7 @@ const NotificationsHistory = () => {
           <Card>
             <CardContent sx={{ textAlign: 'center', py: 2 }}>
               <Typography variant="h4" sx={{ color: 'success.main', fontWeight: 'bold' }}>
-                {stats.enviados}
+                {stats.sent}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Exitosas
@@ -262,7 +380,7 @@ const NotificationsHistory = () => {
           <Card>
             <CardContent sx={{ textAlign: 'center', py: 2 }}>
               <Typography variant="h4" sx={{ color: 'error.main', fontWeight: 'bold' }}>
-                {stats.fallidos}
+                {stats.failed}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Fallidas
@@ -274,7 +392,7 @@ const NotificationsHistory = () => {
           <Card>
             <CardContent sx={{ textAlign: 'center', py: 2 }}>
               <Typography variant="h4" sx={{ color: 'warning.main', fontWeight: 'bold' }}>
-                {stats.pendientes}
+                {stats.pending}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 Pendientes
@@ -286,10 +404,10 @@ const NotificationsHistory = () => {
           <Card>
             <CardContent sx={{ textAlign: 'center', py: 2 }}>
               <Typography variant="h4" sx={{ color: 'info.main', fontWeight: 'bold' }}>
-                {stats.tasaExito}%
+                {stats.simulated}
               </Typography>
               <Typography variant="body2" color="text.secondary">
-                Tasa de Éxito
+                Simuladas
               </Typography>
             </CardContent>
           </Card>
@@ -386,7 +504,7 @@ const NotificationsHistory = () => {
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <CalendarIcon sx={{ fontSize: 16, color: 'text.secondary', mr: 1 }} />
                         <Typography variant="body2">
-                          {formatDate(notification.fechaHora)}
+                          {formatDate(notification.createdAt)}
                         </Typography>
                       </Box>
                     </TableCell>
@@ -395,19 +513,30 @@ const NotificationsHistory = () => {
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <Avatar sx={{ width: 32, height: 32, mr: 1, bgcolor: 'primary.main' }}>
-                          {notification.cliente.charAt(0)}
+                          {notification.clientName.charAt(0).toUpperCase()}
                         </Avatar>
                         <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                          {notification.cliente}
+                          {notification.clientName}
                         </Typography>
                       </Box>
                     </TableCell>
 
                     {/* Documento */}
                     <TableCell>
-                      <Typography variant="body2">
-                        {notification.documento}
-                      </Typography>
+                      {notification.document ? (
+                        <>
+                          <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                            {notification.document.documentType}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {notification.document.protocolNumber}
+                          </Typography>
+                        </>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">
+                          {notification.groupId ? 'Grupo de documentos' : 'Sin documento'}
+                        </Typography>
+                      )}
                     </TableCell>
 
                     {/* Teléfono */}
@@ -415,7 +544,7 @@ const NotificationsHistory = () => {
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <PhoneIcon sx={{ fontSize: 16, color: 'success.main', mr: 1 }} />
                         <Typography variant="body2">
-                          {notification.telefono}
+                          {notification.clientPhone}
                         </Typography>
                       </Box>
                     </TableCell>
@@ -423,9 +552,9 @@ const NotificationsHistory = () => {
                     {/* Estado */}
                     <TableCell>
                       <Chip
-                        icon={getStatusIcon(notification.estadoEnvio)}
-                        label={notification.estadoEnvio.charAt(0).toUpperCase() + notification.estadoEnvio.slice(1)}
-                        color={getStatusColor(notification.estadoEnvio)}
+                        icon={getStatusIcon(notification.status)}
+                        label={getStatusText(notification.status)}
+                        color={getStatusColor(notification.status)}
                         size="small"
                         variant="filled"
                       />
@@ -434,17 +563,18 @@ const NotificationsHistory = () => {
                     {/* Detalles */}
                     <TableCell>
                       <Box>
-                        <Typography variant="caption" display="block">
-                          {notification.mensaje}
+                        <Typography variant="caption" display="block" sx={{ maxWidth: 200, wordBreak: 'break-word' }}>
+                          {notification.messageBody.substring(0, 100)}
+                          {notification.messageBody.length > 100 && '...'}
                         </Typography>
-                        {notification.intentos > 1 && (
-                          <Typography variant="caption" color="warning.main">
-                            {notification.intentos} intentos
+                        {notification.messageId && (
+                          <Typography variant="caption" color="success.main" display="block">
+                            ID: {notification.messageId}
                           </Typography>
                         )}
-                        {notification.codigoRespuesta && (
-                          <Typography variant="caption" color="text.secondary" display="block">
-                            Código: {notification.codigoRespuesta}
+                        {notification.errorMessage && (
+                          <Typography variant="caption" color="error.main" display="block">
+                            Error: {notification.errorMessage}
                           </Typography>
                         )}
                       </Box>
@@ -453,13 +583,20 @@ const NotificationsHistory = () => {
                     {/* Acciones */}
                     <TableCell>
                       <Stack direction="row" spacing={0.5}>
-                        <Tooltip title="Ver en WhatsApp">
-                          <IconButton size="small" color="success">
+                        <Tooltip title="Ver preview del mensaje">
+                          <IconButton 
+                            size="small" 
+                            color="success"
+                            onClick={() => handleWhatsAppPreview(notification)}
+                          >
                             <WhatsAppIcon sx={{ fontSize: 18 }} />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Exportar">
-                          <IconButton size="small">
+                        <Tooltip title="Descargar mensaje">
+                          <IconButton 
+                            size="small"
+                            onClick={() => handleDownloadMessage(notification)}
+                          >
                             <DownloadIcon sx={{ fontSize: 18 }} />
                           </IconButton>
                         </Tooltip>
@@ -495,7 +632,7 @@ const NotificationsHistory = () => {
         <TablePagination
           rowsPerPageOptions={[10, 25, 50, 100]}
           component="div"
-          count={filteredNotifications.length}
+          count={totalNotifications}
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={handlePageChange}
@@ -506,6 +643,13 @@ const NotificationsHistory = () => {
           }
         />
       </Paper>
+
+      {/* Modal de preview de WhatsApp */}
+      <WhatsAppPreviewModal
+        open={whatsappModalOpen}
+        onClose={handleCloseWhatsAppModal}
+        notification={selectedNotification}
+      />
     </Box>
   );
 };

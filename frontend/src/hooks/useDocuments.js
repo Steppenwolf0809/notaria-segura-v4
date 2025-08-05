@@ -219,7 +219,7 @@ const useDocuments = (options = {}) => {
     for (const docId of documentIds) {
       try {
         const result = await updateDocumentStatus(docId, newStatus, { optimistic: false });
-        results.push({ id: docId, success: result });
+        results.push({ id: docId, success: result?.success || false, result });
       } catch (error) {
         results.push({ id: docId, success: false, error: error.message });
       }

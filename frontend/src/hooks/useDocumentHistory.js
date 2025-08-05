@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import documentService from '../services/document-service';
+import notificationsService from '../services/notifications-service';
 
 /**
  * Hook personalizado para manejar el historial de documentos
@@ -20,14 +21,49 @@ const useDocumentHistory = (documentId) => {
     setError(null);
 
     try {
-      // Por ahora simularemos el historial ya que la API puede no estar implementada
-      // En una implementación real, esto sería: const result = await documentService.getDocumentHistory(documentId);
-      
+      // Cargar historial simulado base
       const simulatedHistory = generateSimulatedHistory(documentId);
-      setHistory(simulatedHistory);
+      
+      // Cargar notificaciones reales del documento
+      const notificationsResponse = await notificationsService.getDocumentNotifications(documentId);
+      
+      if (notificationsResponse.success && notificationsResponse.data.length > 0) {
+        // Convertir notificaciones reales a eventos de historial
+        const realNotificationEvents = notificationsResponse.data.map((notification, index) => ({
+          id: `notification_real_${notification.id || index}`,
+          type: 'notification_sent',
+          title: notification.status === 'SENT' ? 'Notificación Enviada' : 'Notificación Falló',
+          description: notification.status === 'SENT' 
+            ? 'Se envió notificación WhatsApp al cliente' 
+            : `Error: ${notification.errorMessage || 'No enviada'}`,
+          timestamp: new Date(notification.createdAt),
+          user: 'Sistema de Notificaciones',
+          icon: 'notification',
+          color: notification.status === 'SENT' ? 'info' : 'error',
+          metadata: {
+            channel: 'WhatsApp',
+            recipient: notification.clientPhone,
+            status: notification.status.toLowerCase(),
+            messageId: notification.messageId,
+            clientName: notification.clientName
+          }
+        }));
+        
+        // Combinar historial simulado con notificaciones reales
+        const combinedHistory = [...simulatedHistory, ...realNotificationEvents]
+          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        
+        setHistory(combinedHistory);
+      } else {
+        // Solo mostrar historial simulado si no hay notificaciones reales
+        setHistory(simulatedHistory);
+      }
     } catch (err) {
       console.error('Error fetching document history:', err);
       setError('Error al cargar el historial del documento');
+      // Fallback al historial simulado en caso de error
+      const simulatedHistory = generateSimulatedHistory(documentId);
+      setHistory(simulatedHistory);
     } finally {
       setLoading(false);
     }
@@ -98,21 +134,7 @@ const useDocumentHistory = (documentId) => {
           processingTime: '22 horas'
         }
       },
-      {
-        id: 5,
-        type: 'notification_sent',
-        title: 'Notificación Enviada',
-        description: 'Se envió notificación WhatsApp al cliente',
-        timestamp: new Date(baseDate.getTime() + 24.5 * 60 * 60 * 1000),
-        user: 'Sistema de Notificaciones',
-        icon: 'notification',
-        color: 'info',
-        metadata: {
-          channel: 'WhatsApp',
-          recipient: '+593999999999',
-          status: 'delivered'
-        }
-      }
+      // Notificaciones reales se cargan desde la API
     ];
   };
 

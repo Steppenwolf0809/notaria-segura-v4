@@ -5,12 +5,13 @@ import dotenv from 'dotenv'
 // Importar rutas implementadas
 import authRoutes from './src/routes/auth-routes.js'
 import documentRoutes from './src/routes/document-routes.js'
+import notificationsRoutes from './src/routes/notifications-routes.js'
 
 // Cargar variables de entorno
-dotenv.config()
+dotenv.config({ path: './.env' })
 
 const app = express()
-const PORT = process.env.PORT || 3001 // Cambiar a 3001 para coincidir con frontend
+const PORT = process.env.PORT || 3002 // Puerto 3002 para evitar conflictos
 
 // Middleware básico
 app.use(cors({
@@ -49,6 +50,9 @@ app.use('/api/auth', authRoutes)
 
 // RUTAS DE DOCUMENTOS (/api/documents/*)  
 app.use('/api/documents', documentRoutes)
+
+// RUTAS DE NOTIFICACIONES (/api/notifications/*)
+app.use('/api/notifications', notificationsRoutes)
 
 // ============================================================================
 // MIDDLEWARE DE MANEJO DE ERRORES

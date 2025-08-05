@@ -121,7 +121,8 @@ model Document {
   documentGroup         DocumentGroup? @relation(fields: [documentGroupId], references: [id])
   
   // Relación de auditoría - NUEVA FUNCIONALIDAD
-  events                DocumentEvent[]  // Historial de eventos del documento
+  events                DocumentEvent[]        // Historial de eventos del documento
+  notifications         WhatsAppNotification[] // Notificaciones enviadas para este documento
   
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt
@@ -155,6 +156,7 @@ model DocumentGroup {
   
   // Relación con documentos
   documents          Document[]
+  notifications      WhatsAppNotification[]
 }
 
 enum GroupStatus {
@@ -191,6 +193,44 @@ enum EventType {
   GROUP_CREATED        // Documento agrupado
   GROUP_DELIVERED      // Grupo de documentos entregado
   VERIFICATION_GENERATED // Código de verificación generado
+}
+
+// Modelo para historial de notificaciones WhatsApp
+model WhatsAppNotification {
+  id            String              @id @default(uuid())
+  documentId    String?                                 // FK al documento (opcional para notificaciones grupales)
+  groupId       String?                                 // FK al grupo (opcional)
+  clientName    String                                  // Nombre del cliente
+  clientPhone   String                                  // Número de teléfono
+  messageType   NotificationType                       // Tipo de notificación
+  messageBody   String                                  // Contenido del mensaje
+  status        NotificationStatus  @default(PENDING)  // Estado de la notificación
+  messageId     String?                                 // ID del mensaje de Twilio (si se envió)
+  errorMessage  String?                                 // Error si falló
+  sentAt        DateTime?                               // Fecha de envío exitoso
+  createdAt     DateTime            @default(now())
+  
+  // Relaciones opcionales
+  document      Document?  @relation(fields: [documentId], references: [id])
+  group         DocumentGroup? @relation(fields: [groupId], references: [id])
+  
+  @@map("whatsapp_notifications")
+}
+
+// Tipos de notificación
+enum NotificationType {
+  DOCUMENT_READY       // Documento individual listo
+  GROUP_READY         // Grupo de documentos listo
+  DOCUMENT_DELIVERED  // Documento entregado
+  REMINDER           // Recordatorio
+}
+
+// Estados de notificación
+enum NotificationStatus {
+  PENDING    // Pendiente de envío
+  SENT       // Enviado exitosamente
+  FAILED     // Falló el envío
+  SIMULATED  // Simulado (desarrollo)
 }
 
 // Modelo básico para verificar conexión

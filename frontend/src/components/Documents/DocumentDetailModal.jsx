@@ -48,7 +48,7 @@ import { es } from 'date-fns/locale';
 import DocumentTimeline from './DocumentTimeline';
 import useDocumentHistory from '../../hooks/useDocumentHistory';
 import useDocumentStore from '../../store/document-store';
-import DocumentEditModal from './DocumentEditModal';
+import EditDocumentModal from './EditDocumentModal';
 import documentService from '../../services/document-service';
 
 /**
@@ -264,6 +264,8 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
     setActionLoading(true);
     try {
       const result = await updateDocumentStatus(document.id, actionConfig.action);
+      console.log('🔍 Resultado completo de updateDocumentStatus:', result);
+      
       if (result.success) {
         // Actualizar documento local
         setLocalDocument(prev => ({
@@ -293,9 +295,11 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
           alert(message);
         }
         
-        console.log(`Documento actualizado a: ${actionConfig.action}`, result);
+        console.log(`✅ Documento actualizado a: ${actionConfig.action}`, result);
       } else {
-        alert('Error: ' + (result.message || 'No se pudo actualizar el documento'));
+        console.error('❌ Error en updateDocumentStatus:', result);
+        const errorMsg = result.error || result.message || 'No se pudo actualizar el documento';
+        alert('Error: ' + errorMsg);
       }
     } catch (error) {
       console.error('Error al actualizar documento:', error);
@@ -637,12 +641,23 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
         )}
       </DialogActions>
 
-      {/* Modal de Edición - NUEVA FUNCIONALIDAD */}
-      <DocumentEditModal
-        open={showEditModal}
+      {/* Modal de Edición Profesional - NUEVA FUNCIONALIDAD */}
+      <EditDocumentModal
+        documento={localDocument}
+        isOpen={showEditModal}
         onClose={() => setShowEditModal(false)}
-        document={localDocument}
-        onDocumentUpdated={handleDocumentUpdated}
+        onSave={async (formData) => {
+          try {
+            const response = await documentService.updateDocumentInfo(localDocument.id, formData);
+            if (response.success) {
+              handleDocumentUpdated(response);
+              setShowEditModal(false);
+            }
+          } catch (error) {
+            console.error('Error actualizando documento:', error);
+          }
+        }}
+        userRole="matrizador"
       />
 
       {/* Modal de Entrega - NUEVA FUNCIONALIDAD */}
