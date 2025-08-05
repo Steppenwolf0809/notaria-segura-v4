@@ -321,15 +321,15 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
       });
       
       // Usar función original para cambios que no requieren confirmación
-      const success = await updateDocumentStatus(draggedItem.id, newStatus);
+      const result = await updateDocumentStatus(draggedItem.id, newStatus);
       
-      if (success) {
+      if (result && result.success) {
         console.log(`✅ Documento ${draggedItem.id} movido exitosamente: ${draggedItem.status} -> ${newStatus}`);
         
         return { success: true, document: draggedItem, newStatus, previousStatus: draggedItem.status };
       } else {
-        console.error('❌ updateDocumentStatus retornó false');
-        throw new Error('Error al actualizar el estado en el servidor');
+        console.error('❌ updateDocumentStatus falló:', result);
+        throw new Error(result?.error || result?.message || 'Error al actualizar el estado en el servidor');
       }
     } catch (error) {
       console.error('💥 Error en drag & drop:', error);

@@ -1,5 +1,8 @@
 import twilio from 'twilio';
 import { parsePhoneNumber } from 'libphonenumber-js';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 /**
  * Servicio WhatsApp para notificaciones de la notaría
@@ -15,8 +18,8 @@ class WhatsAppService {
         
         // Configuración de la notaría
         this.notariaConfig = {
-            nombre: process.env.NOTARIA_NOMBRE || "NOTARÍA PRIMERA DEL CANTÓN AMBATO",
-            direccion: process.env.NOTARIA_DIRECCION || "Calle Sucre y Tomás Sevilla",
+            nombre: process.env.NOTARIA_NOMBRE || "NOTARÍA DECIMO OCTAVA DEL CANTÓN QUITO",
+            direccion: process.env.NOTARIA_DIRECCION || "Azuay E2-231 y Av Amazonas, Quito",
             horario: process.env.NOTARIA_HORARIO || "Lunes a Viernes 8:00-17:00"
         };
 
@@ -33,6 +36,34 @@ class WhatsAppService {
             }
         } else {
             console.log('⚠️ WhatsApp deshabilitado o credenciales faltantes');
+        }
+    }
+
+    /**
+     * Guardar notificación en la base de datos
+     */
+    async saveNotification(data) {
+        try {
+            const notification = await prisma.whatsAppNotification.create({
+                data: {
+                    documentId: data.documentId || null,
+                    groupId: data.groupId || null,
+                    clientName: data.clientName,
+                    clientPhone: data.clientPhone,
+                    messageType: data.messageType,
+                    messageBody: data.messageBody,
+                    status: data.status,
+                    messageId: data.messageId || null,
+                    errorMessage: data.errorMessage || null,
+                    sentAt: data.status === 'SENT' ? new Date() : null
+                }
+            });
+
+            console.log(`💾 Notificación guardada en BD: ${notification.id}`);
+            return notification;
+        } catch (error) {
+            console.error('❌ Error guardando notificación:', error);
+            return null;
         }
     }
 
@@ -89,16 +120,43 @@ class WhatsAppService {
      * Enviar mensaje de documento listo para retiro
      */
     async enviarDocumentoListo(cliente, documento, codigo) {
-        if (!this.isEnabled || !this.client) {
-            return this.simularEnvio(cliente, documento, codigo, 'documento_listo');
-        }
-
-        const numeroWhatsApp = this.formatPhoneNumber(cliente.telefono || cliente.clientPhone);
-        if (!numeroWhatsApp) {
-            throw new Error(`Número de teléfono inválido: ${cliente.telefono || cliente.clientPhone}`);
-        }
-
+        const clientName = cliente.clientName || cliente.nombre;
+        const clientPhone = cliente.clientPhone || cliente.telefono;
         const mensaje = this.generarMensajeDocumentoListo(cliente, documento, codigo);
+
+        // Preparar datos para guardar en BD
+        const notificationData = {
+            documentId: documento.id || null,
+            clientName: clientName,
+            clientPhone: clientPhone,
+            messageType: 'DOCUMENT_READY',
+            messageBody: mensaje
+        };
+
+        if (!this.isEnabled || !this.client) {
+            // Modo simulación
+            const simulationResult = this.simularEnvio(cliente, documento, codigo, 'documento_listo');
+            
+            // Guardar como simulada
+            await this.saveNotification({
+                ...notificationData,
+                status: 'SIMULATED',
+                messageId: simulationResult.messageId
+            });
+            
+            return simulationResult;
+        }
+
+        const numeroWhatsApp = this.formatPhoneNumber(clientPhone);
+        if (!numeroWhatsApp) {
+            // Guardar como error
+            await this.saveNotification({
+                ...notificationData,
+                status: 'FAILED',
+                errorMessage: `Número de teléfono inválido: ${clientPhone}`
+            });
+            throw new Error(`Número de teléfono inválido: ${clientPhone}`);
+        }
 
         try {
             const result = await this.client.messages.create({
@@ -108,6 +166,14 @@ class WhatsAppService {
             });
 
             console.log(`📱 WhatsApp enviado: ${result.sid} → ${numeroWhatsApp}`);
+            
+            // Guardar como exitosa
+            await this.saveNotification({
+                ...notificationData,
+                status: 'SENT',
+                messageId: result.sid
+            });
+
             return {
                 success: true,
                 messageId: result.sid,
@@ -117,6 +183,13 @@ class WhatsAppService {
             };
         } catch (error) {
             console.error('❌ Error enviando WhatsApp:', error);
+            
+            // Guardar como error
+            await this.saveNotification({
+                ...notificationData,
+                status: 'FAILED',
+                errorMessage: error.message
+            });
             
             // En desarrollo, simular si falla el envío real
             if (this.isDevelopment) {
@@ -185,8 +258,9 @@ class WhatsAppService {
                 clientPhone: document.clientPhone
             };
 
-            // Preparar datos del documento
+            // Preparar datos del documento (incluir ID para poder guardarlo en notificaciones)
             const documento = {
+                id: document.id,
                 tipo_documento: document.documentType,
                 tipoDocumento: document.documentType,
                 numero_documento: document.protocolNumber,

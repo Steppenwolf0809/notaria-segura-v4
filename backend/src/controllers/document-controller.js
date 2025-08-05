@@ -1348,10 +1348,10 @@ function validateEditPermissions(user, document) {
   
   // Definir campos editables por rol
   const fieldsByRole = {
-    ADMIN: ['clientPhone', 'clientName', 'detalle_documento', 'comentarios_recepcion'],
-    MATRIZADOR: ['clientPhone', 'detalle_documento', 'comentarios_recepcion'],
-    ARCHIVO: ['clientPhone', 'detalle_documento', 'comentarios_recepcion'],
-    RECEPCION: ['clientPhone', 'comentarios_recepcion'],
+    ADMIN: ['clientPhone', 'clientName', 'clientEmail', 'actoPrincipalDescripcion', 'detalle_documento', 'comentarios_recepcion'],
+    MATRIZADOR: ['clientPhone', 'clientName', 'clientEmail', 'actoPrincipalDescripcion', 'detalle_documento', 'comentarios_recepcion'],
+    ARCHIVO: ['clientPhone', 'clientName', 'clientEmail', 'actoPrincipalDescripcion', 'detalle_documento', 'comentarios_recepcion'],
+    RECEPCION: ['clientPhone', 'clientEmail', 'comentarios_recepcion'],
     CAJA: [] // Caja no puede editar información de documento
   };
 
@@ -1424,6 +1424,40 @@ function validateEditData(data, allowedFields) {
     }
     if (data.clientName && data.clientName.length > 100) {
       errors.push('Nombre del cliente muy largo (máximo 100 caracteres)');
+    }
+  }
+
+  // Validar acto principal descripción
+  if (data.actoPrincipalDescripcion !== undefined) {
+    if (!data.actoPrincipalDescripcion || data.actoPrincipalDescripcion.trim().length < 5) {
+      errors.push('Descripción del acto principal debe tener al menos 5 caracteres');
+    }
+    if (data.actoPrincipalDescripcion && data.actoPrincipalDescripcion.length > 300) {
+      errors.push('Descripción del acto principal muy larga (máximo 300 caracteres)');
+    }
+  }
+
+  // Validar valor del acto principal
+  if (data.actoPrincipalValor !== undefined) {
+    const valor = parseFloat(data.actoPrincipalValor);
+    if (isNaN(valor) || valor < 0) {
+      errors.push('Valor del acto principal debe ser un número mayor o igual a 0');
+    }
+    if (valor > 1000000) {
+      errors.push('Valor del acto principal muy alto (máximo $1,000,000)');
+    }
+  }
+
+  // Validar email del cliente
+  if (data.clientEmail !== undefined) {
+    if (data.clientEmail && data.clientEmail.trim() !== '') {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(data.clientEmail)) {
+        errors.push('Formato de email inválido');
+      }
+      if (data.clientEmail.length > 100) {
+        errors.push('Email muy largo (máximo 100 caracteres)');
+      }
     }
   }
 
@@ -1546,10 +1580,15 @@ async function updateDocumentInfo(req, res) {
       });
     }
 
+    // Debug: Log de los datos recibidos
+    console.log('🔍 DEBUG - Datos recibidos del frontend:', updateData);
+    console.log('🔍 DEBUG - Campos permitidos para el rol:', permissions.editableFields);
+    
     // Validar datos
     const validation = validateEditData(updateData, permissions.editableFields);
     
     if (!validation.isValid) {
+      console.log('❌ DEBUG - Errores de validación:', validation.errors);
       return res.status(400).json({
         success: false,
         message: 'Datos inválidos',

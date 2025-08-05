@@ -258,7 +258,7 @@ const useDocumentStore = create((set, get) => ({
    * MATRIZADOR: Actualizar estado de documento
    * @param {string} documentId - ID del documento
    * @param {string} newStatus - Nuevo estado
-   * @returns {Promise<boolean>} True si se actualizó exitosamente
+   * @returns {Promise<Object>} Resultado completo de la operación con success, data, message, etc.
    */
   updateDocumentStatus: async (documentId, newStatus) => {
     set({ loading: true, error: null });
@@ -266,24 +266,28 @@ const useDocumentStore = create((set, get) => ({
     try {
       const result = await documentService.updateDocumentStatus(documentId, newStatus);
       
-      if (result.success) {
+      if (result.success && result.data && result.data.document) {
         // Actualizar documento en la lista local
         const currentDocuments = get().documents;
         const updatedDocuments = currentDocuments.map(doc => 
-          doc.id === documentId ? result.data.document : doc
+          doc.id === documentId ? { ...doc, ...result.data.document } : doc
         );
         
         set({ 
           documents: updatedDocuments,
           loading: false 
         });
-        return true;
+        
+        // Devolver el resultado completo para que el modal pueda usarlo
+        return result;
       } else {
         set({ 
-          error: result.error, 
+          error: result.error || result.message || 'Error desconocido', 
           loading: false 
         });
-        return false;
+        
+        // Devolver el resultado con error para que el modal pueda manejarlo
+        return result;
       }
     } catch (error) {
       console.error('Error in updateDocumentStatus:', error);
@@ -291,7 +295,13 @@ const useDocumentStore = create((set, get) => ({
         error: 'Error inesperado al actualizar estado', 
         loading: false 
       });
-      return false;
+      
+      // Devolver un objeto de error estructurado
+      return {
+        success: false,
+        error: 'Error inesperado al actualizar estado',
+        message: error.message
+      };
     }
   },
 

@@ -21,13 +21,16 @@ import {
   DragIndicator as DragIcon,
   Info as InfoIcon,
   Phone as PhoneIcon,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Edit as EditIcon
 } from '@mui/icons-material';
 import useDocumentStore from '../../store/document-store';
 import useDragAndDrop from '../../hooks/useDragAndDrop';
 import usePagination from '../../hooks/usePagination';
 import DocumentDetailModal from './DocumentDetailModal';
+import EditDocumentModal from './EditDocumentModal';
 import LoadMoreButton from '../UI/LoadMoreButton';
+import documentService from '../../services/document-service';
 import GroupingAlert from '../grouping/GroupingAlert';
 import QuickGroupingModal from '../grouping/QuickGroupingModal';
 // NUEVOS COMPONENTES: Sistema de confirmaciones y deshacer
@@ -46,6 +49,8 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
   // Estados para modales y componentes
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [documentToEdit, setDocumentToEdit] = useState(null);
   // 🔗 Estados para modal de agrupación rápida
   const [showQuickGroupingModal, setShowQuickGroupingModal] = useState(false);
   const [pendingGroupData, setPendingGroupData] = useState({ main: null, related: [] });
@@ -378,11 +383,37 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
           )}
         </Box>
 
-        <Chip
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+          <Chip
             label={document.documentType}
             size="small"
-            sx={{ fontSize: '0.75rem', height: 22, fontWeight: 500, bgcolor: 'action.hover' }}
-        />
+            sx={{ fontSize: '0.75rem', height: 22, fontWeight: 500, bgcolor: 'action.hover', flex: 1 }}
+          />
+          
+          {/* Botón de edición rápida */}
+          <Tooltip title="Editar información del documento" arrow>
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                e.stopPropagation();
+                openEditModal(document);
+              }}
+              sx={{
+                width: 28,
+                height: 28,
+                bgcolor: 'primary.main',
+                color: 'white',
+                '&:hover': {
+                  bgcolor: 'primary.dark',
+                  transform: 'scale(1.1)'
+                },
+                transition: 'all 0.2s'
+              }}
+            >
+              <EditIcon sx={{ fontSize: 14 }} />
+            </IconButton>
+          </Tooltip>
+        </Box>
 
         {related && (
           <Box sx={{ 
@@ -505,6 +536,38 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
     setSelectedDocument(null);
   };
 
+  const openEditModal = (document) => {
+    setDocumentToEdit(document);
+    setEditModalOpen(true);
+  };
+
+  const closeEditModal = () => {
+    setEditModalOpen(false);
+    setDocumentToEdit(null);
+  };
+
+  const handleEditSave = async (formData) => {
+    try {
+      const response = await documentService.updateDocumentInfo(documentToEdit.id, formData);
+      
+      if (response.success) {
+        // Actualizar documento en el store
+        updateDocument(documentToEdit.id, response.data.document);
+        
+        // Cerrar modal
+        closeEditModal();
+        
+        // Mostrar mensaje de éxito
+        console.log('Documento actualizado exitosamente');
+      } else {
+        console.error('Error actualizando documento:', response.message);
+      }
+    } catch (error) {
+      console.error('Error actualizando documento:', error);
+      throw error; // Re-lanzar para que el modal maneje el error
+    }
+  };
+
   /**
    * Manejar actualización de documento desde modal de detalle
    */
@@ -621,6 +684,15 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
       </Box>
 
       <DocumentDetailModal open={detailModalOpen} onClose={closeDetailModal} document={selectedDocument} onDocumentUpdated={handleDocumentUpdated} />
+
+      {/* Modal de Edición Profesional */}
+      <EditDocumentModal
+        documento={documentToEdit}
+        isOpen={editModalOpen}
+        onClose={closeEditModal}
+        onSave={handleEditSave}
+        userRole="matrizador"
+      />
 
       <QuickGroupingModal
         open={showQuickGroupingModal}
