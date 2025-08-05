@@ -64,7 +64,18 @@ async function parseXmlDocument(xmlContent) {
     
     // 5. Procesar detalles según tipo de documento
     const detalles = factura.detalles?.[0]?.detalle || [];
+    
+    // ⭐ AGREGAR DEBUG
+    console.log(`🔍 Procesando documento tipo: ${documentType}`);
+    console.log(`📋 Items en factura: ${detalles.length}`);
+    detalles.forEach((detalle, index) => {
+      const desc = detalle.descripcion?.[0]?.substring(0, 60) || 'Sin descripción';
+      console.log(`  ${index + 1}. ${desc}...`);
+    });
+    
     const processedDetails = processDocumentByType(documentType, detalles);
+    
+    console.log(`✅ Acto principal seleccionado: ${processedDetails.actoPrincipalDescripcion}`);
     
     // 6. Extraer nombre del matrizador
     const matrizadorName = extractMatrizadorName(factura);
@@ -198,18 +209,19 @@ function processDocumentByType(tipo, detalles) {
       }))
     };
   } else {
-    // Para otros tipos (P, D, A, O): aplicar lógica de filtrado normal
-    return processNormalDocument(detalles);
+    // ⭐ CAMBIO: Pasar el tipo a processNormalDocument
+    return processNormalDocument(detalles, tipo);
   }
 }
 
 /**
  * Procesa documentos normales (no certificaciones)
- * Filtra items secundarios y busca acto principal
+ * Selecciona acto principal según tipo de documento y prioridades
  * @param {Array} detalles - Array de detalles del XML
+ * @param {string} tipo - Tipo de documento (P, D, A, O)
  * @returns {Object} Información procesada del documento
  */
-function processNormalDocument(detalles) {
+function processNormalDocument(detalles, tipo) {
   const itemsSecundarios = [];
   const itemsPrincipales = [];
   
@@ -220,7 +232,8 @@ function processNormalDocument(detalles) {
     
     const item = {
       descripcion,
-      valor
+      valor,
+      detalleCompleto: detalle // Guardar referencia completa
     };
     
     // Verificar si es item a ignorar
@@ -235,25 +248,183 @@ function processNormalDocument(detalles) {
     }
   });
   
-  // Encontrar acto principal (item con mayor valor entre los principales)
-  let actoPrincipal = itemsPrincipales.reduce((max, item) => {
-    return item.valor > max.valor ? item : max;
-  }, { descripcion: 'Sin acto principal', valor: 0 });
-  
-  // Si no hay items principales, tomar el primero de todos
-  if (itemsPrincipales.length === 0 && detalles.length > 0) {
-    const primerItem = detalles[0];
-    actoPrincipal = {
-      descripcion: primerItem.descripcion?.[0] || 'Sin descripción',
-      valor: parseFloat(primerItem.precioTotalSinImpuesto?.[0]) || 0
-    };
-  }
+  // Seleccionar acto principal según tipo de documento
+  const actoPrincipal = seleccionarActoPrincipalPorTipo(itemsPrincipales, tipo);
   
   return {
     actoPrincipalDescripcion: actoPrincipal.descripcion,
     actoPrincipalValor: actoPrincipal.valor,
     itemsSecundarios
   };
+}
+
+/**
+ * Selecciona el acto principal según el tipo de documento
+ * @param {Array} items - Items principales (ya filtrados)
+ * @param {string} tipo - Tipo de documento
+ * @returns {Object} Acto principal seleccionado
+ */
+function seleccionarActoPrincipalPorTipo(items, tipo) {
+  if (items.length === 0) {
+    return { descripcion: 'Sin acto principal', valor: 0 };
+  }
+  
+  if (items.length === 1) {
+    return items[0];
+  }
+  
+  switch (tipo) {
+    case 'OTROS':
+      return seleccionarEnOtros(items);
+    case 'DILIGENCIA':
+      return seleccionarEnDiligencias(items);
+    case 'PROTOCOLO':
+      return seleccionarEnProtocolo(items);
+    case 'ARRENDAMIENTO':
+      return seleccionarEnArrendamiento(items);
+    default:
+      return items[0]; // Fallback: tomar el primero
+  }
+}
+
+/**
+ * Lógica específica para documentos tipo OTROS (O)
+ * Prioridades: 1. Copias archivo, 2. Razón marginal, 3. Oficio, 4. Cualquier otro
+ */
+function seleccionarEnOtros(items) {
+  // Prioridad 1: OTORGAMIENTO DE COPIAS DE ARCHIVO
+  const copiaArchivo = items.find(item => {
+    const desc = item.descripcion.toUpperCase();
+    return desc.includes('OTORGAMIENTO') && 
+           desc.includes('COPIAS') && 
+           desc.includes('ARCHIVO');
+  });
+  
+  if (copiaArchivo) {
+    console.log('✅ OTROS: Seleccionado OTORGAMIENTO DE COPIAS DE ARCHIVO');
+    return copiaArchivo;
+  }
+  
+  // Prioridad 2: RAZÓN MARGINAL (TU CASO ESPECÍFICO)
+  const razonMarginal = items.find(item => {
+    const desc = item.descripcion.toUpperCase();
+    return desc.includes('RAZÓN') && desc.includes('MARGINAL');
+  });
+  
+  if (razonMarginal) {
+    console.log('✅ OTROS: Seleccionado RAZÓN MARGINAL');
+    return razonMarginal;
+  }
+  
+  // Prioridad 3: OFICIO
+  const oficio = items.find(item => {
+    const desc = item.descripcion.toUpperCase();
+    return desc.includes('OFICIO');
+  });
+  
+  if (oficio) {
+    console.log('✅ OTROS: Seleccionado OFICIO');
+    return oficio;
+  }
+  
+  // Prioridad 4: Cualquier otro (tomar el primero)
+  console.log('✅ OTROS: Seleccionado primer item disponible');
+  return items[0];
+}
+
+/**
+ * Lógica específica para documentos tipo DILIGENCIA (D)
+ * Tomar cualquier item que no sea certificación
+ */
+function seleccionarEnDiligencias(items) {
+  // Buscar items que NO sean certificaciones
+  const noCertificaciones = items.filter(item => {
+    const desc = item.descripcion.toUpperCase();
+    return !desc.includes('CERTIFICACIÓN') && 
+           !desc.includes('CERTIFICACION');
+  });
+  
+  if (noCertificaciones.length > 0) {
+    console.log('✅ DILIGENCIAS: Seleccionado item que no es certificación');
+    return noCertificaciones[0];
+  }
+  
+  console.log('✅ DILIGENCIAS: Seleccionado primer item disponible');
+  return items[0];
+}
+
+/**
+ * Lógica específica para documentos tipo PROTOCOLO (P)
+ * Prioridades: Escrituras, Poderes, Testamentos
+ */
+function seleccionarEnProtocolo(items) {
+  const prioridades = [
+    'ESCRITURA',
+    'PODER',
+    'TESTAMENTO',
+    'CANCELACIÓN',
+    'HIPOTECA'
+  ];
+  
+  for (const prioridad of prioridades) {
+    const encontrado = items.find(item => {
+      const desc = item.descripcion.toUpperCase();
+      return desc.includes(prioridad);
+    });
+    
+    if (encontrado) {
+      console.log(`✅ PROTOCOLO: Seleccionado ${prioridad}`);
+      return encontrado;
+    }
+  }
+  
+  // Si no encuentra prioridades específicas, tomar el que no sea certificación
+  const noCertificaciones = items.filter(item => {
+    const desc = item.descripcion.toUpperCase();
+    return !desc.includes('CERTIFICACIÓN') && 
+           !desc.includes('CERTIFICACION');
+  });
+  
+  if (noCertificaciones.length > 0) {
+    console.log('✅ PROTOCOLO: Seleccionado item que no es certificación');
+    return noCertificaciones[0];
+  }
+  
+  console.log('✅ PROTOCOLO: Seleccionado primer item disponible');
+  return items[0];
+}
+
+/**
+ * Lógica específica para documentos tipo ARRENDAMIENTO (A)
+ * Buscar contratos de arrendamiento
+ */
+function seleccionarEnArrendamiento(items) {
+  // Buscar específicamente arrendamientos o contratos
+  const arrendamiento = items.find(item => {
+    const desc = item.descripcion.toUpperCase();
+    return desc.includes('ARRENDAMIENTO') || 
+           desc.includes('CONTRATO');
+  });
+  
+  if (arrendamiento) {
+    console.log('✅ ARRENDAMIENTO: Seleccionado contrato/arrendamiento');
+    return arrendamiento;
+  }
+  
+  // Si no encuentra, tomar el que no sea certificación
+  const noCertificaciones = items.filter(item => {
+    const desc = item.descripcion.toUpperCase();
+    return !desc.includes('CERTIFICACIÓN') && 
+           !desc.includes('CERTIFICACION');
+  });
+  
+  if (noCertificaciones.length > 0) {
+    console.log('✅ ARRENDAMIENTO: Seleccionado item que no es certificación');
+    return noCertificaciones[0];
+  }
+  
+  console.log('✅ ARRENDAMIENTO: Seleccionado primer item disponible');
+  return items[0];
 }
 
 /**
@@ -269,5 +440,11 @@ export {
   extractClientDataFromXml,
   classifyDocumentByCode,
   processDocumentByType,
-  generateVerificationCode
+  generateVerificationCode,
+  // ⭐ AGREGAR NUEVAS FUNCIONES
+  seleccionarActoPrincipalPorTipo,
+  seleccionarEnOtros,
+  seleccionarEnDiligencias,
+  seleccionarEnProtocolo,
+  seleccionarEnArrendamiento
 }; 

@@ -54,53 +54,20 @@ const NotificationsHistory = () => {
   const [loading, setLoading] = useState(false);
 
   /**
-   * Datos simulados de notificaciones
-   * En implementación real vendría del backend
+   * Datos reales de notificaciones desde la base de datos
+   * DATOS SIMULADOS ELIMINADOS - Ahora muestra tabla vacía después del reset
    */
-  const simulatedNotifications = useMemo(() => {
-    const notifications = [];
-    const now = new Date();
-    
-    // Generar datos de ejemplo
-    for (let i = 0; i < 150; i++) {
-      const daysAgo = Math.floor(Math.random() * 30);
-      const hoursAgo = Math.floor(Math.random() * 24);
-      const date = new Date(now.getTime() - (daysAgo * 24 * 60 * 60 * 1000) - (hoursAgo * 60 * 60 * 1000));
-      
-      const statuses = ['enviado', 'fallido', 'pendiente'];
-      const status = statuses[Math.floor(Math.random() * statuses.length)];
-      
-      const clients = [
-        'Juan Pérez', 'María García', 'Carlos López', 'Ana Martínez',
-        'Luis Rodriguez', 'Carmen Silva', 'Pedro Morales', 'Lucía Fernández'
-      ];
-      
-      const documentTypes = ['PROTOCOLO', 'CERTIFICACIÓN', 'DILIGENCIA', 'ARRENDAMIENTO'];
-      
-      notifications.push({
-        id: i + 1,
-        fechaHora: date,
-        cliente: clients[Math.floor(Math.random() * clients.length)],
-        documento: `${documentTypes[Math.floor(Math.random() * documentTypes.length)]} - ${2024000 + i}`,
-        telefono: `+593${Math.floor(Math.random() * 900000000) + 100000000}`,
-        estadoEnvio: status,
-        tipoNotificacion: 'WhatsApp',
-        mensaje: status === 'enviado' ? 'Documento listo para retiro' : 
-                 status === 'fallido' ? 'Error en entrega' : 'En cola de envío',
-        intentos: status === 'fallido' ? Math.floor(Math.random() * 3) + 1 : 1,
-        codigoRespuesta: status === 'enviado' ? '200' : 
-                        status === 'fallido' ? '400' : null
-      });
-    }
-    
-    return notifications.sort((a, b) => new Date(b.fechaHora) - new Date(a.fechaHora));
+  const realNotifications = useMemo(() => {
+    // Base de datos fue limpiada - no hay notificaciones reales
+    // Este array estará vacío hasta que se envíen notificaciones reales
+    return [];
   }, []);
 
   /**
    * Filtrar notificaciones
    */
   const filteredNotifications = useMemo(() => {
-    let filtered = [...simulatedNotifications];
+    let filtered = [...realNotifications];
 
     // Búsqueda por texto
     if (searchTerm.trim()) {
@@ -142,7 +109,7 @@ const NotificationsHistory = () => {
     }
 
     return filtered;
-  }, [simulatedNotifications, searchTerm, statusFilter, dateFilter]);
+  }, [realNotifications, searchTerm, statusFilter, dateFilter]);
 
   /**
    * Notificaciones paginadas
@@ -407,98 +374,119 @@ const NotificationsHistory = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {paginatedNotifications.map((notification) => (
-                <TableRow
-                  key={notification.id}
-                  hover
-                  sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
-                >
-                  {/* Fecha y Hora */}
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <CalendarIcon sx={{ fontSize: 16, color: 'text.secondary', mr: 1 }} />
-                      <Typography variant="body2">
-                        {formatDate(notification.fechaHora)}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-
-                  {/* Cliente */}
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Avatar sx={{ width: 32, height: 32, mr: 1, bgcolor: 'primary.main' }}>
-                        {notification.cliente.charAt(0)}
-                      </Avatar>
-                      <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                        {notification.cliente}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-
-                  {/* Documento */}
-                  <TableCell>
-                    <Typography variant="body2">
-                      {notification.documento}
-                    </Typography>
-                  </TableCell>
-
-                  {/* Teléfono */}
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <PhoneIcon sx={{ fontSize: 16, color: 'success.main', mr: 1 }} />
-                      <Typography variant="body2">
-                        {notification.telefono}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-
-                  {/* Estado */}
-                  <TableCell>
-                    <Chip
-                      icon={getStatusIcon(notification.estadoEnvio)}
-                      label={notification.estadoEnvio.charAt(0).toUpperCase() + notification.estadoEnvio.slice(1)}
-                      color={getStatusColor(notification.estadoEnvio)}
-                      size="small"
-                      variant="filled"
-                    />
-                  </TableCell>
-
-                  {/* Detalles */}
-                  <TableCell>
-                    <Box>
-                      <Typography variant="caption" display="block">
-                        {notification.mensaje}
-                      </Typography>
-                      {notification.intentos > 1 && (
-                        <Typography variant="caption" color="warning.main">
-                          {notification.intentos} intentos
+              {paginatedNotifications.length > 0 ? (
+                paginatedNotifications.map((notification) => (
+                  <TableRow
+                    key={notification.id}
+                    hover
+                    sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
+                  >
+                    {/* Fecha y Hora */}
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <CalendarIcon sx={{ fontSize: 16, color: 'text.secondary', mr: 1 }} />
+                        <Typography variant="body2">
+                          {formatDate(notification.fechaHora)}
                         </Typography>
-                      )}
-                      {notification.codigoRespuesta && (
-                        <Typography variant="caption" color="text.secondary" display="block">
-                          Código: {notification.codigoRespuesta}
-                        </Typography>
-                      )}
-                    </Box>
-                  </TableCell>
+                      </Box>
+                    </TableCell>
 
-                  {/* Acciones */}
-                  <TableCell>
-                    <Stack direction="row" spacing={0.5}>
-                      <Tooltip title="Ver en WhatsApp">
-                        <IconButton size="small" color="success">
-                          <WhatsAppIcon sx={{ fontSize: 18 }} />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Exportar">
-                        <IconButton size="small">
-                          <DownloadIcon sx={{ fontSize: 18 }} />
-                        </IconButton>
-                      </Tooltip>
-                    </Stack>
+                    {/* Cliente */}
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Avatar sx={{ width: 32, height: 32, mr: 1, bgcolor: 'primary.main' }}>
+                          {notification.cliente.charAt(0)}
+                        </Avatar>
+                        <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                          {notification.cliente}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+
+                    {/* Documento */}
+                    <TableCell>
+                      <Typography variant="body2">
+                        {notification.documento}
+                      </Typography>
+                    </TableCell>
+
+                    {/* Teléfono */}
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <PhoneIcon sx={{ fontSize: 16, color: 'success.main', mr: 1 }} />
+                        <Typography variant="body2">
+                          {notification.telefono}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+
+                    {/* Estado */}
+                    <TableCell>
+                      <Chip
+                        icon={getStatusIcon(notification.estadoEnvio)}
+                        label={notification.estadoEnvio.charAt(0).toUpperCase() + notification.estadoEnvio.slice(1)}
+                        color={getStatusColor(notification.estadoEnvio)}
+                        size="small"
+                        variant="filled"
+                      />
+                    </TableCell>
+
+                    {/* Detalles */}
+                    <TableCell>
+                      <Box>
+                        <Typography variant="caption" display="block">
+                          {notification.mensaje}
+                        </Typography>
+                        {notification.intentos > 1 && (
+                          <Typography variant="caption" color="warning.main">
+                            {notification.intentos} intentos
+                          </Typography>
+                        )}
+                        {notification.codigoRespuesta && (
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            Código: {notification.codigoRespuesta}
+                          </Typography>
+                        )}
+                      </Box>
+                    </TableCell>
+
+                    {/* Acciones */}
+                    <TableCell>
+                      <Stack direction="row" spacing={0.5}>
+                        <Tooltip title="Ver en WhatsApp">
+                          <IconButton size="small" color="success">
+                            <WhatsAppIcon sx={{ fontSize: 18 }} />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Exportar">
+                          <IconButton size="small">
+                            <DownloadIcon sx={{ fontSize: 18 }} />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} sx={{ textAlign: 'center', py: 4 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                      <WhatsAppIcon sx={{ fontSize: 48, color: 'text.disabled' }} />
+                      <Box sx={{ textAlign: 'center' }}>
+                        <Typography variant="h6" color="text.secondary">
+                          ✅ Historial de Notificaciones Limpio
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          La base de datos fue resetada exitosamente.
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          Las notificaciones aparecerán aquí cuando se procesen documentos reales.
+                        </Typography>
+                      </Box>
+                    </Box>
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </TableContainer>
