@@ -1,6 +1,8 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@prisma/client';
+import { validatePassword, sanitizePassword } from '../utils/password-validator.js';
+import { logPasswordChange, logLoginAttempt, extractRequestInfo } from '../utils/audit-logger.js';
 
 const prisma = new PrismaClient();
 
@@ -161,6 +163,16 @@ async function login(req, res) {
     // Verificar contraseña
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
+      // Log intento fallido
+      const requestInfo = extractRequestInfo(req);
+      logLoginAttempt({
+        userEmail: email,
+        ipAddress: requestInfo.ipAddress,
+        userAgent: requestInfo.userAgent,
+        success: false,
+        reason: 'Contraseña incorrecta'
+      });
+
       return res.status(401).json({
         success: false,
         message: 'Credenciales inválidas'
@@ -171,6 +183,16 @@ async function login(req, res) {
     await prisma.user.update({
       where: { id: user.id },
       data: { lastLogin: new Date() }
+    });
+
+    // Log login exitoso
+    const requestInfo = extractRequestInfo(req);
+    logLoginAttempt({
+      userId: user.id,
+      userEmail: email,
+      ipAddress: requestInfo.ipAddress,
+      userAgent: requestInfo.userAgent,
+      success: true
     });
 
     // Generar token
@@ -393,10 +415,190 @@ async function initUsers(req, res) {
   }
 }
 
+/**
+ * Cambiar contraseña del usuario autenticado
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+async function changePassword(req, res) {
+  try {
+    const userId = req.user.id;
+    const { currentPassword, newPassword, confirmPassword } = req.body;
+    const requestInfo = extractRequestInfo(req);
+
+    // Validar que todos los campos están presentes
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Todos los campos son obligatorios',
+        details: {
+          required: ['currentPassword', 'newPassword', 'confirmPassword']
+        }
+      });
+    }
+
+    // Verificar que las nuevas contraseñas coincidan
+    if (newPassword !== confirmPassword) {
+      logPasswordChange({
+        userId,
+        userEmail: req.user.email,
+        ipAddress: requestInfo.ipAddress,
+        userAgent: requestInfo.userAgent,
+        success: false,
+        reason: 'Confirmación de contraseña no coincide'
+      });
+
+      return res.status(400).json({
+        success: false,
+        message: 'La nueva contraseña y su confirmación no coinciden'
+      });
+    }
+
+    // Sanitizar y validar nueva contraseña
+    const sanitizedNewPassword = sanitizePassword(newPassword);
+    const passwordValidation = validatePassword(sanitizedNewPassword);
+
+    if (!passwordValidation.isValid) {
+      logPasswordChange({
+        userId,
+        userEmail: req.user.email,
+        ipAddress: requestInfo.ipAddress,
+        userAgent: requestInfo.userAgent,
+        success: false,
+        reason: 'Nueva contraseña no cumple criterios de seguridad'
+      });
+
+      return res.status(400).json({
+        success: false,
+        message: 'La nueva contraseña no cumple los criterios de seguridad',
+        details: {
+          errors: passwordValidation.errors,
+          requirements: passwordValidation.requirements,
+          strength: passwordValidation.strength
+        }
+      });
+    }
+
+    // Buscar usuario actual
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user || !user.isActive) {
+      logPasswordChange({
+        userId,
+        userEmail: req.user.email,
+        ipAddress: requestInfo.ipAddress,
+        userAgent: requestInfo.userAgent,
+        success: false,
+        reason: 'Usuario no encontrado o desactivado'
+      });
+
+      return res.status(404).json({
+        success: false,
+        message: 'Usuario no encontrado'
+      });
+    }
+
+    // Verificar contraseña actual
+    const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isCurrentPasswordValid) {
+      logPasswordChange({
+        userId,
+        userEmail: user.email,
+        ipAddress: requestInfo.ipAddress,
+        userAgent: requestInfo.userAgent,
+        success: false,
+        reason: 'Contraseña actual incorrecta'
+      });
+
+      return res.status(401).json({
+        success: false,
+        message: 'La contraseña actual es incorrecta'
+      });
+    }
+
+    // Verificar que la nueva contraseña sea diferente a la actual
+    const isSamePassword = await bcrypt.compare(sanitizedNewPassword, user.password);
+    if (isSamePassword) {
+      logPasswordChange({
+        userId,
+        userEmail: user.email,
+        ipAddress: requestInfo.ipAddress,
+        userAgent: requestInfo.userAgent,
+        success: false,
+        reason: 'Nueva contraseña igual a la actual'
+      });
+
+      return res.status(400).json({
+        success: false,
+        message: 'La nueva contraseña debe ser diferente a la actual'
+      });
+    }
+
+    // Encriptar nueva contraseña
+    const hashedNewPassword = await bcrypt.hash(sanitizedNewPassword, 12);
+
+    // Actualizar contraseña en la base de datos
+    await prisma.user.update({
+      where: { id: userId },
+      data: { 
+        password: hashedNewPassword,
+        updatedAt: new Date()
+      }
+    });
+
+    // Log cambio exitoso
+    logPasswordChange({
+      userId,
+      userEmail: user.email,
+      ipAddress: requestInfo.ipAddress,
+      userAgent: requestInfo.userAgent,
+      success: true
+    });
+
+    res.json({
+      success: true,
+      message: 'Contraseña cambiada exitosamente',
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role
+        },
+        passwordStrength: passwordValidation.strength,
+        changedAt: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('Error cambiando contraseña:', error);
+    
+    // Log error
+    const requestInfo = extractRequestInfo(req);
+    logPasswordChange({
+      userId: req.user?.id || 'unknown',
+      userEmail: req.user?.email || 'unknown',
+      ipAddress: requestInfo.ipAddress,
+      userAgent: requestInfo.userAgent,
+      success: false,
+      reason: `Error interno: ${error.message}`
+    });
+
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+}
+
 export {
   register,
   login,
   getUserProfile,
   refreshToken,
-  initUsers
+  initUsers,
+  changePassword
 }; 

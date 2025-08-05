@@ -20,11 +20,13 @@ import {
   Dashboard as DashboardIcon,
   FolderSpecial as ArchiveIcon,
   Visibility as SupervisionIcon,
-  Logout as LogoutIcon
+  Logout as LogoutIcon,
+  Settings as SettingsIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import ThemeToggle from './ThemeToggle';
 import useThemeStore from '../store/theme-store';
+import ChangePassword from './ChangePassword';
 
 // Ancho del sidebar
 const DRAWER_WIDTH = 240;
@@ -37,6 +39,7 @@ const DRAWER_WIDTH = 240;
  */
 const ArchivoLayout = ({ children, currentView, onViewChange }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
   const { isDarkMode } = useThemeStore();
 
@@ -228,32 +231,60 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
           <ThemeToggle />
         </Box>
 
-        {/* Logout Button */}
-        <ListItemButton
-          onClick={handleLogout}
-          sx={{
-            borderRadius: 1,
-            py: 1,
-            color: !isDarkMode ? '#ffffff' : 'text.primary',
-            '&:hover': {
-              bgcolor: !isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'action.hover'
-            }
-          }}
-        >
-          <ListItemIcon sx={{ 
-            color: !isDarkMode ? '#93BFEF' : 'text.secondary',
-            minWidth: 36 
-          }}>
-            <LogoutIcon fontSize="small" />
-          </ListItemIcon>
-          <ListItemText 
-            primary="Salir"
-            primaryTypographyProps={{
-              variant: 'body2',
-              color: !isDarkMode ? '#ffffff' : 'inherit'
+        {/* Settings and Logout Buttons */}
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <ListItemButton
+            onClick={() => setShowChangePassword(true)}
+            sx={{
+              borderRadius: 1,
+              py: 1,
+              color: !isDarkMode ? '#ffffff' : 'text.primary',
+              '&:hover': {
+                bgcolor: !isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'action.hover'
+              }
             }}
-          />
-        </ListItemButton>
+          >
+            <ListItemIcon sx={{ 
+              color: !isDarkMode ? '#93BFEF' : 'text.secondary',
+              minWidth: 36 
+            }}>
+              <SettingsIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText 
+              primary="Configuración"
+              primaryTypographyProps={{
+                variant: 'body2',
+                color: !isDarkMode ? '#ffffff' : 'inherit'
+              }}
+            />
+          </ListItemButton>
+
+          <ListItemButton
+            onClick={handleLogout}
+            sx={{
+              borderRadius: 1,
+              py: 1,
+              color: !isDarkMode ? '#ffffff' : 'text.primary',
+              '&:hover': {
+                bgcolor: !isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'action.hover'
+              }
+            }}
+          >
+            <ListItemIcon sx={{ 
+              color: !isDarkMode ? '#93BFEF' : 'text.secondary',
+              minWidth: 36 
+            }}>
+              <LogoutIcon fontSize="small" />
+            </ListItemIcon>
+            <ListItemText 
+              primary="Salir"
+              primaryTypographyProps={{
+                variant: 'body2',
+                color: !isDarkMode ? '#ffffff' : 'inherit'
+              }}
+            />
+          </ListItemButton>
+        </Box>
       </Box>
     </Box>
   );
@@ -358,6 +389,12 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
           {children}
         </Container>
       </Box>
+
+      {/* Modal de cambio de contraseña */}
+      <ChangePassword 
+        open={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
+      />
     </Box>
   );
 };

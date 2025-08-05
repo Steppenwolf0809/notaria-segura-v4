@@ -27,10 +27,12 @@ import {
   KeyboardDoubleArrowLeft as CollapseIcon,
   KeyboardDoubleArrowRight as ExpandIcon,
   Brightness4 as DarkModeIcon,
-  Brightness7 as LightModeIcon
+  Brightness7 as LightModeIcon,
+  Settings as SettingsIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import useThemeStore from '../store/theme-store';
+import ChangePassword from './ChangePassword';
 
 // Anchos del sidebar
 const DRAWER_WIDTH = 240;
@@ -44,6 +46,7 @@ const COLLAPSED_DRAWER_WIDTH = 60;
 const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
   const { isDarkMode, toggleTheme } = useThemeStore();
 
@@ -324,24 +327,46 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
               </Box>
             </Box>
             
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<LogoutIcon />}
-              onClick={logout}
-              fullWidth
-              sx={{ 
-                fontSize: '0.75rem',
-                borderColor: !isDarkMode ? 'rgba(255, 255, 255, 0.5)' : 'inherit',
-                color: !isDarkMode ? '#ffffff' : 'inherit',
-                '&:hover': {
-                  borderColor: !isDarkMode ? '#ffffff' : 'inherit',
-                  backgroundColor: !isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'inherit'
-                }
-              }}
-            >
-              Cerrar Sesión
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<SettingsIcon />}
+                onClick={() => setShowChangePassword(true)}
+                sx={{ 
+                  fontSize: '0.75rem',
+                  borderColor: !isDarkMode ? 'rgba(255, 255, 255, 0.5)' : 'inherit',
+                  color: !isDarkMode ? '#ffffff' : 'inherit',
+                  '&:hover': {
+                    borderColor: !isDarkMode ? '#ffffff' : 'inherit',
+                    backgroundColor: !isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'inherit'
+                  },
+                  minWidth: 'auto',
+                  flex: 1
+                }}
+              >
+                Config
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<LogoutIcon />}
+                onClick={logout}
+                sx={{ 
+                  fontSize: '0.75rem',
+                  borderColor: !isDarkMode ? 'rgba(255, 255, 255, 0.5)' : 'inherit',
+                  color: !isDarkMode ? '#ffffff' : 'inherit',
+                  '&:hover': {
+                    borderColor: !isDarkMode ? '#ffffff' : 'inherit',
+                    backgroundColor: !isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'inherit'
+                  },
+                  minWidth: 'auto',
+                  flex: 1
+                }}
+              >
+                Salir
+              </Button>
+            </Box>
           </>
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
@@ -358,6 +383,23 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
               >
                 {getUserInitials()}
               </Avatar>
+            </Tooltip>
+            
+            <Tooltip title="Configuración" placement="right">
+              <IconButton
+                onClick={() => setShowChangePassword(true)}
+                size="small"
+                sx={{ 
+                  color: !isDarkMode ? '#ffffff' : 'inherit',
+                  border: `1px solid ${!isDarkMode ? 'rgba(255, 255, 255, 0.5)' : 'currentColor'}`,
+                  '&:hover': {
+                    borderColor: !isDarkMode ? '#ffffff' : 'inherit',
+                    backgroundColor: !isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'inherit'
+                  }
+                }}
+              >
+                <SettingsIcon fontSize="small" />
+              </IconButton>
             </Tooltip>
             
             <Tooltip title="Cerrar Sesión" placement="right">
@@ -502,6 +544,12 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
           {children}
         </Container>
       </Box>
+
+      {/* Modal de cambio de contraseña */}
+      <ChangePassword 
+        open={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
+      />
     </Box>
   );
 };
