@@ -16,7 +16,8 @@ import {
 import {
   Logout as LogoutIcon,
   Person as PersonIcon,
-  Dashboard as DashboardIcon
+  Dashboard as DashboardIcon,
+  Settings as SettingsIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import ThemeToggle from './ThemeToggle';
@@ -24,6 +25,7 @@ import CajaDashboard from './CajaDashboard';
 import MatrizadorCenter from './MatrizadorCenter';
 import RecepcionCenter from './RecepcionCenter';
 import ArchivoCenter from './ArchivoCenter';
+import ChangePassword from './ChangePassword';
 
 /**
  * Componente Dashboard principal
@@ -37,6 +39,8 @@ const Dashboard = () => {
     getFullName, 
     getUserInitials 
   } = useAuth();
+
+  const [showChangePassword, setShowChangePassword] = React.useState(false);
 
   /**
    * Obtiene el mensaje de bienvenida según el rol
@@ -133,6 +137,16 @@ const Dashboard = () => {
               </Typography>
             </Box>
 
+            {/* Settings Button */}
+            <IconButton
+              color="inherit"
+              onClick={() => setShowChangePassword(true)}
+              title="Cambiar Contraseña"
+              sx={{ ml: 1 }}
+            >
+              <SettingsIcon />
+            </IconButton>
+
             {/* Theme Toggle */}
             <ThemeToggle />
 
@@ -150,6 +164,12 @@ const Dashboard = () => {
 
         {/* Dashboard de CAJA */}
         <CajaDashboard />
+        
+        {/* Modal de cambio de contraseña */}
+        <ChangePassword 
+          open={showChangePassword}
+          onClose={() => setShowChangePassword(false)}
+        />
       </Box>
     );
   }
@@ -201,6 +221,16 @@ const Dashboard = () => {
               {getFullName()}
             </Typography>
           </Box>
+
+          {/* Settings Button */}
+          <IconButton
+            color="inherit"
+            onClick={() => setShowChangePassword(true)}
+            title="Cambiar Contraseña"
+            sx={{ ml: 1 }}
+          >
+            <SettingsIcon />
+          </IconButton>
 
           {/* Theme Toggle */}
           <ThemeToggle />
@@ -354,6 +384,12 @@ const Dashboard = () => {
           </Grid>
         </Grid>
       </Box>
+
+      {/* Modal de cambio de contraseña */}
+      <ChangePassword 
+        open={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
+      />
     </Box>
   );
 };

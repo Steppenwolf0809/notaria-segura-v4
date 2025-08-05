@@ -112,6 +112,28 @@ const authService = {
   },
 
   /**
+   * Cambiar contraseña del usuario autenticado
+   * @param {Object} passwordData - Datos de cambio de contraseña
+   * @param {string} passwordData.currentPassword - Contraseña actual
+   * @param {string} passwordData.newPassword - Nueva contraseña
+   * @param {string} passwordData.confirmPassword - Confirmación de nueva contraseña
+   * @param {string} token - Token JWT
+   * @returns {Promise<Object>} Respuesta del servidor
+   */
+  changePassword: async (passwordData, token) => {
+    try {
+      const response = await api.put('/auth/change-password', passwordData, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      throw authService.handleError(error);
+    }
+  },
+
+  /**
    * Verificar estado de la API
    * @returns {Promise<Object>} Estado de la API
    */

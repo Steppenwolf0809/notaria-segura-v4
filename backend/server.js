@@ -11,15 +11,70 @@ import notificationsRoutes from './src/routes/notifications-routes.js'
 dotenv.config({ path: './.env' })
 
 const app = express()
-const PORT = process.env.PORT || 3002 // Puerto 3002 para evitar conflictos
+const PORT = process.env.PORT || 3001 // Puerto 3001 para compatibilidad
 
-// Middleware básico
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+// Configuración CORS mejorada para desarrollo y producción
+const corsOptions = {
+  origin: function (origin, callback) {
+    // En producción, usar orígenes específicos del .env
+    if (process.env.NODE_ENV === 'production') {
+      const productionOrigins = process.env.ALLOWED_ORIGINS 
+        ? process.env.ALLOWED_ORIGINS.split(',').map(url => url.trim())
+        : [process.env.FRONTEND_URL || 'https://notaria-segura.com'];
+      
+      if (!origin || productionOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.warn(`🚫 CORS: Origin no permitido en producción: ${origin}`);
+        callback(new Error('No permitido por CORS'));
+      }
+    } else {
+      // En desarrollo, usar lista combinada de orígenes permitidos
+      const developmentOrigins = process.env.ALLOWED_ORIGINS_DEV 
+        ? process.env.ALLOWED_ORIGINS_DEV.split(',').map(url => url.trim())
+        : [
+            'http://localhost:5173',  // Frontend principal (Vite)
+            'http://localhost:5174',  // Frontend backup
+            'http://127.0.0.1:5173',  // Variante local
+            'http://127.0.0.1:5174',  // Variante local backup
+          ];
+
+      // Agregar FRONTEND_URL si no está en la lista
+      if (process.env.FRONTEND_URL && !developmentOrigins.includes(process.env.FRONTEND_URL)) {
+        developmentOrigins.push(process.env.FRONTEND_URL);
+      }
+
+      // En desarrollo, permitir sin origin (herramientas como Postman/curl) o orígenes permitidos
+      if (!origin || developmentOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.warn(`⚠️  CORS: Origin no permitido en desarrollo: ${origin}`);
+        console.log(`📋 Orígenes permitidos: ${developmentOrigins.join(', ')}`);
+        callback(new Error('No permitido por CORS'));
+      }
+    }
+  },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}))
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Access-Control-Request-Method',
+    'Access-Control-Request-Headers'
+  ],
+  exposedHeaders: [
+    'X-RateLimit-Policy', 
+    'X-Security-Info',
+    'X-RateLimit-Limit',
+    'X-RateLimit-Remaining',
+    'X-RateLimit-Reset'
+  ]
+};
+
+app.use(cors(corsOptions))
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 

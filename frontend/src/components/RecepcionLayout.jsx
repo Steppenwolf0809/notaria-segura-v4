@@ -23,11 +23,13 @@ import {
   CheckCircle as CheckCircleIcon,
   Search as SearchIcon,
   History as HistoryIcon,
-  Logout as LogoutIcon
+  Logout as LogoutIcon,
+  Settings as SettingsIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import ThemeToggle from './ThemeToggle';
 import useThemeStore from '../store/theme-store';
+import ChangePassword from './ChangePassword';
 
 // Ancho del sidebar
 const DRAWER_WIDTH = 240;
@@ -38,6 +40,7 @@ const DRAWER_WIDTH = 240;
  */
 const RecepcionLayout = ({ children, currentView, onViewChange }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
   const { isDarkMode } = useThemeStore();
 
@@ -214,20 +217,36 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
         </Box>
 
         {/* Botón de logout */}
-        <Button
-          fullWidth
-          variant="outlined"
-          startIcon={<LogoutIcon />}
-          onClick={logout}
-          size="small"
-          sx={{
-            textTransform: 'none',
-            fontSize: '0.8rem',
-            py: 0.75
-          }}
-        >
-          Cerrar Sesión
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            startIcon={<SettingsIcon />}
+            onClick={() => setShowChangePassword(true)}
+            size="small"
+            sx={{
+              textTransform: 'none',
+              fontSize: '0.8rem',
+              py: 0.75,
+              flex: 1
+            }}
+          >
+            Config
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<LogoutIcon />}
+            onClick={logout}
+            size="small"
+            sx={{
+              textTransform: 'none',
+              fontSize: '0.8rem',
+              py: 0.75,
+              flex: 1
+            }}
+          >
+            Salir
+          </Button>
+        </Box>
       </Box>
     </Box>
   );
@@ -337,6 +356,12 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
           {children}
         </Container>
       </Box>
+
+      {/* Modal de cambio de contraseña */}
+      <ChangePassword 
+        open={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
+      />
     </Box>
   );
 };

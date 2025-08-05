@@ -4,28 +4,42 @@ import {
   login, 
   getUserProfile, 
   refreshToken,
-  initUsers
+  initUsers,
+  changePassword
 } from '../controllers/auth-controller.js';
 import { 
   authenticateToken, 
   requireAdmin 
 } from '../middleware/auth-middleware.js';
+import {
+  passwordChangeRateLimit,
+  loginRateLimit,
+  authGeneralRateLimit,
+  registerRateLimit,
+  addRateLimitHeaders
+} from '../middleware/rate-limiter.js';
 
 const router = express.Router();
+
+// Aplicar headers de rate limiting a todas las rutas
+router.use(addRateLimitHeaders);
+
+// Aplicar rate limiting general a todas las rutas de auth
+router.use(authGeneralRateLimit);
 
 /**
  * @route POST /api/auth/register
  * @desc Registrar nuevo usuario (solo ADMIN)
  * @access Private (ADMIN only)
  */
-router.post('/register', authenticateToken, requireAdmin, register);
+router.post('/register', registerRateLimit, authenticateToken, requireAdmin, register);
 
 /**
  * @route POST /api/auth/login
  * @desc Iniciar sesión
  * @access Public
  */
-router.post('/login', login);
+router.post('/login', loginRateLimit, login);
 
 /**
  * @route GET /api/auth/profile
@@ -55,6 +69,13 @@ router.get('/verify', authenticateToken, (req, res) => {
     }
   });
 });
+
+/**
+ * @route PUT /api/auth/change-password
+ * @desc Cambiar contraseña del usuario autenticado
+ * @access Private
+ */
+router.put('/change-password', passwordChangeRateLimit, authenticateToken, changePassword);
 
 /**
  * @route POST /api/auth/init-users
