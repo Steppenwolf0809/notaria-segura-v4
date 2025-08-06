@@ -1,4 +1,7 @@
 import express from 'express';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 import {
   getAllUsers,
   getUserById,
@@ -16,6 +19,21 @@ import {
   executeBulkDocumentOperation,
   exportDocuments
 } from '../controllers/admin-document-controller.js';
+
+import {
+  getNotificationStats,
+  getNotificationHistory,
+  retryNotification,
+  getNotificationTemplates,
+  createNotificationTemplate,
+  updateNotificationTemplate,
+  deleteNotificationTemplate,
+  sendTestNotification,
+  getFailedNotifications,
+  retryAllFailedNotifications,
+  getSimpleNotificationSettings,
+  updateNotificationSettings
+} from '../controllers/admin-notification-controller.js';
 import { 
   authenticateToken, 
   requireAdmin 
@@ -150,5 +168,163 @@ router.post('/documents/bulk-operation', executeBulkDocumentOperation);
  */
 router.get('/documents/export', exportDocuments);
 
+// ============================================================================
+// RUTAS DE GESTIÓN DE NOTIFICACIONES - ADMIN
+// ============================================================================
+
+/**
+ * @route GET /api/admin/notifications/stats
+ * @desc Obtener estadísticas de notificaciones
+ * @access Private (ADMIN only)
+ */
+router.get('/notifications/stats', getNotificationStats);
+
+/**
+ * @route GET /api/admin/notifications/history
+ * @desc Obtener historial de notificaciones con filtros
+ * @access Private (ADMIN only)
+ */
+router.get('/notifications/history', getNotificationHistory);
+
+/**
+ * @route GET /api/admin/notifications/templates
+ * @desc Obtener plantillas de notificaciones
+ * @access Private (ADMIN only)
+ */
+router.get('/notifications/templates', getNotificationTemplates);
+
+/**
+ * @route POST /api/admin/notifications/templates
+ * @desc Crear plantilla de notificación
+ * @access Private (ADMIN only)
+ */
+router.post('/notifications/templates', createNotificationTemplate);
+
+/**
+ * @route PUT /api/admin/notifications/templates/:templateId
+ * @desc Actualizar plantilla de notificación
+ * @access Private (ADMIN only)
+ */
+router.put('/notifications/templates/:templateId', updateNotificationTemplate);
+
+/**
+ * @route DELETE /api/admin/notifications/templates/:templateId
+ * @desc Eliminar plantilla de notificación
+ * @access Private (ADMIN only)
+ */
+router.delete('/notifications/templates/:templateId', deleteNotificationTemplate);
+
+/**
+ * @route POST /api/admin/notifications/test
+ * @desc Enviar notificación de prueba
+ * @access Private (ADMIN only)
+ */
+router.post('/notifications/test', sendTestNotification);
+
+/**
+ * @route GET /api/admin/notifications/settings
+ * @desc Obtener configuración simple de notificaciones
+ * @access Private (ADMIN only)
+ */
+router.get('/notifications/settings', getSimpleNotificationSettings);
+
+/**
+ * @route PUT /api/admin/notifications/settings
+ * @desc Actualizar configuración de notificaciones
+ * @access Private (ADMIN only)
+ */
+router.put('/notifications/settings', updateNotificationSettings);
+
+/**
+ * @route GET /api/admin/notifications/failed
+ * @desc Obtener notificaciones fallidas
+ * @access Private (ADMIN only)
+ */
+router.get('/notifications/failed', getFailedNotifications);
+
+/**
+ * @route POST /api/admin/notifications/retry/:notificationId
+ * @desc Reintentar notificación específica
+ * @access Private (ADMIN only)
+ */
+router.post('/notifications/retry/:notificationId', retryNotification);
+
+/**
+ * @route POST /api/admin/notifications/retry-all
+ * @desc Reintentar todas las notificaciones fallidas
+ * @access Private (ADMIN only)
+ */
+router.post('/notifications/retry-all', retryAllFailedNotifications);
+
+/**
+ * @route GET /api/admin/notificaciones
+ * @desc Obtener notificaciones WhatsApp reales del sistema
+ * @access Private (ADMIN only)
+ */
+router.get('/notificaciones', async (req, res) => {
+  try {
+    const { page = 1, limit = 50 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    // Query directo a la base de datos para obtener notificaciones reales
+    const [notifications, total] = await Promise.all([
+      prisma.whatsAppNotification.findMany({
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: parseInt(limit),
+        include: {
+          document: {
+            select: {
+              protocolNumber: true,
+              documentType: true
+            }
+          },
+          group: {
+            select: {
+              id: true,
+              verificationCode: true
+            }
+          }
+        }
+      }),
+      prisma.whatsAppNotification.count()
+    ]);
+
+    res.json({
+      success: true,
+      data: {
+        notifications: notifications.map(n => ({
+          id: n.id,
+          cliente: n.clientName,
+          telefono: n.clientPhone,
+          tipo: n.messageType,
+          mensaje: n.messageBody,
+          estado: n.status,
+          fecha: n.createdAt,
+          enviado: n.sentAt,
+          error: n.errorMessage,
+          messageId: n.messageId,
+          documento: n.document ? {
+            numero: n.document.protocolNumber,
+            tipo: n.document.documentType
+          } : null,
+          esGrupo: !!n.groupId
+        })),
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          total,
+          pages: Math.ceil(total / parseInt(limit))
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error obteniendo notificaciones reales:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener notificaciones'
+    });
+  }
+});
 
 export default router;

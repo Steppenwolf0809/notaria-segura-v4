@@ -5,129 +5,74 @@ import {
   CardContent,
   Typography,
   Grid,
-  Tabs,
-  Tab,
-  Paper,
   Alert,
-  Chip,
-  Avatar
+  Chip
 } from '@mui/material';
 import {
   Person as PersonIcon,
   Dashboard as DashboardIcon,
   Settings as SettingsIcon,
-  Security as SecurityIcon,
   Assessment as StatsIcon,
-  Assignment as DocumentIcon
+  Assignment as DocumentIcon,
+  Security as SecurityIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
+import AdminLayout from './AdminLayout';
 import UserManagement from './admin/UserManagement';
 import DocumentOversight from './admin/DocumentOversight';
+import NotificationHistory from './admin/NotificationHistory';
+import NotificationSettings from './admin/NotificationSettings';
+import NotificationTemplates from './admin/NotificationTemplates';
 
 /**
  * Centro de administración - Panel principal para ADMIN
- * Incluye gestión de usuarios y configuración del sistema
+ * Ahora usando AdminLayout con sidebar como otros roles
  */
 const AdminCenter = () => {
-  const { user, getUserRoleColor, getFullName, getUserInitials } = useAuth();
-  const [currentTab, setCurrentTab] = useState(0);
+  const [currentView, setCurrentView] = useState('dashboard');
 
-  const handleTabChange = (event, newValue) => {
-    setCurrentTab(newValue);
+  /**
+   * Manejar cambios de vista
+   */
+  const handleViewChange = (view) => {
+    setCurrentView(view);
   };
 
-  const tabs = [
-    {
-      label: 'Panel de Control',
-      icon: <DashboardIcon />,
-      component: <AdminDashboard />
-    },
-    {
-      label: 'Gestión de Usuarios',
-      icon: <PersonIcon />,
-      component: <UserManagement />
-    },
-    {
-      label: 'Supervisión Documentos',
-      icon: <DocumentIcon />,
-      component: <DocumentOversight />
-    },
-    {
-      label: 'Configuración',
-      icon: <SettingsIcon />,
-      component: <AdminSettings />
+  /**
+   * Renderizar contenido según la vista actual
+   */
+  const renderContent = () => {
+    switch (currentView) {
+      case 'dashboard':
+        return <AdminDashboard />;
+      
+      case 'users':
+        return <UserManagement />;
+      
+      case 'documents':
+        return <DocumentOversight />;
+      
+      case 'notifications':
+        return <NotificationHistory />;
+      
+      case 'notification-settings':
+        return <NotificationSettings />;
+      
+      case 'notification-templates':
+        return <NotificationTemplates />;
+      
+      case 'settings':
+        return <AdminSettings />;
+      
+      default:
+        return <AdminDashboard />;
     }
-  ];
+  };
 
   return (
-    <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      {/* Header del Admin */}
-      <Paper sx={{ borderRadius: 0, boxShadow: 1 }}>
-        <Box sx={{ p: 3, bgcolor: 'primary.main', color: 'white' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-            <Avatar
-              sx={{
-                bgcolor: 'white',
-                color: 'primary.main',
-                width: 56,
-                height: 56,
-                mr: 2,
-                fontSize: '1.5rem'
-              }}
-            >
-              <SecurityIcon />
-            </Avatar>
-            <Box>
-              <Typography variant="h4">
-                Panel de Administración
-              </Typography>
-              <Typography variant="subtitle1" sx={{ opacity: 0.9 }}>
-                Gestión completa del sistema - {getFullName()}
-              </Typography>
-            </Box>
-          </Box>
-          
-          <Alert 
-            severity="info" 
-            sx={{ 
-              bgcolor: 'rgba(255, 255, 255, 0.1)', 
-              color: 'white',
-              '& .MuiAlert-icon': { color: 'white' }
-            }}
-          >
-            Como administrador tienes acceso completo al sistema y puedes gestionar usuarios, 
-            configuraciones y revisar auditorías.
-          </Alert>
-        </Box>
-      </Paper>
-
-      {/* Tabs de navegación */}
-      <Paper sx={{ borderRadius: 0 }}>
-        <Tabs
-          value={currentTab}
-          onChange={handleTabChange}
-          variant="fullWidth"
-          indicatorColor="primary"
-          textColor="primary"
-          sx={{ borderBottom: 1, borderColor: 'divider' }}
-        >
-          {tabs.map((tab, index) => (
-            <Tab
-              key={index}
-              label={tab.label}
-              icon={tab.icon}
-              iconPosition="start"
-              sx={{ minHeight: 72, fontSize: '0.9rem' }}
-            />
-          ))}
-        </Tabs>
-      </Paper>
-
-      {/* Contenido de las tabs */}
-      <Box sx={{ flex: 1, overflow: 'auto', p: 3, bgcolor: 'background.default' }}>
-        {tabs[currentTab]?.component}
-      </Box>
-    </Box>
+    <AdminLayout currentView={currentView} onViewChange={handleViewChange}>
+      {renderContent()}
+    </AdminLayout>
   );
 };
 
