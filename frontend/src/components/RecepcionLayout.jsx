@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Drawer,
@@ -14,7 +14,9 @@ import {
   ListItemText,
   Avatar,
   Button,
-  Container
+  Container,
+  Tooltip,
+  Switch
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -24,15 +26,20 @@ import {
   Search as SearchIcon,
   History as HistoryIcon,
   Logout as LogoutIcon,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  WhatsApp as WhatsAppIcon,
+  KeyboardDoubleArrowLeft as CollapseIcon,
+  KeyboardDoubleArrowRight as ExpandIcon,
+  Brightness4 as DarkModeIcon,
+  Brightness7 as LightModeIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
-import ThemeToggle from './ThemeToggle';
 import useThemeStore from '../store/theme-store';
 import ChangePassword from './ChangePassword';
 
-// Ancho del sidebar
+// Anchos del sidebar
 const DRAWER_WIDTH = 240;
+const COLLAPSED_DRAWER_WIDTH = 60;
 
 /**
  * Layout principal del Recepción siguiendo exactamente el patrón de Matrizador
@@ -40,15 +47,36 @@ const DRAWER_WIDTH = 240;
  */
 const RecepcionLayout = ({ children, currentView, onViewChange }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
-  const { isDarkMode } = useThemeStore();
+  const { isDarkMode, toggleTheme } = useThemeStore();
+
+  // Cargar estado del sidebar desde localStorage
+  useEffect(() => {
+    const savedCollapsed = localStorage.getItem('reception-sidebar-collapsed');
+    if (savedCollapsed !== null) {
+      setSidebarCollapsed(JSON.parse(savedCollapsed));
+    }
+  }, []);
+
+  // Guardar estado del sidebar en localStorage
+  useEffect(() => {
+    localStorage.setItem('reception-sidebar-collapsed', JSON.stringify(sidebarCollapsed));
+  }, [sidebarCollapsed]);
 
   /**
    * Toggle del drawer móvil
    */
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
+  };
+
+  /**
+   * Toggle del sidebar colapsable
+   */
+  const handleSidebarToggle = () => {
+    setSidebarCollapsed(!sidebarCollapsed);
   };
 
   /**
@@ -76,191 +104,342 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
       active: currentView === 'documentos'
     },
     {
-      text: 'Historial',
-      icon: <HistoryIcon />,
-      view: 'historial',
-      active: currentView === 'historial'
+      text: 'Historial WhatsApp',
+      icon: <WhatsAppIcon />,
+      view: 'notificaciones',
+      active: currentView === 'notificaciones'
     }
   ];
 
   /**
-   * Contenido del drawer
+   * Contenido del drawer con funcionalidad de colapso
    */
   const drawer = (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      {/* Header del sidebar con usuario */}
-      <Box
-        sx={{
-          p: 2,
-          bgcolor: isDarkMode ? 'grey.900' : '#1e40af', // Azul más claro en modo claro
-          color: 'white',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 2
-        }}
-      >
-        <Avatar
-          sx={{
-            bgcolor: 'white',
-            color: '#1e40af',
-            width: 40,
-            height: 40,
-            fontWeight: 'bold'
-          }}
-        >
-          RN
-        </Avatar>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography 
-            variant="subtitle1" 
-            sx={{ 
-              fontWeight: 'bold',
-              color: 'inherit',
-              fontSize: '0.9rem',
-              whiteSpace: 'nowrap',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis'
-            }}
-          >
-            ProNotary
-          </Typography>
-          <Typography 
-            variant="caption" 
-            sx={{ 
-              color: 'rgba(255, 255, 255, 0.8)',
-              fontSize: '0.75rem'
-            }}
-          >
-            Recepción
-          </Typography>
-        </Box>
-      </Box>
-
-      {/* Navegación principal */}
-      <List sx={{ flex: 1, py: 1 }}>
-        {navigationItems.map((item) => (
-          <ListItem key={item.view} disablePadding>
-            <ListItemButton
-              onClick={() => handleNavigation(item.view)}
-              sx={{
-                mx: 1,
-                mb: 0.5,
-                borderRadius: 1,
-                bgcolor: item.active ? 'primary.main' : 'transparent',
-                color: item.active ? 'primary.contrastText' : 'text.primary',
-                '&:hover': {
-                  bgcolor: item.active ? 'primary.main' : 'action.hover',
-                },
-                transition: 'all 0.2s ease-in-out'
-              }}
-            >
-              <ListItemIcon 
-                sx={{ 
-                  color: item.active ? 'primary.contrastText' : 'primary.main',
-                  minWidth: 36 
-                }}
-              >
-                {item.icon}
-              </ListItemIcon>
-              <ListItemText
-                primary={item.text}
-                primaryTypographyProps={{
-                  fontSize: '0.875rem',
-                  fontWeight: item.active ? 600 : 400
-                }}
-              />
-            </ListItemButton>
-          </ListItem>
-        ))}
-      </List>
-
-      {/* Footer del sidebar */}
-      <Box sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-        {/* Información del usuario */}
-        <Box sx={{ mb: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Avatar
-              sx={{
-                bgcolor: getUserRoleColor(),
-                width: 32,
-                height: 32,
-                fontSize: '0.75rem'
-              }}
-            >
-              {getUserInitials()}
+    <Box sx={{ 
+      height: '100%', 
+      display: 'flex', 
+      flexDirection: 'column',
+      backgroundColor: !isDarkMode ? '#1e40af' : undefined,
+      color: !isDarkMode ? '#ffffff' : undefined,
+      transition: 'all 0.3s ease',
+    }}>
+      {/* Header del sidebar con botón de colapso */}
+      <Box sx={{ 
+        p: 2, 
+        bgcolor: !isDarkMode ? '#1e40af' : 'primary.main',
+        color: 'white',
+        minHeight: '64px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: sidebarCollapsed ? 'center' : 'space-between',
+        flexShrink: 0,
+        gap: 1,
+      }}>
+        {!sidebarCollapsed && (
+          <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+            <Avatar sx={{ bgcolor: 'white', color: 'primary.main', mr: 1, fontSize: '1rem' }}>
+              📨
             </Avatar>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography 
-                variant="body2" 
-                sx={{ 
-                  fontWeight: 500,
-                  fontSize: '0.8rem',
-                  lineHeight: 1.2,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis'
-                }}
-              >
-                {getFullName()}
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 'bold', lineHeight: 1.2 }}>
+                ProNotary
               </Typography>
-              <Typography 
-                variant="caption" 
-                sx={{ 
-                  color: 'text.secondary',
-                  fontSize: '0.7rem' 
-                }}
-              >
-                RECEPCION
+              <Typography variant="caption" sx={{ opacity: 0.9, lineHeight: 1 }}>
+                Recepción
               </Typography>
             </Box>
           </Box>
-        </Box>
+        )}
+        {sidebarCollapsed && (
+          <Avatar sx={{ bgcolor: 'white', color: 'primary.main', fontSize: '1rem' }}>
+            📨
+          </Avatar>
+        )}
+        <Tooltip title={sidebarCollapsed ? 'Expandir sidebar' : 'Colapsar sidebar'} placement="right">
+          <IconButton
+            onClick={handleSidebarToggle}
+            sx={{
+              color: 'white',
+              bgcolor: 'rgba(255, 255, 255, 0.1)',
+              '&:hover': {
+                bgcolor: 'rgba(255, 255, 255, 0.2)',
+              },
+              transition: 'all 0.2s ease',
+            }}
+            size="small"
+          >
+            {sidebarCollapsed ? <ExpandIcon /> : <CollapseIcon />}
+          </IconButton>
+        </Tooltip>
+      </Box>
 
-        {/* Botón de logout */}
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="outlined"
-            startIcon={<SettingsIcon />}
-            onClick={() => setShowChangePassword(true)}
-            size="small"
+      <Divider sx={{ borderColor: !isDarkMode ? 'rgba(255, 255, 255, 0.2)' : undefined }} />
+      
+      {/* Navegación Principal */}
+      <Box sx={{ flex: 1, overflow: 'auto' }}>
+        <List sx={{ px: 1, py: 2 }}>
+          {navigationItems.map((item) => (
+            <ListItem key={item.view} disablePadding sx={{ mb: 0.5 }}>
+              <Tooltip 
+                title={sidebarCollapsed ? item.text : ''} 
+                placement="right"
+                disableHoverListener={!sidebarCollapsed}
+              >
+                <ListItemButton
+                  onClick={() => handleNavigation(item.view)}
+                  sx={{
+                    borderRadius: 1,
+                    py: 1.5,
+                    px: sidebarCollapsed ? 1.5 : 2,
+                    bgcolor: item.active 
+                      ? (!isDarkMode ? '#468BE6' : 'primary.main')
+                      : 'transparent',
+                    color: item.active 
+                      ? 'white' 
+                      : (!isDarkMode ? '#ffffff' : 'text.primary'),
+                    '&:hover': {
+                      bgcolor: item.active 
+                        ? (!isDarkMode ? '#1e40af' : 'primary.dark')
+                        : (!isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'action.hover')
+                    },
+                    justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <ListItemIcon sx={{ 
+                    color: item.active 
+                      ? 'white' 
+                      : (!isDarkMode ? '#93BFEF' : 'primary.main'),
+                    minWidth: sidebarCollapsed ? 'unset' : 40,
+                    justifyContent: 'center'
+                  }}>
+                    {item.icon}
+                  </ListItemIcon>
+                  {!sidebarCollapsed && (
+                    <ListItemText 
+                      primary={item.text}
+                      primaryTypographyProps={{
+                        variant: 'body2',
+                        fontWeight: item.active ? 'bold' : 'medium',
+                        color: item.active 
+                          ? 'white' 
+                          : (!isDarkMode ? '#ffffff' : 'inherit')
+                      }}
+                    />
+                  )}
+                </ListItemButton>
+              </Tooltip>
+            </ListItem>
+          ))}
+        </List>
+      </Box>
+
+      <Divider sx={{ borderColor: !isDarkMode ? 'rgba(255, 255, 255, 0.2)' : undefined }} />
+
+      {/* Toggle de modo oscuro */}
+      <Box sx={{ px: 1, py: 1, flexShrink: 0 }}>
+        <Tooltip 
+          title={sidebarCollapsed ? (isDarkMode ? 'Modo Claro' : 'Modo Oscuro') : ''} 
+          placement="right"
+          disableHoverListener={!sidebarCollapsed}
+        >
+          <ListItemButton
+            onClick={toggleTheme}
             sx={{
-              textTransform: 'none',
-              fontSize: '0.8rem',
-              py: 0.75,
-              flex: 1
+              borderRadius: 1,
+              py: 1.5,
+              px: sidebarCollapsed ? 1.5 : 2,
+              color: !isDarkMode ? '#ffffff' : 'text.primary',
+              '&:hover': {
+                bgcolor: !isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'action.hover'
+              },
+              justifyContent: sidebarCollapsed ? 'center' : 'space-between',
+              transition: 'all 0.2s ease',
             }}
           >
-            Config
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<LogoutIcon />}
-            onClick={logout}
-            size="small"
-            sx={{
-              textTransform: 'none',
-              fontSize: '0.8rem',
-              py: 0.75,
-              flex: 1
-            }}
-          >
-            Salir
-          </Button>
-        </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: sidebarCollapsed ? 0 : 1.5 }}>
+              <Box sx={{ color: !isDarkMode ? '#93BFEF' : 'primary.main' }}>
+                {isDarkMode ? <LightModeIcon /> : <DarkModeIcon />}
+              </Box>
+              {!sidebarCollapsed && (
+                <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                  {isDarkMode ? 'Modo Claro' : 'Modo Oscuro'}
+                </Typography>
+              )}
+            </Box>
+            {!sidebarCollapsed && (
+              <Switch
+                checked={isDarkMode}
+                onChange={toggleTheme}
+                size="small"
+                sx={{
+                  '& .MuiSwitch-switchBase.Mui-checked': {
+                    color: 'white',
+                    '& + .MuiSwitch-track': {
+                      backgroundColor: '#f39c12',
+                    },
+                  },
+                }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            )}
+          </ListItemButton>
+        </Tooltip>
+      </Box>
+
+      <Divider sx={{ borderColor: !isDarkMode ? 'rgba(255, 255, 255, 0.2)' : undefined }} />
+
+      {/* Usuario Info en el sidebar */}
+      <Box sx={{ p: sidebarCollapsed ? 1 : 2, flexShrink: 0 }}>
+        {!sidebarCollapsed ? (
+          <>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <Avatar
+                sx={{
+                  bgcolor: !isDarkMode ? '#ffffff' : getUserRoleColor(),
+                  color: !isDarkMode ? '#1e40af' : 'inherit',
+                  width: 32,
+                  height: 32,
+                  mr: 1.5,
+                  fontSize: '0.875rem'
+                }}
+              >
+                {getUserInitials()}
+              </Avatar>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography 
+                  variant="body2" 
+                  sx={{ 
+                    fontWeight: 'medium',
+                    color: !isDarkMode ? '#ffffff' : 'inherit'
+                  }} 
+                  noWrap
+                >
+                  {user?.firstName}
+                </Typography>
+                <Typography 
+                  variant="caption" 
+                  sx={{
+                    color: !isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary'
+                  }}
+                  noWrap
+                >
+                  {user?.role}
+                </Typography>
+              </Box>
+            </Box>
+            
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<SettingsIcon />}
+                onClick={() => setShowChangePassword(true)}
+                sx={{ 
+                  fontSize: '0.75rem',
+                  borderColor: !isDarkMode ? 'rgba(255, 255, 255, 0.5)' : 'inherit',
+                  color: !isDarkMode ? '#ffffff' : 'inherit',
+                  '&:hover': {
+                    borderColor: !isDarkMode ? '#ffffff' : 'inherit',
+                    backgroundColor: !isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'inherit'
+                  },
+                  minWidth: 'auto',
+                  flex: 1
+                }}
+              >
+                Config
+              </Button>
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<LogoutIcon />}
+                onClick={logout}
+                sx={{ 
+                  fontSize: '0.75rem',
+                  borderColor: !isDarkMode ? 'rgba(255, 255, 255, 0.5)' : 'inherit',
+                  color: !isDarkMode ? '#ffffff' : 'inherit',
+                  '&:hover': {
+                    borderColor: !isDarkMode ? '#ffffff' : 'inherit',
+                    backgroundColor: !isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'inherit'
+                  },
+                  minWidth: 'auto',
+                  flex: 1
+                }}
+              >
+                Salir
+              </Button>
+            </Box>
+          </>
+        ) : (
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+            <Tooltip title={`${user?.firstName} - ${user?.role}`} placement="right">
+              <Avatar
+                sx={{
+                  bgcolor: !isDarkMode ? '#ffffff' : getUserRoleColor(),
+                  color: !isDarkMode ? '#1e40af' : 'inherit',
+                  width: 32,
+                  height: 32,
+                  fontSize: '0.875rem',
+                  cursor: 'pointer'
+                }}
+              >
+                {getUserInitials()}
+              </Avatar>
+            </Tooltip>
+            
+            <Tooltip title="Configuración" placement="right">
+              <IconButton
+                onClick={() => setShowChangePassword(true)}
+                size="small"
+                sx={{ 
+                  color: !isDarkMode ? '#ffffff' : 'inherit',
+                  border: `1px solid ${!isDarkMode ? 'rgba(255, 255, 255, 0.5)' : 'currentColor'}`,
+                  '&:hover': {
+                    borderColor: !isDarkMode ? '#ffffff' : 'inherit',
+                    backgroundColor: !isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'inherit'
+                  }
+                }}
+              >
+                <SettingsIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            
+            <Tooltip title="Cerrar Sesión" placement="right">
+              <IconButton
+                onClick={logout}
+                size="small"
+                sx={{ 
+                  color: !isDarkMode ? '#ffffff' : 'inherit',
+                  border: `1px solid ${!isDarkMode ? 'rgba(255, 255, 255, 0.5)' : 'currentColor'}`,
+                  '&:hover': {
+                    borderColor: !isDarkMode ? '#ffffff' : 'inherit',
+                    backgroundColor: !isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'inherit'
+                  }
+                }}
+              >
+                <LogoutIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        )}
       </Box>
     </Box>
   );
 
   return (
-    <Box sx={{ display: 'flex', height: '100vh' }}>
-      {/* App Bar */}
+    <Box sx={{ display: 'flex' }}>
+      {/* AppBar superior */}
       <AppBar
         position="fixed"
         sx={{
-          width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` },
-          ml: { sm: `${DRAWER_WIDTH}px` },
+          width: { 
+            sm: `calc(100% - ${sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH}px)` 
+          },
+          ml: { 
+            sm: `${sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH}px` 
+          },
           zIndex: (theme) => theme.zIndex.drawer + 1,
-          bgcolor: isDarkMode ? 'grey.900' : 'primary.main'
+          transition: 'width 0.3s ease, margin-left 0.3s ease',
         }}
       >
         <Toolbar>
@@ -274,57 +453,71 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
             <MenuIcon />
           </IconButton>
           
-          <Typography 
-            variant="h6" 
-            noWrap 
-            component="div"
-            sx={{ flexGrow: 1 }}
-          >
+          <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Centro de Control - Recepción
           </Typography>
           
-          {/* Theme Toggle */}
-          <ThemeToggle />
+          {/* Usuario info en header */}
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <Typography variant="body2" sx={{ mr: 1, display: { xs: 'none', md: 'block' } }}>
+              {getFullName()}
+            </Typography>
+            <Avatar
+              sx={{
+                bgcolor: getUserRoleColor(),
+                width: 32,
+                height: 32,
+                fontSize: '0.875rem'
+              }}
+            >
+              {getUserInitials()}
+            </Avatar>
+          </Box>
         </Toolbar>
       </AppBar>
 
       {/* Sidebar Navigation */}
       <Box
         component="nav"
-        sx={{ width: { sm: DRAWER_WIDTH }, flexShrink: { sm: 0 } }}
-        aria-label="mailbox folders"
+        sx={{ 
+          width: { sm: sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH }, 
+          flexShrink: { sm: 0 },
+          transition: 'width 0.3s ease'
+        }}
       >
-        {/* Mobile drawer */}
+        {/* Drawer móvil */}
         <Drawer
           variant="temporary"
           open={mobileOpen}
           onClose={handleDrawerToggle}
           ModalProps={{
-            keepMounted: true, // Better open performance on mobile.
+            keepMounted: true,
           }}
           sx={{
             display: { xs: 'block', sm: 'none' },
             '& .MuiDrawer-paper': { 
               boxSizing: 'border-box', 
               width: DRAWER_WIDTH,
-              bgcolor: 'background.paper'
+              backgroundColor: !isDarkMode ? '#1e40af' : undefined,
             },
           }}
         >
           {drawer}
         </Drawer>
         
-        {/* Desktop drawer */}
+        {/* Drawer permanente desktop */}
         <Drawer
           variant="permanent"
           sx={{
             display: { xs: 'none', sm: 'block' },
             '& .MuiDrawer-paper': { 
               boxSizing: 'border-box', 
-              width: DRAWER_WIDTH,
-              bgcolor: 'background.paper',
-              borderRight: '1px solid',
-              borderColor: 'divider'
+              width: sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH,
+              backgroundColor: !isDarkMode ? '#1e40af' : undefined,
+              height: '100vh',
+              position: 'fixed',
+              top: 0,
+              transition: 'width 0.3s ease',
             },
           }}
           open
@@ -333,26 +526,23 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
         </Drawer>
       </Box>
 
-      {/* Main content */}
+      {/* Contenido principal */}
       <Box
         component="main"
         sx={{
           flexGrow: 1,
-          width: { sm: `calc(100% - ${DRAWER_WIDTH}px)` },
-          height: '100vh',
-          overflow: 'auto'
+          width: { 
+            sm: `calc(100% - ${sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH}px)` 
+          },
+          minHeight: '100vh',
+          bgcolor: 'background.default',
+          transition: 'width 0.3s ease'
         }}
       >
-        <Toolbar /> {/* Espaciador para el AppBar */}
-        <Container 
-          maxWidth={false} 
-          sx={{ 
-            py: 3,
-            px: { xs: 2, sm: 3 },
-            height: 'calc(100vh - 64px)',
-            overflow: 'auto'
-          }}
-        >
+        <Toolbar />
+        
+        {/* Área de contenido */}
+        <Container maxWidth="xl" sx={{ py: 3 }}>
           {children}
         </Container>
       </Box>

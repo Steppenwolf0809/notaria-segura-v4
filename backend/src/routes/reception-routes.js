@@ -4,7 +4,8 @@ import {
   getMatrizadores,
   listarTodosDocumentos,
   marcarComoListo,
-  marcarGrupoListo
+  marcarGrupoListo,
+  getDashboardStats
 } from '../controllers/reception-controller.js';
 
 const router = express.Router();
@@ -19,6 +20,13 @@ const requireRecepcion = requireRoles(['RECEPCION']);
  * RUTAS DE RECEPCIÓN - Gestión de entregas de documentos
  * Todas las rutas están protegidas y requieren rol RECEPCION
  */
+
+/**
+ * @route GET /api/reception/dashboard
+ * @desc Obtener estadísticas del dashboard de recepción
+ * @access Private (RECEPCION only)
+ */
+router.get('/dashboard', authenticateToken, requireRecepcion, getDashboardStats);
 
 /**
  * @route GET /api/reception/documentos/todos

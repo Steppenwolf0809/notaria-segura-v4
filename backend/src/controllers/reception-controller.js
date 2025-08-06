@@ -4,6 +4,61 @@ import CodigoRetiroService from '../utils/codigo-retiro.js';
 
 const prisma = new PrismaClient();
 
+async function getDashboardStats(req, res) {
+  try {
+    // 🔄 CONSERVADOR: Estadísticas básicas para dashboard de recepción
+    const stats = await Promise.all([
+      // Total de documentos
+      prisma.document.count(),
+      // Documentos en proceso
+      prisma.document.count({ where: { status: 'EN_PROCESO' } }),
+      // Documentos listos para entrega
+      prisma.document.count({ where: { status: 'LISTO' } }),
+      // Documentos entregados
+      prisma.document.count({ where: { status: 'ENTREGADO' } }),
+      // Documentos creados hoy
+      prisma.document.count({
+        where: {
+          createdAt: {
+            gte: new Date(new Date().setHours(0, 0, 0, 0))
+          }
+        }
+      }),
+      // Documentos entregados hoy
+      prisma.document.count({
+        where: {
+          status: 'ENTREGADO',
+          fechaEntrega: {
+            gte: new Date(new Date().setHours(0, 0, 0, 0))
+          }
+        }
+      })
+    ]);
+
+    const [total, enProceso, listos, entregados, creadosHoy, entregadosHoy] = stats;
+
+    res.json({
+      success: true,
+      data: {
+        stats: {
+          total,
+          enProceso,
+          listos,
+          entregados,
+          creadosHoy,
+          entregadosHoy,
+          // Métricas adicionales
+          pendientesEntrega: listos,
+          eficienciaHoy: creadosHoy > 0 ? Math.round((entregadosHoy / creadosHoy) * 100) : 0
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error obteniendo estadísticas del dashboard:', error);
+    res.status(500).json({ success: false, error: 'Error interno del servidor' });
+  }
+}
+
 async function getMatrizadores(req, res) {
   try {
     const matrizadores = await prisma.user.findMany({
@@ -92,6 +147,7 @@ async function listarTodosDocumentos(req, res) {
       matrizador: doc.assignedTo ? `${doc.assignedTo.firstName} ${doc.assignedTo.lastName}` : 'No asignado',
       matrizadorId: doc.assignedToId,
       codigoRetiro: doc.codigoRetiro,
+      verificationCode: doc.verificationCode, // 🔄 CONSERVADOR: Agregar verificationCode para frontend
       fechaCreacion: doc.createdAt,
       fechaEntrega: doc.fechaEntrega
     }));
@@ -242,6 +298,7 @@ async function marcarGrupoListo(req, res) {
 }
 
 export {
+  getDashboardStats,
   getMatrizadores,
   listarTodosDocumentos,
   marcarComoListo,

@@ -25,7 +25,9 @@ router.get('/', authenticateToken, async (req, res) => {
     } else if (userRole === 'CAJA') {
       documentFilter.createdById = userId;
     } else if (userRole === 'RECEPCION') {
-      documentFilter.status = { in: ['LISTO', 'ENTREGADO'] };
+      // 🔄 CONSERVADOR: Recepción puede ver notificaciones de documentos en cualquier estado
+      // desde EN_PROCESO hacia adelante (cuando comienzan a ser relevantes para recepción)
+      documentFilter.status = { in: ['EN_PROCESO', 'LISTO', 'ENTREGADO'] };
     }
     
     // Aplicar filtro de documento solo si hay restricciones por rol

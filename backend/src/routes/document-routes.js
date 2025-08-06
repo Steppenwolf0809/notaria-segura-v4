@@ -22,7 +22,10 @@ import {
   createSmartDocumentGroup,
   // 🔄 Sistema de confirmaciones y deshacer
   undoDocumentStatusChange,
-  getUndoableChanges
+  getUndoableChanges,
+  // 🔗 Funciones de grupos
+  updateDocumentGroupStatus,
+  updateDocumentGroupInfo
 } from '../controllers/document-controller.js';
 
 const router = express.Router();
@@ -82,6 +85,9 @@ router.put('/:id/assign', authenticateToken, assignDocument);
 // GET /api/documents/my-documents - MATRIZADOR: Documentos del usuario
 router.get('/my-documents', authenticateToken, getMyDocuments);
 
+// 🔗 PUT /api/documents/group/status - Actualizar estado de grupo de documentos (DEBE IR ANTES QUE /:id/status)
+router.put('/group/status', authenticateToken, updateDocumentGroupStatus);
+
 // PUT /api/documents/:id/status - MATRIZADOR: Actualizar estado
 router.put('/:id/status', authenticateToken, updateDocumentStatus);
 
@@ -125,6 +131,9 @@ router.post('/undo-status-change', authenticateToken, undoDocumentStatusChange);
 
 // GET /api/documents/:id/undoable-changes - Obtener cambios deshacibles de un documento
 router.get('/:id/undoable-changes', authenticateToken, getUndoableChanges);
+
+// 🔗 PUT /api/documents/group/info - Actualizar información compartida de grupo
+router.put('/group/info', authenticateToken, updateDocumentGroupInfo);
 
 // Obtener información detallada de un grupo
 // TODO: Implementar el método getGroupDetails en document-controller.js

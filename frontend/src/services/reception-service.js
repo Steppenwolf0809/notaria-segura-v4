@@ -137,7 +137,13 @@ const receptionService = {
    */
   async procesarEntrega(documentId, entregaData) {
     try {
-      const response = await api.post(`/reception/documentos/${documentId}/entregar`, entregaData);
+      // 🔄 CONSERVADOR: Usar endpoint principal de documentos que ya existe
+      const response = await axios.post(`${API_BASE_URL}/documents/${documentId}/deliver`, entregaData, {
+        headers: {
+          'Authorization': `Bearer ${this.getToken()}`,
+          'Content-Type': 'application/json'
+        }
+      });
       return {
         success: true,
         data: response.data.data,
@@ -231,6 +237,24 @@ const receptionService = {
         error: receptionService.handleError(error)
       };
     }
+  },
+
+  /**
+   * Obtener token de autenticación
+   * @returns {string|null} Token de autenticación
+   */
+  getToken() {
+    const authData = localStorage.getItem('notaria-auth-storage');
+    if (authData) {
+      try {
+        const parsed = JSON.parse(authData);
+        return parsed.state?.token;
+      } catch (error) {
+        // Si no hay token, usar el que está en localStorage directamente
+        return localStorage.getItem('token');
+      }
+    }
+    return localStorage.getItem('token');
   },
 
   /**

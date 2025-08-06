@@ -229,8 +229,88 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
   }, [updateDocumentStatusWithConfirmation, handleDragEnd]);
 
   /**
+   * Obtener todos los documentos del mismo grupo
+   */
+  const getGroupDocuments = useCallback((document) => {
+    const { documents } = useDocumentStore.getState();
+    
+    if (!document.isGrouped || !document.documentGroupId) {
+      return [document]; // Solo el documento individual
+    }
+    
+    // Buscar todos los documentos del mismo grupo
+    const groupDocuments = documents.filter(doc => 
+      doc.documentGroupId === document.documentGroupId && doc.isGrouped
+    );
+    
+    console.log('🔗 Documentos del grupo encontrados:', {
+      groupId: document.documentGroupId,
+      totalDocuments: groupDocuments.length,
+      documentIds: groupDocuments.map(d => d.id)
+    });
+    
+    return groupDocuments.length > 0 ? groupDocuments : [document];
+  }, []);
+
+  /**
+   * Actualizar estado de grupo completo usando endpoint optimizado
+   */
+  const updateGroupStatus = useCallback(async (groupDocuments, newStatus, options = {}) => {
+    console.log('🔗 Actualizando estado de grupo:', {
+      documentsCount: groupDocuments.length,
+      newStatus,
+      documentIds: groupDocuments.map(d => d.id),
+      groupId: groupDocuments[0]?.documentGroupId
+    });
+
+    try {
+      // Obtener el ID del grupo
+      const documentGroupId = groupDocuments[0]?.documentGroupId;
+      
+      if (!documentGroupId) {
+        console.error('❌ No se encontró ID del grupo');
+        return { success: false, error: 'No se encontró ID del grupo' };
+      }
+
+      // Usar función optimizada del backend para grupos
+      const documentService = await import('../services/document-service.js');
+      const result = await documentService.default.updateDocumentGroupStatus(
+        documentGroupId, 
+        newStatus, 
+        options
+      );
+      
+      if (result.success) {
+        console.log('✅ Grupo actualizado exitosamente via endpoint optimizado');
+        
+        // Actualizar documentos en el store local
+        const { updateDocument } = useDocumentStore.getState();
+        result.data.documents?.forEach(updatedDoc => {
+          updateDocument(updatedDoc.id, updatedDoc);
+        });
+        
+        return { 
+          success: true, 
+          document: groupDocuments[0], // Retornar documento principal
+          groupUpdated: true,
+          groupSize: result.data.documentsUpdated || groupDocuments.length,
+          whatsapp: result.data.whatsapp
+        };
+      } else {
+        console.error('❌ Error en endpoint optimizado:', result.error);
+        return { success: false, error: result.error };
+      }
+      
+    } catch (error) {
+      console.error('💥 Error actualizando grupo via endpoint optimizado:', error);
+      return { success: false, error: error.message };
+    }
+  }, []);
+
+  /**
    * Manejar el drop en una columna
    * CONSERVADOR: Mantiene lógica original + interceptación para confirmaciones
+   * NUEVA FUNCIONALIDAD: Soporte para grupos de documentos
    */
   const handleDrop = useCallback(async (event, newStatus) => {
     // CRÍTICO: Prevenir comportamiento por defecto inmediatamente
@@ -240,6 +320,8 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
     console.log('🎯 Drop detectado:', { 
       draggedItem: draggedItem?.id, 
       newStatus,
+      isGrouped: draggedItem?.isGrouped,
+      groupId: draggedItem?.documentGroupId,
       dataTransfer: !!event.dataTransfer 
     });
     
@@ -264,6 +346,17 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
       return { success: false, error: 'Movimiento no válido según reglas de negocio' };
     }
 
+    // 🔗 NUEVA FUNCIONALIDAD: Detectar si es documento agrupado
+    const groupDocuments = getGroupDocuments(draggedItem);
+    const isGroupMove = groupDocuments.length > 1;
+    
+    if (isGroupMove) {
+      console.log('🔗 Movimiento de grupo detectado:', {
+        groupSize: groupDocuments.length,
+        groupId: draggedItem.documentGroupId
+      });
+    }
+
     // NUEVA FUNCIONALIDAD: Verificar si requiere confirmación
     const confirmationInfo = requiresConfirmation(draggedItem.status, newStatus);
     
@@ -275,7 +368,8 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
       setPendingStatusChange({
         document: draggedItem,
         newStatus,
-        confirmationInfo
+        confirmationInfo,
+        groupDocuments: isGroupMove ? groupDocuments : null // 🔗 Agregar info de grupo
       });
       
       // Llamar callback para mostrar modal de confirmación
@@ -284,16 +378,30 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
         currentStatus: draggedItem.status,
         newStatus,
         confirmationInfo,
+        isGroupMove, // 🔗 Indicar si es movimiento de grupo
+        groupSize: groupDocuments.length, // 🔗 Tamaño del grupo
         onConfirm: async (confirmationData) => {
-          // Ejecutar cambio después de confirmación
-          const result = await executeStatusChange(
-            confirmationData.document, 
-            confirmationData.newStatus, 
-            { 
-              reversionReason: confirmationData.reversionReason,
-              deliveredTo: confirmationData.deliveredTo
-            }
-          );
+          // 🔗 NUEVA FUNCIONALIDAD: Ejecutar cambio de grupo o individual
+          let result;
+          if (isGroupMove) {
+            result = await updateGroupStatus(
+              groupDocuments,
+              confirmationData.newStatus,
+              { 
+                reversionReason: confirmationData.reversionReason,
+                deliveredTo: confirmationData.deliveredTo
+              }
+            );
+          } else {
+            result = await executeStatusChange(
+              confirmationData.document, 
+              confirmationData.newStatus, 
+              { 
+                reversionReason: confirmationData.reversionReason,
+                deliveredTo: confirmationData.deliveredTo
+              }
+            );
+          }
           
           // Limpiar estado pendiente
           setPendingStatusChange(null);
@@ -311,7 +419,38 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
       return { success: false, pending: true, message: 'Esperando confirmación' };
     }
 
-    // CONSERVADOR: Si no requiere confirmación, usar lógica original
+    // 🔗 NUEVA FUNCIONALIDAD: Manejar grupos sin confirmación
+    if (isGroupMove) {
+      console.log('🔗 Procesando movimiento de grupo sin confirmación');
+      setIsDropping(true);
+
+      try {
+        const result = await updateGroupStatus(groupDocuments, newStatus);
+        
+        if (result.success) {
+          console.log(`✅ Grupo de ${result.groupSize} documentos movido exitosamente: ${draggedItem.status} -> ${newStatus}`);
+          return { 
+            success: true, 
+            document: draggedItem, 
+            newStatus, 
+            previousStatus: draggedItem.status,
+            groupUpdated: true,
+            groupSize: result.groupSize
+          };
+        } else {
+          console.error('❌ updateGroupStatus falló:', result.error);
+          throw new Error(result.error || 'Error al actualizar el estado del grupo');
+        }
+      } catch (error) {
+        console.error('💥 Error en drag & drop de grupo:', error);
+        return { success: false, error: error.message };
+      } finally {
+        setIsDropping(false);
+        handleDragEnd();
+      }
+    }
+
+    // CONSERVADOR: Si no requiere confirmación y no es grupo, usar lógica original
     setIsDropping(true);
 
     try {
@@ -343,7 +482,7 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
       setIsDropping(false);
       handleDragEnd();
     }
-  }, [draggedItem, updateDocumentStatus, updateDocumentStatusWithConfirmation, requiresConfirmation, handleDragEnd, isValidMove, onConfirmationRequired, executeStatusChange]);
+  }, [draggedItem, updateDocumentStatus, updateDocumentStatusWithConfirmation, requiresConfirmation, handleDragEnd, isValidMove, onConfirmationRequired, executeStatusChange, getGroupDocuments, updateGroupStatus]);
 
   /**
    * Obtener mensaje explicativo para movimientos inválidos
