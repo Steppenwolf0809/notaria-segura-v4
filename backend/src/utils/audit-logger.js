@@ -14,6 +14,10 @@ const AuditEventTypes = {
   USER_CREATED: 'USER_CREATED',
   USER_UPDATED: 'USER_UPDATED',
   USER_DEACTIVATED: 'USER_DEACTIVATED',
+  USER_ACTIVATED: 'USER_ACTIVATED',
+  USER_DELETED: 'USER_DELETED',
+  ADMIN_USER_LIST: 'ADMIN_USER_LIST',
+  ADMIN_USER_VIEW: 'ADMIN_USER_VIEW',
   SECURITY_VIOLATION: 'SECURITY_VIOLATION'
 };
 
@@ -200,6 +204,54 @@ function isCriticalEvent(eventType, metadata = {}) {
   return false;
 }
 
+/**
+ * Registra acciones administrativas de usuarios
+ * @param {Object} eventData - Datos del evento administrativo
+ */
+function logAdminAction({ adminUserId, adminEmail, targetUserId, targetEmail, action, details, ipAddress, userAgent, success = true, reason = null }) {
+  return logAuditEvent({
+    userId: adminUserId,
+    userEmail: adminEmail,
+    eventType: action,
+    description: success 
+      ? `Admin ${action.toLowerCase()}: ${targetEmail} (ID: ${targetUserId})`
+      : `Admin ${action.toLowerCase()} fallido: ${targetEmail} - ${reason}`,
+    level: success ? AuditLevels.INFO : AuditLevels.WARNING,
+    ipAddress,
+    userAgent,
+    metadata: {
+      success,
+      reason: reason || 'N/A',
+      targetUserId,
+      targetEmail,
+      adminAction: true,
+      details: details || {},
+      timestamp: new Date().toISOString()
+    }
+  });
+}
+
+/**
+ * Registra acceso a lista de usuarios (solo admin)
+ * @param {Object} eventData - Datos del evento
+ */
+function logUserListAccess({ adminUserId, adminEmail, ipAddress, userAgent, filters = null }) {
+  return logAuditEvent({
+    userId: adminUserId,
+    userEmail: adminEmail,
+    eventType: AuditEventTypes.ADMIN_USER_LIST,
+    description: 'Admin accedió a lista de usuarios',
+    level: AuditLevels.INFO,
+    ipAddress,
+    userAgent,
+    metadata: {
+      adminAction: true,
+      filters: filters || {},
+      timestamp: new Date().toISOString()
+    }
+  });
+}
+
 export {
   AuditEventTypes,
   AuditLevels,
@@ -207,6 +259,8 @@ export {
   logPasswordChange,
   logLoginAttempt,
   logSecurityViolation,
+  logAdminAction,
+  logUserListAccess,
   extractRequestInfo,
   generateSessionId,
   isCriticalEvent

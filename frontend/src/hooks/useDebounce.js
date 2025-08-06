@@ -42,4 +42,6 @@ const useDebounce = (value, delay) => {
   return debouncedValue;
 };
 
+// Export as both named and default export for flexibility
+export { useDebounce };
 export default useDebounce;
