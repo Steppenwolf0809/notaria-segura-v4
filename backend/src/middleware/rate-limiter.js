@@ -125,10 +125,49 @@ const addRateLimitHeaders = (req, res, next) => {
   next();
 };
 
+/**
+ * Rate limiter para operaciones administrativas
+ * Límite moderado para acciones de administración
+ */
+const adminRateLimit = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutos
+  max: 50, // Máximo 50 operaciones por ventana
+  message: {
+    success: false,
+    message: 'Demasiadas operaciones administrativas. Intente nuevamente en 5 minutos.',
+    retryAfter: '5 minutos'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  
+  handler: (req, res) => {
+    const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    
+    logSecurityViolation({
+      userId: req.user?.id || null,
+      userEmail: req.user?.email || 'unknown',
+      ipAddress: clientIP,
+      userAgent,
+      violation: 'Excedido límite de operaciones administrativas',
+      severity: 'medium'
+    });
+    
+    console.warn(`Admin rate limit exceeded - IP: ${clientIP}, User: ${req.user?.email || 'unknown'}`);
+    
+    res.status(429).json({
+      success: false,
+      message: 'Demasiadas operaciones administrativas. Intente nuevamente en 5 minutos.',
+      retryAfter: '5 minutos'
+    });
+  }
+});
+
 export {
   passwordChangeRateLimit,
   loginRateLimit,
   authGeneralRateLimit,
   registerRateLimit,
+  adminRateLimit,
   addRateLimitHeaders
 };

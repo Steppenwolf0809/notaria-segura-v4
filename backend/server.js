@@ -6,6 +6,7 @@ import dotenv from 'dotenv'
 import authRoutes from './src/routes/auth-routes.js'
 import documentRoutes from './src/routes/document-routes.js'
 import notificationsRoutes from './src/routes/notifications-routes.js'
+import adminRoutes from './src/routes/admin-routes.js'
 
 // Cargar variables de entorno
 dotenv.config({ path: './.env' })
@@ -109,6 +110,9 @@ app.use('/api/documents', documentRoutes)
 // RUTAS DE NOTIFICACIONES (/api/notifications/*)
 app.use('/api/notifications', notificationsRoutes)
 
+// RUTAS DE ADMINISTRACIÓN (/api/admin/*)
+app.use('/api/admin', adminRoutes)
+
 // ============================================================================
 // MIDDLEWARE DE MANEJO DE ERRORES
 // ============================================================================
@@ -124,7 +128,9 @@ app.use('*', (req, res) => {
       'GET /api/auth/verify', 
       'GET /api/documents/my-documents',
       'POST /api/documents/upload-xml',
-      'POST /api/documents/upload-xml-batch'
+      'POST /api/documents/upload-xml-batch',
+      'GET /api/admin/users (ADMIN only)',
+      'POST /api/admin/users (ADMIN only)'
     ]
   })
 })

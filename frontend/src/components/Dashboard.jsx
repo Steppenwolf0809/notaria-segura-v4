@@ -25,6 +25,7 @@ import CajaDashboard from './CajaDashboard';
 import MatrizadorCenter from './MatrizadorCenter';
 import RecepcionCenter from './RecepcionCenter';
 import ArchivoCenter from './ArchivoCenter';
+import AdminCenter from './AdminCenter';
 import ChangePassword from './ChangePassword';
 
 /**
@@ -186,7 +187,11 @@ const Dashboard = () => {
     return <ArchivoCenter />;
   }
 
-  // Dashboard por defecto para otros roles (ADMIN)
+  if (user.role === 'ADMIN') {
+    return <AdminCenter />;
+  }
+
+  // Dashboard por defecto para otros roles
   return (
     <Box sx={{ flexGrow: 1 }}>
       {/* App Bar */}
