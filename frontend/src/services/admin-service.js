@@ -256,6 +256,209 @@ const adminService = {
   ],
 
   /**
+   * Obtener todos los documentos con filtros avanzados (admin oversight)
+   * @param {Object} filters - Filtros de búsqueda
+   * @param {string} token - Token JWT del admin
+   * @returns {Promise<Object>} Lista de documentos con estadísticas
+   */
+  getDocumentsOversight: async (filters = {}, token) => {
+    try {
+      const response = await api.get('/documents/oversight', {
+        params: filters,
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      throw adminService.handleError(error);
+    }
+  },
+
+  /**
+   * Obtener timeline/eventos de un documento específico
+   * @param {string} documentId - ID del documento
+   * @param {string} token - Token JWT del admin
+   * @returns {Promise<Object>} Timeline de eventos del documento
+   */
+  getDocumentTimeline: async (documentId, token) => {
+    try {
+      const response = await api.get(`/documents/${documentId}/events`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      throw adminService.handleError(error);
+    }
+  },
+
+  /**
+   * Obtener información de múltiples documentos para operaciones en lote
+   * @param {Array} documentIds - Array de IDs de documentos
+   * @param {string} token - Token JWT del admin
+   * @returns {Promise<Object>} Información de los documentos
+   */
+  getBulkDocumentsInfo: async (documentIds, token) => {
+    try {
+      const response = await api.post('/documents/bulk-info', 
+        { documentIds }, 
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw adminService.handleError(error);
+    }
+  },
+
+  /**
+   * Ejecutar operación en lote sobre múltiples documentos
+   * @param {Object} operationData - Datos de la operación
+   * @param {Array} operationData.documentIds - IDs de documentos
+   * @param {string} operationData.operation - Tipo de operación (reassign, changeStatus)
+   * @param {string} operationData.newMatrizadorId - ID del nuevo matrizador (si aplica)
+   * @param {string} operationData.newStatus - Nuevo estado (si aplica)
+   * @param {string} token - Token JWT del admin
+   * @returns {Promise<Object>} Resultado de la operación
+   */
+  executeBulkOperation: async (operationData, token) => {
+    try {
+      const response = await api.post('/documents/bulk-operation', 
+        operationData, 
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw adminService.handleError(error);
+    }
+  },
+
+  /**
+   * Exportar documentos en formato Excel o CSV
+   * @param {Object} filters - Filtros aplicados
+   * @param {string} format - Formato de exportación (excel, csv)
+   * @param {string} token - Token JWT del admin
+   * @returns {Promise<Blob>} Archivo para descarga
+   */
+  exportDocuments: async (filters = {}, format = 'excel', token) => {
+    try {
+      const params = new URLSearchParams({
+        ...filters,
+        format
+      });
+
+      const response = await api.get(`/documents/export?${params}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        },
+        responseType: 'blob'
+      });
+
+      return response.data;
+    } catch (error) {
+      throw adminService.handleError(error);
+    }
+  },
+
+  /**
+   * Reasignar documento a nuevo matrizador
+   * @param {string} documentId - ID del documento
+   * @param {string} newMatrizadorId - ID del nuevo matrizador
+   * @param {string} token - Token JWT del admin
+   * @returns {Promise<Object>} Documento actualizado
+   */
+  reassignDocument: async (documentId, newMatrizadorId, token) => {
+    try {
+      const response = await api.patch(`/documents/${documentId}/reassign`, 
+        { newMatrizadorId }, 
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw adminService.handleError(error);
+    }
+  },
+
+  /**
+   * Cambiar estado de documento (admin override)
+   * @param {string} documentId - ID del documento
+   * @param {string} newStatus - Nuevo estado
+   * @param {string} reason - Razón del cambio
+   * @param {string} token - Token JWT del admin
+   * @returns {Promise<Object>} Documento actualizado
+   */
+  changeDocumentStatus: async (documentId, newStatus, reason, token) => {
+    try {
+      const response = await api.patch(`/documents/${documentId}/status`, 
+        { newStatus, reason }, 
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw adminService.handleError(error);
+    }
+  },
+
+  /**
+   * Obtener estadísticas detalladas de documentos
+   * @param {Object} filters - Filtros para estadísticas
+   * @param {string} token - Token JWT del admin
+   * @returns {Promise<Object>} Estadísticas detalladas
+   */
+  getDocumentStatistics: async (filters = {}, token) => {
+    try {
+      const response = await api.get('/documents/statistics', {
+        params: filters,
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      throw adminService.handleError(error);
+    }
+  },
+
+  /**
+   * Validar filtros de oversight antes de enviar
+   * @param {Object} filters - Filtros a validar
+   * @returns {Object} Filtros validados
+   */
+  validateOversightFilters: (filters) => {
+    const validStatuses = ['PENDIENTE', 'EN_PROCESO', 'LISTO', 'ENTREGADO'];
+    const validTypes = ['PROTOCOLO', 'DILIGENCIA', 'CERTIFICACION', 'ARRENDAMIENTO', 'OTROS'];
+    const validSortBy = ['createdAt', 'updatedAt', 'status', 'protocolNumber', 'clientName'];
+    const validSortOrder = ['asc', 'desc'];
+
+    return {
+      ...filters,
+      status: validStatuses.includes(filters.status) ? filters.status : undefined,
+      type: validTypes.includes(filters.type) ? filters.type : undefined,
+      sortBy: validSortBy.includes(filters.sortBy) ? filters.sortBy : 'createdAt',
+      sortOrder: validSortOrder.includes(filters.sortOrder) ? filters.sortOrder : 'desc',
+      page: Math.max(1, parseInt(filters.page) || 1),
+      limit: Math.min(100, Math.max(5, parseInt(filters.limit) || 10))
+    };
+  },
+
+  /**
    * Maneja errores de las peticiones HTTP
    * @param {Object} error - Error de axios
    * @returns {Object} Error procesado

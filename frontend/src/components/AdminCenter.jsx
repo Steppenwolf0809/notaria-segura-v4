@@ -17,10 +17,12 @@ import {
   Dashboard as DashboardIcon,
   Settings as SettingsIcon,
   Security as SecurityIcon,
-  Assessment as StatsIcon
+  Assessment as StatsIcon,
+  Assignment as DocumentIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import UserManagement from './admin/UserManagement';
+import DocumentOversight from './admin/DocumentOversight';
 
 /**
  * Centro de administración - Panel principal para ADMIN
@@ -44,6 +46,11 @@ const AdminCenter = () => {
       label: 'Gestión de Usuarios',
       icon: <PersonIcon />,
       component: <UserManagement />
+    },
+    {
+      label: 'Supervisión Documentos',
+      icon: <DocumentIcon />,
+      component: <DocumentOversight />
     },
     {
       label: 'Configuración',
