@@ -8,6 +8,7 @@ import documentRoutes from './src/routes/document-routes.js'
 import notificationsRoutes from './src/routes/notifications-routes.js'
 import adminRoutes from './src/routes/admin-routes.js'
 import archivoRoutes from './src/routes/archivo-routes.js'
+import receptionRoutes from './src/routes/reception-routes.js'
 
 // Cargar variables de entorno
 dotenv.config({ path: './.env' })
@@ -117,6 +118,9 @@ app.use('/api/admin', adminRoutes)
 // RUTAS DE ARCHIVO (/api/archivo/*)
 app.use('/api/archivo', archivoRoutes)
 
+// RUTAS DE RECEPCIÓN (/api/reception/*)
+app.use('/api/reception', receptionRoutes)
+
 // ============================================================================
 // MIDDLEWARE DE MANEJO DE ERRORES
 // ============================================================================
@@ -136,7 +140,9 @@ app.use('*', (req, res) => {
       'GET /api/admin/users (ADMIN only)',
       'POST /api/admin/users (ADMIN only)',
       'GET /api/archivo/dashboard (ARCHIVO only)',
-      'GET /api/archivo/mis-documentos (ARCHIVO only)'
+      'GET /api/archivo/mis-documentos (ARCHIVO only)',
+      'GET /api/reception/documentos/todos (RECEPCION only)',
+      'POST /api/reception/documentos/:id/marcar-listo (RECEPCION only)'
     ]
   })
 })
@@ -181,6 +187,7 @@ app.listen(PORT, () => {
   console.log(`🔐 Auth endpoints: http://localhost:${PORT}/api/auth/*`)
   console.log(`📄 Document endpoints: http://localhost:${PORT}/api/documents/*`)
   console.log(`📂 Archivo endpoints: http://localhost:${PORT}/api/archivo/*`)
+  console.log(`📞 Reception endpoints: http://localhost:${PORT}/api/reception/*`)
   console.log(`🏷️  Environment: ${process.env.NODE_ENV || 'development'}`)
   console.log('🔥=====================================🔥')
   

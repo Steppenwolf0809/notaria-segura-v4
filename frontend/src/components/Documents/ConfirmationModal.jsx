@@ -39,7 +39,10 @@ const ConfirmationModal = ({
   currentStatus,
   newStatus,
   confirmationInfo,
-  isLoading = false
+  isLoading = false,
+  // 🔗 NUEVOS PROPS para soporte de grupos
+  isGroupMove = false,
+  groupSize = 1
 }) => {
   const [confirmed, setConfirmed] = useState(false);
   const [reversionReason, setReversionReason] = useState('');
@@ -161,14 +164,23 @@ const ConfirmationModal = ({
         {/* Información del documento */}
         <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
           <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-            INFORMACIÓN DEL DOCUMENTO
+            {isGroupMove ? 'INFORMACIÓN DEL GRUPO' : 'INFORMACIÓN DEL DOCUMENTO'}
           </Typography>
+          
+          {/* 🔗 NUEVA FUNCIONALIDAD: Información de grupo */}
+          {isGroupMove && (
+            <Alert severity="info" sx={{ mb: 2 }}>
+              <Typography variant="body2">
+                <strong>Movimiento de Grupo:</strong> Se actualizarán {groupSize} documentos del mismo cliente simultáneamente.
+              </Typography>
+            </Alert>
+          )}
           
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <AssignmentIcon sx={{ fontSize: 16, color: 'primary.main' }} />
               <Typography variant="body2">
-                <strong>Documento:</strong> {document.protocolNumber}
+                <strong>{isGroupMove ? 'Documento principal:' : 'Documento:'}</strong> {document.protocolNumber}
               </Typography>
             </Box>
             
@@ -187,6 +199,13 @@ const ConfirmationModal = ({
                   <strong>Teléfono:</strong> {document.clientPhone}
                 </Typography>
               </Box>
+            )}
+
+            {/* 🔗 NUEVA FUNCIONALIDAD: Mostrar cantidad de documentos en grupo */}
+            {isGroupMove && (
+              <Typography variant="body2" sx={{ color: 'primary.main', fontWeight: 'medium' }}>
+                <strong>Documentos en grupo:</strong> {groupSize}
+              </Typography>
             )}
           </Box>
         </Box>

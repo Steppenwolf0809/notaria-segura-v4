@@ -314,8 +314,61 @@ const useDocumentStore = create((set, get) => ({
    */
   updateDocument: async (documentId, documentData) => {
     try {
-      // Actualizar documento en la lista local inmediatamente (optimistic update)
       const currentDocuments = get().documents;
+      const targetDoc = currentDocuments.find(doc => doc.id === documentId);
+      
+      // 🔗 NUEVA FUNCIONALIDAD: Si el documento está agrupado y se actualizan campos compartidos
+      if (targetDoc?.isGrouped && targetDoc?.documentGroupId) {
+        const sharedFields = ['clientPhone', 'clientEmail', 'clientName'];
+        const hasSharedUpdate = sharedFields.some(field => documentData[field] !== undefined);
+        
+        if (hasSharedUpdate) {
+          console.log('🔗 Detectado cambio en campo compartido de grupo:', {
+            documentId,
+            groupId: targetDoc.documentGroupId,
+            fields: Object.keys(documentData).filter(field => sharedFields.includes(field))
+          });
+          
+          try {
+            // Preparar datos compartidos para actualizar
+            const sharedData = {};
+            sharedFields.forEach(field => {
+              if (documentData[field] !== undefined) {
+                sharedData[field] = documentData[field];
+              }
+            });
+            
+            // Llamar al servicio para actualizar todo el grupo
+            const result = await documentService.updateDocumentGroupInfo(
+              targetDoc.documentGroupId, 
+              sharedData
+            );
+            
+            if (result.success) {
+              console.log('✅ Información compartida actualizada en todo el grupo');
+              
+              // Actualizar todos los documentos del grupo en el store
+              const updatedDocuments = currentDocuments.map(doc => {
+                if (doc.documentGroupId === targetDoc.documentGroupId && doc.isGrouped) {
+                  return { ...doc, ...sharedData, ...documentData };
+                }
+                return doc.id === documentId ? { ...doc, ...documentData } : doc;
+              });
+              
+              set({ documents: updatedDocuments });
+              return true;
+            } else {
+              console.error('❌ Error actualizando información del grupo:', result.error);
+              // Continuar con actualización local como fallback
+            }
+          } catch (error) {
+            console.error('💥 Error en actualización grupal, usando fallback:', error);
+            // Continuar con actualización local como fallback
+          }
+        }
+      }
+      
+      // Actualización local estándar (para documentos individuales o como fallback)
       const updatedDocuments = currentDocuments.map(doc => 
         doc.id === documentId ? { ...doc, ...documentData } : doc
       );

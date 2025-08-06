@@ -281,10 +281,12 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
         sx={{
           bgcolor: 'background.paper',
           border: '1px solid',
-          borderColor: 'divider',
+          borderColor: document.isGrouped ? 'primary.main' : 'divider',
           p: 2,
           borderRadius: 2,
-          boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+          boxShadow: document.isGrouped 
+            ? '0 4px 12px rgba(25, 118, 210, 0.15)' 
+            : '0 2px 4px rgba(0,0,0,0.05)',
           cursor: isDragging ? 'grabbing' : 'grab',
           mb: 2,
           minHeight: 180,
@@ -293,10 +295,31 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
           gap: 1.2,
           overflow: 'hidden',
           transition: 'all 0.2s ease',
+          position: 'relative',
+          // 🔗 NUEVA FUNCIONALIDAD: Estilo especial para documentos agrupados
+          ...(document.isGrouped && {
+            borderWidth: '2px',
+            borderStyle: 'solid',
+            borderColor: 'primary.main',
+            bgcolor: 'primary.lighter',
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: -1,
+              left: -1,
+              right: -1,
+              bottom: -1,
+              background: 'linear-gradient(45deg, transparent, rgba(25, 118, 210, 0.1), transparent)',
+              borderRadius: 2,
+              zIndex: -1
+            }
+          }),
           '&:hover': {
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+            boxShadow: document.isGrouped 
+              ? '0 6px 20px rgba(25, 118, 210, 0.25)' 
+              : '0 4px 12px rgba(0,0,0,0.1)',
             transform: 'translateY(-2px)',
-            borderColor: 'primary.main'
+            borderColor: document.isGrouped ? 'primary.dark' : 'primary.main'
           },
           ...cardStyle
         }}
@@ -320,6 +343,24 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 0.5, flexShrink: 0 }}>
+            {/* 🔗 NUEVA FUNCIONALIDAD: Indicador de grupo */}
+            {document.isGrouped && (
+              <Chip
+                label={`Grupo`}
+                size="small"
+                sx={{ 
+                  fontSize: '0.6rem',
+                  height: 20,
+                  fontWeight: 600,
+                  bgcolor: 'primary.main',
+                  color: 'primary.contrastText',
+                  '& .MuiChip-label': { px: 0.5 },
+                  border: 'none',
+                  borderRadius: 1,
+                  mr: 0.5
+                }}
+              />
+            )}
             <Chip
               label={getStatusText(status)}
               size="small"
@@ -415,6 +456,30 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
           </Tooltip>
         </Box>
 
+        {/* 🔗 NUEVA FUNCIONALIDAD: Mensaje para documentos agrupados */}
+        {document.isGrouped && (
+          <Box sx={{ 
+            bgcolor: 'rgba(25, 118, 210, 0.08)',
+            border: '1px solid rgba(25, 118, 210, 0.3)',
+            borderRadius: 2, 
+            p: 1, 
+            mt: 1,
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: 0.5
+          }}>
+            <LinkIcon sx={{ fontSize: 14, color: 'primary.main' }} />
+            <Typography variant="body2" sx={{ 
+              fontSize: '0.75rem', 
+              color: 'primary.main', 
+              fontWeight: 600,
+              lineHeight: 1.2
+            }}>
+              Al mover: todos los documentos del grupo se actualizarán juntos
+            </Typography>
+          </Box>
+        )}
+
         {related && (
           <Box sx={{ 
             bgcolor: 'rgba(23, 162, 184, 0.08)',
@@ -472,20 +537,11 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
 
     return (
       <Paper
-        data-column-id={column.id}
-        onDragEnter={(e) => handleDragEnter(e, column.id)}
-        onDragOver={(e) => handleDragOver(e, column.id)}
-        onDrop={(e) => {
-          console.log(`🎯 Drop en columna ${column.id}`);
-          handleDrop(e, column.id);
-        }}
-        onDragLeave={(e) => handleDragLeave(e, column.id)}
         sx={{
           bgcolor: 'background.default',
           border: 1,
           borderColor: 'divider',
           borderRadius: 2,
-          p: { xs: 1.5, md: 2 },
           height: '100%',
           minWidth: { xs: 300, md: 350 },
           flex: 1,
@@ -497,31 +553,53 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
           ...getColumnStyle(column.id)
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexShrink: 0 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: column.color }} />
-            <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1rem' }}>{column.title}</Typography>
-          </Box>
-          <Chip label={filteredDocs.length} size="small" sx={{ fontWeight: 600 }} />
-        </Box>
-        
-        <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: 1 }}>
-          {documents.length > 0 ? (
-            documents.map((doc) => (
-              <DocumentCard 
-                key={doc.id} 
-                document={doc} 
-                allDocumentsInStatus={filteredDocs}
-                onOpenDetail={openDetailModal} 
-              />
-            ))
-          ) : (
-            <Box sx={{ textAlign: 'center', py: 8, opacity: 0.6 }}>
-              <Typography>No hay documentos</Typography>
+        {/* Zona de drop que ocupa toda la columna */}
+        <Box
+          data-column-id={column.id}
+          onDragEnter={(e) => handleDragEnter(e, column.id)}
+          onDragOver={(e) => handleDragOver(e, column.id)}
+          onDrop={(e) => {
+            console.log(`🎯 Drop en columna ${column.id}`);
+            handleDrop(e, column.id);
+          }}
+          onDragLeave={(e) => handleDragLeave(e, column.id)}
+          sx={{
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+            p: { xs: 1.5, md: 2 }
+          }}
+        >
+          {/* Header de la columna */}
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexShrink: 0 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: column.color }} />
+              <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1rem' }}>{column.title}</Typography>
             </Box>
-          )}
+            <Chip label={filteredDocs.length} size="small" sx={{ fontWeight: 600 }} />
+          </Box>
+          
+          {/* Contenido scrolleable de documentos */}
+          <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: 1 }}>
+            {documents.length > 0 ? (
+              documents.map((doc, index) => (
+                <DocumentCard 
+                  key={`${doc.id}-${index}`}
+                  document={doc} 
+                  allDocumentsInStatus={filteredDocs}
+                  onOpenDetail={openDetailModal} 
+                />
+              ))
+            ) : (
+              <Box sx={{ textAlign: 'center', py: 8, opacity: 0.6 }}>
+                <Typography>No hay documentos</Typography>
+              </Box>
+            )}
+          </Box>
+          
+          {/* Botón de cargar más */}
+          <LoadMoreButton onLoadMore={loadMore} hasMore={hasMore} remainingCount={remainingCount} />
         </Box>
-        <LoadMoreButton onLoadMore={loadMore} hasMore={hasMore} remainingCount={remainingCount} />
       </Paper>
     );
   };
@@ -677,9 +755,62 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Box sx={{ flexGrow: 1, display: 'flex', gap: 2, overflowX: 'auto', p: 2 }}>
-        {kanbanColumns.map((column) => (
-          <KanbanColumn key={column.id} column={column} />
+      <Box sx={{ 
+        flexGrow: 1, 
+        display: 'flex', 
+        gap: 2, 
+        overflowX: 'auto', 
+        p: 2,
+        // Asegurar altura mínima para las columnas
+        minHeight: 'calc(100vh - 200px)',
+        alignItems: 'stretch'
+      }}>
+        {kanbanColumns.map((column, index) => (
+          <React.Fragment key={column.id}>
+            <KanbanColumn column={column} />
+            {/* Espacio de drop invisible entre columnas para facilitar el arrastre */}
+            {index < kanbanColumns.length - 1 && (
+              <Box
+                onDragEnter={(e) => {
+                  // Al entrar en el espacio entre columnas, activar la siguiente columna
+                  const nextColumn = kanbanColumns[index + 1];
+                  if (nextColumn && isDragging) {
+                    handleDragEnter(e, nextColumn.id);
+                  }
+                }}
+                onDragOver={(e) => {
+                  const nextColumn = kanbanColumns[index + 1];
+                  if (nextColumn) {
+                    handleDragOver(e, nextColumn.id);
+                  }
+                }}
+                onDrop={(e) => {
+                  const nextColumn = kanbanColumns[index + 1];
+                  if (nextColumn) {
+                    console.log(`🎯 Drop en espacio entre columnas → ${nextColumn.id}`);
+                    handleDrop(e, nextColumn.id);
+                  }
+                }}
+                sx={{
+                  width: 16,
+                  minHeight: '100%',
+                  position: 'relative',
+                  '&::after': isDragging ? {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    backgroundColor: 'primary.main',
+                    opacity: 0.1,
+                    borderRadius: 1,
+                    transition: 'opacity 0.2s ease'
+                  } : {}
+                }}
+              />
+            )}
+          </React.Fragment>
         ))}
       </Box>
 
@@ -755,6 +886,8 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
         newStatus={confirmationData?.newStatus}
         confirmationInfo={confirmationData?.confirmationInfo}
         isLoading={isConfirmationLoading}
+        isGroupMove={confirmationData?.isGroupMove || false}
+        groupSize={confirmationData?.groupSize || 1}
       />
 
       {/* Toast con opción de deshacer */}

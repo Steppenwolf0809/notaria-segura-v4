@@ -20,11 +20,13 @@ import {
   Chip
 } from '@mui/material';
 import receptionService from '../../services/reception-service';
+import archivoService from '../../services/archivo-service';
 
 /**
  * Modal para procesar entrega individual de documento, reconstruido con Material-UI
+ * Ahora soporta tanto RECEPCIÓN como ARQUIVO usando el servicio correcto
  */
-function ModalEntrega({ documento, onClose, onEntregaExitosa }) {
+function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'reception' }) {
   const [formData, setFormData] = useState({
     codigoVerificacion: '',
     entregadoA: '',
@@ -44,12 +46,26 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa }) {
 
   const cargarRelacionesOptions = async () => {
     try {
-      const result = await receptionService.getRelacionesTitular();
-      if (result.success) {
-        setRelacionesOptions(result.data.relaciones);
-      }
+      // Opciones por defecto ya que no existe la función en el servicio
+      const relacionesDefault = [
+        { value: 'titular', label: 'Titular del documento' },
+        { value: 'conyuge', label: 'Cónyuge' },
+        { value: 'hijo', label: 'Hijo/Hija' },
+        { value: 'padre', label: 'Padre/Madre' },
+        { value: 'hermano', label: 'Hermano/Hermana' },
+        { value: 'apoderado', label: 'Apoderado legal' },
+        { value: 'representante', label: 'Representante autorizado' },
+        { value: 'otro', label: 'Otro' }
+      ];
+      setRelacionesOptions(relacionesDefault);
     } catch (error) {
       console.error('Error cargando opciones:', error);
+      // Fallback con opciones básicas
+      setRelacionesOptions([
+        { value: 'titular', label: 'Titular del documento' },
+        { value: 'apoderado', label: 'Apoderado legal' },
+        { value: 'otro', label: 'Otro' }
+      ]);
     }
   };
 
@@ -84,7 +100,9 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa }) {
       setLoading(true);
       setError(null);
 
-      const result = await receptionService.procesarEntrega(documento.id, formData);
+      // Usar el servicio correcto según el tipo
+      const service = serviceType === 'arquivo' ? archivoService : receptionService;
+      const result = await service.procesarEntrega(documento.id, formData);
 
       if (result.success) {
         onEntregaExitosa();
@@ -124,7 +142,7 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa }) {
               <Typography variant="body2">
                 <strong>Código:</strong> 
                 <Chip 
-                  label={documento.codigoRetiro || 'N/A'} 
+                  label={documento.codigoRetiro || documento.verificationCode || 'N/A'} 
                   size="small" 
                   color="success"
                   sx={{ ml: 1, fontFamily: 'monospace', fontWeight: 'bold' }}

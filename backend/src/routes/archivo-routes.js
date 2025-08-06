@@ -4,6 +4,7 @@ import {
   dashboardArchivo,
   listarMisDocumentos,
   cambiarEstadoDocumento,
+  procesarEntregaDocumento,
   supervisionGeneral,
   resumenGeneral,
   obtenerMatrizadores,
@@ -50,6 +51,21 @@ router.get('/mis-documentos', authenticateToken, requireArchivo, listarMisDocume
  * @access Private (ARCHIVO only)
  */
 router.post('/documentos/:id/estado', authenticateToken, requireArchivo, cambiarEstadoDocumento);
+
+/**
+ * @route POST /api/arquivo/documentos/:id/entregar
+ * @desc Procesar entrega de documento propio del arquivo (equivalente a recepción)
+ * @param id - ID del documento a entregar
+ * @body entregadoA - Nombre de quien retira el documento
+ * @body cedulaReceptor - Cédula/ID de quien retira (opcional)
+ * @body relacionTitular - Relación con el titular
+ * @body codigoVerificacion - Código de verificación de 4 dígitos
+ * @body verificacionManual - Si es verificación manual (sin código)
+ * @body facturaPresenta - Si presentó factura
+ * @body observaciones - Observaciones adicionales
+ * @access Private (ARQUIVO only)
+ */
+router.post('/documentos/:id/entregar', authenticateToken, requireArchivo, procesarEntregaDocumento);
 
 /**
  * ============================================================================

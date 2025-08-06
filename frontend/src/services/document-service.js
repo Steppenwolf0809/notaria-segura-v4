@@ -547,6 +547,118 @@ const documentService = {
         message: errorMessage
       };
     }
+  },
+
+  /**
+   * 🔗 Actualizar estado de grupo de documentos
+   * @param {string} documentGroupId - ID del grupo de documentos
+   * @param {string} newStatus - Nuevo estado
+   * @param {Object} options - Opciones adicionales
+   * @returns {Promise<Object>} Resultado de la operación
+   */
+  async updateDocumentGroupStatus(documentGroupId, newStatus, options = {}) {
+    console.log('🌐 SERVICE: updateDocumentGroupStatus iniciado:', {
+      documentGroupId,
+      newStatus,
+      options,
+      url: '/documents/group/status'
+    });
+    
+    try {
+      // 🔧 CORRECCIÓN: Estructurar correctamente el body según lo que espera el backend
+      const requestBody = { 
+        documentGroupId,
+        newStatus,  // El backend espera exactamente este campo
+        deliveredTo: options.deliveredTo,
+        reversionReason: options.reversionReason
+      };
+      
+      // Limpiar campos undefined
+      Object.keys(requestBody).forEach(key => {
+        if (requestBody[key] === undefined) {
+          delete requestBody[key];
+        }
+      });
+      
+      console.log('📤 SERVICE: Enviando request de grupo al backend (corregido):', requestBody);
+      
+      const response = await api.put('/documents/group/status', requestBody);
+      console.log('📥 SERVICE: Respuesta del backend para grupo:', response.data);
+      
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('💥 SERVICE: Error updating group status:', error);
+      console.error('📊 SERVICE: Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Error al actualizar estado del grupo';
+      
+      return {
+        success: false,
+        error: errorMessage,
+        message: errorMessage
+      };
+    }
+  },
+
+  /**
+   * 🔗 Actualizar información compartida de grupo de documentos
+   * @param {string} documentGroupId - ID del grupo de documentos
+   * @param {Object} sharedData - Datos compartidos a actualizar
+   * @returns {Promise<Object>} Resultado de la operación
+   */
+  async updateDocumentGroupInfo(documentGroupId, sharedData) {
+    console.log('🌐 SERVICE: updateDocumentGroupInfo iniciado:', {
+      documentGroupId,
+      sharedData,
+      url: '/documents/group/info'
+    });
+    
+    try {
+      const requestBody = { 
+        documentGroupId,
+        sharedData
+      };
+      
+      console.log('📤 SERVICE: Enviando update de info grupal al backend:', requestBody);
+      
+      const response = await api.put('/documents/group/info', requestBody);
+      console.log('📥 SERVICE: Respuesta del backend para info grupal:', response.data);
+      
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('💥 SERVICE: Error updating group info:', error);
+      console.error('📊 SERVICE: Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Error al actualizar información del grupo';
+      
+      return {
+        success: false,
+        error: errorMessage,
+        message: errorMessage
+      };
+    }
   }
 };
 

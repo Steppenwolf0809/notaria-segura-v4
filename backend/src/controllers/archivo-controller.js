@@ -296,6 +296,192 @@ async function cambiarEstadoDocumento(req, res) {
   }
 }
 
+/**
+ * Procesar entrega de documento propio (nueva funcionalidad ARQUIVO = RECEPCIÓN)
+ * FUNCIONALIDAD: Equivalente a recepción pero para documentos de archivo
+ */
+async function procesarEntregaDocumento(req, res) {
+  try {
+    const { id } = req.params;
+    const {
+      entregadoA,
+      cedulaReceptor,
+      relacionTitular,
+      codigoVerificacion,
+      verificacionManual,
+      facturaPresenta,
+      observaciones
+    } = req.body;
+
+    const userId = req.user.id;
+
+    // Validaciones
+    if (!entregadoA) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nombre de quien retira es obligatorio'
+      });
+    }
+
+    if (!relacionTitular) {
+      return res.status(400).json({
+        success: false,
+        message: 'Relación con titular es obligatoria'
+      });
+    }
+
+    // Buscar documento y verificar que pertenece al archivo
+    const documento = await prisma.document.findFirst({
+      where: {
+        id,
+        assignedToId: userId
+      },
+      include: {
+        assignedTo: {
+          select: { firstName: true, lastName: true }
+        }
+      }
+    });
+
+    if (!documento) {
+      return res.status(404).json({
+        success: false,
+        message: 'Documento no encontrado o no asignado a usted'
+      });
+    }
+
+    // Solo documentos LISTO pueden ser entregados
+    if (documento.status !== 'LISTO') {
+      return res.status(400).json({
+        success: false,
+        message: 'Solo se pueden entregar documentos que estén LISTO'
+      });
+    }
+
+    // Validar código de verificación (si no es manual)
+    if (!verificacionManual) {
+      if (!codigoVerificacion) {
+        return res.status(400).json({
+          success: false,
+          message: 'Código de verificación es obligatorio'
+        });
+      }
+      
+      if (documento.codigoRetiro !== codigoVerificacion) {
+        return res.status(400).json({
+          success: false,
+          message: 'Código de verificación incorrecto'
+        });
+      }
+    }
+
+    // Actualizar documento con información de entrega
+    const documentoActualizado = await prisma.document.update({
+      where: { id },
+      data: {
+        status: 'ENTREGADO',
+        entregadoA,
+        cedulaReceptor,
+        relacionTitular,
+        verificacionManual: verificacionManual || false,
+        facturaPresenta: facturaPresenta || false,
+        fechaEntrega: new Date(),
+        usuarioEntregaId: userId,
+        observacionesEntrega: observaciones
+      },
+      include: {
+        assignedTo: {
+          select: { firstName: true, lastName: true }
+        },
+        usuarioEntrega: {
+          select: { firstName: true, lastName: true }
+        }
+      }
+    });
+
+    // 📱 ENVIAR NOTIFICACIÓN WHATSAPP
+    let whatsappSent = false;
+    let whatsappError = null;
+    
+    if (documentoActualizado.clientPhone) {
+      try {
+        const datosEntrega = {
+          entregado_a: entregadoA,
+          deliveredTo: entregadoA,
+          fecha: new Date(),
+          usuario_entrega: `${req.user.firstName} ${req.user.lastName} (ARQUIVO)`
+        };
+
+        const whatsappResult = await whatsappService.enviarDocumentoEntregado(
+          {
+            nombre: documentoActualizado.clientName,
+            clientName: documentoActualizado.clientName,
+            telefono: documentoActualizado.clientPhone,
+            clientPhone: documentoActualizado.clientPhone
+          },
+          {
+            tipo_documento: documentoActualizado.documentType,
+            tipoDocumento: documentoActualizado.documentType,
+            numero_documento: documentoActualizado.protocolNumber,
+            protocolNumber: documentoActualizado.protocolNumber
+          },
+          datosEntrega
+        );
+        
+        whatsappSent = whatsappResult.success;
+        
+        if (!whatsappResult.success) {
+          whatsappError = whatsappResult.error;
+          console.error('Error enviando WhatsApp de entrega arquivo:', whatsappResult.error);
+        } else {
+          console.log('📱 Notificação WhatsApp de entrega arquivo enviada exitosamente');
+        }
+      } catch (error) {
+        console.error('Error en servicio WhatsApp para entrega arquivo:', error);
+        whatsappError = error.message;
+      }
+    }
+
+    // Preparar mensaje de respuesta
+    let message = 'Documento entregado exitosamente';
+    if (whatsappSent) {
+      message += ' y notificación WhatsApp enviada';
+    } else if (documentoActualizado.clientPhone && whatsappError) {
+      message += ', pero falló la notificación WhatsApp';
+    }
+
+    res.json({
+      success: true,
+      message,
+      data: {
+        documento: documentoActualizado,
+        entrega: {
+          entregadoA,
+          cedulaReceptor,
+          relacionTitular,
+          verificacionManual,
+          facturaPresenta,
+          fechaEntrega: documentoActualizado.fechaEntrega,
+          usuarioEntrega: `${req.user.firstName} ${req.user.lastName}`,
+          observacionesEntrega: observaciones
+        },
+        whatsapp: {
+          sent: whatsappSent,
+          error: whatsappError,
+          phone: documentoActualizado.clientPhone
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error procesando entrega arquivo:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+}
+
 // ============================================================================
 // SECCIÓN 2: SUPERVISIÓN GLOBAL (VISTA DE TODOS LOS DOCUMENTOS)
 // ============================================================================
@@ -612,6 +798,7 @@ export {
   dashboardArchivo,
   listarMisDocumentos,
   cambiarEstadoDocumento,
+  procesarEntregaDocumento,
   
   // Funciones de supervisión global
   supervisionGeneral,

@@ -103,7 +103,7 @@ function DocumentosUnificados({ onEstadisticasChange }) {
   const [filters, setFilters] = useState({
     search: '',
     matrizador: '',
-    estado: '',
+    estado: 'LISTO', // 🎯 CONSERVADOR: Filtro por defecto para Recepción
     fechaDesde: '',
     fechaHasta: '',
   });
@@ -506,8 +506,13 @@ function DocumentosUnificados({ onEstadisticasChange }) {
                     </TableCell>
                     <TableCell><StatusIndicator status={documento.status} /></TableCell>
                     <TableCell>
-                      {documento.codigoRetiro ? (
-                        <Chip label={documento.codigoRetiro} size="small" variant="outlined" sx={{ fontFamily: 'monospace' }} />
+                      {(documento.codigoRetiro || documento.verificationCode) ? (
+                        <Chip 
+                          label={documento.codigoRetiro || documento.verificationCode} 
+                          size="small" 
+                          variant="outlined" 
+                          sx={{ fontFamily: 'monospace' }} 
+                        />
                       ) : (
                         <Typography variant="body2" color="text.secondary">-</Typography>
                       )}

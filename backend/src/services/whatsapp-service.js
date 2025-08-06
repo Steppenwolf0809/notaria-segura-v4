@@ -205,16 +205,43 @@ class WhatsAppService {
      * Enviar mensaje de documento entregado
      */
     async enviarDocumentoEntregado(cliente, documento, datosEntrega) {
-        if (!this.isEnabled || !this.client) {
-            return this.simularEnvio(cliente, documento, datosEntrega, 'documento_entregado');
-        }
-
-        const numeroWhatsApp = this.formatPhoneNumber(cliente.telefono || cliente.clientPhone);
-        if (!numeroWhatsApp) {
-            throw new Error(`Número de teléfono inválido: ${cliente.telefono || cliente.clientPhone}`);
-        }
-
+        const clientName = cliente.clientName || cliente.nombre;
+        const clientPhone = cliente.clientPhone || cliente.telefono;
         const mensaje = this.generarMensajeDocumentoEntregado(cliente, documento, datosEntrega);
+
+        // 🔄 CONSERVADOR: Preparar datos para guardar en BD como enviarDocumentoListo
+        const notificationData = {
+            documentId: documento.id || null,
+            clientName: clientName,
+            clientPhone: clientPhone,
+            messageType: 'DOCUMENT_DELIVERED',
+            messageBody: mensaje
+        };
+
+        if (!this.isEnabled || !this.client) {
+            // Modo simulación
+            const simulationResult = this.simularEnvio(cliente, documento, datosEntrega, 'documento_entregado');
+            
+            // 💾 Guardar como simulada
+            await this.saveNotification({
+                ...notificationData,
+                status: 'SIMULATED',
+                messageId: simulationResult.messageId
+            });
+            
+            return simulationResult;
+        }
+
+        const numeroWhatsApp = this.formatPhoneNumber(clientPhone);
+        if (!numeroWhatsApp) {
+            // 💾 Guardar como error
+            await this.saveNotification({
+                ...notificationData,
+                status: 'FAILED',
+                errorMessage: `Número de teléfono inválido: ${clientPhone}`
+            });
+            throw new Error(`Número de teléfono inválido: ${clientPhone}`);
+        }
 
         try {
             const result = await this.client.messages.create({
@@ -224,6 +251,14 @@ class WhatsAppService {
             });
 
             console.log(`📱 WhatsApp de entrega enviado: ${result.sid} → ${numeroWhatsApp}`);
+            
+            // 💾 Guardar como exitosa
+            await this.saveNotification({
+                ...notificationData,
+                status: 'SENT',
+                messageId: result.sid
+            });
+
             return {
                 success: true,
                 messageId: result.sid,
@@ -233,6 +268,13 @@ class WhatsAppService {
             };
         } catch (error) {
             console.error('❌ Error enviando WhatsApp de entrega:', error);
+            
+            // 💾 Guardar como error
+            await this.saveNotification({
+                ...notificationData,
+                status: 'FAILED',
+                errorMessage: error.message
+            });
             
             // En desarrollo, simular si falla el envío real
             if (this.isDevelopment) {

@@ -90,6 +90,68 @@ const cambiarEstadoDocumento = async (token, documentoId, nuevoEstado) => {
 };
 
 /**
+ * Procesar entrega de documento (nueva funcionalidad ARQUIVO = RECEPCIÓN)
+ */
+/**
+ * Crear instancia configurada de axios con interceptor
+ */
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  timeout: 10000
+});
+
+// Interceptor para agregar token automáticamente
+api.interceptors.request.use(
+  (config) => {
+    const authData = localStorage.getItem('notaria-auth-storage');
+    if (authData) {
+      try {
+        const parsed = JSON.parse(authData);
+        if (parsed.state && parsed.state.token) {
+          config.headers.Authorization = `Bearer ${parsed.state.token}`;
+        }
+      } catch (error) {
+        // Fallback al token directo
+        const token = localStorage.getItem('token');
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+      }
+    } else {
+      // Fallback al token directo
+      const token = localStorage.getItem('token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+const procesarEntrega = async (documentoId, entregaData) => {
+  try {
+    const response = await api.post(`/arquivo/documentos/${documentoId}/entregar`, entregaData);
+    return {
+      success: true,
+      data: response.data.data,
+      message: response.data.message
+    };
+  } catch (error) {
+    console.error('Error procesando entrega:', error);
+    return {
+      success: false,
+      error: error.response?.data?.message || 'Error de conexión'
+    };
+  }
+};
+
+/**
  * ============================================================================
  * SECCIÓN 2: SUPERVISIÓN GLOBAL (SOLO LECTURA)
  * ============================================================================
@@ -256,6 +318,7 @@ const archivoService = {
   getDashboard,
   getMisDocumentos,
   cambiarEstadoDocumento,
+  procesarEntrega,
   
   // Supervisión global
   getSupervisionGeneral,

@@ -1168,6 +1168,324 @@ async function createSmartDocumentGroup(req, res) {
 }
 
 /**
+ * Actualizar estado de grupo de documentos
+ * Función optimizada para mover todos los documentos de un grupo juntos
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+async function updateDocumentGroupStatus(req, res) {
+  try {
+    const { documentGroupId, newStatus, deliveredTo, reversionReason } = req.body;
+
+    if (!documentGroupId || !newStatus) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID del grupo y nuevo estado son obligatorios'
+      });
+    }
+
+    // Validar estados válidos
+    const validStatuses = ['PENDIENTE', 'EN_PROCESO', 'LISTO', 'ENTREGADO'];
+    if (!validStatuses.includes(newStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Estado no válido'
+      });
+    }
+
+    // Buscar documentos del grupo y verificar permisos
+    const groupDocuments = await prisma.document.findMany({
+      where: { 
+        documentGroupId,
+        isGrouped: true
+      },
+      include: {
+        documentGroup: true
+      }
+    });
+
+    if (groupDocuments.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Grupo de documentos no encontrado'
+      });
+    }
+
+    // Verificar permisos - todos los documentos deben pertenecer al usuario
+    const userRole = req.user.role;
+    if (['MATRIZADOR', 'ARCHIVO'].includes(userRole)) {
+      const unauthorizedDocs = groupDocuments.filter(doc => doc.assignedToId !== req.user.id);
+      if (unauthorizedDocs.length > 0) {
+        return res.status(403).json({
+          success: false,
+          message: 'Solo puedes modificar documentos asignados a ti'
+        });
+      }
+    }
+
+    // Preparar datos de actualización
+    const updateData = { status: newStatus };
+
+    // Generar códigos de verificación si se marca como LISTO
+    if (newStatus === 'LISTO') {
+      // Para grupos, usar el código del grupo
+      const groupCode = groupDocuments[0].documentGroup?.verificationCode;
+      if (groupCode) {
+        updateData.verificationCode = groupCode;
+      }
+    }
+
+    // Si se marca como ENTREGADO, registrar datos de entrega
+    if (newStatus === 'ENTREGADO') {
+      updateData.usuarioEntregaId = req.user.id;
+      updateData.fechaEntrega = new Date();
+      updateData.entregadoA = deliveredTo || `Entrega por ${req.user.role.toLowerCase()}`;
+      updateData.relacionTitular = 'directo';
+    }
+
+    // Actualizar todos los documentos del grupo
+    const updateResult = await prisma.document.updateMany({
+      where: { 
+        documentGroupId,
+        isGrouped: true
+      },
+      data: updateData
+    });
+
+    // Obtener documentos actualizados
+    const updatedDocuments = await prisma.document.findMany({
+      where: { 
+        documentGroupId,
+        isGrouped: true
+      },
+      include: {
+        documentGroup: true,
+        assignedTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        }
+      }
+    });
+
+    // Enviar notificación grupal si corresponde
+    let whatsappSent = false;
+    let whatsappError = null;
+    
+    if (newStatus === 'LISTO' && updatedDocuments[0]?.clientPhone && updatedDocuments[0]?.documentGroup) {
+      try {
+        const whatsappService = await import('../services/whatsapp-service.js');
+        
+        const cliente = {
+          nombre: updatedDocuments[0].clientName,
+          telefono: updatedDocuments[0].clientPhone
+        };
+
+        const whatsappResult = await whatsappService.default.enviarGrupoDocumentosListo(
+          cliente,
+          updatedDocuments,
+          updatedDocuments[0].documentGroup.verificationCode
+        );
+        
+        whatsappSent = whatsappResult.success;
+        
+        if (!whatsappResult.success) {
+          whatsappError = whatsappResult.error;
+          console.error('Error enviando WhatsApp grupal:', whatsappResult.error);
+        } else {
+          console.log('📱 Notificación grupal WhatsApp enviada exitosamente');
+        }
+      } catch (error) {
+        console.error('Error en servicio WhatsApp grupal:', error);
+        whatsappError = error.message;
+      }
+    }
+
+    // 🆕 CORRECCIÓN: Enviar notificación WhatsApp para estado ENTREGADO
+    if (newStatus === 'ENTREGADO' && updatedDocuments[0]?.clientPhone) {
+      try {
+        const whatsappService = await import('../services/whatsapp-service.js');
+        
+        const cliente = {
+          nombre: updatedDocuments[0].clientName,
+          clientName: updatedDocuments[0].clientName,
+          telefono: updatedDocuments[0].clientPhone,
+          clientPhone: updatedDocuments[0].clientPhone
+        };
+
+        const datosEntrega = {
+          entregado_a: deliveredTo || `Entrega grupal por ${req.user.role.toLowerCase()}`,
+          deliveredTo: deliveredTo || `Entrega grupal por ${req.user.role.toLowerCase()}`,
+          fecha: new Date(),
+          usuario_entrega: `${req.user.firstName} ${req.user.lastName} (${req.user.role})`
+        };
+
+        // Enviar notificación de grupo entregado usando la función de documento individual
+        // pero con información del grupo
+        const whatsappResult = await whatsappService.default.enviarDocumentoEntregado(
+          cliente,
+          {
+            tipo_documento: `Grupo de ${updatedDocuments.length} documento(s)`,
+            tipoDocumento: `Grupo de ${updatedDocuments.length} documento(s)`,
+            numero_documento: documentGroupId,
+            protocolNumber: documentGroupId
+          },
+          datosEntrega
+        );
+        
+        whatsappSent = whatsappResult.success;
+        
+        if (!whatsappResult.success) {
+          whatsappError = whatsappResult.error;
+          console.error('Error enviando WhatsApp de entrega grupal:', whatsappResult.error);
+        } else {
+          console.log('📱 Notificación grupal WhatsApp de entrega enviada exitosamente');
+        }
+      } catch (error) {
+        console.error('Error en servicio WhatsApp para entrega grupal:', error);
+        whatsappError = error.message;
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Grupo de ${updateResult.count} documentos actualizado exitosamente`,
+      data: {
+        documentsUpdated: updateResult.count,
+        newStatus,
+        groupId: documentGroupId,
+        documents: updatedDocuments,
+        whatsapp: {
+          sent: whatsappSent,
+          error: whatsappError,
+          phone: updatedDocuments[0]?.clientPhone
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error actualizando estado del grupo:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+}
+
+/**
+ * Actualizar información compartida de grupo de documentos
+ * Función para sincronizar datos como teléfono, email entre documentos del mismo grupo
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+async function updateDocumentGroupInfo(req, res) {
+  try {
+    const { documentGroupId, sharedData } = req.body;
+
+    if (!documentGroupId || !sharedData) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID del grupo y datos compartidos son obligatorios'
+      });
+    }
+
+    // Buscar documentos del grupo
+    const groupDocuments = await prisma.document.findMany({
+      where: { 
+        documentGroupId,
+        isGrouped: true
+      }
+    });
+
+    if (groupDocuments.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Grupo de documentos no encontrado'
+      });
+    }
+
+    // Verificar permisos - al menos uno debe pertenecer al usuario
+    const userRole = req.user.role;
+    if (['MATRIZADOR', 'ARCHIVO'].includes(userRole)) {
+      const hasPermission = groupDocuments.some(doc => doc.assignedToId === req.user.id);
+      if (!hasPermission) {
+        return res.status(403).json({
+          success: false,
+          message: 'No tienes permisos para modificar este grupo'
+        });
+      }
+    }
+
+    // Preparar datos que se pueden actualizar de forma compartida
+    const updateData = {};
+    
+    // Solo permitir actualizar campos específicos que son compartidos
+    const allowedFields = ['clientPhone', 'clientEmail', 'clientName'];
+    allowedFields.forEach(field => {
+      if (sharedData[field] !== undefined) {
+        updateData[field] = sharedData[field];
+      }
+    });
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No hay campos válidos para actualizar'
+      });
+    }
+
+    // Actualizar todos los documentos del grupo
+    const updateResult = await prisma.document.updateMany({
+      where: { 
+        documentGroupId,
+        isGrouped: true
+      },
+      data: updateData
+    });
+
+    // También actualizar el grupo si existe
+    if (updateData.clientPhone || updateData.clientEmail || updateData.clientName) {
+      await prisma.documentGroup.update({
+        where: { id: documentGroupId },
+        data: {
+          clientPhone: updateData.clientPhone,
+          clientEmail: updateData.clientEmail,
+          clientName: updateData.clientName
+        }
+      });
+    }
+
+    // Obtener documentos actualizados
+    const updatedDocuments = await prisma.document.findMany({
+      where: { 
+        documentGroupId,
+        isGrouped: true
+      }
+    });
+
+    res.json({
+      success: true,
+      message: `Información compartida actualizada en ${updateResult.count} documentos del grupo`,
+      data: {
+        documentsUpdated: updateResult.count,
+        groupId: documentGroupId,
+        updatedFields: Object.keys(updateData),
+        documents: updatedDocuments
+      }
+    });
+
+  } catch (error) {
+    console.error('Error actualizando información del grupo:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+}
+
+/**
  * Entregar documento con información completa de recepción
  * Función para RECEPCION: Marcar documento como entregado con detalles
  * @param {Object} req - Request object
@@ -2023,5 +2341,8 @@ export {
   createSmartDocumentGroup,
   // 🔄 Sistema de confirmaciones y deshacer
   undoDocumentStatusChange,
-  getUndoableChanges
+  getUndoableChanges,
+  // 🔗 Funciones de grupos
+  updateDocumentGroupStatus,
+  updateDocumentGroupInfo
 }; 
