@@ -227,15 +227,19 @@ const documentService = {
    * @param {string} newStatus - Nuevo estado del documento
    * @returns {Promise<Object>} Documento actualizado
    */
-  async updateDocumentStatus(documentId, newStatus) {
+  async updateDocumentStatus(documentId, newStatus, options = {}) {
     console.log('🌐 SERVICE: updateDocumentStatus iniciado:', {
       documentId,
       newStatus,
+      options,
       url: `/documents/${documentId}/status`
     });
     
     try {
-      const requestBody = { status: newStatus };
+      const requestBody = { 
+        status: newStatus,
+        ...options
+      };
       console.log('📤 SERVICE: Enviando request al backend:', requestBody);
       
       const response = await api.put(`/documents/${documentId}/status`, requestBody);

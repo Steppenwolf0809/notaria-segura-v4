@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import documentService from '../services/document-service.js';
+import useAuthStore from './auth-store.js';
 
 /**
  * Store de documentos usando Zustand
@@ -421,7 +422,7 @@ const useDocumentStore = create((set, get) => ({
     
     try {
       console.log('🌐 STORE: Llamando documentService.updateDocumentStatus...');
-      const result = await documentService.updateDocumentStatus(documentId, newStatus);
+      const result = await documentService.updateDocumentStatus(documentId, newStatus, options);
       console.log('📊 STORE: Respuesta del service:', result);
       
       if (result.success) {
@@ -555,6 +556,10 @@ const useDocumentStore = create((set, get) => ({
    * @returns {Object} Información sobre si requiere confirmación
    */
   requiresConfirmation: (fromStatus, toStatus) => {
+    // Obtener usuario actual
+    const currentUser = useAuthStore.getState().user;
+    const userRole = currentUser?.role;
+
     // Cambios críticos que disparan WhatsApp
     const criticalChanges = [
       { from: 'EN_PROCESO', to: 'LISTO' },
@@ -572,16 +577,32 @@ const useDocumentStore = create((set, get) => ({
     const toIndex = statusOrder.indexOf(toStatus);
     const isReversion = fromIndex > toIndex;
 
+    // NUEVA LÓGICA: Para MATRIZADOR y ARCHIVO, entrega directa simplificada
+    if ((userRole === 'MATRIZADOR' || userRole === 'ARCHIVO') && 
+        fromStatus === 'LISTO' && toStatus === 'ENTREGADO') {
+      return {
+        requiresConfirmation: true,
+        isCritical: false,
+        isReversion: false,
+        isDirectDelivery: true,
+        type: 'direct_delivery',
+        reason: 'Confirmar entrega directa por matrizador/archivo',
+        userRole: userRole
+      };
+    }
+
     return {
       requiresConfirmation: isCritical || isReversion,
       isCritical,
       isReversion,
+      isDirectDelivery: false,
       type: isCritical ? 'critical' : isReversion ? 'reversion' : 'normal',
       reason: isCritical ? 
         'Este cambio enviará notificaciones automáticas al cliente' :
         isReversion ? 
         'Esta es una reversión que puede confundir al cliente' :
-        'Cambio normal'
+        'Cambio normal',
+      userRole: userRole
     };
   },
 

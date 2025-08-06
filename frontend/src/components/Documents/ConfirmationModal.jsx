@@ -38,11 +38,13 @@ const ConfirmationModal = ({
   document,
   currentStatus,
   newStatus,
+  confirmationInfo,
   isLoading = false
 }) => {
   const [confirmed, setConfirmed] = useState(false);
   const [reversionReason, setReversionReason] = useState('');
   const [showReversionField, setShowReversionField] = useState(false);
+  const [deliveredTo, setDeliveredTo] = useState('');
 
   // Reset del estado cuando se abre/cierra el modal
   useEffect(() => {
@@ -50,6 +52,7 @@ const ConfirmationModal = ({
       setConfirmed(false);
       setReversionReason('');
       setShowReversionField(false);
+      setDeliveredTo('');
     }
   }, [open]);
 
@@ -92,13 +95,13 @@ const ConfirmationModal = ({
     return statusTexts[status] || status;
   };
 
+  // Usar confirmationInfo si está disponible, o calcular internamente como fallback
+  const changeInfo = confirmationInfo || getChangeType(currentStatus, newStatus);
+
   // Verificar si se necesita campo de motivo para reversión
   useEffect(() => {
-    const changeInfo = getChangeType(currentStatus, newStatus);
     setShowReversionField(changeInfo.isReversion);
-  }, [currentStatus, newStatus]);
-
-  const changeInfo = getChangeType(currentStatus, newStatus);
+  }, [currentStatus, newStatus, changeInfo]);
 
   const handleConfirm = () => {
     // Para reversiones, verificar que se haya dado un motivo
@@ -110,7 +113,8 @@ const ConfirmationModal = ({
       document,
       newStatus,
       reversionReason: showReversionField ? reversionReason : null,
-      changeType: changeInfo.type
+      changeType: changeInfo.type,
+      deliveredTo: changeInfo.isDirectDelivery ? deliveredTo : null
     });
   };
 
@@ -149,7 +153,7 @@ const ConfirmationModal = ({
           <WarningIcon />
         )}
         <Typography variant="h6" component="div">
-          Confirmar Cambio de Estado
+          {changeInfo.isDirectDelivery ? 'Confirmar Entrega Directa' : 'Confirmar Cambio de Estado'}
         </Typography>
       </DialogTitle>
 
@@ -217,7 +221,7 @@ const ConfirmationModal = ({
           </Alert>
         )}
 
-        {changeInfo.isCriticalForward && newStatus === 'ENTREGADO' && (
+        {changeInfo.isCriticalForward && newStatus === 'ENTREGADO' && !changeInfo.isDirectDelivery && (
           <Alert severity="success" sx={{ mb: 2 }}>
             <Typography variant="subtitle2" gutterBottom>
               <CheckCircleIcon sx={{ fontSize: 16, mr: 0.5 }} />
@@ -229,6 +233,37 @@ const ConfirmationModal = ({
               <li>📊 Se actualizarán métricas de productividad</li>
             </Box>
           </Alert>
+        )}
+
+        {changeInfo.isDirectDelivery && (
+          <>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                <CheckCircleIcon sx={{ fontSize: 16, mr: 0.5 }} />
+                Entrega Directa por {changeInfo.userRole === 'MATRIZADOR' ? 'Matrizador' : 'Archivo'}:
+              </Typography>
+              <Box component="ul" sx={{ m: 0, pl: 2 }}>
+                <li>✅ Se registrará como entrega directa</li>
+                <li>👤 Usted aparecerá como quien entregó</li>
+                <li>📝 Se mantendrá trazabilidad completa</li>
+                <li>⚡ Proceso simplificado sin códigos</li>
+              </Box>
+            </Alert>
+            
+            {/* Campo para nombre de quien retira */}
+            <Box sx={{ mb: 2 }}>
+              <TextField
+                fullWidth
+                label="Nombre de quien retira el documento"
+                placeholder="Ej: Juan Pérez, Cliente directo, etc."
+                value={deliveredTo}
+                onChange={(e) => setDeliveredTo(e.target.value)}
+                variant="outlined"
+                size="small"
+                helperText="Campo opcional para control posterior"
+              />
+            </Box>
+          </>
         )}
 
         {changeInfo.isReversion && (
@@ -277,7 +312,9 @@ const ConfirmationModal = ({
           }
           label={
             <Typography variant="body2" fontWeight={600}>
-              Entiendo las consecuencias y deseo continuar
+              {changeInfo.isDirectDelivery ? 
+                'Confirmo que he entregado este documento directamente' : 
+                'Entiendo las consecuencias y deseo continuar'}
             </Typography>
           }
         />
