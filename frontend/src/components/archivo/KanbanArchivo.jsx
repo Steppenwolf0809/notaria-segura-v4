@@ -4,31 +4,21 @@ import {
   Grid,
   Paper,
   Typography,
-  Card,
-  CardContent,
-  Chip,
-  IconButton,
-  Menu,
-  MenuItem,
-  Divider,
   Alert,
-  Tooltip
+  Tooltip,
+  Chip,
+  Divider
 } from '@mui/material';
 import {
-  MoreVert as MoreIcon,
-  Person as PersonIcon,
-  Phone as PhoneIcon,
-  Assignment as DocumentIcon,
-  AttachMoney as MoneyIcon,
-  CalendarToday as DateIcon,
-  Info as InfoIcon,
-  LocalShipping as EntregarIcon,
-  Check as CheckIcon
+  Info as InfoIcon
 } from '@mui/icons-material';
 import archivoService from '../../services/archivo-service';
 import { getDeliveryFilterNote, DELIVERY_FILTER_PERIODS } from '../../utils/dateUtils';
 import GroupingAlert from '../grouping/GroupingAlert';
 import ModalEntrega from '../recepcion/ModalEntrega';
+import UnifiedDocumentCard from '../shared/UnifiedDocumentCard';
+import DocumentDetailModal from '../Documents/DocumentDetailModal';
+import EditDocumentModal from '../Documents/EditDocumentModal';
 
 /**
  * Vista Kanban para documentos de archivo
@@ -36,12 +26,16 @@ import ModalEntrega from '../recepcion/ModalEntrega';
  */
 const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) => {
   const [dragError, setDragError] = useState(null);
-  const [menuAnchor, setMenuAnchor] = useState(null);
-  const [selectedDocument, setSelectedDocument] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [draggedDocument, setDraggedDocument] = useState(null);
   const [modalEntregaOpen, setModalEntregaOpen] = useState(false);
   const [documentoParaEntrega, setDocumentoParaEntrega] = useState(null);
+  
+  // Estados para modales unificados
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState(null);
+  const [documentToEdit, setDocumentToEdit] = useState(null);
 
   // Configuración de columnas
   const columnas = archivoService.getColumnasKanban();
@@ -139,29 +133,58 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
   };
 
   /**
-   * Abrir menú de acciones
+   * Abrir modal de detalles del documento
    */
-  const handleMenuOpen = (event, documento) => {
-    setMenuAnchor(event.currentTarget);
+  const handleOpenDetail = (documento) => {
     setSelectedDocument(documento);
+    setDetailModalOpen(true);
   };
 
   /**
-   * Cerrar menú
+   * Cerrar modal de detalles
    */
-  const handleMenuClose = () => {
-    setMenuAnchor(null);
+  const handleCloseDetail = () => {
+    setDetailModalOpen(false);
     setSelectedDocument(null);
   };
 
   /**
-   * Abrir modal de entrega
+   * Abrir modal de edición
    */
-  const handleEntregarClick = () => {
-    if (selectedDocument && selectedDocument.status === 'LISTO') {
-      setDocumentoParaEntrega(selectedDocument);
-      setModalEntregaOpen(true);
-      handleMenuClose();
+  const handleOpenEdit = (documento) => {
+    setDocumentToEdit(documento);
+    setEditModalOpen(true);
+  };
+
+  /**
+   * Cerrar modal de edición
+   */
+  const handleCloseEdit = () => {
+    setEditModalOpen(false);
+    setDocumentToEdit(null);
+  };
+
+  /**
+   * Manejar avance de estado del documento
+   */
+  const handleAdvanceStatus = async (documento, nuevoEstado) => {
+    try {
+      // Si es para entregar, abrir modal de entrega
+      if (nuevoEstado === 'ENTREGADO' && documento.status === 'LISTO') {
+        setDocumentoParaEntrega(documento);
+        setModalEntregaOpen(true);
+        return;
+      }
+
+      // Para otros cambios de estado, usar la función proporcionada
+      const response = await onEstadoChange(documento.id, nuevoEstado);
+      
+      if (!response.success) {
+        setDragError(response.message || 'Error al cambiar estado');
+      }
+    } catch (error) {
+      console.error('Error al avanzar estado:', error);
+      setDragError('Error al cambiar estado del documento');
     }
   };
 
@@ -185,189 +208,47 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
   };
 
   /**
-   * Manejar avance rápido de estado
+   * Manejar guardado de edición
    */
-  const handleAvanceRapido = async (documento, event) => {
-    event.stopPropagation(); // Evitar abrir el menú
-    
-    const siguienteEstado = {
-      'EN_PROCESO': 'LISTO',
-      'LISTO': 'ENTREGADO'
-    };
-    
-    const nuevoEstado = siguienteEstado[documento.status];
-    
-    if (nuevoEstado) {
-      console.log(`🚀 Avance rápido: ${documento.protocolNumber} → ${nuevoEstado}`);
-      
-      try {
-        const response = await onEstadoChange(documento.id, nuevoEstado);
-        
-        if (!response.success) {
-          setDragError(response.message || 'Error al cambiar estado');
-        }
-      } catch (error) {
-        console.error('Error en avance rápido:', error);
-        setDragError('Error al cambiar estado del documento');
+  const handleEditSave = async (formData) => {
+    try {
+      // Aquí podrías implementar la lógica de guardado específica del archivo
+      // Por ahora, simplemente cerramos el modal y refrescamos
+      handleCloseEdit();
+      if (onRefresh) {
+        onRefresh();
       }
+    } catch (error) {
+      console.error('Error al guardar edición:', error);
+      throw error;
     }
   };
 
-  /**
-   * Formatear fecha
-   */
-  const formatearFecha = (fecha) => {
-    return new Date(fecha).toLocaleDateString('es-ES');
-  };
+
+
+
 
   /**
-   * Obtener color del estado
-   */
-  const getEstadoColor = (estado) => {
-    const colores = {
-      'PENDIENTE': 'warning',
-      'EN_PROCESO': 'info', 
-      'LISTO': 'success'
-    };
-    return colores[estado] || 'default';
-  };
-
-  /**
-   * Renderizar tarjeta de documento
+   * Renderizar tarjeta de documento usando el componente unificado
    */
   const renderDocumentCard = (documento, index) => (
-    <Card
+    <UnifiedDocumentCard
       key={documento.id}
-      draggable="true"
-      onDragStart={(event) => handleDragStart(event, documento)}
-      onDragEnd={handleDragEnd}
-      onClick={(event) => {
-        // Solo abrir acciones si no se está arrastrando
-        if (!isDragging) {
-          handleMenuOpen(event, documento);
-        }
+      document={documento}
+      role="archivo"
+      onOpenDetail={handleOpenDetail}
+      onOpenEdit={handleOpenEdit}
+      onAdvanceStatus={handleAdvanceStatus}
+      isDragging={isDragging && draggedDocument?.id === documento.id}
+      dragHandlers={{
+        onDragStart: (event) => handleDragStart(event, documento),
+        onDragEnd: handleDragEnd
       }}
-      sx={{
-        mb: 2,
-        cursor: isDragging && draggedDocument?.id === documento.id ? 'grabbing' : 'grab',
+      style={{
         transform: isDragging && draggedDocument?.id === documento.id ? 'rotate(5deg)' : 'none',
-        boxShadow: isDragging && draggedDocument?.id === documento.id ? 4 : 1,
-        '&:hover': {
-          boxShadow: 3
-        },
-        '&:active': {
-          cursor: 'grabbing'
-        }
+        boxShadow: isDragging && draggedDocument?.id === documento.id ? 4 : 1
       }}
-    >
-          <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-            {/* Header con acciones */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, flex: 1 }}>
-                #{documento.protocolNumber}
-              </Typography>
-              <IconButton
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleMenuOpen(e, documento);
-                }}
-                sx={{ ml: 1 }}
-              >
-                <MoreIcon fontSize="small" />
-              </IconButton>
-            </Box>
-
-            {/* Cliente */}
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-              <PersonIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
-              <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                {documento.clientName}
-              </Typography>
-            </Box>
-
-            {/* Teléfono */}
-            {documento.clientPhone && (
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <PhoneIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
-                <Typography variant="body2" color="text.secondary">
-                  {documento.clientPhone}
-                </Typography>
-              </Box>
-            )}
-
-            {/* Tipo de documento */}
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-              <DocumentIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
-              <Typography variant="body2" color="text.secondary">
-                {documento.documentType}
-              </Typography>
-            </Box>
-
-            {/* Valor */}
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-              <MoneyIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
-              <Typography variant="body2" sx={{ fontWeight: 500, color: 'success.main' }}>
-                ${documento.totalFactura?.toFixed(2) || '0.00'}
-              </Typography>
-            </Box>
-
-            {/* Fecha */}
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <DateIcon sx={{ fontSize: 16, mr: 1, color: 'text.secondary' }} />
-              <Typography variant="caption" color="text.secondary">
-                {formatearFecha(documento.createdAt)}
-              </Typography>
-            </Box>
-
-            {/* Estado */}
-            <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1 }}>
-              <Chip 
-                label={archivoService.formatearEstado(documento.status).texto}
-                color={getEstadoColor(documento.status)}
-                size="small"
-                sx={{ fontWeight: 600 }}
-              />
-            </Box>
-
-            {/* 🔗 ALERTA DE AGRUPACIÓN COMPACTA */}
-            {!documento.isGrouped && (
-              <Box sx={{ display: 'flex', justifyContent: 'center' }}>
-                <GroupingAlert
-                  document={documento}
-                  variant="chip"
-                />
-              </Box>
-            )}
-
-            {/* BOTÓN DE AVANCE RÁPIDO */}
-            {(documento.status === 'EN_PROCESO' || documento.status === 'LISTO') && (
-              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-                <Tooltip title={`Marcar como ${documento.status === 'EN_PROCESO' ? 'LISTO' : 'ENTREGADO'}`}>
-                  <IconButton
-                    size="small"
-                    onClick={(e) => handleAvanceRapido(documento, e)}
-                    sx={{
-                      backgroundColor: 'primary.main',
-                      color: 'white',
-                      '&:hover': {
-                        backgroundColor: 'primary.dark',
-                        transform: 'scale(1.1)'
-                      },
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    {documento.status === 'EN_PROCESO' ? (
-                      <CheckIcon fontSize="small" />
-                    ) : (
-                      <EntregarIcon fontSize="small" />
-                    )}
-                  </IconButton>
-                </Tooltip>
-              </Box>
-            )}
-          </CardContent>
-        </Card>
+    />
   );
 
   /**
@@ -582,33 +463,25 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
         ))}
       </Box>
 
-      {/* Menú de acciones */}
-      <Menu
-        anchorEl={menuAnchor}
-        open={Boolean(menuAnchor)}
-        onClose={handleMenuClose}
-      >
-        {/* Opción de entrega solo para documentos LISTO */}
-        {selectedDocument?.status === 'LISTO' && (
-          <>
-            <MenuItem onClick={handleEntregarClick}>
-              <EntregarIcon sx={{ mr: 1 }} />
-              Entregar Documento
-            </MenuItem>
-            <Divider />
-          </>
-        )}
-        <MenuItem onClick={handleMenuClose}>
-          Ver Detalles
-        </MenuItem>
-        <MenuItem onClick={handleMenuClose}>
-          Editar
-        </MenuItem>
-        <Divider />
-        <MenuItem onClick={handleMenuClose}>
-          Historial
-        </MenuItem>
-      </Menu>
+      {/* Modal de detalles del documento */}
+      {detailModalOpen && selectedDocument && (
+        <DocumentDetailModal
+          open={detailModalOpen}
+          onClose={handleCloseDetail}
+          document={selectedDocument}
+          userRole="archivo"
+        />
+      )}
+
+      {/* Modal de edición del documento */}
+      {editModalOpen && documentToEdit && (
+        <EditDocumentModal
+          open={editModalOpen}
+          onClose={handleCloseEdit}
+          document={documentToEdit}
+          onSave={handleEditSave}
+        />
+      )}
 
       {/* Modal de Entrega */}
       {modalEntregaOpen && documentoParaEntrega && (
