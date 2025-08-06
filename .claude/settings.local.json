@@ -3,7 +3,15 @@
     "allow": [
       "Bash(npm test)",
       "Bash(node:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(npm start)",
+      "Bash(grep:*)",
+      "Bash(timeout 5s npm start)",
+      "Bash(timeout 10s npm start)",
+      "Bash(npm run:*)",
+      "Bash(timeout 10s npm run dev)",
+      "Bash(find:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }
