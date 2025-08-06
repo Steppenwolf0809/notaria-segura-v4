@@ -169,23 +169,45 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
 
     return (
       <Paper
-        sx={{
-          bgcolor: 'background.default',
-          border: 1,
-          borderColor: 'divider',
-          borderRadius: 2,
-          height: '100%',
-          minWidth: { xs: 300, md: 350 },
-          flex: 1,
-          display: 'flex',
+        data-column-id={column.id}
+        sx={{ 
+          p: 2, 
+          height: 'calc(100vh - 280px)', 
+          display: 'flex', 
           flexDirection: 'column',
-          transition: 'all 0.3s ease',
-          ...(isDragging && canDrop(column.id) && { bgcolor: 'action.hover', borderStyle: 'dashed' }),
-          ...(isDragging && !canDrop(column.id) && { bgcolor: 'error.light', opacity: 0.6 }),
-          ...getColumnStyle(column.id)
+          bgcolor: 'background.default',
+          minWidth: { xs: 320, md: 380 },
+          flex: 1,
+          maxWidth: { xs: 320, md: 'none' },
+          // Estilos dinámicos basados en el drag - CONSERVANDO LÓGICA ORIGINAL
+          ...(isDragging && draggedItem && {
+            opacity: canDrop(column.id) ? 1 : 0.6,
+            border: canDrop(column.id) 
+              ? '2px dashed #10b981' 
+              : '2px solid #ef4444'
+          })
         }}
       >
-        {/* Zona de drop que ocupa toda la columna */}
+        {/* Header de columna */}
+        <Box sx={{ mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, color: column.color }}>
+              {column.title}
+            </Typography>
+            <Chip 
+              label={filteredDocs.length} 
+              size="small" 
+              sx={{ 
+                bgcolor: column.color, 
+                color: 'white',
+                fontWeight: 600 
+              }} 
+            />
+          </Box>
+          <Box sx={{ mt: 1, height: 2, bgcolor: column.color, borderRadius: 1 }} />
+        </Box>
+
+        {/* ZONA DE DROP COMPLETA - Estilo Archivo */}
         <Box
           data-column-id={column.id}
           onDragEnter={(e) => handleDragEnter(e, column.id)}
@@ -196,44 +218,74 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
           }}
           onDragLeave={(e) => handleDragLeave(e, column.id)}
           sx={{
-            height: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            p: { xs: 1.5, md: 2 }
+            flex: 1,
+            position: 'relative',
+            minHeight: 400,
+            borderRadius: 1,
+            // Indicador visual cuando se está arrastrando - ESTILO ARCHIVO
+            ...(isDragging && draggedItem && {
+              backgroundColor: canDrop(column.id) 
+                ? 'rgba(16, 185, 129, 0.1)' 
+                : 'rgba(239, 68, 68, 0.1)',
+              border: canDrop(column.id)
+                ? '2px dashed #10b981'
+                : '2px dashed #ef4444',
+              '&::before': {
+                content: canDrop(column.id) 
+                  ? '"✓ Suelta aquí"' 
+                  : '"✗ No permitido"',
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                color: canDrop(column.id) ? '#10b981' : '#ef4444',
+                fontWeight: 700,
+                fontSize: '1.1rem',
+                opacity: 0.8,
+                pointerEvents: 'none',
+                zIndex: 10,
+                backgroundColor: 'background.paper',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+              }
+            })
           }}
         >
-          {/* Header de la columna */}
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexShrink: 0 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: column.color }} />
-              <Typography variant="h6" sx={{ fontWeight: 600, fontSize: '1rem' }}>{column.title}</Typography>
-            </Box>
-            <Chip label={filteredDocs.length} size="small" sx={{ fontWeight: 600 }} />
-          </Box>
-          
-          {/* Contenido scrolleable de documentos */}
-          <Box sx={{ flexGrow: 1, overflowY: 'auto', pr: 1 }}>
-            {documents.length > 0 ? (
-              documents.map((doc, index) => (
+          {/* ÁREA SCROLLEABLE DE DOCUMENTOS - Estilo Archivo */}
+          <Box sx={{ 
+            overflow: 'auto', 
+            height: '100%',
+            p: 1
+          }}>
+            {documents.length === 0 ? (
+              <Box 
+                sx={{ 
+                  textAlign: 'center', 
+                  py: 4,
+                  color: 'text.secondary',
+                  fontStyle: 'italic'
+                }}
+              >
+                No hay documentos
+              </Box>
+            ) : (
+              documents.map((document, index) => (
                 <UnifiedDocumentCard
-                  key={`${doc.id}-${index}`}
-                  document={doc}
+                  key={`${document.id}-${index}`}
+                  document={document}
                   role="matrizador"
                   onOpenDetail={openDetailModal}
                   onOpenEdit={openEditModal}
                   onAdvanceStatus={handleAdvanceStatus}
-                  isDragging={isDragging && draggedItem?.id === doc.id}
+                  isDragging={isDragging && draggedItem?.id === document.id}
                   dragHandlers={{
-                    onDragStart: (event) => handleDragStart(event, doc),
+                    onDragStart: (event) => handleDragStart(event, document),
                     onDragEnd: handleDragEnd
                   }}
-                  style={getDraggedItemStyle(doc)}
+                  style={getDraggedItemStyle(document)}
                 />
               ))
-            ) : (
-              <Box sx={{ textAlign: 'center', py: 8, opacity: 0.6 }}>
-                <Typography>No hay documentos</Typography>
-              </Box>
             )}
           </Box>
           
@@ -415,15 +467,14 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {/* Kanban Board con estilo de Archivo */}
       <Box sx={{ 
-        flexGrow: 1, 
         display: 'flex', 
-        gap: 2, 
-        overflowX: 'auto', 
-        p: 2,
-        // Asegurar altura mínima para las columnas
-        minHeight: 'calc(100vh - 200px)',
-        alignItems: 'stretch'
+        gap: 3, 
+        minHeight: 'calc(100vh - 280px)',
+        overflowX: 'auto',
+        alignItems: 'stretch',  // Asegurar que todas las columnas tengan la misma altura
+        p: 2
       }}>
         {kanbanColumns.map((column, index) => (
           <React.Fragment key={column.id}>
@@ -431,14 +482,9 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
             {/* Espacio de drop invisible entre columnas para facilitar el arrastre */}
             {index < kanbanColumns.length - 1 && (
               <Box
-                onDragEnter={(e) => {
-                  // Al entrar en el espacio entre columnas, activar la siguiente columna
-                  const nextColumn = kanbanColumns[index + 1];
-                  if (nextColumn && isDragging) {
-                    handleDragEnter(e, nextColumn.id);
-                  }
-                }}
+
                 onDragOver={(e) => {
+                  e.preventDefault();
                   const nextColumn = kanbanColumns[index + 1];
                   if (nextColumn) {
                     handleDragOver(e, nextColumn.id);
@@ -452,7 +498,7 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
                   }
                 }}
                 sx={{
-                  width: 16,
+                  width: 20,
                   minHeight: '100%',
                   position: 'relative',
                   '&::after': isDragging ? {

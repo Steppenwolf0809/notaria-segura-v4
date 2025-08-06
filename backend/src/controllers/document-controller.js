@@ -2,6 +2,14 @@ import { PrismaClient } from '@prisma/client';
 import { parseXmlDocument, generateVerificationCode } from '../services/xml-parser-service.js';
 import DocumentGroupingService from '../services/document-grouping-service.js';
 import MatrizadorAssignmentService from '../services/matrizador-assignment-service.js';
+import { 
+  formatEventDescription, 
+  getEventContextInfo, 
+  formatEventDate, 
+  getEventTitle,
+  getEventIcon, 
+  getEventColor 
+} from '../utils/event-formatter.js';
 // const WhatsAppService = require('../services/whatsapp-service.js'); // Descomentar cuando exista
 
 const prisma = new PrismaClient();
@@ -84,6 +92,33 @@ async function uploadXmlDocument(req, res) {
         }
       }
     });
+
+    // 📈 Registrar evento de creación de documento
+    try {
+      await prisma.documentEvent.create({
+        data: {
+          documentId: document.id,
+          userId: req.user.id,
+          eventType: 'DOCUMENT_CREATED',
+          description: `Documento creado desde XML por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
+          details: {
+            protocolNumber: parsedData.protocolNumber,
+            documentType: parsedData.documentType,
+            clientName: parsedData.clientName,
+            source: 'XML_UPLOAD',
+            xmlFileName: req.file.originalname,
+            fileSize: req.file.size,
+            totalFactura: parsedData.totalFactura,
+            timestamp: new Date().toISOString()
+          },
+          ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown'
+        }
+      });
+    } catch (auditError) {
+      console.error('Error registrando evento de creación de documento:', auditError);
+      // No fallar la creación del documento si hay error en auditoría
+    }
 
     // 🤖 ASIGNACIÓN AUTOMÁTICA DE MATRIZADOR
     console.log(`🔍 Intentando asignación automática para matrizador: "${parsedData.matrizadorName}"`);
@@ -271,6 +306,33 @@ async function assignDocument(req, res) {
         }
       }
     });
+
+    // 📈 Registrar evento de asignación de documento
+    try {
+      await prisma.documentEvent.create({
+        data: {
+          documentId: id,
+          userId: req.user.id,
+          eventType: 'DOCUMENT_ASSIGNED',
+          description: `Documento asignado a ${matrizador.firstName} ${matrizador.lastName} por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
+          details: {
+            assignedFrom: document.assignedToId,
+            assignedTo: parseInt(matrizadorId),
+            matrizadorName: `${matrizador.firstName} ${matrizador.lastName}`,
+            matrizadorRole: matrizador.role,
+            previousStatus: document.status,
+            newStatus: 'EN_PROCESO',
+            assignmentType: 'MANUAL',
+            timestamp: new Date().toISOString()
+          },
+          ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown'
+        }
+      });
+    } catch (auditError) {
+      console.error('Error registrando evento de asignación de documento:', auditError);
+      // No fallar la asignación del documento si hay error en auditoría
+    }
 
     res.json({
       success: true,
@@ -2320,6 +2382,155 @@ async function getUndoableChanges(req, res) {
   }
 }
 
+/**
+ * Obtener historial completo de un documento
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+async function getDocumentHistory(req, res) {
+  try {
+    const { id } = req.params;
+    const { limit = 50, offset = 0, eventType } = req.query;
+
+    // Buscar documento y verificar permisos
+    const document = await prisma.document.findUnique({
+      where: { id }
+    });
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Documento no encontrado'
+      });
+    }
+
+    // Control de permisos por rol
+    const userRole = req.user.role;
+    const userId = req.user.id;
+
+    // MATRIZADOR: Solo SUS documentos asignados
+    if (userRole === 'MATRIZADOR' && document.assignedToId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo puedes ver el historial de documentos asignados a ti'
+      });
+    }
+
+    // ADMIN/RECEPCIÓN/CAJA/ARCHIVO: Ven TODOS los documentos
+    if (!['ADMIN', 'RECEPCION', 'CAJA', 'ARCHIVO', 'MATRIZADOR'].includes(userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para ver el historial de documentos'
+      });
+    }
+
+    // Construir filtros de consulta
+    const whereClause = {
+      documentId: id
+    };
+
+    if (eventType) {
+      whereClause.eventType = eventType;
+    }
+
+    // Obtener eventos del historial
+    const events = await prisma.documentEvent.findMany({
+      where: whereClause,
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      skip: parseInt(offset),
+      take: parseInt(limit)
+    });
+
+    // Obtener total de eventos para paginación
+    const totalEvents = await prisma.documentEvent.count({
+      where: whereClause
+    });
+
+    // Formatear eventos para respuesta con descripciones mejoradas
+    const formattedEvents = events.map(event => {
+      // Usar el formateo mejorado de descripción
+      const formattedDescription = formatEventDescription(event);
+      
+      // Obtener información contextual adicional
+      const contextInfo = getEventContextInfo(event);
+      
+      return {
+        id: event.id,
+        type: event.eventType,
+        title: getEventTitle(event.eventType),
+        description: formattedDescription,
+        timestamp: event.createdAt,
+        user: {
+          id: event.user.id,
+          name: `${event.user.firstName} ${event.user.lastName}`,
+          role: event.user.role
+        },
+        icon: getEventIcon(event.eventType),
+        color: getEventColor(event.eventType, event.details),
+        contextInfo: contextInfo, // Información adicional para mostrar
+        details: event.details, // Detalles técnicos (solo para debug si es necesario)
+        // Omitir metadata técnica innecesaria para el usuario final
+        ...(userRole === 'ADMIN' && { 
+          metadata: {
+            ipAddress: event.ipAddress,
+            userAgent: event.userAgent
+          }
+        })
+      };
+    });
+
+    // Información básica del documento para contexto
+    const documentInfo = {
+      id: document.id,
+      protocolNumber: document.protocolNumber,
+      clientName: document.clientName,
+      currentStatus: document.status,
+      documentType: document.documentType,
+      createdAt: document.createdAt
+    };
+
+    res.json({
+      success: true,
+      data: {
+        document: documentInfo,
+        history: {
+          events: formattedEvents,
+          pagination: {
+            total: totalEvents,
+            limit: parseInt(limit),
+            offset: parseInt(offset),
+            hasMore: (parseInt(offset) + parseInt(limit)) < totalEvents
+          }
+        },
+        permissions: {
+          role: userRole,
+          canViewAll: ['ADMIN', 'RECEPCION', 'CAJA', 'ARCHIVO'].includes(userRole),
+          canViewOwned: userRole === 'MATRIZADOR' && document.assignedToId === userId
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error obteniendo historial del documento:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+}
+
 export {
   uploadXmlDocument,
   uploadXmlDocumentsBatch,
@@ -2342,6 +2553,8 @@ export {
   // 🔄 Sistema de confirmaciones y deshacer
   undoDocumentStatusChange,
   getUndoableChanges,
+  // 📈 Sistema de historial universal
+  getDocumentHistory,
   // 🔗 Funciones de grupos
   updateDocumentGroupStatus,
   updateDocumentGroupInfo

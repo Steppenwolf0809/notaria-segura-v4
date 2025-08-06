@@ -21,6 +21,7 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { formatCurrency } from '../../utils/currencyUtils';
 
 /**
  * Componente de tarjeta unificado para ambos roles (Matrizador y Archivo)
@@ -63,17 +64,7 @@ const UnifiedDocumentCard = ({
     }
   };
 
-  /**
-   * Formatear moneda
-   */
-  const formatCurrency = (value) => {
-    if (!value) return null;
-    return new Intl.NumberFormat('es-EC', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0
-    }).format(value);
-  };
+  // Función de formateo de moneda movida a utils/currencyUtils.js
 
   /**
    * Obtener color del estado
@@ -119,6 +110,14 @@ const UnifiedDocumentCard = ({
     }
     
     if (role === 'archivo') {
+      if (status === 'EN_PROCESO') {
+        return {
+          text: 'Marcar Listo',
+          color: 'success',
+          icon: <CheckCircleIcon sx={{ fontSize: 16 }} />,
+          newStatus: 'LISTO'
+        };
+      }
       if (status === 'LISTO') {
         return {
           text: 'Entregar',

@@ -28,6 +28,7 @@ import {
 import useDocumentStore from '../../store/document-store';
 import DocumentDetailModal from './DocumentDetailModal';
 import GroupingAlert from '../grouping/GroupingAlert';
+import { formatCurrency } from '../../utils/currencyUtils';
 
 /**
  * Vista Lista - EXACTA AL PROTOTIPO
@@ -338,7 +339,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'success.main' }}>
-                        ${new Intl.NumberFormat('es-EC').format(document.actoPrincipalValor || 0)}
+                        {formatCurrency(document.actoPrincipalValor || 0)}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         {document.actoPrincipalDescripcion}

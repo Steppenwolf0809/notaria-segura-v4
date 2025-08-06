@@ -20,6 +20,7 @@ import {
   Dashboard as DashboardIcon,
   FolderSpecial as ArchiveIcon,
   Visibility as SupervisionIcon,
+  WhatsApp as WhatsAppIcon,
   Logout as LogoutIcon,
   Settings as SettingsIcon
 } from '@mui/icons-material';
@@ -75,6 +76,13 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
       view: 'documentos',
       active: currentView === 'documentos',
       description: 'Documentos de archivo asignados'
+    },
+    {
+      text: 'Notificaciones',
+      icon: <WhatsAppIcon />,
+      view: 'notificaciones',
+      active: currentView === 'notificaciones',
+      description: 'Historial de notificaciones WhatsApp'
     },
     {
       text: 'Supervisión General',

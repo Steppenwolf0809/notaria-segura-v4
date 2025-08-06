@@ -4,70 +4,222 @@ import notificationsService from '../services/notifications-service';
 
 /**
  * Hook personalizado para manejar el historial de documentos
- * Gestiona la obtención y visualización del timeline de eventos
+ * Gestiona la obtención y visualización del timeline de eventos con API real
  */
-const useDocumentHistory = (documentId) => {
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+const useDocumentHistory = (documentId, options = {}) => {
+  const {
+    limit = 50,
+    eventType = null,
+    autoRefresh = false,
+    refreshInterval = 30000, // 30 segundos
+    enabled = true,
+    fallbackToSimulated = true // Fallback a datos simulados si falla la API
+  } = options;
+
+  const [state, setState] = useState({
+    history: [],
+    document: null,
+    permissions: null,
+    loading: false,
+    error: null,
+    pagination: {
+      total: 0,
+      limit: 50,
+      offset: 0,
+      hasMore: false
+    },
+    usingRealData: false
+  });
 
   /**
-   * Cargar historial del documento
+   * Cargar historial del documento usando la API real
    */
-  const fetchHistory = useCallback(async () => {
-    if (!documentId) return;
+  const fetchHistory = useCallback(async (offset = 0) => {
+    if (!documentId || !enabled) return;
 
-    setLoading(true);
-    setError(null);
+    setState(prev => ({ ...prev, loading: true, error: null }));
 
     try {
-      // Cargar historial simulado base
-      const simulatedHistory = generateSimulatedHistory(documentId);
+      // Intentar obtener historial real de la API
+      const params = {
+        limit,
+        offset,
+        ...(eventType && { eventType })
+      };
+
+      console.log('🔍 Obteniendo historial real del documento:', documentId);
+      const response = await documentService.getDocumentHistory(documentId, params);
       
-      // Cargar notificaciones reales del documento
-      const notificationsResponse = await notificationsService.getDocumentNotifications(documentId);
-      
-      if (notificationsResponse.success && notificationsResponse.data.length > 0) {
-        // Convertir notificaciones reales a eventos de historial
-        const realNotificationEvents = notificationsResponse.data.map((notification, index) => ({
-          id: `notification_real_${notification.id || index}`,
-          type: 'notification_sent',
-          title: notification.status === 'SENT' ? 'Notificación Enviada' : 'Notificación Falló',
-          description: notification.status === 'SENT' 
-            ? 'Se envió notificación WhatsApp al cliente' 
-            : `Error: ${notification.errorMessage || 'No enviada'}`,
-          timestamp: new Date(notification.createdAt),
-          user: 'Sistema de Notificaciones',
-          icon: 'notification',
-          color: notification.status === 'SENT' ? 'info' : 'error',
-          metadata: {
-            channel: 'WhatsApp',
-            recipient: notification.clientPhone,
-            status: notification.status.toLowerCase(),
-            messageId: notification.messageId,
-            clientName: notification.clientName
-          }
+      if (response.success && response.data) {
+        const { document, history, permissions } = response.data;
+        
+        // Formatear eventos para el componente Timeline
+        const formattedEvents = (history.events || []).map(event => ({
+          id: event.id,
+          type: event.type,
+          title: event.title || getEventTitle(event.type),
+          description: event.description,
+          timestamp: event.timestamp,
+          user: event.user ? `${event.user.name} (${event.user.role})` : 'Sistema',
+          icon: event.icon || getEventIcon(event.type),
+          color: event.color || getEventColor(event.type),
+          contextInfo: event.contextInfo || [], // Nueva información contextual
+          metadata: event.details || {}, // Mantener para compatibilidad
+          // Solo mostrar metadata técnica para administradores
+          technicalDetails: event.metadata || null
         }));
-        
-        // Combinar historial simulado con notificaciones reales
-        const combinedHistory = [...simulatedHistory, ...realNotificationEvents]
-          .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-        
-        setHistory(combinedHistory);
-      } else {
-        // Solo mostrar historial simulado si no hay notificaciones reales
-        setHistory(simulatedHistory);
+
+        setState(prev => ({
+          ...prev,
+          history: formattedEvents,
+          document,
+          permissions,
+          pagination: history.pagination || prev.pagination,
+          loading: false,
+          error: null,
+          usingRealData: true
+        }));
+
+        console.log('✅ Historial real cargado exitosamente:', formattedEvents.length, 'eventos');
+        return;
       }
     } catch (err) {
-      console.error('Error fetching document history:', err);
-      setError('Error al cargar el historial del documento');
-      // Fallback al historial simulado en caso de error
-      const simulatedHistory = generateSimulatedHistory(documentId);
-      setHistory(simulatedHistory);
-    } finally {
-      setLoading(false);
+      console.error('❌ Error obteniendo historial real:', err);
+      
+      // Si falla la API y está habilitado el fallback, usar datos simulados
+      if (fallbackToSimulated) {
+        console.log('🔄 Fallback a historial simulado');
+        await loadSimulatedHistory();
+        return;
+      } else {
+        setState(prev => ({
+          ...prev,
+          loading: false,
+          error: err.message || 'Error al cargar el historial del documento'
+        }));
+      }
     }
-  }, [documentId]);
+  }, [documentId, limit, eventType, enabled, fallbackToSimulated]);
+
+  /**
+   * Cargar historial simulado (fallback)
+   */
+  const loadSimulatedHistory = useCallback(async () => {
+    try {
+      console.log('📋 Cargando historial simulado para documento:', documentId);
+      
+      // Generar historial simulado base
+      const simulatedHistory = generateSimulatedHistory(documentId);
+      
+      // Intentar cargar notificaciones reales como complemento
+      let combinedHistory = simulatedHistory;
+      
+      try {
+        const notificationsResponse = await notificationsService.getDocumentNotifications(documentId);
+        
+        if (notificationsResponse.success && notificationsResponse.data.length > 0) {
+          // Convertir notificaciones reales a eventos de historial
+          const realNotificationEvents = notificationsResponse.data.map((notification, index) => ({
+            id: `notification_real_${notification.id || index}`,
+            type: 'notification_sent',
+            title: notification.status === 'SENT' ? 'Notificación Enviada' : 'Notificación Falló',
+            description: notification.status === 'SENT' 
+              ? 'Se envió notificación WhatsApp al cliente' 
+              : `Error: ${notification.errorMessage || 'No enviada'}`,
+            timestamp: new Date(notification.createdAt),
+            user: 'Sistema de Notificaciones',
+            icon: 'notification',
+            color: notification.status === 'SENT' ? 'info' : 'error',
+            metadata: {
+              channel: 'WhatsApp',
+              recipient: notification.clientPhone,
+              status: notification.status.toLowerCase(),
+              messageId: notification.messageId,
+              clientName: notification.clientName
+            }
+          }));
+          
+          // Combinar historial simulado con notificaciones reales
+          combinedHistory = [...simulatedHistory, ...realNotificationEvents]
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+          
+          console.log('✅ Historial simulado enriquecido con notificaciones reales');
+        }
+      } catch (notificationError) {
+        console.warn('⚠️ No se pudieron cargar notificaciones reales:', notificationError);
+      }
+      
+      setState(prev => ({
+        ...prev,
+        history: combinedHistory,
+        document: { id: documentId }, // Documento simulado básico
+        permissions: { canViewAll: true }, // Permisos simulados
+        pagination: { total: combinedHistory.length, limit, offset: 0, hasMore: false },
+        loading: false,
+        error: null,
+        usingRealData: false
+      }));
+
+    } catch (err) {
+      console.error('❌ Error en historial simulado:', err);
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: 'Error al cargar el historial del documento'
+      }));
+    }
+  }, [documentId, limit]);
+
+  /**
+   * Obtener título del evento según su tipo
+   */
+  const getEventTitle = (eventType) => {
+    const titleMap = {
+      DOCUMENT_CREATED: 'Documento Creado',
+      DOCUMENT_ASSIGNED: 'Documento Asignado',
+      STATUS_CHANGED: 'Estado Cambiado',
+      INFO_EDITED: 'Información Editada',
+      GROUP_CREATED: 'Grupo Creado',
+      GROUP_DELIVERED: 'Grupo Entregado',
+      VERIFICATION_GENERATED: 'Código Generado',
+      notification_sent: 'Notificación Enviada'
+    };
+    return titleMap[eventType] || eventType;
+  };
+
+  /**
+   * Obtener icono del evento según su tipo
+   */
+  const getEventIcon = (eventType) => {
+    const iconMap = {
+      DOCUMENT_CREATED: 'create',
+      DOCUMENT_ASSIGNED: 'assignment',
+      STATUS_CHANGED: 'play',
+      INFO_EDITED: 'edit',
+      GROUP_CREATED: 'group',
+      GROUP_DELIVERED: 'delivery',
+      VERIFICATION_GENERATED: 'check_circle',
+      notification_sent: 'notification'
+    };
+    return iconMap[eventType] || 'default';
+  };
+
+  /**
+   * Obtener color del evento según su tipo
+   */
+  const getEventColor = (eventType) => {
+    const colorMap = {
+      DOCUMENT_CREATED: 'info',
+      DOCUMENT_ASSIGNED: 'primary',
+      STATUS_CHANGED: 'warning',
+      INFO_EDITED: 'info',
+      GROUP_CREATED: 'success',
+      GROUP_DELIVERED: 'success',
+      VERIFICATION_GENERATED: 'success',
+      notification_sent: 'info'
+    };
+    return colorMap[eventType] || 'grey';
+  };
 
   /**
    * Generar historial simulado basado en los datos disponibles
@@ -139,34 +291,61 @@ const useDocumentHistory = (documentId) => {
   };
 
   /**
-   * Agregar nuevo evento al historial
+   * Cargar más eventos (paginación)
    */
-  const addHistoryEvent = useCallback((event) => {
-    setHistory(prev => [event, ...prev]);
-  }, []);
+  const loadMore = useCallback(async () => {
+    const { pagination, loading } = state;
+    
+    if (loading || !pagination.hasMore) return;
+
+    const nextOffset = pagination.offset + pagination.limit;
+    await fetchHistory(nextOffset);
+  }, [state, fetchHistory]);
+
+  /**
+   * Refrescar historial
+   */
+  const refresh = useCallback(() => {
+    fetchHistory(0);
+  }, [fetchHistory]);
+
+  /**
+   * Filtrar por tipo de evento
+   */
+  const filterByEventType = useCallback((type) => {
+    // Reset y recargar con el nuevo filtro
+    setState(prev => ({ 
+      ...prev, 
+      history: [], 
+      pagination: { ...prev.pagination, offset: 0 } 
+    }));
+    
+    // Esto triggereará un useEffect que recarga con el nuevo eventType
+    fetchHistory(0);
+  }, [fetchHistory]);
 
   /**
    * Obtener eventos por tipo
    */
   const getEventsByType = useCallback((type) => {
-    return history.filter(event => event.type === type);
-  }, [history]);
+    return state.history.filter(event => event.type === type);
+  }, [state.history]);
 
   /**
    * Obtener último evento
    */
   const getLastEvent = useCallback(() => {
-    return history[history.length - 1];
-  }, [history]);
+    return state.history[state.history.length - 1];
+  }, [state.history]);
 
   /**
    * Obtener duración total del proceso
    */
   const getTotalDuration = useCallback(() => {
-    if (history.length < 2) return null;
+    if (state.history.length < 2) return null;
 
-    const firstEvent = history[history.length - 1];
-    const lastEvent = history[0];
+    const firstEvent = state.history[state.history.length - 1];
+    const lastEvent = state.history[0];
     
     const diffMs = new Date(lastEvent.timestamp) - new Date(firstEvent.timestamp);
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
@@ -177,32 +356,53 @@ const useDocumentHistory = (documentId) => {
     } else {
       return `${diffHours} horas`;
     }
-  }, [history]);
+  }, [state.history]);
 
   /**
    * Verificar si hay eventos pendientes
    */
   const hasPendingEvents = useCallback(() => {
-    return history.some(event => 
+    return state.history.some(event => 
       event.metadata?.status === 'pending' || 
       event.metadata?.status === 'processing'
     );
-  }, [history]);
+  }, [state.history]);
+
+  /**
+   * Configurar auto-refresh
+   */
+  useEffect(() => {
+    if (!autoRefresh || !documentId) return;
+
+    const interval = setInterval(() => {
+      refresh();
+    }, refreshInterval);
+
+    return () => clearInterval(interval);
+  }, [autoRefresh, refreshInterval, documentId, refresh]);
 
   // Cargar historial cuando cambia el documentId
   useEffect(() => {
-    fetchHistory();
-  }, [fetchHistory]);
+    if (documentId && enabled) {
+      fetchHistory();
+    }
+  }, [fetchHistory, documentId, enabled]);
 
   return {
     // Estado del historial
-    history,
-    loading,
-    error,
+    history: state.history,
+    document: state.document,
+    permissions: state.permissions,
+    loading: state.loading,
+    error: state.error,
+    pagination: state.pagination,
+    usingRealData: state.usingRealData,
 
     // Funciones de gestión
     fetchHistory,
-    addHistoryEvent,
+    refresh,
+    loadMore,
+    filterByEventType,
 
     // Funciones de consulta
     getEventsByType,
@@ -211,10 +411,19 @@ const useDocumentHistory = (documentId) => {
     hasPendingEvents,
 
     // Datos calculados
-    totalEvents: history.length,
-    hasHistory: history.length > 0,
+    totalEvents: state.history.length,
+    hasHistory: state.history.length > 0,
+    isEmpty: !state.loading && state.history.length === 0,
 
-    // Utilidades para el timeline
+    // Estadísticas
+    stats: {
+      totalEvents: state.pagination.total,
+      loadedEvents: state.history.length,
+      hasMoreToLoad: state.pagination.hasMore,
+      currentPage: Math.floor(state.pagination.offset / state.pagination.limit) + 1
+    },
+
+    // Utilidades compatibles con versión anterior
     utils: {
       formatEventTime: (timestamp) => {
         const date = new Date(timestamp);
@@ -241,7 +450,10 @@ const useDocumentHistory = (documentId) => {
           notification: 'Notifications',
           delivery: 'LocalShipping',
           error: 'Error',
-          warning: 'Warning'
+          warning: 'Warning',
+          edit: 'Edit',
+          group: 'Group',
+          default: 'Circle'
         };
         return iconMap[iconType] || 'Circle';
       },
@@ -252,7 +464,8 @@ const useDocumentHistory = (documentId) => {
           success: '#4caf50',
           warning: '#ff9800',
           error: '#f44336',
-          primary: '#1976d2'
+          primary: '#1976d2',
+          grey: '#757575'
         };
         return colorMap[color] || '#757575';
       }
