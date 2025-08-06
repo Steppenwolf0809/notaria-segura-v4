@@ -753,6 +753,7 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
         document={confirmationData?.document}
         currentStatus={confirmationData?.currentStatus}
         newStatus={confirmationData?.newStatus}
+        confirmationInfo={confirmationData?.confirmationInfo}
         isLoading={isConfirmationLoading}
       />
 

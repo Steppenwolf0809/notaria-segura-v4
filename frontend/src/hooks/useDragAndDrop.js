@@ -289,7 +289,10 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
           const result = await executeStatusChange(
             confirmationData.document, 
             confirmationData.newStatus, 
-            { reversionReason: confirmationData.reversionReason }
+            { 
+              reversionReason: confirmationData.reversionReason,
+              deliveredTo: confirmationData.deliveredTo
+            }
           );
           
           // Limpiar estado pendiente

@@ -356,7 +356,7 @@ async function getMyDocuments(req, res) {
 async function updateDocumentStatus(req, res) {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, deliveredTo } = req.body;
 
     if (!status) {
       return res.status(400).json({
@@ -386,6 +386,9 @@ async function updateDocumentStatus(req, res) {
       });
     }
 
+    // Preparar datos de actualización
+    const updateData = { status };
+
     // Verificar permisos según rol y estado
     if (['MATRIZADOR', 'ARCHIVO'].includes(req.user.role)) {
       // Matrizadores solo pueden modificar sus documentos asignados
@@ -395,12 +398,20 @@ async function updateDocumentStatus(req, res) {
           message: 'Solo puedes modificar documentos asignados a ti'
         });
       }
-      // Matrizadores no pueden marcar como ENTREGADO
+      // NUEVA FUNCIONALIDAD: Matrizadores pueden marcar como ENTREGADO sus documentos LISTO
       if (status === 'ENTREGADO') {
-        return res.status(403).json({
-          success: false,
-          message: 'Solo RECEPCIÓN puede marcar documentos como entregados'
-        });
+        // Solo documentos LISTO pueden ser entregados
+        if (document.status !== 'LISTO') {
+          return res.status(403).json({
+            success: false,
+            message: 'Solo se pueden entregar documentos que estén LISTO'
+          });
+        }
+        // Registrar datos de entrega simplificada para matrizador
+        updateData.usuarioEntregaId = req.user.id;
+        updateData.fechaEntrega = new Date();
+        updateData.entregadoA = deliveredTo || `Entrega directa por ${req.user.role.toLowerCase()}`;
+        updateData.relacionTitular = 'directo';
       }
     } else if (req.user.role === 'RECEPCION') {
       // Recepción solo puede marcar como ENTREGADO y solo documentos LISTO
@@ -422,9 +433,6 @@ async function updateDocumentStatus(req, res) {
         message: 'No tienes permisos para modificar documentos'
       });
     }
-
-    // Preparar datos de actualización
-    const updateData = { status };
 
     // Generar código de verificación si se marca como LISTO
     if (status === 'LISTO' && !document.verificationCode) {
@@ -480,6 +488,51 @@ async function updateDocumentStatus(req, res) {
       }
     }
 
+    // NUEVA FUNCIONALIDAD: Enviar notificación WhatsApp para entrega directa de MATRIZADOR/ARCHIVO
+    if (status === 'ENTREGADO' && ['MATRIZADOR', 'ARCHIVO'].includes(req.user.role) && updatedDocument.clientPhone) {
+      try {
+        // Importar el servicio de WhatsApp
+        const whatsappService = await import('../services/whatsapp-service.js');
+        
+        // Preparar datos de entrega
+        const datosEntrega = {
+          entregado_a: updateData.entregadoA,
+          deliveredTo: updateData.entregadoA,
+          fecha: updateData.fechaEntrega,
+          usuario_entrega: `${req.user.firstName} ${req.user.lastName} (${req.user.role})`
+        };
+
+        // Enviar notificación de documento entregado
+        const whatsappResult = await whatsappService.default.enviarDocumentoEntregado(
+          {
+            nombre: updatedDocument.clientName,
+            clientName: updatedDocument.clientName,
+            telefono: updatedDocument.clientPhone,
+            clientPhone: updatedDocument.clientPhone
+          },
+          {
+            tipo_documento: updatedDocument.documentType,
+            tipoDocumento: updatedDocument.documentType,
+            numero_documento: updatedDocument.protocolNumber,
+            protocolNumber: updatedDocument.protocolNumber
+          },
+          datosEntrega
+        );
+        
+        whatsappSent = whatsappResult.success;
+        
+        if (!whatsappResult.success) {
+          whatsappError = whatsappResult.error;
+          console.error('Error enviando WhatsApp de entrega directa:', whatsappResult.error);
+        } else {
+          console.log('📱 Notificación WhatsApp de entrega directa enviada exitosamente');
+        }
+      } catch (error) {
+        console.error('Error en servicio WhatsApp para entrega directa:', error);
+        whatsappError = error.message;
+      }
+    }
+
     // Registrar evento de auditoría
     try {
       await prisma.documentEvent.create({
@@ -487,7 +540,7 @@ async function updateDocumentStatus(req, res) {
           documentId: id,
           userId: req.user.id,
           eventType: 'STATUS_CHANGED',
-          description: `Estado cambiado de ${document.status} a ${status} por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
+          description: `Estado cambiado de ${document.status} a ${status} por ${req.user.firstName} ${req.user.lastName} (${req.user.role})${status === 'ENTREGADO' && ['MATRIZADOR', 'ARCHIVO'].includes(req.user.role) ? ' - Entrega directa' : ''}`,
           details: {
             previousStatus: document.status,
             newStatus: status,
@@ -495,6 +548,8 @@ async function updateDocumentStatus(req, res) {
             whatsappSent: whatsappSent,
             whatsappError: whatsappError,
             userRole: req.user.role,
+            deliveryType: status === 'ENTREGADO' && ['MATRIZADOR', 'ARCHIVO'].includes(req.user.role) ? 'DIRECT_DELIVERY' : 'STANDARD_DELIVERY',
+            entregadoA: status === 'ENTREGADO' ? updateData.entregadoA : undefined,
             timestamp: new Date().toISOString()
           },
           ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',

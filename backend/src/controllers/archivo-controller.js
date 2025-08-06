@@ -190,6 +190,14 @@ async function cambiarEstadoDocumento(req, res) {
       updateData.codigoRetiro = codigoGenerado;
     }
 
+    // Si se marca como ENTREGADO, registrar datos de entrega simplificada
+    if (nuevoEstado === 'ENTREGADO') {
+      updateData.usuarioEntregaId = req.user.id;
+      updateData.fechaEntrega = new Date();
+      updateData.entregadoA = `Entrega directa por archivo`;
+      updateData.relacionTitular = 'directo';
+    }
+
     // Actualizar estado
     const documentoActualizado = await prisma.document.update({
       where: { id },
@@ -198,6 +206,8 @@ async function cambiarEstadoDocumento(req, res) {
 
     // 📱 ENVIAR NOTIFICACIÓN WHATSAPP si se marca como LISTO
     let whatsappSent = false;
+    let whatsappError = null;
+    
     if (nuevoEstado === 'LISTO' && codigoGenerado) {
       try {
         const clienteData = {
@@ -218,9 +228,52 @@ async function cambiarEstadoDocumento(req, res) {
 
         console.log('✅ Notificación WhatsApp enviada desde archivo:', whatsappResult.messageId || 'simulado');
         whatsappSent = true;
-      } catch (whatsappError) {
+      } catch (error) {
         // No fallar la operación principal si WhatsApp falla
-        console.error('⚠️ Error enviando WhatsApp desde archivo (operación continúa):', whatsappError.message);
+        console.error('⚠️ Error enviando WhatsApp desde archivo (operación continúa):', error.message);
+        whatsappError = error.message;
+      }
+    }
+
+    // 📱 ENVIAR NOTIFICACIÓN WHATSAPP si se marca como ENTREGADO
+    if (nuevoEstado === 'ENTREGADO' && documento.clientPhone) {
+      try {
+        // Preparar datos de entrega
+        const datosEntrega = {
+          entregado_a: updateData.entregadoA,
+          deliveredTo: updateData.entregadoA,
+          fecha: updateData.fechaEntrega,
+          usuario_entrega: `${req.user.firstName} ${req.user.lastName} (ARCHIVO)`
+        };
+
+        // Enviar notificación de documento entregado
+        const whatsappResult = await whatsappService.enviarDocumentoEntregado(
+          {
+            nombre: documento.clientName,
+            clientName: documento.clientName,
+            telefono: documento.clientPhone,
+            clientPhone: documento.clientPhone
+          },
+          {
+            tipo_documento: documento.documentType,
+            tipoDocumento: documento.documentType,
+            numero_documento: documento.protocolNumber,
+            protocolNumber: documento.protocolNumber
+          },
+          datosEntrega
+        );
+        
+        whatsappSent = whatsappResult.success;
+        
+        if (!whatsappResult.success) {
+          whatsappError = whatsappResult.error;
+          console.error('Error enviando WhatsApp de entrega directa desde archivo:', whatsappResult.error);
+        } else {
+          console.log('📱 Notificación WhatsApp de entrega directa desde archivo enviada exitosamente');
+        }
+      } catch (error) {
+        console.error('Error en servicio WhatsApp para entrega directa desde archivo:', error);
+        whatsappError = error.message;
       }
     }
 
