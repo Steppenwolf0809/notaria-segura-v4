@@ -19,12 +19,17 @@ import ModalEntrega from '../recepcion/ModalEntrega';
 import UnifiedDocumentCard from '../shared/UnifiedDocumentCard';
 import DocumentDetailModal from '../Documents/DocumentDetailModal';
 import EditDocumentModal from '../Documents/EditDocumentModal';
+import ConfirmationModal from '../Documents/ConfirmationModal';
+import useDocumentStore from '../../store/document-store';
+import documentService from '../../services/document-service';
 
 /**
  * Vista Kanban para documentos de archivo
  * Siguiendo el patrón de KanbanView pero adaptado para archivo
  */
 const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) => {
+  const { requiresConfirmation } = useDocumentStore();
+  
   const [dragError, setDragError] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [draggedDocument, setDraggedDocument] = useState(null);
@@ -36,6 +41,11 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [documentToEdit, setDocumentToEdit] = useState(null);
+  
+  // Estados para modal de confirmación
+  const [confirmationModalOpen, setConfirmationModalOpen] = useState(false);
+  const [confirmationData, setConfirmationData] = useState(null);
+  const [isConfirmationLoading, setIsConfirmationLoading] = useState(false);
 
   // Configuración de columnas
   const columnas = archivoService.getColumnasKanban();
@@ -63,12 +73,13 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
 
   /**
    * Validar si un movimiento es válido según las reglas del archivo
+   * ACTUALIZADO: Permite reversión ENTREGADO→LISTO para corregir errores
    */
   const isValidMove = (fromStatus, toStatus) => {
     const validTransitions = {
-      'EN_PROCESO': ['LISTO'],        // En proceso solo puede ir a listo
-      'LISTO': ['ENTREGADO'],         // Listo solo puede ir a entregado
-      'ENTREGADO': []                 // Entregado no se puede mover
+      'EN_PROCESO': ['LISTO'],                    // En proceso solo puede ir a listo
+      'LISTO': ['ENTREGADO'],                     // Listo solo puede ir a entregado
+      'ENTREGADO': ['LISTO']                      // Entregado puede revertir a listo (con confirmación)
     };
 
     return validTransitions[fromStatus]?.includes(toStatus) || false;
@@ -93,7 +104,7 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
   };
 
   /**
-   * Manejar drop
+   * Manejar drop - CON MODAL DE CONFIRMACIÓN
    */
   const handleDrop = async (event, nuevoEstado) => {
     event.preventDefault();
@@ -120,6 +131,22 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
 
     console.log(`📋 DROP VÁLIDO: ${draggedDocument.protocolNumber} → ${nuevoEstado}`);
     
+    // NUEVA FUNCIONALIDAD: Verificar si requiere confirmación
+    const confirmationInfo = requiresConfirmation(draggedDocument.status, nuevoEstado);
+    
+    if (confirmationInfo.requiresConfirmation) {
+      console.log('🎯 Drop requiere confirmación, abriendo modal...');
+      setConfirmationData({
+        document: draggedDocument,
+        currentStatus: draggedDocument.status,
+        newStatus: nuevoEstado,
+        confirmationInfo: confirmationInfo
+      });
+      setConfirmationModalOpen(true);
+      return;
+    }
+    
+    // Si no requiere confirmación, proceder directamente
     try {
       const response = await onEstadoChange(documentoId, nuevoEstado);
       
@@ -165,10 +192,28 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
   };
 
   /**
-   * Manejar avance de estado del documento
+   * Manejar avance de estado del documento - CON MODAL DE CONFIRMACIÓN
    */
   const handleAdvanceStatus = async (documento, nuevoEstado) => {
+    console.log(`🚀 handleAdvanceStatus: ${documento.protocolNumber} → ${nuevoEstado}`);
+    
     try {
+      // NUEVA FUNCIONALIDAD: Verificar si requiere confirmación
+      const confirmationInfo = requiresConfirmation(documento.status, nuevoEstado);
+      
+      if (confirmationInfo.requiresConfirmation) {
+        console.log('🎯 Cambio de estado requiere confirmación, abriendo modal...');
+        setConfirmationData({
+          document: documento,
+          currentStatus: documento.status,
+          newStatus: nuevoEstado,
+          confirmationInfo: confirmationInfo
+        });
+        setConfirmationModalOpen(true);
+        return;
+      }
+      
+      // Si no requiere confirmación, proceder directamente
       // Si es para entregar, abrir modal de entrega
       if (nuevoEstado === 'ENTREGADO' && documento.status === 'LISTO') {
         setDocumentoParaEntrega(documento);
@@ -211,16 +256,74 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
    * Manejar guardado de edición
    */
   const handleEditSave = async (formData) => {
-    try {
-      // Aquí podrías implementar la lógica de guardado específica del archivo
-      // Por ahora, simplemente cerramos el modal y refrescamos
+    console.log('💾 Guardando cambios del documento:', documentToEdit?.protocolNumber);
+    console.log('📝 Datos a guardar:', formData);
+    
+    // Llamar al servicio para actualizar el documento
+    const response = await documentService.updateDocumentInfo(documentToEdit.id, formData);
+    
+    if (response.success) {
+      console.log('✅ Documento actualizado exitosamente');
+      
+      // Cerrar el modal
       handleCloseEdit();
+      
+      // Refrescar los datos para mostrar los cambios
       if (onRefresh) {
         onRefresh();
       }
+      
+      // El EditDocumentModal espera que no se lance excepción si es exitoso
+      return;
+    } else {
+      console.error('❌ Error al actualizar documento:', response.error);
+      setDragError(response.error || 'Error al guardar los cambios');
+      
+      // Lanzar excepción para que el modal sepa que hubo un error
+      throw new Error(response.error || 'Error al guardar los cambios');
+    }
+  };
+
+  /**
+   * Cerrar modal de confirmación
+   */
+  const handleCloseConfirmation = () => {
+    setConfirmationModalOpen(false);
+    setConfirmationData(null);
+    setIsConfirmationLoading(false);
+  };
+
+  /**
+   * Confirmar cambio de estado
+   */
+  const handleConfirmStatusChange = async (data) => {
+    console.log('🎯 Confirmando cambio de estado:', data);
+    setIsConfirmationLoading(true);
+    
+    try {
+      const response = await onEstadoChange(data.document.id, data.newStatus, {
+        reversionReason: data.reversionReason,
+        changeType: data.changeType,
+        deliveredTo: data.deliveredTo
+      });
+      
+      if (response.success) {
+        console.log('✅ Cambio de estado confirmado exitosamente');
+        handleCloseConfirmation();
+        
+        // Refrescar datos si es necesario
+        if (onRefresh) {
+          onRefresh();
+        }
+      } else {
+        console.error('❌ Error al confirmar cambio:', response.message);
+        setDragError(response.message || 'Error al cambiar estado');
+        setIsConfirmationLoading(false);
+      }
     } catch (error) {
-      console.error('Error al guardar edición:', error);
-      throw error;
+      console.error('❌ Error al confirmar cambio de estado:', error);
+      setDragError('Error al cambiar estado del documento');
+      setIsConfirmationLoading(false);
     }
   };
 
@@ -476,12 +579,14 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
       {/* Modal de edición del documento */}
       {editModalOpen && documentToEdit && (
         <EditDocumentModal
-          open={editModalOpen}
+          isOpen={editModalOpen}
           onClose={handleCloseEdit}
-          document={documentToEdit}
+          documento={documentToEdit}
           onSave={handleEditSave}
+          userRole="archivo"
         />
       )}
+
 
       {/* Modal de Entrega */}
       {modalEntregaOpen && documentoParaEntrega && (
@@ -490,6 +595,20 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
           onClose={handleCloseModalEntrega}
           onEntregaExitosa={handleEntregaExitosa}
           serviceType="arquivo"
+        />
+      )}
+
+      {/* Modal de confirmación de cambio de estado */}
+      {confirmationModalOpen && confirmationData && (
+        <ConfirmationModal
+          open={confirmationModalOpen}
+          onClose={handleCloseConfirmation}
+          onConfirm={handleConfirmStatusChange}
+          document={confirmationData.document}
+          currentStatus={confirmationData.currentStatus}
+          newStatus={confirmationData.newStatus}
+          confirmationInfo={confirmationData.confirmationInfo}
+          isLoading={isConfirmationLoading}
         />
       )}
     </Box>

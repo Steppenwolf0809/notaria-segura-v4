@@ -4,6 +4,7 @@ import ArchivoLayout from './ArchivoLayout';
 import ArchivoDashboard from './ArchivoDashboard';
 import GestionArchivo from './GestionArchivo';
 import SupervisionGeneral from './archivo/SupervisionGeneral';
+import NotificationHistory from './archivo/NotificationHistory';
 import archivoService from '../services/archivo-service';
 import useAuth from '../hooks/use-auth';
 
@@ -99,6 +100,9 @@ const ArchivoCenter = () => {
             onDataUpdate={handleDataUpdate}
           />
         );
+      
+      case 'notificaciones':
+        return <NotificationHistory />;
       
       case 'supervision':
         return (

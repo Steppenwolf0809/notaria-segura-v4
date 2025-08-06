@@ -659,6 +659,59 @@ const documentService = {
         message: errorMessage
       };
     }
+  },
+
+  /**
+   * 📈 Obtener historial completo de un documento
+   * @param {string} documentId - ID del documento
+   * @param {Object} params - Parámetros de consulta (limit, offset, eventType)
+   * @returns {Promise<Object>} Historial del documento
+   */
+  async getDocumentHistory(documentId, params = {}) {
+    console.log('📈 SERVICE: getDocumentHistory iniciado:', {
+      documentId,
+      params,
+      url: `/documents/${documentId}/history`
+    });
+    
+    try {
+      const queryParams = new URLSearchParams();
+      
+      if (params.limit) queryParams.append('limit', params.limit);
+      if (params.offset) queryParams.append('offset', params.offset);
+      if (params.eventType) queryParams.append('eventType', params.eventType);
+      
+      const url = `/documents/${documentId}/history${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      
+      console.log('📤 SERVICE: Solicitando historial del documento:', url);
+      
+      const response = await api.get(url);
+      console.log('📥 SERVICE: Respuesta del historial recibida:', response.data);
+      
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('💥 SERVICE: Error obteniendo historial del documento:', error);
+      console.error('📊 SERVICE: Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Error al obtener historial del documento';
+      
+      return {
+        success: false,
+        error: errorMessage,
+        message: errorMessage
+      };
+    }
   }
 };
 

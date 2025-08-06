@@ -526,9 +526,14 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
         {currentTab === 1 && (
           <Box sx={{ p: 3 }}>
             <DocumentTimeline 
-              history={history}
-              loading={loading}
-              error={error}
+              documentId={document?.id}
+              showRefresh={true}
+              showLoadMore={true}
+              autoRefresh={false}
+              options={{
+                limit: 20,
+                fallbackToSimulated: true
+              }}
             />
           </Box>
         )}

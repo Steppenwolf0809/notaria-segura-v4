@@ -11,7 +11,8 @@
       "Bash(npm run:*)",
       "Bash(timeout 10s npm run dev)",
       "Bash(find:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(npx prisma generate:*)"
     ],
     "deny": []
   }

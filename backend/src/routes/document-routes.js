@@ -23,6 +23,8 @@ import {
   // 🔄 Sistema de confirmaciones y deshacer
   undoDocumentStatusChange,
   getUndoableChanges,
+  // 📈 Sistema de historial universal
+  getDocumentHistory,
   // 🔗 Funciones de grupos
   updateDocumentGroupStatus,
   updateDocumentGroupInfo
@@ -131,6 +133,9 @@ router.post('/undo-status-change', authenticateToken, undoDocumentStatusChange);
 
 // GET /api/documents/:id/undoable-changes - Obtener cambios deshacibles de un documento
 router.get('/:id/undoable-changes', authenticateToken, getUndoableChanges);
+
+// 📈 GET /api/documents/:id/history - Obtener historial completo de un documento
+router.get('/:id/history', authenticateToken, getDocumentHistory);
 
 // 🔗 PUT /api/documents/group/info - Actualizar información compartida de grupo
 router.put('/group/info', authenticateToken, updateDocumentGroupInfo);

@@ -173,6 +173,12 @@ class MatrizadorAssignmentService {
         };
       }
 
+      // Obtener documento original para registro de evento
+      const originalDocument = await prisma.document.findUnique({
+        where: { id: documentId },
+        select: { status: true, assignedToId: true, createdById: true }
+      });
+
       // Asignar documento al matrizador
       const documentoAsignado = await prisma.document.update({
         where: { id: documentId },
@@ -192,6 +198,34 @@ class MatrizadorAssignmentService {
           }
         }
       });
+
+      // 📈 Registrar evento de asignación automática
+      try {
+        await prisma.documentEvent.create({
+          data: {
+            documentId: documentId,
+            userId: originalDocument.createdById, // Usuario que creó el documento
+            eventType: 'DOCUMENT_ASSIGNED',
+            description: `Documento asignado automáticamente a ${matrizador.firstName} ${matrizador.lastName} (${matrizador.role})`,
+            details: {
+              assignedFrom: originalDocument.assignedToId,
+              assignedTo: matrizador.id,
+              matrizadorName: `${matrizador.firstName} ${matrizador.lastName}`,
+              matrizadorRole: matrizador.role,
+              previousStatus: originalDocument.status,
+              newStatus: 'EN_PROCESO',
+              assignmentType: 'AUTOMATIC',
+              xmlMatrizadorName: matrizadorNameFromXml,
+              timestamp: new Date().toISOString()
+            },
+            ipAddress: 'system',
+            userAgent: 'auto-assignment-service'
+          }
+        });
+      } catch (auditError) {
+        console.error('Error registrando evento de asignación automática:', auditError);
+        // No fallar la asignación del documento si hay error en auditoría
+      }
 
       console.log(`✅ Documento ${documentId} asignado automáticamente a ${matrizador.firstName} ${matrizador.lastName}`);
 

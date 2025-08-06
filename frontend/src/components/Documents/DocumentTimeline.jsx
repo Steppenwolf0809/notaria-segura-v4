@@ -8,7 +8,9 @@ import {
   Chip,
   Stack,
   Skeleton,
-  Alert
+  Alert,
+  Button,
+  IconButton
 } from '@mui/material';
 import {
   Timeline as MuiTimeline,
@@ -27,16 +29,57 @@ import {
   LocalShipping as DeliveryIcon,
   Error as ErrorIcon,
   Warning as WarningIcon,
-  Circle as DefaultIcon
+  Circle as DefaultIcon,
+  Refresh as RefreshIcon,
+  ExpandMore as LoadMoreIcon,
+  Edit as EditIcon,
+  Group as GroupIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import useDocumentHistory from '../../hooks/useDocumentHistory';
 
 /**
  * Componente DocumentTimeline - Timeline visual del historial del documento
  * Muestra eventos cronológicos con iconos, colores y metadata
+ * Ahora integrado con el sistema de historial universal
  */
-const DocumentTimeline = ({ history, loading, error }) => {
+const DocumentTimeline = ({ 
+  history, 
+  loading, 
+  error, 
+  documentId,
+  showLoadMore = true,
+  showRefresh = true,
+  autoRefresh = false,
+  options = {} 
+}) => {
+  // Usar el hook si se pasa documentId, sino usar props legacy
+  const hookData = useDocumentHistory(documentId, {
+    autoRefresh,
+    enabled: !!documentId,
+    ...options
+  });
+
+  // Determinar qué datos usar
+  const timelineData = documentId ? hookData : { 
+    history: history || [], 
+    loading: loading || false, 
+    error: error || null,
+    refresh: () => {},
+    loadMore: () => {},
+    stats: { hasMoreToLoad: false }
+  };
+
+  const { 
+    history: timelineHistory, 
+    loading: timelineLoading, 
+    error: timelineError,
+    refresh,
+    loadMore,
+    stats,
+    usingRealData
+  } = timelineData;
 
   /**
    * Obtener icono según el tipo de evento
@@ -50,7 +93,10 @@ const DocumentTimeline = ({ history, loading, error }) => {
       notification: NotificationIcon,
       delivery: DeliveryIcon,
       error: ErrorIcon,
-      warning: WarningIcon
+      warning: WarningIcon,
+      edit: EditIcon,
+      group: GroupIcon,
+      default: DefaultIcon
     };
     
     const IconComponent = iconMap[iconType] || DefaultIcon;
@@ -105,46 +151,76 @@ const DocumentTimeline = ({ history, loading, error }) => {
   };
 
   /**
-   * Renderizar metadata del evento
+   * Renderizar información contextual del evento (reemplaza metadata técnica)
    */
-  const renderEventMetadata = (metadata) => {
-    if (!metadata || Object.keys(metadata).length === 0) return null;
+  const renderEventContextInfo = (contextInfo) => {
+    if (!contextInfo || contextInfo.length === 0) return null;
 
     return (
       <Box sx={{ mt: 1 }}>
         <Stack direction="row" spacing={1} flexWrap="wrap">
-          {Object.entries(metadata).map(([key, value]) => {
-            if (key === 'previousStatus' || key === 'newStatus') {
-              return (
-                <Chip
-                  key={key}
-                  label={`${key === 'previousStatus' ? 'De' : 'A'}: ${value}`}
-                  size="small"
-                  variant="outlined"
-                  color={key === 'newStatus' ? 'success' : 'default'}
-                />
-              );
-            } else if (key === 'status') {
-              return (
-                <Chip
-                  key={key}
-                  label={value}
-                  size="small"
-                  color={value === 'delivered' ? 'success' : value === 'failed' ? 'error' : 'default'}
-                />
-              );
-            } else {
-              return (
-                <Chip
-                  key={key}
-                  label={`${key}: ${value}`}
-                  size="small"
-                  variant="outlined"
-                />
-              );
-            }
-          })}
+          {contextInfo.map((info, index) => (
+            <Chip
+              key={index}
+              label={info}
+              size="small"
+              variant="outlined"
+              color="primary"
+              sx={{ 
+                backgroundColor: (theme) => theme.palette.mode === 'dark' 
+                  ? 'rgba(144, 202, 249, 0.08)' 
+                  : 'rgba(25, 118, 210, 0.08)',
+                '& .MuiChip-label': {
+                  fontSize: '0.75rem',
+                  fontWeight: 500
+                }
+              }}
+            />
+          ))}
         </Stack>
+      </Box>
+    );
+  };
+
+  /**
+   * Renderizar información de usuario con mejor formato
+   */
+  const renderUserInfo = (user, timestamp) => {
+    if (!user) return null;
+
+    const roleColors = {
+      'ADMIN': '#d32f2f',
+      'RECEPCION': '#1976d2', 
+      'CAJA': '#388e3c',
+      'ARCHIVO': '#f57c00',
+      'MATRIZADOR': '#7b1fa2'
+    };
+
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="caption" sx={{ fontWeight: 'medium' }}>
+            👤 {user}
+          </Typography>
+          {user.includes('(') && (
+            <Chip
+              label={user.match(/\(([^)]+)\)/)?.[1] || ''}
+              size="small"
+              sx={{
+                height: 16,
+                fontSize: '0.65rem',
+                backgroundColor: roleColors[user.match(/\(([^)]+)\)/)?.[1]] || '#757575',
+                color: 'white',
+                '& .MuiChip-label': {
+                  px: 1
+                }
+              }}
+            />
+          )}
+        </Box>
+        <Typography variant="caption" color="text.secondary">
+          📅 {formatTimestamp(timestamp)}
+        </Typography>
       </Box>
     );
   };
@@ -152,7 +228,7 @@ const DocumentTimeline = ({ history, loading, error }) => {
   /**
    * Loading skeleton
    */
-  if (loading) {
+  if (timelineLoading) {
     return (
       <Box>
         {[1, 2, 3].map((item) => (
@@ -172,10 +248,10 @@ const DocumentTimeline = ({ history, loading, error }) => {
   /**
    * Error state
    */
-  if (error) {
+  if (timelineError) {
     return (
       <Alert severity="error" sx={{ mt: 2 }}>
-        {error}
+        {timelineError}
       </Alert>
     );
   }
@@ -183,7 +259,7 @@ const DocumentTimeline = ({ history, loading, error }) => {
   /**
    * Empty state
    */
-  if (!history || history.length === 0) {
+  if (!timelineHistory || timelineHistory.length === 0) {
     return (
       <Box sx={{ textAlign: 'center', py: 4 }}>
         <DefaultIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
@@ -201,17 +277,37 @@ const DocumentTimeline = ({ history, loading, error }) => {
     <Box>
       {/* Header del timeline */}
       <Box sx={{ mb: 3 }}>
-        <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 1 }}>
-          Historial del Documento
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {history.length} eventos registrados
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+          <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+            Historial del Documento
+          </Typography>
+          {showRefresh && (
+            <IconButton onClick={refresh} size="small" disabled={timelineLoading}>
+              <RefreshIcon />
+            </IconButton>
+          )}
+        </Box>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+          <Typography variant="body2" color="text.secondary">
+            {timelineHistory.length} eventos mostrados
+            {stats?.totalEvents && stats.totalEvents !== timelineHistory.length && 
+              ` de ${stats.totalEvents} totales`
+            }
+          </Typography>
+          {usingRealData && (
+            <Chip 
+              label="Datos en vivo" 
+              size="small" 
+              color="success" 
+              variant="outlined" 
+            />
+          )}
+        </Box>
       </Box>
 
       {/* Timeline */}
       <MuiTimeline sx={{ p: 0 }}>
-        {history.map((event, index) => (
+        {timelineHistory.map((event, index) => (
           <MuiTimelineItem key={event.id}>
             <MuiTimelineSeparator>
               <MuiTimelineDot 
@@ -226,7 +322,7 @@ const DocumentTimeline = ({ history, loading, error }) => {
               >
                 {getEventIcon(event.icon)}
               </MuiTimelineDot>
-              {index < history.length - 1 && (
+              {index < timelineHistory.length - 1 && (
                 <MuiTimelineConnector sx={{ height: 60 }} />
               )}
             </MuiTimelineSeparator>
@@ -256,24 +352,31 @@ const DocumentTimeline = ({ history, loading, error }) => {
                     {event.description}
                   </Typography>
 
-                  {/* Usuario y timestamp */}
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                    <Typography variant="caption" sx={{ fontWeight: 'medium' }}>
-                      👤 {event.user}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      📅 {formatTimestamp(event.timestamp)}
-                    </Typography>
-                  </Box>
+                  {/* Usuario y timestamp mejorados */}
+                  {renderUserInfo(event.user, event.timestamp)}
 
-                  {/* Metadata */}
-                  {renderEventMetadata(event.metadata)}
+                  {/* Información contextual (reemplaza metadata técnica) */}
+                  {renderEventContextInfo(event.contextInfo)}
                 </CardContent>
               </Card>
             </MuiTimelineContent>
           </MuiTimelineItem>
         ))}
       </MuiTimeline>
+
+      {/* Botón de cargar más */}
+      {showLoadMore && stats?.hasMoreToLoad && (
+        <Box sx={{ textAlign: 'center', mt: 2 }}>
+          <Button
+            variant="outlined"
+            startIcon={<LoadMoreIcon />}
+            onClick={loadMore}
+            disabled={timelineLoading}
+          >
+            Cargar más eventos
+          </Button>
+        </Box>
+      )}
 
       {/* Footer con información adicional */}
       <Box sx={{ 
@@ -289,6 +392,12 @@ const DocumentTimeline = ({ history, loading, error }) => {
       }}>
         <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
           💡 Los eventos se actualizan automáticamente conforme cambia el estado del documento
+          {usingRealData && (
+            <>
+              <br />
+              🔄 Conectado a datos en tiempo real
+            </>
+          )}
         </Typography>
       </Box>
     </Box>
