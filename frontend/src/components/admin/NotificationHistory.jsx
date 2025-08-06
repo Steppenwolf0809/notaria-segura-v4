@@ -278,15 +278,16 @@ const NotificationHistory = () => {
                 <Typography variant="body2" color="text.secondary">
                   Tipo: {getTypeLabel(previewNotification.tipo)}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Estado: 
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Estado:
+                  </Typography>
                   <Chip 
                     label={previewNotification.estado} 
                     size="small" 
                     color={getStatusColor(previewNotification.estado)}
-                    sx={{ ml: 1 }}
                   />
-                </Typography>
+                </Box>
                 <Typography variant="body2" color="text.secondary">
                   Fecha: {formatDate(previewNotification.fecha)}
                 </Typography>
