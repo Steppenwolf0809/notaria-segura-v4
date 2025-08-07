@@ -234,6 +234,25 @@ enum NotificationStatus {
   SIMULATED  // Simulado (desarrollo)
 }
 
+// Modelo para templates WhatsApp personalizables por admin
+model WhatsAppTemplate {
+  id        String              @id @default(uuid())
+  tipo      TemplateType        // Tipo de template
+  titulo    String              // Título descriptivo para el admin
+  mensaje   String              // Contenido del mensaje con variables {cliente}, {documento}, etc.
+  activo    Boolean             @default(true)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+  
+  @@map("whatsapp_templates")
+}
+
+// Tipos de templates disponibles
+enum TemplateType {
+  DOCUMENTO_LISTO     // Notificación cuando documento está listo
+  DOCUMENTO_ENTREGADO // Confirmación de entrega
+}
+
 // Modelo básico para verificar conexión
 model TestConnection {
   id        Int      @id @default(autoincrement())

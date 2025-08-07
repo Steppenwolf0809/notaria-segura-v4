@@ -23,6 +23,8 @@ import DocumentOversight from './admin/DocumentOversight';
 import NotificationHistory from './admin/NotificationHistory';
 import NotificationSettings from './admin/NotificationSettings';
 import NotificationTemplates from './admin/NotificationTemplates';
+import WhatsAppTemplates from './admin/WhatsAppTemplates';
+import AdminSettings from './admin/AdminSettings';
 
 /**
  * Centro de administración - Panel principal para ADMIN
@@ -55,11 +57,11 @@ const AdminCenter = () => {
       case 'notifications':
         return <NotificationHistory />;
       
-      case 'notification-settings':
-        return <NotificationSettings />;
-      
       case 'notification-templates':
         return <NotificationTemplates />;
+      
+      case 'whatsapp-templates':
+        return <WhatsAppTemplates />;
       
       case 'settings':
         return <AdminSettings />;
@@ -219,46 +221,5 @@ const AdminDashboard = () => {
   );
 };
 
-/**
- * Panel de configuración del administrador
- */
-const AdminSettings = () => {
-  return (
-    <Box>
-      <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-        <SettingsIcon sx={{ mr: 1 }} />
-        Configuración del Sistema
-      </Typography>
-
-      <Grid container spacing={3}>
-        <Grid item xs={12}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                🚧 En Desarrollo
-              </Typography>
-              <Typography variant="body1" color="text.secondary">
-                Las configuraciones avanzadas del sistema estarán disponibles en futuras versiones.
-              </Typography>
-              
-              <Alert severity="info" sx={{ mt: 2 }}>
-                <Typography variant="body2">
-                  Funcionalidades planificadas:
-                </Typography>
-                <ul style={{ margin: '8px 0', paddingLeft: '20px' }}>
-                  <li>Configuración de notificaciones</li>
-                  <li>Parámetros del sistema</li>
-                  <li>Gestión de plantillas</li>
-                  <li>Configuración de auditoría</li>
-                  <li>Respaldos y restauración</li>
-                </ul>
-              </Alert>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-    </Box>
-  );
-};
 
 export default AdminCenter;

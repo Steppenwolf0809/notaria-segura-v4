@@ -34,6 +34,17 @@ import {
   getSimpleNotificationSettings,
   updateNotificationSettings
 } from '../controllers/admin-notification-controller.js';
+
+import {
+  getTemplates,
+  getTemplate,
+  createTemplate,
+  updateTemplate,
+  deleteTemplate,
+  toggleTemplate,
+  previewTemplate,
+  initializeDefaultTemplates
+} from '../controllers/admin-whatsapp-templates-controller.js';
 import { 
   authenticateToken, 
   requireAdmin 
@@ -326,5 +337,69 @@ router.get('/notificaciones', async (req, res) => {
     });
   }
 });
+
+// ============================================================================
+// RUTAS DE TEMPLATES WHATSAPP - ADMIN
+// ============================================================================
+
+/**
+ * @route GET /api/admin/whatsapp-templates
+ * @desc Obtener todos los templates WhatsApp
+ * @access Private (ADMIN only)
+ */
+router.get('/whatsapp-templates', getTemplates);
+
+/**
+ * @route GET /api/admin/whatsapp-templates/:id
+ * @desc Obtener template específico por ID
+ * @access Private (ADMIN only)
+ */
+router.get('/whatsapp-templates/:id', getTemplate);
+
+/**
+ * @route POST /api/admin/whatsapp-templates
+ * @desc Crear nuevo template WhatsApp
+ * @access Private (ADMIN only)
+ * @body tipo, titulo, mensaje, activo?
+ */
+router.post('/whatsapp-templates', createTemplate);
+
+/**
+ * @route PUT /api/admin/whatsapp-templates/:id
+ * @desc Actualizar template WhatsApp existente
+ * @access Private (ADMIN only)
+ * @body titulo?, mensaje?, activo?
+ */
+router.put('/whatsapp-templates/:id', updateTemplate);
+
+/**
+ * @route DELETE /api/admin/whatsapp-templates/:id
+ * @desc Eliminar template WhatsApp
+ * @access Private (ADMIN only)
+ */
+router.delete('/whatsapp-templates/:id', deleteTemplate);
+
+/**
+ * @route PATCH /api/admin/whatsapp-templates/:id/toggle
+ * @desc Activar/desactivar template WhatsApp
+ * @access Private (ADMIN only)
+ * @body activo (boolean)
+ */
+router.patch('/whatsapp-templates/:id/toggle', toggleTemplate);
+
+/**
+ * @route POST /api/admin/whatsapp-templates/preview
+ * @desc Generar preview de template con datos ejemplo
+ * @access Private (ADMIN only)
+ * @body mensaje
+ */
+router.post('/whatsapp-templates/preview', previewTemplate);
+
+/**
+ * @route POST /api/admin/whatsapp-templates/initialize
+ * @desc Crear templates por defecto (setup inicial)
+ * @access Private (ADMIN only)
+ */
+router.post('/whatsapp-templates/initialize', initializeDefaultTemplates);
 
 export default router;

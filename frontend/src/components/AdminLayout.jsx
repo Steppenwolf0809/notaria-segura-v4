@@ -30,7 +30,10 @@ import {
   Brightness7 as LightModeIcon,
   KeyboardDoubleArrowLeft as CollapseIcon,
   KeyboardDoubleArrowRight as ExpandIcon,
-  Notifications as NotificationsIcon
+  Notifications as NotificationsIcon,
+  WhatsApp as WhatsAppIcon,
+  ExpandMore as ExpandMoreIcon,
+  ChevronRight as ChevronRightIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import useThemeStore from '../store/theme-store';
@@ -48,6 +51,7 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
+  const [configMenuOpen, setConfigMenuOpen] = useState(false);
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
   const { isDarkMode, toggleTheme } = useThemeStore();
 
@@ -57,12 +61,29 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
     if (savedCollapsed !== null) {
       setSidebarCollapsed(JSON.parse(savedCollapsed));
     }
+
+    const savedConfigOpen = localStorage.getItem('admin-config-menu-open');
+    if (savedConfigOpen !== null) {
+      setConfigMenuOpen(JSON.parse(savedConfigOpen));
+    }
   }, []);
+
+  // Mantener submenu de configuración abierto si estamos en una vista de configuración
+  useEffect(() => {
+    if (currentView === 'settings' || currentView === 'whatsapp-templates') {
+      setConfigMenuOpen(true);
+    }
+  }, [currentView]);
 
   // Guardar estado del sidebar en localStorage
   useEffect(() => {
     localStorage.setItem('admin-sidebar-collapsed', JSON.stringify(sidebarCollapsed));
   }, [sidebarCollapsed]);
+
+  // Guardar estado del submenu de configuración
+  useEffect(() => {
+    localStorage.setItem('admin-config-menu-open', JSON.stringify(configMenuOpen));
+  }, [configMenuOpen]);
 
   /**
    * Toggle del drawer móvil
@@ -113,18 +134,22 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
       icon: <NotificationsIcon />,
       view: 'notifications',
       active: currentView === 'notifications'
-    },
+    }
+  ];
+
+  /**
+   * Items del submenu de Configuración
+   */
+  const configSubmenuItems = [
     {
-      text: 'Config. Notificaciones',
-      icon: <SettingsIcon />,
-      view: 'notification-settings',
-      active: currentView === 'notification-settings'
-    },
-    {
-      text: 'Configuración',
-      icon: <SettingsIcon />,
+      text: 'General',
       view: 'settings',
       active: currentView === 'settings'
+    },
+    {
+      text: 'Templates WhatsApp',
+      view: 'whatsapp-templates', 
+      active: currentView === 'whatsapp-templates'
     }
   ];
 
@@ -251,6 +276,95 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
               </Tooltip>
             </ListItem>
           ))}
+
+          {/* Configuración con submenu */}
+          <ListItem disablePadding sx={{ mb: 0.5, flexDirection: 'column' }}>
+            {/* Botón principal de Configuración */}
+            <Tooltip title={sidebarCollapsed ? 'Configuración' : ''} placement="right">
+              <ListItemButton
+                onClick={() => setConfigMenuOpen(!configMenuOpen)}
+                sx={{
+                  borderRadius: 1,
+                  minHeight: 48,
+                  justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                  px: sidebarCollapsed ? 1 : 2,
+                  backgroundColor: (currentView === 'settings' || currentView === 'whatsapp-templates')
+                    ? (isDarkMode ? 'primary.dark' : 'rgba(255, 255, 255, 0.25)') 
+                    : 'transparent',
+                  color: 'inherit',
+                  '&:hover': {
+                    backgroundColor: (currentView === 'settings' || currentView === 'whatsapp-templates')
+                      ? (isDarkMode ? 'primary.main' : 'rgba(255, 255, 255, 0.35)') 
+                      : (isDarkMode ? 'action.hover' : 'rgba(255, 255, 255, 0.15)'),
+                  },
+                  transition: 'all 0.2s ease',
+                  width: '100%'
+                }}
+              >
+                <ListItemIcon
+                  sx={{
+                    color: 'inherit',
+                    minWidth: sidebarCollapsed ? 'auto' : 40,
+                    justifyContent: 'center',
+                  }}
+                >
+                  <SettingsIcon />
+                </ListItemIcon>
+                {!sidebarCollapsed && (
+                  <>
+                    <ListItemText 
+                      primary="Configuración"
+                      primaryTypographyProps={{
+                        fontSize: '0.875rem',
+                        fontWeight: (currentView === 'settings' || currentView === 'whatsapp-templates') ? 600 : 400,
+                        color: 'inherit'
+                      }}
+                    />
+                    <IconButton size="small" sx={{ color: 'inherit' }}>
+                      {configMenuOpen ? <ExpandMoreIcon /> : <ChevronRightIcon />}
+                    </IconButton>
+                  </>
+                )}
+              </ListItemButton>
+            </Tooltip>
+
+            {/* Submenu de Configuración */}
+            {!sidebarCollapsed && configMenuOpen && (
+              <List sx={{ pl: 2, width: '100%' }}>
+                {configSubmenuItems.map((subItem) => (
+                  <ListItem key={subItem.view} disablePadding>
+                    <ListItemButton
+                      onClick={() => handleNavigation(subItem.view)}
+                      sx={{
+                        borderRadius: 1,
+                        minHeight: 40,
+                        px: 2,
+                        backgroundColor: subItem.active 
+                          ? (isDarkMode ? 'primary.main' : 'rgba(255, 255, 255, 0.35)') 
+                          : 'transparent',
+                        color: 'inherit',
+                        '&:hover': {
+                          backgroundColor: subItem.active 
+                            ? (isDarkMode ? 'primary.light' : 'rgba(255, 255, 255, 0.45)') 
+                            : (isDarkMode ? 'action.hover' : 'rgba(255, 255, 255, 0.25)'),
+                        },
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      <ListItemText 
+                        primary={subItem.text}
+                        primaryTypographyProps={{
+                          fontSize: '0.8rem',
+                          fontWeight: subItem.active ? 600 : 400,
+                          color: 'inherit'
+                        }}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </ListItem>
         </List>
       </Box>
 

@@ -458,6 +458,165 @@ const adminService = {
     };
   },
 
+  // ============================================================================
+  // WHATSAPP TEMPLATES - Gestión de plantillas de mensajes
+  // ============================================================================
+
+  /**
+   * Obtener todos los templates WhatsApp
+   * @param {string} token - Token JWT del admin
+   * @returns {Promise<Object>} Lista de templates
+   */
+  getWhatsAppTemplates: async (token) => {
+    try {
+      const response = await api.get('/whatsapp-templates', {
+        headers: {
+          Authorization: `Bearer ${token || localStorage.getItem('token')}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      throw adminService.handleError(error);
+    }
+  },
+
+  /**
+   * Obtener template específico por ID
+   * @param {string} templateId - ID del template
+   * @param {string} token - Token JWT del admin
+   * @returns {Promise<Object>} Template específico
+   */
+  getWhatsAppTemplate: async (templateId, token) => {
+    try {
+      const response = await api.get(`/whatsapp-templates/${templateId}`, {
+        headers: {
+          Authorization: `Bearer ${token || localStorage.getItem('token')}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      throw adminService.handleError(error);
+    }
+  },
+
+  /**
+   * Crear nuevo template WhatsApp
+   * @param {Object} templateData - Datos del template
+   * @param {string} token - Token JWT del admin
+   * @returns {Promise<Object>} Template creado
+   */
+  createWhatsAppTemplate: async (templateData, token) => {
+    try {
+      const response = await api.post('/whatsapp-templates', templateData, {
+        headers: {
+          Authorization: `Bearer ${token || localStorage.getItem('token')}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      throw adminService.handleError(error);
+    }
+  },
+
+  /**
+   * Actualizar template WhatsApp existente
+   * @param {string} templateId - ID del template
+   * @param {Object} templateData - Datos actualizados
+   * @param {string} token - Token JWT del admin
+   * @returns {Promise<Object>} Template actualizado
+   */
+  updateWhatsAppTemplate: async (templateId, templateData, token) => {
+    try {
+      const response = await api.put(`/whatsapp-templates/${templateId}`, templateData, {
+        headers: {
+          Authorization: `Bearer ${token || localStorage.getItem('token')}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      throw adminService.handleError(error);
+    }
+  },
+
+  /**
+   * Eliminar template WhatsApp
+   * @param {string} templateId - ID del template
+   * @param {string} token - Token JWT del admin
+   * @returns {Promise<Object>} Confirmación de eliminación
+   */
+  deleteWhatsAppTemplate: async (templateId, token) => {
+    try {
+      const response = await api.delete(`/whatsapp-templates/${templateId}`, {
+        headers: {
+          Authorization: `Bearer ${token || localStorage.getItem('token')}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      throw adminService.handleError(error);
+    }
+  },
+
+  /**
+   * Activar/desactivar template WhatsApp
+   * @param {string} templateId - ID del template
+   * @param {boolean} activo - Estado del template
+   * @param {string} token - Token JWT del admin
+   * @returns {Promise<Object>} Template actualizado
+   */
+  toggleWhatsAppTemplate: async (templateId, activo, token) => {
+    try {
+      const response = await api.patch(`/whatsapp-templates/${templateId}/toggle`, 
+        { activo }, 
+        {
+          headers: {
+            Authorization: `Bearer ${token || localStorage.getItem('token')}`
+          }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw adminService.handleError(error);
+    }
+  },
+
+  /**
+   * Generar preview de template con datos ejemplo
+   * @param {Object} templateData - Datos del template para preview
+   * @param {string} token - Token JWT del admin
+   * @returns {Promise<Object>} Preview del mensaje
+   */
+  previewWhatsAppTemplate: async (templateData, token) => {
+    try {
+      const response = await api.post('/whatsapp-templates/preview', templateData, {
+        headers: {
+          Authorization: `Bearer ${token || localStorage.getItem('token')}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      throw adminService.handleError(error);
+    }
+  },
+
+  /**
+   * Inicializar templates por defecto
+   * @param {string} token - Token JWT del admin
+   * @returns {Promise<Object>} Templates creados
+   */
+  initializeWhatsAppTemplates: async (token) => {
+    try {
+      const response = await api.post('/whatsapp-templates/initialize', {}, {
+        headers: {
+          Authorization: `Bearer ${token || localStorage.getItem('token')}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      throw adminService.handleError(error);
+    }
+  },
+
   /**
    * Maneja errores de las peticiones HTTP
    * @param {Object} error - Error de axios

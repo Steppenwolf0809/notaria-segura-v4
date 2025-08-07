@@ -1,6 +1,7 @@
 import twilio from 'twilio';
 import { parsePhoneNumber } from 'libphonenumber-js';
 import { PrismaClient } from '@prisma/client';
+import { getActiveTemplateByType } from '../controllers/admin-whatsapp-templates-controller.js';
 
 const prisma = new PrismaClient();
 
@@ -122,7 +123,8 @@ class WhatsAppService {
     async enviarDocumentoListo(cliente, documento, codigo) {
         const clientName = cliente.clientName || cliente.nombre;
         const clientPhone = cliente.clientPhone || cliente.telefono;
-        const mensaje = this.generarMensajeDocumentoListo(cliente, documento, codigo);
+        // Usar template de BD o fallback a hardcodeado
+        const mensaje = await this.generarMensajeDocumentoListoFromTemplate(cliente, documento, codigo);
 
         // Preparar datos para guardar en BD
         const notificationData = {
@@ -204,10 +206,12 @@ class WhatsAppService {
     /**
      * Enviar mensaje de documento entregado
      */
-    async enviarDocumentoEntregado(cliente, documento, datosEntrega) {
-        const clientName = cliente.clientName || cliente.nombre;
-        const clientPhone = cliente.clientPhone || cliente.telefono;
-        const mensaje = this.generarMensajeDocumentoEntregado(cliente, documento, datosEntrega);
+    async enviarDocumentoEntregado(documento, datosEntrega) {
+        const cliente = {
+            clientName: documento.clientName,
+            clientPhone: documento.clientPhone
+        };
+        const mensaje = await this.generarMensajeDocumentoEntregadoFromTemplate(cliente, documento, datosEntrega);
 
         // 🔄 CONSERVADOR: Preparar datos para guardar en BD como enviarDocumentoListo
         const notificationData = {
@@ -220,7 +224,7 @@ class WhatsAppService {
 
         if (!this.isEnabled || !this.client) {
             // Modo simulación
-            const simulationResult = this.simularEnvio(cliente, documento, datosEntrega, 'documento_entregado');
+            const simulationResult = this.simularEnvio(documento, datosEntrega, 'documento_entregado');
             
             // 💾 Guardar como simulada
             await this.saveNotification({
@@ -279,7 +283,7 @@ class WhatsAppService {
             // En desarrollo, simular si falla el envío real
             if (this.isDevelopment) {
                 console.log('🔄 Fallback a simulación en desarrollo');
-                return this.simularEnvio(cliente, documento, datosEntrega, 'documento_entregado');
+                return this.simularEnvio(documento, datosEntrega, 'documento_entregado');
             }
             
             throw error;
@@ -363,6 +367,91 @@ class WhatsAppService {
             }
             
             throw error;
+        }
+    }
+
+    /**
+     * Reemplazar variables en template de mensaje
+     */
+    replaceTemplateVariables(templateMessage, variables) {
+        let mensaje = templateMessage;
+        
+        // Variables disponibles
+        const availableVariables = {
+            cliente: variables.cliente || 'Cliente',
+            documento: variables.documento || 'Documento',
+            codigo: variables.codigo || 'XXXX',
+            notaria: this.notariaConfig.nombre,
+            fecha: variables.fecha || new Date().toLocaleDateString('es-EC', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            }),
+            receptor_nombre: variables.receptor_nombre || '',
+            receptor_cedula: variables.receptor_cedula || '',
+            receptor_relacion: variables.receptor_relacion || '',
+        };
+
+        // Reemplazar cada variable
+        Object.keys(availableVariables).forEach(variable => {
+            const regex = new RegExp(`\\{${variable}\\}`, 'g');
+            mensaje = mensaje.replace(regex, availableVariables[variable]);
+        });
+
+        return mensaje;
+    }
+
+    /**
+     * Generar mensaje para documento individual listo usando template de BD
+     */
+    async generarMensajeDocumentoListoFromTemplate(cliente, documento, codigo) {
+        try {
+            const template = await getActiveTemplateByType('DOCUMENTO_LISTO');
+            
+            const variables = {
+                cliente: cliente.nombre || cliente.clientName || 'Cliente',
+                documento: documento.tipo_documento || documento.tipoDocumento || 'Documento',
+                codigo: codigo
+            };
+
+            return this.replaceTemplateVariables(template.mensaje, variables);
+        } catch (error) {
+            console.error('Error usando template de BD, usando fallback:', error);
+            // Fallback al método original
+            return this.generarMensajeDocumentoListo(cliente, documento, codigo);
+        }
+    }
+
+    /**
+     * Generar mensaje para documento entregado usando template de BD
+     */
+    async generarMensajeDocumentoEntregadoFromTemplate(cliente, documento, datosEntrega) {
+        try {
+            const template = await getActiveTemplateByType('DOCUMENTO_ENTREGADO');
+            
+            const variables = {
+                cliente: cliente.nombre || cliente.clientName || 'Cliente',
+                documento: documento.tipo_documento || documento.tipoDocumento || 'Documento',
+                codigo: datosEntrega.codigo || '',
+                fecha: new Date().toLocaleDateString('es-EC', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                }),
+                receptor_nombre: datosEntrega.entregadoA || '',
+                receptor_cedula: datosEntrega.cedulaReceptor || '',
+                receptor_relacion: datosEntrega.relacionTitular || '',
+            };
+
+            return this.replaceTemplateVariables(template.mensaje, variables);
+        } catch (error) {
+            console.error('Error usando template de BD, usando fallback:', error);
+            // Fallback al método original
+            return this.generarMensajeDocumentoEntregado(cliente, documento, datosEntrega);
         }
     }
 
@@ -452,11 +541,12 @@ Sus documentos están listos para retiro:
     /**
      * Simular envío para desarrollo/testing
      */
-    simularEnvio(cliente, documento, datos, tipo) {
-        const numeroSimulado = this.formatPhoneNumber(cliente.telefono || cliente.clientPhone) || 
+    simularEnvio(documento, datos, tipo) {
+        const numeroSimulado = this.formatPhoneNumber(documento.clientPhone) || 
                               `whatsapp:+593987654321`;
         
         let mensaje;
+        let cliente = { clientName: documento.clientName };
         switch (tipo) {
             case 'documento_listo':
                 mensaje = this.generarMensajeDocumentoListo(cliente, documento, datos);
