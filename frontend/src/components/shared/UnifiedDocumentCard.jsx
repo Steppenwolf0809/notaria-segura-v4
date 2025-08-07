@@ -107,6 +107,14 @@ const UnifiedDocumentCard = ({
           newStatus: 'LISTO'
         };
       }
+      if (status === 'LISTO') {
+        return {
+          text: 'Entregar',
+          color: 'primary',
+          icon: <EntregarIcon sx={{ fontSize: 16 }} />,
+          newStatus: 'ENTREGADO'
+        };
+      }
     }
     
     if (role === 'archivo') {
