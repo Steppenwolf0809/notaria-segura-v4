@@ -1566,11 +1566,11 @@ async function deliverDocument(req, res) {
       observacionesEntrega
     } = req.body;
 
-    // Verificar que el usuario sea RECEPCION, ADMIN o CAJA
-    if (!['RECEPCION', 'ADMIN', 'CAJA'].includes(req.user.role)) {
+    // Verificar que el usuario sea RECEPCION, ADMIN, CAJA o MATRIZADOR
+    if (!['RECEPCION', 'ADMIN', 'CAJA', 'MATRIZADOR'].includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: 'Solo RECEPCIÓN puede entregar documentos'
+        message: 'Solo RECEPCIÓN y MATRIZADORES pueden entregar documentos'
       });
     }
 
@@ -1604,6 +1604,17 @@ async function deliverDocument(req, res) {
         success: false,
         message: 'Documento no encontrado'
       });
+    }
+
+    // Validar permisos específicos por rol
+    if (req.user.role === 'MATRIZADOR') {
+      // Los matrizadores solo pueden entregar sus propios documentos
+      if (document.assignedToId !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          message: 'Solo puedes entregar documentos asignados a ti'
+        });
+      }
     }
 
     // Verificar que el documento esté LISTO

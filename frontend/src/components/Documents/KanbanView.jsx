@@ -12,7 +12,14 @@ import {
   Paper,
   Button,
   Snackbar,
-  Alert
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Grid,
+  CircularProgress
 } from '@mui/material';
 import {
   Schedule as ScheduleIcon,
@@ -22,7 +29,8 @@ import {
   Info as InfoIcon,
   Phone as PhoneIcon,
   Link as LinkIcon,
-  Edit as EditIcon
+  Edit as EditIcon,
+  Close as CloseIcon
 } from '@mui/icons-material';
 import useDocumentStore from '../../store/document-store';
 import useDragAndDrop from '../../hooks/useDragAndDrop';
@@ -66,6 +74,10 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
   // Estados para agrupación
   const [groupingLoading, setGroupingLoading] = useState(false);
   const [groupingSuccess, setGroupingSuccess] = useState(null);
+  
+  // Estados para modal de entrega de matrizador
+  const [showMatrizadorDeliveryModal, setShowMatrizadorDeliveryModal] = useState(false);
+  const [documentForDelivery, setDocumentForDelivery] = useState(null);
 
   // Callback para manejar requerimientos de confirmación
   const handleConfirmationRequired = useCallback((data) => {
@@ -321,7 +333,14 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
    */
   const handleAdvanceStatus = async (document, newStatus) => {
     try {
-      // Para el rol matrizador, usar la lógica existente de confirmación
+      // Si es para entregar documento (LISTO -> ENTREGADO), abrir modal de entrega
+      if (newStatus === 'ENTREGADO' && document.status === 'LISTO') {
+        setDocumentForDelivery(document);
+        setShowMatrizadorDeliveryModal(true);
+        return;
+      }
+
+      // Para otros cambios de estado, usar la lógica existente de confirmación
       const confirmationData = {
         document,
         newStatus,
@@ -465,6 +484,30 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
     setLastChangeInfo(null);
   }, []);
 
+  /**
+   * Manejar entrega exitosa desde modal de matrizador
+   */
+  const handleMatrizadorDelivered = useCallback((deliveryData) => {
+    console.log('📝 Documento entregado por matrizador:', deliveryData);
+    
+    // Actualizar documento en el store si se proporciona
+    if (deliveryData && deliveryData.document) {
+      updateDocument(deliveryData.document.id, deliveryData.document);
+    }
+    
+    // Cerrar modal
+    setShowMatrizadorDeliveryModal(false);
+    setDocumentForDelivery(null);
+  }, [updateDocument]);
+
+  /**
+   * Cerrar modal de entrega de matrizador
+   */
+  const handleCloseMatrizadorDeliveryModal = useCallback(() => {
+    setShowMatrizadorDeliveryModal(false);
+    setDocumentForDelivery(null);
+  }, []);
+
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Kanban Board con estilo de Archivo */}
@@ -605,6 +648,14 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
         autoHideDelay={10000}
       />
 
+      {/* Modal de Entrega Simplificado para Matrizadores */}
+      <MatrizadorDeliveryModal
+        open={showMatrizadorDeliveryModal}
+        onClose={handleCloseMatrizadorDeliveryModal}
+        document={documentForDelivery}
+        onDocumentDelivered={handleMatrizadorDelivered}
+      />
+
       {/* Snackbar para éxito de agrupación */}
       <Snackbar
         open={!!groupingSuccess}
@@ -649,6 +700,184 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
         </Alert>
       </Snackbar>
     </Box>
+  );
+};
+
+/**
+ * Modal Simplificado de Entrega para Matrizadores en Kanban
+ * Solo requiere información básica, sin códigos de verificación
+ */
+const MatrizadorDeliveryModal = ({ open, onClose, document, onDocumentDelivered }) => {
+  const [formData, setFormData] = React.useState({
+    entregadoA: '',
+    observacionesEntrega: ''
+  });
+  const [saving, setSaving] = React.useState(false);
+  const [errors, setErrors] = React.useState([]);
+
+  // Resetear formulario cuando se abre el modal
+  React.useEffect(() => {
+    if (open) {
+      setFormData({
+        entregadoA: '',
+        observacionesEntrega: ''
+      });
+      setErrors([]);
+    }
+  }, [open]);
+
+  const handleFieldChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    setErrors([]);
+  };
+
+  const handleDeliver = async () => {
+    // Validaciones simplificadas
+    const validationErrors = [];
+    
+    if (!formData.entregadoA.trim()) {
+      validationErrors.push('Nombre de quien retira es obligatorio');
+    }
+
+    if (validationErrors.length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
+    setSaving(true);
+    setErrors([]);
+
+    try {
+      // Preparar datos simplificados para matrizador
+      const deliveryData = {
+        entregadoA: formData.entregadoA.trim(),
+        relacionTitular: 'titular', // Por defecto para matrizadores
+        verificacionManual: true, // Siempre manual para matrizadores
+        codigoVerificacion: '', // Sin código para matrizadores
+        facturaPresenta: false, // Sin validación de factura
+        observacionesEntrega: formData.observacionesEntrega.trim()
+      };
+
+      const result = await documentService.deliverDocument(document.id, deliveryData);
+      
+      if (result.success) {
+        // Notificar al componente padre
+        if (onDocumentDelivered) {
+          onDocumentDelivered(result.data);
+        }
+        
+        // Mostrar mensaje de éxito
+        const message = result.message || 'Documento entregado exitosamente';
+        alert(message);
+        onClose();
+      } else {
+        setErrors([result.message || 'Error al entregar documento']);
+      }
+    } catch (error) {
+      console.error('Error entregando documento:', error);
+      setErrors(['Error de conexión al entregar el documento']);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!document) return null;
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <LocalShippingIcon color="primary" />
+            <Typography variant="h6">Entregar Documento</Typography>
+          </Box>
+          <IconButton onClick={onClose} disabled={saving}>
+            <CloseIcon />
+          </IconButton>
+        </Box>
+      </DialogTitle>
+
+      <DialogContent>
+        <Box sx={{ mt: 2 }}>
+          {/* Información del documento */}
+          <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+              📄 Documento a Entregar
+            </Typography>
+            <Typography variant="body2">
+              <strong>Número:</strong> {document.protocolNumber} | 
+              <strong> Tipo:</strong> {document.documentType} | 
+              <strong> Cliente:</strong> {document.clientName}
+            </Typography>
+          </Box>
+
+          {/* Errores */}
+          {errors.length > 0 && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              <ul style={{ margin: 0, paddingLeft: '20px' }}>
+                {errors.map((error, index) => (
+                  <li key={index}>{error}</li>
+                ))}
+              </ul>
+            </Alert>
+          )}
+
+          {/* Formulario simplificado */}
+          <Grid container spacing={2}>
+            {/* Quien retira */}
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                required
+                label="Persona que Retira"
+                value={formData.entregadoA}
+                onChange={(e) => handleFieldChange('entregadoA', e.target.value)}
+                placeholder="Nombre completo"
+                disabled={saving}
+              />
+            </Grid>
+
+            {/* Observaciones */}
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                multiline
+                rows={3}
+                label="Observaciones de Entrega"
+                value={formData.observacionesEntrega}
+                onChange={(e) => handleFieldChange('observacionesEntrega', e.target.value)}
+                placeholder="Notas adicionales sobre la entrega (opcional)"
+                disabled={saving}
+              />
+            </Grid>
+          </Grid>
+
+          {/* Nota informativa */}
+          <Alert severity="info" sx={{ mt: 2 }}>
+            <Typography variant="body2">
+              ℹ️ Entrega simplificada para matrizadores: No requiere código de verificación ni validación de factura.
+            </Typography>
+          </Alert>
+        </Box>
+      </DialogContent>
+
+      <DialogActions sx={{ p: 2, gap: 1 }}>
+        <Button onClick={onClose} disabled={saving} variant="outlined">
+          Cancelar
+        </Button>
+        <Button
+          onClick={handleDeliver}
+          disabled={saving}
+          variant="contained"
+          startIcon={saving ? <CircularProgress size={16} /> : <LocalShippingIcon />}
+        >
+          {saving ? 'Entregando...' : 'Entregar Documento'}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 };
 
