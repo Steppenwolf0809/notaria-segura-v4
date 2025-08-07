@@ -71,3 +71,6 @@ Thumbs.db
 # Railway
 .railway/ 
 /src/generated/prisma
+
+#claudecode
+CLAUDE.md
