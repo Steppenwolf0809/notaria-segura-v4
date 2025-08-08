@@ -378,7 +378,7 @@ async function procesarEntregaDocumento(req, res) {
       });
     }
 
-    // Buscar documento y verificar que pertenece al archivo
+    // Buscar documento y verificar que pertenece al archivo (con información de grupo)
     const documento = await prisma.document.findFirst({
       where: {
         id,
@@ -387,6 +387,12 @@ async function procesarEntregaDocumento(req, res) {
       include: {
         assignedTo: {
           select: { firstName: true, lastName: true }
+        },
+        // 🔗 NUEVA FUNCIONALIDAD: Incluir información de grupo
+        documentGroup: {
+          include: {
+            documents: true
+          }
         }
       }
     });
@@ -423,7 +429,69 @@ async function procesarEntregaDocumento(req, res) {
       }
     }
 
-    // Actualizar documento con información de entrega
+    // 🔗 NUEVA FUNCIONALIDAD: Si el documento está agrupado, entregar todos los documentos del grupo
+    let groupDocuments = [];
+    if (documento.isGrouped && documento.documentGroupId) {
+      console.log(`🔗 ARQUIVO: Documento ${documento.protocolNumber} está agrupado, entregando grupo completo`);
+      
+      // Buscar todos los documentos del grupo que estén LISTO
+      const groupDocsToDeliver = await prisma.document.findMany({
+        where: {
+          documentGroupId: documento.documentGroupId,
+          status: 'LISTO',
+          id: { not: id }, // Excluir el documento actual
+          isGrouped: true
+        }
+      });
+
+      if (groupDocsToDeliver.length > 0) {
+        console.log(`🚚 ARQUIVO: Entregando ${groupDocsToDeliver.length + 1} documentos del grupo automáticamente`);
+        
+        // Actualizar todos los documentos del grupo
+        await prisma.document.updateMany({
+          where: {
+            id: { in: groupDocsToDeliver.map(doc => doc.id) }
+          },
+          data: {
+            status: 'ENTREGADO',
+            entregadoA,
+            cedulaReceptor,
+            relacionTitular,
+            verificacionManual: verificacionManual || false,
+            facturaPresenta: facturaPresenta || false,
+            fechaEntrega: new Date(),
+            usuarioEntregaId: userId,
+            observacionesEntrega: observaciones || `Entregado grupalmente junto con ${documento.protocolNumber} por ARQUIVO`
+          }
+        });
+
+        // Registrar eventos para todos los documentos del grupo
+        for (const doc of groupDocsToDeliver) {
+          await prisma.documentEvent.create({
+            data: {
+              documentId: doc.id,
+              userId: userId,
+              eventType: 'DOCUMENTO_ENTREGADO',
+              description: `Documento entregado grupalmente por ARQUIVO a ${entregadoA}`,
+              metadata: {
+                entregadoA,
+                cedulaReceptor,
+                relacionTitular,
+                verificacionManual: verificacionManual || false,
+                facturaPresenta: facturaPresenta || false,
+                deliveredWith: documento.protocolNumber,
+                groupDelivery: true,
+                deliveredBy: 'ARQUIVO'
+              }
+            }
+          });
+        }
+
+        groupDocuments = groupDocsToDeliver;
+      }
+    }
+
+    // Actualizar documento principal con información de entrega
     const documentoActualizado = await prisma.document.update({
       where: { id },
       data: {
@@ -490,8 +558,11 @@ async function procesarEntregaDocumento(req, res) {
       }
     }
 
-    // Preparar mensaje de respuesta
-    let message = 'Documento entregado exitosamente';
+    // Preparar mensaje de respuesta (incluir información de grupo)
+    let message = groupDocuments.length > 0 
+      ? `Grupo de ${groupDocuments.length + 1} documentos entregado exitosamente` 
+      : 'Documento entregado exitosamente';
+    
     if (whatsappSent) {
       message += ' y notificación WhatsApp enviada';
     } else if (documentoActualizado.clientPhone && whatsappError) {
@@ -503,6 +574,16 @@ async function procesarEntregaDocumento(req, res) {
       message,
       data: {
         documento: documentoActualizado,
+        // 🔗 NUEVA FUNCIONALIDAD: Información de entrega grupal
+        groupDelivery: {
+          wasGroupDelivery: groupDocuments.length > 0,
+          totalDocuments: groupDocuments.length + 1,
+          groupDocuments: groupDocuments.map(doc => ({
+            id: doc.id,
+            protocolNumber: doc.protocolNumber,
+            documentType: doc.documentType
+          }))
+        },
         entrega: {
           entregadoA,
           cedulaReceptor,

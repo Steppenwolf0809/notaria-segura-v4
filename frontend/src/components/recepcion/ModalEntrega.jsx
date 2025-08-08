@@ -105,6 +105,11 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
       const result = await service.procesarEntrega(documento.id, formData);
 
       if (result.success) {
+        // 🔗 NUEVA FUNCIONALIDAD: Mostrar información de entrega grupal si aplica
+        const groupInfo = result.data?.groupDelivery;
+        if (groupInfo?.wasGroupDelivery) {
+          console.log(`✅ Entrega grupal exitosa: ${groupInfo.totalDocuments} documentos entregados`);
+        }
         onEntregaExitosa();
       } else {
         setError(result.error || 'Error procesando entrega');
@@ -126,6 +131,23 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
       </DialogTitle>
       <DialogContent dividers>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        
+        {/* 🔗 NUEVA FUNCIONALIDAD: Alerta de entrega grupal */}
+        {documento.isGrouped && (
+          <Alert 
+            severity="info" 
+            sx={{ mb: 2 }}
+            icon={<Box component="span">📦</Box>}
+          >
+            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+              ⚡ Entrega Grupal Automática
+            </Typography>
+            <Typography variant="body2">
+              Este documento es parte de un grupo. Al procesarlo, se entregarán automáticamente 
+              TODOS los documentos del grupo que estén listos.
+            </Typography>
+          </Alert>
+        )}
         
         <Box sx={{ p: 2, bgcolor: (theme) => theme.palette.background.default, borderRadius: 2, mb: 3 }}>
           <Typography variant="h6" sx={{ mb: 1 }}>
