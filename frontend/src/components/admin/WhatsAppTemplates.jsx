@@ -227,9 +227,33 @@ const WhatsAppTemplates = () => {
   };
   
   const insertVariable = (variable) => {
-    const newText = `${formData.mensaje || ''}{${variable}}`;
-    setFormData(prev => ({...prev, mensaje: newText}));
-    generatePreview(newText);
+    const textarea = document.getElementById('mensaje');
+    if (!textarea) {
+      // Fallback si no se encuentra el textarea
+      const newText = `${formData.mensaje || ''}{${variable}}`;
+      setFormData(prev => ({...prev, mensaje: newText}));
+      generatePreview(newText);
+      return;
+    }
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const currentMessage = formData.mensaje || '';
+    
+    // Insertar la variable en la posición del cursor
+    const newMessage = currentMessage.substring(0, start) + 
+                      `{${variable}}` + 
+                      currentMessage.substring(end);
+    
+    setFormData(prev => ({...prev, mensaje: newMessage}));
+    generatePreview(newMessage);
+
+    // Restaurar el foco y posicionar el cursor después de la variable insertada
+    setTimeout(() => {
+      textarea.focus();
+      const newCursorPosition = start + `{${variable}}`.length;
+      textarea.setSelectionRange(newCursorPosition, newCursorPosition);
+    }, 0);
   };
 
   return (

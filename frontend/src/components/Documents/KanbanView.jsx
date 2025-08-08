@@ -45,6 +45,7 @@ import UnifiedDocumentCard from '../shared/UnifiedDocumentCard';
 // NUEVOS COMPONENTES: Sistema de confirmaciones y deshacer
 import ConfirmationModal from './ConfirmationModal';
 import UndoToast from './UndoToast';
+import GroupInfoModal from '../shared/GroupInfoModal';
 import { filterRecentlyDelivered, getDeliveryFilterNote, DELIVERY_FILTER_PERIODS } from '../../utils/dateUtils';
 import './KanbanView.css';
 
@@ -53,7 +54,7 @@ import './KanbanView.css';
  * Columnas lado a lado con scroll horizontal si es necesario
  */
 const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
-  const { getDocumentsByStatus, documents, undoDocumentStatusChange, createDocumentGroup, updateDocument } = useDocumentStore();
+  const { getDocumentsByStatus, documents, undoDocumentStatusChange, createDocumentGroup, updateDocument, updateDocumentStatusWithConfirmation, requiresConfirmation } = useDocumentStore();
   
   // Estados para modales y componentes
   const [selectedDocument, setSelectedDocument] = useState(null);
@@ -78,6 +79,10 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
   // Estados para modal de entrega de matrizador
   const [showMatrizadorDeliveryModal, setShowMatrizadorDeliveryModal] = useState(false);
   const [documentForDelivery, setDocumentForDelivery] = useState(null);
+  
+  // Estados para modal de información de grupo
+  const [groupInfoModalOpen, setGroupInfoModalOpen] = useState(false);
+  const [selectedGroupDocument, setSelectedGroupDocument] = useState(null);
 
   // Callback para manejar requerimientos de confirmación
   const handleConfirmationRequired = useCallback((data) => {
@@ -290,6 +295,8 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
                   onOpenDetail={openDetailModal}
                   onOpenEdit={openEditModal}
                   onAdvanceStatus={handleAdvanceStatus}
+                  onGroupDocuments={handleGroupDocuments}
+                  onShowGroupInfo={openGroupInfoModal}
                   isDragging={isDragging && draggedItem?.id === document.id}
                   dragHandlers={{
                     onDragStart: (event) => handleDragStart(event, document),
@@ -328,30 +335,148 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
     setDocumentToEdit(null);
   };
 
+  // Handlers para modal de información de grupo
+  const openGroupInfoModal = (document) => {
+    setSelectedGroupDocument(document);
+    setGroupInfoModalOpen(true);
+  };
+
+  const closeGroupInfoModal = () => {
+    setGroupInfoModalOpen(false);
+    setSelectedGroupDocument(null);
+  };
+
   /**
    * Manejar avance de estado para el rol Matrizador
+   * UNIFICADO: Usa el mismo sistema de confirmaciones que drag and drop
    */
   const handleAdvanceStatus = async (document, newStatus) => {
     try {
+      console.log('🚀 handleAdvanceStatus iniciado:', { documentId: document.id, currentStatus: document.status, newStatus });
+      
       // Si es para entregar documento (LISTO -> ENTREGADO), abrir modal de entrega
       if (newStatus === 'ENTREGADO' && document.status === 'LISTO') {
+        console.log('🎯 Abriendo modal de entrega directa');
         setDocumentForDelivery(document);
         setShowMatrizadorDeliveryModal(true);
         return;
       }
 
-      // Para otros cambios de estado, usar la lógica existente de confirmación
-      const confirmationData = {
-        document,
-        newStatus,
-        oldStatus: document.status,
-        action: 'advance'
-      };
+      // UNIFICADO: Usar el mismo sistema de confirmaciones que drag and drop
+      console.log('🔄 Verificando si requiere confirmación...');
+      const confirmationInfo = requiresConfirmation(document.status, newStatus);
       
-      setConfirmationData(confirmationData);
-      setConfirmationModalOpen(true);
+      // 🔗 DETECCIÓN DE GRUPO: El botón debe detectar si el documento está agrupado
+      const isDocumentGrouped = document.isGrouped && document.documentGroupId;
+      const groupSize = isDocumentGrouped ? 
+        documents.filter(doc => doc.documentGroupId === document.documentGroupId && doc.isGrouped).length : 
+        1;
+      
+      console.log('🔗 Información de agrupación desde botón:', {
+        isGrouped: isDocumentGrouped,
+        groupId: document.documentGroupId,
+        groupSize,
+        documentId: document.id
+      });
+      
+      if (confirmationInfo.requiresConfirmation) {
+        console.log('⚠️ Cambio requiere confirmación, usando handleConfirmationRequired');
+        
+        // Usar el callback del hook useDragAndDrop que SÍ incluye onConfirm
+        handleConfirmationRequired({
+          document,
+          currentStatus: document.status,
+          newStatus,
+          confirmationInfo,
+          isGroupMove: isDocumentGrouped, // 🔗 CORREGIDO: Detectar si es grupo
+          groupSize: groupSize, // 🔗 CORREGIDO: Tamaño real del grupo
+          onConfirm: async (confirmationData) => {
+            console.log('🎯 onConfirm ejecutándose desde botón:', confirmationData);
+            console.log('🔗 Es movimiento de grupo:', isDocumentGrouped);
+            
+            // 🔗 LÓGICA UNIFICADA: Si es grupo, usar lógica de grupo
+            if (isDocumentGrouped) {
+              console.log('🔗 Usando lógica de grupo desde botón');
+              // Obtener todos los documentos del grupo
+              const groupDocuments = documents.filter(doc => 
+                doc.documentGroupId === document.documentGroupId && doc.isGrouped
+              );
+              
+              // Usar el servicio de grupo (necesito importar updateDocumentGroupStatus)
+              const documentService = await import('../../services/document-service.js');
+              const result = await documentService.default.updateDocumentGroupStatus(
+                document.documentGroupId,
+                confirmationData.newStatus,
+                { 
+                  reversionReason: confirmationData.reversionReason,
+                  deliveredTo: confirmationData.deliveredTo
+                }
+              );
+              
+              if (result.success) {
+                // Actualizar todos los documentos del grupo en el store local
+                result.data.documents?.forEach(updatedDoc => {
+                  updateDocument(updatedDoc.id, updatedDoc);
+                });
+              }
+              
+              return result;
+            } else {
+              // Lógica individual
+              const result = await updateDocumentStatusWithConfirmation(
+                confirmationData.document.id,
+                confirmationData.newStatus,
+                { 
+                  reversionReason: confirmationData.reversionReason,
+                  deliveredTo: confirmationData.deliveredTo
+                }
+              );
+              
+              console.log('📊 Resultado de updateDocumentStatusWithConfirmation:', result);
+              return result;
+            }
+          },
+          onCancel: () => {
+            console.log('🚫 Cambio cancelado desde botón');
+          }
+        });
+      } else {
+        console.log('✅ Cambio no requiere confirmación, ejecutando directamente');
+        
+        // 🔗 LÓGICA UNIFICADA: También aplicar detección de grupo sin confirmación
+        if (isDocumentGrouped) {
+          console.log('🔗 Ejecutando cambio de grupo sin confirmación');
+          
+          // Usar el servicio de grupo
+          const documentService = await import('../../services/document-service.js');
+          const result = await documentService.default.updateDocumentGroupStatus(
+            document.documentGroupId,
+            newStatus
+          );
+          
+          if (result.success) {
+            console.log('✅ Cambio de grupo exitoso sin confirmación');
+            // Actualizar todos los documentos del grupo en el store local
+            result.data.documents?.forEach(updatedDoc => {
+              updateDocument(updatedDoc.id, updatedDoc);
+            });
+          } else {
+            console.error('❌ Error en cambio de grupo sin confirmación:', result.error);
+          }
+        } else {
+          // Ejecutar cambio individual sin confirmación
+          const result = await updateDocumentStatusWithConfirmation(document.id, newStatus);
+          
+          if (result.success) {
+            console.log('✅ Cambio individual exitoso sin confirmación');
+          } else {
+            console.error('❌ Error en cambio individual sin confirmación:', result.error);
+          }
+        }
+      }
+      
     } catch (error) {
-      console.error('Error al avanzar estado:', error);
+      console.error('💥 Error al avanzar estado:', error);
     }
   };
 
@@ -508,6 +633,22 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
     setDocumentForDelivery(null);
   }, []);
 
+  /**
+   * Manejar agrupación inteligente para matrizador
+   */
+  const handleGroupDocuments = useCallback((groupableDocuments, mainDocument) => {
+    console.log('🔗 Matrizador: Activando agrupación inteligente:', {
+      main: mainDocument.protocolNumber,
+      groupable: groupableDocuments.map(d => d.protocolNumber)
+    });
+    
+    setPendingGroupData({
+      main: mainDocument,
+      related: groupableDocuments
+    });
+    setShowQuickGroupingModal(true);
+  }, []);
+
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Kanban Board con estilo de Archivo */}
@@ -646,6 +787,13 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
         onUndo={handleUndo}
         changeInfo={lastChangeInfo}
         autoHideDelay={10000}
+      />
+
+      {/* Modal de información de grupo */}
+      <GroupInfoModal
+        open={groupInfoModalOpen}
+        onClose={closeGroupInfoModal}
+        document={selectedGroupDocument}
       />
 
       {/* Modal de Entrega Simplificado para Matrizadores */}

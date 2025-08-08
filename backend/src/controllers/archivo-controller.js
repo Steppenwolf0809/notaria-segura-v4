@@ -156,6 +156,9 @@ async function cambiarEstadoDocumento(req, res) {
       where: {
         id,
         assignedToId: userId
+      },
+      include: {
+        documentGroup: true
       }
     });
 
@@ -186,8 +189,13 @@ async function cambiarEstadoDocumento(req, res) {
     // Si se marca como LISTO, generar código de retiro
     let codigoGenerado = null;
     if (nuevoEstado === 'LISTO' && !documento.codigoRetiro) {
-      codigoGenerado = await CodigoRetiroService.generarUnico();
-      updateData.codigoRetiro = codigoGenerado;
+      // Para documentos agrupados, usar el código del grupo si existe
+      if (documento.isGrouped && documento.documentGroup?.verificationCode) {
+        updateData.codigoRetiro = documento.documentGroup.verificationCode;
+      } else {
+        codigoGenerado = await CodigoRetiroService.generarUnico();
+        updateData.codigoRetiro = codigoGenerado;
+      }
     }
 
     // Si se marca como ENTREGADO, registrar datos de entrega simplificada
@@ -198,11 +206,43 @@ async function cambiarEstadoDocumento(req, res) {
       updateData.relacionTitular = 'directo';
     }
 
-    // Actualizar estado
-    const documentoActualizado = await prisma.document.update({
-      where: { id },
-      data: updateData
-    });
+    // 🔗 NUEVA FUNCIONALIDAD: Sincronización grupal
+    let documentosActualizados = [];
+    
+    if (documento.isGrouped && documento.documentGroupId) {
+      console.log(`🔗 Documento ${id} es parte de un grupo, sincronizando cambio de estado...`);
+      
+      // Actualizar todos los documentos del grupo
+      await prisma.document.updateMany({
+        where: {
+          documentGroupId: documento.documentGroupId,
+          isGrouped: true,
+          assignedToId: userId // Solo documentos asignados al mismo usuario
+        },
+        data: updateData
+      });
+      
+      // Obtener todos los documentos actualizados del grupo
+      documentosActualizados = await prisma.document.findMany({
+        where: {
+          documentGroupId: documento.documentGroupId,
+          isGrouped: true,
+          assignedToId: userId
+        }
+      });
+      
+      console.log(`✅ Sincronizados ${documentosActualizados.length} documentos del grupo`);
+    } else {
+      // Actualizar solo el documento individual
+      const documentoActualizado = await prisma.document.update({
+        where: { id },
+        data: updateData
+      });
+      documentosActualizados = [documentoActualizado];
+    }
+
+    // Usar el primer documento para las notificaciones (en grupos, todos son iguales)
+    const documentoActualizado = documentosActualizados[0];
 
     // 📱 ENVIAR NOTIFICACIÓN WHATSAPP si se marca como LISTO
     let whatsappSent = false;
@@ -277,14 +317,22 @@ async function cambiarEstadoDocumento(req, res) {
       }
     }
 
+    // Preparar respuesta con información de sincronización
+    const totalSincronizados = documentosActualizados.length;
+    const mensajeBase = totalSincronizados > 1 
+      ? `${totalSincronizados} documentos del grupo ${nuevoEstado.toLowerCase()}s`
+      : `Documento ${nuevoEstado.toLowerCase()}`;
+
     res.json({
       success: true,
       data: { 
         documento: documentoActualizado,
+        documentosSincronizados: totalSincronizados,
+        esGrupo: totalSincronizados > 1,
         codigoGenerado,
         whatsappSent 
       },
-      message: `Documento ${nuevoEstado.toLowerCase()}${codigoGenerado ? ` - Código: ${codigoGenerado}` : ''}`
+      message: `${mensajeBase}${codigoGenerado ? ` - Código: ${codigoGenerado}` : ''}`
     });
 
   } catch (error) {

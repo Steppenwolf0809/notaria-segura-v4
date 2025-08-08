@@ -7,35 +7,53 @@ class DocumentGroupingService {
    * Detecta documentos EN_PROCESO del mismo cliente que pueden agruparse
    */
   async detectGroupableDocuments(clientData, matrizadorId) {
-    const { clientName, clientPhone } = clientData;
+    const { clientName, clientId } = clientData;
 
     // Buscar documentos del mismo matrizador que:
-    // 1. Están EN_PROCESO (no LISTO)
-    // 2. Mismo cliente (por teléfono o nombre exacto)
+    // 1. Están EN_PROCESO o LISTO (pueden agruparse)
+    // 2. Mismo cliente (por nombre Y cédula/RUC - NUNCA por teléfono)
     // 3. No están ya agrupados
     const whereConditions = {
       assignedToId: matrizadorId,
-      status: 'EN_PROCESO',
+      status: { in: ['EN_PROCESO', 'LISTO'] },
       isGrouped: false
     };
 
-    // Construir condiciones OR para cliente
-    const orConditions = [];
-    
-    if (clientPhone) {
-      orConditions.push({ clientPhone: clientPhone });
+    // CRITERIO PRINCIPAL: Nombre del cliente (exacto) - OBLIGATORIO
+    if (clientName) {
+      whereConditions.clientName = clientName.trim();
+    } else {
+      console.warn('⚠️ DocumentGroupingService: clientName es obligatorio');
+      return [];
     }
     
-    if (clientName) {
-      orConditions.push({ clientName: clientName });
+    // CRITERIO SECUNDARIO: ID cliente (cualquier identificación: cédula, RUC, pasaporte) - OPCIONAL pero recomendado
+    if (clientId && clientId.trim()) {
+      whereConditions.clientId = clientId.trim();
+    } else {
+      console.warn('⚠️ DocumentGroupingService: Sin ID cliente, agrupando solo por nombre (menos preciso)');
     }
 
-    if (orConditions.length > 0) {
-      whereConditions.OR = orConditions;
-    }
+    console.log('🔍 DocumentGroupingService: Buscando documentos agrupables con criterios:', {
+      clientName,
+      clientId,
+      matrizadorId,
+      whereConditions: JSON.stringify(whereConditions, null, 2)
+    });
 
     const groupableDocuments = await prisma.document.findMany({
       where: whereConditions
+    });
+
+    console.log('📋 DocumentGroupingService: Documentos encontrados:', {
+      count: groupableDocuments.length,
+      documentos: groupableDocuments.map(d => ({
+        protocolo: d.protocolNumber,
+        cliente: d.clientName,
+        clientId: d.clientId,
+        telefono: d.clientPhone,
+        id: d.id
+      }))
     });
 
     return groupableDocuments;
@@ -77,6 +95,17 @@ class DocumentGroupingService {
       throw new Error('Todos los documentos deben ser del mismo cliente');
     }
     
+    // Buscar el mejor teléfono disponible (priorizar el que no sea null)
+    const bestPhone = documents.find(doc => doc.clientPhone)?.clientPhone || firstDoc.clientPhone;
+    const bestEmail = documents.find(doc => doc.clientEmail)?.clientEmail || firstDoc.clientEmail;
+    
+    console.log('📞 Seleccionando datos de contacto para el grupo:', {
+      clientName: firstDoc.clientName,
+      bestPhone: bestPhone || 'NO TIENE TELÉFONO',
+      firstDocPhone: firstDoc.clientPhone || 'NO TIENE',
+      allPhones: documents.map(d => d.clientPhone || 'NULL')
+    });
+    
     // Crear grupo
     const groupCode = this.generateGroupCode();
     const verificationCode = this.generateVerificationCode();
@@ -86,8 +115,8 @@ class DocumentGroupingService {
         groupCode,
         verificationCode,
         clientName: firstDoc.clientName,
-        clientPhone: firstDoc.clientPhone,
-        clientEmail: firstDoc.clientEmail,
+        clientPhone: bestPhone,
+        clientEmail: bestEmail,
         documentsCount: documents.length,
         status: 'READY',
         createdBy: matrizadorId.toString()

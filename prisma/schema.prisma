@@ -65,7 +65,7 @@ model Document {
   clientName              String                   // Nombre del cliente
   clientPhone             String?                  // CELULAR del cliente para WhatsApp
   clientEmail             String?                  // Email del cliente
-  clientRuc               String?                  // Cédula o RUC del cliente para verificación
+  clientId                String?                  // Cédula, RUC, pasaporte o cualquier ID del cliente
   
   // CAMPOS EDITABLES - Agregados para funcionalidad de edición
   detalle_documento       String?                  // Descripción específica del trámite

@@ -471,6 +471,15 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
                       </Box>
                     )}
 
+                    {localDocument?.clientId && (
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                        <AssignmentIcon sx={{ mr: 2, color: 'warning.main' }} />
+                        <Typography variant="body1">
+                          <strong>Identificación:</strong> {localDocument.clientId}
+                        </Typography>
+                      </Box>
+                    )}
+
                     {localDocument?.clientEmail && (
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                         <EmailIcon sx={{ mr: 2, color: 'info.main' }} />

@@ -86,7 +86,7 @@ class WhatsAppService {
             if (cleanNumber.startsWith('+')) {
                 const parsed = parsePhoneNumber(cleanNumber);
                 if (parsed && parsed.isValid()) {
-                    return `whatsapp:+${parsed.number}`;
+                    return `whatsapp:${parsed.number}`;
                 }
             }
             
@@ -186,18 +186,30 @@ class WhatsAppService {
         } catch (error) {
             console.error('❌ Error enviando WhatsApp:', error);
             
-            // Guardar como error
+            // En desarrollo, hacer fallback a simulación en lugar de fallar
+            if (this.isDevelopment) {
+                console.log('🔄 Fallback a simulación en desarrollo debido a:', error.message);
+                
+                // Crear resultado de simulación
+                const simulationResult = this.simularEnvio(cliente, documento, codigo, 'documento_listo');
+                
+                // Guardar como simulada (no como fallida)
+                await this.saveNotification({
+                    ...notificationData,
+                    status: 'SIMULATED',
+                    messageId: simulationResult.messageId,
+                    errorMessage: `Fallback a simulación por error: ${error.message}`
+                });
+                
+                return simulationResult;
+            }
+            
+            // En producción, guardar como error y fallar
             await this.saveNotification({
                 ...notificationData,
                 status: 'FAILED',
                 errorMessage: error.message
             });
-            
-            // En desarrollo, simular si falla el envío real
-            if (this.isDevelopment) {
-                console.log('🔄 Fallback a simulación en desarrollo');
-                return this.simularEnvio(cliente, documento, codigo, 'documento_listo');
-            }
             
             throw error;
         }
@@ -206,11 +218,9 @@ class WhatsAppService {
     /**
      * Enviar mensaje de documento entregado
      */
-    async enviarDocumentoEntregado(documento, datosEntrega) {
-        const cliente = {
-            clientName: documento.clientName,
-            clientPhone: documento.clientPhone
-        };
+    async enviarDocumentoEntregado(cliente, documento, datosEntrega) {
+        const clientName = cliente.clientName || cliente.nombre;
+        const clientPhone = cliente.clientPhone || cliente.telefono;
         const mensaje = await this.generarMensajeDocumentoEntregadoFromTemplate(cliente, documento, datosEntrega);
 
         // 🔄 CONSERVADOR: Preparar datos para guardar en BD como enviarDocumentoListo
@@ -273,18 +283,30 @@ class WhatsAppService {
         } catch (error) {
             console.error('❌ Error enviando WhatsApp de entrega:', error);
             
-            // 💾 Guardar como error
+            // En desarrollo, hacer fallback a simulación en lugar de fallar
+            if (this.isDevelopment) {
+                console.log('🔄 Fallback a simulación en desarrollo debido a:', error.message);
+                
+                // Crear resultado de simulación
+                const simulationResult = this.simularEnvio(cliente, documento, datosEntrega, 'documento_entregado');
+                
+                // Guardar como simulada (no como fallida)
+                await this.saveNotification({
+                    ...notificationData,
+                    status: 'SIMULATED',
+                    messageId: simulationResult.messageId,
+                    errorMessage: `Fallback a simulación por error: ${error.message}`
+                });
+                
+                return simulationResult;
+            }
+            
+            // En producción, guardar como error y fallar
             await this.saveNotification({
                 ...notificationData,
                 status: 'FAILED',
                 errorMessage: error.message
             });
-            
-            // En desarrollo, simular si falla el envío real
-            if (this.isDevelopment) {
-                console.log('🔄 Fallback a simulación en desarrollo');
-                return this.simularEnvio(documento, datosEntrega, 'documento_entregado');
-            }
             
             throw error;
         }
@@ -333,16 +355,57 @@ class WhatsAppService {
      * Enviar notificación de grupo de documentos listos
      */
     async enviarGrupoDocumentosListo(cliente, documentos, codigo) {
-        if (!this.isEnabled || !this.client) {
-            return this.simularEnvio(cliente, documentos, codigo, 'grupo_listo');
-        }
-
-        const numeroWhatsApp = this.formatPhoneNumber(cliente.telefono || cliente.clientPhone);
-        if (!numeroWhatsApp) {
-            throw new Error(`Número de teléfono inválido: ${cliente.telefono || cliente.clientPhone}`);
-        }
-
+        const clientName = cliente.clientName || cliente.nombre;
+        const clientPhone = cliente.clientPhone || cliente.telefono;
+        
         const mensaje = this.generarMensajeGrupoListo(cliente, documentos, codigo);
+
+        // Preparar datos para guardar en BD (igual que documentos individuales)
+        const notificationData = {
+            groupId: documentos[0]?.documentGroupId || null,
+            clientName: clientName,
+            clientPhone: clientPhone,
+            messageType: 'GROUP_READY',
+            messageBody: mensaje,
+            documentCount: Array.isArray(documentos) ? documentos.length : documentos
+        };
+
+        if (!this.isEnabled || !this.client) {
+            // Modo simulación - crear resultado simulado
+            const simulationResult = {
+                success: true,
+                messageId: `sim_group_${Date.now()}`,
+                to: this.formatPhoneNumber(clientPhone) || `whatsapp:+593987654321`,
+                message: mensaje,
+                simulated: true,
+                timestamp: new Date().toISOString()
+            };
+
+            console.log('\n📱 ═══════════ SIMULACIÓN WHATSAPP GRUPO ═══════════');
+            console.log(`Para: ${simulationResult.to}`);
+            console.log(`Mensaje: ${mensaje}`);
+            console.log('════════════════════════════════════════════════\n');
+            
+            // Guardar como simulada en BD
+            await this.saveNotification({
+                ...notificationData,
+                status: 'SIMULATED',
+                messageId: simulationResult.messageId
+            });
+            
+            return simulationResult;
+        }
+
+        const numeroWhatsApp = this.formatPhoneNumber(clientPhone);
+        if (!numeroWhatsApp) {
+            // Guardar como error en BD
+            await this.saveNotification({
+                ...notificationData,
+                status: 'FAILED',
+                errorMessage: `Número de teléfono inválido: ${clientPhone}`
+            });
+            throw new Error(`Número de teléfono inválido: ${clientPhone}`);
+        }
 
         try {
             const result = await this.client.messages.create({
@@ -352,6 +415,15 @@ class WhatsAppService {
             });
 
             console.log(`📱 WhatsApp grupo enviado: ${result.sid} → ${numeroWhatsApp}`);
+            
+            // Guardar como exitosa en BD
+            await this.saveNotification({
+                ...notificationData,
+                status: 'SENT',
+                messageId: result.sid,
+                sentAt: new Date()
+            });
+            
             return {
                 success: true,
                 messageId: result.sid,
@@ -363,8 +435,35 @@ class WhatsAppService {
             console.error('❌ Error enviando WhatsApp de grupo:', error);
             
             if (this.isDevelopment) {
-                return this.simularEnvio(cliente, documentos, codigo, 'grupo_listo');
+                console.log('🔄 Fallback a simulación en desarrollo debido a:', error.message);
+                
+                // En desarrollo, simular después del error
+                const simulationResult = {
+                    success: true,
+                    messageId: `sim_group_fallback_${Date.now()}`,
+                    to: numeroWhatsApp,
+                    message: mensaje,
+                    simulated: true,
+                    timestamp: new Date().toISOString()
+                };
+                
+                // Guardar SOLO como simulada (no como fallida)
+                await this.saveNotification({
+                    ...notificationData,
+                    status: 'SIMULATED',
+                    messageId: simulationResult.messageId,
+                    errorMessage: `Fallback a simulación por error: ${error.message}`
+                });
+                
+                return simulationResult;
             }
+            
+            // En producción, guardar como error y fallar
+            await this.saveNotification({
+                ...notificationData,
+                status: 'FAILED',
+                errorMessage: error.message
+            });
             
             throw error;
         }
