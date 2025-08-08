@@ -1702,24 +1702,16 @@ async function deliverDocument(req, res) {
       });
     }
 
-    // Buscar documento con información de grupo
+    // Buscar documento con información de grupo (ajustado al esquema actual)
     const document = await prisma.document.findUnique({
       where: { id },
       include: {
         assignedTo: {
           select: { firstName: true, lastName: true }
         },
-        groupMembers: {
+        documentGroup: {
           include: {
-            group: {
-              include: {
-                members: {
-                  include: {
-                    document: true
-                  }
-                }
-              }
-            }
+            documents: true
           }
         }
       }
@@ -1770,18 +1762,17 @@ async function deliverDocument(req, res) {
 
     // Si el documento está agrupado, entregar todos los documentos del grupo
     let groupDocuments = [];
-    if (document.groupMembers && document.groupMembers.length > 0) {
-      const group = document.groupMembers[0].group;
-      const allGroupDocuments = group.members.map(member => member.document);
-      
-      // Entregar todos los documentos del grupo que estén LISTO
+    if (document.documentGroup && Array.isArray(document.documentGroup.documents)) {
+      const allGroupDocuments = document.documentGroup.documents;
+
+      // Entregar todos los documentos del grupo que estén LISTO (excepto el actual)
       const documentsToDeliver = allGroupDocuments.filter(doc => 
         doc.status === 'LISTO' && doc.id !== id
       );
 
       if (documentsToDeliver.length > 0) {
         console.log(`🚚 Entregando ${documentsToDeliver.length + 1} documentos del grupo automáticamente`);
-        
+
         // Actualizar todos los documentos del grupo
         await prisma.document.updateMany({
           where: {
@@ -1806,16 +1797,19 @@ async function deliverDocument(req, res) {
             data: {
               documentId: doc.id,
               userId: req.user.id,
-              eventType: 'DOCUMENTO_ENTREGADO',
+              eventType: 'STATUS_CHANGED',
               description: `Documento entregado grupalmente a ${entregadoA}`,
-              metadata: {
+              details: {
+                previousStatus: 'LISTO',
+                newStatus: 'ENTREGADO',
                 entregadoA,
                 cedulaReceptor,
                 relacionTitular,
                 verificacionManual: verificacionManual || false,
                 facturaPresenta: facturaPresenta || false,
                 deliveredWith: document.protocolNumber,
-                groupDelivery: true
+                groupDelivery: true,
+                timestamp: new Date().toISOString()
               }
             }
           });
@@ -1861,7 +1855,11 @@ async function deliverDocument(req, res) {
           entregado_a: entregadoA,
           deliveredTo: entregadoA,
           fecha: new Date(),
-          usuario_entrega: `${req.user.firstName} ${req.user.lastName}`
+          usuario_entrega: `${req.user.firstName} ${req.user.lastName}`,
+          // Claves adicionales que esperan los templates del servicio
+          entregadoA,
+          cedulaReceptor,
+          relacionTitular
         };
 
         const whatsappResult = await whatsappService.default.enviarDocumentoEntregado(
