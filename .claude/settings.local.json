@@ -15,7 +15,8 @@
       "Bash(npx prisma generate:*)",
       "Bash(npx prisma:*)",
       "Bash(npx eslint:*)",
-      "Bash(sqlite3:*)"
+      "Bash(sqlite3:*)",
+      "Bash(timeout 5s npm run dev)"
     ],
     "deny": []
   }

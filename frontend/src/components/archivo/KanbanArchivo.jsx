@@ -227,12 +227,25 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
   };
 
   /**
-   * Manejar avance de estado del documento - CON MODAL DE CONFIRMACIÓN
+   * Manejar avance de estado del documento - CON MODAL DE CONFIRMACIÓN Y DETECCIÓN DE GRUPOS
    */
   const handleAdvanceStatus = async (documento, nuevoEstado) => {
     console.log(`🚀 handleAdvanceStatus: ${documento.protocolNumber} → ${nuevoEstado}`);
     
     try {
+      // 🔗 DETECCIÓN DE GRUPO: El botón debe detectar si el documento está agrupado
+      const isDocumentGrouped = documento.isGrouped && documento.documentGroupId;
+      const groupSize = isDocumentGrouped ? 
+        documentos.flat().filter(doc => doc.documentGroupId === documento.documentGroupId && doc.isGrouped).length : 
+        1;
+      
+      console.log('🔗 Información de agrupación desde botón (Archivo):', {
+        isGrouped: isDocumentGrouped,
+        groupId: documento.documentGroupId,
+        groupSize,
+        documentId: documento.id
+      });
+      
       // NUEVA FUNCIONALIDAD: Verificar si requiere confirmación
       const confirmationInfo = requiresConfirmation(documento.status, nuevoEstado);
       
@@ -242,7 +255,9 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
           document: documento,
           currentStatus: documento.status,
           newStatus: nuevoEstado,
-          confirmationInfo: confirmationInfo
+          confirmationInfo: confirmationInfo,
+          isGroupMove: isDocumentGrouped, // 🔗 Agregar información de grupo
+          groupSize: groupSize
         });
         setConfirmationModalOpen(true);
         return;
@@ -256,11 +271,29 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
         return;
       }
 
-      // Para otros cambios de estado, usar la función proporcionada
-      const response = await onEstadoChange(documento.id, nuevoEstado);
-      
-      if (!response.success) {
-        setDragError(response.message || 'Error al cambiar estado');
+      // 🔗 LÓGICA DE GRUPO: Si es grupo, usar el servicio de grupo
+      if (isDocumentGrouped) {
+        console.log('🔗 Ejecutando cambio de grupo sin confirmación (Archivo)');
+        
+        const result = await documentService.updateDocumentGroupStatus(
+          documento.documentGroupId,
+          nuevoEstado
+        );
+        
+        if (result.success) {
+          console.log('✅ Cambio de grupo exitoso sin confirmación (Archivo)');
+          // Los documentos se actualizarán automáticamente a través del store
+        } else {
+          console.error('❌ Error en cambio de grupo sin confirmación (Archivo):', result.error);
+          setDragError(result.error || 'Error al cambiar estado del grupo');
+        }
+      } else {
+        // Para otros cambios de estado individuales, usar la función proporcionada
+        const response = await onEstadoChange(documento.id, nuevoEstado);
+        
+        if (!response.success) {
+          setDragError(response.message || 'Error al cambiar estado');
+        }
       }
     } catch (error) {
       console.error('Error al avanzar estado:', error);
@@ -329,31 +362,62 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
   };
 
   /**
-   * Confirmar cambio de estado
+   * Confirmar cambio de estado - CON DETECCIÓN DE GRUPOS
    */
   const handleConfirmStatusChange = async (data) => {
     console.log('🎯 Confirmando cambio de estado:', data);
     setIsConfirmationLoading(true);
     
     try {
-      const response = await onEstadoChange(data.document.id, data.newStatus, {
-        reversionReason: data.reversionReason,
-        changeType: data.changeType,
-        deliveredTo: data.deliveredTo
-      });
+      // 🔗 Verificar si es un movimiento de grupo
+      const isGroupMove = confirmationData?.isGroupMove || false;
       
-      if (response.success) {
-        console.log('✅ Cambio de estado confirmado exitosamente');
-        handleCloseConfirmation();
+      if (isGroupMove && data.document.documentGroupId) {
+        console.log('🔗 Ejecutando cambio de grupo con confirmación (Archivo)');
         
-        // Refrescar datos si es necesario
-        if (onRefresh) {
-          onRefresh();
+        const result = await documentService.updateDocumentGroupStatus(
+          data.document.documentGroupId,
+          data.newStatus,
+          {
+            reversionReason: data.reversionReason,
+            deliveredTo: data.deliveredTo
+          }
+        );
+        
+        if (result.success) {
+          console.log('✅ Cambio de grupo confirmado exitosamente (Archivo)');
+          handleCloseConfirmation();
+          
+          // Refrescar datos si es necesario
+          if (onRefresh) {
+            onRefresh();
+          }
+        } else {
+          console.error('❌ Error al confirmar cambio de grupo (Archivo):', result.error);
+          setDragError(result.error || 'Error al cambiar estado del grupo');
+          setIsConfirmationLoading(false);
         }
       } else {
-        console.error('❌ Error al confirmar cambio:', response.message);
-        setDragError(response.message || 'Error al cambiar estado');
-        setIsConfirmationLoading(false);
+        // Lógica individual existente
+        const response = await onEstadoChange(data.document.id, data.newStatus, {
+          reversionReason: data.reversionReason,
+          changeType: data.changeType,
+          deliveredTo: data.deliveredTo
+        });
+        
+        if (response.success) {
+          console.log('✅ Cambio de estado confirmado exitosamente');
+          handleCloseConfirmation();
+          
+          // Refrescar datos si es necesario
+          if (onRefresh) {
+            onRefresh();
+          }
+        } else {
+          console.error('❌ Error al confirmar cambio:', response.message);
+          setDragError(response.message || 'Error al cambiar estado');
+          setIsConfirmationLoading(false);
+        }
       }
     } catch (error) {
       console.error('❌ Error al confirmar cambio de estado:', error);
@@ -737,6 +801,8 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
           newStatus={confirmationData.newStatus}
           confirmationInfo={confirmationData.confirmationInfo}
           isLoading={isConfirmationLoading}
+          isGroupMove={confirmationData.isGroupMove || false}
+          groupSize={confirmationData.groupSize || 1}
         />
       )}
 

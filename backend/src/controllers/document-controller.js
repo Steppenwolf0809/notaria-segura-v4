@@ -1312,6 +1312,14 @@ async function createSmartDocumentGroup(req, res) {
 async function updateDocumentGroupStatus(req, res) {
   try {
     const { documentGroupId, newStatus, deliveredTo, reversionReason } = req.body;
+    
+    console.log('🔄 updateDocumentGroupStatus iniciado:', {
+      documentGroupId,
+      newStatus,
+      deliveredTo,
+      userRole: req.user.role,
+      userId: req.user.id
+    });
 
     if (!documentGroupId || !newStatus) {
       return res.status(400).json({
@@ -1330,6 +1338,7 @@ async function updateDocumentGroupStatus(req, res) {
     }
 
     // Buscar documentos del grupo y verificar permisos
+    console.log('🔍 Buscando documentos del grupo:', documentGroupId);
     const groupDocuments = await prisma.document.findMany({
       where: { 
         documentGroupId,
@@ -1340,7 +1349,18 @@ async function updateDocumentGroupStatus(req, res) {
       }
     });
 
+    console.log('📄 Documentos encontrados:', {
+      count: groupDocuments.length,
+      documents: groupDocuments.map(doc => ({
+        id: doc.id,
+        status: doc.status,
+        assignedToId: doc.assignedToId,
+        clientName: doc.clientName
+      }))
+    });
+
     if (groupDocuments.length === 0) {
+      console.log('❌ Grupo de documentos no encontrado:', documentGroupId);
       return res.status(404).json({
         success: false,
         message: 'Grupo de documentos no encontrado'
@@ -1380,12 +1400,18 @@ async function updateDocumentGroupStatus(req, res) {
     }
 
     // Actualizar todos los documentos del grupo
+    console.log('📝 Actualizando documentos con datos:', updateData);
     const updateResult = await prisma.document.updateMany({
       where: { 
         documentGroupId,
         isGrouped: true
       },
       data: updateData
+    });
+    
+    console.log('✅ Documentos actualizados:', {
+      count: updateResult.count,
+      newStatus
     });
 
     // Obtener documentos actualizados
@@ -1439,8 +1465,9 @@ async function updateDocumentGroupStatus(req, res) {
       }
     } else {
       console.log('❌ WhatsApp grupal NO enviado. Razones:', {
-        sendNotification: !req.body.sendNotification ? 'sendNotification es false' : 'OK',
-        clientPhone: !result.group.clientPhone ? 'clientPhone está vacío' : 'OK'
+        newStatus: newStatus !== 'LISTO' ? 'Estado no es LISTO' : 'OK',
+        clientPhone: !updatedDocuments[0]?.clientPhone ? 'clientPhone está vacío' : 'OK',
+        hasGroup: !updatedDocuments[0]?.documentGroup ? 'Sin grupo de documentos' : 'OK'
       });
     }
 
@@ -1507,10 +1534,17 @@ async function updateDocumentGroupStatus(req, res) {
     });
 
   } catch (error) {
-    console.error('Error actualizando estado del grupo:', error);
+    console.error('❌ Error actualizando estado del grupo:', error);
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      code: error.code
+    });
     res.status(500).json({
       success: false,
-      message: 'Error interno del servidor'
+      message: 'Error interno del servidor',
+      error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno del servidor'
     });
   }
 }

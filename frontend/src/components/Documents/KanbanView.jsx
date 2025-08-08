@@ -402,9 +402,17 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
                 doc.documentGroupId === document.documentGroupId && doc.isGrouped
               );
               
-              // Usar el servicio de grupo (necesito importar updateDocumentGroupStatus)
-              const documentService = await import('../../services/document-service.js');
-              const result = await documentService.default.updateDocumentGroupStatus(
+              // Usar el servicio de grupo
+              console.log('🔗 Llamando updateDocumentGroupStatus con:', {
+                groupId: document.documentGroupId,
+                newStatus: confirmationData.newStatus,
+                options: { 
+                  reversionReason: confirmationData.reversionReason,
+                  deliveredTo: confirmationData.deliveredTo
+                }
+              });
+              
+              const result = await documentService.updateDocumentGroupStatus(
                 document.documentGroupId,
                 confirmationData.newStatus,
                 { 
@@ -448,8 +456,12 @@ const KanbanView = ({ searchTerm, statusFilter, typeFilter }) => {
           console.log('🔗 Ejecutando cambio de grupo sin confirmación');
           
           // Usar el servicio de grupo
-          const documentService = await import('../../services/document-service.js');
-          const result = await documentService.default.updateDocumentGroupStatus(
+          console.log('🔗 Llamando updateDocumentGroupStatus (sin confirmación) con:', {
+            groupId: document.documentGroupId,
+            newStatus: newStatus
+          });
+          
+          const result = await documentService.updateDocumentGroupStatus(
             document.documentGroupId,
             newStatus
           );
