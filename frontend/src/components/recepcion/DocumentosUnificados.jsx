@@ -43,11 +43,16 @@ import {
   Visibility as VisibilityIcon,
   MoreVert as MoreVertIcon,
   Phone as PhoneIcon,
-  Clear as ClearIcon
+  Clear as ClearIcon,
+  GroupWork as GroupWorkIcon
 } from '@mui/icons-material';
 import ModalEntrega from './ModalEntrega';
 import ModalEntregaGrupal from './ModalEntregaGrupal';
+import QuickGroupingModal from '../grouping/QuickGroupingModal';
+import GroupInfoModal from '../shared/GroupInfoModal';
 import receptionService from '../../services/reception-service';
+import documentService from '../../services/document-service';
+import useDocumentStore from '../../store/document-store';
 
 const StatusIndicator = ({ status }) => {
   const statusConfig = {
@@ -94,6 +99,7 @@ function formatLocalDate(dateString) {
 }
 
 function DocumentosUnificados({ onEstadisticasChange }) {
+  const { createDocumentGroup, detectGroupableDocuments } = useDocumentStore();
   const [documentos, setDocumentos] = useState([]);
   const [selectedDocuments, setSelectedDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -123,6 +129,16 @@ function DocumentosUnificados({ onEstadisticasChange }) {
 
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [actionType, setActionType] = useState('');
+  
+  // Estados para funcionalidad de agrupación
+  const [showQuickGroupingModal, setShowQuickGroupingModal] = useState(false);
+  const [pendingGroupData, setPendingGroupData] = useState({ main: null, related: [] });
+  const [groupingLoading, setGroupingLoading] = useState(false);
+  const [groupingSuccess, setGroupingSuccess] = useState(null);
+  
+  // Estados para modal de información de grupo
+  const [groupInfoModalOpen, setGroupInfoModalOpen] = useState(false);
+  const [selectedGroupDocument, setSelectedGroupDocument] = useState(null);
   
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
@@ -300,6 +316,105 @@ function DocumentosUnificados({ onEstadisticasChange }) {
       return { action: 'entregar', text: `Entregar ${listos.length} docs`, color: 'primary', disabled };
     }
     return { action: 'mixto', text: 'Estados mixtos', color: 'warning', disabled: true };
+  };
+
+  // 🔗 FUNCIONES DE AGRUPACIÓN PARA RECEPCIÓN
+  
+  /**
+   * Manejar agrupación inteligente detectada automáticamente
+   */
+  const handleGroupDocuments = async (groupableDocuments, mainDocument) => {
+    console.log('🔗 RECEPCION: Activando agrupación inteligente:', {
+      main: mainDocument.protocolNumber || mainDocument.id,
+      groupable: groupableDocuments.map(d => d.protocolNumber || d.id)
+    });
+    
+    setPendingGroupData({
+      main: mainDocument,
+      related: groupableDocuments
+    });
+    setShowQuickGroupingModal(true);
+  };
+
+  /**
+   * Crear grupo desde modal de confirmación
+   */
+  const handleCreateDocumentGroup = async (selectedDocumentIds) => {
+    if (!pendingGroupData.main || selectedDocumentIds.length === 0) {
+      setShowQuickGroupingModal(false);
+      return;
+    }
+
+    setGroupingLoading(true);
+    
+    try {
+      const documentIds = [pendingGroupData.main.id, ...selectedDocumentIds];
+      console.log('🔗 RECEPCION: Creando grupo con documentos:', documentIds);
+      
+      const result = await createDocumentGroup(documentIds);
+      
+      if (result.success) {
+        // Mostrar mensaje de éxito
+        setGroupingSuccess({
+          message: result.message || `Grupo creado exitosamente con ${documentIds.length} documentos`,
+          verificationCode: result.verificationCode,
+          documentCount: documentIds.length,
+          whatsappSent: result.whatsapp?.sent || false,
+          whatsappError: result.whatsapp?.error || null,
+          clientPhone: result.whatsapp?.phone || null
+        });
+
+        // Refrescar documentos para mostrar los cambios
+        await cargarDocumentos();
+
+        // Mostrar notificación
+        setSnackbar({
+          open: true,
+          message: `Grupo creado exitosamente con ${documentIds.length} documentos`,
+          severity: 'success'
+        });
+
+        console.log('✅ RECEPCION: Agrupación exitosa:', result);
+        
+        // Auto-ocultar después de 5 segundos
+        setTimeout(() => {
+          setGroupingSuccess(null);
+        }, 5000);
+      } else {
+        console.error('❌ RECEPCION: Error en agrupación:', result.error);
+        setSnackbar({
+          open: true,
+          message: result.error || 'Error al crear el grupo',
+          severity: 'error'
+        });
+      }
+    } catch (error) {
+      console.error('❌ RECEPCION: Error inesperado en agrupación:', error);
+      setSnackbar({
+        open: true,
+        message: 'Error inesperado al crear el grupo',
+        severity: 'error'
+      });
+    } finally {
+      setGroupingLoading(false);
+      setShowQuickGroupingModal(false);
+    }
+  };
+
+  /**
+   * Abrir modal de información de grupo
+   */
+  const handleOpenGroupInfo = (documento) => {
+    setSelectedGroupDocument(documento);
+    setGroupInfoModalOpen(true);
+  };
+
+  /**
+   * Cerrar modal de información de grupo
+   */
+  const handleCloseGroupInfo = () => {
+    setGroupInfoModalOpen(false);
+    setSelectedGroupDocument(null);
   };
 
   if (loading && !documentos.length) {
@@ -490,6 +605,26 @@ function DocumentosUnificados({ onEstadisticasChange }) {
                              <Typography variant="caption" color="text.secondary">{documento.clientPhone}</Typography>
                           </Box>
                         )}
+                        {/* Indicador de grupo */}
+                        {documento.isGrouped && (
+                          <Chip
+                            label="⚡ Parte de un grupo"
+                            size="small"
+                            variant="outlined"
+                            color="primary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenGroupInfo(documento);
+                            }}
+                            sx={{ 
+                              mt: 0.5, 
+                              cursor: 'pointer',
+                              fontSize: '0.65rem',
+                              height: '20px',
+                              '& .MuiChip-label': { px: 1 }
+                            }}
+                          />
+                        )}
                       </Box>
                     </TableCell>
                     <TableCell>
@@ -546,6 +681,41 @@ function DocumentosUnificados({ onEstadisticasChange }) {
             <ListItemText>Entregar</ListItemText>
           </MenuItem>
         )}
+        {/* Opción de agrupar para documentos EN_PROCESO o LISTO */}
+        {currentDocumento && ['EN_PROCESO', 'LISTO'].includes(currentDocumento.status) && !currentDocumento.isGrouped && (
+          <MenuItem onClick={async () => {
+            // Detectar documentos agrupables
+            try {
+              const result = await detectGroupableDocuments({
+                clientName: currentDocumento.clientName,
+                clientPhone: currentDocumento.clientPhone,
+                status: currentDocumento.status
+              });
+              
+              if (result.success && result.groupableDocuments.length > 0) {
+                handleGroupDocuments(result.groupableDocuments, currentDocumento);
+              } else {
+                setSnackbar({
+                  open: true,
+                  message: 'No se encontraron documentos agrupables para este cliente',
+                  severity: 'info'
+                });
+              }
+            } catch (error) {
+              console.error('Error detectando documentos agrupables:', error);
+              setSnackbar({
+                open: true,
+                message: 'Error al detectar documentos agrupables',
+                severity: 'error'
+              });
+            }
+            handleMenuClose();
+          }}>
+            <ListItemIcon><GroupWorkIcon fontSize="small" color="primary" /></ListItemIcon>
+            <ListItemText>Agrupar Documentos</ListItemText>
+          </MenuItem>
+        )}
+        
         <MenuItem onClick={handleMenuClose}>
           <ListItemIcon><VisibilityIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Ver Detalles</ListItemText>
@@ -585,6 +755,24 @@ function DocumentosUnificados({ onEstadisticasChange }) {
 
       {showModalEntrega && documentoSeleccionado && <ModalEntrega documento={documentoSeleccionado} onClose={cerrarModales} onEntregaExitosa={onEntregaCompletada} />}
       {showEntregaGrupal && selectedDocuments.length > 0 && <ModalEntregaGrupal documentos={documentos.filter(doc => selectedDocuments.includes(doc.id))} onClose={cerrarModales} onEntregaExitosa={onEntregaCompletada} />}
+      
+      {/* Modal de agrupación rápida */}
+      <QuickGroupingModal
+        open={showQuickGroupingModal}
+        onClose={() => setShowQuickGroupingModal(false)}
+        mainDocument={pendingGroupData.main}
+        relatedDocuments={pendingGroupData.related}
+        loading={groupingLoading}
+        onConfirm={handleCreateDocumentGroup}
+      />
+
+      {/* Modal de información de grupo */}
+      <GroupInfoModal
+        open={groupInfoModalOpen}
+        onClose={handleCloseGroupInfo}
+        document={selectedGroupDocument}
+      />
+
       <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={cerrarSnackbar}>
         <Alert onClose={cerrarSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>{snackbar.message}</Alert>
       </Snackbar>

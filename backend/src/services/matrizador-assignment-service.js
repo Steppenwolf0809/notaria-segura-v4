@@ -32,11 +32,11 @@ class MatrizadorAssignmentService {
     const nombreLimpio = this.normalizeMatrizadorName(matrizadorNameFromXml);
     
     try {
-      // Buscar todos los matrizadores activos (incluye ADMIN y ARCHIVO que también son matrizadores)
+      // Buscar todos los matrizadores activos (incluye ADMIN, ARCHIVO y CAJA que también pueden ser matrizadores)
       const matrizadores = await prisma.user.findMany({
         where: {
           role: {
-            in: ['MATRIZADOR', 'ADMIN', 'ARCHIVO']
+            in: ['MATRIZADOR', 'ADMIN', 'ARCHIVO', 'CAJA']
           },
           isActive: true
         },
@@ -76,7 +76,7 @@ class MatrizadorAssignmentService {
       }
 
       if (coincidenciasParciales.length > 1) {
-        // Si hay múltiples coincidencias, priorizar ADMIN > ARCHIVO > MATRIZADOR
+        // Si hay múltiples coincidencias, priorizar ADMIN > ARCHIVO > MATRIZADOR > CAJA
         const adminMatch = coincidenciasParciales.find(m => m.role === 'ADMIN');
         if (adminMatch) {
           console.log(`✅ Múltiples coincidencias - seleccionando ADMIN: ${adminMatch.firstName} ${adminMatch.lastName}`);
@@ -89,8 +89,14 @@ class MatrizadorAssignmentService {
           return archivoMatch;
         }
         
-        // Si no hay ADMIN ni ARCHIVO, tomar el primero (MATRIZADOR)
-        console.log(`⚠️ Múltiples coincidencias - seleccionando MATRIZADOR: ${coincidenciasParciales[0].firstName} ${coincidenciasParciales[0].lastName}`);
+        const matrizadorMatch = coincidenciasParciales.find(m => m.role === 'MATRIZADOR');
+        if (matrizadorMatch) {
+          console.log(`✅ Múltiples coincidencias - seleccionando MATRIZADOR: ${matrizadorMatch.firstName} ${matrizadorMatch.lastName}`);
+          return matrizadorMatch;
+        }
+        
+        // Si no hay otro rol, tomar CAJA
+        console.log(`⚠️ Múltiples coincidencias - seleccionando CAJA: ${coincidenciasParciales[0].firstName} ${coincidenciasParciales[0].lastName}`);
         return coincidenciasParciales[0];
       }
 
@@ -132,6 +138,15 @@ class MatrizadorAssignmentService {
   matchesPartialName(nombreXml, firstName, lastName) {
     const palabrasXml = nombreXml.toLowerCase().split(' ');
     const palabrasUsuario = `${firstName} ${lastName}`.toLowerCase().split(' ');
+
+    // Verificar que al menos coincida el primer nombre
+    const primerNombreXml = palabrasXml[0];
+    const primerNombreUsuario = palabrasUsuario[0];
+    
+    // Si el primer nombre no coincide, no es una buena coincidencia
+    if (!primerNombreUsuario.includes(primerNombreXml) && !primerNombreXml.includes(primerNombreUsuario)) {
+      return false;
+    }
 
     // Contar cuántas palabras del XML coinciden con palabras del usuario
     let coincidencias = 0;

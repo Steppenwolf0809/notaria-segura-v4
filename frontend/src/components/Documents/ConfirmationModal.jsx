@@ -143,7 +143,7 @@ const ConfirmationModal = ({
       <DialogTitle
         sx={{
           bgcolor: changeInfo.isReversion ? 'warning.light' : 'info.light',
-          color: changeInfo.isReversion ? 'warning.contrastText' : 'info.contrastText',
+          color: 'text.primary',
           display: 'flex',
           alignItems: 'center',
           gap: 1,

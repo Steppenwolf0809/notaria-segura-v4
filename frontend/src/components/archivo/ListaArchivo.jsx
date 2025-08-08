@@ -21,19 +21,33 @@ import {
   Select,
   Button,
   Divider,
-  TableSortLabel
+  TableSortLabel,
+  Checkbox,
+  Toolbar,
+  Alert,
+  Badge,
+  Tooltip
 } from '@mui/material';
 import {
   MoreVert as MoreIcon,
   Search as SearchIcon,
   Refresh as RefreshIcon,
-  FilterList as FilterIcon
+  FilterList as FilterIcon,
+  GroupWork as GroupIcon,
+  LinkOff as UngroupIcon,
+  LocalShipping as DeliveryIcon,
+  ChangeCircle as StatusIcon,
+  Link as LinkIcon,
+  Info as InfoIcon
 } from '@mui/icons-material';
 import archivoService from '../../services/archivo-service';
 import { formatCurrency } from '../../utils/currencyUtils';
 import DocumentDetailModal from '../Documents/DocumentDetailModal';
 import EditDocumentModal from '../Documents/EditDocumentModal';
 import ConfirmationModal from '../Documents/ConfirmationModal';
+import ModalEntrega from '../recepcion/ModalEntrega';
+import ModalEntregaGrupal from '../recepcion/ModalEntregaGrupal';
+import QuickGroupingModal from '../grouping/QuickGroupingModal';
 import useDocumentStore from '../../store/document-store';
 
 /**
@@ -41,7 +55,7 @@ import useDocumentStore from '../../store/document-store';
  * Tabla completa con filtros y paginación
  */
 const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
-  const { requiresConfirmation } = useDocumentStore();
+  const { requiresConfirmation, createDocumentGroup } = useDocumentStore();
   
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -61,6 +75,14 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false);
   const [confirmationData, setConfirmationData] = useState(null);
   const [isConfirmationLoading, setIsConfirmationLoading] = useState(false);
+
+  // 🔗 NUEVOS ESTADOS PARA AGRUPACIÓN
+  const [selectedDocuments, setSelectedDocuments] = useState(new Set());
+  const [showGroupingModal, setShowGroupingModal] = useState(false);
+  const [showGroupDeliveryModal, setShowGroupDeliveryModal] = useState(false);
+  const [groupingLoading, setGroupingLoading] = useState(false);
+  const [groupingSuccess, setGroupingSuccess] = useState(null);
+  const [showSingleDeliveryModal, setShowSingleDeliveryModal] = useState(false);
 
   /**
    * Filtrar y ordenar documentos (igual que ListView de Matrizador)
@@ -302,8 +324,269 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
     }
   };
 
+  // 🔗 FUNCIONES DE AGRUPACIÓN
+  
+  /**
+   * Seleccionar/deseleccionar documento individual
+   */
+  const handleToggleDocument = (documentId) => {
+    setSelectedDocuments(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(documentId)) {
+        newSet.delete(documentId);
+      } else {
+        newSet.add(documentId);
+      }
+      return newSet;
+    });
+  };
+
+  /**
+   * Seleccionar/deseleccionar todos los documentos de la página
+   */
+  const handleToggleAll = () => {
+    const currentPageIds = documentosPagina.map(doc => doc.id);
+    const allSelected = currentPageIds.every(id => selectedDocuments.has(id));
+    
+    setSelectedDocuments(prev => {
+      const newSet = new Set(prev);
+      if (allSelected) {
+        // Deseleccionar todos de la página actual
+        currentPageIds.forEach(id => newSet.delete(id));
+      } else {
+        // Seleccionar todos de la página actual
+        currentPageIds.forEach(id => newSet.add(id));
+      }
+      return newSet;
+    });
+  };
+
+  /**
+   * Crear grupo de documentos seleccionados
+   */
+  const handleCreateGroup = async () => {
+    if (selectedDocuments.size < 2) {
+      alert('Seleccione al menos 2 documentos para agrupar');
+      return;
+    }
+
+    setGroupingLoading(true);
+    try {
+      const documentIds = Array.from(selectedDocuments);
+      console.log('🔗 Creando grupo desde lista archivo:', documentIds);
+      
+      const result = await createDocumentGroup(documentIds);
+      console.log('🔗 Resultado de createDocumentGroup:', result);
+      
+      if (result && result.success) {
+        setGroupingSuccess({
+          message: `Grupo creado exitosamente con ${documentIds.length} documentos`,
+          verificationCode: result.verificationCode,
+          documentCount: documentIds.length,
+          whatsappSent: result.whatsapp?.sent || false,
+          whatsappError: result.whatsapp?.error || null,
+          clientPhone: result.whatsapp?.phone || null
+        });
+        
+        // Limpiar selección
+        setSelectedDocuments(new Set());
+        
+        // Refrescar datos
+        if (onRefresh) {
+          onRefresh();
+        }
+        
+        // Auto-ocultar mensaje después de 5 segundos
+        setTimeout(() => {
+          setGroupingSuccess(null);
+        }, 5000);
+      } else {
+        console.error('❌ Error en resultado de agrupación:', result);
+        alert(`Error al crear el grupo: ${result?.error || result?.message || 'Error desconocido'}`);
+      }
+    } catch (error) {
+      console.error('❌ Error creando grupo:', error);
+      alert(`Error al crear el grupo: ${error.message}`);
+    } finally {
+      setGroupingLoading(false);
+    }
+  };
+
+  /**
+   * Abrir modal de entrega grupal
+   */
+  const handleGroupDelivery = () => {
+    if (selectedDocuments.size === 0) {
+      alert('Seleccione documentos para entrega grupal');
+      return;
+    }
+    setShowGroupDeliveryModal(true);
+  };
+
+  /**
+   * Cambiar estado de documentos seleccionados
+   */
+  const handleGroupStatusChange = async (newStatus) => {
+    if (selectedDocuments.size === 0) {
+      alert('Seleccione documentos para cambiar estado');
+      return;
+    }
+
+    for (const docId of selectedDocuments) {
+      try {
+        await onEstadoChange(docId, newStatus);
+      } catch (error) {
+        console.error(`Error cambiando estado del documento ${docId}:`, error);
+      }
+    }
+    
+    // Limpiar selección y refrescar
+    setSelectedDocuments(new Set());
+    if (onRefresh) {
+      onRefresh();
+    }
+  };
+
+  /**
+   * Desagrupar documentos seleccionados
+   */
+  const handleUngroup = async () => {
+    if (selectedDocuments.size === 0) {
+      alert('Seleccione documentos agrupados para desagrupar');
+      return;
+    }
+
+    try {
+      // TODO: Implementar desagrupación en el servicio
+      console.log('🔓 Desagrupando documentos:', Array.from(selectedDocuments));
+      
+      // Por ahora solo refrescamos
+      setSelectedDocuments(new Set());
+      if (onRefresh) {
+        onRefresh();
+      }
+    } catch (error) {
+      console.error('Error desagrupando:', error);
+    }
+  };
+
+  /**
+   * Entregar documento individual
+   */
+  const handleSingleDelivery = () => {
+    if (!selectedDocument) return;
+    setShowSingleDeliveryModal(true);
+    handleMenuClose();
+  };
+
+  /**
+   * Obtener documentos seleccionados para entrega grupal
+   */
+  const getSelectedDocumentsForDelivery = () => {
+    return documentos.filter(doc => selectedDocuments.has(doc.id));
+  };
+
   return (
     <Box>
+      {/* Mensaje de éxito de agrupación */}
+      {groupingSuccess && (
+        <Alert 
+          severity="success" 
+          onClose={() => setGroupingSuccess(null)}
+          sx={{ mb: 3 }}
+        >
+          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+            {groupingSuccess.message}
+          </Typography>
+          {groupingSuccess.verificationCode && (
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              Código de verificación: <strong>{groupingSuccess.verificationCode}</strong>
+            </Typography>
+          )}
+          {groupingSuccess.whatsappSent && (
+            <Typography variant="body2" color="success.main">
+              ✓ Notificación WhatsApp enviada a {groupingSuccess.clientPhone}
+            </Typography>
+          )}
+          {groupingSuccess.whatsappError && (
+            <Typography variant="body2" color="warning.main">
+              ⚠ WhatsApp: {groupingSuccess.whatsappError}
+            </Typography>
+          )}
+        </Alert>
+      )}
+
+      {/* Barra de herramientas de agrupación */}
+      {selectedDocuments.size > 0 && (
+        <Paper sx={{ mb: 3 }}>
+          <Toolbar sx={{ bgcolor: 'primary.main', color: 'white' }}>
+            <Typography variant="h6" sx={{ flex: 1 }}>
+              {selectedDocuments.size} documento{selectedDocuments.size !== 1 ? 's' : ''} seleccionado{selectedDocuments.size !== 1 ? 's' : ''}
+            </Typography>
+            
+            {selectedDocuments.size >= 2 && (
+              <Button
+                startIcon={<GroupIcon />}
+                onClick={handleCreateGroup}
+                disabled={groupingLoading}
+                sx={{ 
+                  color: 'white', 
+                  borderColor: 'white',
+                  mr: 1,
+                  '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
+                }}
+                variant="outlined"
+              >
+                {groupingLoading ? 'Agrupando...' : 'Agrupar'}
+              </Button>
+            )}
+            
+            <Button
+              startIcon={<DeliveryIcon />}
+              onClick={handleGroupDelivery}
+              sx={{ 
+                color: 'white', 
+                borderColor: 'white',
+                mr: 1,
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
+              }}
+              variant="outlined"
+            >
+              Entregar
+            </Button>
+            
+            <Button
+              startIcon={<StatusIcon />}
+              onClick={() => handleGroupStatusChange('LISTO')}
+              sx={{ 
+                color: 'white', 
+                borderColor: 'white',
+                mr: 1,
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
+              }}
+              variant="outlined"
+            >
+              Marcar Listo
+            </Button>
+            
+            <Button
+              startIcon={<UngroupIcon />}
+              onClick={handleUngroup}
+              disabled={true}
+              sx={{ 
+                color: 'rgba(255,255,255,0.5)', 
+                borderColor: 'rgba(255,255,255,0.5)',
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
+              }}
+              variant="outlined"
+              title="Funcionalidad en desarrollo"
+            >
+              Desagrupar
+            </Button>
+          </Toolbar>
+        </Paper>
+      )}
+
       {/* Controles y Filtros */}
       <Paper sx={{ p: 3, mb: 3 }}>
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -405,6 +688,20 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
           <Table stickyHeader>
             <TableHead>
               <TableRow>
+                <TableCell padding="checkbox">
+                  <Checkbox
+                    indeterminate={
+                      selectedDocuments.size > 0 && 
+                      selectedDocuments.size < documentosPagina.length
+                    }
+                    checked={
+                      documentosPagina.length > 0 && 
+                      documentosPagina.every(doc => selectedDocuments.has(doc.id))
+                    }
+                    onChange={handleToggleAll}
+                    color="primary"
+                  />
+                </TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>
                   <TableSortLabel
                     active={orderBy === 'protocolNumber'}
@@ -468,17 +765,37 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                 <TableRow 
                   key={documento.id}
                   hover
+                  selected={selectedDocuments.has(documento.id)}
                   sx={{ 
                     '&:hover': { 
                       backgroundColor: 'action.hover',
                       cursor: 'pointer' 
-                    } 
+                    },
+                    // Resaltar documentos agrupados
+                    ...(documento.isGrouped && {
+                      borderLeft: '4px solid #1976d2',
+                      backgroundColor: 'rgba(25, 118, 210, 0.04)'
+                    })
                   }}
                 >
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      checked={selectedDocuments.has(documento.id)}
+                      onChange={() => handleToggleDocument(documento.id)}
+                      color="primary"
+                    />
+                  </TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      #{documento.protocolNumber}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        #{documento.protocolNumber}
+                      </Typography>
+                      {documento.isGrouped && (
+                        <Tooltip title={`Grupo: ${documento.groupCode || 'N/A'}`}>
+                          <LinkIcon color="primary" fontSize="small" />
+                        </Tooltip>
+                      )}
+                    </Box>
                   </TableCell>
                   
                   <TableCell>
@@ -506,12 +823,26 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                   </TableCell>
                   
                   <TableCell>
-                    <Chip 
-                      label={archivoService.formatearEstado(documento.status).texto}
-                      color={getEstadoColor(documento.status)}
-                      size="small"
-                      sx={{ fontWeight: 600 }}
-                    />
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                      <Chip 
+                        label={archivoService.formatearEstado(documento.status).texto}
+                        color={getEstadoColor(documento.status)}
+                        size="small"
+                        sx={{ fontWeight: 600 }}
+                      />
+                      {documento.isGrouped && documento.groupCode && (
+                        <Typography 
+                          variant="caption" 
+                          sx={{ 
+                            color: 'primary.main', 
+                            fontWeight: 500,
+                            fontSize: '0.7rem' 
+                          }}
+                        >
+                          Grupo: {documento.groupCode}
+                        </Typography>
+                      )}
+                    </Box>
                   </TableCell>
                   
                   <TableCell>
@@ -533,7 +864,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
               
               {documentosPagina.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} sx={{ textAlign: 'center', py: 4 }}>
+                  <TableCell colSpan={9} sx={{ textAlign: 'center', py: 4 }}>
                     <Typography color="text.secondary">
                       {documentosFiltrados.length === 0 
                         ? 'No hay documentos que coincidan con los filtros'
@@ -586,6 +917,11 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
             Marcar como Entregado
           </MenuItem>
         )}
+        {selectedDocument?.status === 'LISTO' && (
+          <MenuItem onClick={handleSingleDelivery}>
+            Entregar Documento
+          </MenuItem>
+        )}
         {selectedDocument?.status === 'ENTREGADO' && (
           <MenuItem onClick={() => handleCambiarEstado('LISTO')}>
             Revertir a Listo
@@ -624,6 +960,36 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
           newStatus={confirmationData.newStatus}
           confirmationInfo={confirmationData.confirmationInfo}
           isLoading={isConfirmationLoading}
+        />
+      )}
+
+      {/* Modal de entrega individual */}
+      {showSingleDeliveryModal && selectedDocument && (
+        <ModalEntrega
+          documento={selectedDocument}
+          onClose={() => setShowSingleDeliveryModal(false)}
+          onEntregaExitosa={() => {
+            setShowSingleDeliveryModal(false);
+            if (onRefresh) {
+              onRefresh();
+            }
+          }}
+          serviceType="arquivo"
+        />
+      )}
+
+      {/* Modal de entrega grupal */}
+      {showGroupDeliveryModal && (
+        <ModalEntregaGrupal
+          documentos={getSelectedDocumentsForDelivery()}
+          onClose={() => setShowGroupDeliveryModal(false)}
+          onEntregaExitosa={() => {
+            setShowGroupDeliveryModal(false);
+            setSelectedDocuments(new Set());
+            if (onRefresh) {
+              onRefresh();
+            }
+          }}
         />
       )}
     </Box>

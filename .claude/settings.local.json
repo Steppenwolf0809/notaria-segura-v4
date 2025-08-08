@@ -14,7 +14,8 @@
       "Bash(rm:*)",
       "Bash(npx prisma generate:*)",
       "Bash(npx prisma:*)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Bash(sqlite3:*)"
     ],
     "deny": []
   }

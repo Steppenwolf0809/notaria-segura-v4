@@ -22,6 +22,7 @@ import {
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatCurrency } from '../../utils/currencyUtils';
+import GroupingDetector from '../grouping/GroupingDetector';
 
 /**
  * Componente de tarjeta unificado para ambos roles (Matrizador y Archivo)
@@ -37,6 +38,8 @@ const UnifiedDocumentCard = ({
   onOpenDetail,
   onOpenEdit,
   onAdvanceStatus,
+  onGroupDocuments, // Nueva prop para agrupación
+  onShowGroupInfo, // Nueva prop para mostrar info del grupo
   isDragging = false,
   dragHandlers = {},
   style = {}
@@ -252,18 +255,42 @@ const UnifiedDocumentCard = ({
 
         {/* Indicador de grupo */}
         {document.isGrouped && (
-          <Box sx={{ 
-            bgcolor: 'primary.lighter',
-            border: '1px solid',
-            borderColor: 'primary.main',
-            borderRadius: 1,
-            p: 1,
-            mb: 1.5
-          }}>
+          <Box 
+            sx={{ 
+              bgcolor: 'primary.lighter',
+              border: '1px solid',
+              borderColor: 'primary.main',
+              borderRadius: 1,
+              p: 1,
+              mb: 1.5,
+              cursor: onShowGroupInfo ? 'pointer' : 'default',
+              transition: 'all 0.2s',
+              '&:hover': onShowGroupInfo ? {
+                bgcolor: 'primary.main',
+                color: 'white',
+                '& .MuiTypography-root': {
+                  color: 'white'
+                }
+              } : {}
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onShowGroupInfo?.(document);
+            }}
+          >
             <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 600 }}>
-              ⚡ Parte de un grupo
+              ⚡ Parte de un grupo {onShowGroupInfo ? '(click para ver)' : ''}
             </Typography>
           </Box>
+        )}
+
+        {/* Detector de agrupación inteligente - Para archivo y matrizador */}
+        {onGroupDocuments && (
+          <GroupingDetector
+            document={document}
+            onGroupDocuments={(groupableDocuments) => onGroupDocuments(groupableDocuments, document)}
+            isVisible={true}
+          />
         )}
 
         {/* Acciones: Botón de editar y botón de avance */}

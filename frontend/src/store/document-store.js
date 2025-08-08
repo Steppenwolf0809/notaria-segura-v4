@@ -484,14 +484,20 @@ const useDocumentStore = create((set, get) => ({
         // Actualizar documento en la lista local
         const currentDocuments = get().documents;
         const updatedDocuments = currentDocuments.map(doc => 
-          doc.id === documentId ? result.data.document : doc
+          doc.id === documentId ? { ...doc, ...result.data.document } : doc
         );
         
         console.log('📝 STORE: Actualizando documentos en el estado local');
+        console.log('📊 STORE: Documento actualizado:', result.data.document);
         set({ 
           documents: updatedDocuments,
           loading: false 
         });
+        
+        // Forzar re-render para asegurar actualización visual
+        setTimeout(() => {
+          set({ documents: [...updatedDocuments] });
+        }, 100);
 
         // Retornar información extendida para el sistema de confirmaciones
         const changeInfo = {

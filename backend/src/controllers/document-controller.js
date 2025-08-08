@@ -69,6 +69,7 @@ async function uploadXmlDocument(req, res) {
       data: {
         protocolNumber: parsedData.protocolNumber,
         clientName: parsedData.clientName,
+        clientId: parsedData.clientId,
         clientPhone: parsedData.clientPhone,
         clientEmail: parsedData.clientEmail,
         documentType: parsedData.documentType,
@@ -420,6 +421,13 @@ async function updateDocumentStatus(req, res) {
     const { id } = req.params;
     const { status, deliveredTo } = req.body;
 
+    console.log('🔄 updateDocumentStatus iniciado:', {
+      documentId: id,
+      newStatus: status,
+      currentUser: `${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
+      requestBody: req.body
+    });
+
     if (!status) {
       return res.status(400).json({
         success: false,
@@ -448,11 +456,39 @@ async function updateDocumentStatus(req, res) {
       });
     }
 
+    console.log('📄 Documento encontrado:', {
+      currentStatus: document.status,
+      newStatus: status,
+      assignedTo: document.assignedToId,
+      userId: req.user.id
+    });
+
+    // Detectar si es una reversión (estado "hacia atrás")
+    const statusOrder = ['PENDIENTE', 'EN_PROCESO', 'LISTO', 'ENTREGADO'];
+    const currentIndex = statusOrder.indexOf(document.status);
+    const newIndex = statusOrder.indexOf(status);
+    const isReversion = newIndex < currentIndex;
+
+    console.log('🔄 Análisis de cambio:', {
+      currentStatus: document.status,
+      newStatus: status,
+      isReversion,
+      requiresReason: isReversion
+    });
+
+    // Para reversiones, requerir razón obligatoria
+    if (isReversion && !req.body.reversionReason) {
+      return res.status(400).json({
+        success: false,
+        message: 'Las reversiones de estado requieren especificar una razón'
+      });
+    }
+
     // Preparar datos de actualización
     const updateData = { status };
 
     // Verificar permisos según rol y estado
-    if (['MATRIZADOR', 'ARCHIVO'].includes(req.user.role)) {
+    if (req.user.role === 'MATRIZADOR') {
       // Matrizadores solo pueden modificar sus documentos asignados
       if (document.assignedToId !== req.user.id) {
         return res.status(403).json({
@@ -460,19 +496,32 @@ async function updateDocumentStatus(req, res) {
           message: 'Solo puedes modificar documentos asignados a ti'
         });
       }
-      // NUEVA FUNCIONALIDAD: Matrizadores pueden marcar como ENTREGADO sus documentos LISTO
+      // Matrizadores pueden marcar como ENTREGADO sus documentos LISTO
       if (status === 'ENTREGADO') {
-        // Solo documentos LISTO pueden ser entregados
         if (document.status !== 'LISTO') {
           return res.status(403).json({
             success: false,
             message: 'Solo se pueden entregar documentos que estén LISTO'
           });
         }
-        // Registrar datos de entrega simplificada para matrizador
         updateData.usuarioEntregaId = req.user.id;
         updateData.fechaEntrega = new Date();
-        updateData.entregadoA = deliveredTo || `Entrega directa por ${req.user.role.toLowerCase()}`;
+        updateData.entregadoA = deliveredTo || `Entrega directa por matrizador`;
+        updateData.relacionTitular = 'directo';
+      }
+    } else if (req.user.role === 'ARCHIVO') {
+      // ARCHIVO puede gestionar cualquier documento (supervisión completa)
+      // Puede entregar documentos directamente como MATRIZADOR
+      if (status === 'ENTREGADO') {
+        if (document.status !== 'LISTO') {
+          return res.status(403).json({
+            success: false,
+            message: 'Solo se pueden entregar documentos que estén LISTO'
+          });
+        }
+        updateData.usuarioEntregaId = req.user.id;
+        updateData.fechaEntrega = new Date();
+        updateData.entregadoA = deliveredTo || `Entrega directa por archivo`;
         updateData.relacionTitular = 'directo';
       }
     } else if (req.user.role === 'RECEPCION') {
@@ -602,7 +651,7 @@ async function updateDocumentStatus(req, res) {
           documentId: id,
           userId: req.user.id,
           eventType: 'STATUS_CHANGED',
-          description: `Estado cambiado de ${document.status} a ${status} por ${req.user.firstName} ${req.user.lastName} (${req.user.role})${status === 'ENTREGADO' && ['MATRIZADOR', 'ARCHIVO'].includes(req.user.role) ? ' - Entrega directa' : ''}`,
+          description: `Estado cambiado de ${document.status} a ${status} por ${req.user.firstName} ${req.user.lastName} (${req.user.role})${status === 'ENTREGADO' && ['MATRIZADOR', 'ARCHIVO'].includes(req.user.role) ? ' - Entrega directa' : ''}${isReversion && req.body.reversionReason ? ` - Razón: ${req.body.reversionReason}` : ''}`,
           details: {
             previousStatus: document.status,
             newStatus: status,
@@ -612,6 +661,8 @@ async function updateDocumentStatus(req, res) {
             userRole: req.user.role,
             deliveryType: status === 'ENTREGADO' && ['MATRIZADOR', 'ARCHIVO'].includes(req.user.role) ? 'DIRECT_DELIVERY' : 'STANDARD_DELIVERY',
             entregadoA: status === 'ENTREGADO' ? updateData.entregadoA : undefined,
+            isReversion,
+            reason: req.body.reversionReason || null,
             timestamp: new Date().toISOString()
           },
           ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
@@ -653,10 +704,18 @@ async function updateDocumentStatus(req, res) {
     });
 
   } catch (error) {
-    console.error('Error actualizando estado del documento:', error);
+    console.error('❌ Error actualizando estado del documento:', error);
+    console.error('📊 Detalles del error:', {
+      message: error.message,
+      stack: error.stack,
+      documentId: req.params.id,
+      status: req.body.status,
+      userRole: req.user.role,
+      options: req.body
+    });
     res.status(500).json({
       success: false,
-      message: 'Error interno del servidor'
+      message: `Error interno del servidor: ${error.message}`
     });
   }
 }
@@ -815,11 +874,18 @@ async function detectGroupableDocuments(req, res) {
       });
     }
 
-    const { clientName, clientPhone } = req.body;
+    const { clientName, clientId } = req.body;
     const matrizadorId = req.user.id;
     
+    console.log('🔍 Controller: detectGroupableDocuments solicitado:', {
+      clientName,
+      clientId: clientId || '(sin ID)',
+      matrizadorId,
+      userRole: req.user.role
+    });
+    
     const groupableDocuments = await DocumentGroupingService
-      .detectGroupableDocuments({ clientName, clientPhone }, matrizadorId);
+      .detectGroupableDocuments({ clientName, clientId }, matrizadorId);
     
     res.json({
       success: true,
@@ -858,6 +924,13 @@ async function createDocumentGroup(req, res) {
     // Enviar notificación grupal si se solicita
     let whatsappSent = false;
     let whatsappError = null;
+    
+    console.log('🔍 DEBUG: Verificando condiciones para WhatsApp grupal:', {
+      sendNotification: req.body.sendNotification,
+      clientPhone: result.group.clientPhone,
+      clientName: result.group.clientName,
+      documentsCount: result.documents.length
+    });
     
     if (req.body.sendNotification && result.group.clientPhone) {
       try {
@@ -1032,6 +1105,7 @@ async function uploadXmlDocumentsBatch(req, res) {
           data: {
             protocolNumber: parsedData.protocolNumber,
             clientName: parsedData.clientName,
+            clientId: parsedData.clientId,
             clientPhone: parsedData.clientPhone,
             clientEmail: parsedData.clientEmail,
             documentType: parsedData.documentType,
@@ -1363,6 +1437,11 @@ async function updateDocumentGroupStatus(req, res) {
         console.error('Error en servicio WhatsApp grupal:', error);
         whatsappError = error.message;
       }
+    } else {
+      console.log('❌ WhatsApp grupal NO enviado. Razones:', {
+        sendNotification: !req.body.sendNotification ? 'sendNotification es false' : 'OK',
+        clientPhone: !result.group.clientPhone ? 'clientPhone está vacío' : 'OK'
+      });
     }
 
     // 🆕 CORRECCIÓN: Enviar notificación WhatsApp para estado ENTREGADO
@@ -1589,12 +1668,25 @@ async function deliverDocument(req, res) {
       });
     }
 
-    // Buscar documento
+    // Buscar documento con información de grupo
     const document = await prisma.document.findUnique({
       where: { id },
       include: {
         assignedTo: {
           select: { firstName: true, lastName: true }
+        },
+        groupMembers: {
+          include: {
+            group: {
+              include: {
+                members: {
+                  include: {
+                    document: true
+                  }
+                }
+              }
+            }
+          }
         }
       }
     });
@@ -1642,7 +1734,64 @@ async function deliverDocument(req, res) {
       }
     }
 
-    // Actualizar documento con información de entrega
+    // Si el documento está agrupado, entregar todos los documentos del grupo
+    let groupDocuments = [];
+    if (document.groupMembers && document.groupMembers.length > 0) {
+      const group = document.groupMembers[0].group;
+      const allGroupDocuments = group.members.map(member => member.document);
+      
+      // Entregar todos los documentos del grupo que estén LISTO
+      const documentsToDeliver = allGroupDocuments.filter(doc => 
+        doc.status === 'LISTO' && doc.id !== id
+      );
+
+      if (documentsToDeliver.length > 0) {
+        console.log(`🚚 Entregando ${documentsToDeliver.length + 1} documentos del grupo automáticamente`);
+        
+        // Actualizar todos los documentos del grupo
+        await prisma.document.updateMany({
+          where: {
+            id: { in: documentsToDeliver.map(doc => doc.id) }
+          },
+          data: {
+            status: 'ENTREGADO',
+            entregadoA,
+            cedulaReceptor,
+            relacionTitular,
+            verificacionManual: verificacionManual || false,
+            facturaPresenta: facturaPresenta || false,
+            fechaEntrega: new Date(),
+            usuarioEntregaId: req.user.id,
+            observacionesEntrega: observacionesEntrega || `Entregado grupalmente junto con ${document.protocolNumber}`
+          }
+        });
+
+        // Registrar eventos para todos los documentos del grupo
+        for (const doc of documentsToDeliver) {
+          await prisma.documentEvent.create({
+            data: {
+              documentId: doc.id,
+              userId: req.user.id,
+              eventType: 'DOCUMENTO_ENTREGADO',
+              description: `Documento entregado grupalmente a ${entregadoA}`,
+              metadata: {
+                entregadoA,
+                cedulaReceptor,
+                relacionTitular,
+                verificacionManual: verificacionManual || false,
+                facturaPresenta: facturaPresenta || false,
+                deliveredWith: document.protocolNumber,
+                groupDelivery: true
+              }
+            }
+          });
+        }
+
+        groupDocuments = documentsToDeliver;
+      }
+    }
+
+    // Actualizar documento principal con información de entrega
     const updatedDocument = await prisma.document.update({
       where: { id },
       data: {
@@ -1737,7 +1886,11 @@ async function deliverDocument(req, res) {
     }
 
     // Preparar mensaje de respuesta
-    let message = 'Documento entregado exitosamente';
+    const totalDelivered = 1 + groupDocuments.length;
+    let message = totalDelivered > 1 
+      ? `${totalDelivered} documentos entregados exitosamente (entrega grupal)`
+      : 'Documento entregado exitosamente';
+    
     if (whatsappSent) {
       message += ' y notificación WhatsApp enviada';
     } else if (updatedDocument.clientPhone && whatsappError) {
@@ -1763,6 +1916,16 @@ async function deliverDocument(req, res) {
           sent: whatsappSent,
           error: whatsappError,
           phone: updatedDocument.clientPhone
+        },
+        groupDelivery: {
+          isGroupDelivery: groupDocuments.length > 0,
+          totalDocuments: totalDelivered,
+          groupDocuments: groupDocuments.map(doc => ({
+            id: doc.id,
+            protocolNumber: doc.protocolNumber,
+            documentType: doc.documentType,
+            status: 'ENTREGADO'
+          }))
         }
       }
     });

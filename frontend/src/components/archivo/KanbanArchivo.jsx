@@ -7,19 +7,28 @@ import {
   Alert,
   Tooltip,
   Chip,
-  Divider
+  Divider,
+  Button,
+  Toolbar,
+  Checkbox
 } from '@mui/material';
 import {
-  Info as InfoIcon
+  Info as InfoIcon,
+  GroupWork as GroupIcon,
+  LinkOff as UngroupIcon,
+  LocalShipping as DeliveryIcon,
+  ChangeCircle as StatusIcon
 } from '@mui/icons-material';
 import archivoService from '../../services/archivo-service';
 import { getDeliveryFilterNote, DELIVERY_FILTER_PERIODS } from '../../utils/dateUtils';
 import GroupingAlert from '../grouping/GroupingAlert';
 import ModalEntrega from '../recepcion/ModalEntrega';
 import UnifiedDocumentCard from '../shared/UnifiedDocumentCard';
+import QuickGroupingModal from '../grouping/QuickGroupingModal';
 import DocumentDetailModal from '../Documents/DocumentDetailModal';
 import EditDocumentModal from '../Documents/EditDocumentModal';
 import ConfirmationModal from '../Documents/ConfirmationModal';
+import GroupInfoModal from '../shared/GroupInfoModal';
 import useDocumentStore from '../../store/document-store';
 import documentService from '../../services/document-service';
 
@@ -28,7 +37,7 @@ import documentService from '../../services/document-service';
  * Siguiendo el patrón de KanbanView pero adaptado para archivo
  */
 const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) => {
-  const { requiresConfirmation } = useDocumentStore();
+  const { requiresConfirmation, createDocumentGroup } = useDocumentStore();
   
   const [dragError, setDragError] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -46,6 +55,16 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false);
   const [confirmationData, setConfirmationData] = useState(null);
   const [isConfirmationLoading, setIsConfirmationLoading] = useState(false);
+
+  // 🔗 ESTADOS PARA AGRUPACIÓN INTELIGENTE
+  const [showQuickGroupingModal, setShowQuickGroupingModal] = useState(false);
+  const [pendingGroupData, setPendingGroupData] = useState({ main: null, related: [] });
+  const [groupingLoading, setGroupingLoading] = useState(false);
+  const [groupingSuccess, setGroupingSuccess] = useState(null);
+
+  // Estados para modal de información de grupo
+  const [groupInfoModalOpen, setGroupInfoModalOpen] = useState(false);
+  const [selectedGroupDocument, setSelectedGroupDocument] = useState(null);
 
   // Configuración de columnas
   const columnas = archivoService.getColumnasKanban();
@@ -192,6 +211,22 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
   };
 
   /**
+   * Abrir modal de información de grupo
+   */
+  const handleOpenGroupInfo = (documento) => {
+    setSelectedGroupDocument(documento);
+    setGroupInfoModalOpen(true);
+  };
+
+  /**
+   * Cerrar modal de información de grupo
+   */
+  const handleCloseGroupInfo = () => {
+    setGroupInfoModalOpen(false);
+    setSelectedGroupDocument(null);
+  };
+
+  /**
    * Manejar avance de estado del documento - CON MODAL DE CONFIRMACIÓN
    */
   const handleAdvanceStatus = async (documento, nuevoEstado) => {
@@ -327,12 +362,72 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
     }
   };
 
+  // 🔗 FUNCIONES DE AGRUPACIÓN INTELIGENTE
+  
+  /**
+   * Manejar agrupación inteligente detectada automáticamente
+   */
+  const handleGroupDocuments = (groupableDocuments, mainDocument) => {
+    console.log('🔗 Activando agrupación inteligente:', {
+      main: mainDocument.protocolNumber,
+      groupable: groupableDocuments.map(d => d.protocolNumber)
+    });
+    
+    setPendingGroupData({
+      main: mainDocument,
+      related: groupableDocuments
+    });
+    setShowQuickGroupingModal(true);
+  };
+
+  /**
+   * Crear grupo inteligente desde el modal
+   */
+  const handleCreateSmartGroup = async (documentIds) => {
+    setGroupingLoading(true);
+    try {
+      console.log('🔗 Creando grupo inteligente:', documentIds);
+      
+      const result = await createDocumentGroup(documentIds);
+      console.log('🔗 Resultado de agrupación inteligente:', result);
+      
+      if (result && result.success) {
+        setGroupingSuccess({
+          message: `Grupo creado exitosamente con ${documentIds.length} documentos`,
+          verificationCode: result.verificationCode,
+          documentCount: documentIds.length,
+          whatsappSent: result.whatsapp?.sent || false,
+          whatsappError: result.whatsapp?.error || null,
+          clientPhone: result.whatsapp?.phone || null
+        });
+        
+        // Refrescar datos
+        if (onRefresh) {
+          onRefresh();
+        }
+        
+        // Auto-ocultar mensaje después de 5 segundos
+        setTimeout(() => {
+          setGroupingSuccess(null);
+        }, 5000);
+      } else {
+        console.error('❌ Error en agrupación inteligente:', result);
+        setDragError(`Error al crear el grupo: ${result?.error || result?.message || 'Error desconocido'}`);
+      }
+    } catch (error) {
+      console.error('❌ Error en agrupación inteligente:', error);
+      setDragError(`Error al crear el grupo: ${error.message}`);
+    } finally {
+      setGroupingLoading(false);
+    }
+  };
+
 
 
 
 
   /**
-   * Renderizar tarjeta de documento usando el componente unificado
+   * Renderizar tarjeta de documento usando el componente unificado con agrupación inteligente
    */
   const renderDocumentCard = (documento, index) => (
     <UnifiedDocumentCard
@@ -342,6 +437,8 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
       onOpenDetail={handleOpenDetail}
       onOpenEdit={handleOpenEdit}
       onAdvanceStatus={handleAdvanceStatus}
+      onGroupDocuments={handleGroupDocuments}
+      onShowGroupInfo={handleOpenGroupInfo}
       isDragging={isDragging && draggedDocument?.id === documento.id}
       dragHandlers={{
         onDragStart: (event) => handleDragStart(event, documento),
@@ -349,7 +446,8 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
       }}
       style={{
         transform: isDragging && draggedDocument?.id === documento.id ? 'rotate(5deg)' : 'none',
-        boxShadow: isDragging && draggedDocument?.id === documento.id ? 4 : 1
+        boxShadow: isDragging && draggedDocument?.id === documento.id ? 4 : 1,
+        mb: 1
       }}
     />
   );
@@ -499,6 +597,36 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
         </Alert>
       )}
 
+      {/* Mensaje de éxito de agrupación */}
+      {groupingSuccess && (
+        <Alert 
+          severity="success" 
+          onClose={() => setGroupingSuccess(null)}
+          sx={{ mb: 3 }}
+        >
+          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+            {groupingSuccess.message}
+          </Typography>
+          {groupingSuccess.verificationCode && (
+            <Typography variant="body2" sx={{ mt: 1 }}>
+              Código de verificación: <strong>{groupingSuccess.verificationCode}</strong>
+            </Typography>
+          )}
+          {groupingSuccess.whatsappSent && (
+            <Typography variant="body2" color="success.main">
+              ✓ Notificación WhatsApp enviada a {groupingSuccess.clientPhone}
+            </Typography>
+          )}
+          {groupingSuccess.whatsappError && (
+            <Typography variant="body2" color="warning.main">
+              ⚠ WhatsApp: {groupingSuccess.whatsappError}
+            </Typography>
+          )}
+        </Alert>
+      )}
+
+
+
       {/* Resumen de columnas */}
       <Box sx={{ mb: 3 }}>
         <Grid container spacing={2}>
@@ -611,6 +739,29 @@ const KanbanArchivo = ({ documentos, estadisticas, onEstadoChange, onRefresh }) 
           isLoading={isConfirmationLoading}
         />
       )}
+
+      {/* Modal de agrupación inteligente */}
+      <QuickGroupingModal
+        open={showQuickGroupingModal}
+        onClose={() => setShowQuickGroupingModal(false)}
+        mainDocument={pendingGroupData.main}
+        relatedDocuments={pendingGroupData.related}
+        loading={groupingLoading}
+        onConfirm={async (selectedDocumentIds) => {
+          if (pendingGroupData.main && selectedDocumentIds.length > 0) {
+            const documentIds = [pendingGroupData.main.id, ...selectedDocumentIds];
+            await handleCreateSmartGroup(documentIds);
+          }
+          setShowQuickGroupingModal(false);
+        }}
+      />
+
+      {/* Modal de información de grupo */}
+      <GroupInfoModal
+        open={groupInfoModalOpen}
+        onClose={handleCloseGroupInfo}
+        document={selectedGroupDocument}
+      />
     </Box>
   );
 };

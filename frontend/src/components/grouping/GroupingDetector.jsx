@@ -12,26 +12,54 @@ const GroupingDetector = ({
   const [loading, setLoading] = useState(false);
   
   useEffect(() => {
-    if (isVisible && document?.status === 'EN_PROCESO') {
+    // Mostrar agrupación para documentos EN_PROCESO y LISTO
+    if (isVisible && document && ['EN_PROCESO', 'LISTO'].includes(document.status)) {
       detectGroupableDocuments();
     }
   }, [document, isVisible]);
   
   const detectGroupableDocuments = async () => {
-    // Solo requiere clientName, clientPhone es opcional
+    // Requiere al menos clientName
     if (!document?.clientName) {
+      console.log('🚫 GroupingDetector: Saltando detección - falta clientName:', {
+        protocolo: document?.protocolNumber,
+        clientName: document?.clientName,
+        clientId: document?.clientId
+      });
       return;
+    }
+
+    // Advertencia si no hay clientId (menos preciso)
+    if (!document?.clientId) {
+      console.warn('⚠️ GroupingDetector: Detectando sin clientId (menos preciso):', {
+        protocolo: document?.protocolNumber,
+        clientName: document?.clientName
+      });
     }
     
     setLoading(true);
     try {
       const response = await documentService.detectGroupableDocuments({
         clientName: document.clientName,
-        clientPhone: document.clientPhone || ''
+        clientId: document.clientId || ''
       });
       
       // Filtramos el documento actual de la lista de agrupables
       const otherGroupableDocs = response.groupableDocuments.filter(doc => doc.id !== document.id);
+
+      console.log(`🔍 GroupingDetector para ${document.clientName}:`, {
+        documentoActual: document.protocolNumber,
+        documentosEncontrados: response.groupableDocuments.map(d => ({
+          protocolo: d.protocolNumber,
+          id: d.id,
+          estado: d.status
+        })),
+        documentosFiltrados: otherGroupableDocs.map(d => ({
+          protocolo: d.protocolNumber,
+          id: d.id,
+          estado: d.status
+        }))
+      });
 
       if (response.canGroup && otherGroupableDocs.length > 0) {
         setGroupableDocuments(otherGroupableDocs);
@@ -51,33 +79,29 @@ const GroupingDetector = ({
   }
   
   return (
-    <Alert 
-      severity="info" 
-      sx={{ mb: 2, bgcolor: 'info.light', border: '1px solid', borderColor: 'info.main' }}
-      icon={<GroupIcon />}
+    <Button
+      fullWidth
+      size="small"
+      variant="outlined"
+      startIcon={<GroupIcon />}
+      onClick={() => onGroupDocuments(groupableDocuments)}
+      sx={{
+        mb: 1,
+        py: 0.5,
+        borderColor: 'info.main',
+        color: 'info.main',
+        backgroundColor: 'rgba(33, 150, 243, 0.04)',
+        '&:hover': {
+          backgroundColor: 'rgba(33, 150, 243, 0.08)',
+          borderColor: 'info.dark'
+        },
+        fontSize: '0.75rem',
+        textTransform: 'none',
+        borderRadius: 1
+      }}
     >
-      <AlertTitle>📋 Agrupación disponible</AlertTitle>
-      <Typography variant="body2" sx={{ mb: 1 }}>
-        Se encontraron <strong>{groupableDocuments.length} documentos adicionales</strong> del mismo cliente que pueden procesarse juntos.
-      </Typography>
-      
-      <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
-        <Button 
-          size="small" 
-          variant="outlined"
-          onClick={() => onGroupDocuments([document, ...groupableDocuments])}
-        >
-          Ver documentos disponibles
-        </Button>
-        <Button 
-          size="small" 
-          variant="contained"
-          onClick={() => onGroupDocuments([document, ...groupableDocuments], true)}
-        >
-          Agrupar y marcar como listos
-        </Button>
-      </Box>
-    </Alert>
+      🔗 Agrupar con {groupableDocuments.length} documento{groupableDocuments.length !== 1 ? 's' : ''} más
+    </Button>
   );
 };
 

@@ -83,6 +83,7 @@ async function parseXmlDocument(xmlContent) {
     return {
       protocolNumber,
       clientName: clientData.clientName,
+      clientId: clientData.clientId,
       clientPhone: clientData.clientPhone,
       clientEmail: clientData.clientEmail,
       documentType,
@@ -112,6 +113,9 @@ function extractClientDataFromXml(factura) {
   // Extraer nombre del cliente (razonSocialComprador)
   const clientName = infoFactura.razonSocialComprador?.[0] || 'Sin nombre';
   
+  // ⭐ NUEVO: Extraer ID del cliente (cualquier tipo de identificación: cédula, RUC, pasaporte, etc.)
+  const clientId = infoFactura.identificacionComprador?.[0] || null;
+  
   // Buscar email en infoAdicional
   let clientEmail = null;
   const emailField = infoAdicional.find(campo => 
@@ -130,8 +134,16 @@ function extractClientDataFromXml(factura) {
     clientPhone = celularField._;
   }
   
+  console.log('🔍 XML Parser: Datos del cliente extraídos:', {
+    clientName,
+    clientId: clientId || 'Sin identificación',
+    clientEmail: clientEmail || 'Sin email',
+    clientPhone: clientPhone || 'Sin celular'
+  });
+  
   return {
     clientName,
+    clientId,
     clientEmail,
     clientPhone
   };
