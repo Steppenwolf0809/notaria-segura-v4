@@ -34,7 +34,8 @@ import {
   Refresh as RefreshIcon,
   Message as MessageIcon,
   Preview as PreviewIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
+  SettingsBackupRestore as RestoreIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import adminService from '../../services/admin-service';
@@ -73,6 +74,7 @@ const WhatsAppTemplates = () => {
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
   const [confirmDialog, setConfirmDialog] = useState({ open: false });
+  const [initializing, setInitializing] = useState(false);
 
   const loadTemplates = useCallback(async () => {
     try {
@@ -93,6 +95,23 @@ const WhatsAppTemplates = () => {
   useEffect(() => {
     loadTemplates();
   }, [loadTemplates]);
+
+  const handleInitializeDefaults = async () => {
+    try {
+      setInitializing(true);
+      const resp = await adminService.initializeWhatsAppTemplates(token);
+      if (resp.success) {
+        toast.success(resp.message || 'Templates por defecto creados');
+      } else {
+        toast.info(resp.message || 'Operación completada');
+      }
+      await loadTemplates();
+    } catch (err) {
+      toast.error(err.message || 'Error al inicializar templates');
+    } finally {
+      setInitializing(false);
+    }
+  };
 
   const resetForm = () => {
     setCurrentTemplate(null);
@@ -263,6 +282,14 @@ const WhatsAppTemplates = () => {
         <Typography variant="h4" component="h1" sx={{ flexGrow: 1 }}>
           Templates WhatsApp
         </Typography>
+        <Button
+          variant="outlined"
+          startIcon={initializing ? <CircularProgress size={16} /> : <RestoreIcon />}
+          onClick={handleInitializeDefaults}
+          disabled={initializing}
+        >
+          Restaurar por defecto
+        </Button>
         <Button variant="contained" startIcon={<AddIcon />} onClick={() => handleOpenForm()}>
           Nuevo Template
         </Button>
