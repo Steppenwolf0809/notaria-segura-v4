@@ -38,7 +38,8 @@ const NotificationSettings = () => {
       
       // Intentar cargar desde la API
       try {
-        const response = await fetch('http://localhost:3001/api/admin/notifications/settings', {
+        const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
+        const response = await fetch(`${API_BASE_URL}/admin/notifications/settings`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -76,7 +77,8 @@ const NotificationSettings = () => {
     try {
       // Intentar cargar desde la API
       try {
-        const response = await fetch('http://localhost:3001/api/admin/notifications/failed', {
+        const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
+        const response = await fetch(`${API_BASE_URL}/admin/notifications/failed`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -131,7 +133,8 @@ const NotificationSettings = () => {
 
   const saveSettings = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/admin/notifications/settings', {
+      const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
+      const response = await fetch(`${API_BASE_URL}/admin/notifications/settings`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -155,7 +158,8 @@ const NotificationSettings = () => {
 
   const retryFailedNotification = async (notificationId) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/admin/notifications/retry/${notificationId}`, {
+      const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
+      const response = await fetch(`${API_BASE_URL}/admin/notifications/retry/${notificationId}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -181,7 +185,8 @@ const NotificationSettings = () => {
 
   const retryAllFailed = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/admin/notifications/retry-all', {
+      const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
+      const response = await fetch(`${API_BASE_URL}/admin/notifications/retry-all`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -79,7 +79,18 @@ const DocumentGroupingModal = ({
   const messagePreview = `🏛️ NOTARÍA DÉCIMA OCTAVA\n\nEstimado/a ${clientName},\n\nSus documentos están listos para retiro:\n\n📋 DOCUMENTOS DISPONIBLES:\n${selectedDocs.map(doc => `• ${doc.documentType} ${doc.protocolNumber}`).join('\n')}\n\n[Se generará UN CÓDIGO para todos los documentos]\n\n📍 Dirección: Azuay E2-231\n⏰ Horario: Lunes a Viernes 8:00-17:00`;
   
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
+    <Dialog 
+      open={open} 
+      onClose={onClose} 
+      maxWidth="lg" 
+      fullWidth
+      PaperProps={{
+        sx: (theme) => ({
+          bgcolor: theme.palette.mode === 'dark' ? 'background.default' : 'background.paper',
+          color: 'text.primary'
+        })
+      }}
+    >
       <DialogTitle>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <GroupIcon />
@@ -117,6 +128,14 @@ const DocumentGroupingModal = ({
             onChange={(e) => setVerifiedPhone(e.target.value)}
             helperText="Verificar que sea número de WhatsApp válido"
             error={!verifiedPhone.trim()}
+            InputLabelProps={{ sx: { color: 'text.primary' } }}
+            FormHelperTextProps={{ sx: { color: 'text.secondary' } }}
+            sx={{
+              '& .MuiInputBase-root': {
+                bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'background.paper',
+                color: 'text.primary'
+              }
+            }}
           />
         </Box>
         
@@ -125,7 +144,12 @@ const DocumentGroupingModal = ({
           Documentos a agrupar ({selectedDocuments.length} seleccionados):
         </Typography>
         
-        <Table size="small">
+        <Table size="small" sx={{
+          '& thead th': {
+            bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
+            color: 'text.primary'
+          }
+        }}>
           <TableHead>
             <TableRow>
               <TableCell padding="checkbox">
@@ -162,8 +186,8 @@ const DocumentGroupingModal = ({
                   <Chip 
                     label={doc.documentType} 
                     size="small" 
-                    color="primary"
                     variant="outlined"
+                    sx={{ bgcolor: 'action.hover', color: 'text.primary', borderColor: 'divider' }}
                   />
                 </TableCell>
                 <TableCell>
@@ -189,7 +213,15 @@ const DocumentGroupingModal = ({
             <Typography variant="h6" sx={{ mb: 1 }}>
               Vista previa de la notificación:
             </Typography>
-            <Paper sx={{ p: 2, bgcolor: 'grey.50', maxHeight: 200, overflow: 'auto' }}>
+            <Paper sx={{ 
+              p: 2, 
+              bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.04)' : 'grey.50', 
+              color: 'text.primary',
+              border: '1px solid',
+              borderColor: 'divider',
+              maxHeight: 200, 
+              overflow: 'auto' 
+            }}>
               <Typography 
                 variant="body2" 
                 sx={{ whiteSpace: 'pre-line', fontFamily: 'monospace' }}

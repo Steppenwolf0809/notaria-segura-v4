@@ -1,9 +1,7 @@
 import twilio from 'twilio';
 import { parsePhoneNumber } from 'libphonenumber-js';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db.js';
 import { getActiveTemplateByType } from '../controllers/admin-whatsapp-templates-controller.js';
-
-const prisma = new PrismaClient();
 
 /**
  * Servicio WhatsApp para notificaciones de la notaría
@@ -612,13 +610,31 @@ Estimado/a ${nombreCliente},
     generarMensajeGrupoListo(cliente, documentos, codigo) {
         const nombreCliente = cliente.nombre || cliente.clientName || 'Cliente';
         const cantidad = Array.isArray(documentos) ? documentos.length : documentos;
-        
+
         let listaDocumentos = '';
-        if (Array.isArray(documentos) && documentos.length <= 5) {
-            listaDocumentos = '\n\n📄 *Documentos incluidos:*\n' + 
-                documentos.map((doc, index) => 
-                    `${index + 1}. ${doc.tipo_documento || doc.tipoDocumento || 'Documento'}`
-                ).join('\n');
+        if (Array.isArray(documentos) && documentos.length > 0) {
+            // Mostrar hasta 5 documentos detallados (conservador)
+            const maxListado = 5;
+            const itemsDetallados = documentos.slice(0, maxListado).map((doc, index) => {
+                const tipoDocumento = doc.documentType || doc.tipo_documento || doc.tipoDocumento || 'Documento';
+                const numeroProtocolo = doc.protocolNumber || doc.numero_documento || '';
+                const detalleEspecifico = doc.detalle_documento || '';
+
+                const partes = [
+                    `${index + 1}. ${tipoDocumento}`,
+                    numeroProtocolo ? `Protocolo: ${numeroProtocolo}` : null,
+                    detalleEspecifico ? `Detalle: ${detalleEspecifico}` : null
+                ].filter(Boolean);
+
+                return partes.join(' • ');
+            });
+
+            listaDocumentos = '\n\n📄 *Documentos incluidos:*\n' + itemsDetallados.join('\n');
+
+            if (documentos.length > maxListado) {
+                const restantes = documentos.length - maxListado;
+                listaDocumentos += `\n… y ${restantes} más`;
+            }
         }
 
         return `🏛️ *${this.notariaConfig.nombre}*

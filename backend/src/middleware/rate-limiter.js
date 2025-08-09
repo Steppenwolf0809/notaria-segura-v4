@@ -127,15 +127,15 @@ const addRateLimitHeaders = (req, res, next) => {
 
 /**
  * Rate limiter para operaciones administrativas
- * Límite moderado para acciones de administración
+ * Límite por hora como solicitado en Sprint 1
  */
 const adminRateLimit = rateLimit({
-  windowMs: 5 * 60 * 1000, // 5 minutos
-  max: 50, // Máximo 50 operaciones por ventana
+  windowMs: 60 * 60 * 1000, // 1 hora
+  max: 100, // Máximo 100 requests por hora por IP
   message: {
     success: false,
-    message: 'Demasiadas operaciones administrativas. Intente nuevamente en 5 minutos.',
-    retryAfter: '5 minutos'
+    message: 'Demasiadas operaciones administrativas. Intente nuevamente en 1 hora.',
+    retryAfter: '1 hora'
   },
   standardHeaders: true,
   legacyHeaders: false,
@@ -157,8 +157,8 @@ const adminRateLimit = rateLimit({
     
     res.status(429).json({
       success: false,
-      message: 'Demasiadas operaciones administrativas. Intente nuevamente en 5 minutos.',
-      retryAfter: '5 minutos'
+      message: 'Demasiadas operaciones administrativas. Intente nuevamente en 1 hora.',
+      retryAfter: '1 hora'
     });
   }
 });

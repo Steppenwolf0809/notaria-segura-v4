@@ -1,6 +1,10 @@
 import express from 'express'
 import cors from 'cors'
+import helmet from 'helmet'
+import compression from 'compression'
 import dotenv from 'dotenv'
+import { closePrismaClient } from './src/db.js'
+import { getConfig, isConfigurationComplete, debugConfiguration } from './src/config/environment.js'
 
 // Importar rutas implementadas
 import authRoutes from './src/routes/auth-routes.js'
@@ -9,12 +13,25 @@ import notificationsRoutes from './src/routes/notifications-routes.js'
 import adminRoutes from './src/routes/admin-routes.js'
 import archivoRoutes from './src/routes/archivo-routes.js'
 import receptionRoutes from './src/routes/reception-routes.js'
+import alertasRoutes from './src/routes/alertas-routes.js'
 
 // Cargar variables de entorno
 dotenv.config({ path: './.env' })
 
+// Validar configuración de entorno
+const config = getConfig()
+debugConfiguration(config)
+
+// Verificar configuración crítica
+if (!isConfigurationComplete(config)) {
+  console.error('💥 Configuración incompleta - la aplicación puede no funcionar correctamente')
+  if (config.NODE_ENV === 'production') {
+    process.exit(1)
+  }
+}
+
 const app = express()
-const PORT = process.env.PORT || 3001 // Puerto 3001 para compatibilidad
+const PORT = config.PORT || 3001
 
 // Configuración CORS mejorada para desarrollo y producción
 const corsOptions = {
@@ -77,6 +94,40 @@ const corsOptions = {
   ]
 };
 
+// ============================================================================
+// MIDDLEWARES DE SEGURIDAD Y OPTIMIZACIÓN
+// ============================================================================
+
+// Helmet - Headers de seguridad HTTP
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false // Permitir embedding para notificaciones WhatsApp
+}));
+
+// Compression - Optimizar respuestas
+app.use(compression({
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  },
+  level: 6,
+  threshold: 1000
+}));
+
 app.use(cors(corsOptions))
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
@@ -98,7 +149,8 @@ app.get('/api/health', (req, res) => {
       'Agrupación de documentos',
       'Sistema de auditoría',
       'Notificaciones WhatsApp',
-      'Gestión completa por roles'
+      'Gestión completa por roles',
+      'Sistema de alertas inteligentes'
     ]
   })
 })
@@ -120,6 +172,9 @@ app.use('/api/archivo', archivoRoutes)
 
 // RUTAS DE RECEPCIÓN (/api/reception/*)
 app.use('/api/reception', receptionRoutes)
+
+// RUTAS DE ALERTAS (/api/alertas/*)
+app.use('/api/alertas', alertasRoutes)
 
 // ============================================================================
 // MIDDLEWARE DE MANEJO DE ERRORES
@@ -179,7 +234,7 @@ app.use((error, req, res, next) => {
 // INICIO DEL SERVIDOR
 // ============================================================================
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log('🔥=====================================🔥')
   console.log(`🚀 NOTARÍA SEGURA API v4 - SERVIDOR INICIADO`)
   console.log(`📡 Puerto: ${PORT}`)
@@ -201,4 +256,38 @@ app.listen(PORT, () => {
     console.log('   ✅ Sistema de auditoría')
     console.log('   ✅ Notificaciones WhatsApp')
   }
-}) 
+})
+
+// ============================================================================
+// SHUTDOWN HANDLERS PARA CIERRE ORDENADO
+// ============================================================================
+
+// Manejar SIGINT (Ctrl+C)
+process.on('SIGINT', async () => {
+  console.log('\n🔄 Recibida señal SIGINT, cerrando servidor...')
+  await gracefulShutdown()
+})
+
+// Manejar SIGTERM (terminación del proceso)
+process.on('SIGTERM', async () => {
+  console.log('\n🔄 Recibida señal SIGTERM, cerrando servidor...')
+  await gracefulShutdown()
+})
+
+// Función de cierre ordenado
+async function gracefulShutdown() {
+  console.log('📊 Cerrando conexión con base de datos...')
+  await closePrismaClient()
+  
+  console.log('🛑 Cerrando servidor HTTP...')
+  server.close(() => {
+    console.log('✅ Servidor cerrado correctamente')
+    process.exit(0)
+  })
+  
+  // Forzar cierre después de 10 segundos
+  setTimeout(() => {
+    console.error('❌ Cierre forzado: timeout alcanzado')
+    process.exit(1)
+  }, 10000)
+} 

@@ -16,7 +16,14 @@
       "Bash(npx prisma:*)",
       "Bash(npx eslint:*)",
       "Bash(sqlite3:*)",
-      "Bash(timeout 5s npm run dev)"
+      "Bash(timeout 5s npm run dev)",
+      "Bash(git add:*)",
+      "Bash(mkdir:*)",
+      "Bash(timeout:*)",
+      "Bash(pkill:*)",
+      "Bash(true)",
+      "Bash(PORT=3001 timeout 5s node server.js)",
+      "Bash(npm install:*)"
     ],
     "deny": []
   }

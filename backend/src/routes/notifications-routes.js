@@ -1,9 +1,8 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db.js';
 import { authenticateToken } from '../middleware/auth-middleware.js';
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 /**
  * Obtener historial de notificaciones WhatsApp

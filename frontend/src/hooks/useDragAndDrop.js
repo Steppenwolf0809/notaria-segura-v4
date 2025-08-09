@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import useDocumentStore from '../store/document-store';
 
 /**
@@ -14,37 +14,162 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
   
   // Estados para sistema de confirmaciones
   const [pendingStatusChange, setPendingStatusChange] = useState(null);
+  
+  // Referencias para cleanup robusto
+  const dragTimeoutRef = useRef(null);
+  const dragStartTimeRef = useRef(null);
+  const cleanupTimeoutRef = useRef(null);
+  const isDragActiveRef = useRef(false);
+
+  /**
+   * Cleanup robusto y forzado de estados de drag
+   * NUEVO: Más agresivo y con logging detallado
+   */
+  const forceCleanupDragState = useCallback((reason = 'unknown') => {
+    const dragDuration = dragStartTimeRef.current ? Date.now() - dragStartTimeRef.current : 0;
+    
+    console.log(`🧹 FORCE CLEANUP: ${reason}`, {
+      hadDraggedItem: !!draggedItem,
+      hadDragOverColumn: !!dragOverColumn,
+      wasDropping: isDropping,
+      dragDuration: dragDuration + 'ms',
+      isDragActiveRef: isDragActiveRef.current
+    });
+
+    // Limpiar todos los timeouts previos
+    if (dragTimeoutRef.current) {
+      clearTimeout(dragTimeoutRef.current);
+      dragTimeoutRef.current = null;
+    }
+    if (cleanupTimeoutRef.current) {
+      clearTimeout(cleanupTimeoutRef.current);
+      cleanupTimeoutRef.current = null;
+    }
+
+    // Reset inmediato de estados
+    setDraggedItem(null);
+    setDragOverColumn(null);
+    setIsDropping(false);
+    
+    // Reset referencias
+    isDragActiveRef.current = false;
+    dragStartTimeRef.current = null;
+    
+    // Cleanup adicional con doble verificación después de un tiempo más largo
+    cleanupTimeoutRef.current = setTimeout(() => {
+      setDraggedItem(null);
+      setDragOverColumn(null);
+      setIsDropping(false);
+      isDragActiveRef.current = false;
+      
+      // Log final de verificación
+      console.log('✅ Cleanup verificado completado');
+    }, 50); // 50ms para dar más tiempo a operaciones normales
+  }, [draggedItem, dragOverColumn, isDropping]);
 
   /**
    * Efecto para cleanup global - detecta cuando el drag se abandona
+   * MEJORADO: Múltiples listeners y timeout de seguridad
    */
   useEffect(() => {
-    const handleGlobalDragEnd = () => {
-      // Este es un fallback. Si el drag termina sin un drop válido,
-      // se limpian los estados para prevenir que un item se quede "pegado".
-      if (draggedItem) {
-        console.log('🌍 Drag global finalizado sin un drop válido, forzando cleanup...');
+    const handleGlobalDragEnd = (event) => {
+      if (isDragActiveRef.current) {
+        console.log('🌍 Global dragend detectado', {
+          eventType: event.type,
+          target: event.target?.tagName,
+          dataTransfer: !!event.dataTransfer
+        });
+        
+        // Dar tiempo para que el drop normal se procese antes de cleanup
         setTimeout(() => {
-          setDraggedItem(null);
-          setDragOverColumn(null);
-          setIsDropping(false);
-        }, 50);
+          if (isDragActiveRef.current) {
+            console.log('🌍 Cleanup después de dragend - no se procesó drop');
+            forceCleanupDragState('global-dragend-delayed');
+          }
+        }, 100);
       }
     };
 
-    // Escuchamos 'dragend' para el caso en que el usuario suelte el drag fuera de una drop-zone.
+    const handleGlobalMouseUp = () => {
+      // Solo cleanup si ha pasado suficiente tiempo sin que se complete el drag
+      if (isDragActiveRef.current && dragStartTimeRef.current) {
+        const dragDuration = Date.now() - dragStartTimeRef.current;
+        if (dragDuration > 1000) { // Solo si el drag dura más de 1 segundo
+          console.log('🖱️ Global mouseup detectado con drag activo prolongado');
+          setTimeout(() => {
+            if (isDragActiveRef.current) {
+              forceCleanupDragState('global-mouseup-prolonged');
+            }
+          }, 200);
+        }
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      // Si el usuario cambia de tab durante drag
+      if (document.hidden && isDragActiveRef.current) {
+        console.log('👁️ Tab cambio detectado con drag activo');
+        forceCleanupDragState('visibility-change');
+      }
+    };
+
+    // Múltiples listeners para casos edge
     document.addEventListener('dragend', handleGlobalDragEnd);
+    document.addEventListener('mouseup', handleGlobalMouseUp);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     
     return () => {
       document.removeEventListener('dragend', handleGlobalDragEnd);
+      document.removeEventListener('mouseup', handleGlobalMouseUp);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      
+      // Cleanup final al desmontar
+      if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+      if (cleanupTimeoutRef.current) clearTimeout(cleanupTimeoutRef.current);
     };
-  }, [draggedItem]); // Se quita handleDragEnd de las dependencias para evitar el crash.
+  }, [forceCleanupDragState]);
+
+  /**
+   * Timeout de seguridad para drag abandonado
+   * NUEVO: Limpia automáticamente después de tiempo límite
+   */
+  const startDragSafetyTimeout = useCallback(() => {
+    // Limpiar timeout previo si existe
+    if (dragTimeoutRef.current) {
+      clearTimeout(dragTimeoutRef.current);
+    }
+    
+    // Configurar nuevo timeout de seguridad más largo (10 segundos)
+    dragTimeoutRef.current = setTimeout(() => {
+      if (isDragActiveRef.current) {
+        console.log('⏰ TIMEOUT DE SEGURIDAD: Drag abandonado por más de 10 segundos');
+        forceCleanupDragState('safety-timeout');
+      }
+    }, 10000);
+  }, [forceCleanupDragState]);
 
   /**
    * Iniciar el arrastre de un documento
+   * MEJORADO: Con timeout de seguridad y logging detallado
    */
   const handleDragStart = useCallback((event, document) => {
-    console.log('🚀 Drag iniciado:', document.id, document.status);
+    // Solo limpiar si ha pasado tiempo razonable desde el último drag
+    if (isDragActiveRef.current && dragStartTimeRef.current) {
+      const timeSinceLastDrag = Date.now() - dragStartTimeRef.current;
+      if (timeSinceLastDrag > 500) { // Solo si han pasado más de 500ms
+        console.log('⚠️ Drag previo detectado (500ms+), limpiando...');
+        forceCleanupDragState('overlapping-drag-start');
+      } else {
+        console.log('⚠️ Drag rápido detectado, permitiendo...');
+      }
+    }
+    
+    console.log('🚀 Drag iniciado:', {
+      documentId: document.id,
+      status: document.status,
+      isGrouped: document.isGrouped,
+      timestamp: new Date().toISOString()
+    });
     
     // CRÍTICO: Verificar que tenemos dataTransfer
     if (!event.dataTransfer) {
@@ -64,11 +189,20 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
       }
     } catch (error) {
       console.error('❌ Error configurando dataTransfer:', error);
+      forceCleanupDragState('datatransfer-error');
+      return;
     }
     
+    // Configurar estado activo
     setDraggedItem(document);
-    console.log('✅ Drag configurado correctamente');
-  }, []);
+    isDragActiveRef.current = true;
+    dragStartTimeRef.current = Date.now();
+    
+    // Iniciar timeout de seguridad
+    startDragSafetyTimeout();
+    
+    console.log('✅ Drag configurado correctamente con timeout de seguridad');
+  }, [forceCleanupDragState, startDragSafetyTimeout]);
 
   /**
    * Verificar si el movimiento es válido
@@ -101,32 +235,49 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
 
   /**
    * Finalizar el arrastre - CLEANUP GARANTIZADO
+   * MEJORADO: Con logging detallado y limpieza de timeout
    */
   const handleDragEnd = useCallback((event) => {
-    console.log('🏁 Drag finalizado, limpiando estados...');
+    const dragDuration = dragStartTimeRef.current ? Date.now() - dragStartTimeRef.current : 0;
     
-    // CRÍTICO: Cleanup inmediato y forzado
-    setDraggedItem(null);
-    setDragOverColumn(null);
-    setIsDropping(false);
+    console.log('🏁 Drag finalizado:', {
+      eventType: event?.type || 'manual',
+      dragDuration: dragDuration + 'ms',
+      hadDraggedItem: !!draggedItem,
+      hadDataTransfer: !!event?.dataTransfer,
+      dropEffect: event?.dataTransfer?.dropEffect
+    });
     
-    // Cleanup adicional con pequeño delay para asegurar que el DOM se actualice
-    setTimeout(() => {
-      setDraggedItem(null);
-      setDragOverColumn(null);
-      setIsDropping(false);
-    }, 50);
+    // Limpiar timeout de seguridad
+    if (dragTimeoutRef.current) {
+      clearTimeout(dragTimeoutRef.current);
+      dragTimeoutRef.current = null;
+    }
     
-    console.log('🧹 Estados limpiados');
-  }, []);
+    // Usar la función de cleanup robusta
+    forceCleanupDragState('drag-end');
+    
+    console.log('🧹 Estados limpiados via handleDragEnd');
+  }, [draggedItem, forceCleanupDragState]);
 
   /**
    * Manejar cuando se arrastra sobre una columna
+   * MEJORADO: Con logging detallado y verificaciones de estado
    */
   const handleDragOver = useCallback((event, columnId) => {
     // CRÍTICO: preventDefault es obligatorio para permitir drop
     event.preventDefault();
     event.stopPropagation();
+    
+    // Verificar consistencia de estado solo en casos extremos
+    if (!isDragActiveRef.current && draggedItem && dragStartTimeRef.current) {
+      const timeSinceDragStart = Date.now() - dragStartTimeRef.current;
+      if (timeSinceDragStart > 2000) { // Solo si han pasado más de 2 segundos
+        console.log('⚠️ Inconsistencia detectada prolongada: draggedItem sin isDragActiveRef');
+        forceCleanupDragState('inconsistent-state-dragover');
+        return;
+      }
+    }
     
     // CRÍTICO: No procesar si es la misma columna de origen
     if (draggedItem && draggedItem.status === columnId) {
@@ -138,6 +289,12 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
     
     // Solo actualizar si realmente cambiamos de columna
     if (dragOverColumn !== columnId) {
+      console.log('🎯 DragOver cambio de columna:', {
+        from: dragOverColumn,
+        to: columnId,
+        documentId: draggedItem?.id,
+        documentStatus: draggedItem?.status
+      });
       setDragOverColumn(columnId);
     }
     
@@ -145,8 +302,13 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
     if (draggedItem && event.dataTransfer) {
       const isValid = isValidMove(draggedItem.status, columnId);
       event.dataTransfer.dropEffect = isValid ? 'move' : 'none';
+      
+      // Log detallado solo si hay cambio de validez
+      if (dragOverColumn !== columnId) {
+        console.log(`🔍 Validación de movimiento ${draggedItem.status} -> ${columnId}: ${isValid ? '✅ válido' : '❌ inválido'}`);
+      }
     }
-  }, [dragOverColumn, draggedItem, isValidMove]);
+  }, [dragOverColumn, draggedItem, isValidMove, forceCleanupDragState]);
 
   /**
    * Manejar cuando entra a una columna
@@ -317,13 +479,25 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
     event.preventDefault();
     event.stopPropagation();
     
+    const dragDuration = dragStartTimeRef.current ? Date.now() - dragStartTimeRef.current : 0;
+    
     console.log('🎯 Drop detectado:', { 
       draggedItem: draggedItem?.id, 
       newStatus,
       isGrouped: draggedItem?.isGrouped,
       groupId: draggedItem?.documentGroupId,
-      dataTransfer: !!event.dataTransfer 
+      dataTransfer: !!event.dataTransfer,
+      dragDuration: dragDuration + 'ms',
+      isDragActiveRef: isDragActiveRef.current,
+      eventType: event.type
     });
+    
+    // Verificar consistencia de estado crítico solo si es realmente un problema
+    if (!isDragActiveRef.current && !draggedItem) {
+      console.error('❌ DROP INCONSISTENTE: No hay drag activo y no hay draggedItem');
+      forceCleanupDragState('inconsistent-drop');
+      return { success: false, error: 'Estado de drag inconsistente' };
+    }
     
     // Validaciones antes del drop
     if (!draggedItem) {
@@ -572,25 +746,78 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
 
   /**
    * Obtener estilo visual para el documento que se está arrastrando
+   * MEJORADO: Con indicadores de estado más claros
    */
   const getDraggedItemStyle = useCallback((document) => {
     if (draggedItem && draggedItem.id === document.id) {
-      return {
-        opacity: 0.8,
-        transform: 'rotate(3deg) scale(1.05)',
+      // Diferentes estilos según el estado del drag
+      const baseStyle = {
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        boxShadow: '0 15px 35px rgba(0,0,0,0.25), 0 5px 15px rgba(0,0,0,0.1)',
         zIndex: 1000,
         cursor: 'grabbing',
+        borderRadius: '12px',
+        position: 'relative'
+      };
+
+      // Si está processing (dropping)
+      if (isDropping) {
+        return {
+          ...baseStyle,
+          opacity: 0.6,
+          transform: 'scale(0.95)',
+          boxShadow: '0 8px 20px rgba(16, 185, 129, 0.3)',
+          border: '2px solid #10b981',
+          backgroundColor: 'rgba(16, 185, 129, 0.1)',
+          '&::after': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'linear-gradient(45deg, transparent 30%, rgba(16, 185, 129, 0.2) 50%, transparent 70%)',
+            borderRadius: '12px',
+            animation: 'shimmer 1s infinite'
+          }
+        };
+      }
+
+      // Estado normal de drag
+      return {
+        ...baseStyle,
+        opacity: 0.8,
+        transform: 'rotate(3deg) scale(1.05)',
+        boxShadow: '0 15px 35px rgba(0,0,0,0.25), 0 5px 15px rgba(0,0,0,0.1)',
         border: '2px solid #3b82f6',
         backgroundColor: 'rgba(59, 130, 246, 0.05)',
-        borderRadius: '12px'
+        '&::before': {
+          content: '"🎯"',
+          position: 'absolute',
+          top: '-8px',
+          right: '-8px',
+          fontSize: '16px',
+          backgroundColor: '#3b82f6',
+          color: 'white',
+          borderRadius: '50%',
+          width: '24px',
+          height: '24px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1001
+        }
       };
     }
+    
     return {
-      transition: 'all 0.2s ease-in-out'
+      transition: 'all 0.2s ease-in-out',
+      cursor: 'grab',
+      '&:hover': {
+        transform: 'translateY(-2px)',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+      }
     };
-  }, [draggedItem]);
+  }, [draggedItem, isDropping]);
 
   /**
    * Verificar si una columna puede recibir drops
@@ -601,6 +828,44 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
     if (draggedItem.status === columnId) return false;
     return isValidMove(draggedItem.status, columnId);
   }, [draggedItem, isValidMove]);
+
+  /**
+   * Hook de debugging - expone funciones de diagnóstico
+   * NUEVO: Para debugging y testing del drag and drop
+   */
+  const debugDragState = useCallback(() => {
+    const currentState = {
+      draggedItem: !!draggedItem,
+      draggedItemId: draggedItem?.id,
+      draggedItemStatus: draggedItem?.status,
+      dragOverColumn,
+      isDropping,
+      isDragActiveRef: isDragActiveRef.current,
+      dragStartTime: dragStartTimeRef.current,
+      timeoutActive: !!dragTimeoutRef.current
+    };
+    
+    console.table(currentState);
+    return currentState;
+  }, [draggedItem, dragOverColumn, isDropping]);
+
+  /**
+   * Función de emergencia para resetear completamente el drag
+   * NUEVO: Para casos extremos donde hay problemas persistentes
+   */
+  const emergencyReset = useCallback(() => {
+    console.log('🚨 EMERGENCY RESET del sistema drag and drop');
+    forceCleanupDragState('emergency-reset');
+    
+    // Reset adicional de cualquier estado persistente
+    setPendingStatusChange(null);
+    
+    // Mensaje para el usuario
+    return {
+      success: true,
+      message: 'Sistema drag and drop reiniciado'
+    };
+  }, [forceCleanupDragState]);
 
   return {
     // Estado del drag & drop
@@ -635,7 +900,16 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
     // Funciones adicionales para verificar confirmaciones
     requiresConfirmation: (fromStatus, toStatus) => {
       return requiresConfirmation(fromStatus, toStatus);
-    }
+    },
+
+    // NUEVAS FUNCIONES DE DEBUGGING Y RECOVERY
+    debugDragState,
+    emergencyReset,
+    
+    // Estado adicional para debugging
+    isDragActive: isDragActiveRef.current,
+    dragStartTime: dragStartTimeRef.current,
+    hasSafetyTimeout: !!dragTimeoutRef.current
   };
 };
 

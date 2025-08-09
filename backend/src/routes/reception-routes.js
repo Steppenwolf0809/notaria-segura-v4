@@ -5,7 +5,8 @@ import {
   listarTodosDocumentos,
   marcarComoListo,
   marcarGrupoListo,
-  getDashboardStats
+  getDashboardStats,
+  getAlertasRecepcion
 } from '../controllers/reception-controller.js';
 
 const router = express.Router();
@@ -64,6 +65,13 @@ router.post('/documentos/marcar-grupo-listo', authenticateToken, requireRecepcio
  * @access Private (RECEPCION only)
  */
 router.get('/matrizadores', authenticateToken, requireRecepcion, getMatrizadores);
+
+/**
+ * @route GET /api/reception/alertas
+ * @desc Obtener alertas de documentos LISTO sin entregar específicas de recepción
+ * @access Private (RECEPCION only)
+ */
+router.get('/alertas', authenticateToken, requireRecepcion, getAlertasRecepcion);
 
 // Ruta de prueba simple para verificar conectividad
 router.get('/test', (req, res) => {

@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db.js';
 import { parseXmlDocument, generateVerificationCode } from '../services/xml-parser-service.js';
 import DocumentGroupingService from '../services/document-grouping-service.js';
 import MatrizadorAssignmentService from '../services/matrizador-assignment-service.js';
@@ -11,8 +11,6 @@ import {
   getEventColor 
 } from '../utils/event-formatter.js';
 // const WhatsAppService = require('../services/whatsapp-service.js'); // Descomentar cuando exista
-
-const prisma = new PrismaClient();
 
 /**
  * Procesar XML y crear documento automáticamente
@@ -545,9 +543,31 @@ async function updateDocumentStatus(req, res) {
       });
     }
 
-    // Generar código de verificación si se marca como LISTO
+    // Generar código de verificación si se marca como LISTO Y no tiene código
     if (status === 'LISTO' && !document.verificationCode) {
       updateData.verificationCode = generateVerificationCode();
+      
+      // 📈 Registrar evento de generación de código de verificación
+      try {
+        await prisma.documentEvent.create({
+          data: {
+            documentId: id,
+            userId: req.user.id,
+            eventType: 'VERIFICATION_GENERATED',
+            description: `Código de verificación generado automáticamente: ${updateData.verificationCode}`,
+            details: {
+              verificationCode: updateData.verificationCode,
+              generatedBy: `${req.user.firstName} ${req.user.lastName}`,
+              userRole: req.user.role,
+              timestamp: new Date().toISOString()
+            },
+            ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+            userAgent: req.get('User-Agent') || 'unknown'
+          }
+        });
+      } catch (auditError) {
+        console.error('Error registrando evento de generación de código:', auditError);
+      }
     }
 
     // Actualizar documento
@@ -592,6 +612,30 @@ async function updateDocumentStatus(req, res) {
           console.error('Error enviando WhatsApp:', whatsappResult.error);
         } else {
           console.log('Notificación WhatsApp enviada exitosamente');
+          
+          // 📈 Registrar evento de notificación WhatsApp enviada
+          try {
+            await prisma.documentEvent.create({
+              data: {
+                documentId: id,
+                userId: req.user.id,
+                eventType: 'WHATSAPP_SENT',
+                description: `Notificación WhatsApp de documento listo enviada a ${updatedDocument.clientPhone}`,
+                details: {
+                  phoneNumber: updatedDocument.clientPhone,
+                  messageType: 'DOCUMENT_READY',
+                  verificationCode: updatedDocument.verificationCode,
+                  sentBy: `${req.user.firstName} ${req.user.lastName}`,
+                  userRole: req.user.role,
+                  timestamp: new Date().toISOString()
+                },
+                ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+                userAgent: req.get('User-Agent') || 'unknown'
+              }
+            });
+          } catch (auditError) {
+            console.error('Error registrando evento de notificación WhatsApp:', auditError);
+          }
         }
       } catch (error) {
         console.error('Error en servicio WhatsApp:', error);
@@ -637,6 +681,31 @@ async function updateDocumentStatus(req, res) {
           console.error('Error enviando WhatsApp de entrega directa:', whatsappResult.error);
         } else {
           console.log('📱 Notificación WhatsApp de entrega directa enviada exitosamente');
+          
+          // 📈 Registrar evento de notificación WhatsApp de entrega directa
+          try {
+            await prisma.documentEvent.create({
+              data: {
+                documentId: id,
+                userId: req.user.id,
+                eventType: 'WHATSAPP_SENT',
+                description: `Notificación WhatsApp de entrega directa enviada a ${updatedDocument.clientPhone}`,
+                details: {
+                  phoneNumber: updatedDocument.clientPhone,
+                  messageType: 'DOCUMENT_DELIVERED',
+                  deliveredTo: updateData.entregadoA,
+                  deliveredBy: `${req.user.firstName} ${req.user.lastName}`,
+                  deliveredByRole: req.user.role,
+                  deliveryType: 'DIRECT_DELIVERY',
+                  timestamp: new Date().toISOString()
+                },
+                ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+                userAgent: req.get('User-Agent') || 'unknown'
+              }
+            });
+          } catch (auditError) {
+            console.error('Error registrando evento de notificación WhatsApp de entrega:', auditError);
+          }
         }
       } catch (error) {
         console.error('Error en servicio WhatsApp para entrega directa:', error);
@@ -1510,6 +1579,33 @@ async function updateDocumentGroupStatus(req, res) {
           console.error('Error enviando WhatsApp de entrega grupal:', whatsappResult.error);
         } else {
           console.log('📱 Notificación grupal WhatsApp de entrega enviada exitosamente');
+          
+          // 📈 Registrar evento de notificación WhatsApp grupal
+          try {
+            await prisma.documentEvent.create({
+              data: {
+                documentId: groupData.documents[0].id, // Documento principal del grupo
+                userId: req.user.id,
+                eventType: 'WHATSAPP_SENT',
+                description: `Notificación WhatsApp de entrega grupal enviada a ${updatedDocuments[0].clientPhone}`,
+                details: {
+                  phoneNumber: updatedDocuments[0].clientPhone,
+                  messageType: 'GROUP_DELIVERY',
+                  deliveredTo: deliveredTo || `Entrega grupal por ${req.user.role.toLowerCase()}`,
+                  deliveredBy: `${req.user.firstName} ${req.user.lastName}`,
+                  deliveredByRole: req.user.role,
+                  deliveryType: 'GROUP_DELIVERY',
+                  groupSize: updateResult.count,
+                  messageId: whatsappResult.messageId || 'simulado',
+                  timestamp: new Date().toISOString()
+                },
+                ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+                userAgent: req.get('User-Agent') || 'unknown'
+              }
+            });
+          } catch (auditError) {
+            console.error('Error registrando evento de notificación WhatsApp grupal:', auditError);
+          }
         }
       } catch (error) {
         console.error('Error en servicio WhatsApp para entrega grupal:', error);
@@ -2007,6 +2103,34 @@ async function deliverDocument(req, res) {
         whatsappSent = whatsappResult.success;
         if (!whatsappResult.success) {
           whatsappError = whatsappResult.error;
+        } else {
+          // 📈 Registrar evento de notificación WhatsApp de entrega individual
+          try {
+            await prisma.documentEvent.create({
+              data: {
+                documentId: id,
+                userId: req.user.id,
+                eventType: 'WHATSAPP_SENT',
+                description: `Notificación WhatsApp de entrega enviada a ${updatedDocument.clientPhone}`,
+                details: {
+                  phoneNumber: updatedDocument.clientPhone,
+                  messageType: 'DOCUMENT_DELIVERED',
+                  deliveredTo: entregadoA,
+                  deliveredBy: `${req.user.firstName} ${req.user.lastName}`,
+                  deliveredByRole: req.user.role,
+                  deliveryType: 'INDIVIDUAL_DELIVERY',
+                  cedulaReceptor,
+                  relacionTitular,
+                  messageId: whatsappResult.messageId || 'simulado',
+                  timestamp: new Date().toISOString()
+                },
+                ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+                userAgent: req.get('User-Agent') || 'unknown'
+              }
+            });
+          } catch (auditError) {
+            console.error('Error registrando evento de notificación WhatsApp de entrega:', auditError);
+          }
         }
       } catch (error) {
         console.error('Error enviando WhatsApp de entrega:', error);

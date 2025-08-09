@@ -290,13 +290,38 @@ function AppWithTheme() {
             backgroundColor: isDarkMode ? '#1e2530 !important' : '#ffffff !important',
             borderRadius: 8,
             border: isDarkMode ? '1px solid #334155' : '1px solid #e2e8f0',
-            
+
             // FORZAR EN CONTENEDORES DE TABLA
             '&.MuiTableContainer-root': {
               backgroundColor: isDarkMode ? '#1e2530 !important' : '#ffffff !important',
             }
           }
         }
+      },
+
+      // ALERT: asegurar buen contraste en mensajes (snackbars/toasts de MUI)
+      MuiAlert: {
+        styleOverrides: {
+          root: {
+            color: '#ffffff',
+          },
+          filledSuccess: {
+            backgroundColor: `${isDarkMode ? '#047857' : '#10b981'} !important`,
+            color: '#ffffff',
+          },
+          filledInfo: {
+            backgroundColor: `${isDarkMode ? '#0e7490' : '#0891b2'} !important`,
+            color: '#ffffff',
+          },
+          filledWarning: {
+            backgroundColor: `${isDarkMode ? '#b45309' : '#d97706'} !important`,
+            color: '#ffffff',
+          },
+          filledError: {
+            backgroundColor: `${isDarkMode ? '#b91c1c' : '#dc2626'} !important`,
+            color: '#ffffff',
+          },
+        },
       },
       
       // TABLE ENTERPRISE

@@ -1,7 +1,5 @@
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '../db.js';
 
 /**
  * Middleware para verificar token JWT
@@ -36,11 +34,13 @@ async function authenticateToken(req, res, next) {
       });
     }
 
-    // Agregar información del usuario al request
+    // Agregar información del usuario al request (incluye nombres para auditoría)
     req.user = {
       id: user.id,
       email: user.email,
-      role: user.role
+      role: user.role,
+      firstName: user.firstName,
+      lastName: user.lastName
     };
 
     next();

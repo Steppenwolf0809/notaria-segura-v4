@@ -59,7 +59,8 @@ const NotificationCenter = () => {
       setLoading(true);
       setError(null);
 
-      const response = await fetch('http://localhost:3001/api/admin/notifications/stats', {
+      const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
+      const response = await fetch(`${API_BASE_URL}/admin/notifications/stats`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -363,7 +364,8 @@ const NotificationCenter = () => {
    */
   const handleRetryNotification = async (notificationId) => {
     try {
-      const response = await fetch(`http://localhost:3001/api/admin/notifications/${notificationId}/retry`, {
+      const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
+      const response = await fetch(`${API_BASE_URL}/admin/notifications/${notificationId}/retry`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

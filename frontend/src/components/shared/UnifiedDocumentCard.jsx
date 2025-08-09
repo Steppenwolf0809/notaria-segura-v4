@@ -225,6 +225,16 @@ const UnifiedDocumentCard = ({
           />
         </Box>
 
+        {/* Descripción del trámite (acto principal) */}
+        {document.actoPrincipalDescripcion && (
+          <Typography 
+            variant="body2" 
+            sx={{ fontSize: '0.85rem', color: 'text.secondary', mb: 1 }}
+          >
+            {document.actoPrincipalDescripcion}
+          </Typography>
+        )}
+
         {/* Información de contacto */}
         {formattedPhone && (
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>

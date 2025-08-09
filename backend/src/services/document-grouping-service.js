@@ -1,5 +1,4 @@
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
+import prisma from '../db.js';
 
 class DocumentGroupingService {
   
@@ -96,15 +95,20 @@ class DocumentGroupingService {
     }
     
     // Buscar el mejor teléfono disponible (priorizar el que no sea null)
-    const bestPhone = documents.find(doc => doc.clientPhone)?.clientPhone || firstDoc.clientPhone;
+    const bestPhone = documents.find(doc => doc.clientPhone)?.clientPhone || firstDoc.clientPhone || 'SIN_TELEFONO';
     const bestEmail = documents.find(doc => doc.clientEmail)?.clientEmail || firstDoc.clientEmail;
     
     console.log('📞 Seleccionando datos de contacto para el grupo:', {
       clientName: firstDoc.clientName,
-      bestPhone: bestPhone || 'NO TIENE TELÉFONO',
+      bestPhone: bestPhone,
       firstDocPhone: firstDoc.clientPhone || 'NO TIENE',
       allPhones: documents.map(d => d.clientPhone || 'NULL')
     });
+    
+    // Validar que el clientPhone no sea null (requerido por schema)
+    if (!bestPhone || bestPhone === 'null' || bestPhone === '') {
+      throw new Error('No se puede crear el grupo: al menos un documento debe tener número de teléfono válido');
+    }
     
     // Crear grupo
     const groupCode = this.generateGroupCode();

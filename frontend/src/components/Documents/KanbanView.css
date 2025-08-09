@@ -1,4 +1,21 @@
-/* Estilos adicionales para KanbanView - Optimizaciones de rendimiento */
+/* Estilos adicionales para KanbanView - Optimizaciones de rendimiento y drag & drop robusto */
+
+/* NUEVO: Animaciones para feedback visual mejorado */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes pulse-error {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.02); opacity: 0.8; }
+}
+
+@keyframes success-flash {
+  0% { background-color: transparent; }
+  50% { background-color: rgba(16, 185, 129, 0.2); }
+  100% { background-color: transparent; }
+}
 
 /* Optimizaciones para scroll en móviles */
 .kanban-container {
@@ -17,11 +34,34 @@
   overflow: hidden; /* CORRECCIÓN: Contenido siempre dentro */
 }
 
+/* MEJORADO: Estilos de drag más robustos y claros */
 .document-card.dragging {
   opacity: 0.8;
   transform: rotate(2deg) scale(1.02);
   z-index: 1000;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  transition: all 0.2s ease-in-out;
+  border: 2px solid #3b82f6;
+  background: rgba(59, 130, 246, 0.05);
+}
+
+/* NUEVO: Estados visuales adicionales para drag & drop */
+.document-card.processing {
+  animation: shimmer 1s infinite, success-flash 0.5s ease-in-out;
+  border: 2px solid #10b981;
+  opacity: 0.9;
+}
+
+.document-card.drag-error {
+  animation: pulse-error 0.5s ease-in-out;
+  border: 2px solid #ef4444;
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.document-card.drag-stuck {
+  animation: pulse-error 2s infinite;
+  border: 2px dashed #f59e0b;
+  background: rgba(245, 158, 11, 0.05);
 }
 
 /* Estilos específicos para tarjetas profesionales */
