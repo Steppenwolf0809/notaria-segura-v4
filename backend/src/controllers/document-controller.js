@@ -1505,7 +1505,52 @@ async function updateDocumentGroupStatus(req, res) {
     let whatsappSent = false;
     let whatsappError = null;
     
-    if (newStatus === 'LISTO' && updatedDocuments[0]?.clientPhone && updatedDocuments[0]?.documentGroup) {
+    console.log('🔍 Verificando condiciones iniciales para WhatsApp grupal:', {
+      newStatus,
+      isListo: newStatus === 'LISTO',
+      hasClientPhone: !!updatedDocuments[0]?.clientPhone,
+      clientPhone: updatedDocuments[0]?.clientPhone,
+      hasDocumentGroupOriginal: !!updatedDocuments[0]?.documentGroup,
+      documentGroupId: updatedDocuments[0]?.documentGroupId,
+      documentGroupOriginal: updatedDocuments[0]?.documentGroup ? {
+        id: updatedDocuments[0].documentGroup.id,
+        verificationCode: updatedDocuments[0].documentGroup.verificationCode
+      } : null
+    });
+    
+    // 🔧 CORRECCIÓN: Verificar/obtener documentGroup si no está presente
+    let documentGroupForWhatsApp = updatedDocuments[0]?.documentGroup;
+    
+    if (newStatus === 'LISTO' && updatedDocuments[0]?.clientPhone && !documentGroupForWhatsApp && updatedDocuments[0]?.documentGroupId) {
+      console.log('🔄 documentGroup no incluido, obteniendo manualmente...', {
+        documentGroupId: updatedDocuments[0].documentGroupId
+      });
+      
+      try {
+        documentGroupForWhatsApp = await prisma.documentGroup.findUnique({
+          where: { id: updatedDocuments[0].documentGroupId }
+        });
+        
+        console.log('✅ DocumentGroup obtenido manualmente:', {
+          id: documentGroupForWhatsApp?.id,
+          verificationCode: documentGroupForWhatsApp?.verificationCode
+        });
+      } catch (error) {
+        console.error('❌ Error obteniendo documentGroup manualmente:', error);
+      }
+    }
+    
+    console.log('🔍 Condiciones finales para WhatsApp grupal:', {
+      newStatus,
+      isListo: newStatus === 'LISTO',
+      hasClientPhone: !!updatedDocuments[0]?.clientPhone,
+      hasDocumentGroup: !!documentGroupForWhatsApp,
+      willSendWhatsApp: newStatus === 'LISTO' && 
+                        !!updatedDocuments[0]?.clientPhone && 
+                        !!documentGroupForWhatsApp
+    });
+    
+    if (newStatus === 'LISTO' && updatedDocuments[0]?.clientPhone && documentGroupForWhatsApp) {
       try {
         const whatsappService = await import('../services/whatsapp-service.js');
         
@@ -1517,7 +1562,7 @@ async function updateDocumentGroupStatus(req, res) {
         const whatsappResult = await whatsappService.default.enviarGrupoDocumentosListo(
           cliente,
           updatedDocuments,
-          updatedDocuments[0].documentGroup.verificationCode
+          documentGroupForWhatsApp.verificationCode
         );
         
         whatsappSent = whatsappResult.success;
@@ -1533,10 +1578,37 @@ async function updateDocumentGroupStatus(req, res) {
         whatsappError = error.message;
       }
     } else {
-      console.log('❌ WhatsApp grupal NO enviado. Razones:', {
-        newStatus: newStatus !== 'LISTO' ? 'Estado no es LISTO' : 'OK',
-        clientPhone: !updatedDocuments[0]?.clientPhone ? 'clientPhone está vacío' : 'OK',
-        hasGroup: !updatedDocuments[0]?.documentGroup ? 'Sin grupo de documentos' : 'OK'
+      console.log('❌ WhatsApp grupal NO enviado. Diagnóstico detallado:', {
+        newStatus: {
+          valor: newStatus,
+          esListo: newStatus === 'LISTO',
+          problema: newStatus !== 'LISTO' ? `Estado actual '${newStatus}' no es 'LISTO'` : null
+        },
+        clientPhone: {
+          valor: updatedDocuments[0]?.clientPhone,
+          existe: !!updatedDocuments[0]?.clientPhone,
+          problema: !updatedDocuments[0]?.clientPhone ? 'clientPhone está vacío o undefined' : null
+        },
+        documentGroup: {
+          existeOriginal: !!updatedDocuments[0]?.documentGroup,
+          existeCorregido: !!documentGroupForWhatsApp,
+          documentGroupId: updatedDocuments[0]?.documentGroupId,
+          isGrouped: updatedDocuments[0]?.isGrouped,
+          grupoOriginal: updatedDocuments[0]?.documentGroup ? {
+            id: updatedDocuments[0].documentGroup.id,
+            verificationCode: updatedDocuments[0].documentGroup.verificationCode
+          } : null,
+          grupoCorregido: documentGroupForWhatsApp ? {
+            id: documentGroupForWhatsApp.id,
+            verificationCode: documentGroupForWhatsApp.verificationCode
+          } : null,
+          problema: !documentGroupForWhatsApp ? 'documentGroup no disponible ni con fallback' : null
+        },
+        resumenProblemas: [
+          newStatus !== 'LISTO' ? `Estado: ${newStatus}` : null,
+          !updatedDocuments[0]?.clientPhone ? 'Sin teléfono' : null,
+          !documentGroupForWhatsApp ? 'Sin documentGroup (ni original ni fallback)' : null
+        ].filter(Boolean)
       });
     }
 

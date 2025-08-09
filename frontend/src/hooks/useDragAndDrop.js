@@ -77,8 +77,13 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
         console.log('🌍 Global dragend detectado', {
           eventType: event.type,
           target: event.target?.tagName,
-          dataTransfer: !!event.dataTransfer
+          dataTransfer: !!event.dataTransfer,
+          isGroupedDocument: draggedItem?.isGrouped || false
         });
+        
+        // Para documentos agrupados, dar más tiempo para procesar
+        const isGroupedDocument = draggedItem?.isGrouped || false;
+        const delayTime = isGroupedDocument ? 500 : 100; // Más tiempo para agrupados
         
         // Dar tiempo para que el drop normal se procese antes de cleanup
         setTimeout(() => {
@@ -86,18 +91,34 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
             console.log('🌍 Cleanup después de dragend - no se procesó drop');
             forceCleanupDragState('global-dragend-delayed');
           }
-        }, 100);
+        }, delayTime);
       }
     };
 
     const handleGlobalMouseUp = () => {
+      // No hacer cleanup si estamos en medio de un drop
+      const { isDropping } = useDocumentStore.getState();
+      if (isDropping) {
+        console.log('🖱️ Global mouseup ignorado - drop en progreso');
+        return;
+      }
+
       // Solo cleanup si ha pasado suficiente tiempo sin que se complete el drag
       if (isDragActiveRef.current && dragStartTimeRef.current) {
         const dragDuration = Date.now() - dragStartTimeRef.current;
-        if (dragDuration > 1000) { // Solo si el drag dura más de 1 segundo
-          console.log('🖱️ Global mouseup detectado con drag activo prolongado');
+        
+        // Para documentos agrupados, usar un timeout mucho más largo
+        const isGroupedDocument = draggedItem?.isGrouped || false;
+        const cleanupThreshold = isGroupedDocument ? 5000 : 2000; // 5s para agrupados, 2s para individuales
+        
+        if (dragDuration > cleanupThreshold) {
+          console.log('🖱️ Global mouseup detectado con drag activo prolongado', {
+            dragDuration,
+            cleanupThreshold,
+            isGroupedDocument
+          });
           setTimeout(() => {
-            if (isDragActiveRef.current) {
+            if (isDragActiveRef.current && !useDocumentStore.getState().isDropping) {
               forceCleanupDragState('global-mouseup-prolonged');
             }
           }, 200);
@@ -166,10 +187,22 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
     
     console.log('🚀 Drag iniciado:', {
       documentId: document.id,
+      tramiteNumber: document.tramiteNumber,
       status: document.status,
       isGrouped: document.isGrouped,
+      groupId: document.documentGroupId,
       timestamp: new Date().toISOString()
     });
+    
+    // Debug específico para documento problemático
+    if (document.tramiteNumber?.includes('20251701018C01696')) {
+      console.log('🔍 DEBUG documento específico 20251701018C01696:', {
+        document,
+        canDrag: true,
+        event: event.type,
+        dataTransfer: !!event.dataTransfer
+      });
+    }
     
     // CRÍTICO: Verificar que tenemos dataTransfer
     if (!event.dataTransfer) {
@@ -867,6 +900,50 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
     };
   }, [forceCleanupDragState]);
 
+  /**
+   * Diagnóstico completo del estado actual
+   * NUEVO: Para debuggear problemas específicos
+   */
+  const runFullDiagnosis = useCallback((documentInfo = null) => {
+    console.log('🔬 === DIAGNÓSTICO COMPLETO DRAG & DROP ===');
+    
+    const diagnosis = {
+      currentState: {
+        draggedItem: draggedItem ? {
+          id: draggedItem.id,
+          tramiteNumber: draggedItem.tramiteNumber,
+          status: draggedItem.status,
+          isGrouped: draggedItem.isGrouped
+        } : null,
+        dragOverColumn,
+        isDropping,
+        isDragActiveRef: isDragActiveRef.current,
+        dragStartTime: dragStartTimeRef.current,
+        hasActiveTimeout: !!dragTimeoutRef.current
+      },
+      documentSpecific: documentInfo ? {
+        documentId: documentInfo.id,
+        tramiteNumber: documentInfo.tramiteNumber,
+        status: documentInfo.status,
+        canMoveToEnProceso: isValidMove(documentInfo.status, 'EN_PROCESO'),
+        validTransitions: isValidMove.toString().match(/validTransitions.*=.*{[\s\S]*?};/)?.[0] || 'No encontrado'
+      } : null,
+      systemHealth: {
+        hasCleanupTimeout: !!cleanupTimeoutRef.current,
+        dragDurationMs: dragStartTimeRef.current ? Date.now() - dragStartTimeRef.current : 0
+      }
+    };
+    
+    console.table(diagnosis.currentState);
+    if (diagnosis.documentSpecific) {
+      console.table(diagnosis.documentSpecific);
+    }
+    console.table(diagnosis.systemHealth);
+    
+    console.log('🔬 === FIN DIAGNÓSTICO ===');
+    return diagnosis;
+  }, [draggedItem, dragOverColumn, isDropping, isValidMove]);
+
   return {
     // Estado del drag & drop
     draggedItem,
@@ -905,6 +982,7 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
     // NUEVAS FUNCIONES DE DEBUGGING Y RECOVERY
     debugDragState,
     emergencyReset,
+    runFullDiagnosis,
     
     // Estado adicional para debugging
     isDragActive: isDragActiveRef.current,
