@@ -1,8 +1,7 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db.js';
 import whatsappService from '../services/whatsapp-service.js';
 import CodigoRetiroService from '../utils/codigo-retiro.js';
-
-const prisma = new PrismaClient();
+import AlertasService from '../services/alertas-service.js';
 
 async function getDashboardStats(req, res) {
   try {
@@ -197,6 +196,30 @@ async function marcarComoListo(req, res) {
             data: { status: 'LISTO', codigoRetiro: nuevoCodigo, updatedAt: new Date() }
         });
 
+        // 📈 Registrar evento de generación de código de retiro
+        try {
+          await prisma.documentEvent.create({
+            data: {
+              documentId: id,
+              userId: req.user.id,
+              eventType: 'VERIFICATION_GENERATED',
+              description: `Código de retiro generado: ${nuevoCodigo}`,
+              details: {
+                codigoRetiro: nuevoCodigo,
+                previousStatus: 'EN_PROCESO',
+                newStatus: 'LISTO',
+                generatedBy: `${req.user.firstName || 'Sistema'} ${req.user.lastName || ''}`,
+                userRole: req.user.role || 'RECEPCION',
+                timestamp: new Date().toISOString()
+              },
+              ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+              userAgent: req.get('User-Agent') || 'unknown'
+            }
+          });
+        } catch (auditError) {
+          console.error('Error registrando evento de código de retiro:', auditError);
+        }
+
         // 📱 ENVIAR NOTIFICACIÓN WHATSAPP
         try {
             const clienteData = {
@@ -216,6 +239,33 @@ async function marcarComoListo(req, res) {
             );
 
             console.log('✅ Notificación WhatsApp enviada:', whatsappResult.messageId || 'simulado');
+            
+            // 📈 Registrar evento de notificación WhatsApp enviada exitosamente
+            if (whatsappResult.success) {
+              try {
+                await prisma.documentEvent.create({
+                  data: {
+                    documentId: id,
+                    userId: req.user.id,
+                    eventType: 'WHATSAPP_SENT',
+                    description: `Notificación WhatsApp de documento listo enviada a ${document.clientPhone}`,
+                    details: {
+                      phoneNumber: document.clientPhone,
+                      messageType: 'DOCUMENT_READY',
+                      codigoRetiro: nuevoCodigo,
+                      messageId: whatsappResult.messageId || 'simulado',
+                      sentBy: `${req.user.firstName || 'Sistema'} ${req.user.lastName || ''}`,
+                      userRole: req.user.role || 'RECEPCION',
+                      timestamp: new Date().toISOString()
+                    },
+                    ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+                    userAgent: req.get('User-Agent') || 'unknown'
+                  }
+                });
+              } catch (auditError) {
+                console.error('Error registrando evento de notificación WhatsApp:', auditError);
+              }
+            }
         } catch (whatsappError) {
             // No fallar la operación principal si WhatsApp falla
             console.error('⚠️ Error enviando WhatsApp (operación continúa):', whatsappError.message);
@@ -301,10 +351,33 @@ async function marcarGrupoListo(req, res) {
     }
 }
 
+/**
+ * Obtener alertas de recepción (documentos LISTO sin entregar)
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+async function getAlertasRecepcion(req, res) {
+  try {
+    const alertas = await AlertasService.getAlertasRecepcion();
+    res.json(alertas);
+  } catch (error) {
+    console.error('Error obteniendo alertas de recepción:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error interno del servidor',
+      data: {
+        alertas: [],
+        stats: { total: 0, criticas: 0, urgentes: 0, atencion: 0, documentosListo: 0 }
+      }
+    });
+  }
+}
+
 export {
   getDashboardStats,
   getMatrizadores,
   listarTodosDocumentos,
   marcarComoListo,
-  marcarGrupoListo
+  marcarGrupoListo,
+  getAlertasRecepcion
 };

@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db.js';
 import { logAuditEvent } from '../utils/audit-logger.js';
 import jwt from 'jsonwebtoken';
 
@@ -6,8 +6,6 @@ import jwt from 'jsonwebtoken';
 const auditLogger = {
   log: logAuditEvent
 };
-
-const prisma = new PrismaClient();
 
 /**
  * Controlador para gestión de notificaciones por administradores

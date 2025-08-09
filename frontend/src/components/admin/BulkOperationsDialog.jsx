@@ -59,7 +59,8 @@ const BulkOperationsDialog = ({ open, onClose, selectedDocuments, onOperationCom
     if (!selectedDocuments || selectedDocuments.length === 0) return;
 
     try {
-      const response = await fetch('http://localhost:3001/api/admin/documents/bulk-info', {
+      const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
+      const response = await fetch(`${API_BASE_URL}/admin/documents/bulk-info`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -84,7 +85,8 @@ const BulkOperationsDialog = ({ open, onClose, selectedDocuments, onOperationCom
    */
   const loadMatrizadores = async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/admin/users?role=MATRIZADOR&status=active&limit=100', {
+      const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
+      const response = await fetch(`${API_BASE_URL}/admin/users?role=MATRIZADOR&status=active&limit=100`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -144,7 +146,8 @@ const BulkOperationsDialog = ({ open, onClose, selectedDocuments, onOperationCom
         ...(operation === 'changeStatus' && { newStatus })
       };
 
-      const response = await fetch('http://localhost:3001/api/admin/documents/bulk-operation', {
+      const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
+      const response = await fetch(`${API_BASE_URL}/admin/documents/bulk-operation`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

@@ -1,10 +1,9 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db.js';
+import { sendSuccess, sendError, sendUnauthorized, sendValidationError, sanitizeResponse } from '../utils/http.js';
 import { validatePassword, sanitizePassword } from '../utils/password-validator.js';
 import { logPasswordChange, logLoginAttempt, extractRequestInfo } from '../utils/audit-logger.js';
-
-const prisma = new PrismaClient();
 
 /**
  * Roles válidos del sistema (completo con ARCHIVO)
@@ -146,18 +145,12 @@ async function login(req, res) {
     });
 
     if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'Credenciales inválidas'
-      });
+      return sendUnauthorized(res, 'Credenciales inválidas');
     }
 
     // Verificar si el usuario está activo
     if (!user.isActive) {
-      return res.status(401).json({
-        success: false,
-        message: 'Usuario desactivado'
-      });
+      return sendUnauthorized(res, 'Usuario desactivado');
     }
 
     // Verificar contraseña
@@ -173,10 +166,7 @@ async function login(req, res) {
         reason: 'Contraseña incorrecta'
       });
 
-      return res.status(401).json({
-        success: false,
-        message: 'Credenciales inválidas'
-      });
+      return sendUnauthorized(res, 'Credenciales inválidas');
     }
 
     // Actualizar último login
@@ -198,28 +188,24 @@ async function login(req, res) {
     // Generar token
     const token = generateToken(user);
 
-    res.json({
-      success: true,
+    return sendSuccess(res, {
       message: 'Inicio de sesión exitoso',
       data: {
-        user: {
+        user: sanitizeResponse({
           id: user.id,
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
           role: user.role,
           roleColor: getRoleColor(user.role)
-        },
+        }),
         token
       }
     });
 
   } catch (error) {
     console.error('Error en login:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error interno del servidor'
-    });
+    return sendError(res);
   }
 }
 

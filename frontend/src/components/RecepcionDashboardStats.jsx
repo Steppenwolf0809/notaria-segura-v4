@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Card,
@@ -19,11 +19,14 @@ import {
   Groups as GroupsIcon,
   TrendingUp as TrendingUpIcon
 } from '@mui/icons-material';
+import AlertasPanel from './alertas/AlertasPanel';
+import AlertasModal from './alertas/AlertasModal';
 
 /**
  * Componente para mostrar estadísticas del dashboard de recepción
  */
 function RecepcionDashboardStats({ estadisticas, onEstadisticasChange }) {
+  const [alertasModalOpen, setAlertasModalOpen] = useState(false);
   const stats = estadisticas || {
     documentosEnProceso: 0,
     documentosListos: 0,
@@ -78,6 +81,22 @@ function RecepcionDashboardStats({ estadisticas, onEstadisticasChange }) {
           Gestión completa: Marcar documentos como listos y gestionar entregas
         </Typography>
       </Box>
+
+      {/* Panel de Alertas */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid item xs={12}>
+          <AlertasPanel
+            userRole="RECEPCION"
+            onDocumentClick={(alerta) => {
+              console.log('Documento seleccionado:', alerta);
+              // Aquí puedes agregar lógica para navegar al documento
+              // Por ejemplo: onDocumentClick?.(alerta);
+            }}
+            compact={false}
+            maxHeight={300}
+          />
+        </Grid>
+      </Grid>
 
       {/* Tarjetas de estadísticas */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
@@ -265,6 +284,17 @@ function RecepcionDashboardStats({ estadisticas, onEstadisticasChange }) {
           • Gestiona entregas individuales y grupales
         </Typography>
       </Paper>
+
+      {/* Modal detallado de alertas */}
+      <AlertasModal
+        open={alertasModalOpen}
+        onClose={() => setAlertasModalOpen(false)}
+        userRole="RECEPCION"
+        onDocumentClick={(alerta) => {
+          console.log('Documento seleccionado desde modal:', alerta);
+          // Aquí puedes agregar lógica para navegar al documento
+        }}
+      />
     </Box>
   );
 }

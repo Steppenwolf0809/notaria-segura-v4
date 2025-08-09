@@ -51,7 +51,8 @@ const NotificationHistory = () => {
       setLoading(true);
       setError(null);
 
-      const response = await fetch('http://localhost:3001/api/admin/notificaciones', {
+      const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
+      const response = await fetch(`${API_BASE_URL}/admin/notificaciones`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

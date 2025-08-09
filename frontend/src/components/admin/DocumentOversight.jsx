@@ -126,7 +126,8 @@ const DocumentOversight = () => {
       if (matrizadorFilter) params.append('matrizador', matrizadorFilter);
       if (overdueOnly) params.append('overdueOnly', 'true');
 
-      const response = await fetch(`http://localhost:3001/api/admin/documents/oversight?${params}`, {
+      const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
+      const response = await fetch(`${API_BASE_URL}/admin/documents/oversight?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -158,7 +159,8 @@ const DocumentOversight = () => {
    */
   const loadMatrizadores = useCallback(async () => {
     try {
-      const response = await fetch('http://localhost:3001/api/admin/users?role=MATRIZADOR&limit=100', {
+      const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
+      const response = await fetch(`${API_BASE_URL}/admin/users?role=MATRIZADOR&limit=100`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -311,7 +313,8 @@ const DocumentOversight = () => {
         overdueOnly: overdueOnly ? 'true' : 'false'
       });
 
-      const response = await fetch(`http://localhost:3001/api/admin/documents/export?${params}`, {
+      const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
+      const response = await fetch(`${API_BASE_URL}/admin/documents/export?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

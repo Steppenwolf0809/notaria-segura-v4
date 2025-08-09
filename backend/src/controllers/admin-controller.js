@@ -1,14 +1,13 @@
 import bcrypt from 'bcryptjs';
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db.js';
 import { validatePassword, sanitizePassword } from '../utils/password-validator.js';
+import { sendSuccess, sendError, sendNotFound, sendConflict, sendPaginated, sanitizeResponse } from '../utils/http.js';
 import { 
   logAdminAction, 
   logUserListAccess, 
   extractRequestInfo, 
   AuditEventTypes 
 } from '../utils/audit-logger.js';
-
-const prisma = new PrismaClient();
 
 /**
  * Roles válidos del sistema
@@ -81,27 +80,21 @@ async function getAllUsers(req, res) {
 
     const totalPages = Math.ceil(totalCount / take);
 
-    res.json({
-      success: true,
-      data: {
-        users,
-        pagination: {
-          currentPage: parseInt(page),
-          totalPages,
-          totalCount,
-          limit: take,
-          hasNextPage: parseInt(page) < totalPages,
-          hasPrevPage: parseInt(page) > 1
-        }
+    return sendPaginated(res, 
+      sanitizeResponse(users, ['password']), 
+      {
+        page: parseInt(page),
+        limit: take,
+        total: totalCount,
+        totalPages,
+        hasNextPage: parseInt(page) < totalPages,
+        hasPrevPage: parseInt(page) > 1
       }
-    });
+    );
 
   } catch (error) {
     console.error('Error obteniendo usuarios:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error interno del servidor'
-    });
+    return sendError(res);
   }
 }
 
@@ -217,10 +210,7 @@ async function createUser(req, res) {
         userAgent: requestInfo.userAgent
       });
 
-      return res.status(400).json({
-        success: false,
-        message: 'Ya existe un usuario con este email'
-      });
+      return sendConflict(res, 'Ya existe un usuario con este email');
     }
 
     // Validar contraseña

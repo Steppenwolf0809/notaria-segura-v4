@@ -96,12 +96,24 @@ function formatEventDescription(event) {
       }
 
     case 'WHATSAPP_SENT':
-      if (details.status === 'SENT' || details.whatsappSent) {
-        const recipient = details.clientName || 'cliente';
-        return `Notificación WhatsApp enviada exitosamente a ${recipient}`;
-      } else {
-        const error = details.errorMessage || 'Error desconocido';
-        return `Error al enviar WhatsApp: ${error}`;
+      const messageType = details.messageType;
+      const phoneNumber = details.phoneNumber || 'cliente';
+      
+      switch (messageType) {
+        case 'DOCUMENT_READY':
+          return `Notificación de documento listo enviada a ${phoneNumber}`;
+        case 'DOCUMENT_DELIVERED':
+          return `Notificación de entrega enviada a ${phoneNumber}`;
+        case 'GROUP_DELIVERY':
+          return `Notificación de entrega grupal enviada a ${phoneNumber}`;
+        default:
+          if (details.status === 'SENT' || details.whatsappSent) {
+            const recipient = details.clientName || phoneNumber;
+            return `Notificación WhatsApp enviada a ${recipient}`;
+          } else {
+            const error = details.errorMessage || 'Error desconocido';
+            return `Error al enviar WhatsApp: ${error}`;
+          }
       }
 
     default:

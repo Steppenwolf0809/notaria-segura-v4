@@ -12,9 +12,7 @@
  * - Prioriza usuarios ADMIN sobre MATRIZADOR en caso de empate
  */
 
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import prisma from '../db.js';
 
 class MatrizadorAssignmentService {
   

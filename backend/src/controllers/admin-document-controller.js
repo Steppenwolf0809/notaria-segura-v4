@@ -1,11 +1,9 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db.js';
 import { 
   logAdminAction,
   logUserListAccess,
   extractRequestInfo 
 } from '../utils/audit-logger.js';
-
-const prisma = new PrismaClient();
 
 /**
  * Obtener todos los documentos con filtros avanzados para supervisión

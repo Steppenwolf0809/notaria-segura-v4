@@ -4,7 +4,10 @@
 class AdminNotificationService {
   constructor(token) {
     this.token = token;
-    this.baseUrl = 'http://localhost:3001/api/admin/notifications';
+    const apiBase = (typeof import !== 'undefined' && typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_URL)
+      ? import.meta.env.VITE_API_URL
+      : 'http://localhost:3001/api';
+    this.baseUrl = `${apiBase}/admin/notifications`;
   }
 
   async getStats() {

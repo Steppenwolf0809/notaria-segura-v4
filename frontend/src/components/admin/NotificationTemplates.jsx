@@ -115,7 +115,8 @@ const NotificationTemplates = () => {
       setLoading(true);
       setError(null);
 
-      const response = await fetch('http://localhost:3001/api/admin/notifications/templates', {
+      const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
+      const response = await fetch(`${API_BASE_URL}/admin/notifications/templates`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -195,8 +196,8 @@ const NotificationTemplates = () => {
       }
 
       const url = editingTemplate 
-        ? `http://localhost:3001/api/admin/notifications/templates/${editingTemplate.id}`
-        : 'http://localhost:3001/api/admin/notifications/templates';
+        ? `${(import.meta.env?.VITE_API_URL || 'http://localhost:3001/api')}/admin/notifications/templates/${editingTemplate.id}`
+        : `${(import.meta.env?.VITE_API_URL || 'http://localhost:3001/api')}/admin/notifications/templates`;
 
       const method = editingTemplate ? 'PUT' : 'POST';
 
@@ -232,7 +233,8 @@ const NotificationTemplates = () => {
     }
 
     try {
-      const response = await fetch(`http://localhost:3001/api/admin/notifications/templates/${templateId}`, {
+      const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
+      const response = await fetch(`${API_BASE_URL}/admin/notifications/templates/${templateId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -282,7 +284,8 @@ const NotificationTemplates = () => {
     if (!testPhone) return;
 
     try {
-      const response = await fetch('http://localhost:3001/api/admin/notifications/test', {
+      const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
+      const response = await fetch(`${API_BASE_URL}/admin/notifications/test`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

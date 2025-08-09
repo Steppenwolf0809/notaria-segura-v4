@@ -147,7 +147,8 @@ const LoginForm = () => {
           {/* Error Alert */}
           {error && (
             <Alert 
-              severity="error" 
+              severity="error"
+              variant="filled"
               sx={{ mb: 2 }}
               onClose={clearError}
             >

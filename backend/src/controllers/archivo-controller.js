@@ -1,8 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db.js';
 import whatsappService from '../services/whatsapp-service.js';
 import CodigoRetiroService from '../utils/codigo-retiro.js';
-
-const prisma = new PrismaClient();
 
 /**
  * CONTROLADOR DE ARCHIVO
@@ -195,6 +193,30 @@ async function cambiarEstadoDocumento(req, res) {
       } else {
         codigoGenerado = await CodigoRetiroService.generarUnico();
         updateData.codigoRetiro = codigoGenerado;
+        
+        // 📈 Registrar evento de generación de código de retiro
+        try {
+          await prisma.documentEvent.create({
+            data: {
+              documentId: id,
+              userId: req.user.id,
+              eventType: 'VERIFICATION_GENERATED',
+              description: `Código de retiro generado por archivo: ${codigoGenerado}`,
+              details: {
+                codigoRetiro: codigoGenerado,
+                previousStatus: documento.status,
+                newStatus: nuevoEstado,
+                generatedBy: `${req.user.firstName} ${req.user.lastName}`,
+                userRole: 'ARCHIVO',
+                timestamp: new Date().toISOString()
+              },
+              ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+              userAgent: req.get('User-Agent') || 'unknown'
+            }
+          });
+        } catch (auditError) {
+          console.error('Error registrando evento de código de retiro:', auditError);
+        }
       }
     }
 
@@ -471,7 +493,7 @@ async function procesarEntregaDocumento(req, res) {
             data: {
               documentId: doc.id,
               userId: userId,
-              eventType: 'DOCUMENTO_ENTREGADO',
+              eventType: 'STATUS_CHANGED',
               description: `Documento entregado grupalmente por ARQUIVO a ${entregadoA}`,
               metadata: {
                 entregadoA,

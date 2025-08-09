@@ -213,12 +213,19 @@ const QuickGroupingModal = ({
                 control={<Checkbox checked disabled />}
                 label={
                   <Box>
-                    <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                      {mainDocument.documentType}
+                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                      {mainDocument.actoPrincipalDescripcion || mainDocument.documentType}
                     </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      Protocolo: {mainDocument.protocolNumber}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mt: 0.25 }}>
+                      <Chip 
+                        label={mainDocument.documentType}
+                        size="small"
+                        sx={{ height: 22, fontSize: '0.7rem' }}
+                      />
+                      <Typography variant="body2" color="textSecondary">
+                        Protocolo: {mainDocument.protocolNumber}
+                      </Typography>
+                    </Box>
                     <Chip 
                       label={mainDocument.status} 
                       size="small" 
@@ -284,12 +291,19 @@ const QuickGroupingModal = ({
                   }
                   label={
                     <Box>
-                      <Typography variant="body1" sx={{ fontWeight: 500 }}>
-                        {doc.documentType}
+                      <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                        {doc.actoPrincipalDescripcion || doc.documentType}
                       </Typography>
-                      <Typography variant="body2" color="textSecondary">
-                        Protocolo: {doc.protocolNumber}
-                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mt: 0.25 }}>
+                        <Chip 
+                          label={doc.documentType}
+                          size="small"
+                          sx={{ height: 22, fontSize: '0.7rem' }}
+                        />
+                        <Typography variant="body2" color="textSecondary">
+                          Protocolo: {doc.protocolNumber}
+                        </Typography>
+                      </Box>
                       <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
                         <Chip 
                           label={doc.status} 
@@ -318,7 +332,8 @@ const QuickGroupingModal = ({
           <List sx={{ py: 0 }}>
             <ListItem sx={{ py: 0.25, px: 0 }}>
               <ListItemText 
-                primary={`• ${mainDocument.documentType} (principal)`}
+                primary={`• ${mainDocument.actoPrincipalDescripcion || mainDocument.documentType} (principal)`}
+                secondary={`Protocolo: ${mainDocument.protocolNumber}`}
                 sx={{ my: 0 }}
               />
             </ListItem>
@@ -327,7 +342,8 @@ const QuickGroupingModal = ({
               .map(doc => (
                 <ListItem key={doc.id} sx={{ py: 0.25, px: 0 }}>
                   <ListItemText 
-                    primary={`• ${doc.documentType}`}
+                    primary={`• ${doc.actoPrincipalDescripcion || doc.documentType}`}
+                    secondary={`Protocolo: ${doc.protocolNumber}`}
                     sx={{ my: 0 }}
                   />
                 </ListItem>
