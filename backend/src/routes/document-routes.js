@@ -27,7 +27,9 @@ import {
   getDocumentHistory,
   // 🔗 Funciones de grupos
   updateDocumentGroupStatus,
-  updateDocumentGroupInfo
+  updateDocumentGroupInfo,
+  // 🔓 Desagrupar documento
+  ungroupDocument
 } from '../controllers/document-controller.js';
 
 const router = express.Router();
@@ -92,6 +94,9 @@ router.put('/group/status', authenticateToken, updateDocumentGroupStatus);
 
 // PUT /api/documents/:id/status - MATRIZADOR: Actualizar estado
 router.put('/:id/status', authenticateToken, updateDocumentStatus);
+
+// 🔓 PUT /api/documents/:id/ungroup - Desagrupar documento del grupo
+router.put('/:id/ungroup', authenticateToken, ungroupDocument);
 
 // POST /api/documents/:id/deliver - RECEPCION: Entregar documento con información completa
 router.post('/:id/deliver', authenticateToken, deliverDocument);

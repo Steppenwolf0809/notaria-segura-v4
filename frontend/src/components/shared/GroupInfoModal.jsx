@@ -33,6 +33,7 @@ import {
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import useDocumentStore from '../../store/document-store';
+import useAuthStore from '../../store/auth-store';
 
 /**
  * Modal para mostrar información detallada de un grupo de documentos
@@ -41,7 +42,9 @@ import useDocumentStore from '../../store/document-store';
 const GroupInfoModal = ({ open, onClose, document }) => {
   const [groupDocuments, setGroupDocuments] = useState([]);
   const [loading, setLoading] = useState(false);
-  const { documents } = useDocumentStore();
+  const [ungroupLoading, setUngroupLoading] = useState(false);
+  const { documents, ungroupDocument, fetchMyDocuments, fetchAllDocuments } = useDocumentStore();
+  const { user } = useAuthStore();
 
   // Cargar documentos del grupo cuando se abre el modal
   useEffect(() => {
@@ -108,6 +111,35 @@ const GroupInfoModal = ({ open, onClose, document }) => {
   if (!document || !document.isGrouped) {
     return null;
   }
+
+  const canUngroup = ['MATRIZADOR', 'RECEPCION', 'ARCHIVO', 'ADMIN'].includes(user?.role);
+
+  const handleUngroup = async () => {
+    if (!document?.id) return;
+    setUngroupLoading(true);
+    try {
+      // Cerrar primero para evitar updates durante render de otros componentes
+      onClose?.();
+      const result = await ungroupDocument(document.id);
+      if (result.success) {
+        // Refrescar según rol (en siguiente tick)
+        setTimeout(async () => {
+          if (['MATRIZADOR', 'ARCHIVO'].includes(user?.role)) {
+            await fetchMyDocuments();
+          } else {
+            await fetchAllDocuments();
+          }
+        }, 0);
+      } else {
+        alert(result.error || 'No se pudo desagrupar el documento');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error inesperado al desagrupar');
+    } finally {
+      setUngroupLoading(false);
+    }
+  };
 
   return (
     <Dialog 
@@ -300,7 +332,21 @@ const GroupInfoModal = ({ open, onClose, document }) => {
         )}
       </DialogContent>
 
-      <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
+      <DialogActions sx={{ px: 3, pb: 2, gap: 1, justifyContent: 'space-between' }}>
+        {canUngroup && (
+          <Tooltip title="Separar este documento del grupo (permite entrega parcial)">
+            <span>
+              <Button 
+                onClick={handleUngroup}
+                variant="outlined"
+                color="warning"
+                disabled={ungroupLoading}
+              >
+                {ungroupLoading ? 'Desagrupando...' : 'Desagrupar este documento'}
+              </Button>
+            </span>
+          </Tooltip>
+        )}
         <Button 
           onClick={onClose} 
           variant="contained"

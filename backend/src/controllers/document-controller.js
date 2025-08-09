@@ -1661,6 +1661,131 @@ async function updateDocumentGroupInfo(req, res) {
 }
 
 /**
+ * Desagrupar un documento del grupo
+ * Permite separar un documento para entrega/gestión individual
+ */
+async function ungroupDocument(req, res) {
+  try {
+    const { id } = req.params;
+
+    // Roles permitidos: MATRIZADOR, RECEPCION, ARCHIVO, ADMIN
+    if (!['MATRIZADOR', 'RECEPCION', 'ARCHIVO', 'ADMIN'].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para desagrupar documentos'
+      });
+    }
+
+    // Buscar documento con su grupo
+    const document = await prisma.document.findUnique({
+      where: { id },
+      include: {
+        documentGroup: true
+      }
+    });
+
+    if (!document) {
+      return res.status(404).json({ success: false, message: 'Documento no encontrado' });
+    }
+
+    if (!document.isGrouped || !document.documentGroupId) {
+      return res.status(400).json({ success: false, message: 'El documento no pertenece a un grupo' });
+    }
+
+    if (document.status === 'ENTREGADO') {
+      return res.status(400).json({ success: false, message: 'No se puede desagrupar un documento ya entregado' });
+    }
+
+    // Regla de propiedad para MATRIZADOR: debe ser dueño del documento
+    if (req.user.role === 'MATRIZADOR' && document.assignedToId !== req.user.id) {
+      return res.status(403).json({ success: false, message: 'Solo puedes desagrupar documentos asignados a ti' });
+    }
+
+    const groupId = document.documentGroupId;
+
+    // Transacción para consistencia
+    const result = await prisma.$transaction(async (tx) => {
+      // Desagrupar documento actual
+      const updated = await tx.document.update({
+        where: { id },
+        data: {
+          isGrouped: false,
+          documentGroupId: null,
+          groupLeaderId: null,
+          groupPosition: null,
+          groupVerificationCode: null,
+          verificationCode: null
+        }
+      });
+
+      // Recontar documentos restantes en el grupo
+      const remaining = await tx.document.findMany({
+        where: { documentGroupId: groupId, isGrouped: true }
+      });
+
+      // Si quedan menos de 2, desagrupar todos y eliminar el grupo
+      if (remaining.length < 2) {
+        if (remaining.length === 1) {
+          const lastId = remaining[0].id;
+          await tx.document.update({
+            where: { id: lastId },
+            data: {
+              isGrouped: false,
+              documentGroupId: null,
+              groupLeaderId: null,
+              groupPosition: null,
+              groupVerificationCode: null,
+              verificationCode: null
+            }
+          });
+        }
+        // Eliminar el registro de grupo
+        await tx.documentGroup.delete({ where: { id: groupId } });
+      } else {
+        // Actualizar el contador del grupo si se mantiene
+        await tx.documentGroup.update({
+          where: { id: groupId },
+          data: { documentsCount: remaining.length }
+        });
+      }
+
+      // Evento de auditoría (usar STATUS_CHANGED para no modificar esquema)
+      try {
+        await tx.documentEvent.create({
+          data: {
+            documentId: id,
+            userId: req.user.id,
+            eventType: 'STATUS_CHANGED',
+            description: `Documento desagrupado del grupo por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
+            details: {
+              action: 'UNGROUP_DOCUMENT',
+              previousGroupId: groupId,
+              groupRemoved: remaining.length < 2,
+              timestamp: new Date().toISOString()
+            },
+            ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+            userAgent: req.get('User-Agent') || 'unknown'
+          }
+        });
+      } catch (auditError) {
+        console.warn('Auditoría: no se pudo registrar evento de desagrupación', auditError.message);
+      }
+
+      return { updatedDocument: updated, groupId, groupDisbanded: remaining.length < 2 };
+    });
+
+    return res.json({
+      success: true,
+      message: result.groupDisbanded ? 'Documento desagrupado y grupo disuelto' : 'Documento desagrupado exitosamente',
+      data: result
+    });
+  } catch (error) {
+    console.error('Error desagrupando documento:', error);
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
+  }
+}
+
+/**
  * Entregar documento con información completa de recepción
  * Función para RECEPCION: Marcar documento como entregado con detalles
  * @param {Object} req - Request object
@@ -1743,7 +1868,7 @@ async function deliverDocument(req, res) {
       });
     }
 
-    // Verificar código de verificación si no es manual
+    // Verificar código de verificación si no es manual (aceptar individual o grupal)
     if (!verificacionManual) {
       if (!codigoVerificacion) {
         return res.status(400).json({
@@ -1751,8 +1876,9 @@ async function deliverDocument(req, res) {
           message: 'Código de verificación es obligatorio'
         });
       }
-      
-      if (document.verificationCode !== codigoVerificacion) {
+
+      const expectedCode = document.verificationCode || document.groupVerificationCode || document.codigoRetiro;
+      if (!expectedCode || expectedCode !== codigoVerificacion) {
         return res.status(400).json({
           success: false,
           message: 'Código de verificación incorrecto'
@@ -2763,5 +2889,7 @@ export {
   getDocumentHistory,
   // 🔗 Funciones de grupos
   updateDocumentGroupStatus,
-  updateDocumentGroupInfo
+  updateDocumentGroupInfo,
+  // 🔓 Desagrupación
+  ungroupDocument
 }; 

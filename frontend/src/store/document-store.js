@@ -722,6 +722,35 @@ const useDocumentStore = create((set, get) => ({
   },
 
   /**
+   * 🔓 Desagrupar documento
+   * @param {string} documentId - ID del documento a desagrupar
+   * @returns {Promise<Object>} Resultado de la operación
+   */
+  ungroupDocument: async (documentId) => {
+    set({ loading: true, error: null });
+    try {
+      const result = await documentService.ungroupDocument(documentId);
+      if (result.success) {
+        // Refrescar lista de documentos del usuario si aplica
+        const currentUser = useAuthStore.getState().user;
+        if (currentUser?.role === 'MATRIZADOR' || currentUser?.role === 'ARCHIVO') {
+          await useDocumentStore.getState().fetchMyDocuments();
+        } else {
+          await useDocumentStore.getState().fetchAllDocuments();
+        }
+        set({ loading: false });
+        return { success: true, message: result.message, data: result.data };
+      }
+      set({ loading: false, error: result.message || 'Error al desagrupar documento' });
+      return { success: false, error: result.message };
+    } catch (error) {
+      console.error('Error en ungroupDocument:', error);
+      set({ loading: false, error: 'Error inesperado al desagrupar documento' });
+      return { success: false, error: 'Error inesperado al desagrupar documento' };
+    }
+  },
+
+  /**
    * Detectar documentos agrupables
    * @param {Object} clientData - Datos del cliente
    * @returns {Promise<Object>} Documentos agrupables
