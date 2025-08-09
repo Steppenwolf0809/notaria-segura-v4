@@ -23,7 +23,8 @@
       "Bash(pkill:*)",
       "Bash(true)",
       "Bash(PORT=3001 timeout 5s node server.js)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(chmod:*)"
     ],
     "deny": []
   }
