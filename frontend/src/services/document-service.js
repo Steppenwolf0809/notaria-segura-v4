@@ -236,10 +236,34 @@ const documentService = {
     });
     
     try {
+      // Preparar el cuerpo de la petición
       const requestBody = { 
         status: newStatus,
         ...options
       };
+
+      // Si no se proporciona una razón de reversión, detectar automáticamente si es necesaria
+      if (!requestBody.reversionReason) {
+        try {
+          // Obtener el documento actual para verificar si es una reversión
+          const currentDoc = await this.getDocumentById(documentId);
+          if (currentDoc.success && currentDoc.data?.document) {
+            const currentStatus = currentDoc.data.document.status;
+            const statusOrder = ['PENDIENTE', 'EN_PROCESO', 'LISTO', 'ENTREGADO'];
+            const currentIndex = statusOrder.indexOf(currentStatus);
+            const newIndex = statusOrder.indexOf(newStatus);
+            
+            // Si es una reversión, agregar una razón por defecto
+            if (newIndex < currentIndex && newIndex >= 0) {
+              requestBody.reversionReason = 'Cambio de estado desde interfaz de usuario (drag & drop)';
+              console.log('🔄 SERVICE: Reversión detectada, agregando razón automática');
+            }
+          }
+        } catch (reversionCheckError) {
+          console.warn('⚠️ SERVICE: Error verificando reversión, continuando sin razón:', reversionCheckError);
+        }
+      }
+
       console.log('📤 SERVICE: Enviando request al backend:', requestBody);
       
       const response = await api.put(`/documents/${documentId}/status`, requestBody);
