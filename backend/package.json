@@ -6,11 +6,16 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "start:prod": "prisma generate && prisma db push --accept-data-loss && node server.js",
+    "build": "prisma generate && prisma db deploy",
+    "start:prod": "prisma generate && prisma db deploy && node server.js",
+    "postdeploy": "node ../scripts/setup-production-data.js",
     "dev": "nodemon server.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "db:studio": "prisma studio"
+    "db:deploy": "prisma db deploy",
+    "db:studio": "prisma studio",
+    "setup:prod": "node ../scripts/setup-production-data.js",
+    "verify:prod": "node ../scripts/verify-production.js"
   },
   "dependencies": {
     "@prisma/client": "^5.7.0",

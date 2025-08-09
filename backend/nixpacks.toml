@@ -1,0 +1,21 @@
+# Railway nixpacks.toml para Node.js con Prisma
+[phases.setup]
+nixPkgs = ["nodejs_20", "npm-9_x", "openssl"]
+
+[phases.install]
+cmds = [
+    "npm ci --only=production",
+    "npx prisma generate"
+]
+
+[phases.build]
+cmds = [
+    "npx prisma generate",
+    "npx prisma db deploy"
+]
+
+[start]
+cmd = "node server.js"
+
+[variables]
+NODE_ENV = "production"
