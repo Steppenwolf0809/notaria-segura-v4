@@ -144,6 +144,10 @@ async function listarTodosDocumentos(req, res) {
       clientPhone: doc.clientPhone,
       documentType: doc.documentType,
       status: doc.status,
+      // 🔗 Campos de agrupación para que el frontend muestre chips e info de grupo
+      isGrouped: doc.isGrouped,
+      documentGroupId: doc.documentGroupId,
+      groupVerificationCode: doc.groupVerificationCode,
       matrizador: doc.assignedTo ? `${doc.assignedTo.firstName} ${doc.assignedTo.lastName}` : 'No asignado',
       matrizadorId: doc.assignedToId,
       codigoRetiro: doc.codigoRetiro,

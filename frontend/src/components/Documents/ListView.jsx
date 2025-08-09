@@ -16,26 +16,30 @@ import {
   Tooltip,
   Menu,
   MenuItem,
-  TableSortLabel
+  TableSortLabel,
+  ListItemIcon,
+  ListItemText
 } from '@mui/material';
 import {
   Visibility as ViewIcon,
   MoreVert as MoreIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  Phone as PhoneIcon
+  Phone as PhoneIcon,
+  GroupWork as GroupWorkIcon
 } from '@mui/icons-material';
 import useDocumentStore from '../../store/document-store';
 import DocumentDetailModal from './DocumentDetailModal';
 import GroupingAlert from '../grouping/GroupingAlert';
 import { formatCurrency } from '../../utils/currencyUtils';
+import QuickGroupingModal from '../grouping/QuickGroupingModal';
 
 /**
  * Vista Lista - EXACTA AL PROTOTIPO
  * Tabla completa con todas las funcionalidades
  */
 const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
-  const { documents, updateDocumentStatus, updateDocument } = useDocumentStore();
+  const { documents, updateDocumentStatus, updateDocument, createDocumentGroup, detectGroupableDocuments } = useDocumentStore();
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [page, setPage] = useState(0);
@@ -44,6 +48,13 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
   const [order, setOrder] = useState('desc');
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedRowId, setSelectedRowId] = useState(null);
+
+  // 🔗 Estados para agrupación rápida reutilizando modal existente
+  const [showQuickGroupingModal, setShowQuickGroupingModal] = useState(false);
+  const [pendingGroupData, setPendingGroupData] = useState({ main: null, related: [] });
+  const [groupingLoading, setGroupingLoading] = useState(false);
+  const [groupInfoModalOpen, setGroupInfoModalOpen] = useState(false);
+  const [selectedGroupDocument, setSelectedGroupDocument] = useState(null);
 
   /**
    * Filtrar y ordenar documentos
@@ -180,6 +191,40 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
     handleMenuClose();
   };
 
+  /**
+   * Abrir flujo de agrupación rápida desde un documento
+   */
+  const handleOpenGroupingFromDocument = async (document) => {
+    try {
+      // Detectar documentos agrupables para el cliente
+      const result = await detectGroupableDocuments({
+        clientName: document.clientName,
+        clientPhone: document.clientPhone || ''
+      });
+
+      const related = (result.groupableDocuments || []).filter(d => d.id !== document.id);
+      if (result.success && related.length > 0) {
+        setPendingGroupData({ main: document, related });
+        setShowQuickGroupingModal(true);
+      } else {
+        // Silencioso: cerrar menú sin ruido si no hay agrupables
+      }
+    } catch (e) {
+      // Silencioso para no ensuciar la vista lista
+      console.error('Error detectando agrupables (ListView):', e);
+    } finally {
+      handleMenuClose();
+    }
+  };
+
+  /**
+   * Callback para chip/alerta de agrupación
+   */
+  const handleGroupDocuments = (groupableDocuments, mainDocument) => {
+    setPendingGroupData({ main: mainDocument, related: groupableDocuments });
+    setShowQuickGroupingModal(true);
+  };
+
   // Documentos de la página actual
   const paginatedDocuments = filteredAndSortedDocuments.slice(
     page * rowsPerPage,
@@ -314,10 +359,24 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
                           variant="filled"
                         />
                         {/* 🔗 ALERTA DE AGRUPACIÓN COMPACTA */}
-                        {!document.isGrouped && (
+                        {/* Mostrar chip de agrupación si aplica; si ya está agrupado, mostrar texto sutil */}
+                        {!document.isGrouped ? (
                           <GroupingAlert
                             document={document}
                             variant="chip"
+                            onGroupAction={handleGroupDocuments}
+                          />
+                        ) : (
+                          <Chip 
+                            label="⚡ Parte de un grupo"
+                            size="small"
+                            variant="outlined"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedGroupDocument(document);
+                              setGroupInfoModalOpen(true);
+                            }}
+                            sx={{ mt: 0.5, height: '20px', '& .MuiChip-label': { px: 1 } }}
                           />
                         )}
                       </Box>
@@ -412,6 +471,20 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
           <EditIcon sx={{ mr: 1, fontSize: 16 }} />
           Marcar Entregado
         </MenuItem>
+        {/* Agrupar documentos del mismo cliente (EN_PROCESO o LISTO) */}
+        {(() => {
+          const doc = documents.find(d => d.id === selectedRowId);
+          const canGroup = doc && !doc.isGrouped && (doc.status === 'EN_PROCESO' || doc.status === 'LISTO');
+          if (!canGroup) return null;
+          return (
+            <MenuItem onClick={() => handleOpenGroupingFromDocument(doc)}>
+              <ListItemIcon>
+                <GroupWorkIcon fontSize="small" />
+              </ListItemIcon>
+              <ListItemText>Agrupar documentos</ListItemText>
+            </MenuItem>
+          );
+        })()}
       </Menu>
 
       {/* Modal de Detalle */}
@@ -420,6 +493,38 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
         onClose={closeDetailModal}
         document={selectedDocument}
         onDocumentUpdated={handleDocumentUpdated}
+      />
+
+      {/* Modal de información de grupo (reutilizado) */}
+      {groupInfoModalOpen && selectedGroupDocument && (
+        <GroupInfoModal
+          open={groupInfoModalOpen}
+          onClose={() => { setGroupInfoModalOpen(false); setSelectedGroupDocument(null); }}
+          document={selectedGroupDocument}
+        />
+      )}
+
+      {/* Modal de agrupación rápida (reutilizado sin duplicar lógica) */}
+      <QuickGroupingModal
+        open={showQuickGroupingModal}
+        onClose={() => setShowQuickGroupingModal(false)}
+        mainDocument={pendingGroupData.main}
+        relatedDocuments={pendingGroupData.related}
+        loading={groupingLoading}
+        onConfirm={async (selectedDocumentIds) => {
+          if (pendingGroupData.main && selectedDocumentIds.length > 0) {
+            setGroupingLoading(true);
+            try {
+              const documentIds = [pendingGroupData.main.id, ...selectedDocumentIds];
+              await createDocumentGroup(documentIds);
+            } finally {
+              setGroupingLoading(false);
+              setShowQuickGroupingModal(false);
+            }
+          } else {
+            setShowQuickGroupingModal(false);
+          }
+        }}
       />
     </Box>
   );

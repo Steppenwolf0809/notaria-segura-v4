@@ -612,6 +612,21 @@ const documentService = {
   },
 
   /**
+   * 🔓 Desagrupar un documento
+   * @param {string} documentId - ID del documento a desagrupar
+   * @returns {Promise<Object>} Resultado de la operación
+   */
+  async ungroupDocument(documentId) {
+    try {
+      const response = await api.put(`/documents/${documentId}/ungroup`);
+      return response.data;
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || error.message || 'Error al desagrupar documento';
+      return { success: false, message: errorMessage, error: error.response?.data || error };
+    }
+  },
+
+  /**
    * 🔗 Actualizar información compartida de grupo de documentos
    * @param {string} documentGroupId - ID del grupo de documentos
    * @param {Object} sharedData - Datos compartidos a actualizar

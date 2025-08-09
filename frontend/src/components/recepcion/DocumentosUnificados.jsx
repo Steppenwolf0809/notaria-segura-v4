@@ -50,6 +50,7 @@ import ModalEntrega from './ModalEntrega';
 import ModalEntregaGrupal from './ModalEntregaGrupal';
 import QuickGroupingModal from '../grouping/QuickGroupingModal';
 import GroupInfoModal from '../shared/GroupInfoModal';
+import DocumentDetailModal from '../Documents/DocumentDetailModal';
 import receptionService from '../../services/reception-service';
 import documentService from '../../services/document-service';
 import useDocumentStore from '../../store/document-store';
@@ -129,6 +130,10 @@ function DocumentosUnificados({ onEstadisticasChange }) {
 
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [actionType, setActionType] = useState('');
+
+  // Estado para modal de detalles y fila clickeable
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [detailDocument, setDetailDocument] = useState(null);
   
   // Estados para funcionalidad de agrupación
   const [showQuickGroupingModal, setShowQuickGroupingModal] = useState(false);
@@ -275,6 +280,16 @@ function DocumentosUnificados({ onEstadisticasChange }) {
     setDocumentoSeleccionado(documento);
     setShowModalEntrega(true);
     handleMenuClose();
+  };
+
+  const abrirDetalles = (documento) => {
+    setDetailDocument(documento);
+    setDetailModalOpen(true);
+  };
+
+  const cerrarDetalles = () => {
+    setDetailModalOpen(false);
+    setDetailDocument(null);
   };
 
   const cerrarModales = () => {
@@ -572,24 +587,29 @@ function DocumentosUnificados({ onEstadisticasChange }) {
                 <TableCell sx={{ fontWeight: 'bold', py: 2 }}>Matrizador</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', py: 2 }}>Fecha Creación</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', py: 2 }}>Estado</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', py: 2 }}>Código Retiro</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', py: 2 }}>Acciones</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {documentos.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                     <Typography color="text.secondary">No se encontraron documentos.</Typography>
                   </TableCell>
                 </TableRow>
               ) : (
                 documentos.map((documento) => (
-                  <TableRow key={documento.id} selected={selectedDocuments.includes(documento.id)} hover>
+                  <TableRow 
+                    key={documento.id} 
+                    selected={selectedDocuments.includes(documento.id)} 
+                    hover
+                    onClick={() => abrirDetalles(documento)}
+                    sx={{ cursor: 'pointer' }}
+                  >
                     <TableCell padding="checkbox">
                       <Checkbox
                         checked={selectedDocuments.includes(documento.id)}
-                        onChange={() => handleSelectDocument(documento.id)}
+                        onChange={(e) => { e.stopPropagation(); handleSelectDocument(documento.id); }}
                         disabled={documento.status === 'ENTREGADO'}
                       />
                     </TableCell>
@@ -607,23 +627,32 @@ function DocumentosUnificados({ onEstadisticasChange }) {
                         )}
                         {/* Indicador de grupo */}
                         {documento.isGrouped && (
-                          <Chip
-                            label="⚡ Parte de un grupo"
-                            size="small"
-                            variant="outlined"
-                            color="primary"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenGroupInfo(documento);
-                            }}
-                            sx={{ 
-                              mt: 0.5, 
-                              cursor: 'pointer',
-                              fontSize: '0.65rem',
-                              height: '20px',
-                              '& .MuiChip-label': { px: 1 }
-                            }}
-                          />
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                            <Chip
+                              label="⚡ Parte de un grupo"
+                              size="small"
+                              variant="outlined"
+                              color="primary"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenGroupInfo(documento);
+                              }}
+                              sx={{ 
+                                cursor: 'pointer',
+                                fontSize: '0.65rem',
+                                height: '20px',
+                                '& .MuiChip-label': { px: 1 }
+                              }}
+                            />
+                            {documento.groupVerificationCode && (
+                              <Chip 
+                                label={`Código: ${documento.groupVerificationCode}`}
+                                size="small"
+                                variant="outlined"
+                                sx={{ fontFamily: 'monospace', height: '20px' }}
+                              />
+                            )}
+                          </Box>
                         )}
                       </Box>
                     </TableCell>
@@ -640,20 +669,22 @@ function DocumentosUnificados({ onEstadisticasChange }) {
                       </Typography>
                     </TableCell>
                     <TableCell><StatusIndicator status={documento.status} /></TableCell>
-                    <TableCell>
-                      {(documento.codigoRetiro || documento.verificationCode) ? (
-                        <Chip 
-                          label={documento.codigoRetiro || documento.verificationCode} 
-                          size="small" 
-                          variant="outlined" 
-                          sx={{ fontFamily: 'monospace' }} 
-                        />
-                      ) : (
-                        <Typography variant="body2" color="text.secondary">-</Typography>
-                      )}
-                    </TableCell>
                     <TableCell sx={{ textAlign: 'center' }}>
-                      <IconButton aria-label="actions" onClick={(event) => handleMenuOpen(event, documento)}>
+                      {documento.status === 'LISTO' ? (
+                        <Button 
+                          size="small" 
+                          variant="contained" 
+                          color="primary" 
+                          startIcon={<SendIcon />}
+                          onClick={(e) => { e.stopPropagation(); abrirModalEntrega(documento); }}
+                          sx={{ mr: 1 }}
+                        >
+                          Entregar
+                        </Button>
+                      ) : (
+                        <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>-</Typography>
+                      )}
+                      <IconButton aria-label="actions" onClick={(event) => { event.stopPropagation(); handleMenuOpen(event, documento); }}>
                         <MoreVertIcon />
                       </IconButton>
                     </TableCell>
@@ -716,7 +747,7 @@ function DocumentosUnificados({ onEstadisticasChange }) {
           </MenuItem>
         )}
         
-        <MenuItem onClick={handleMenuClose}>
+        <MenuItem onClick={() => { if (currentDocumento) abrirDetalles(currentDocumento); handleMenuClose(); }}>
           <ListItemIcon><VisibilityIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Ver Detalles</ListItemText>
         </MenuItem>
@@ -776,6 +807,15 @@ function DocumentosUnificados({ onEstadisticasChange }) {
       <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={cerrarSnackbar}>
         <Alert onClose={cerrarSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>{snackbar.message}</Alert>
       </Snackbar>
+
+      {detailModalOpen && detailDocument && (
+        <DocumentDetailModal
+          open={detailModalOpen}
+          onClose={cerrarDetalles}
+          document={detailDocument}
+          onDocumentUpdated={() => { cargarDocumentos(); }}
+        />
+      )}
     </Box>
   );
 }
