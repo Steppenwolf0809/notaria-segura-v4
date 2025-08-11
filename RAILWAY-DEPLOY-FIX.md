@@ -29,7 +29,7 @@ nixPkgs = ["nodejs_20", "npm-9_x", "openssl"]  ← ✅ NODE.JS 20
 [phases.install]
 cmds = [
     "cd backend",                    ← ✅ PATHS CORRECTOS
-    "npm ci --only=production",
+    "npm ci --omit=dev",            ← ✅ WARNING CORREGIDO
     "npx prisma generate"
 ]
 
@@ -37,7 +37,7 @@ cmds = [
 cmds = [
     "cd backend",
     "npx prisma generate",
-    "npx prisma db deploy"
+    "npx prisma db push"             ← ✅ COMANDO CORRECTO
 ]
 
 [start]
@@ -53,7 +53,7 @@ cmd = "cd backend && npm start"     ← ✅ COMANDO START CON PATH
 {
   "scripts": {
     "start": "node server.js",      ← ✅ COMANDO START EXISTE
-    "build": "npx prisma generate && npx prisma db deploy"
+    "build": "npx prisma generate && npx prisma db push"  ← ✅ COMANDO CORRECTO
   }
 }
 ```
@@ -63,9 +63,9 @@ cmd = "cd backend && npm start"     ← ✅ COMANDO START CON PATH
 ### Deploy desde Raíz del Proyecto:
 ```bash
 1. Railway detecta Node.js 20 (.nvmrc, package.json engines)
-2. Ejecuta: cd backend && npm ci --only=production
+2. Ejecuta: cd backend && npm ci --omit=dev
 3. Genera: npx prisma generate (en backend/)
-4. Build: npx prisma generate && npx prisma db deploy
+4. Build: npx prisma generate && npx prisma db push
 5. Start: cd backend && npm start → node server.js
 ```
 
