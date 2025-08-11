@@ -5,7 +5,7 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "start": "npx prisma db push && node server.js",
+    "start": "node server.js",
     "build": "npx prisma generate",
     "start:prod": "npx prisma generate && npx prisma db push && node server.js",
     "postbuild": "node prisma/seed.js",
