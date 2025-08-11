@@ -36,7 +36,8 @@
       "Bash(printenv:*)",
       "Bash(docker-compose up:*)",
       "Bash(./setup-database.sh:*)",
-      "Bash(bash:*)"
+      "Bash(bash:*)",
+      "Bash(npm view:*)"
     ],
     "deny": []
   }
