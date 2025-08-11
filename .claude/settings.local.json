@@ -24,7 +24,19 @@
       "Bash(true)",
       "Bash(PORT=3001 timeout 5s node server.js)",
       "Bash(npm install:*)",
-      "Bash(chmod:*)"
+      "Bash(chmod:*)",
+      "Bash(NODE_ENV=development timeout 5s node server.js)",
+      "Bash(apt list:*)",
+      "Bash(docker run:*)",
+      "Bash(sudo:*)",
+      "Bash(psql:*)",
+      "Bash(service postgresql:*)",
+      "Bash(systemctl status:*)",
+      "Bash(pg_ctl:*)",
+      "Bash(printenv:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(./setup-database.sh:*)",
+      "Bash(bash:*)"
     ],
     "deny": []
   }

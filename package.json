@@ -8,6 +8,8 @@
     "backend"
   ],
   "scripts": {
+    "start": "cd backend && npm start",
+    "build": "cd backend && npm run build",
     "install:all": "npm install && npm run install:frontend && npm run install:backend",
     "install:frontend": "cd frontend && npm install",
     "install:backend": "cd backend && npm install",
@@ -24,6 +26,10 @@
   ],
   "author": "Notaría Segura",
   "license": "PRIVATE",
+  "engines": {
+    "node": "20.x",
+    "npm": ">=9.0.0"
+  },
   "dependencies": {
     "@prisma/client": "^6.13.0",
     "twilio": "^5.8.0"
