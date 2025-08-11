@@ -4,15 +4,12 @@ nixPkgs = ["nodejs_20", "npm-9_x", "openssl"]
 
 [phases.install]
 cmds = [
-    "cd backend",
-    "npm ci --omit=dev",
-    "npx prisma generate"
+    "cd backend && npm install --only=production"
 ]
 
 [phases.build]
 cmds = [
-    "cd backend",
-    "npx prisma generate"
+    "cd backend && npx prisma generate"
 ]
 
 [start]
