@@ -15,8 +15,7 @@ const environmentSchema = z.object({
       required_error: 'DATABASE_URL es obligatorio',
       invalid_type_error: 'DATABASE_URL debe ser una string'
     })
-    .url('DATABASE_URL debe ser una URL válida')
-    .startsWith('postgresql://', 'DATABASE_URL debe ser una conexión PostgreSQL'),
+    .refine(val => val.startsWith('postgresql://') || val.startsWith('file:'), 'DATABASE_URL debe ser PostgreSQL o SQLite'),
 
   // JWT Secret - Obligatorio, mínimo 32 caracteres
   JWT_SECRET: z
@@ -41,12 +40,12 @@ const environmentSchema = z.object({
     })
     .min(10, 'TWILIO_AUTH_TOKEN debe tener al menos 10 caracteres'),
 
-  TWILIO_PHONE_NUMBER: z
+  TWILIO_WHATSAPP_FROM: z
     .string({
-      required_error: 'TWILIO_PHONE_NUMBER es obligatorio',
-      invalid_type_error: 'TWILIO_PHONE_NUMBER debe ser una string'
+      required_error: 'TWILIO_WHATSAPP_FROM es obligatorio',
+      invalid_type_error: 'TWILIO_WHATSAPP_FROM debe ser una string'
     })
-    .min(10, 'TWILIO_PHONE_NUMBER debe tener formato válido'),
+    .min(10, 'TWILIO_WHATSAPP_FROM debe tener formato válido'),
 
   // Entorno - Con valores válidos específicos
   NODE_ENV: z

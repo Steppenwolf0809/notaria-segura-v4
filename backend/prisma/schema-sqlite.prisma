@@ -1,0 +1,35 @@
+// Schema simplificado para SQLite (solo para crear usuarios)
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Modelo básico de usuarios (compatible con SQLite)
+model User {
+  id          Int      @id @default(autoincrement())
+  email       String   @unique
+  password    String
+  firstName   String
+  lastName    String
+  role        String   // En lugar de enum, usamos String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lastLogin   DateTime?
+
+  @@map("users")
+}
+
+// Modelo básico para verificar conexión
+model TestConnection {
+  id        Int      @id @default(autoincrement())
+  message   String   @default("Conexión exitosa")
+  createdAt DateTime @default(now())
+  
+  @@map("test_connection")
+}

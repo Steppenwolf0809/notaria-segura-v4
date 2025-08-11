@@ -14,6 +14,9 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma db deploy",
     "db:studio": "prisma studio",
+    "db:seed": "node prisma/seed.js",
+    "populate-users": "node scripts/populate-users.js",
+    "seed:users": "node scripts/seed-real-users.js",
     "setup:prod": "node ../scripts/setup-production-data.js",
     "verify:prod": "node ../scripts/verify-production.js"
   },
