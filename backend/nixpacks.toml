@@ -15,7 +15,7 @@ cmds = [
 ]
 
 [start]
-cmd = "node server.js"
+cmd = "npm start"
 
 [variables]
 NODE_ENV = "production"
