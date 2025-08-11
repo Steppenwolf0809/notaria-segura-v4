@@ -4,14 +4,14 @@ nixPkgs = ["nodejs_20", "npm-9_x", "openssl"]
 
 [phases.install]
 cmds = [
-    "npm ci --only=production",
+    "npm ci --omit=dev",
     "npx prisma generate"
 ]
 
 [phases.build]
 cmds = [
     "npx prisma generate",
-    "npx prisma db deploy"
+    "npx prisma db push"
 ]
 
 [start]
