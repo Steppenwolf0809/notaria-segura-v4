@@ -10,8 +10,7 @@ cmds = [
 
 [phases.build]
 cmds = [
-    "npx prisma generate",
-    "npx prisma db push"
+    "npx prisma generate"
 ]
 
 [start]

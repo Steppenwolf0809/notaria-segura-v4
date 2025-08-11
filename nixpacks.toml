@@ -12,8 +12,7 @@ cmds = [
 [phases.build]
 cmds = [
     "cd backend",
-    "npx prisma generate",
-    "npx prisma db push"
+    "npx prisma generate"
 ]
 
 [start]
