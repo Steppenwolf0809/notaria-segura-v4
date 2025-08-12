@@ -27,8 +27,6 @@ import {
   Security as SecurityIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
-import logoFull from '../assets/images/logo-gzs-complete.png';
-import logoCompact from '../assets/images/logo-gzs-notaria18.png';
 
 /**
  * Componente de formulario de inicio de sesión
@@ -131,39 +129,13 @@ const LoginForm = () => {
         >
           <Grow in timeout={700}>
             <Box sx={{ textAlign: 'center', maxWidth: 520, width: '100%' }}>
-              {/* Logos responsivos */}
-              <Box sx={{ mb: 3 }}>
-                <Box
-                  component="img"
-                  src={logoFull}
-                  alt="Notaría 18 - Dra. Glenda Zapata Silva"
-                  loading="lazy"
-                  sx={{
-                    maxWidth: { xs: '70%', md: '100%' },
-                    display: { xs: 'none', sm: 'inline-block' }
-                  }}
-                />
-                <Box
-                  component="img"
-                  src={logoCompact}
-                  alt="Notaría 18 Quito"
-                  loading="lazy"
-                  sx={{
-                    maxWidth: '60%',
-                    display: { xs: 'inline-block', sm: 'none' }
-                  }}
-                />
-              </Box>
-
-              <Typography
-                variant="h4"
-                sx={{ fontWeight: 300, letterSpacing: 1, mb: 1 }}
-              >
-                Sistema de Trazabilidad Documental
-              </Typography>
-              <Typography variant="body2" sx={{ opacity: 0.85 }}>
-                Gestión notarial inteligente con seguridad y confiabilidad
-              </Typography>
+              <div className="logo-container" aria-label="Identidad Notaría 18">
+                <h1 className="gzs-initials gradient-logo-primary">GZS</h1>
+                <h2 className="notaria-title">NOTARÍA 18</h2>
+                <div className="decorative-line" />
+                <p className="doctor-name">Dra. Glenda Zapata Silva</p>
+                <p className="system-description">Sistema de Trazabilidad<br/>Documental</p>
+              </div>
 
               <Stack direction="row" spacing={1} justifyContent="center" sx={{ mt: 3, opacity: 0.9 }}>
                 <SecurityIcon fontSize="small" />
