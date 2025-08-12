@@ -5,6 +5,9 @@
   --dark-blue: #1A5799;        /* Navegación */
   --light-background: #E9F5FF;  /* Fondo general */
   --text-primary: #1F1F1F;     /* Texto principal */
+  /* Tokens de login */
+  --login-accent: #1B5E96;     /* Azul corporativo GZS */
+  --login-accent-hover: #2563EB; /* Azul hover */
 }
 
 /* Variables para modo oscuro enterprise */
@@ -32,6 +35,16 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Animaciones sutiles para login */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in-up {
+  animation: fadeInUp 500ms ease-out both;
 }
 
 /* Estilos globales para la aplicación */
