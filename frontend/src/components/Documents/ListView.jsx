@@ -238,6 +238,12 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
 
   // 🎯 NUEVAS FUNCIONES PARA SELECCIÓN MÚLTIPLE
 
+  // Documentos de la página actual - DEBE IR ANTES de los useMemo
+  const paginatedDocuments = filteredAndSortedDocuments.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
+  );
+
   /**
    * Manejar selección de todos los documentos visibles
    */
@@ -301,12 +307,6 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
       setPendingBulkAction(null);
     }
   };
-
-  // Documentos de la página actual
-  const paginatedDocuments = filteredAndSortedDocuments.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>

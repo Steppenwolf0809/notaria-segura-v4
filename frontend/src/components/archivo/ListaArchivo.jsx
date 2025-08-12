@@ -209,7 +209,6 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
    * Manejar selección de todos los documentos visibles
    */
   const handleSelectAll = (event) => {
-    const documentosPagina = documentosPaginados;
     bulkActions.toggleSelectAll(documentosPagina, event.target.checked);
   };
 
@@ -217,31 +216,31 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
    * Verificar si todos los documentos visibles están seleccionados
    */
   const isAllSelected = React.useMemo(() => {
-    if (documentosPaginados.length === 0) return false;
-    return documentosPaginados.every(doc => bulkActions.selectedDocuments.has(doc.id));
-  }, [documentosPaginados, bulkActions.selectedDocuments]);
+    if (documentosPagina.length === 0) return false;
+    return documentosPagina.every(doc => bulkActions.selectedDocuments.has(doc.id));
+  }, [documentosPagina, bulkActions.selectedDocuments]);
 
   /**
    * Verificar si algunos documentos están seleccionados (para indeterminate)
    */
   const isIndeterminate = React.useMemo(() => {
-    const selectedCount = documentosPaginados.filter(doc => 
+    const selectedCount = documentosPagina.filter(doc => 
       bulkActions.selectedDocuments.has(doc.id)
     ).length;
-    return selectedCount > 0 && selectedCount < documentosPaginados.length;
-  }, [documentosPaginados, bulkActions.selectedDocuments]);
+    return selectedCount > 0 && selectedCount < documentosPagina.length;
+  }, [documentosPagina, bulkActions.selectedDocuments]);
 
   /**
    * Manejar clic en acción masiva desde toolbar
    */
   const handleBulkAction = (targetStatus, options) => {
-    const selectedDocs = documentosOrdenados.filter(doc => 
+    const selectedDocs = documentosFiltrados.filter(doc => 
       bulkActions.selectedDocuments.has(doc.id)
     );
     
     setPendingBulkAction({
       documents: selectedDocs,
-      fromStatus: bulkActions.getCommonStatus(documentosOrdenados),
+      fromStatus: bulkActions.getCommonStatus(documentosFiltrados),
       toStatus: targetStatus,
       options
     });
@@ -254,7 +253,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
   const handleConfirmBulkAction = async (actionData) => {
     try {
       await bulkActions.executeBulkStatusChange(
-        documentosOrdenados, 
+        documentosFiltrados, 
         actionData.toStatus, 
         actionData.options
       );
@@ -771,7 +770,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                     indeterminate={isIndeterminate}
                     checked={isAllSelected}
                     onChange={handleSelectAll}
-                    disabled={documentosPaginados.length === 0}
+                    disabled={documentosPagina.length === 0}
                     color="primary"
                   />
                 </TableCell>
@@ -861,9 +860,9 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                       onChange={() => bulkActions.toggleDocumentSelection(
                         documento.id, 
                         documento.status, 
-                        documentosOrdenados
+                        documentosFiltrados
                       )}
-                      disabled={!bulkActions.canSelectDocument(documento, documentosOrdenados)}
+                      disabled={!bulkActions.canSelectDocument(documento, documentosFiltrados)}
                       color="primary"
                     />
                   </TableCell>
@@ -1080,8 +1079,8 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
       {/* Toolbar flotante para acciones masivas */}
       <BulkActionToolbar
         selectionCount={bulkActions.selectionInfo.count}
-        commonStatus={bulkActions.getCommonStatus(documentosOrdenados)}
-        validTransitions={bulkActions.getValidTransitions(documentosOrdenados)}
+        commonStatus={bulkActions.getCommonStatus(documentosFiltrados)}
+        validTransitions={bulkActions.getValidTransitions(documentosFiltrados)}
         maxSelection={bulkActions.MAX_BULK_SELECTION}
         isExecuting={bulkActions.isExecuting}
         onClearSelection={bulkActions.clearSelection}
@@ -1103,7 +1102,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
       />
 
       {/* Alerta informativa cuando hay documentos con estados mixtos */}
-      {bulkActions.selectionInfo.count > 0 && !bulkActions.getCommonStatus(documentosOrdenados) && (
+      {bulkActions.selectionInfo.count > 0 && !bulkActions.getCommonStatus(documentosFiltrados) && (
         <Alert 
           severity="warning" 
           sx={{ 
