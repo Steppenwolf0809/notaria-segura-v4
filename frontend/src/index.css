@@ -47,6 +47,101 @@ body {
   animation: fadeInUp 500ms ease-out both;
 }
 
+/* ==============================
+   Logo tipográfico (GZS/Notaría)
+   ============================== */
+.logo-container {
+  display: grid;
+  place-items: center;
+  gap: 0.25rem;
+  text-align: center;
+  color: #fff;
+  user-select: none;
+}
+
+.gzs-initials {
+  font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  margin: 0;
+  padding: 0.25rem 0.5rem;
+  font-size: clamp(3rem, 8vw, 5rem);
+  background: linear-gradient(135deg, #1B5E96 0%, #2563EB 50%, #3B82F6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 4px 8px rgba(27, 94, 150, 0.3);
+  transition: transform 300ms ease, filter 300ms ease;
+  animation: fadeInUp 600ms ease-out both;
+  animation-delay: 200ms;
+}
+
+.gzs-initials:hover {
+  background: linear-gradient(135deg, #1E40AF 0%, #1D4ED8 35%, #2563EB 70%, #3B82F6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  transform: scale(1.02);
+  filter: drop-shadow(0 6px 16px rgba(37, 99, 235, 0.25));
+}
+
+.notaria-title {
+  margin: 1rem 0 0 0;
+  font-family: "Inter", Arial, sans-serif;
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+  font-weight: 300;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.95);
+  animation: slideInBottom 700ms ease-out both;
+  animation-delay: 400ms;
+}
+
+.doctor-name {
+  margin: 0.5rem 0 0 0;
+  font-family: "Inter", Arial, sans-serif;
+  font-size: clamp(1rem, 2.5vw, 1.25rem);
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  color: rgba(255,255,255,0.8);
+  font-style: italic;
+  animation: fadeInUp 600ms ease-out both;
+  animation-delay: 800ms;
+}
+
+.decorative-line {
+  width: 0;
+  height: 1px;
+  margin: 1.25rem auto 0.75rem auto;
+  background: linear-gradient(90deg, transparent, var(--login-accent), transparent);
+  animation: expandLine 600ms ease-out forwards;
+  animation-delay: 600ms;
+}
+
+.system-description {
+  margin: 0.25rem 0 0 0;
+  font-family: "Inter", Arial, sans-serif;
+  font-size: clamp(0.875rem, 2vw, 1rem);
+  font-weight: 300;
+  letter-spacing: 0.025em;
+  color: rgba(255,255,255,0.7);
+  line-height: 1.4;
+  animation: fadeInUp 600ms ease-out both;
+  animation-delay: 1000ms;
+}
+
+@keyframes slideInBottom {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes expandLine {
+  from { width: 0; }
+  to { width: 60%; }
+}
+
 /* Estilos globales para la aplicación */
 #root {
   min-height: 100vh;
