@@ -5,10 +5,9 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "start": "node server.js",
+    "start": "npx prisma db push && node prisma/seed.js && node server.js",
     "build": "npx prisma generate",
     "start:prod": "npx prisma generate && npx prisma db push && node server.js",
-    "postbuild": "node prisma/seed.js",
     "dev": "nodemon server.js",
     "db:generate": "npx prisma generate",
     "db:migrate": "npx prisma migrate dev",
@@ -18,7 +17,8 @@
     "populate-users": "node scripts/populate-users.js",
     "seed:users": "node scripts/seed-real-users.js",
     "setup:prod": "node scripts/setup-production-data.js",
-    "verify:prod": "node scripts/verify-production.js"
+    "verify:prod": "node scripts/verify-production.js",
+    "verify:users": "node scripts/verify-users.js"
   },
   "dependencies": {
     "@prisma/client": "^5.7.0",
