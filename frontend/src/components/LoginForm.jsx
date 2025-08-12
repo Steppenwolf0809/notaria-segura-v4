@@ -167,11 +167,11 @@ const LoginForm = () => {
             <Card sx={{
               width: '100%',
               maxWidth: 520,
-              backgroundColor: 'rgba(10, 25, 41, 0.6)',
-              backdropFilter: 'blur(10px)',
-              border: '1px solid rgba(255, 255, 255, 0.125)',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              backdropFilter: 'blur(12px)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
               borderRadius: 4,
-              boxShadow: '0 0 30px rgba(0,0,0,0.5)'
+              boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37)'
             }}>
               <CardContent sx={{ p: { xs: 4, md: 5 } }}>
                 {/* Encabezado */}

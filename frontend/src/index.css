@@ -97,6 +97,7 @@ body {
   color: rgba(255,255,255,0.95);
   animation: slideInBottom 700ms ease-out both;
   animation-delay: 400ms;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 
 .doctor-name {
@@ -109,6 +110,7 @@ body {
   font-style: italic;
   animation: fadeInUp 600ms ease-out both;
   animation-delay: 800ms;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
 
 .decorative-line {
@@ -130,6 +132,7 @@ body {
   line-height: 1.4;
   animation: fadeInUp 600ms ease-out both;
   animation-delay: 1000ms;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
 
 @keyframes slideInBottom {
