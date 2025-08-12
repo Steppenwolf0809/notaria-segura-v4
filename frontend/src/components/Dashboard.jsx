@@ -140,10 +140,15 @@ const Dashboard = () => {
 
             {/* Settings Button */}
             <IconButton
-              color="inherit"
               onClick={() => setShowChangePassword(true)}
               title="Cambiar Contraseña"
-              sx={{ ml: 1 }}
+              sx={{ 
+                ml: 1,
+                color: 'white', // Siempre blanco para contraste en AppBar
+                '&:hover': {
+                  bgcolor: 'rgba(255, 255, 255, 0.1)'
+                }
+              }}
             >
               <SettingsIcon />
             </IconButton>
@@ -153,10 +158,15 @@ const Dashboard = () => {
 
             {/* Logout Button */}
             <IconButton
-              color="inherit"
               onClick={handleLogout}
               title="Cerrar Sesión"
-              sx={{ ml: 1 }}
+              sx={{ 
+                ml: 1,
+                color: 'white', // Siempre blanco para contraste en AppBar
+                '&:hover': {
+                  bgcolor: 'rgba(255, 255, 255, 0.1)'
+                }
+              }}
             >
               <LogoutIcon />
             </IconButton>
@@ -229,10 +239,15 @@ const Dashboard = () => {
 
           {/* Settings Button */}
           <IconButton
-            color="inherit"
             onClick={() => setShowChangePassword(true)}
             title="Cambiar Contraseña"
-            sx={{ ml: 1 }}
+            sx={{ 
+              ml: 1,
+              color: 'white', // Siempre blanco para contraste en AppBar
+              '&:hover': {
+                bgcolor: 'rgba(255, 255, 255, 0.1)'
+              }
+            }}
           >
             <SettingsIcon />
           </IconButton>
@@ -242,10 +257,15 @@ const Dashboard = () => {
 
           {/* Logout Button */}
           <IconButton
-            color="inherit"
             onClick={handleLogout}
             title="Cerrar Sesión"
-            sx={{ ml: 1 }}
+            sx={{ 
+              ml: 1,
+              color: 'white', // Siempre blanco para contraste en AppBar
+              '&:hover': {
+                bgcolor: 'rgba(255, 255, 255, 0.1)'
+              }
+            }}
           >
             <LogoutIcon />
           </IconButton>
