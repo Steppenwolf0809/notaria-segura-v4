@@ -496,7 +496,7 @@ const DocumentOversight = () => {
                   <MenuItem value="unassigned">
                     <em>Sin asignar</em>
                   </MenuItem>
-                  {matrizadores.map((matrizador) => (
+                  {matrizadores?.map((matrizador) => (
                     <MenuItem key={matrizador.id} value={matrizador.id}>
                       {matrizador.firstName} {matrizador.lastName}
                     </MenuItem>

@@ -101,8 +101,8 @@ const UserManagement = () => {
       const response = await adminService.getUsers(params, token);
       
       if (response.success) {
-        setUsers(response.data.users.map(adminService.formatUser));
-        setTotalCount(response.data.pagination.totalCount);
+        setUsers(response.data.map(adminService.formatUser));
+        setTotalCount(response.meta.pagination.total);
       }
     } catch (error) {
       console.error('Error cargando usuarios:', error);
