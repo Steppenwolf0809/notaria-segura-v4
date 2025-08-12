@@ -150,7 +150,9 @@ const QuickGroupingModal = ({
       {/* Header Profesional */}
       <DialogTitle 
         sx={{ 
-          background: 'linear-gradient(135deg, #162840, #17a2b8)',
+          background: (theme) => theme.palette.mode === 'dark' 
+            ? 'linear-gradient(135deg, #162840, #17a2b8)'
+            : 'linear-gradient(135deg, #1976d2, #42a5f5)',
           color: 'white',
           borderBottom: '3px solid #D4AF37',
           py: 2
