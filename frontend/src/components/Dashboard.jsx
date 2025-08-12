@@ -144,9 +144,9 @@ const Dashboard = () => {
               title="Cambiar Contraseña"
               sx={{ 
                 ml: 1,
-                color: 'white', // Siempre blanco para contraste en AppBar
+                color: 'inherit',
                 '&:hover': {
-                  bgcolor: 'rgba(255, 255, 255, 0.1)'
+                  bgcolor: 'action.hover'
                 }
               }}
             >
@@ -162,9 +162,9 @@ const Dashboard = () => {
               title="Cerrar Sesión"
               sx={{ 
                 ml: 1,
-                color: 'white', // Siempre blanco para contraste en AppBar
+                color: 'inherit',
                 '&:hover': {
-                  bgcolor: 'rgba(255, 255, 255, 0.1)'
+                  bgcolor: 'action.hover'
                 }
               }}
             >
@@ -243,9 +243,9 @@ const Dashboard = () => {
             title="Cambiar Contraseña"
             sx={{ 
               ml: 1,
-              color: 'white', // Siempre blanco para contraste en AppBar
+              color: 'inherit',
               '&:hover': {
-                bgcolor: 'rgba(255, 255, 255, 0.1)'
+                bgcolor: 'action.hover'
               }
             }}
           >
@@ -261,9 +261,9 @@ const Dashboard = () => {
             title="Cerrar Sesión"
             sx={{ 
               ml: 1,
-              color: 'white', // Siempre blanco para contraste en AppBar
+              color: 'inherit',
               '&:hover': {
-                bgcolor: 'rgba(255, 255, 255, 0.1)'
+                bgcolor: 'action.hover'
               }
             }}
           >
