@@ -246,7 +246,8 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
     // Definir transiciones válidas según la lógica de negocio
     const validTransitions = {
       'PENDIENTE': ['EN_PROCESO'],
-      'EN_PROCESO': ['LISTO', 'PENDIENTE'], // Permite regresionar si es necesario
+      'EN_PROCESO': ['AGRUPADO', 'LISTO', 'PENDIENTE'], // Puede ir a agrupado o listo
+      'AGRUPADO': ['LISTO', 'EN_PROCESO'], // Desde agrupado puede ir a listo o regresar
       'LISTO': ['ENTREGADO', 'EN_PROCESO'], // Permite regresionar si es necesario
       'ENTREGADO': [] // Los entregados no se pueden mover
     };

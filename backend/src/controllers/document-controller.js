@@ -986,9 +986,10 @@ async function createDocumentGroup(req, res) {
     const { documentIds, verifiedPhone, notificationMessage } = req.body;
     const matrizadorId = req.user.id;
     
-    // Crear grupo y marcar documentos como LISTO
+    // NUEVA FUNCIONALIDAD: Crear grupo con estado configurable
+    const markAsReady = req.body.markAsReady || false; // Por defecto solo agrupar
     const result = await DocumentGroupingService
-      .createDocumentGroup(documentIds, matrizadorId);
+      .createDocumentGroup(documentIds, matrizadorId, markAsReady);
     
     // Enviar notificación grupal si se solicita
     let whatsappSent = false;
@@ -1001,7 +1002,8 @@ async function createDocumentGroup(req, res) {
       documentsCount: result.documents.length
     });
     
-    if (req.body.sendNotification && result.group.clientPhone) {
+    // NUEVA FUNCIONALIDAD: Solo enviar notificación si se marca como listo
+    if (markAsReady && req.body.sendNotification && result.group.clientPhone) {
       try {
         // Importar el servicio de WhatsApp
         const whatsappService = await import('../services/whatsapp-service.js');
@@ -1368,6 +1370,97 @@ async function createSmartDocumentGroup(req, res) {
       success: false,
       message: 'Error interno del servidor',
       error: error.message
+    });
+  }
+}
+
+/**
+ * NUEVA FUNCIONALIDAD: Marcar grupo como listo para entrega
+ */
+async function markDocumentGroupAsReady(req, res) {
+  try {
+    // Validar roles autorizados
+    if (!['MATRIZADOR', 'ADMIN'].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo usuarios MATRIZADOR pueden marcar grupos como listos'
+      });
+    }
+
+    const { documentGroupId } = req.body;
+    const matrizadorId = req.user.id;
+
+    console.log('🚀 markDocumentGroupAsReady iniciado:', {
+      documentGroupId,
+      matrizadorId,
+      userRole: req.user.role
+    });
+
+    if (!documentGroupId) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID del grupo es obligatorio'
+      });
+    }
+
+    // Marcar grupo como listo
+    const result = await DocumentGroupingService.markDocumentGroupAsReady(
+      documentGroupId,
+      matrizadorId
+    );
+
+    // Enviar notificación WhatsApp automáticamente
+    let whatsappSent = false;
+    let whatsappError = null;
+
+    if (result.group.clientPhone) {
+      try {
+        const whatsappService = await import('../services/whatsapp-service.js');
+        
+        const cliente = {
+          nombre: result.group.clientName,
+          telefono: result.group.clientPhone
+        };
+        
+        const whatsappResult = await whatsappService.default.enviarGrupoDocumentosListo(
+          cliente,
+          result.documents,
+          result.group.verificationCode
+        );
+        
+        whatsappSent = whatsappResult.success;
+        
+        if (!whatsappResult.success) {
+          whatsappError = whatsappResult.error;
+          console.error('Error enviando WhatsApp al marcar grupo como listo:', whatsappResult.error);
+        } else {
+          console.log('📱 Notificación WhatsApp enviada al marcar grupo como listo');
+        }
+      } catch (error) {
+        console.error('Error en servicio WhatsApp al marcar grupo como listo:', error);
+        whatsappError = error.message;
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Grupo marcado como listo exitosamente',
+      data: {
+        group: result.group,
+        documents: result.documents,
+        whatsapp: {
+          sent: whatsappSent,
+          error: whatsappError,
+          phone: result.group.clientPhone
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error marcando grupo como listo:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Error interno del servidor'
     });
   }
 }
@@ -3086,6 +3179,7 @@ export {
   // 🔗 Funciones de grupos
   updateDocumentGroupStatus,
   updateDocumentGroupInfo,
+  markDocumentGroupAsReady,
   // 🔓 Desagrupación
   ungroupDocument
 }; 

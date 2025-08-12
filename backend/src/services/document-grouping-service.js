@@ -59,9 +59,10 @@ class DocumentGroupingService {
   }
     
   /**
-   * Crea un grupo de documentos y los marca como LISTO
+   * Crea un grupo de documentos y los marca como AGRUPADO (estado intermedio)
+   * NUEVA FUNCIONALIDAD: Separación entre agrupar y marcar como listo
    */
-  async createDocumentGroup(documentIds, matrizadorId) {
+  async createDocumentGroup(documentIds, matrizadorId, markAsReady = false) {
     // Validar que todos los documentos:
     // 1. Pertenezcan al matrizador
     // 2. No estén ya ENTREGADOS
@@ -122,16 +123,19 @@ class DocumentGroupingService {
         clientPhone: bestPhone,
         clientEmail: bestEmail,
         documentsCount: documents.length,
-        status: 'READY',
+        status: markAsReady ? 'READY' : 'IN_PROCESS', // Grupo en proceso si documentos están agrupados
         createdBy: matrizadorId.toString()
       }
     });
     
-    // Actualizar documentos como agrupados y LISTOS
+    // NUEVA FUNCIONALIDAD: Actualizar documentos según el estado solicitado
+    const newStatus = markAsReady ? 'LISTO' : 'AGRUPADO';
+    console.log(`🔗 Marcando documentos como: ${newStatus} (markAsReady: ${markAsReady})`);
+    
     await prisma.document.updateMany({
       where: { id: { in: documentIds } },
       data: {
-        status: 'LISTO',
+        status: newStatus,
         documentGroupId: documentGroup.id,
         isGrouped: true,
         groupLeaderId: documents[0].id, // Primer documento es líder
@@ -154,6 +158,72 @@ class DocumentGroupingService {
       documents: await prisma.document.findMany({
         where: { documentGroupId: documentGroup.id }
       })
+    };
+  }
+
+  /**
+   * NUEVA FUNCIONALIDAD: Marcar grupo como LISTO y enviar notificaciones
+   * Convierte documentos AGRUPADOS a LISTO
+   */
+  async markDocumentGroupAsReady(documentGroupId, matrizadorId) {
+    console.log(`🚀 Marcando grupo ${documentGroupId} como LISTO`);
+
+    // Verificar que el grupo existe y pertenece al matrizador
+    const groupDocuments = await prisma.document.findMany({
+      where: { 
+        documentGroupId,
+        isGrouped: true,
+        assignedToId: matrizadorId
+      },
+      include: {
+        documentGroup: true
+      }
+    });
+
+    if (groupDocuments.length === 0) {
+      throw new Error('Grupo no encontrado o no autorizado');
+    }
+
+    // Verificar que los documentos están en estado AGRUPADO
+    const nonGroupedDocs = groupDocuments.filter(doc => doc.status !== 'AGRUPADO');
+    if (nonGroupedDocs.length > 0) {
+      console.warn('⚠️ Algunos documentos no están en estado AGRUPADO:', 
+        nonGroupedDocs.map(d => ({ id: d.id, status: d.status }))
+      );
+    }
+
+    // Actualizar documentos a LISTO
+    await prisma.document.updateMany({
+      where: { 
+        documentGroupId,
+        isGrouped: true
+      },
+      data: {
+        status: 'LISTO'
+      }
+    });
+
+    // Actualizar grupo a READY
+    await prisma.documentGroup.update({
+      where: { id: documentGroupId },
+      data: {
+        status: 'READY'
+      }
+    });
+
+    // Obtener documentos actualizados
+    const updatedDocuments = await prisma.document.findMany({
+      where: { documentGroupId },
+      include: {
+        documentGroup: true
+      }
+    });
+
+    console.log(`✅ Grupo ${documentGroupId} marcado como LISTO`);
+
+    return {
+      group: updatedDocuments[0].documentGroup,
+      documents: updatedDocuments
     };
   }
   
