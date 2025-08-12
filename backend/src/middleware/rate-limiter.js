@@ -44,19 +44,26 @@ const passwordChangeRateLimit = rateLimit({
 
 /**
  * Rate limiter para intentos de login
- * Límite moderado para prevenir ataques de fuerza bruta
+ * Límite por combinación email+IP para entornos de oficina
  */
 const loginRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 5, // Máximo 5 intentos por IP
+  max: 10, // Máximo 10 intentos por combinación email+IP
   message: {
     success: false,
-    message: 'Demasiados intentos de inicio de sesión. Intente nuevamente en 15 minutos.',
+    message: 'Demasiados intentos de inicio de sesión para esta cuenta. Intente nuevamente en 15 minutos.',
     retryAfter: '15 minutos'
   },
   standardHeaders: true,
   legacyHeaders: false,
   trustProxy: true, // Confiar en headers de proxy para obtener IP real
+  
+  // Generar key única por combinación email+IP
+  keyGenerator: (req) => {
+    const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
+    const email = req.body?.email || 'no-email';
+    return `${email}:${clientIP}`;
+  },
   
   handler: (req, res) => {
     const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
@@ -68,15 +75,15 @@ const loginRateLimit = rateLimit({
       userEmail: attemptedEmail,
       ipAddress: clientIP,
       userAgent,
-      violation: 'Excedido límite de intentos de login',
+      violation: 'Excedido límite de intentos de login por email+IP',
       severity: 'high'
     });
     
-    console.warn(`Login rate limit exceeded - IP: ${clientIP}, Email: ${attemptedEmail}`);
+    console.warn(`Login rate limit exceeded - Email: ${attemptedEmail}, IP: ${clientIP}`);
     
     res.status(429).json({
       success: false,
-      message: 'Demasiados intentos de inicio de sesión. Intente nuevamente en 15 minutos.',
+      message: 'Demasiados intentos de inicio de sesión para esta cuenta. Intente nuevamente en 15 minutos.',
       retryAfter: '15 minutos'
     });
   }
