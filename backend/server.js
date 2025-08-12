@@ -3,6 +3,8 @@ import cors from 'cors'
 import helmet from 'helmet'
 import compression from 'compression'
 import dotenv from 'dotenv'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import { closePrismaClient } from './src/db.js'
 import { getConfig, isConfigurationComplete, debugConfiguration } from './src/config/environment.js'
 
@@ -190,11 +192,50 @@ app.use('/api/reception', receptionRoutes)
 app.use('/api/alertas', alertasRoutes)
 
 // ============================================================================
+// SERVIR ARCHIVOS ESTÁTICOS DEL FRONTEND
+// ============================================================================
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Servir archivos estáticos del frontend desde ../frontend/dist
+const frontendPath = path.join(__dirname, '..', 'frontend', 'dist');
+app.use(express.static(frontendPath));
+
+// ============================================================================
 // MIDDLEWARE DE MANEJO DE ERRORES
 // ============================================================================
 
-// Manejo de errores 404
-app.use('*', (req, res) => {
+// Catch-all handler: servir index.html para React Router (SPA)
+app.get('*', (req, res) => {
+  // Solo para requests que no sean API
+  if (!req.path.startsWith('/api')) {
+    res.sendFile(path.join(frontendPath, 'index.html'));
+  } else {
+    // Para rutas API no encontradas, devolver 404 JSON
+    res.status(404).json({ 
+      success: false,
+      error: 'Endpoint no encontrado',
+      availableEndpoints: [
+        'GET /api/health',
+        'POST /api/auth/login',
+        'GET /api/auth/verify',
+        'GET /api/documents/my-documents',
+        'POST /api/documents/upload-xml',
+        'POST /api/documents/upload-xml-batch',
+        'GET /api/admin/users (ADMIN only)',
+        'POST /api/admin/users (ADMIN only)',
+        'GET /api/archivo/dashboard (ARCHIVO only)',
+        'GET /api/archivo/mis-documentos (ARCHIVO only)',
+        'GET /api/reception/documentos/todos (RECEPCION only)',
+        'POST /api/reception/documentos/:id/marcar-listo (RECEPCION only)'
+      ]
+    });
+  }
+});
+
+// Manejo de errores 404 para APIs (fallback)
+app.use('/api/*', (req, res) => {
   res.status(404).json({ 
     success: false,
     error: 'Endpoint no encontrado',
