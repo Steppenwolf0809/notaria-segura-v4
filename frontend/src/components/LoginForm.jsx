@@ -110,13 +110,16 @@ const LoginForm = () => {
   };
 
   return (
-    <Box sx={{ minHeight: '100vh', width: '100%', overflow: 'hidden' }}>
-      <Grid container sx={{ minHeight: '100vh' }}>
+    <Box sx={{ minHeight: '100vh', width: '100vw', overflow: 'hidden' }}>
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'grid',
+          gridTemplateColumns: { xs: '1fr', md: '35% 45% 20%' },
+        }}
+      >
         {/* Columna Izquierda - Branding */}
-        <Grid
-          item
-          xs={12}
-          md={5}
+        <Box
           sx={{
             display: 'flex',
             alignItems: 'center',
@@ -124,7 +127,8 @@ const LoginForm = () => {
             p: { xs: 4, md: 6 },
             background: 'linear-gradient(135deg, #000000 0%, #0b1624 40%, #1B5E96 100%)',
             color: '#ffffff',
-            position: 'relative'
+            position: 'relative',
+            gridColumn: { xs: '1 / -1', md: '1 / 2' }
           }}
         >
           <Grow in timeout={700}>
@@ -143,23 +147,21 @@ const LoginForm = () => {
               </Stack>
             </Box>
           </Grow>
-        </Grid>
+        </Box>
 
         {/* Columna Derecha - Formulario */}
-        <Grid
-          item
-          xs={12}
-          md={7}
+        <Box
           sx={{
-            backgroundColor: '#1a1a1a',
+            backgroundColor: '#121212',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            p: { xs: 4, md: 8 }
+            p: { xs: 4, md: 8 },
+            gridColumn: { xs: '1 / -1', md: '2 / 3' }
           }}
         >
           <Grow in timeout={800}>
-            <Card sx={{ width: '100%', maxWidth: 460 }}>
+            <Card sx={{ width: '100%', maxWidth: 520 }}>
               <CardContent sx={{ p: { xs: 4, md: 5 } }}>
                 {/* Encabezado */}
                 <Box sx={{ textAlign: 'center', mb: 3 }}>
@@ -295,8 +297,11 @@ const LoginForm = () => {
               </CardContent>
             </Card>
           </Grow>
-        </Grid>
-      </Grid>
+        </Box>
+
+        {/* Columna Espaciadora - solo desktop */}
+        <Box sx={{ display: { xs: 'none', md: 'block' }, backgroundColor: '#E9F5FF', gridColumn: '3 / 4' }} />
+      </Box>
     </Box>
   );
 };
