@@ -30,6 +30,7 @@ enum DocumentType {
 enum DocumentStatus {
   PENDIENTE
   EN_PROCESO
+  AGRUPADO      // NUEVO: Estado intermedio cuando documentos están agrupados pero no listos
   LISTO
   ENTREGADO
 }

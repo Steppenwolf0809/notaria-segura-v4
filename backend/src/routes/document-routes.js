@@ -28,6 +28,7 @@ import {
   // 🔗 Funciones de grupos
   updateDocumentGroupStatus,
   updateDocumentGroupInfo,
+  markDocumentGroupAsReady,
   // 🔓 Desagrupar documento
   ungroupDocument
 } from '../controllers/document-controller.js';
@@ -144,6 +145,9 @@ router.get('/:id/history', authenticateToken, getDocumentHistory);
 
 // 🔗 PUT /api/documents/group/info - Actualizar información compartida de grupo
 router.put('/group/info', authenticateToken, updateDocumentGroupInfo);
+
+// 🆕 POST /api/documents/group/mark-ready - Marcar grupo como listo para entrega
+router.post('/group/mark-ready', authenticateToken, markDocumentGroupAsReady);
 
 // Obtener información detallada de un grupo
 // TODO: Implementar el método getGroupDetails en document-controller.js

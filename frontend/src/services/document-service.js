@@ -383,6 +383,28 @@ const documentService = {
     }
   },
 
+  /**
+   * NUEVA FUNCIONALIDAD: Marcar grupo como listo para entrega
+   * @param {string} documentGroupId - ID del grupo de documentos
+   * @returns {Promise<Object>} Resultado de la operación
+   */
+  async markDocumentGroupAsReady(documentGroupId) {
+    console.log('🌐 SERVICE: markDocumentGroupAsReady iniciado:', {
+      documentGroupId,
+      url: '/documents/group/mark-ready'
+    });
+    
+    try {
+      const response = await api.post('/documents/group/mark-ready', { documentGroupId });
+      console.log('📊 SERVICE: Respuesta de markDocumentGroupAsReady:', response.data);
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.message || 'Error marcando grupo como listo';
+      console.error(message, error);
+      return { success: false, error: message };
+    }
+  },
+
   async deliverDocumentGroup(deliveryData) {
     try {
       const response = await api.post('/documents/deliver-group', deliveryData);

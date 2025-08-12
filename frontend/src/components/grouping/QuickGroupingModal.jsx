@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import EditDocumentModal from '../shared/EditDocumentModal';
 import {
   Dialog,
   DialogTitle,
@@ -32,7 +33,9 @@ import {
   Info as InfoIcon,
   Person as PersonIcon,
   Phone as PhoneIcon,
-  Badge as BadgeIcon
+  Badge as BadgeIcon,
+  Edit as EditIcon,
+  Notifications as NotificationsIcon
 } from '@mui/icons-material';
 
 /**
@@ -51,6 +54,11 @@ const QuickGroupingModal = ({
   const [selectedDocuments, setSelectedDocuments] = useState(
     new Set(relatedDocuments.map(doc => doc.id))
   );
+  
+  // Estados para modal de edición
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [documentToEdit, setDocumentToEdit] = useState(null);
+  const [documentUpdates, setDocumentUpdates] = useState(new Map());
 
 
   // Debug del modal
@@ -67,13 +75,13 @@ const QuickGroupingModal = ({
     }
   }, [open, mainDocument, relatedDocuments]);
 
-  const handleConfirm = async () => {
+  const handleConfirm = async (markAsReady = false) => {
     setConfirming(true);
     try {
-      console.log('🔗 Ejecutando confirmación de agrupación...');
+      console.log('🔗 Ejecutando confirmación de agrupación...', { markAsReady });
       if (onConfirm) {
         const selectedIds = Array.from(selectedDocuments);
-        await onConfirm(selectedIds);
+        await onConfirm(selectedIds, markAsReady);
       }
       console.log('✅ Agrupación confirmada exitosamente');
       onClose();
@@ -92,6 +100,28 @@ const QuickGroupingModal = ({
       newSelected.add(documentId);
     }
     setSelectedDocuments(newSelected);
+  };
+
+  // Funciones para edición de documentos
+  const handleEditDocument = (document) => {
+    console.log('📝 Abriendo edición para documento:', document.id);
+    setDocumentToEdit(document);
+    setEditModalOpen(true);
+  };
+
+  const handleDocumentUpdated = (updatedDocument) => {
+    console.log('📝 Documento actualizado:', updatedDocument.id);
+    // Guardar los cambios en un mapa para referencia
+    const updates = new Map(documentUpdates);
+    updates.set(updatedDocument.id, updatedDocument);
+    setDocumentUpdates(updates);
+    setEditModalOpen(false);
+    setDocumentToEdit(null);
+  };
+
+  const handleCloseEditModal = () => {
+    setEditModalOpen(false);
+    setDocumentToEdit(null);
   };
 
   const totalSelected = selectedDocuments.size + 1; // +1 por documento principal
@@ -282,41 +312,73 @@ const QuickGroupingModal = ({
               }}
             >
               <CardContent sx={{ py: 2 }}>
-                <FormControlLabel
-                  control={
-                    <Checkbox 
-                      checked={selectedDocuments.has(doc.id)}
-                      onChange={() => handleDocumentToggle(doc.id)}
-                    />
-                  }
-                  label={
-                    <Box>
-                      <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                        {doc.actoPrincipalDescripcion || doc.documentType}
-                      </Typography>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mt: 0.25 }}>
-                        <Chip 
-                          label={doc.documentType}
-                          size="small"
-                          sx={{ height: 22, fontSize: '0.7rem' }}
-                        />
-                        <Typography variant="body2" color="textSecondary">
-                          Protocolo: {doc.protocolNumber}
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                  <FormControlLabel
+                    sx={{ flex: 1 }}
+                    control={
+                      <Checkbox 
+                        checked={selectedDocuments.has(doc.id)}
+                        onChange={() => handleDocumentToggle(doc.id)}
+                      />
+                    }
+                    label={
+                      <Box>
+                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                          {doc.actoPrincipalDescripcion || doc.documentType}
+                          {documentUpdates.has(doc.id) && (
+                            <Chip 
+                              label="Editado" 
+                              size="small" 
+                              color="success" 
+                              sx={{ ml: 1, height: 20, fontSize: '0.6rem' }}
+                            />
+                          )}
                         </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mt: 0.25 }}>
+                          <Chip 
+                            label={doc.documentType}
+                            size="small"
+                            sx={{ height: 22, fontSize: '0.7rem' }}
+                          />
+                          <Typography variant="body2" color="textSecondary">
+                            Protocolo: {doc.protocolNumber}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
+                          <Chip 
+                            label={doc.status} 
+                            size="small" 
+                            color="info"
+                          />
+                          <Typography variant="caption" color="textSecondary">
+                            {new Date(doc.createdAt).toLocaleDateString('es-EC')}
+                          </Typography>
+                        </Box>
                       </Box>
-                      <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
-                        <Chip 
-                          label={doc.status} 
-                          size="small" 
-                          color="info"
-                        />
-                        <Typography variant="caption" color="textSecondary">
-                          {new Date(doc.createdAt).toLocaleDateString('es-EC')}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  }
-                />
+                    }
+                  />
+                  
+                  {/* Botón de Edición */}
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<EditIcon />}
+                    onClick={() => handleEditDocument(doc)}
+                    sx={{ 
+                      minWidth: 'auto',
+                      height: 32,
+                      px: 1.5,
+                      borderColor: '#17a2b8',
+                      color: '#17a2b8',
+                      '&:hover': {
+                        borderColor: '#138496',
+                        backgroundColor: 'rgba(23, 162, 184, 0.1)'
+                      }
+                    }}
+                  >
+                    Editar
+                  </Button>
+                </Box>
               </CardContent>
             </Card>
           ))}
@@ -354,25 +416,19 @@ const QuickGroupingModal = ({
 
 
 
-        {/* Información del Proceso */}
-        <Alert severity="success" sx={{ 
+        {/* Información del Proceso - ACTUALIZADA */}
+        <Alert severity="info" sx={{ 
           background: (theme) => theme.palette.mode === 'dark'
-            ? 'rgba(40, 167, 69, 0.2)'
-            : 'rgba(40, 167, 69, 0.05)'
+            ? 'rgba(23, 162, 184, 0.2)'
+            : 'rgba(23, 162, 184, 0.05)'
         }}>
-          <AlertTitle>Al confirmar se realizará:</AlertTitle>
+          <AlertTitle>Opciones de Agrupación:</AlertTitle>
           <List sx={{ py: 0 }}>
             <ListItem sx={{ py: 0.25, px: 0 }}>
-              <ListItemText primary="• Se generará un código único para todos los documentos" />
+              <ListItemText primary="• Agrupar Documentos: Los documentos se agrupan en estado AGRUPADO" />
             </ListItem>
             <ListItem sx={{ py: 0.25, px: 0 }}>
-              <ListItemText primary="• Se enviará una notificación WhatsApp grupal al cliente" />
-            </ListItem>
-            <ListItem sx={{ py: 0.25, px: 0 }}>
-              <ListItemText primary="• Los documentos se marcarán como LISTOS" />
-            </ListItem>
-            <ListItem sx={{ py: 0.25, px: 0 }}>
-              <ListItemText primary="• El cliente podrá retirar todos con un solo código" />
+              <ListItemText primary="• Agrupar y Marcar Listo: Agrupa + marca como LISTO + envía WhatsApp" />
             </ListItem>
           </List>
         </Alert>
@@ -411,8 +467,32 @@ const QuickGroupingModal = ({
           Cancelar
         </Button>
         
+        {/* NUEVA FUNCIONALIDAD: Botones separados para agrupar vs agrupar y marcar listo */}
         <Button
-          onClick={handleConfirm}
+          onClick={() => handleConfirm(false)}
+          disabled={confirming || loading || selectedDocuments.size === 0}
+          variant="outlined"
+          sx={{
+            borderColor: '#17a2b8',
+            color: '#17a2b8',
+            fontWeight: 600,
+            px: 3,
+            '&:hover': {
+              borderColor: '#138496',
+              backgroundColor: 'rgba(23, 162, 184, 0.1)'
+            }
+          }}
+        >
+          {confirming ? (
+            <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
+          ) : (
+            <GroupIcon sx={{ mr: 1 }} />
+          )}
+          Agrupar Documentos ({totalSelected})
+        </Button>
+        
+        <Button
+          onClick={() => handleConfirm(true)}
           disabled={confirming || loading || selectedDocuments.size === 0}
           variant="contained"
           sx={{
@@ -427,11 +507,19 @@ const QuickGroupingModal = ({
           {confirming ? (
             <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} />
           ) : (
-            <CheckIcon sx={{ mr: 1 }} />
+            <NotificationsIcon sx={{ mr: 1 }} />
           )}
-          Confirmar Agrupación ({totalSelected})
+          Agrupar y Marcar Listo ({totalSelected})
         </Button>
       </DialogActions>
+      
+      {/* Modal de Edición de Documento */}
+      <EditDocumentModal
+        open={editModalOpen}
+        onClose={handleCloseEditModal}
+        document={documentToEdit}
+        onDocumentUpdated={handleDocumentUpdated}
+      />
     </Dialog>
   );
 };
