@@ -449,9 +449,10 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
 
   /**
    * Actualizar estado de grupo completo usando endpoint optimizado
+   * CORREGIDO: Usar siempre documentService para consistencia con botones individuales
    */
   const updateGroupStatus = useCallback(async (groupDocuments, newStatus, options = {}) => {
-    console.log('🔗 Actualizando estado de grupo:', {
+    console.log('🔗 Actualizando estado de grupo via drag & drop:', {
       documentsCount: groupDocuments.length,
       newStatus,
       documentIds: groupDocuments.map(d => d.id),
@@ -467,7 +468,7 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
         return { success: false, error: 'No se encontró ID del grupo' };
       }
 
-      // Usar función optimizada del backend para grupos
+      // 🔧 CORRECCIÓN: Usar documentService directamente (igual que botón individual)
       const documentService = await import('../services/document-service.js');
       const result = await documentService.default.updateDocumentGroupStatus(
         documentGroupId, 
@@ -475,29 +476,40 @@ const useDragAndDrop = (onConfirmationRequired = null) => {
         options
       );
       
+      console.log('📊 Resultado de documentService.updateDocumentGroupStatus (drag):', result);
+      
       if (result.success) {
-        console.log('✅ Grupo actualizado exitosamente via endpoint optimizado');
+        console.log('✅ Grupo actualizado exitosamente desde drag & drop');
         
-        // Actualizar documentos en el store local
+        // 🔧 CORRECCIÓN: Actualizar documentos en el store local usando la estructura correcta
         const { updateDocument } = useDocumentStore.getState();
-        result.data.documents?.forEach(updatedDoc => {
-          updateDocument(updatedDoc.id, updatedDoc);
-        });
+        
+        // El resultado viene en result.data.documents
+        if (result.data && result.data.documents) {
+          result.data.documents.forEach(updatedDoc => {
+            updateDocument(updatedDoc.id, updatedDoc);
+          });
+          
+          console.log('🔄 Documentos actualizados en store local desde drag');
+        } else {
+          console.warn('⚠️ No se encontraron documentos actualizados en la respuesta');
+        }
         
         return { 
           success: true, 
           document: groupDocuments[0], // Retornar documento principal
           groupUpdated: true,
-          groupSize: result.data.documentsUpdated || groupDocuments.length,
-          whatsapp: result.data.whatsapp
+          groupSize: result.data?.documentsUpdated || groupDocuments.length,
+          whatsapp: result.data?.whatsapp,
+          changeInfo: result.changeInfo // Para sistema de deshacer
         };
       } else {
-        console.error('❌ Error en endpoint optimizado:', result.error);
+        console.error('❌ Error en documentService desde drag:', result.error);
         return { success: false, error: result.error };
       }
       
     } catch (error) {
-      console.error('💥 Error actualizando grupo via endpoint optimizado:', error);
+      console.error('💥 Error actualizando grupo desde drag & drop:', error);
       return { success: false, error: error.message };
     }
   }, []);
