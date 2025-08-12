@@ -1,4 +1,4 @@
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { logSecurityViolation } from '../utils/audit-logger.js';
 
 /**
@@ -58,15 +58,15 @@ const loginRateLimit = rateLimit({
   legacyHeaders: false,
   trustProxy: true, // Confiar en headers de proxy para obtener IP real
   
-  // Generar key única por combinación email+IP
+  // Generar key única por combinación email+IP con soporte IPv6
   keyGenerator: (req) => {
-    const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
+    const clientIP = ipKeyGenerator(req); // Helper oficial para IPv4/IPv6
     const email = req.body?.email || 'no-email';
     return `${email}:${clientIP}`;
   },
   
   handler: (req, res) => {
-    const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
+    const clientIP = ipKeyGenerator(req); // Usar helper oficial para consistencia
     const userAgent = req.headers['user-agent'] || 'unknown';
     const attemptedEmail = req.body?.email || 'unknown';
     

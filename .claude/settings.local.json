@@ -37,7 +37,8 @@
       "Bash(docker-compose up:*)",
       "Bash(./setup-database.sh:*)",
       "Bash(bash:*)",
-      "Bash(npm view:*)"
+      "Bash(npm view:*)",
+      "WebFetch(domain:express-rate-limit.github.io)"
     ],
     "deny": []
   }
