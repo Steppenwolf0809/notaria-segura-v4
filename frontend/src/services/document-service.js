@@ -766,6 +766,47 @@ const documentService = {
         message: errorMessage
       };
     }
+  },
+
+  /**
+   * 🔄 NUEVA FUNCIONALIDAD: Cambio de estado masivo
+   * @param {Object} bulkData - Datos para cambio masivo
+   * @returns {Promise<Object>} Resultado de la operación masiva
+   */
+  async bulkStatusChange(bulkData) {
+    console.log('🔄 SERVICE: bulkStatusChange iniciado:', {
+      bulkData,
+      url: '/documents/bulk-status-change'
+    });
+    
+    try {
+      const response = await api.post('/documents/bulk-status-change', bulkData);
+      console.log('📊 SERVICE: Respuesta de bulkStatusChange:', response.data);
+      
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('💥 SERVICE: Error en bulkStatusChange:', error);
+      console.error('📊 SERVICE: Error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Error al realizar cambio masivo de estado';
+      
+      return {
+        success: false,
+        error: errorMessage,
+        message: errorMessage
+      };
+    }
   }
 };
 

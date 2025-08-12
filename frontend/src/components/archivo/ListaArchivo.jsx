@@ -49,6 +49,10 @@ import ModalEntrega from '../recepcion/ModalEntrega';
 import ModalEntregaGrupal from '../recepcion/ModalEntregaGrupal';
 import QuickGroupingModal from '../grouping/QuickGroupingModal';
 import useDocumentStore from '../../store/document-store';
+// 🎯 NUEVOS IMPORTS PARA SELECCIÓN MÚLTIPLE
+import useBulkActions from '../../hooks/useBulkActions';
+import BulkActionToolbar from '../bulk/BulkActionToolbar';
+import BulkStatusChangeModal from '../bulk/BulkStatusChangeModal';
 
 /**
  * Vista Lista para documentos de archivo
@@ -83,6 +87,11 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
   const [groupingLoading, setGroupingLoading] = useState(false);
   const [groupingSuccess, setGroupingSuccess] = useState(null);
   const [showSingleDeliveryModal, setShowSingleDeliveryModal] = useState(false);
+
+  // 🎯 NUEVOS ESTADOS PARA SELECCIÓN MÚLTIPLE
+  const bulkActions = useBulkActions();
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [pendingBulkAction, setPendingBulkAction] = useState(null);
 
   /**
    * Filtrar y ordenar documentos (igual que ListView de Matrizador)
@@ -192,6 +201,75 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
       month: '2-digit', 
       year: 'numeric'
     });
+  };
+
+  // 🎯 NUEVAS FUNCIONES PARA SELECCIÓN MÚLTIPLE
+
+  /**
+   * Manejar selección de todos los documentos visibles
+   */
+  const handleSelectAll = (event) => {
+    const documentosPagina = documentosPaginados;
+    bulkActions.toggleSelectAll(documentosPagina, event.target.checked);
+  };
+
+  /**
+   * Verificar si todos los documentos visibles están seleccionados
+   */
+  const isAllSelected = React.useMemo(() => {
+    if (documentosPaginados.length === 0) return false;
+    return documentosPaginados.every(doc => bulkActions.selectedDocuments.has(doc.id));
+  }, [documentosPaginados, bulkActions.selectedDocuments]);
+
+  /**
+   * Verificar si algunos documentos están seleccionados (para indeterminate)
+   */
+  const isIndeterminate = React.useMemo(() => {
+    const selectedCount = documentosPaginados.filter(doc => 
+      bulkActions.selectedDocuments.has(doc.id)
+    ).length;
+    return selectedCount > 0 && selectedCount < documentosPaginados.length;
+  }, [documentosPaginados, bulkActions.selectedDocuments]);
+
+  /**
+   * Manejar clic en acción masiva desde toolbar
+   */
+  const handleBulkAction = (targetStatus, options) => {
+    const selectedDocs = documentosOrdenados.filter(doc => 
+      bulkActions.selectedDocuments.has(doc.id)
+    );
+    
+    setPendingBulkAction({
+      documents: selectedDocs,
+      fromStatus: bulkActions.getCommonStatus(documentosOrdenados),
+      toStatus: targetStatus,
+      options
+    });
+    setBulkModalOpen(true);
+  };
+
+  /**
+   * Ejecutar cambio masivo confirmado
+   */
+  const handleConfirmBulkAction = async (actionData) => {
+    try {
+      await bulkActions.executeBulkStatusChange(
+        documentosOrdenados, 
+        actionData.toStatus, 
+        actionData.options
+      );
+      
+      // Refrescar la vista
+      if (onRefresh) {
+        onRefresh();
+      }
+      console.log('✅ Cambio masivo completado en ListaArchivo');
+    } catch (error) {
+      console.error('❌ Error en cambio masivo:', error);
+    } finally {
+      setBulkModalOpen(false);
+      setPendingBulkAction(null);
+    }
   };
 
   /**
@@ -690,15 +768,10 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
               <TableRow>
                 <TableCell padding="checkbox">
                   <Checkbox
-                    indeterminate={
-                      selectedDocuments.size > 0 && 
-                      selectedDocuments.size < documentosPagina.length
-                    }
-                    checked={
-                      documentosPagina.length > 0 && 
-                      documentosPagina.every(doc => selectedDocuments.has(doc.id))
-                    }
-                    onChange={handleToggleAll}
+                    indeterminate={isIndeterminate}
+                    checked={isAllSelected}
+                    onChange={handleSelectAll}
+                    disabled={documentosPaginados.length === 0}
                     color="primary"
                   />
                 </TableCell>
@@ -765,7 +838,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                 <TableRow 
                   key={documento.id}
                   hover
-                  selected={selectedDocuments.has(documento.id)}
+                  selected={bulkActions.selectedDocuments.has(documento.id)}
                   sx={{ 
                     '&:hover': { 
                       backgroundColor: 'action.hover',
@@ -775,13 +848,22 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                     ...(documento.isGrouped && {
                       borderLeft: '4px solid #1976d2',
                       backgroundColor: 'rgba(25, 118, 210, 0.04)'
+                    }),
+                    // Resaltar documentos seleccionados para bulk
+                    ...(bulkActions.selectedDocuments.has(documento.id) && {
+                      bgcolor: 'action.selected'
                     })
                   }}
                 >
                   <TableCell padding="checkbox">
                     <Checkbox
-                      checked={selectedDocuments.has(documento.id)}
-                      onChange={() => handleToggleDocument(documento.id)}
+                      checked={bulkActions.selectedDocuments.has(documento.id)}
+                      onChange={() => bulkActions.toggleDocumentSelection(
+                        documento.id, 
+                        documento.status, 
+                        documentosOrdenados
+                      )}
+                      disabled={!bulkActions.canSelectDocument(documento, documentosOrdenados)}
                       color="primary"
                     />
                   </TableCell>
@@ -991,6 +1073,51 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
             }
           }}
         />
+      )}
+
+      {/* 🎯 NUEVOS COMPONENTES: Selección múltiple */}
+      
+      {/* Toolbar flotante para acciones masivas */}
+      <BulkActionToolbar
+        selectionCount={bulkActions.selectionInfo.count}
+        commonStatus={bulkActions.getCommonStatus(documentosOrdenados)}
+        validTransitions={bulkActions.getValidTransitions(documentosOrdenados)}
+        maxSelection={bulkActions.MAX_BULK_SELECTION}
+        isExecuting={bulkActions.isExecuting}
+        onClearSelection={bulkActions.clearSelection}
+        onBulkAction={handleBulkAction}
+      />
+
+      {/* Modal de confirmación para cambios masivos */}
+      <BulkStatusChangeModal
+        open={bulkModalOpen}
+        onClose={() => {
+          setBulkModalOpen(false);
+          setPendingBulkAction(null);
+        }}
+        documents={pendingBulkAction?.documents || []}
+        fromStatus={pendingBulkAction?.fromStatus}
+        toStatus={pendingBulkAction?.toStatus}
+        onConfirm={handleConfirmBulkAction}
+        loading={bulkActions.isExecuting}
+      />
+
+      {/* Alerta informativa cuando hay documentos con estados mixtos */}
+      {bulkActions.selectionInfo.count > 0 && !bulkActions.getCommonStatus(documentosOrdenados) && (
+        <Alert 
+          severity="warning" 
+          sx={{ 
+            position: 'fixed', 
+            bottom: 100, 
+            left: '50%', 
+            transform: 'translateX(-50%)', 
+            zIndex: 1200,
+            maxWidth: '90vw'
+          }}
+        >
+          Solo se pueden realizar cambios masivos en documentos del mismo estado. 
+          Documentos con estados diferentes han sido deseleccionados automáticamente.
+        </Alert>
       )}
     </Box>
   );

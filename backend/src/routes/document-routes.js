@@ -33,6 +33,11 @@ import {
   ungroupDocument
 } from '../controllers/document-controller.js';
 
+// 🔄 NUEVAS IMPORTACIONES: Operaciones masivas
+import {
+  bulkStatusChange
+} from '../controllers/bulk-operations-controller.js';
+
 const router = express.Router();
 
 // Configuración de multer para upload de archivos XML (individual)
@@ -148,6 +153,9 @@ router.put('/group/info', authenticateToken, updateDocumentGroupInfo);
 
 // 🆕 POST /api/documents/group/mark-ready - Marcar grupo como listo para entrega
 router.post('/group/mark-ready', authenticateToken, markDocumentGroupAsReady);
+
+// 🔄 POST /api/documents/bulk-status-change - Cambio de estado masivo
+router.post('/bulk-status-change', authenticateToken, bulkStatusChange);
 
 // Obtener información detallada de un grupo
 // TODO: Implementar el método getGroupDetails en document-controller.js

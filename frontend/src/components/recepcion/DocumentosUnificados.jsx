@@ -102,7 +102,8 @@ function formatLocalDate(dateString) {
 function DocumentosUnificados({ onEstadisticasChange }) {
   const { createDocumentGroup, detectGroupableDocuments } = useDocumentStore();
   const [documentos, setDocumentos] = useState([]);
-  const [selectedDocuments, setSelectedDocuments] = useState([]);
+  const [selectedDocuments, setSelectedDocuments] = useState([]); // Solo para visualización
+  const [visualSelection, setVisualSelection] = useState(new Set()); // 🎯 NUEVA: Selección visual sin funcionalidad
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [matrizadores, setMatrizadores] = useState([]);
@@ -432,6 +433,42 @@ function DocumentosUnificados({ onEstadisticasChange }) {
     setSelectedGroupDocument(null);
   };
 
+  // 🎯 NUEVAS FUNCIONES PARA SELECCIÓN VISUAL (SOLO INFORMATIVA)
+
+  /**
+   * Alternar selección visual de documento (sin funcionalidad)
+   */
+  const handleToggleVisualSelection = (documentId) => {
+    setVisualSelection(prev => {
+      const newSelection = new Set(prev);
+      if (newSelection.has(documentId)) {
+        newSelection.delete(documentId);
+      } else {
+        newSelection.add(documentId);
+      }
+      return newSelection;
+    });
+  };
+
+  /**
+   * Seleccionar/deseleccionar todos los documentos visibles
+   */
+  const handleToggleAllVisual = (selectAll) => {
+    if (selectAll) {
+      const visibleIds = documentos.slice(page * rowsPerPage, (page + 1) * rowsPerPage).map(doc => doc.id);
+      setVisualSelection(new Set(visibleIds));
+    } else {
+      setVisualSelection(new Set());
+    }
+  };
+
+  // Calcular documentos paginados
+  const documentosPaginados = documentos.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+  
+  // Verificar estado de selección para checkbox master
+  const allVisualSelected = documentosPaginados.length > 0 && documentosPaginados.every(doc => visualSelection.has(doc.id));
+  const someVisualSelected = documentosPaginados.some(doc => visualSelection.has(doc.id));
+
   if (loading && !documentos.length) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 400 }}>
@@ -578,9 +615,11 @@ function DocumentosUnificados({ onEstadisticasChange }) {
               <TableRow sx={{ bgcolor: 'grey.50' }}>
                 <TableCell padding="checkbox">
                   <Checkbox
-                    indeterminate={selectedDocuments.length > 0 && selectedDocuments.length < documentos.filter(d => d.status !== 'ENTREGADO').length}
-                    checked={documentos.length > 0 && selectedDocuments.length === documentos.filter(d => d.status !== 'ENTREGADO').length}
-                    onChange={handleSelectAll}
+                    indeterminate={someVisualSelected && !allVisualSelected}
+                    checked={allVisualSelected}
+                    onChange={(e) => handleToggleAllVisual(e.target.checked)}
+                    disabled={documentosPaginados.length === 0}
+                    color="primary"
                   />
                 </TableCell>
                 <TableCell sx={{ fontWeight: 'bold', py: 2 }}>Cliente / Documento</TableCell>
@@ -601,16 +640,25 @@ function DocumentosUnificados({ onEstadisticasChange }) {
                 documentos.map((documento) => (
                   <TableRow 
                     key={documento.id} 
-                    selected={selectedDocuments.includes(documento.id)} 
+                    selected={visualSelection.has(documento.id)} 
                     hover
                     onClick={() => abrirDetalles(documento)}
-                    sx={{ cursor: 'pointer' }}
+                    sx={{ 
+                      cursor: 'pointer',
+                      ...(visualSelection.has(documento.id) && {
+                        bgcolor: 'action.selected'
+                      })
+                    }}
                   >
-                    <TableCell padding="checkbox">
+                    <TableCell 
+                      padding="checkbox"
+                      onClick={(e) => e.stopPropagation()} // Evitar que abra el modal
+                    >
                       <Checkbox
-                        checked={selectedDocuments.includes(documento.id)}
-                        onChange={(e) => { e.stopPropagation(); handleSelectDocument(documento.id); }}
-                        disabled={documento.status === 'ENTREGADO'}
+                        checked={visualSelection.has(documento.id)}
+                        onChange={() => handleToggleVisualSelection(documento.id)}
+                        color="primary"
+                        // 🎯 Solo visual para Recepción (sin funcionalidad de cambio masivo)
                       />
                     </TableCell>
                     <TableCell sx={{ py: 1.5 }}>
@@ -815,6 +863,28 @@ function DocumentosUnificados({ onEstadisticasChange }) {
           document={detailDocument}
           onDocumentUpdated={() => { cargarDocumentos(); }}
         />
+      )}
+
+      {/* 🎯 NOTA INFORMATIVA: Checkboxes solo visuales para Recepción */}
+      {visualSelection.size > 0 && (
+        <Alert 
+          severity="info" 
+          sx={{ 
+            position: 'fixed', 
+            bottom: 24, 
+            left: '50%', 
+            transform: 'translateX(-50%)', 
+            zIndex: 1200,
+            maxWidth: '90vw'
+          }}
+        >
+          <Typography variant="body2">
+            📋 Documentos seleccionados: {visualSelection.size} (solo visualización)
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
+            Los checkboxes permiten selección visual. Para cambios masivos, use las vistas de Matrizador o Archivo.
+          </Typography>
+        </Alert>
       )}
     </Box>
   );

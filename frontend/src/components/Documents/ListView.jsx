@@ -18,7 +18,9 @@ import {
   MenuItem,
   TableSortLabel,
   ListItemIcon,
-  ListItemText
+  ListItemText,
+  Checkbox,
+  Alert
 } from '@mui/material';
 import {
   Visibility as ViewIcon,
@@ -33,10 +35,14 @@ import DocumentDetailModal from './DocumentDetailModal';
 import GroupingAlert from '../grouping/GroupingAlert';
 import { formatCurrency } from '../../utils/currencyUtils';
 import QuickGroupingModal from '../grouping/QuickGroupingModal';
+// NUEVOS COMPONENTES PARA SELECCIÓN MÚLTIPLE
+import useBulkActions from '../../hooks/useBulkActions';
+import BulkActionToolbar from '../bulk/BulkActionToolbar';
+import BulkStatusChangeModal from '../bulk/BulkStatusChangeModal';
 
 /**
- * Vista Lista - EXACTA AL PROTOTIPO
- * Tabla completa con todas las funcionalidades
+ * Vista Lista - EXACTA AL PROTOTIPO + SELECCIÓN MÚLTIPLE
+ * Tabla completa con todas las funcionalidades + checkboxes para cambios masivos
  */
 const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
   const { documents, updateDocumentStatus, updateDocument, createDocumentGroup, detectGroupableDocuments } = useDocumentStore();
@@ -55,6 +61,11 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
   const [groupingLoading, setGroupingLoading] = useState(false);
   const [groupInfoModalOpen, setGroupInfoModalOpen] = useState(false);
   const [selectedGroupDocument, setSelectedGroupDocument] = useState(null);
+
+  // 🆕 NUEVOS ESTADOS PARA SELECCIÓN MÚLTIPLE
+  const bulkActions = useBulkActions();
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [pendingBulkAction, setPendingBulkAction] = useState(null);
 
   /**
    * Filtrar y ordenar documentos
@@ -225,6 +236,72 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
     setShowQuickGroupingModal(true);
   };
 
+  // 🎯 NUEVAS FUNCIONES PARA SELECCIÓN MÚLTIPLE
+
+  /**
+   * Manejar selección de todos los documentos visibles
+   */
+  const handleSelectAll = (event) => {
+    bulkActions.toggleSelectAll(paginatedDocuments, event.target.checked);
+  };
+
+  /**
+   * Verificar si todos los documentos visibles están seleccionados
+   */
+  const isAllSelected = useMemo(() => {
+    if (paginatedDocuments.length === 0) return false;
+    return paginatedDocuments.every(doc => bulkActions.selectedDocuments.has(doc.id));
+  }, [paginatedDocuments, bulkActions.selectedDocuments]);
+
+  /**
+   * Verificar si algunos documentos están seleccionados (para indeterminate)
+   */
+  const isIndeterminate = useMemo(() => {
+    const selectedCount = paginatedDocuments.filter(doc => 
+      bulkActions.selectedDocuments.has(doc.id)
+    ).length;
+    return selectedCount > 0 && selectedCount < paginatedDocuments.length;
+  }, [paginatedDocuments, bulkActions.selectedDocuments]);
+
+  /**
+   * Manejar clic en acción masiva desde toolbar
+   */
+  const handleBulkAction = (targetStatus, options) => {
+    const selectedDocs = filteredAndSortedDocuments.filter(doc => 
+      bulkActions.selectedDocuments.has(doc.id)
+    );
+    
+    setPendingBulkAction({
+      documents: selectedDocs,
+      fromStatus: bulkActions.getCommonStatus(filteredAndSortedDocuments),
+      toStatus: targetStatus,
+      options
+    });
+    setBulkModalOpen(true);
+  };
+
+  /**
+   * Ejecutar cambio masivo confirmado
+   */
+  const handleConfirmBulkAction = async (actionData) => {
+    try {
+      await bulkActions.executeBulkStatusChange(
+        filteredAndSortedDocuments, 
+        actionData.toStatus, 
+        actionData.options
+      );
+      
+      // Refrescar la vista (el hook ya limpia la selección)
+      console.log('✅ Cambio masivo completado en ListView');
+    } catch (error) {
+      console.error('❌ Error en cambio masivo:', error);
+      // TODO: Mostrar notificación de error
+    } finally {
+      setBulkModalOpen(false);
+      setPendingBulkAction(null);
+    }
+  };
+
   // Documentos de la página actual
   const paginatedDocuments = filteredAndSortedDocuments.slice(
     page * rowsPerPage,
@@ -239,6 +316,16 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
           <Table stickyHeader>
             <TableHead>
               <TableRow>
+                {/* 🎯 NUEVA COLUMNA: Checkbox para selección múltiple */}
+                <TableCell padding="checkbox" sx={{ fontWeight: 'bold' }}>
+                  <Checkbox
+                    indeterminate={isIndeterminate}
+                    checked={isAllSelected}
+                    onChange={handleSelectAll}
+                    disabled={paginatedDocuments.length === 0}
+                    color="primary"
+                  />
+                </TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>
                   <TableSortLabel
                     active={orderBy === 'protocolNumber'}
@@ -299,18 +386,37 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
                   <TableRow 
                     key={document.id} 
                     hover
+                    selected={bulkActions.selectedDocuments.has(document.id)}
                     sx={{ 
                       cursor: 'pointer',
-                      '&:hover': { bgcolor: 'action.hover' }
+                      '&:hover': { bgcolor: 'action.hover' },
+                      ...(bulkActions.selectedDocuments.has(document.id) && {
+                        bgcolor: 'action.selected'
+                      })
                     }}
-                    onClick={() => openDetailModal(document)}
                   >
-                    <TableCell>
+                    {/* 🎯 NUEVA CELDA: Checkbox individual */}
+                    <TableCell 
+                      padding="checkbox"
+                      onClick={(e) => e.stopPropagation()} // Evitar que abra el modal
+                    >
+                      <Checkbox
+                        checked={bulkActions.selectedDocuments.has(document.id)}
+                        onChange={() => bulkActions.toggleDocumentSelection(
+                          document.id, 
+                          document.status, 
+                          filteredAndSortedDocuments
+                        )}
+                        disabled={!bulkActions.canSelectDocument(document, filteredAndSortedDocuments)}
+                        color="primary"
+                      />
+                    </TableCell>
+                    <TableCell onClick={() => openDetailModal(document)}>
                       <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
                         {document.protocolNumber}
                       </Typography>
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={() => openDetailModal(document)}>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
                         <Avatar sx={{ 
                           width: 32, 
@@ -334,7 +440,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
                         </Box>
                       </Box>
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={() => openDetailModal(document)}>
                       <Chip
                         label={document.documentType}
                         size="small"
@@ -350,7 +456,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
                         }}
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={() => openDetailModal(document)}>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                         <Chip
                           label={statusInfo.label}
@@ -381,7 +487,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
                         )}
                       </Box>
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={() => openDetailModal(document)}>
                       <Typography variant="body2">
                         {new Date(document.createdAt).toLocaleDateString('es-EC', {
                           day: '2-digit',
@@ -396,7 +502,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
                         })}
                       </Typography>
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={() => openDetailModal(document)}>
                       <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'success.main' }}>
                         {formatCurrency(document.actoPrincipalValor || 0)}
                       </Typography>
@@ -526,6 +632,51 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
           }
         }}
       />
+
+      {/* 🎯 NUEVOS COMPONENTES: Selección múltiple */}
+      
+      {/* Toolbar flotante para acciones masivas */}
+      <BulkActionToolbar
+        selectionCount={bulkActions.selectionInfo.count}
+        commonStatus={bulkActions.getCommonStatus(filteredAndSortedDocuments)}
+        validTransitions={bulkActions.getValidTransitions(filteredAndSortedDocuments)}
+        maxSelection={bulkActions.MAX_BULK_SELECTION}
+        isExecuting={bulkActions.isExecuting}
+        onClearSelection={bulkActions.clearSelection}
+        onBulkAction={handleBulkAction}
+      />
+
+      {/* Modal de confirmación para cambios masivos */}
+      <BulkStatusChangeModal
+        open={bulkModalOpen}
+        onClose={() => {
+          setBulkModalOpen(false);
+          setPendingBulkAction(null);
+        }}
+        documents={pendingBulkAction?.documents || []}
+        fromStatus={pendingBulkAction?.fromStatus}
+        toStatus={pendingBulkAction?.toStatus}
+        onConfirm={handleConfirmBulkAction}
+        loading={bulkActions.isExecuting}
+      />
+
+      {/* Alerta informativa cuando hay documentos con estados mixtos */}
+      {bulkActions.selectionInfo.count > 0 && !bulkActions.getCommonStatus(filteredAndSortedDocuments) && (
+        <Alert 
+          severity="warning" 
+          sx={{ 
+            position: 'fixed', 
+            bottom: 100, 
+            left: '50%', 
+            transform: 'translateX(-50%)', 
+            zIndex: 1200,
+            maxWidth: '90vw'
+          }}
+        >
+          Solo se pueden realizar cambios masivos en documentos del mismo estado. 
+          Documentos con estados diferentes han sido deseleccionados automáticamente.
+        </Alert>
+      )}
     </Box>
   );
 };
