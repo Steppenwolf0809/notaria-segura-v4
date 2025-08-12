@@ -10,7 +10,7 @@ cmds = [
 
 [phases.build]
 cmds = [
-    "cd frontend && npm run build",
+    "cd frontend && NODE_ENV=production npm run build",
     "cd backend && npx prisma generate"
 ]
 

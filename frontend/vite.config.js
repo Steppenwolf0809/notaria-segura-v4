@@ -8,7 +8,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'http://localhost:3001',
         changeOrigin: true
       }
     }
@@ -16,5 +16,9 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true
+  },
+  define: {
+    // Forzar variables de entorno para producción
+    'import.meta.env.VITE_API_URL': JSON.stringify('/api')
   }
 })

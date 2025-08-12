@@ -1,7 +1,16 @@
 import axios from 'axios';
 
-// URL base de la API
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+// URL base de la API - Auto-detectar producción
+const getApiBaseUrl = () => {
+  // Si estamos en producción (mismo dominio), usar rutas relativas
+  if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return '/api';
+  }
+  // En desarrollo, usar la variable de entorno o fallback
+  return import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // Instancia de axios configurada
 const api = axios.create({
