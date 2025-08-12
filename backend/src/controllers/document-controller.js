@@ -1418,6 +1418,7 @@ async function getEditableDocumentInfo(req, res) {
           documentType: document.documentType,
           detalle_documento: document.detalle_documento,
           comentarios_recepcion: document.comentarios_recepcion,
+          actoPrincipalDescripcion: document.actoPrincipalDescripcion,
           clientName: document.clientName,
           clientPhone: document.clientPhone,
           clientEmail: document.clientEmail,

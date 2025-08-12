@@ -41,6 +41,7 @@ const EditDocumentModal = ({
   const [formData, setFormData] = useState({
     detalle_documento: '',
     comentarios_recepcion: '',
+    actoPrincipalDescripcion: '',
     clientName: '',
     clientPhone: '',
     clientEmail: '',
@@ -73,6 +74,7 @@ const EditDocumentModal = ({
         setFormData({
           detalle_documento: docData.detalle_documento || '',
           comentarios_recepcion: docData.comentarios_recepcion || '',
+          actoPrincipalDescripcion: docData.actoPrincipalDescripcion || '',
           clientName: docData.clientName || '',
           clientPhone: docData.clientPhone || '',
           clientEmail: docData.clientEmail || '',
@@ -84,6 +86,7 @@ const EditDocumentModal = ({
         setFormData({
           detalle_documento: document.detalle_documento || '',
           comentarios_recepcion: document.comentarios_recepcion || '',
+          actoPrincipalDescripcion: document.actoPrincipalDescripcion || '',
           clientName: document.clientName || '',
           clientPhone: document.clientPhone || '',
           clientEmail: document.clientEmail || '',
@@ -97,6 +100,7 @@ const EditDocumentModal = ({
       setFormData({
         detalle_documento: document.detalle_documento || '',
         comentarios_recepcion: document.comentarios_recepcion || '',
+        actoPrincipalDescripcion: document.actoPrincipalDescripcion || '',
         clientName: document.clientName || '',
         clientPhone: document.clientPhone || '',
         clientEmail: document.clientEmail || '',
@@ -272,6 +276,36 @@ const EditDocumentModal = ({
                       onChange={(e) => handleFieldChange('detalle_documento', e.target.value)}
                       placeholder="Descripción específica del trámite o documento"
                       disabled={saving || loading}
+                    />
+                  </Grid>
+                  
+                  <Grid item xs={12}>
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={3}
+                      label="Acto Principal"
+                      value={formData.actoPrincipalDescripcion}
+                      onChange={(e) => handleFieldChange('actoPrincipalDescripcion', e.target.value)}
+                      placeholder="Ej: PRESTACIÓN DEL SERVICIO NOTARIAL FUERA DEL DESPACHO EN ESCRITURAS DE VIVIENDA CON FINALIDAD SOCIAL"
+                      disabled={saving || loading}
+                      helperText="💡 Este texto aparecerá en la notificación WhatsApp al cliente"
+                      sx={{
+                        '& .MuiInputBase-root': {
+                          backgroundColor: (theme) => theme.palette.mode === 'dark' 
+                            ? 'rgba(255, 193, 7, 0.08)' 
+                            : 'rgba(255, 193, 7, 0.05)',
+                          border: (theme) => `1px solid ${theme.palette.warning.main}20`
+                        },
+                        '& .MuiFormLabel-root': {
+                          fontWeight: 600,
+                          color: (theme) => theme.palette.warning.main
+                        },
+                        '& .MuiFormHelperText-root': {
+                          fontWeight: 500,
+                          color: (theme) => theme.palette.warning.main
+                        }
+                      }}
                     />
                   </Grid>
                   
