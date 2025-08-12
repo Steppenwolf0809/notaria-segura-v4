@@ -153,8 +153,8 @@ const QuickGroupingModal = ({
           background: (theme) => theme.palette.mode === 'dark' 
             ? 'linear-gradient(135deg, #162840, #17a2b8)'
             : 'linear-gradient(135deg, #1976d2, #42a5f5)',
-          color: 'white',
-          borderBottom: '3px solid #D4AF37',
+          color: 'primary.contrastText',
+          borderBottom: (theme) => `3px solid ${theme.palette.warning.main}`,
           py: 2
         }}
       >
@@ -183,10 +183,10 @@ const QuickGroupingModal = ({
           <CardContent sx={{ py: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
               <PersonIcon sx={{ 
-                color: (theme) => theme.palette.mode === 'dark' ? '#17a2b8' : '#162840' 
+                color: 'primary.main' 
               }} />
               <Typography variant="h6" sx={{ 
-                color: (theme) => theme.palette.mode === 'dark' ? '#fff' : '#162840', 
+                color: 'text.primary', 
                 fontWeight: 600 
               }}>
                 {mainDocument.clientName}
@@ -195,13 +195,13 @@ const QuickGroupingModal = ({
             <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
               {mainDocument.clientPhone && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <PhoneIcon sx={{ fontSize: '16px', color: '#17a2b8' }} />
+                  <PhoneIcon sx={{ fontSize: '16px', color: 'primary.main' }} />
                   <Typography variant="body2">{mainDocument.clientPhone}</Typography>
                 </Box>
               )}
               {mainDocument.clientRuc && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <BadgeIcon sx={{ fontSize: '16px', color: '#D4AF37' }} />
+                  <BadgeIcon sx={{ fontSize: '16px', color: 'warning.main' }} />
                   <Typography variant="body2" sx={{ fontWeight: 500 }}>
                     {mainDocument.clientRuc}
                   </Typography>
@@ -219,14 +219,14 @@ const QuickGroupingModal = ({
         {/* Documento Principal */}
         <Box sx={{ mb: 3 }}>
           <Typography variant="h6" sx={{ 
-            color: (theme) => theme.palette.mode === 'dark' ? '#fff' : '#162840', 
+            color: 'text.primary', 
             mb: 1, 
             fontSize: '1rem' 
           }}>
             <DocumentIcon sx={{ 
               mr: 1, 
               verticalAlign: 'middle',
-              color: (theme) => theme.palette.mode === 'dark' ? '#17a2b8' : '#162840'
+              color: 'primary.main'
             }} />
             Documento Principal
           </Typography>
@@ -274,14 +274,14 @@ const QuickGroupingModal = ({
         {/* Documentos Relacionados */}
         <Box sx={{ mb: 3 }}>
           <Typography variant="h6" sx={{ 
-            color: (theme) => theme.palette.mode === 'dark' ? '#fff' : '#162840', 
+            color: 'text.primary', 
             mb: 1, 
             fontSize: '1rem' 
           }}>
             <GroupIcon sx={{ 
               mr: 1, 
               verticalAlign: 'middle',
-              color: (theme) => theme.palette.mode === 'dark' ? '#17a2b8' : '#162840'
+              color: 'primary.main'
             }} />
             Documentos Relacionados ({relatedDocuments.length})
           </Typography>
@@ -308,8 +308,8 @@ const QuickGroupingModal = ({
                     : 'white',
                 transition: 'all 0.2s ease',
                 '&:hover': {
-                  borderColor: '#17a2b8',
-                  boxShadow: '0 2px 8px rgba(23, 162, 184, 0.15)'
+                  borderColor: 'primary.main',
+                  boxShadow: (theme) => `0 2px 8px ${theme.palette.primary.main}26`
                 }
               }}
             >
@@ -370,11 +370,11 @@ const QuickGroupingModal = ({
                       minWidth: 'auto',
                       height: 32,
                       px: 1.5,
-                      borderColor: '#17a2b8',
-                      color: '#17a2b8',
+                      borderColor: 'primary.main',
+                      color: 'primary.main',
                       '&:hover': {
-                        borderColor: '#138496',
-                        backgroundColor: 'rgba(23, 162, 184, 0.1)'
+                        borderColor: 'primary.dark',
+                        backgroundColor: 'primary.light'
                       }
                     }}
                   >
@@ -475,13 +475,13 @@ const QuickGroupingModal = ({
           disabled={confirming || loading || selectedDocuments.size === 0}
           variant="outlined"
           sx={{
-            borderColor: '#17a2b8',
-            color: '#17a2b8',
+            borderColor: 'primary.main',
+            color: 'primary.main',
             fontWeight: 600,
             px: 3,
             '&:hover': {
-              borderColor: '#138496',
-              backgroundColor: 'rgba(23, 162, 184, 0.1)'
+              borderColor: 'primary.dark',
+              backgroundColor: (theme) => `${theme.palette.primary.main}1A`
             }
           }}
         >
