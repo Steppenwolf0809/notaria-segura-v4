@@ -108,7 +108,7 @@ const Dashboard = () => {
         {/* App Bar */}
         <AppBar 
           position="static"
-          color="primary" // Usar color primario del tema
+          color="default"
         >
           <Toolbar>
             <DashboardIcon sx={{ mr: 2 }} />
@@ -144,31 +144,48 @@ const Dashboard = () => {
               title="Cambiar Contraseña"
               sx={{ 
                 ml: 1,
-                color: 'inherit',
+                color: 'text.primary',
                 '&:hover': {
                   bgcolor: 'action.hover'
                 }
               }}
             >
-              <SettingsIcon />
+              <SettingsIcon sx={{ color: 'text.primary' }} />
             </IconButton>
 
             {/* Theme Toggle */}
             <ThemeToggle />
 
-            {/* Logout Button */}
-            <IconButton
+            {/* Logout Button - visible en modo claro */}
+            <Button
+              variant="outlined"
+              color="error"
               onClick={handleLogout}
-              title="Cerrar Sesión"
-              sx={{ 
+              startIcon={<LogoutIcon />}
+              sx={{
                 ml: 1,
-                color: 'inherit',
+                display: { xs: 'none', sm: 'inline-flex' },
+                borderColor: 'error.main',
+                color: 'error.main',
                 '&:hover': {
-                  bgcolor: 'action.hover'
+                  bgcolor: 'rgba(244, 67, 54, 0.08)',
+                  borderColor: 'error.dark'
                 }
               }}
             >
-              <LogoutIcon />
+              Salir
+            </Button>
+            <IconButton
+              onClick={handleLogout}
+              title="Cerrar Sesión"
+              sx={{
+                ml: 1,
+                color: 'text.primary',
+                '&:hover': { bgcolor: 'action.hover' },
+                display: { xs: 'inline-flex', sm: 'none' }
+              }}
+            >
+              <LogoutIcon sx={{ color: 'text.primary' }} />
             </IconButton>
           </Toolbar>
         </AppBar>
@@ -207,7 +224,7 @@ const Dashboard = () => {
       {/* App Bar */}
       <AppBar 
         position="static" 
-        color="primary" // Usar color primario del tema
+        color="default"
       >
         <Toolbar>
           <DashboardIcon sx={{ mr: 2 }} />
@@ -243,13 +260,13 @@ const Dashboard = () => {
             title="Cambiar Contraseña"
             sx={{ 
               ml: 1,
-              color: 'inherit',
+              color: 'text.primary',
               '&:hover': {
                 bgcolor: 'action.hover'
               }
             }}
           >
-            <SettingsIcon />
+            <SettingsIcon sx={{ color: 'text.primary' }} />
           </IconButton>
 
           {/* Theme Toggle */}
@@ -261,13 +278,13 @@ const Dashboard = () => {
             title="Cerrar Sesión"
             sx={{ 
               ml: 1,
-              color: 'inherit',
+              color: 'text.primary',
               '&:hover': {
                 bgcolor: 'action.hover'
               }
             }}
           >
-            <LogoutIcon />
+            <LogoutIcon sx={{ color: 'text.primary' }} />
           </IconButton>
         </Toolbar>
       </AppBar>
