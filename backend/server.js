@@ -33,6 +33,9 @@ if (!isConfigurationComplete(config)) {
 const app = express()
 const PORT = config.PORT || 3001
 
+// Configurar trust proxy para Railway y otros proxies
+app.set('trust proxy', true)
+
 // Configuración CORS mejorada para desarrollo y producción
 const corsOptions = {
   origin: function (origin, callback) {
@@ -42,10 +45,20 @@ const corsOptions = {
         ? process.env.ALLOWED_ORIGINS.split(',').map(url => url.trim())
         : [process.env.FRONTEND_URL || 'https://notaria-segura.com'];
       
+      // Auto-detectar URL de Railway para permitir requests desde la misma aplicación
+      if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+        const railwayUrl = `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
+        if (!productionOrigins.includes(railwayUrl)) {
+          productionOrigins.push(railwayUrl);
+        }
+      }
+      
+      // Permitir requests sin origin (API calls) o desde orígenes permitidos
       if (!origin || productionOrigins.includes(origin)) {
         callback(null, true);
       } else {
         console.warn(`🚫 CORS: Origin no permitido en producción: ${origin}`);
+        console.warn(`📋 Orígenes permitidos: ${productionOrigins.join(', ')}`);
         callback(new Error('No permitido por CORS'));
       }
     } else {

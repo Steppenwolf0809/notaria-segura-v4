@@ -15,6 +15,7 @@ const passwordChangeRateLimit = rateLimit({
   },
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  trustProxy: true, // Confiar en headers de proxy para obtener IP real
   
   // Handler actualizado para express-rate-limit v7+
   handler: (req, res) => {
@@ -55,6 +56,7 @@ const loginRateLimit = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  trustProxy: true, // Confiar en headers de proxy para obtener IP real
   
   handler: (req, res) => {
     const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
@@ -93,7 +95,8 @@ const authGeneralRateLimit = rateLimit({
     retryAfter: '15 minutos'
   },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  trustProxy: true // Confiar en headers de proxy para obtener IP real
 });
 
 /**
@@ -109,7 +112,8 @@ const registerRateLimit = rateLimit({
     retryAfter: '1 hora'
   },
   standardHeaders: true,
-  legacyHeaders: false
+  legacyHeaders: false,
+  trustProxy: true // Confiar en headers de proxy para obtener IP real
 });
 
 /**
@@ -139,6 +143,7 @@ const adminRateLimit = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
+  trustProxy: true, // Confiar en headers de proxy para obtener IP real
   
   handler: (req, res) => {
     const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
