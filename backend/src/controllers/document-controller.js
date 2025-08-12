@@ -1375,6 +1375,186 @@ async function createSmartDocumentGroup(req, res) {
 }
 
 /**
+ * NUEVA FUNCIONALIDAD: Obtener información editable de un documento
+ */
+async function getEditableDocumentInfo(req, res) {
+  try {
+    const { id } = req.params;
+    
+    console.log('📝 getEditableDocumentInfo iniciado:', {
+      documentId: id,
+      userRole: req.user.role,
+      userId: req.user.id
+    });
+
+    // Buscar documento
+    const document = await prisma.document.findUnique({
+      where: { id }
+    });
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Documento no encontrado'
+      });
+    }
+
+    // Verificar permisos según rol
+    if (['MATRIZADOR', 'ARCHIVO'].includes(req.user.role)) {
+      if (document.assignedToId !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          message: 'Solo puedes editar documentos asignados a ti'
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      data: {
+        document: {
+          id: document.id,
+          protocolNumber: document.protocolNumber,
+          documentType: document.documentType,
+          detalle_documento: document.detalle_documento,
+          comentarios_recepcion: document.comentarios_recepcion,
+          clientName: document.clientName,
+          clientPhone: document.clientPhone,
+          clientEmail: document.clientEmail,
+          clientId: document.clientId
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error obteniendo información editable del documento:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+}
+
+/**
+ * NUEVA FUNCIONALIDAD: Actualizar información editable de un documento
+ */
+async function updateDocumentInfo(req, res) {
+  try {
+    const { id } = req.params;
+    const {
+      detalle_documento,
+      comentarios_recepcion,
+      clientName,
+      clientPhone,
+      clientEmail,
+      clientId
+    } = req.body;
+    
+    console.log('📝 updateDocumentInfo iniciado:', {
+      documentId: id,
+      userRole: req.user.role,
+      userId: req.user.id,
+      updateData: req.body
+    });
+
+    // Buscar documento
+    const document = await prisma.document.findUnique({
+      where: { id }
+    });
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Documento no encontrado'
+      });
+    }
+
+    // Verificar permisos según rol
+    if (['MATRIZADOR', 'ARCHIVO'].includes(req.user.role)) {
+      if (document.assignedToId !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          message: 'Solo puedes editar documentos asignados a ti'
+        });
+      }
+    }
+
+    // Validaciones básicas
+    if (!clientName?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nombre del cliente es obligatorio'
+      });
+    }
+
+    // Actualizar documento
+    const updatedDocument = await prisma.document.update({
+      where: { id },
+      data: {
+        detalle_documento: detalle_documento?.trim() || null,
+        comentarios_recepcion: comentarios_recepcion?.trim() || null,
+        clientName: clientName.trim(),
+        clientPhone: clientPhone?.trim() || null,
+        clientEmail: clientEmail?.trim() || null,
+        clientId: clientId?.trim() || null,
+        updatedAt: new Date()
+      }
+    });
+
+    // Registrar evento de edición
+    try {
+      await prisma.documentEvent.create({
+        data: {
+          documentId: id,
+          userId: req.user.id,
+          eventType: 'INFO_EDITED',
+          description: `Información del documento editada por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
+          details: {
+            previousData: {
+              clientName: document.clientName,
+              clientPhone: document.clientPhone,
+              clientEmail: document.clientEmail,
+              clientId: document.clientId,
+              detalle_documento: document.detalle_documento,
+              comentarios_recepcion: document.comentarios_recepcion
+            },
+            newData: {
+              clientName,
+              clientPhone,
+              clientEmail,
+              clientId,
+              detalle_documento,
+              comentarios_recepcion
+            },
+            editedBy: `${req.user.firstName} ${req.user.lastName}`,
+            editedByRole: req.user.role
+          },
+          ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown'
+        }
+      });
+    } catch (auditError) {
+      console.error('Error registrando evento de edición:', auditError);
+    }
+
+    res.json({
+      success: true,
+      message: 'Información del documento actualizada exitosamente',
+      data: {
+        document: updatedDocument
+      }
+    });
+
+  } catch (error) {
+    console.error('Error actualizando información del documento:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+}
+
+/**
  * NUEVA FUNCIONALIDAD: Marcar grupo como listo para entrega
  */
 async function markDocumentGroupAsReady(req, res) {

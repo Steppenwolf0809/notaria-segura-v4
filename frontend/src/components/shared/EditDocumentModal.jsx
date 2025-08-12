@@ -123,9 +123,12 @@ const EditDocumentModal = ({
       validationErrors.push('Nombre del cliente es obligatorio');
     }
 
-    // Validación de teléfono (si se proporciona)
-    if (formData.clientPhone && !/^09\d{8}$/.test(formData.clientPhone.replace(/\s/g, ''))) {
-      validationErrors.push('Teléfono debe tener formato 099999999');
+    // Validación de teléfono (si se proporciona) - CORREGIDA: Más flexible
+    if (formData.clientPhone.trim()) {
+      const cleanPhone = formData.clientPhone.replace(/[\s\-\(\)]/g, ''); // Remover espacios, guiones y paréntesis
+      if (!/^0[9]\d{8}$/.test(cleanPhone) && !/^[9]\d{8}$/.test(cleanPhone)) {
+        validationErrors.push('Teléfono debe tener formato válido (ej: 099999999 o 99999999)');
+      }
     }
 
     // Validación de email (si se proporciona)
@@ -200,8 +203,10 @@ const EditDocumentModal = ({
       {/* Header */}
       <DialogTitle 
         sx={{ 
-          background: 'linear-gradient(135deg, #162840, #17a2b8)',
-          color: 'white',
+          background: (theme) => theme.palette.mode === 'dark' 
+            ? 'linear-gradient(135deg, #162840, #17a2b8)'
+            : 'linear-gradient(135deg, #1976d2, #42a5f5)',
+          color: (theme) => theme.palette.mode === 'dark' ? 'white' : 'white',
           borderBottom: '3px solid #D4AF37',
           py: 2
         }}
@@ -213,7 +218,10 @@ const EditDocumentModal = ({
               Editar Información del Documento
             </Typography>
           </Box>
-          <IconButton onClick={handleClose} sx={{ color: 'white' }}>
+          <IconButton 
+            onClick={handleClose} 
+            sx={{ color: (theme) => theme.palette.mode === 'dark' ? 'white' : 'white' }}
+          >
             <CloseIcon />
           </IconButton>
         </Box>
@@ -263,7 +271,7 @@ const EditDocumentModal = ({
                       value={formData.detalle_documento}
                       onChange={(e) => handleFieldChange('detalle_documento', e.target.value)}
                       placeholder="Descripción específica del trámite o documento"
-                      disabled={saving}
+                      disabled={saving || loading}
                     />
                   </Grid>
                   
@@ -276,7 +284,7 @@ const EditDocumentModal = ({
                       value={formData.comentarios_recepcion}
                       onChange={(e) => handleFieldChange('comentarios_recepcion', e.target.value)}
                       placeholder="Notas especiales para el personal de recepción"
-                      disabled={saving}
+                      disabled={saving || loading}
                     />
                   </Grid>
                 </Grid>
@@ -304,7 +312,7 @@ const EditDocumentModal = ({
                       value={formData.clientName}
                       onChange={(e) => handleFieldChange('clientName', e.target.value)}
                       placeholder="Nombre completo del cliente"
-                      disabled={saving}
+                      disabled={saving || loading}
                       InputProps={{
                         startAdornment: <PersonIcon sx={{ mr: 1, color: 'text.secondary' }} />
                       }}
@@ -318,7 +326,7 @@ const EditDocumentModal = ({
                       value={formData.clientId}
                       onChange={(e) => handleFieldChange('clientId', e.target.value)}
                       placeholder="Identificación del cliente"
-                      disabled={saving}
+                      disabled={saving || loading}
                       InputProps={{
                         startAdornment: <BadgeIcon sx={{ mr: 1, color: 'text.secondary' }} />
                       }}
@@ -332,7 +340,7 @@ const EditDocumentModal = ({
                       value={formData.clientPhone}
                       onChange={(e) => handleFieldChange('clientPhone', e.target.value)}
                       placeholder="099999999"
-                      disabled={saving}
+                      disabled={saving || loading}
                       InputProps={{
                         startAdornment: <PhoneIcon sx={{ mr: 1, color: 'text.secondary' }} />
                       }}
@@ -347,7 +355,7 @@ const EditDocumentModal = ({
                       value={formData.clientEmail}
                       onChange={(e) => handleFieldChange('clientEmail', e.target.value)}
                       placeholder="cliente@email.com"
-                      disabled={saving}
+                      disabled={saving || loading}
                       InputProps={{
                         startAdornment: <EmailIcon sx={{ mr: 1, color: 'text.secondary' }} />
                       }}

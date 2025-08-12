@@ -405,6 +405,52 @@ const documentService = {
     }
   },
 
+  /**
+   * NUEVA FUNCIONALIDAD: Obtener información editable de un documento
+   * @param {string} documentId - ID del documento
+   * @returns {Promise<Object>} Información del documento
+   */
+  async getEditableDocumentInfo(documentId) {
+    console.log('🌐 SERVICE: getEditableDocumentInfo iniciado:', {
+      documentId,
+      url: `/documents/${documentId}/editable-info`
+    });
+    
+    try {
+      const response = await api.get(`/documents/${documentId}/editable-info`);
+      console.log('📊 SERVICE: Respuesta de getEditableDocumentInfo:', response.data);
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.message || 'Error obteniendo información del documento';
+      console.error(message, error);
+      return { success: false, error: message };
+    }
+  },
+
+  /**
+   * NUEVA FUNCIONALIDAD: Actualizar información de un documento
+   * @param {string} documentId - ID del documento
+   * @param {Object} updateData - Datos a actualizar
+   * @returns {Promise<Object>} Resultado de la operación
+   */
+  async updateDocumentInfo(documentId, updateData) {
+    console.log('🌐 SERVICE: updateDocumentInfo iniciado:', {
+      documentId,
+      updateData,
+      url: `/documents/${documentId}/update-info`
+    });
+    
+    try {
+      const response = await api.put(`/documents/${documentId}/update-info`, updateData);
+      console.log('📊 SERVICE: Respuesta de updateDocumentInfo:', response.data);
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.message || 'Error actualizando información del documento';
+      console.error(message, error);
+      return { success: false, error: message };
+    }
+  },
+
   async deliverDocumentGroup(deliveryData) {
     try {
       const response = await api.post('/documents/deliver-group', deliveryData);
