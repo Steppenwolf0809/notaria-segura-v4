@@ -303,7 +303,7 @@ function AppWithTheme() {
       MuiAlert: {
         styleOverrides: {
           root: {
-            color: '#ffffff',
+
           },
           filledSuccess: {
             backgroundColor: `${isDarkMode ? '#047857' : '#10b981'} !important`,

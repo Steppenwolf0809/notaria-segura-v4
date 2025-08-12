@@ -114,7 +114,9 @@ const LoginForm = () => {
       minHeight: '100vh',
       width: '100vw',
       overflow: 'hidden',
-      background: 'linear-gradient(135deg, #000000 0%, #0b1624 40%, #1B5E96 100%)'
+      background: (theme) => theme.palette.mode === 'dark' 
+        ? 'linear-gradient(135deg, #000000 0%, #0b1624 40%, #1B5E96 100%)'
+        : theme.palette.background.default
     }}>
       <Box
         sx={{
@@ -130,7 +132,7 @@ const LoginForm = () => {
             alignItems: 'center',
             justifyContent: 'center',
             p: { xs: 4, md: 6 },
-            color: '#ffffff',
+            color: 'text.primary',
             position: 'relative',
             gridColumn: { xs: '1 / -1', md: '1 / 2' }
           }}
@@ -167,11 +169,15 @@ const LoginForm = () => {
             <Card sx={{
               width: '100%',
               maxWidth: 520,
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              backgroundColor: (theme) => theme.palette.mode === 'dark' 
+                ? 'rgba(255, 255, 255, 0.1)'
+                : 'background.paper',
               backdropFilter: 'blur(12px)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
+              border: (theme) => `1px solid ${theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.15)' : theme.palette.divider}`,
               borderRadius: 4,
-              boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.37)'
+              boxShadow: (theme) => theme.palette.mode === 'dark'
+                ? '0 8px 32px 0 rgba(0, 0, 0, 0.37)'
+                : '0 8px 32px 0 rgba(0, 0, 0, 0.1)'
             }}>
               <CardContent sx={{ p: { xs: 4, md: 5 } }}>
                 {/* Encabezado */}
@@ -210,17 +216,17 @@ const LoginForm = () => {
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <EmailIcon sx={{ color: '#1B5E96' }} />
+                          <EmailIcon color="primary" />
                         </InputAdornment>
                       )
                     }}
                     sx={{
                       '& .MuiOutlinedInput-root': {
-                        '& fieldset': { borderColor: 'rgba(27,94,150,0.35)' },
-                        '&:hover fieldset': { borderColor: '#1B5E96' },
-                        '&.Mui-focused fieldset': { borderColor: '#1B5E96' },
+                        '& fieldset': { borderColor: 'primary.light' },
+                        '&:hover fieldset': { borderColor: 'primary.main' },
+                        '&.Mui-focused fieldset': { borderColor: 'primary.main' },
                       },
-                      '& .MuiInputLabel-root.Mui-focused': { color: '#1B5E96' }
+                      '& .MuiInputLabel-root.Mui-focused': { color: 'primary.main' }
                     }}
                   />
 
@@ -241,7 +247,7 @@ const LoginForm = () => {
                     InputProps={{
                       startAdornment: (
                         <InputAdornment position="start">
-                          <LockIcon sx={{ color: '#1B5E96' }} />
+                          <LockIcon color="primary" />
                         </InputAdornment>
                       ),
                       endAdornment: (
@@ -254,11 +260,11 @@ const LoginForm = () => {
                     }}
                     sx={{
                       '& .MuiOutlinedInput-root': {
-                        '& fieldset': { borderColor: 'rgba(27,94,150,0.35)' },
-                        '&:hover fieldset': { borderColor: '#1B5E96' },
-                        '&.Mui-focused fieldset': { borderColor: '#1B5E96' },
+                        '& fieldset': { borderColor: 'primary.light' },
+                        '&:hover fieldset': { borderColor: 'primary.main' },
+                        '&.Mui-focused fieldset': { borderColor: 'primary.main' },
                       },
-                      '& .MuiInputLabel-root.Mui-focused': { color: '#1B5E96' }
+                      '& .MuiInputLabel-root.Mui-focused': { color: 'primary.main' }
                     }}
                   />
 
@@ -278,9 +284,13 @@ const LoginForm = () => {
                     sx={{
                       mt: 3,
                       height: 48,
-                      background: 'linear-gradient(135deg, #1B5E96 0%, #2563EB 100%)',
+                      background: (theme) => theme.palette.mode === 'dark' 
+                        ? 'linear-gradient(135deg, #1B5E96 0%, #2563EB 100%)'
+                        : `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
                       '&:hover': {
-                        background: 'linear-gradient(135deg, #174a75 0%, #1e40af 100%)'
+                        background: (theme) => theme.palette.mode === 'dark'
+                          ? 'linear-gradient(135deg, #174a75 0%, #1e40af 100%)'
+                          : `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.dark} 100%)`
                       }
                     }}
                     startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <LoginIcon />}
@@ -290,7 +300,7 @@ const LoginForm = () => {
 
                   <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} justifyContent="space-between" sx={{ mt: 2 }}>
                     <Stack direction="row" spacing={1} alignItems="center">
-                      <SecurityIcon fontSize="small" sx={{ color: '#1B5E96' }} />
+                      <SecurityIcon fontSize="small" color="primary" />
                       <Typography variant="caption" sx={{ opacity: 0.8 }}>Conexión Segura</Typography>
                     </Stack>
                     <Link href="mailto:soporte@notaria18.ec" underline="hover" variant="caption">

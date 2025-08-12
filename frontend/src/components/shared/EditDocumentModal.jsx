@@ -206,8 +206,8 @@ const EditDocumentModal = ({
           background: (theme) => theme.palette.mode === 'dark' 
             ? 'linear-gradient(135deg, #162840, #17a2b8)'
             : 'linear-gradient(135deg, #1976d2, #42a5f5)',
-          color: (theme) => theme.palette.mode === 'dark' ? 'white' : 'white',
-          borderBottom: '3px solid #D4AF37',
+          color: 'primary.contrastText',
+          borderBottom: (theme) => `3px solid ${theme.palette.warning.main}`,
           py: 2
         }}
       >
@@ -220,7 +220,7 @@ const EditDocumentModal = ({
           </Box>
           <IconButton 
             onClick={handleClose} 
-            sx={{ color: (theme) => theme.palette.mode === 'dark' ? 'white' : 'white' }}
+            sx={{ color: 'primary.contrastText' }}
           >
             <CloseIcon />
           </IconButton>
@@ -252,7 +252,7 @@ const EditDocumentModal = ({
             )}
 
             {/* Información del Documento */}
-            <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
+            <Card sx={{ mb: 3, border: (theme) => `1px solid ${theme.palette.divider}` }}>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                   <DocumentIcon color="primary" />
@@ -294,7 +294,7 @@ const EditDocumentModal = ({
             <Divider sx={{ my: 2 }} />
 
             {/* Información del Cliente */}
-            <Card sx={{ border: '1px solid #e0e0e0' }}>
+            <Card sx={{ border: (theme) => `1px solid ${theme.palette.divider}` }}>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                   <PersonIcon color="primary" />

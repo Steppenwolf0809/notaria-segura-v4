@@ -164,11 +164,11 @@ const Dashboard = () => {
               startIcon={<LogoutIcon />}
               sx={{
                 ml: 1,
-                display: { xs: 'none', sm: 'inline-flex' },
+                display: { xs: 'none', sm: 'flex' },
                 borderColor: 'error.main',
                 color: 'error.main',
                 '&:hover': {
-                  bgcolor: 'rgba(244, 67, 54, 0.08)',
+                  bgcolor: (theme) => theme.palette.mode === 'dark' ? 'error.dark' : 'error.light',
                   borderColor: 'error.dark'
                 }
               }}
@@ -326,9 +326,8 @@ const Dashboard = () => {
               
               <Chip
                 label={user.role}
+                color="primary"
                 sx={{
-                  bgcolor: getUserRoleColor(),
-                  color: 'white',
                   fontWeight: 'bold'
                 }}
               />
@@ -365,10 +364,7 @@ const Dashboard = () => {
                   <Chip
                     label={user.role}
                     size="small"
-                    sx={{
-                      bgcolor: getUserRoleColor(),
-                      color: 'white'
-                    }}
+                    color="primary"
                   />
                 </Box>
               </CardContent>
