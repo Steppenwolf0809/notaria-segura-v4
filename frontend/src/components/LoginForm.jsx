@@ -9,16 +9,26 @@ import {
   Alert,
   CircularProgress,
   InputAdornment,
-  IconButton
+  IconButton,
+  Grid,
+  FormControlLabel,
+  Checkbox,
+  Link,
+  Stack,
+  Divider,
+  Grow
 } from '@mui/material';
 import {
   Email as EmailIcon,
   Lock as LockIcon,
   Visibility,
   VisibilityOff,
-  Login as LoginIcon
+  Login as LoginIcon,
+  Security as SecurityIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
+import logoFull from '../assets/images/logo-gzs-complete.png';
+import logoCompact from '../assets/images/logo-gzs-notaria18.png';
 
 /**
  * Componente de formulario de inicio de sesión
@@ -102,188 +112,219 @@ const LoginForm = () => {
   };
 
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        bgcolor: 'background.default',
-        padding: 2
-      }}
-    >
-      <Card
-        sx={{
-          width: '100%',
-          maxWidth: 400,
-          boxShadow: 3
-        }}
-      >
-        <CardContent sx={{ p: 4 }}>
-          {/* Header */}
-          <Box sx={{ textAlign: 'center', mb: 3 }}>
-            <Typography
-              variant="h4"
-              component="h1"
-              sx={{
-                color: 'primary.main',
-                fontWeight: 'bold',
-                mb: 1
-              }}
-            >
-              Notaría Segura
-            </Typography>
-            <Typography
-              variant="subtitle1"
-              sx={{
-                color: 'text.primary',
-                opacity: 0.7
-              }}
-            >
-              Iniciar Sesión
-            </Typography>
-          </Box>
+    <Box sx={{ minHeight: '100vh', width: '100%', overflow: 'hidden' }}>
+      <Grid container sx={{ minHeight: '100vh' }}>
+        {/* Columna Izquierda - Branding */}
+        <Grid
+          item
+          xs={12}
+          md={5}
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            p: { xs: 4, md: 6 },
+            background: 'linear-gradient(135deg, #000000 0%, #0b1624 40%, #1B5E96 100%)',
+            color: '#ffffff',
+            position: 'relative'
+          }}
+        >
+          <Grow in timeout={700}>
+            <Box sx={{ textAlign: 'center', maxWidth: 520, width: '100%' }}>
+              {/* Logos responsivos */}
+              <Box sx={{ mb: 3 }}>
+                <Box
+                  component="img"
+                  src={logoFull}
+                  alt="Notaría 18 - Dra. Glenda Zapata Silva"
+                  loading="lazy"
+                  sx={{
+                    maxWidth: { xs: '70%', md: '100%' },
+                    display: { xs: 'none', sm: 'inline-block' }
+                  }}
+                />
+                <Box
+                  component="img"
+                  src={logoCompact}
+                  alt="Notaría 18 Quito"
+                  loading="lazy"
+                  sx={{
+                    maxWidth: '60%',
+                    display: { xs: 'inline-block', sm: 'none' }
+                  }}
+                />
+              </Box>
 
-          {/* Error Alert */}
-          {error && (
-            <Alert 
-              severity="error"
-              variant="filled"
-              sx={{ mb: 2 }}
-              onClose={clearError}
-            >
-              {error}
-            </Alert>
-          )}
+              <Typography
+                variant="h4"
+                sx={{ fontWeight: 300, letterSpacing: 1, mb: 1 }}
+              >
+                Sistema de Trazabilidad Documental
+              </Typography>
+              <Typography variant="body2" sx={{ opacity: 0.85 }}>
+                Gestión notarial inteligente con seguridad y confiabilidad
+              </Typography>
 
-          {/* Login Form */}
-          <Box
-            component="form"
-            onSubmit={handleSubmit}
-            sx={{ mt: 1 }}
-          >
-            {/* Email Field */}
-            <TextField
-              fullWidth
-              id="email"
-              name="email"
-              label="Email"
-              type="email"
-              value={formData.email}
-              onChange={handleInputChange}
-              error={!!formErrors.email}
-              helperText={formErrors.email}
-              disabled={isLoading}
-              margin="normal"
-              required
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <EmailIcon sx={{ color: 'primary.main' }} />
-                  </InputAdornment>
-                )
-              }}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  '&.Mui-focused fieldset': {
-                    borderColor: 'primary.main'
-                  }
-                },
-                '& .MuiInputLabel-root.Mui-focused': {
-                  color: 'primary.main'
-                }
-              }}
-            />
+              <Stack direction="row" spacing={1} justifyContent="center" sx={{ mt: 3, opacity: 0.9 }}>
+                <SecurityIcon fontSize="small" />
+                <Typography variant="body2">Conexión Segura</Typography>
+              </Stack>
+            </Box>
+          </Grow>
+        </Grid>
 
-            {/* Password Field */}
-            <TextField
-              fullWidth
-              id="password"
-              name="password"
-              label="Contraseña"
-              type={showPassword ? 'text' : 'password'}
-              value={formData.password}
-              onChange={handleInputChange}
-              error={!!formErrors.password}
-              helperText={formErrors.password}
-              disabled={isLoading}
-              margin="normal"
-              required
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <LockIcon sx={{ color: 'primary.main' }} />
-                  </InputAdornment>
-                ),
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton
-                      onClick={togglePasswordVisibility}
-                      disabled={isLoading}
-                      edge="end"
-                    >
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
-                    </IconButton>
-                  </InputAdornment>
-                )
-              }}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  '&.Mui-focused fieldset': {
-                    borderColor: 'primary.main'
-                  }
-                },
-                '& .MuiInputLabel-root.Mui-focused': {
-                  color: 'primary.main'
-                }
-              }}
-            />
+        {/* Columna Derecha - Formulario */}
+        <Grid
+          item
+          xs={12}
+          md={7}
+          sx={{
+            backgroundColor: '#1a1a1a',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            p: { xs: 4, md: 8 }
+          }}
+        >
+          <Grow in timeout={800}>
+            <Card sx={{ width: '100%', maxWidth: 460 }}>
+              <CardContent sx={{ p: { xs: 4, md: 5 } }}>
+                {/* Encabezado */}
+                <Box sx={{ textAlign: 'center', mb: 3 }}>
+                  <Typography variant="h4" component="h1" sx={{ fontWeight: 400, mb: 1 }}>
+                    Iniciar Sesión
+                  </Typography>
+                  <Typography variant="body2" sx={{ opacity: 0.7 }}>
+                    Acceda al sistema de trazabilidad de Notaría 18
+                  </Typography>
+                </Box>
 
-            {/* Submit Button */}
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              disabled={isLoading}
-              sx={{
-                mt: 3,
-                mb: 2,
-                height: 48,
-                bgcolor: 'primary.main',
-                '&:hover': {
-                  bgcolor: 'primary.dark'
-                },
-                '&.Mui-disabled': {
-                  bgcolor: 'primary.light',
-                  color: 'white'
-                }
-              }}
-              startIcon={
-                isLoading ? (
-                  <CircularProgress size={20} color="inherit" />
-                ) : (
-                  <LoginIcon />
-                )
-              }
-            >
-              {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
-            </Button>
-          </Box>
+                {/* Error */}
+                {error && (
+                  <Alert severity="error" variant="filled" sx={{ mb: 2 }} onClose={clearError}>
+                    {error.message || error}
+                  </Alert>
+                )}
 
-          {/* Footer */}
-          <Box sx={{ textAlign: 'center', mt: 2 }}>
-            <Typography
-              variant="caption"
-              sx={{
-                color: 'text.primary',
-                opacity: 0.6
-              }}
-            >
-              Sistema Notaría Segura v4.0
-            </Typography>
-          </Box>
-        </CardContent>
-      </Card>
+                {/* Formulario */}
+                <Box component="form" onSubmit={handleSubmit} noValidate>
+                  <TextField
+                    fullWidth
+                    id="email"
+                    name="email"
+                    label="Correo electrónico"
+                    type="email"
+                    value={formData.email}
+                    onChange={handleInputChange}
+                    error={!!formErrors.email}
+                    helperText={formErrors.email}
+                    disabled={isLoading}
+                    margin="normal"
+                    required
+                    autoComplete="email"
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <EmailIcon sx={{ color: '#1B5E96' }} />
+                        </InputAdornment>
+                      )
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        '& fieldset': { borderColor: 'rgba(27,94,150,0.35)' },
+                        '&:hover fieldset': { borderColor: '#1B5E96' },
+                        '&.Mui-focused fieldset': { borderColor: '#1B5E96' },
+                      },
+                      '& .MuiInputLabel-root.Mui-focused': { color: '#1B5E96' }
+                    }}
+                  />
+
+                  <TextField
+                    fullWidth
+                    id="password"
+                    name="password"
+                    label="Contraseña"
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    error={!!formErrors.password}
+                    helperText={formErrors.password}
+                    disabled={isLoading}
+                    margin="normal"
+                    required
+                    autoComplete="current-password"
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <LockIcon sx={{ color: '#1B5E96' }} />
+                        </InputAdornment>
+                      ),
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton onClick={togglePasswordVisibility} disabled={isLoading} edge="end">
+                            {showPassword ? <VisibilityOff /> : <Visibility />}
+                          </IconButton>
+                        </InputAdornment>
+                      )
+                    }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        '& fieldset': { borderColor: 'rgba(27,94,150,0.35)' },
+                        '&:hover fieldset': { borderColor: '#1B5E96' },
+                        '&.Mui-focused fieldset': { borderColor: '#1B5E96' },
+                      },
+                      '& .MuiInputLabel-root.Mui-focused': { color: '#1B5E96' }
+                    }}
+                  />
+
+                  <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: 1 }}>
+                    <FormControlLabel
+                      control={<Checkbox color="primary" size="small" />}
+                      label={<Typography variant="body2">Recordar mi sesión</Typography>}
+                    />
+                    <Link href="#" underline="hover" variant="body2">¿Olvidaste tu contraseña?</Link>
+                  </Stack>
+
+                  <Button
+                    type="submit"
+                    fullWidth
+                    variant="contained"
+                    disabled={isLoading}
+                    sx={{
+                      mt: 3,
+                      height: 48,
+                      background: 'linear-gradient(135deg, #1B5E96 0%, #2563EB 100%)',
+                      '&:hover': {
+                        background: 'linear-gradient(135deg, #174a75 0%, #1e40af 100%)'
+                      }
+                    }}
+                    startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : <LoginIcon />}
+                  >
+                    {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+                  </Button>
+
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} justifyContent="space-between" sx={{ mt: 2 }}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <SecurityIcon fontSize="small" sx={{ color: '#1B5E96' }} />
+                      <Typography variant="caption" sx={{ opacity: 0.8 }}>Conexión Segura</Typography>
+                    </Stack>
+                    <Link href="mailto:soporte@notaria18.ec" underline="hover" variant="caption">
+                      Contactar Soporte
+                    </Link>
+                  </Stack>
+                </Box>
+
+                <Divider sx={{ my: 3 }} />
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="caption" sx={{ opacity: 0.6 }}>
+                    Sistema Notaría Segura v4.0
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grow>
+        </Grid>
+      </Grid>
     </Box>
   );
 };
