@@ -110,12 +110,17 @@ const LoginForm = () => {
   };
 
   return (
-    <Box sx={{ minHeight: '100vh', width: '100vw', overflow: 'hidden' }}>
+    <Box sx={{
+      minHeight: '100vh',
+      width: '100vw',
+      overflow: 'hidden',
+      background: 'linear-gradient(135deg, #000000 0%, #0b1624 40%, #1B5E96 100%)'
+    }}>
       <Box
         sx={{
           minHeight: '100vh',
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', md: '35% 45% 20%' },
+          gridTemplateColumns: { xs: '1fr', md: '40% 60%' },
         }}
       >
         {/* Columna Izquierda - Branding */}
@@ -125,7 +130,6 @@ const LoginForm = () => {
             alignItems: 'center',
             justifyContent: 'center',
             p: { xs: 4, md: 6 },
-            background: 'linear-gradient(135deg, #000000 0%, #0b1624 40%, #1B5E96 100%)',
             color: '#ffffff',
             position: 'relative',
             gridColumn: { xs: '1 / -1', md: '1 / 2' }
@@ -152,7 +156,6 @@ const LoginForm = () => {
         {/* Columna Derecha - Formulario */}
         <Box
           sx={{
-            backgroundColor: '#121212',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -161,7 +164,15 @@ const LoginForm = () => {
           }}
         >
           <Grow in timeout={800}>
-            <Card sx={{ width: '100%', maxWidth: 520 }}>
+            <Card sx={{
+              width: '100%',
+              maxWidth: 520,
+              backgroundColor: 'rgba(10, 25, 41, 0.6)',
+              backdropFilter: 'blur(10px)',
+              border: '1px solid rgba(255, 255, 255, 0.125)',
+              borderRadius: 4,
+              boxShadow: '0 0 30px rgba(0,0,0,0.5)'
+            }}>
               <CardContent sx={{ p: { xs: 4, md: 5 } }}>
                 {/* Encabezado */}
                 <Box sx={{ textAlign: 'center', mb: 3 }}>
@@ -298,9 +309,6 @@ const LoginForm = () => {
             </Card>
           </Grow>
         </Box>
-
-        {/* Columna Espaciadora - solo desktop */}
-        <Box sx={{ display: { xs: 'none', md: 'block' }, backgroundColor: '#E9F5FF', gridColumn: '3 / 4' }} />
       </Box>
     </Box>
   );
