@@ -87,13 +87,12 @@ async function listarTodosDocumentos(req, res) {
 
     const where = {};
     
-    // Para SQLite, no podemos usar mode: 'insensitive', así que convertiremos a minúsculas
+    // PostgreSQL - Búsqueda case-insensitive con mode: 'insensitive'
     if (search) {
-      const searchLower = search.toLowerCase();
       where.OR = [
-        { clientName: { contains: searchLower } },
-        { clientPhone: { contains: search } }, // Los teléfonos son numéricos, no necesitan toLowerCase
-        { protocolNumber: { contains: searchLower } }
+        { clientName: { contains: search, mode: 'insensitive' } },
+        { clientPhone: { contains: search } },
+        { protocolNumber: { contains: search, mode: 'insensitive' } }
       ];
     }
     
