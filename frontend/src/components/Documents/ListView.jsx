@@ -621,6 +621,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
         mainDocument={pendingGroupData.main}
         relatedDocuments={pendingGroupData.related}
         loading={groupingLoading}
+        onDocumentUpdated={handleDocumentUpdated}
         onConfirm={async (selectedDocumentIds) => {
           if (pendingGroupData.main && selectedDocumentIds.length > 0) {
             setGroupingLoading(true);

@@ -48,6 +48,7 @@ const QuickGroupingModal = ({
   mainDocument,
   relatedDocuments = [],
   onConfirm,
+  onDocumentUpdated, // Nuevo prop para notificar actualizaciones
   loading = false 
 }) => {
   const [confirming, setConfirming] = useState(false);
@@ -59,6 +60,7 @@ const QuickGroupingModal = ({
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [documentToEdit, setDocumentToEdit] = useState(null);
   const [documentUpdates, setDocumentUpdates] = useState(new Map());
+  const [updatedMainDocument, setUpdatedMainDocument] = useState(null);
 
 
   // Debug del modal
@@ -70,8 +72,10 @@ const QuickGroupingModal = ({
         relatedDocuments: relatedDocuments.map(d => d.protocolNumber),
         totalDocuments: relatedDocuments.length + 1
       });
-      // Reset selección cuando se abre
+      // Reset selección y documento actualizado cuando se abre
       setSelectedDocuments(new Set(relatedDocuments.map(doc => doc.id)));
+      setUpdatedMainDocument(null);
+      setDocumentUpdates(new Map());
     }
   }, [open, mainDocument, relatedDocuments]);
 
@@ -111,10 +115,24 @@ const QuickGroupingModal = ({
 
   const handleDocumentUpdated = (updatedDocument) => {
     console.log('📝 Documento actualizado:', updatedDocument.id);
-    // Guardar los cambios en un mapa para referencia
+    
+    // Guardar los cambios en un mapa para referencia local
     const updates = new Map(documentUpdates);
     updates.set(updatedDocument.id, updatedDocument);
     setDocumentUpdates(updates);
+    
+    // Si es el documento principal, actualizar estado local para reflejar cambios inmediatamente
+    if (updatedDocument.id === mainDocument?.id) {
+      setUpdatedMainDocument(updatedDocument);
+      console.log('📝 Documento principal actualizado localmente');
+    }
+    
+    // 🎯 CORRECCIÓN: Notificar al componente padre para que actualice los datos
+    if (onDocumentUpdated) {
+      onDocumentUpdated(updatedDocument);
+      console.log('📤 Notificando actualización al componente padre');
+    }
+    
     setEditModalOpen(false);
     setDocumentToEdit(null);
   };
@@ -125,6 +143,9 @@ const QuickGroupingModal = ({
   };
 
   const totalSelected = selectedDocuments.size + 1; // +1 por documento principal
+
+  // Usar documento principal actualizado si existe, sino el original
+  const currentMainDocument = updatedMainDocument || mainDocument;
 
   if (!open || !mainDocument) {
     console.log('🔗 QuickGroupingModal NO mostrado - open:', open, 'mainDocument:', !!mainDocument);
@@ -189,21 +210,21 @@ const QuickGroupingModal = ({
                 color: 'text.primary', 
                 fontWeight: 600 
               }}>
-                {mainDocument.clientName}
+                {currentMainDocument.clientName}
               </Typography>
             </Box>
             <Box sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-              {mainDocument.clientPhone && (
+              {currentMainDocument.clientPhone && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <PhoneIcon sx={{ fontSize: '16px', color: 'primary.main' }} />
-                  <Typography variant="body2">{mainDocument.clientPhone}</Typography>
+                  <Typography variant="body2">{currentMainDocument.clientPhone}</Typography>
                 </Box>
               )}
-              {mainDocument.clientRuc && (
+              {currentMainDocument.clientRuc && (
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <BadgeIcon sx={{ fontSize: '16px', color: 'warning.main' }} />
                   <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                    {mainDocument.clientRuc}
+                    {currentMainDocument.clientRuc}
                   </Typography>
                 </Box>
               )}
@@ -248,8 +269,8 @@ const QuickGroupingModal = ({
                   label={
                     <Box>
                       <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                        {mainDocument.actoPrincipalDescripcion || mainDocument.documentType}
-                        {documentUpdates.has(mainDocument.id) && (
+                        {currentMainDocument.actoPrincipalDescripcion || currentMainDocument.documentType}
+                        {documentUpdates.has(currentMainDocument.id) && (
                           <Chip 
                             label="Editado" 
                             size="small" 
@@ -260,16 +281,16 @@ const QuickGroupingModal = ({
                       </Typography>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mt: 0.25 }}>
                         <Chip 
-                          label={mainDocument.documentType}
+                          label={currentMainDocument.documentType}
                           size="small"
                           sx={{ height: 22, fontSize: '0.7rem' }}
                         />
                         <Typography variant="body2" color="textSecondary">
-                          Protocolo: {mainDocument.protocolNumber}
+                          Protocolo: {currentMainDocument.protocolNumber}
                         </Typography>
                       </Box>
                       <Chip 
-                        label={mainDocument.status} 
+                        label={currentMainDocument.status} 
                         size="small" 
                         color="primary"
                         sx={{ mt: 0.5 }}
@@ -283,7 +304,7 @@ const QuickGroupingModal = ({
                   variant="outlined"
                   size="small"
                   startIcon={<EditIcon />}
-                  onClick={() => handleEditDocument(mainDocument)}
+                  onClick={() => handleEditDocument(currentMainDocument)}
                   sx={{ 
                     minWidth: 'auto',
                     height: 32,
@@ -428,8 +449,8 @@ const QuickGroupingModal = ({
           <List sx={{ py: 0 }}>
             <ListItem sx={{ py: 0.25, px: 0 }}>
               <ListItemText 
-                primary={`• ${mainDocument.actoPrincipalDescripcion || mainDocument.documentType} (principal)`}
-                secondary={`Protocolo: ${mainDocument.protocolNumber}`}
+                primary={`• ${currentMainDocument.actoPrincipalDescripcion || currentMainDocument.documentType} (principal)`}
+                secondary={`Protocolo: ${currentMainDocument.protocolNumber}`}
                 sx={{ my: 0 }}
               />
             </ListItem>
