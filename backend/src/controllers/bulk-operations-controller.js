@@ -282,11 +282,22 @@ export const bulkStatusChange = async (req, res) => {
 
   } catch (error) {
     console.error('❌ BULK: Error en cambio masivo:', error);
+    console.error('❌ BULK: Stack trace:', error.stack);
+    console.error('❌ BULK: Request data:', { documentIds, fromStatus, toStatus, sendNotifications });
     
     res.status(500).json({
       success: false,
       message: 'Error interno al realizar cambio masivo',
-      error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno del servidor'
+      error: process.env.NODE_ENV === 'development' ? {
+        message: error.message,
+        stack: error.stack,
+        details: {
+          documentIds: documentIds?.length,
+          fromStatus,
+          toStatus,
+          sendNotifications
+        }
+      } : 'Error interno del servidor'
     });
   }
 };
