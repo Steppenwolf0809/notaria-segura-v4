@@ -34,14 +34,10 @@ import {
   AccessTime as AccessTimeIcon,
   Warning as WarningIcon,
   Notifications as NotificationsIcon,
-  ViewModule as ViewModuleIcon,
-  ViewList as ViewListIcon,
   History as HistoryIcon,
   Speed as SpeedIcon
 } from '@mui/icons-material';
 import DocumentCard from './DocumentCard';
-import KanbanView from './Documents/KanbanView';
-import DocumentsList from './Documents/DocumentsList';
 import NotificationsHistory from './Documents/NotificationsHistory';
 import useDocumentStore from '../store/document-store';
 import useStats from '../hooks/useStats';
@@ -73,7 +69,7 @@ const MatrizadorDashboard = () => {
   } = useDocumentStore();
 
   const [refreshing, setRefreshing] = useState(false);
-  const [currentView, setCurrentView] = useState(0); // 0: Dashboard, 1: Kanban, 2: Lista, 3: Historial
+  const [currentView, setCurrentView] = useState(0); // 0: Dashboard, 1: Historial
 
   /**
    * Cargar documentos al montar el componente
@@ -251,13 +247,7 @@ const MatrizadorDashboard = () => {
           </Box>
         );
       
-      case 1: // Vista Kanban
-        return <KanbanView />;
-      
-      case 2: // Vista Lista
-        return <DocumentsList />;
-      
-      case 3: // Historial de Notificaciones
+      case 1: // Historial de Notificaciones
         return <NotificationsHistory />;
       
       default:
@@ -316,16 +306,6 @@ const MatrizadorDashboard = () => {
           <Tab 
             icon={<SpeedIcon />} 
             label="Dashboard" 
-            sx={{ fontWeight: 'bold' }}
-          />
-          <Tab 
-            icon={<ViewModuleIcon />} 
-            label="Vista Kanban"
-            sx={{ fontWeight: 'bold' }}
-          />
-          <Tab 
-            icon={<ViewListIcon />} 
-            label="Vista Lista"
             sx={{ fontWeight: 'bold' }}
           />
           <Tab 
