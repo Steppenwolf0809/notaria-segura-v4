@@ -40,6 +40,49 @@ const getApiBaseUrl = () => {
   return import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
 };
 
+// Crear instancia de axios con interceptor de autenticación
+const createApiClient = () => {
+  const client = axios.create({
+    baseURL: getApiBaseUrl(),
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  });
+
+  // Interceptor para agregar token automáticamente
+  client.interceptors.request.use(
+    (config) => {
+      const authData = localStorage.getItem('notaria-auth-storage');
+      if (authData) {
+        try {
+          const parsed = JSON.parse(authData);
+          if (parsed.state && parsed.state.token) {
+            config.headers.Authorization = `Bearer ${parsed.state.token}`;
+          }
+        } catch (error) {
+          // Fallback al token directo
+          const token = localStorage.getItem('token');
+          if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+          }
+        }
+      } else {
+        // Fallback al token directo
+        const token = localStorage.getItem('token');
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
+      }
+      return config;
+    },
+    (error) => {
+      return Promise.reject(error);
+    }
+  );
+
+  return client;
+};
+
 /**
  * Panel principal de alertas para dashboards por rol
  * @param {string} userRole - Rol del usuario (RECEPCION, MATRIZADOR, ARCHIVO, ADMIN)
@@ -79,13 +122,9 @@ function AlertasPanel({ userRole, onDocumentClick, compact = false, maxHeight = 
     setError(null);
 
     try {
-      const token = localStorage.getItem('token');
-      const API_BASE_URL = getApiBaseUrl();
-      const response = await axios.get(`${API_BASE_URL}${endpoint}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      // Usar cliente API con interceptor de autenticación
+      const apiClient = createApiClient();
+      const response = await apiClient.get(endpoint);
 
       if (response.data.success) {
         setAlertas(response.data.data.alertas || []);
@@ -96,7 +135,28 @@ function AlertasPanel({ userRole, onDocumentClick, compact = false, maxHeight = 
       }
     } catch (error) {
       console.error('Error obteniendo alertas:', error);
-      setError(error.response?.data?.error || 'Error de conexión');
+      
+      let errorMessage = 'Error de conexión';
+      if (error.response) {
+        // Error del servidor
+        if (error.response.status === 401) {
+          errorMessage = 'Error de autenticación - Sesión expirada';
+        } else if (error.response.status === 403) {
+          errorMessage = 'Sin permisos para ver alertas';
+        } else if (error.response.status === 404) {
+          errorMessage = 'Endpoint de alertas no encontrado';
+        } else {
+          errorMessage = error.response.data?.error || `Error del servidor (${error.response.status})`;
+        }
+      } else if (error.request) {
+        // Error de red
+        errorMessage = 'Error de conexión con el servidor';
+      } else {
+        // Error de configuración
+        errorMessage = error.message || 'Error desconocido';
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
