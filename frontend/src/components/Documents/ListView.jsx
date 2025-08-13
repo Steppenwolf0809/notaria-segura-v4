@@ -35,6 +35,7 @@ import DocumentDetailModal from './DocumentDetailModal';
 import GroupingAlert from '../grouping/GroupingAlert';
 import { formatCurrency } from '../../utils/currencyUtils';
 import QuickGroupingModal from '../grouping/QuickGroupingModal';
+import GroupInfoModal from '../shared/GroupInfoModal';
 // NUEVOS COMPONENTES PARA SELECCIÓN MÚLTIPLE
 import useBulkActions from '../../hooks/useBulkActions';
 import BulkActionToolbar from '../bulk/BulkActionToolbar';
@@ -291,10 +292,13 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
    */
   const handleConfirmBulkAction = async (actionData) => {
     try {
+      // Filtrar opciones para evitar duplicados de fromStatus/toStatus
+      const { fromStatus, toStatus, ...cleanOptions } = actionData.options || {};
+      
       await bulkActions.executeBulkStatusChange(
         filteredAndSortedDocuments, 
         actionData.toStatus, 
-        actionData.options
+        cleanOptions
       );
       
       // Refrescar la vista (el hook ya limpia la selección)

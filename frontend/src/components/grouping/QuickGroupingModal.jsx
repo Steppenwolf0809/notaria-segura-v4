@@ -241,32 +241,64 @@ const QuickGroupingModal = ({
               : 'white'
           }}>
             <CardContent sx={{ py: 2 }}>
-              <FormControlLabel
-                control={<Checkbox checked disabled />}
-                label={
-                  <Box>
-                    <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                      {mainDocument.actoPrincipalDescripcion || mainDocument.documentType}
-                    </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mt: 0.25 }}>
-                      <Chip 
-                        label={mainDocument.documentType}
-                        size="small"
-                        sx={{ height: 22, fontSize: '0.7rem' }}
-                      />
-                      <Typography variant="body2" color="textSecondary">
-                        Protocolo: {mainDocument.protocolNumber}
+              <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                <FormControlLabel
+                  sx={{ flex: 1 }}
+                  control={<Checkbox checked disabled />}
+                  label={
+                    <Box>
+                      <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                        {mainDocument.actoPrincipalDescripcion || mainDocument.documentType}
+                        {documentUpdates.has(mainDocument.id) && (
+                          <Chip 
+                            label="Editado" 
+                            size="small" 
+                            color="success" 
+                            sx={{ ml: 1, height: 20, fontSize: '0.6rem' }}
+                          />
+                        )}
                       </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mt: 0.25 }}>
+                        <Chip 
+                          label={mainDocument.documentType}
+                          size="small"
+                          sx={{ height: 22, fontSize: '0.7rem' }}
+                        />
+                        <Typography variant="body2" color="textSecondary">
+                          Protocolo: {mainDocument.protocolNumber}
+                        </Typography>
+                      </Box>
+                      <Chip 
+                        label={mainDocument.status} 
+                        size="small" 
+                        color="primary"
+                        sx={{ mt: 0.5 }}
+                      />
                     </Box>
-                    <Chip 
-                      label={mainDocument.status} 
-                      size="small" 
-                      color="primary"
-                      sx={{ mt: 0.5 }}
-                    />
-                  </Box>
-                }
-              />
+                  }
+                />
+                
+                {/* 🎯 NUEVO: Botón de Edición para documento principal */}
+                <Button
+                  variant="outlined"
+                  size="small"
+                  startIcon={<EditIcon />}
+                  onClick={() => handleEditDocument(mainDocument)}
+                  sx={{ 
+                    minWidth: 'auto',
+                    height: 32,
+                    px: 1.5,
+                    borderColor: 'primary.main',
+                    color: 'primary.main',
+                    '&:hover': {
+                      borderColor: 'primary.dark',
+                      backgroundColor: 'primary.light'
+                    }
+                  }}
+                >
+                  Editar
+                </Button>
+              </Box>
             </CardContent>
           </Card>
         </Box>
