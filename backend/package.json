@@ -18,7 +18,9 @@
     "seed:users": "node scripts/seed-real-users.js",
     "setup:prod": "node scripts/setup-production-data.js",
     "verify:prod": "node scripts/verify-production.js",
-    "verify:users": "node scripts/verify-users.js"
+    "verify:users": "node scripts/verify-users.js",
+    "fix:enum": "node scripts/fix-agrupado-enum.js",
+    "db:sync": "npx prisma db push --accept-data-loss"
   },
   "dependencies": {
     "@prisma/client": "^5.7.0",
