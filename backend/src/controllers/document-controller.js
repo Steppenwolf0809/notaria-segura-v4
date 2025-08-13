@@ -523,17 +523,28 @@ async function updateDocumentStatus(req, res) {
         updateData.relacionTitular = 'directo';
       }
     } else if (req.user.role === 'RECEPCION') {
-      // Recepción solo puede marcar como ENTREGADO y solo documentos LISTO
-      if (status !== 'ENTREGADO') {
+      // Recepción puede marcar como LISTO (EN_PROCESO → LISTO) y como ENTREGADO (LISTO → ENTREGADO)
+      if (status === 'LISTO') {
+        // RECEPCION puede marcar EN_PROCESO como LISTO
+        if (document.status !== 'EN_PROCESO') {
+          return res.status(403).json({
+            success: false,
+            message: 'Solo se pueden marcar como LISTO los documentos que estén EN_PROCESO'
+          });
+        }
+      } else if (status === 'ENTREGADO') {
+        // RECEPCION puede marcar LISTO como ENTREGADO
+        if (document.status !== 'LISTO') {
+          return res.status(403).json({
+            success: false,
+            message: 'Solo se pueden entregar documentos que estén LISTO'
+          });
+        }
+      } else {
+        // RECEPCION no puede usar otros estados
         return res.status(403).json({
           success: false,
-          message: 'RECEPCIÓN solo puede marcar documentos como entregados'
-        });
-      }
-      if (document.status !== 'LISTO') {
-        return res.status(403).json({
-          success: false,
-          message: 'Solo se pueden entregar documentos que estén LISTO'
+          message: 'RECEPCIÓN solo puede marcar documentos como LISTO o ENTREGADO'
         });
       }
     } else if (!['CAJA', 'ADMIN'].includes(req.user.role)) {
