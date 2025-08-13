@@ -140,6 +140,8 @@ async function listarTodosDocumentos(req, res) {
       protocolNumber: doc.protocolNumber,
       clientName: doc.clientName,
       clientPhone: doc.clientPhone,
+      clientEmail: doc.clientEmail,
+      clientId: doc.clientId,
       documentType: doc.documentType,
       status: doc.status,
       // 🔗 Campos de agrupación para que el frontend muestre chips e info de grupo
@@ -151,7 +153,15 @@ async function listarTodosDocumentos(req, res) {
       codigoRetiro: doc.codigoRetiro,
       verificationCode: doc.verificationCode, // 🔄 CONSERVADOR: Agregar verificationCode para frontend
       fechaCreacion: doc.createdAt,
-      fechaEntrega: doc.fechaEntrega
+      fechaEntrega: doc.fechaEntrega,
+      // ✅ AGREGADO: Información del acto principal para que RECEPCION la vea
+      actoPrincipalDescripcion: doc.actoPrincipalDescripcion,
+      actoPrincipalValor: doc.actoPrincipalValor,
+      totalFactura: doc.totalFactura,
+      matrizadorName: doc.matrizadorName,
+      // Campos editables
+      detalle_documento: doc.detalle_documento,
+      comentarios_recepcion: doc.comentarios_recepcion
     }));
 
     const totalPages = Math.ceil(total / take);

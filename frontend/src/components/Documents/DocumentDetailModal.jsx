@@ -517,7 +517,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
                     </Typography>
                     
                     <Typography variant="h5" sx={{ mb: 2, fontWeight: 'bold' }}>
-                      {document.actoPrincipalDescripcion}
+                      {document.actoPrincipalDescripcion || 'No especificado'}
                     </Typography>
 
                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
@@ -549,7 +549,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
                         <strong>Total Factura:</strong> {formatCurrency(document.totalFactura)}
                       </Typography>
                       <Typography variant="body2">
-                        <strong>Matrizador XML:</strong> {document.matrizadorName}
+                        <strong>Matrizador XML:</strong> {document.matrizadorName || 'No especificado'}
                       </Typography>
                     </Box>
                   </CardContent>
