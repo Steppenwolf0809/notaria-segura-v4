@@ -807,6 +807,42 @@ const documentService = {
         message: errorMessage
       };
     }
+  },
+
+  /**
+   * Obtener todos los documentos de un grupo
+   * @param {string} groupId - ID del grupo
+   * @returns {Promise<Object>} Lista de documentos del grupo
+   */
+  async getGroupDocuments(groupId) {
+    try {
+      console.log('📋 Obteniendo documentos del grupo:', groupId);
+      const response = await api.get(`/documents/group/${groupId}`);
+      
+      console.log('✅ Documentos del grupo obtenidos:', {
+        groupId,
+        documentCount: response.data.data?.length || 0
+      });
+      
+      return {
+        success: true,
+        data: response.data.data || [],
+        message: response.data.message || 'Documentos del grupo obtenidos exitosamente'
+      };
+    } catch (error) {
+      console.error('❌ Error obteniendo documentos del grupo:', error);
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Error al obtener documentos del grupo';
+      
+      return {
+        success: false,
+        error: errorMessage,
+        message: errorMessage,
+        data: []
+      };
+    }
   }
 };
 

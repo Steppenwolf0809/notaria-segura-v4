@@ -570,62 +570,105 @@ async function updateDocumentStatus(req, res) {
       }
     }
 
-    // Actualizar documento
-    const updatedDocument = await prisma.document.update({
-      where: { id },
-      data: updateData,
-      include: {
-        createdBy: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true
+    // NUEVA FUNCIONALIDAD: Manejar propagación de estado en documentos agrupados
+    let updatedDocuments = [];
+    let groupAffected = false;
+    
+    // Verificar si el documento pertenece a un grupo y si el cambio debe propagarse
+    if (document.documentGroupId && status === 'LISTO') {
+      console.log('🔗 Documento agrupado detectado - Iniciando propagación de estado:', {
+        documentGroupId: document.documentGroupId,
+        newStatus: status
+      });
+
+      try {
+        // Obtener todos los documentos del mismo grupo
+        const groupDocuments = await prisma.document.findMany({
+          where: {
+            documentGroupId: document.documentGroupId,
+            status: { not: 'ENTREGADO' } // Solo documentos no entregados
+          },
+          include: {
+            createdBy: {
+              select: { id: true, firstName: true, lastName: true, email: true }
+            },
+            assignedTo: {
+              select: { id: true, firstName: true, lastName: true, email: true }
+            }
           }
-        },
-        assignedTo: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true
+        });
+
+        console.log(`📋 Encontrados ${groupDocuments.length} documentos en el grupo para actualizar`);
+
+        // Verificar permisos para todos los documentos del grupo
+        if (req.user.role === 'MATRIZADOR') {
+          const unauthorizedDocs = groupDocuments.filter(doc => doc.assignedToId !== req.user.id);
+          if (unauthorizedDocs.length > 0) {
+            return res.status(403).json({
+              success: false,
+              message: `No tienes permisos para modificar todos los documentos del grupo. ${unauthorizedDocs.length} documento(s) están asignados a otros matrizadores.`
+            });
           }
         }
-      }
-    });
 
-    // NUEVA FUNCIONALIDAD: Enviar notificación WhatsApp si se marca como LISTO
-    let whatsappSent = false;
-    let whatsappError = null;
-    
-    if (status === 'LISTO' && updatedDocument.clientPhone) {
-      try {
-        // Importar el servicio de WhatsApp
-        const whatsappService = await import('../services/whatsapp-service.js');
-        
-        // Enviar notificación de documento listo
-        const whatsappResult = await whatsappService.default.sendDocumentReadyNotification(updatedDocument);
-        whatsappSent = whatsappResult.success;
-        
-        if (!whatsappResult.success) {
-          whatsappError = whatsappResult.error;
-          console.error('Error enviando WhatsApp:', whatsappResult.error);
-        } else {
-          console.log('Notificación WhatsApp enviada exitosamente');
+        // Generar códigos de verificación únicos para cada documento si no los tienen
+        const documentsToUpdate = [];
+        for (const doc of groupDocuments) {
+          const docUpdateData = { ...updateData };
+          if (status === 'LISTO' && !doc.verificationCode) {
+            docUpdateData.verificationCode = generateVerificationCode();
+            console.log(`🎯 Código generado para ${doc.protocolNumber}: ${docUpdateData.verificationCode}`);
+          }
+          documentsToUpdate.push({
+            docId: doc.id,
+            updateData: docUpdateData,
+            originalStatus: doc.status
+          });
+        }
+
+        // Actualizar todos los documentos del grupo en una transacción
+        updatedDocuments = await prisma.$transaction(async (tx) => {
+          const updates = [];
+          for (const { docId, updateData: docUpdateData } of documentsToUpdate) {
+            const updated = await tx.document.update({
+              where: { id: docId },
+              data: docUpdateData,
+              include: {
+                createdBy: {
+                  select: { id: true, firstName: true, lastName: true, email: true }
+                },
+                assignedTo: {
+                  select: { id: true, firstName: true, lastName: true, email: true }
+                }
+              }
+            });
+            updates.push(updated);
+          }
+          return updates;
+        });
+
+        groupAffected = true;
+        console.log(`✅ ${updatedDocuments.length} documentos del grupo actualizados exitosamente`);
+
+        // Registrar eventos de auditoría para todos los documentos afectados
+        for (let i = 0; i < updatedDocuments.length; i++) {
+          const doc = updatedDocuments[i];
+          const originalStatus = documentsToUpdate[i].originalStatus;
           
-          // 📈 Registrar evento de notificación WhatsApp enviada
           try {
             await prisma.documentEvent.create({
               data: {
-                documentId: id,
+                documentId: doc.id,
                 userId: req.user.id,
-                eventType: 'WHATSAPP_SENT',
-                description: `Notificación WhatsApp de documento listo enviada a ${updatedDocument.clientPhone}`,
+                eventType: 'STATUS_CHANGED',
+                description: `Estado cambiado de ${originalStatus} a ${status} por propagación grupal - ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
                 details: {
-                  phoneNumber: updatedDocument.clientPhone,
-                  messageType: 'DOCUMENT_READY',
-                  verificationCode: updatedDocument.verificationCode,
-                  sentBy: `${req.user.firstName} ${req.user.lastName}`,
+                  previousStatus: originalStatus,
+                  newStatus: status,
+                  verificationCodeGenerated: status === 'LISTO' && doc.verificationCode,
+                  groupOperation: true,
+                  groupId: document.documentGroupId,
+                  triggerDocumentId: id,
                   userRole: req.user.role,
                   timestamp: new Date().toISOString()
                 },
@@ -634,7 +677,158 @@ async function updateDocumentStatus(req, res) {
               }
             });
           } catch (auditError) {
-            console.error('Error registrando evento de notificación WhatsApp:', auditError);
+            console.error(`Error registrando evento para documento ${doc.id}:`, auditError);
+          }
+        }
+
+      } catch (groupError) {
+        console.error('Error actualizando documentos del grupo:', groupError);
+        return res.status(500).json({
+          success: false,
+          message: 'Error al actualizar documentos del grupo',
+          error: groupError.message
+        });
+      }
+    } else {
+      // Actualización individual (comportamiento original)
+      const updatedDocument = await prisma.document.update({
+        where: { id },
+        data: updateData,
+        include: {
+          createdBy: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true
+            }
+          },
+          assignedTo: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true
+            }
+          }
+        }
+      });
+      updatedDocuments = [updatedDocument];
+    }
+
+    // Usar el primer documento como principal para compatibilidad
+    const updatedDocument = updatedDocuments[0];
+
+    // NUEVA FUNCIONALIDAD: Enviar notificación WhatsApp si se marca como LISTO
+    let whatsappSent = false;
+    let whatsappError = null;
+    let whatsappResults = [];
+    
+    if (status === 'LISTO') {
+      try {
+        // Importar el servicio de WhatsApp
+        const whatsappService = await import('../services/whatsapp-service.js');
+        
+        if (groupAffected && updatedDocuments.length > 1) {
+          // Enviar notificaciones grupales - una por cada documento con teléfono único
+          const uniqueClients = new Map();
+          
+          // Agrupar documentos por teléfono del cliente
+          for (const doc of updatedDocuments) {
+            if (doc.clientPhone) {
+              if (!uniqueClients.has(doc.clientPhone)) {
+                uniqueClients.set(doc.clientPhone, {
+                  clientName: doc.clientName,
+                  clientPhone: doc.clientPhone,
+                  documents: []
+                });
+              }
+              uniqueClients.get(doc.clientPhone).documents.push(doc);
+            }
+          }
+          
+          console.log(`📱 Enviando notificaciones grupales a ${uniqueClients.size} cliente(s)`);
+          
+          // Enviar notificación a cada cliente único
+          for (const [phone, clientData] of uniqueClients) {
+            try {
+              if (clientData.documents.length === 1) {
+                // Un solo documento - notificación individual
+                const whatsappResult = await whatsappService.default.sendDocumentReadyNotification(clientData.documents[0]);
+                whatsappResults.push({
+                  phone: phone,
+                  success: whatsappResult.success,
+                  error: whatsappResult.error,
+                  documentCount: 1
+                });
+              } else {
+                // Múltiples documentos - notificación grupal
+                const whatsappResult = await whatsappService.default.enviarGrupoDocumentosListo(
+                  {
+                    clientName: clientData.clientName,
+                    clientPhone: clientData.clientPhone
+                  },
+                  clientData.documents,
+                  clientData.documents[0].verificationCode // Usar el código del primer documento
+                );
+                whatsappResults.push({
+                  phone: phone,
+                  success: whatsappResult.success,
+                  error: whatsappResult.error,
+                  documentCount: clientData.documents.length
+                });
+              }
+            } catch (error) {
+              console.error(`Error enviando WhatsApp a ${phone}:`, error);
+              whatsappResults.push({
+                phone: phone,
+                success: false,
+                error: error.message,
+                documentCount: clientData.documents.length
+              });
+            }
+          }
+          
+          whatsappSent = whatsappResults.some(result => result.success);
+          const failedNotifications = whatsappResults.filter(result => !result.success);
+          if (failedNotifications.length > 0) {
+            whatsappError = `Falló envío a ${failedNotifications.length} cliente(s)`;
+          }
+          
+        } else if (updatedDocument.clientPhone) {
+          // Enviar notificación individual (comportamiento original)
+          const whatsappResult = await whatsappService.default.sendDocumentReadyNotification(updatedDocument);
+          whatsappSent = whatsappResult.success;
+          
+          if (!whatsappResult.success) {
+            whatsappError = whatsappResult.error;
+            console.error('Error enviando WhatsApp:', whatsappResult.error);
+          } else {
+            console.log('Notificación WhatsApp enviada exitosamente');
+          
+            // 📈 Registrar evento de notificación WhatsApp enviada
+            try {
+              await prisma.documentEvent.create({
+                data: {
+                  documentId: id,
+                  userId: req.user.id,
+                  eventType: 'WHATSAPP_SENT',
+                  description: `Notificación WhatsApp de documento listo enviada a ${updatedDocument.clientPhone}`,
+                  details: {
+                    phoneNumber: updatedDocument.clientPhone,
+                    messageType: 'DOCUMENT_READY',
+                    verificationCode: updatedDocument.verificationCode,
+                    sentBy: `${req.user.firstName} ${req.user.lastName}`,
+                    userRole: req.user.role,
+                    timestamp: new Date().toISOString()
+                  },
+                  ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+                  userAgent: req.get('User-Agent') || 'unknown'
+                }
+              });
+            } catch (auditError) {
+              console.error('Error registrando evento de notificación WhatsApp:', auditError);
+            }
           }
         }
       } catch (error) {
@@ -743,14 +937,26 @@ async function updateDocumentStatus(req, res) {
     }
 
     // Preparar mensaje de respuesta
-    let message = 'Estado del documento actualizado exitosamente';
+    let message = groupAffected 
+      ? `${updatedDocuments.length} documentos del grupo actualizados exitosamente`
+      : 'Estado del documento actualizado exitosamente';
+      
     if (status === 'LISTO') {
-      if (whatsappSent) {
-        message += ' y notificación WhatsApp enviada';
-      } else if (updatedDocument.clientPhone && whatsappError) {
-        message += ', pero falló la notificación WhatsApp';
-      } else if (!updatedDocument.clientPhone) {
-        message += ' (sin teléfono para notificación WhatsApp)';
+      if (groupAffected) {
+        if (whatsappSent) {
+          const successCount = whatsappResults.filter(r => r.success).length;
+          message += ` y notificaciones WhatsApp enviadas (${successCount}/${whatsappResults.length} clientes)`;
+        } else if (whatsappError) {
+          message += ', pero fallaron las notificaciones WhatsApp';
+        }
+      } else {
+        if (whatsappSent) {
+          message += ' y notificación WhatsApp enviada';
+        } else if (updatedDocument.clientPhone && whatsappError) {
+          message += ', pero falló la notificación WhatsApp';
+        } else if (!updatedDocument.clientPhone) {
+          message += ' (sin teléfono para notificación WhatsApp)';
+        }
       }
     }
 
@@ -764,10 +970,17 @@ async function updateDocumentStatus(req, res) {
           newStatus: status,
           verificationCodeGenerated: status === 'LISTO' && updateData.verificationCode
         },
+        groupOperation: {
+          isGroupOperation: groupAffected,
+          documentsAffected: updatedDocuments.length,
+          groupId: document.documentGroupId,
+          allDocuments: groupAffected ? updatedDocuments : undefined
+        },
         whatsapp: {
           sent: whatsappSent,
           error: whatsappError,
-          phone: updatedDocument.clientPhone
+          phone: updatedDocument.clientPhone,
+          groupResults: whatsappResults.length > 0 ? whatsappResults : undefined
         }
       }
     });
@@ -3116,6 +3329,98 @@ async function getDocumentHistory(req, res) {
   }
 }
 
+/**
+ * Obtener todos los documentos de un grupo
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+async function getGroupDocuments(req, res) {
+  try {
+    const { groupId } = req.params;
+    
+    console.log('📋 getGroupDocuments iniciado:', {
+      groupId,
+      userId: req.user.id,
+      userRole: req.user.role
+    });
+
+    if (!groupId) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID del grupo es obligatorio'
+      });
+    }
+
+    // Obtener todos los documentos del grupo
+    const groupDocuments = await prisma.document.findMany({
+      where: {
+        documentGroupId: groupId
+      },
+      include: {
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        },
+        assignedTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        },
+        documentGroup: true
+      },
+      orderBy: {
+        createdAt: 'asc'
+      }
+    });
+
+    if (groupDocuments.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No se encontraron documentos en el grupo'
+      });
+    }
+
+    // Verificar permisos si es matrizador
+    if (req.user.role === 'MATRIZADOR') {
+      const userDocuments = groupDocuments.filter(doc => doc.assignedToId === req.user.id);
+      if (userDocuments.length === 0) {
+        return res.status(403).json({
+          success: false,
+          message: 'No tienes permisos para ver los documentos de este grupo'
+        });
+      }
+    }
+
+    console.log('✅ Documentos del grupo obtenidos:', {
+      groupId,
+      documentCount: groupDocuments.length,
+      documentStatuses: groupDocuments.map(doc => ({ id: doc.id, status: doc.status }))
+    });
+
+    res.json({
+      success: true,
+      data: groupDocuments,
+      message: `${groupDocuments.length} documentos encontrados en el grupo`,
+      groupInfo: groupDocuments[0]?.documentGroup || null
+    });
+
+  } catch (error) {
+    console.error('❌ Error obteniendo documentos del grupo:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor al obtener documentos del grupo',
+      error: error.message
+    });
+  }
+}
+
 export {
   uploadXmlDocument,
   uploadXmlDocumentsBatch,
@@ -3144,6 +3449,7 @@ export {
   updateDocumentGroupStatus,
   updateDocumentGroupInfo,
   markDocumentGroupAsReady,
+  getGroupDocuments,
   // 🔓 Desagrupación
   ungroupDocument
 }; 

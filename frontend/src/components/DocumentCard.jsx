@@ -10,7 +10,12 @@ import {
   IconButton,
   Avatar,
   Divider,
-  Stack
+  Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Alert
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
@@ -44,6 +49,9 @@ const DocumentCard = ({ document, onStatusChange }) => {
   // 🔗 Estados para el nuevo modal de confirmación rápida
   const [showQuickGroupingModal, setShowQuickGroupingModal] = useState(false);
   const [pendingGroupDocuments, setPendingGroupDocuments] = useState([]);
+  // 📝 Estados para confirmación de cambio de estado grupal
+  const [showGroupStatusConfirmation, setShowGroupStatusConfirmation] = useState(false);
+  const [groupStatusInfo, setGroupStatusInfo] = useState(null);
   const fetchDocuments = useDocumentStore((state) => state.fetchMyDocuments);
 
   const handleGroupDocuments = (groupableDocs, autoCreate = false) => {
@@ -170,14 +178,67 @@ const DocumentCard = ({ document, onStatusChange }) => {
    */
   const handleMarkAsReady = async () => {
     if (loading || !onStatusChange) return;
+
+    // Verificar si el documento pertenece a un grupo
+    if (document.documentGroupId) {
+      try {
+        setLoading(true);
+        // Obtener información del grupo antes de proceder
+        const groupInfo = await documentService.getGroupDocuments(document.documentGroupId);
+        
+        if (groupInfo.success && groupInfo.data.length > 1) {
+          // Hay múltiples documentos en el grupo - mostrar confirmación
+          const otherDocuments = groupInfo.data.filter(doc => 
+            doc.id !== document.id && doc.status !== 'ENTREGADO'
+          );
+          
+          if (otherDocuments.length > 0) {
+            setGroupStatusInfo({
+              totalDocuments: groupInfo.data.length,
+              documentsToUpdate: otherDocuments.length + 1, // +1 por el documento actual
+              otherDocuments: otherDocuments,
+              clientNames: [...new Set(groupInfo.data.map(doc => doc.clientName))]
+            });
+            setShowGroupStatusConfirmation(true);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (error) {
+        console.error('Error checking group status:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    // Proceder con cambio de estado normal (documento individual o grupo sin otros documentos)
+    await proceedWithStatusChange();
+  };
+
+  /**
+   * Procede con el cambio de estado después de la confirmación
+   */
+  const proceedWithStatusChange = async () => {
+    if (loading || !onStatusChange) return;
     
     setLoading(true);
     try {
-      await onStatusChange(document.id, 'LISTO');
+      const result = await onStatusChange(document.id, 'LISTO');
+      
+      // Mostrar información sobre la operación grupal si está disponible
+      if (result && result.data && result.data.groupOperation && result.data.groupOperation.isGroupOperation) {
+        console.log('✅ Operación grupal completada:', {
+          documentsAffected: result.data.groupOperation.documentsAffected,
+          groupId: result.data.groupOperation.groupId
+        });
+      }
+      
     } catch (error) {
       console.error('Error updating status:', error);
     } finally {
       setLoading(false);
+      setShowGroupStatusConfirmation(false);
+      setGroupStatusInfo(null);
     }
   };
 
@@ -422,6 +483,98 @@ const DocumentCard = ({ document, onStatusChange }) => {
         }}
         loading={loading}
       />
+
+      {/* 📝 MODAL DE CONFIRMACIÓN CAMBIO DE ESTADO GRUPAL */}
+      <Dialog
+        open={showGroupStatusConfirmation}
+        onClose={() => {
+          if (!loading) {
+            setShowGroupStatusConfirmation(false);
+            setGroupStatusInfo(null);
+          }
+        }}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <GroupIcon color="warning" />
+            <Typography variant="h6">
+              Confirmación de Cambio de Estado Grupal
+            </Typography>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent>
+          {groupStatusInfo && (
+            <Box sx={{ mb: 2 }}>
+              <Alert severity="info" sx={{ mb: 3 }}>
+                Este documento pertenece a un grupo. Al marcarlo como LISTO, 
+                <strong> TODOS los documentos del grupo </strong>
+                cambiarán de estado automáticamente.
+              </Alert>
+
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="body1" sx={{ mb: 1 }}>
+                  <strong>📋 Documentos que serán afectados:</strong> {groupStatusInfo.documentsToUpdate}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Cliente(s): {groupStatusInfo.clientNames.join(', ')}
+                </Typography>
+              </Box>
+
+              {groupStatusInfo.otherDocuments.length > 0 && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography variant="body2" sx={{ mb: 1, fontWeight: 'bold' }}>
+                    Otros documentos del grupo:
+                  </Typography>
+                  {groupStatusInfo.otherDocuments.slice(0, 3).map((doc) => (
+                    <Typography key={doc.id} variant="body2" sx={{ ml: 2, mb: 0.5 }}>
+                      • {doc.protocolNumber} - {doc.documentType} ({getStatusText(doc.status)})
+                    </Typography>
+                  ))}
+                  {groupStatusInfo.otherDocuments.length > 3 && (
+                    <Typography variant="body2" sx={{ ml: 2, fontStyle: 'italic' }}>
+                      ... y {groupStatusInfo.otherDocuments.length - 3} más
+                    </Typography>
+                  )}
+                </Box>
+              )}
+
+              <Alert severity="warning" sx={{ mt: 2 }}>
+                <Typography variant="body2">
+                  <strong>⚠️ Importante:</strong> Se generarán códigos de verificación únicos 
+                  para cada documento y se enviarán notificaciones WhatsApp correspondientes.
+                </Typography>
+              </Alert>
+            </Box>
+          )}
+        </DialogContent>
+
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setShowGroupStatusConfirmation(false);
+              setGroupStatusInfo(null);
+            }}
+            disabled={loading}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            color="success"
+            onClick={proceedWithStatusChange}
+            disabled={loading}
+            startIcon={loading ? null : <CheckCircleIcon />}
+          >
+            {loading 
+              ? `Marcando ${groupStatusInfo?.documentsToUpdate || 1} documento(s)...` 
+              : `Marcar ${groupStatusInfo?.documentsToUpdate || 1} documento(s) como LISTO`
+            }
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Card>
   );
 };
