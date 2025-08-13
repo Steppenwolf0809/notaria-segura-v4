@@ -128,21 +128,27 @@ class DocumentGroupingService {
       }
     });
     
-    // NUEVA FUNCIONALIDAD: Actualizar documentos según el estado solicitado
-    const newStatus = markAsReady ? 'LISTO' : 'AGRUPADO';
-    console.log(`🔗 Marcando documentos como: ${newStatus} (markAsReady: ${markAsReady})`);
+    // CORRECCIÓN: Solo cambiar estado si se marca como listo, mantener estado original al agrupar
+    const updateData = {
+      documentGroupId: documentGroup.id,
+      isGrouped: true,
+      groupLeaderId: documents[0].id, // Primer documento es líder
+      groupVerificationCode: verificationCode,
+      groupCreatedAt: new Date(),
+      groupCreatedBy: matrizadorId.toString()
+    };
+    
+    // Solo cambiar estado a LISTO si se solicita explícitamente
+    if (markAsReady) {
+      updateData.status = 'LISTO';
+      console.log(`🔗 Agrupando y marcando documentos como LISTO`);
+    } else {
+      console.log(`🔗 Agrupando documentos (manteniendo estado original)`);
+    }
     
     await prisma.document.updateMany({
       where: { id: { in: documentIds } },
-      data: {
-        status: newStatus,
-        documentGroupId: documentGroup.id,
-        isGrouped: true,
-        groupLeaderId: documents[0].id, // Primer documento es líder
-        groupVerificationCode: verificationCode,
-        groupCreatedAt: new Date(),
-        groupCreatedBy: matrizadorId.toString()
-      }
+      data: updateData
     });
     
     // Asignar posiciones en el grupo
@@ -184,12 +190,10 @@ class DocumentGroupingService {
       throw new Error('Grupo no encontrado o no autorizado');
     }
 
-    // Verificar que los documentos están en estado AGRUPADO
-    const nonGroupedDocs = groupDocuments.filter(doc => doc.status !== 'AGRUPADO');
-    if (nonGroupedDocs.length > 0) {
-      console.warn('⚠️ Algunos documentos no están en estado AGRUPADO:', 
-        nonGroupedDocs.map(d => ({ id: d.id, status: d.status }))
-      );
+    // Verificar que los documentos están agrupados pero no entregados
+    const invalidDocs = groupDocuments.filter(doc => doc.status === 'ENTREGADO');
+    if (invalidDocs.length > 0) {
+      throw new Error('No se puede marcar como listo: algunos documentos ya están entregados');
     }
 
     // Actualizar documentos a LISTO
