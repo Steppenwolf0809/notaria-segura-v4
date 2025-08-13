@@ -252,10 +252,13 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
    */
   const handleConfirmBulkAction = async (actionData) => {
     try {
+      // Filtrar opciones para evitar duplicados de fromStatus/toStatus
+      const { fromStatus, toStatus, ...cleanOptions } = actionData.options || {};
+      
       await bulkActions.executeBulkStatusChange(
         documentosFiltrados, 
         actionData.toStatus, 
-        actionData.options
+        cleanOptions
       );
       
       // Refrescar la vista

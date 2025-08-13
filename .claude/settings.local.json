@@ -38,7 +38,10 @@
       "Bash(./setup-database.sh:*)",
       "Bash(bash:*)",
       "Bash(npm view:*)",
-      "WebFetch(domain:express-rate-limit.github.io)"
+      "WebFetch(domain:express-rate-limit.github.io)",
+      "Bash(echo:*)",
+      "Bash(cat:*)",
+      "Bash(NODE_ENV=production npx prisma db push --accept-data-loss)"
     ],
     "deny": []
   }
