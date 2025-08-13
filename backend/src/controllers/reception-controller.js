@@ -156,7 +156,7 @@ async function listarTodosDocumentos(req, res) {
       fechaEntrega: doc.fechaEntrega,
       // ✅ AGREGADO: Información del acto principal para que RECEPCION la vea
       actoPrincipalDescripcion: doc.actoPrincipalDescripcion,
-      actoPrincipalValor: doc.actoPrincipalValor,
+      actoPrincipalValor: doc.totalFactura, // ⭐ CAMBIO: Usar valor total de factura
       totalFactura: doc.totalFactura,
       matrizadorName: doc.matrizadorName,
       // Campos editables

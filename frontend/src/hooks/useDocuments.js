@@ -278,13 +278,13 @@ const useDocuments = (options = {}) => {
         return false;
       }
 
-      // Filtro por valor mínimo
-      if (filterOptions.minValue && doc.actoPrincipalValor < filterOptions.minValue) {
+      // Filtro por valor mínimo - ⭐ CAMBIO: Usar valor total de factura
+      if (filterOptions.minValue && doc.totalFactura < filterOptions.minValue) {
         return false;
       }
 
-      // Filtro por valor máximo
-      if (filterOptions.maxValue && doc.actoPrincipalValor > filterOptions.maxValue) {
+      // Filtro por valor máximo - ⭐ CAMBIO: Usar valor total de factura
+      if (filterOptions.maxValue && doc.totalFactura > filterOptions.maxValue) {
         return false;
       }
 
@@ -335,8 +335,8 @@ const useDocuments = (options = {}) => {
       // Por tipo
       stats.byType[doc.documentType] = (stats.byType[doc.documentType] || 0) + 1;
       
-      // Valor total
-      stats.totalValue += doc.actoPrincipalValor || 0;
+      // Valor total - ⭐ CAMBIO: Usar valor total de factura
+      stats.totalValue += doc.totalFactura || 0;
       
       // Documentos urgentes (más de 2 días)
       const daysDiff = Math.floor((new Date() - new Date(doc.createdAt)) / (1000 * 60 * 60 * 24));

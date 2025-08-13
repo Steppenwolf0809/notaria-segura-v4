@@ -510,7 +510,7 @@ const DocumentsList = () => {
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       <MoneyIcon sx={{ fontSize: 16, color: 'success.main', mr: 0.5 }} />
                       <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.main' }}>
-                        {formatCurrency(document.actoPrincipalValor)}
+                        {formatCurrency(document.totalFactura)} {/* ⭐ CAMBIO: Usar valor total de factura */}
                       </Typography>
                     </Box>
                   </TableCell>

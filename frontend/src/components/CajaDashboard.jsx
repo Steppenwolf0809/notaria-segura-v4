@@ -457,7 +457,7 @@ const CajaDashboard = () => {
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.main' }}>
-                        {formatCurrency(document.actoPrincipalValor)}
+                        {formatCurrency(document.totalFactura)} {/* ⭐ CAMBIO: Usar valor total de factura */}
                       </Typography>
                     </TableCell>
                     <TableCell>

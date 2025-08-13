@@ -371,7 +371,7 @@ const DocumentCard = ({ document, onStatusChange }) => {
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <MoneyIcon fontSize="small" sx={{ mr: 1, color: 'success.main' }} />
             <Typography variant="h6" sx={{ color: 'success.main', fontWeight: 'bold' }}>
-              {formatCurrency(document.actoPrincipalValor)}
+              {formatCurrency(document.totalFactura)} {/* ⭐ CAMBIO: Usar valor total de factura */}
             </Typography>
           </Box>
         </Box>
