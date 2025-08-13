@@ -1631,6 +1631,14 @@ async function getEditableDocumentInfo(req, res) {
           message: 'Solo puedes editar documentos asignados a ti'
         });
       }
+    } else if (req.user.role === 'RECEPCION') {
+      // RECEPCION puede ver información de cualquier documento para editar
+      // No hay restricciones adicionales para RECEPCION
+    } else if (!['ADMIN', 'CAJA'].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para ver la información de documentos'
+      });
     }
 
     res.json({
@@ -1702,6 +1710,14 @@ async function updateDocumentInfo(req, res) {
           message: 'Solo puedes editar documentos asignados a ti'
         });
       }
+    } else if (req.user.role === 'RECEPCION') {
+      // RECEPCION puede editar información de cualquier documento
+      // No hay restricciones adicionales para RECEPCION
+    } else if (!['ADMIN', 'CAJA'].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para editar documentos'
+      });
     }
 
     // Validaciones básicas

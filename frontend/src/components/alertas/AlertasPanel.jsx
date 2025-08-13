@@ -30,7 +30,15 @@ import {
 import AlertaItem from './AlertaItem';
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';
+// Configuración base de la API - Auto-detectar producción
+const getApiBaseUrl = () => {
+  // Si estamos en producción (mismo dominio), usar rutas relativas
+  if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return '/api';
+  }
+  // En desarrollo, usar la variable de entorno o fallback
+  return import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
+};
 
 /**
  * Panel principal de alertas para dashboards por rol
@@ -51,10 +59,10 @@ function AlertasPanel({ userRole, onDocumentClick, compact = false, maxHeight = 
   // Configuración de endpoints por rol
   const getEndpoint = () => {
     const endpoints = {
-      RECEPCION: '/api/alertas/recepcion',
-      MATRIZADOR: '/api/alertas/matrizador',
-      ARCHIVO: '/api/alertas/archivo',
-      ADMIN: '/api/alertas/admin'
+      RECEPCION: '/alertas/recepcion',
+      MATRIZADOR: '/alertas/matrizador',
+      ARCHIVO: '/alertas/archivo',
+      ADMIN: '/alertas/admin'
     };
     return endpoints[userRole];
   };
@@ -72,6 +80,7 @@ function AlertasPanel({ userRole, onDocumentClick, compact = false, maxHeight = 
 
     try {
       const token = localStorage.getItem('token');
+      const API_BASE_URL = getApiBaseUrl();
       const response = await axios.get(`${API_BASE_URL}${endpoint}`, {
         headers: {
           'Authorization': `Bearer ${token}`
