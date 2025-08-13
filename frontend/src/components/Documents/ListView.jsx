@@ -508,7 +508,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
                     </TableCell>
                     <TableCell onClick={() => openDetailModal(document)}>
                       <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'success.main' }}>
-                        {formatCurrency(document.actoPrincipalValor || 0)}
+                        {formatCurrency(document.totalFactura || 0)} {/* ⭐ CAMBIO: Usar valor total de factura */}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
                         {document.actoPrincipalDescripcion}

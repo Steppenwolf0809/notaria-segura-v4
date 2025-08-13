@@ -462,7 +462,7 @@ async function exportDocuments(req, res) {
         new Date(doc.createdAt).toLocaleDateString('es-ES') : '',
       'Última Actualización': doc.updatedAt ? 
         new Date(doc.updatedAt).toLocaleDateString('es-ES') : '',
-      'Valor Acto Principal': doc.actoPrincipalValor || 0,
+      'Valor Acto Principal': doc.totalFactura || 0, // ⭐ CAMBIO: Usar valor total de factura
       'Total Factura': doc.totalFactura || 0,
       'Código Verificación': doc.verificationCode || '',
       'Agrupado': doc.isGrouped ? 'Sí' : 'No'

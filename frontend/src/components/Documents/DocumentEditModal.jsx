@@ -338,7 +338,7 @@ const DocumentEditModal = ({
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <Typography variant="body2">
-                    <strong>Valor:</strong> ${readOnlyInfo.actoPrincipalValor || 0}
+                    <strong>Valor:</strong> ${readOnlyInfo.totalFactura || 0} {/* ⭐ CAMBIO: Usar valor total de factura */}
                   </Typography>
                 </Grid>
               </Grid>

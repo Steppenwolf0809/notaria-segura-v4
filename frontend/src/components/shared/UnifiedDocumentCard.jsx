@@ -163,7 +163,7 @@ const UnifiedDocumentCard = ({
   const advanceButtonConfig = getAdvanceButtonConfig();
   const relevantDate = getRelevantDate();
   const formattedPhone = formatPhone(document.clientPhone);
-  const formattedAmount = formatCurrency(document.actoPrincipalValor);
+  const formattedAmount = formatCurrency(document.totalFactura); // ⭐ CAMBIO: Usar valor total de factura
 
   return (
     <Card

@@ -523,7 +523,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                       <MoneyIcon sx={{ mr: 1, color: 'success.main' }} />
                       <Typography variant="h4" sx={{ color: 'success.main', fontWeight: 'bold' }}>
-                        {formatCurrency(document.actoPrincipalValor)}
+                        {formatCurrency(document.totalFactura)} {/* ⭐ CAMBIO: Usar valor total de factura */}
                       </Typography>
                     </Box>
 
