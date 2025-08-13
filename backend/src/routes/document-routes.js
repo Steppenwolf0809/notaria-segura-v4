@@ -29,6 +29,7 @@ import {
   updateDocumentGroupStatus,
   updateDocumentGroupInfo,
   markDocumentGroupAsReady,
+  getGroupDocuments,
   // 🔓 Desagrupar documento
   ungroupDocument
 } from '../controllers/document-controller.js';
@@ -157,14 +158,11 @@ router.post('/group/mark-ready', authenticateToken, markDocumentGroupAsReady);
 // 🔄 POST /api/documents/bulk-status-change - Cambio de estado masivo
 router.post('/bulk-status-change', authenticateToken, bulkStatusChange);
 
-// Obtener información detallada de un grupo
-// TODO: Implementar el método getGroupDetails en document-controller.js
-/*
+// Obtener todos los documentos de un grupo
 router.get('/group/:groupId',
   authenticateToken,
-  getGroupDetails
+  getGroupDocuments
 );
-*/
 
 
 /**
