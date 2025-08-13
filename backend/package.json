@@ -20,6 +20,8 @@
     "verify:prod": "node scripts/verify-production.js",
     "verify:users": "node scripts/verify-users.js",
     "fix:enum": "node scripts/fix-agrupado-enum.js",
+    "fix:grouped": "node scripts/fix-grouped-documents-status.js smart",
+    "fix:grouped-force": "node scripts/fix-grouped-documents-status.js force EN_PROCESO",
     "db:sync": "npx prisma db push --accept-data-loss"
   },
   "dependencies": {
