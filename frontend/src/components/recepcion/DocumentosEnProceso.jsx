@@ -254,13 +254,21 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
 
   // Detectar automáticamente documentos agrupables del mismo cliente
   const getDocumentosAgrupablesPorCliente = (documento) => {
-    return documentos.filter(doc => 
+    const candidatos = documentos.filter(doc => 
       doc.id !== documento.id && 
       doc.clientName === documento.clientName &&
       // Si ambos tienen clientId, deben coincidir. Si uno no tiene, agrupar solo por nombre
       (!documento.clientId || !doc.clientId || doc.clientId === documento.clientId) &&
       doc.status === 'EN_PROCESO'
     );
+    // ✅ Deduplicar por protocolo
+    const seen = new Set();
+    return candidatos.filter(d => {
+      const key = d.protocolNumber || d.id;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   };
 
   // Sugerir agrupación automática al seleccionar un documento

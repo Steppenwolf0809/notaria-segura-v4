@@ -49,9 +49,19 @@ class DocumentGroupingService {
       where: whereConditions
     });
 
+    // ✅ Deduplicar por número de protocolo para evitar duplicados lógicos
+    const seenProtocols = new Set();
+    const uniqueByProtocol = [];
+    for (const doc of groupableDocuments) {
+      const key = doc.protocolNumber || doc.id;
+      if (seenProtocols.has(key)) continue;
+      seenProtocols.add(key);
+      uniqueByProtocol.push(doc);
+    }
+
     console.log('📋 DocumentGroupingService: Documentos encontrados:', {
-      count: groupableDocuments.length,
-      documentos: groupableDocuments.map(d => ({
+      count: uniqueByProtocol.length,
+      documentos: uniqueByProtocol.map(d => ({
         protocolo: d.protocolNumber,
         cliente: d.clientName,
         clientId: d.clientId,
@@ -60,7 +70,7 @@ class DocumentGroupingService {
       }))
     });
 
-    return groupableDocuments;
+    return uniqueByProtocol;
   }
     
   /**
