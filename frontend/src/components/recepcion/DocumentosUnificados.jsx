@@ -278,6 +278,15 @@ function DocumentosUnificados({ onEstadisticasChange }) {
       } else if (actionType === 'grupal' && selectedDocuments.length > 0) {
         console.log('📁 Marcando grupo de documentos:', selectedDocuments);
         result = await receptionService.marcarGrupoListo(selectedDocuments);
+      } else {
+        // Fallback conservador por si el estado actionType se perdió
+        if (currentDocumento?.id) {
+          console.warn('⚠️ actionType no definido; aplicando fallback a individual');
+          result = await receptionService.marcarComoListo(currentDocumento.id);
+        } else if (selectedDocuments.length > 0) {
+          console.warn('⚠️ actionType no definido; aplicando fallback a grupal');
+          result = await receptionService.marcarGrupoListo(selectedDocuments);
+        }
       }
 
       console.log('✅ Resultado completo del servicio:', {
@@ -371,6 +380,19 @@ function DocumentosUnificados({ onEstadisticasChange }) {
     if (selectedDocuments.length <= 1) return true;
     const docs = documentos.filter(doc => selectedDocuments.includes(doc.id));
     return new Set(docs.map(doc => doc.clientName)).size === 1;
+  };
+
+  // Mostrar botón Agrupar solo si hay más de un documento de ese cliente en la lista
+  const hasMoreThanOneForClient = (doc) => {
+    if (!doc) return false;
+    const sameClientDocs = documentos.filter(d => {
+      if (d.id === doc.id) return false;
+      if (!['EN_PROCESO', 'LISTO'].includes(d.status)) return false;
+      const sameName = d.clientName === doc.clientName;
+      const sameId = doc.clientId ? d.clientId === doc.clientId : true;
+      return sameName && sameId && !d.isGrouped;
+    });
+    return sameClientDocs.length > 0;
   };
 
   const getSelectedDocumentsAction = () => {
@@ -823,8 +845,8 @@ function DocumentosUnificados({ onEstadisticasChange }) {
                             />
                           </Tooltip>
                         ) : (
-                          // Mostrar botón de agrupación para documentos EN_PROCESO y LISTO
-                          ['EN_PROCESO', 'LISTO'].includes(documento.status) && (
+                          // Mostrar botón solo si hay más de un documento del mismo cliente
+                          ['EN_PROCESO', 'LISTO'].includes(documento.status) && hasMoreThanOneForClient(documento) && (
                             <Button
                               size="small"
                               variant="outlined"
@@ -835,12 +857,13 @@ function DocumentosUnificados({ onEstadisticasChange }) {
                                 try {
                                   const result = await detectGroupableDocuments({
                                     clientName: documento.clientName,
-                                    clientPhone: documento.clientPhone,
-                                    status: documento.status
+                                    clientId: documento.clientId || ''
                                   });
                                   
-                                  if (result.success && result.groupableDocuments.length > 0) {
-                                    handleGroupDocuments(result.groupableDocuments, documento);
+                                  // Excluir el documento principal y abrir solo si hay más de uno
+                                  const related = (result.groupableDocuments || []).filter(d => d.id !== documento.id);
+                                  if (result.success && related.length > 0) {
+                                    handleGroupDocuments(related, documento);
                                   } else {
                                     setSnackbar({
                                       open: true,
@@ -982,7 +1005,15 @@ function DocumentosUnificados({ onEstadisticasChange }) {
         </DialogContent>
         <DialogActions>
           <Button onClick={cerrarConfirmacion}>Cancelar</Button>
-          <Button onClick={ejecutarMarcarListo} variant="contained" color="success" startIcon={<CheckCircleIcon />}>Confirmar</Button>
+          <Button 
+            onClick={ejecutarMarcarListo} 
+            variant="contained" 
+            color="success" 
+            startIcon={<CheckCircleIcon />} 
+            disabled={!((actionType === 'individual' && currentDocumento) || (actionType === 'grupal' && selectedDocuments.length > 0))}
+          >
+            Confirmar
+          </Button>
         </DialogActions>
       </Dialog>
 

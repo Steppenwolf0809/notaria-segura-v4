@@ -1168,7 +1168,8 @@ async function detectGroupableDocuments(req, res) {
     }
 
     const { clientName, clientId } = req.body;
-    const matrizadorId = req.user.id;
+    // Solo forza filtro por asignación cuando es MATRIZADOR, para RECEPCION/ARCHIVO/ADMIN buscamos por cliente sin restringir asignación
+    const matrizadorId = req.user.role === 'MATRIZADOR' ? req.user.id : null;
     
     console.log('🔍 Controller: detectGroupableDocuments solicitado:', {
       clientName,
