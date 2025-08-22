@@ -66,7 +66,15 @@ const StatusIndicator = ({ status }) => {
   return (
     <Box sx={{ display: 'flex', alignItems: 'center' }}>
       <Box component="span" sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: config.color, mr: 1 }} />
-      <Typography variant="body2" color="text.primary" sx={{ opacity: 0.8, fontWeight: 500 }}>{config.label}</Typography>
+      <Typography 
+        variant="body2" 
+        sx={{ 
+          fontWeight: 500,
+          color: (theme) => theme.palette.mode === 'dark' ? '#e2e8f0' : '#374151'
+        }}
+      >
+        {config.label}
+      </Typography>
     </Box>
   );
 };
@@ -633,7 +641,14 @@ function DocumentosUnificados({ onEstadisticasChange }) {
               {documentos.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                    <Typography color="text.primary" sx={{ opacity: 0.7, fontWeight: 500 }}>No se encontraron documentos.</Typography>
+                    <Typography 
+                      sx={{ 
+                        fontWeight: 500,
+                        color: (theme) => theme.palette.mode === 'dark' ? '#94a3b8' : '#6b7280'
+                      }}
+                    >
+                      No se encontraron documentos.
+                    </Typography>
                   </TableCell>
                 </TableRow>
               ) : (
@@ -664,13 +679,28 @@ function DocumentosUnificados({ onEstadisticasChange }) {
                     <TableCell sx={{ py: 1.5 }}>
                       <Box>
                         <Typography variant="body2" sx={{ fontWeight: 500 }}>{documento.clientName}</Typography>
-                        <Typography variant="caption" color="text.primary" component="div" sx={{ opacity: 0.75, fontWeight: 500 }}>
+                        <Typography 
+                          variant="caption" 
+                          component="div" 
+                          sx={{ 
+                            fontWeight: 500,
+                            color: (theme) => theme.palette.mode === 'dark' ? '#cbd5e1' : '#4b5563'
+                          }}
+                        >
                           Doc: {documento.protocolNumber} | {documento.documentType}
                         </Typography>
                         {documento.clientPhone && (
                           <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
                              <PhoneIcon sx={{ fontSize: '0.8rem', color: 'action.active', mr: 0.5 }} />
-                             <Typography variant="caption" color="text.primary" sx={{ opacity: 0.75, fontWeight: 500 }}>{documento.clientPhone}</Typography>
+                             <Typography 
+                               variant="caption" 
+                               sx={{ 
+                                 fontWeight: 500,
+                                 color: (theme) => theme.palette.mode === 'dark' ? '#cbd5e1' : '#4b5563'
+                               }}
+                             >
+                               {documento.clientPhone}
+                             </Typography>
                           </Box>
                         )}
                         {/* Indicador de grupo */}
@@ -712,7 +742,13 @@ function DocumentosUnificados({ onEstadisticasChange }) {
                       </Tooltip>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" color="text.primary" sx={{ opacity: 0.8, fontWeight: 500 }}>
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          fontWeight: 500,
+                          color: (theme) => theme.palette.mode === 'dark' ? '#e2e8f0' : '#374151'
+                        }}
+                      >
                         {formatLocalDate(documento.fechaCreacion)}
                       </Typography>
                     </TableCell>
@@ -730,7 +766,15 @@ function DocumentosUnificados({ onEstadisticasChange }) {
                           Entregar
                         </Button>
                       ) : (
-                        <Typography variant="body2" color="text.primary" sx={{ opacity: 0.6, mr: 1 }}>-</Typography>
+                        <Typography 
+                          variant="body2" 
+                          sx={{ 
+                            mr: 1,
+                            color: (theme) => theme.palette.mode === 'dark' ? '#94a3b8' : '#9ca3af'
+                          }}
+                        >
+                          -
+                        </Typography>
                       )}
                       <IconButton aria-label="actions" onClick={(event) => { event.stopPropagation(); handleMenuOpen(event, documento); }}>
                         <MoreVertIcon />
@@ -881,7 +925,12 @@ function DocumentosUnificados({ onEstadisticasChange }) {
           <Typography variant="body2">
             📋 Documentos seleccionados: {visualSelection.size} (solo visualización)
           </Typography>
-          <Typography variant="caption" color="text.primary" sx={{ opacity: 0.8 }}>
+          <Typography 
+            variant="caption" 
+            sx={{ 
+              color: (theme) => theme.palette.mode === 'dark' ? '#cbd5e1' : '#4b5563'
+            }}
+          >
             Los checkboxes permiten selección visual. Para cambios masivos, use las vistas de Matrizador o Archivo.
           </Typography>
         </Alert>
