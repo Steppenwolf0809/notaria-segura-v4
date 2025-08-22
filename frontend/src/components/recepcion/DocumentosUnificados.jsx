@@ -57,16 +57,16 @@ import useDocumentStore from '../../store/document-store';
 
 const StatusIndicator = ({ status }) => {
   const statusConfig = {
-    EN_PROCESO: { label: 'En Proceso', color: 'info.main' },
-    LISTO: { label: 'Listo', color: 'success.main' },
-    ENTREGADO: { label: 'Entregado', color: 'grey.500' },
-    PENDIENTE: { label: 'Pendiente', color: 'warning.main' },
+    EN_PROCESO: { label: '⚙️ En Proceso', color: '#1976d2' },
+    LISTO: { label: '✅ Listo', color: '#2e7d32' },
+    ENTREGADO: { label: '📦 Entregado', color: '#616161' },
+    PENDIENTE: { label: '⏳ Pendiente', color: '#f57c00' },
   };
-  const config = statusConfig[status] || { label: status, color: 'grey.500' };
+  const config = statusConfig[status] || { label: `📎 ${status}`, color: '#616161' };
   return (
     <Box sx={{ display: 'flex', alignItems: 'center' }}>
       <Box component="span" sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: config.color, mr: 1 }} />
-      <Typography variant="body2" color="text.secondary">{config.label}</Typography>
+      <Typography variant="body2" color="text.primary" sx={{ opacity: 0.8, fontWeight: 500 }}>{config.label}</Typography>
     </Box>
   );
 };
@@ -633,7 +633,7 @@ function DocumentosUnificados({ onEstadisticasChange }) {
               {documentos.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                    <Typography color="text.secondary">No se encontraron documentos.</Typography>
+                    <Typography color="text.primary" sx={{ opacity: 0.7, fontWeight: 500 }}>No se encontraron documentos.</Typography>
                   </TableCell>
                 </TableRow>
               ) : (
@@ -664,13 +664,13 @@ function DocumentosUnificados({ onEstadisticasChange }) {
                     <TableCell sx={{ py: 1.5 }}>
                       <Box>
                         <Typography variant="body2" sx={{ fontWeight: 500 }}>{documento.clientName}</Typography>
-                        <Typography variant="caption" color="text.secondary" component="div">
+                        <Typography variant="caption" color="text.primary" component="div" sx={{ opacity: 0.75, fontWeight: 500 }}>
                           Doc: {documento.protocolNumber} | {documento.documentType}
                         </Typography>
                         {documento.clientPhone && (
                           <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
-                             <PhoneIcon sx={{ fontSize: '0.8rem', color: 'text.secondary', mr: 0.5 }} />
-                             <Typography variant="caption" color="text.secondary">{documento.clientPhone}</Typography>
+                             <PhoneIcon sx={{ fontSize: '0.8rem', color: 'action.active', mr: 0.5 }} />
+                             <Typography variant="caption" color="text.primary" sx={{ opacity: 0.75, fontWeight: 500 }}>{documento.clientPhone}</Typography>
                           </Box>
                         )}
                         {/* Indicador de grupo */}
@@ -712,7 +712,7 @@ function DocumentosUnificados({ onEstadisticasChange }) {
                       </Tooltip>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" color="text.secondary">
+                      <Typography variant="body2" color="text.primary" sx={{ opacity: 0.8, fontWeight: 500 }}>
                         {formatLocalDate(documento.fechaCreacion)}
                       </Typography>
                     </TableCell>
@@ -730,7 +730,7 @@ function DocumentosUnificados({ onEstadisticasChange }) {
                           Entregar
                         </Button>
                       ) : (
-                        <Typography variant="body2" color="text.secondary" sx={{ mr: 1 }}>-</Typography>
+                        <Typography variant="body2" color="text.primary" sx={{ opacity: 0.6, mr: 1 }}>-</Typography>
                       )}
                       <IconButton aria-label="actions" onClick={(event) => { event.stopPropagation(); handleMenuOpen(event, documento); }}>
                         <MoreVertIcon />
@@ -881,7 +881,7 @@ function DocumentosUnificados({ onEstadisticasChange }) {
           <Typography variant="body2">
             📋 Documentos seleccionados: {visualSelection.size} (solo visualización)
           </Typography>
-          <Typography variant="caption" color="text.secondary">
+          <Typography variant="caption" color="text.primary" sx={{ opacity: 0.8 }}>
             Los checkboxes permiten selección visual. Para cambios masivos, use las vistas de Matrizador o Archivo.
           </Typography>
         </Alert>
