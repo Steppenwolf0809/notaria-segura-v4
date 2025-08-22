@@ -114,13 +114,51 @@ const receptionService = {
    */
   async marcarComoListo(documentId) {
     try {
+      console.log('🌐 Enviando request para marcar como listo:', documentId);
       const response = await api.post(`/reception/documentos/${documentId}/marcar-listo`);
-      return {
-        success: true,
-        data: response.data.data,
-        message: response.data.message
-      };
+      
+      console.log('🌐 Respuesta completa del servidor:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: response.headers,
+        data: response.data,
+        dataType: typeof response.data,
+        dataKeys: response.data ? Object.keys(response.data) : 'no keys'
+      });
+
+      // Verificar estructura de respuesta
+      if (!response.data) {
+        console.error('❌ Respuesta del servidor sin data');
+        return {
+          success: false,
+          error: 'Respuesta del servidor vacía'
+        };
+      }
+
+      if (response.data.success === true) {
+        console.log('✅ Respuesta exitosa del servidor');
+        return {
+          success: true,
+          data: response.data.data,
+          message: response.data.message
+        };
+      } else {
+        console.error('❌ Respuesta del servidor indica error:', response.data);
+        return {
+          success: false,
+          error: response.data.error || response.data.message || 'Error del servidor sin mensaje específico'
+        };
+      }
     } catch (error) {
+      console.error('🌐 Error en request marcar como listo:', {
+        name: error.name,
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        responseData: error.response?.data,
+        stack: error.stack
+      });
+      
       return {
         success: false,
         error: receptionService.handleError(error)

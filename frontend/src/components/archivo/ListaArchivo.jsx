@@ -41,6 +41,7 @@ import {
   Info as InfoIcon
 } from '@mui/icons-material';
 import archivoService from '../../services/archivo-service';
+import documentService from '../../services/document-service';
 import { formatCurrency } from '../../utils/currencyUtils';
 import DocumentDetailModal from '../Documents/DocumentDetailModal';
 import EditDocumentModal from '../Documents/EditDocumentModal';
@@ -48,6 +49,8 @@ import ConfirmationModal from '../Documents/ConfirmationModal';
 import ModalEntrega from '../recepcion/ModalEntrega';
 import ModalEntregaGrupal from '../recepcion/ModalEntregaGrupal';
 import QuickGroupingModal from '../grouping/QuickGroupingModal';
+import GroupInfoModal from '../shared/GroupInfoModal';
+import GroupingDetector from '../grouping/GroupingDetector';
 import useDocumentStore from '../../store/document-store';
 // 🎯 NUEVOS IMPORTS PARA SELECCIÓN MÚLTIPLE
 import useBulkActions from '../../hooks/useBulkActions';
@@ -59,7 +62,7 @@ import BulkStatusChangeModal from '../bulk/BulkStatusChangeModal';
  * Tabla completa con filtros y paginación
  */
 const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
-  const { requiresConfirmation, createDocumentGroup } = useDocumentStore();
+  const { requiresConfirmation, createDocumentGroup, detectGroupableDocuments } = useDocumentStore();
   
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -80,13 +83,19 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
   const [confirmationData, setConfirmationData] = useState(null);
   const [isConfirmationLoading, setIsConfirmationLoading] = useState(false);
 
-  // 🔗 NUEVOS ESTADOS PARA AGRUPACIÓN
-  const [selectedDocuments, setSelectedDocuments] = useState(new Set());
-  const [showGroupingModal, setShowGroupingModal] = useState(false);
-  const [showGroupDeliveryModal, setShowGroupDeliveryModal] = useState(false);
+  // 🔗 ESTADOS PARA AGRUPACIÓN (como en Recepción)
+  const [showQuickGroupingModal, setShowQuickGroupingModal] = useState(false);
+  const [pendingGroupData, setPendingGroupData] = useState({ main: null, related: [] });
   const [groupingLoading, setGroupingLoading] = useState(false);
   const [groupingSuccess, setGroupingSuccess] = useState(null);
+  
+  // Estados para modal de información de grupo
+  const [groupInfoModalOpen, setGroupInfoModalOpen] = useState(false);
+  const [selectedGroupDocument, setSelectedGroupDocument] = useState(null);
+  
+  // Estados para entrega
   const [showSingleDeliveryModal, setShowSingleDeliveryModal] = useState(false);
+  const [showGroupDeliveryModal, setShowGroupDeliveryModal] = useState(false);
 
   // 🎯 NUEVOS ESTADOS PARA SELECCIÓN MÚLTIPLE
   const bulkActions = useBulkActions();
@@ -566,6 +575,90 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
     return documentos.filter(doc => selectedDocuments.has(doc.id));
   };
 
+  // 🔗 FUNCIONES DE AGRUPACIÓN PARA ARCHIVO (como en Recepción)
+  
+  /**
+   * Manejar agrupación inteligente detectada automáticamente
+   */
+  const handleGroupDocuments = async (groupableDocuments, mainDocument) => {
+    console.log('🔗 ARCHIVO: Activando agrupación inteligente:', {
+      main: mainDocument.protocolNumber || mainDocument.id,
+      groupable: groupableDocuments.map(d => d.protocolNumber || d.id)
+    });
+    
+    setPendingGroupData({
+      main: mainDocument,
+      related: groupableDocuments
+    });
+    setShowQuickGroupingModal(true);
+  };
+
+  /**
+   * Crear grupo desde modal de confirmación
+   */
+  const handleCreateDocumentGroup = async (selectedDocumentIds) => {
+    if (!pendingGroupData.main || selectedDocumentIds.length === 0) {
+      setShowQuickGroupingModal(false);
+      return;
+    }
+
+    setGroupingLoading(true);
+    
+    try {
+      const documentIds = [pendingGroupData.main.id, ...selectedDocumentIds];
+      console.log('🔗 ARCHIVO: Creando grupo con documentos:', documentIds);
+      
+      const result = await createDocumentGroup(documentIds);
+      
+      if (result.success) {
+        // Mostrar mensaje de éxito
+        setGroupingSuccess({
+          message: result.message || `Grupo creado exitosamente con ${documentIds.length} documentos`,
+          verificationCode: result.verificationCode,
+          documentCount: documentIds.length,
+          whatsappSent: result.whatsapp?.sent || false,
+          whatsappError: result.whatsapp?.error || null,
+          clientPhone: result.whatsapp?.phone || null
+        });
+
+        // Refrescar documentos para mostrar los cambios
+        if (onRefresh) {
+          onRefresh();
+        }
+
+        console.log('✅ ARCHIVO: Agrupación exitosa:', result);
+        
+        // Auto-ocultar después de 5 segundos
+        setTimeout(() => {
+          setGroupingSuccess(null);
+        }, 5000);
+      } else {
+        console.error('❌ ARCHIVO: Error en agrupación:', result.error);
+      }
+    } catch (error) {
+      console.error('❌ ARCHIVO: Error inesperado en agrupación:', error);
+    } finally {
+      setGroupingLoading(false);
+      setShowQuickGroupingModal(false);
+    }
+  };
+
+  /**
+   * Abrir modal de información de grupo
+   */
+  const handleOpenGroupInfo = (documento) => {
+    setSelectedGroupDocument(documento);
+    setGroupInfoModalOpen(true);
+  };
+
+  /**
+   * Cerrar modal de información de grupo
+   */
+  const handleCloseGroupInfo = () => {
+    setGroupInfoModalOpen(false);
+    setSelectedGroupDocument(null);
+  };
+
   return (
     <Box>
       {/* Mensaje de éxito de agrupación */}
@@ -832,6 +925,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                     Fecha
                   </TableSortLabel>
                 </TableCell>
+                <TableCell sx={{ fontWeight: 600, textAlign: 'center', minWidth: 120 }}>Agrupación</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Acciones</TableCell>
               </TableRow>
             </TableHead>
@@ -935,6 +1029,41 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                     </Typography>
                   </TableCell>
                   
+                  <TableCell sx={{ textAlign: 'center', py: 1 }}>
+                    {/* Columna de Agrupación - Mostrar detector o estado de grupo */}
+                    {documento.isGrouped ? (
+                      <Tooltip title="Ver información del grupo">
+                        <Chip
+                          label="🔗 Agrupado"
+                          size="small"
+                          variant="filled"
+                          color="primary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenGroupInfo(documento);
+                          }}
+                          sx={{ 
+                            cursor: 'pointer',
+                            fontSize: '0.7rem',
+                            height: '24px',
+                            '& .MuiChip-label': { px: 1 }
+                          }}
+                        />
+                      </Tooltip>
+                    ) : (
+                      // Mostrar detector de agrupación solo para documentos EN_PROCESO y LISTO
+                      ['EN_PROCESO', 'LISTO'].includes(documento.status) && (
+                        <Box sx={{ minWidth: 100 }}>
+                          <GroupingDetector
+                            document={documento}
+                            onGroupDocuments={handleGroupDocuments}
+                            isVisible={true}
+                          />
+                        </Box>
+                      )
+                    )}
+                  </TableCell>
+                  
                   <TableCell>
                     <IconButton
                       size="small"
@@ -948,7 +1077,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
               
               {documentosPagina.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} sx={{ textAlign: 'center', py: 4 }}>
+                  <TableCell colSpan={10} sx={{ textAlign: 'center', py: 4 }}>
                     <Typography color="text.secondary">
                       {documentosFiltrados.length === 0 
                         ? 'No hay documentos que coincidan con los filtros'
@@ -1076,6 +1205,25 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
           }}
         />
       )}
+
+      {/* 🔗 MODALES DE AGRUPACIÓN */}
+      
+      {/* Modal de agrupación rápida */}
+      <QuickGroupingModal
+        open={showQuickGroupingModal}
+        onClose={() => setShowQuickGroupingModal(false)}
+        mainDocument={pendingGroupData.main}
+        relatedDocuments={pendingGroupData.related}
+        loading={groupingLoading}
+        onConfirm={handleCreateDocumentGroup}
+      />
+
+      {/* Modal de información de grupo */}
+      <GroupInfoModal
+        open={groupInfoModalOpen}
+        onClose={handleCloseGroupInfo}
+        document={selectedGroupDocument}
+      />
 
       {/* 🎯 NUEVOS COMPONENTES: Selección múltiple */}
       

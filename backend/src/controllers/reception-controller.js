@@ -1,4 +1,6 @@
-import prisma from '../db.js';
+import { getPrismaClient } from '../db.js';
+
+const prisma = getPrismaClient();
 import whatsappService from '../services/whatsapp-service.js';
 import CodigoRetiroService from '../utils/codigo-retiro.js';
 import AlertasService from '../services/alertas-service.js';
