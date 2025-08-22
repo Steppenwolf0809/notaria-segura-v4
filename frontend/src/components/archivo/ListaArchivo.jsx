@@ -419,15 +419,10 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
    * Seleccionar/deseleccionar documento individual
    */
   const handleToggleDocument = (documentId) => {
-    setSelectedDocuments(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(documentId)) {
-        newSet.delete(documentId);
-      } else {
-        newSet.add(documentId);
-      }
-      return newSet;
-    });
+    const document = documentos.find(doc => doc.id === documentId);
+    if (document) {
+      bulkActions.toggleDocumentSelection(documentId, document.status, documentos);
+    }
   };
 
   /**
@@ -435,33 +430,23 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
    */
   const handleToggleAll = () => {
     const currentPageIds = documentosPagina.map(doc => doc.id);
-    const allSelected = currentPageIds.every(id => selectedDocuments.has(id));
+    const allSelected = currentPageIds.every(id => bulkActions.selectedDocuments.has(id));
     
-    setSelectedDocuments(prev => {
-      const newSet = new Set(prev);
-      if (allSelected) {
-        // Deseleccionar todos de la página actual
-        currentPageIds.forEach(id => newSet.delete(id));
-      } else {
-        // Seleccionar todos de la página actual
-        currentPageIds.forEach(id => newSet.add(id));
-      }
-      return newSet;
-    });
+    bulkActions.toggleSelectAll(documentosPagina, !allSelected);
   };
 
   /**
    * Crear grupo de documentos seleccionados
    */
   const handleCreateGroup = async () => {
-    if (selectedDocuments.size < 2) {
+    if (bulkActions.selectedDocuments.size < 2) {
       alert('Seleccione al menos 2 documentos para agrupar');
       return;
     }
 
     setGroupingLoading(true);
     try {
-      const documentIds = Array.from(selectedDocuments);
+      const documentIds = Array.from(bulkActions.selectedDocuments);
       console.log('🔗 Creando grupo desde lista archivo:', documentIds);
       
       const result = await createDocumentGroup(documentIds);
@@ -478,7 +463,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
         });
         
         // Limpiar selección
-        setSelectedDocuments(new Set());
+        bulkActions.clearSelection();
         
         // Refrescar datos
         if (onRefresh) {
@@ -505,7 +490,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
    * Abrir modal de entrega grupal
    */
   const handleGroupDelivery = () => {
-    if (selectedDocuments.size === 0) {
+    if (bulkActions.selectedDocuments.size === 0) {
       alert('Seleccione documentos para entrega grupal');
       return;
     }
@@ -516,12 +501,12 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
    * Cambiar estado de documentos seleccionados
    */
   const handleGroupStatusChange = async (newStatus) => {
-    if (selectedDocuments.size === 0) {
+    if (bulkActions.selectedDocuments.size === 0) {
       alert('Seleccione documentos para cambiar estado');
       return;
     }
 
-    for (const docId of selectedDocuments) {
+    for (const docId of bulkActions.selectedDocuments) {
       try {
         await onEstadoChange(docId, newStatus);
       } catch (error) {
@@ -530,7 +515,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
     }
     
     // Limpiar selección y refrescar
-    setSelectedDocuments(new Set());
+    bulkActions.clearSelection();
     if (onRefresh) {
       onRefresh();
     }
@@ -540,17 +525,17 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
    * Desagrupar documentos seleccionados
    */
   const handleUngroup = async () => {
-    if (selectedDocuments.size === 0) {
+    if (bulkActions.selectedDocuments.size === 0) {
       alert('Seleccione documentos agrupados para desagrupar');
       return;
     }
 
     try {
       // TODO: Implementar desagrupación en el servicio
-      console.log('🔓 Desagrupando documentos:', Array.from(selectedDocuments));
+      console.log('🔓 Desagrupando documentos:', Array.from(bulkActions.selectedDocuments));
       
       // Por ahora solo refrescamos
-      setSelectedDocuments(new Set());
+      bulkActions.clearSelection();
       if (onRefresh) {
         onRefresh();
       }
@@ -572,7 +557,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
    * Obtener documentos seleccionados para entrega grupal
    */
   const getSelectedDocumentsForDelivery = () => {
-    return documentos.filter(doc => selectedDocuments.has(doc.id));
+    return documentos.filter(doc => bulkActions.selectedDocuments.has(doc.id));
   };
 
   // 🔗 FUNCIONES DE AGRUPACIÓN PARA ARCHIVO (como en Recepción)
@@ -690,14 +675,14 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
       )}
 
       {/* Barra de herramientas de agrupación */}
-      {selectedDocuments.size > 0 && (
+      {bulkActions.selectedDocuments.size > 0 && (
         <Paper sx={{ mb: 3 }}>
           <Toolbar sx={{ bgcolor: 'primary.main', color: 'white' }}>
             <Typography variant="h6" sx={{ flex: 1 }}>
-              {selectedDocuments.size} documento{selectedDocuments.size !== 1 ? 's' : ''} seleccionado{selectedDocuments.size !== 1 ? 's' : ''}
+              {bulkActions.selectedDocuments.size} documento{bulkActions.selectedDocuments.size !== 1 ? 's' : ''} seleccionado{bulkActions.selectedDocuments.size !== 1 ? 's' : ''}
             </Typography>
             
-            {selectedDocuments.size >= 2 && (
+            {bulkActions.selectedDocuments.size >= 2 && (
               <Button
                 startIcon={<GroupIcon />}
                 onClick={handleCreateGroup}
@@ -907,13 +892,13 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                     Valor
                   </TableSortLabel>
                 </TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>
+                <TableCell sx={{ fontWeight: 600, minWidth: 120 }}>
                   <TableSortLabel
                     active={orderBy === 'status'}
                     direction={orderBy === 'status' ? order : 'asc'}
                     onClick={() => handleSort('status')}
                   >
-                    Estado
+                    Estado / Agrupación
                   </TableSortLabel>
                 </TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>
@@ -925,7 +910,6 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                     Fecha
                   </TableSortLabel>
                 </TableCell>
-                <TableCell sx={{ fontWeight: 600, textAlign: 'center', minWidth: 120 }}>Agrupación</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Acciones</TableCell>
               </TableRow>
             </TableHead>
@@ -1008,17 +992,71 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                         size="small"
                         sx={{ fontWeight: 600 }}
                       />
-                      {documento.isGrouped && documento.groupCode && (
-                        <Typography 
-                          variant="caption" 
-                          sx={{ 
-                            color: 'primary.main', 
-                            fontWeight: 500,
-                            fontSize: '0.7rem' 
-                          }}
-                        >
-                          Grupo: {documento.groupCode}
-                        </Typography>
+                      
+                      {/* Indicador y botón de agrupación debajo del estado */}
+                      {documento.isGrouped ? (
+                        <Tooltip title="Ver información del grupo">
+                          <Chip
+                            label="🔗 Agrupado"
+                            size="small"
+                            variant="filled"
+                            color="primary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenGroupInfo(documento);
+                            }}
+                            sx={{ 
+                              cursor: 'pointer',
+                              fontSize: '0.65rem',
+                              height: '20px',
+                              '& .MuiChip-label': { px: 1 }
+                            }}
+                          />
+                        </Tooltip>
+                      ) : (
+                        // Mostrar botón de agrupación para documentos EN_PROCESO y LISTO
+                        ['EN_PROCESO', 'LISTO'].includes(documento.status) && (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="info"
+                            startIcon={<GroupIcon />}
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                const result = await detectGroupableDocuments({
+                                  clientName: documento.clientName,
+                                  clientPhone: documento.clientPhone,
+                                  status: documento.status
+                                });
+                                
+                                if (result.success && result.groupableDocuments.length > 0) {
+                                  handleGroupDocuments(result.groupableDocuments, documento);
+                                } else {
+                                  // Silencioso para no ensuciar la vista
+                                  console.log('No hay documentos agrupables para:', documento.clientName);
+                                }
+                              } catch (error) {
+                                console.error('Error detectando documentos agrupables:', error);
+                              }
+                            }}
+                            sx={{
+                              fontSize: '0.65rem',
+                              height: '22px',
+                              borderColor: 'info.main',
+                              color: 'info.main',
+                              backgroundColor: 'rgba(33, 150, 243, 0.04)',
+                              '&:hover': {
+                                backgroundColor: 'rgba(33, 150, 243, 0.08)',
+                                borderColor: 'info.dark'
+                              },
+                              textTransform: 'none',
+                              px: 1
+                            }}
+                          >
+                            Agrupar
+                          </Button>
+                        )
                       )}
                     </Box>
                   </TableCell>
@@ -1029,55 +1067,70 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                     </Typography>
                   </TableCell>
                   
-                  <TableCell sx={{ textAlign: 'center', py: 1 }}>
-                    {/* Columna de Agrupación - Mostrar detector o estado de grupo */}
-                    {documento.isGrouped ? (
-                      <Tooltip title="Ver información del grupo">
-                        <Chip
-                          label="🔗 Agrupado"
-                          size="small"
-                          variant="filled"
-                          color="primary"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenGroupInfo(documento);
+                  <TableCell sx={{ textAlign: 'center' }}>
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'center' }}>
+                      {/* Botón principal según estado */}
+                      {documento.status === 'EN_PROCESO' && (
+                        <Button 
+                          size="small" 
+                          variant="contained" 
+                          color="success" 
+                          startIcon={<StatusIcon />}
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            handleCambiarEstado('LISTO');
                           }}
+                        >
+                          Marcar Listo
+                        </Button>
+                      )}
+                      
+                      {documento.status === 'LISTO' && (
+                        <Button 
+                          size="small" 
+                          variant="contained" 
+                          color="primary" 
+                          startIcon={<DeliveryIcon />}
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            handleSingleDelivery();
+                          }}
+                        >
+                          Entregar
+                        </Button>
+                      )}
+                      
+                      {documento.status === 'ENTREGADO' && (
+                        <Typography 
+                          variant="body2" 
                           sx={{ 
-                            cursor: 'pointer',
-                            fontSize: '0.7rem',
-                            height: '24px',
-                            '& .MuiChip-label': { px: 1 }
+                            color: (theme) => theme.palette.mode === 'dark' ? '#94a3b8' : '#9ca3af',
+                            fontStyle: 'italic'
                           }}
-                        />
-                      </Tooltip>
-                    ) : (
-                      // Mostrar detector de agrupación solo para documentos EN_PROCESO y LISTO
-                      ['EN_PROCESO', 'LISTO'].includes(documento.status) && (
-                        <Box sx={{ minWidth: 100 }}>
-                          <GroupingDetector
-                            document={documento}
-                            onGroupDocuments={handleGroupDocuments}
-                            isVisible={true}
-                          />
-                        </Box>
-                      )
-                    )}
-                  </TableCell>
-                  
-                  <TableCell>
-                    <IconButton
-                      size="small"
-                      onClick={(e) => handleMenuOpen(e, documento)}
-                    >
-                      <MoreIcon />
-                    </IconButton>
+                        >
+                          Completado
+                        </Typography>
+                      )}
+                      
+                      {/* Menú de opciones adicionales */}
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedDocument(documento);
+                          handleMenuOpen(e, documento);
+                        }}
+                      >
+                        <MoreIcon />
+                      </IconButton>
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}
               
               {documentosPagina.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={10} sx={{ textAlign: 'center', py: 4 }}>
+                  <TableCell colSpan={9} sx={{ textAlign: 'center', py: 4 }}>
                     <Typography color="text.secondary">
                       {documentosFiltrados.length === 0 
                         ? 'No hay documentos que coincidan con los filtros'
@@ -1198,7 +1251,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
           onClose={() => setShowGroupDeliveryModal(false)}
           onEntregaExitosa={() => {
             setShowGroupDeliveryModal(false);
-            setSelectedDocuments(new Set());
+            bulkActions.clearSelection();
             if (onRefresh) {
               onRefresh();
             }

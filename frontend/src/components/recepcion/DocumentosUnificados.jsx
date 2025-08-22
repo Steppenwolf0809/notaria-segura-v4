@@ -679,15 +679,14 @@ function DocumentosUnificados({ onEstadisticasChange }) {
                 <TableCell sx={{ fontWeight: 'bold', py: 2 }}>Cliente / Documento</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', py: 2 }}>Matrizador</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', py: 2 }}>Fecha Creación</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', py: 2 }}>Estado</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', py: 2, minWidth: 120 }}>Agrupación</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', py: 2, minWidth: 120 }}>Estado / Agrupación</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', py: 2 }}>Acciones</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {documentos.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
                     <Typography 
                       sx={{ 
                         fontWeight: 500,
@@ -799,67 +798,133 @@ function DocumentosUnificados({ onEstadisticasChange }) {
                         {formatLocalDate(documento.fechaCreacion)}
                       </Typography>
                     </TableCell>
-                    <TableCell><StatusIndicator status={documento.status} /></TableCell>
-                    <TableCell sx={{ textAlign: 'center', py: 1 }}>
-                      {/* Columna de Agrupación - Mostrar detector o estado de grupo */}
-                      {documento.isGrouped ? (
-                        <Tooltip title="Ver información del grupo">
-                          <Chip
-                            label="🔗 Agrupado"
-                            size="small"
-                            variant="filled"
-                            color="primary"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenGroupInfo(documento);
-                            }}
-                            sx={{ 
-                              cursor: 'pointer',
-                              fontSize: '0.7rem',
-                              height: '24px',
-                              '& .MuiChip-label': { px: 1 }
-                            }}
-                          />
-                        </Tooltip>
-                      ) : (
-                        // Mostrar detector de agrupación solo para documentos EN_PROCESO y LISTO
-                        ['EN_PROCESO', 'LISTO'].includes(documento.status) && (
-                          <Box sx={{ minWidth: 100 }}>
-                            <GroupingDetector
-                              document={documento}
-                              onGroupDocuments={handleGroupDocuments}
-                              isVisible={true}
+                    <TableCell>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                        <StatusIndicator status={documento.status} />
+                        
+                        {/* Indicador y botón de agrupación debajo del estado */}
+                        {documento.isGrouped ? (
+                          <Tooltip title="Ver información del grupo">
+                            <Chip
+                              label="🔗 Agrupado"
+                              size="small"
+                              variant="filled"
+                              color="primary"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenGroupInfo(documento);
+                              }}
+                              sx={{ 
+                                cursor: 'pointer',
+                                fontSize: '0.65rem',
+                                height: '20px',
+                                '& .MuiChip-label': { px: 1 }
+                              }}
                             />
-                          </Box>
-                        )
-                      )}
+                          </Tooltip>
+                        ) : (
+                          // Mostrar botón de agrupación para documentos EN_PROCESO y LISTO
+                          ['EN_PROCESO', 'LISTO'].includes(documento.status) && (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="info"
+                              startIcon={<GroupWorkIcon />}
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                try {
+                                  const result = await detectGroupableDocuments({
+                                    clientName: documento.clientName,
+                                    clientPhone: documento.clientPhone,
+                                    status: documento.status
+                                  });
+                                  
+                                  if (result.success && result.groupableDocuments.length > 0) {
+                                    handleGroupDocuments(result.groupableDocuments, documento);
+                                  } else {
+                                    setSnackbar({
+                                      open: true,
+                                      message: 'No se encontraron documentos agrupables para este cliente',
+                                      severity: 'info'
+                                    });
+                                  }
+                                } catch (error) {
+                                  console.error('Error detectando documentos agrupables:', error);
+                                  setSnackbar({
+                                    open: true,
+                                    message: 'Error al detectar documentos agrupables',
+                                    severity: 'error'
+                                  });
+                                }
+                              }}
+                              sx={{
+                                fontSize: '0.65rem',
+                                height: '22px',
+                                borderColor: 'info.main',
+                                color: 'info.main',
+                                backgroundColor: 'rgba(33, 150, 243, 0.04)',
+                                '&:hover': {
+                                  backgroundColor: 'rgba(33, 150, 243, 0.08)',
+                                  borderColor: 'info.dark'
+                                },
+                                textTransform: 'none',
+                                px: 1
+                              }}
+                            >
+                              Agrupar
+                            </Button>
+                          )
+                        )}
+                      </Box>
                     </TableCell>
                     <TableCell sx={{ textAlign: 'center' }}>
-                      {documento.status === 'LISTO' ? (
-                        <Button 
-                          size="small" 
-                          variant="contained" 
-                          color="primary" 
-                          startIcon={<SendIcon />}
-                          onClick={(e) => { e.stopPropagation(); abrirModalEntrega(documento); }}
-                          sx={{ mr: 1 }}
+                      <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'center' }}>
+                        {/* Botón principal según estado */}
+                        {documento.status === 'EN_PROCESO' && (
+                          <Button 
+                            size="small" 
+                            variant="contained" 
+                            color="success" 
+                            startIcon={<CheckCircleIcon />}
+                            onClick={(e) => { e.stopPropagation(); abrirConfirmacionIndividual(documento); }}
+                          >
+                            Marcar Listo
+                          </Button>
+                        )}
+                        
+                        {documento.status === 'LISTO' && (
+                          <Button 
+                            size="small" 
+                            variant="contained" 
+                            color="primary" 
+                            startIcon={<SendIcon />}
+                            onClick={(e) => { e.stopPropagation(); abrirModalEntrega(documento); }}
+                          >
+                            Entregar
+                          </Button>
+                        )}
+                        
+                        {documento.status === 'ENTREGADO' && (
+                          <Typography 
+                            variant="body2" 
+                            sx={{ 
+                              color: (theme) => theme.palette.mode === 'dark' ? '#94a3b8' : '#9ca3af',
+                              fontStyle: 'italic'
+                            }}
+                          >
+                            Completado
+                          </Typography>
+                        )}
+                        
+                        {/* Menú de opciones adicionales */}
+                        <IconButton 
+                          size="small"
+                          aria-label="more actions" 
+                          onClick={(event) => { event.stopPropagation(); handleMenuOpen(event, documento); }}
                         >
-                          Entregar
-                        </Button>
-                      ) : (
-                        <Typography 
-                          variant="body2" 
-                          sx={{ 
-                            mr: 1,
-                            color: (theme) => theme.palette.mode === 'dark' ? '#94a3b8' : '#9ca3af'
-                          }}
-                        >
-                          -
-                        </Typography>
-                      )}
-                      <IconButton aria-label="actions" onClick={(event) => { event.stopPropagation(); handleMenuOpen(event, documento); }}>
-                        <MoreVertIcon />
-                      </IconButton>
+                          <MoreVertIcon />
+                        </IconButton>
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ))
@@ -873,57 +938,21 @@ function DocumentosUnificados({ onEstadisticasChange }) {
       </Card>
       
       <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={handleMenuClose}>
-        {currentDocumento?.status === 'EN_PROCESO' && (
-          <MenuItem onClick={() => abrirConfirmacionIndividual(currentDocumento)}>
-            <ListItemIcon><CheckCircleIcon fontSize="small" color="success" /></ListItemIcon>
-            <ListItemText>Marcar Listo</ListItemText>
-          </MenuItem>
-        )}
-        {currentDocumento?.status === 'LISTO' && (
-          <MenuItem onClick={() => abrirModalEntrega(currentDocumento)}>
-            <ListItemIcon><SendIcon fontSize="small" color="primary" /></ListItemIcon>
-            <ListItemText>Entregar</ListItemText>
-          </MenuItem>
-        )}
-        {/* Opción de agrupar para documentos EN_PROCESO o LISTO */}
-        {currentDocumento && ['EN_PROCESO', 'LISTO'].includes(currentDocumento.status) && !currentDocumento.isGrouped && (
-          <MenuItem onClick={async () => {
-            // Detectar documentos agrupables
-            try {
-              const result = await detectGroupableDocuments({
-                clientName: currentDocumento.clientName,
-                clientPhone: currentDocumento.clientPhone,
-                status: currentDocumento.status
-              });
-              
-              if (result.success && result.groupableDocuments.length > 0) {
-                handleGroupDocuments(result.groupableDocuments, currentDocumento);
-              } else {
-                setSnackbar({
-                  open: true,
-                  message: 'No se encontraron documentos agrupables para este cliente',
-                  severity: 'info'
-                });
-              }
-            } catch (error) {
-              console.error('Error detectando documentos agrupables:', error);
-              setSnackbar({
-                open: true,
-                message: 'Error al detectar documentos agrupables',
-                severity: 'error'
-              });
-            }
-            handleMenuClose();
-          }}>
-            <ListItemIcon><GroupWorkIcon fontSize="small" color="primary" /></ListItemIcon>
-            <ListItemText>Agrupar Documentos</ListItemText>
-          </MenuItem>
-        )}
-        
         <MenuItem onClick={() => { if (currentDocumento) abrirDetalles(currentDocumento); handleMenuClose(); }}>
           <ListItemIcon><VisibilityIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Ver Detalles</ListItemText>
         </MenuItem>
+        
+        {/* Opción de ver información de grupo si está agrupado */}
+        {currentDocumento?.isGrouped && (
+          <MenuItem onClick={() => {
+            handleOpenGroupInfo(currentDocumento);
+            handleMenuClose();
+          }}>
+            <ListItemIcon><GroupWorkIcon fontSize="small" color="primary" /></ListItemIcon>
+            <ListItemText>Info del Grupo</ListItemText>
+          </MenuItem>
+        )}
       </Menu>
 
       <Dialog open={showConfirmDialog} onClose={cerrarConfirmacion} maxWidth="sm" fullWidth>
