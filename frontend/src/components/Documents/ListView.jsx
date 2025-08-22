@@ -211,7 +211,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
       // Detectar documentos agrupables para el cliente
       const result = await detectGroupableDocuments({
         clientName: document.clientName,
-        clientPhone: document.clientPhone || ''
+        clientId: document.clientId || ''
       });
 
       const related = (result.groupableDocuments || []).filter(d => d.id !== document.id);

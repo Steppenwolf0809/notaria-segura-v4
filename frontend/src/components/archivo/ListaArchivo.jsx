@@ -1026,12 +1026,12 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                               try {
                                 const result = await detectGroupableDocuments({
                                   clientName: documento.clientName,
-                                  clientPhone: documento.clientPhone,
-                                  status: documento.status
+                                  clientId: documento.clientId || ''
                                 });
                                 
-                                if (result.success && result.groupableDocuments.length > 0) {
-                                  handleGroupDocuments(result.groupableDocuments, documento);
+                                const related = (result.groupableDocuments || []).filter(d => d.id !== documento.id);
+                                if (result.success && related.length > 0) {
+                                  handleGroupDocuments(related, documento);
                                 } else {
                                   // Silencioso para no ensuciar la vista
                                   console.log('No hay documentos agrupables para:', documento.clientName);

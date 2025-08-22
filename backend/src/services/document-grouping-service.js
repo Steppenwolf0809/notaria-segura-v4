@@ -8,15 +8,20 @@ class DocumentGroupingService {
   async detectGroupableDocuments(clientData, matrizadorId) {
     const { clientName, clientId } = clientData;
 
-    // Buscar documentos del mismo matrizador que:
+    // Buscar documentos que:
     // 1. Están EN_PROCESO o LISTO (pueden agruparse)
     // 2. Mismo cliente (por nombre Y cédula/RUC - NUNCA por teléfono)
     // 3. No están ya agrupados
+    // 4. (Opcional) Pertenezcan al mismo matrizador si se proporciona matrizadorId
     const whereConditions = {
-      assignedToId: matrizadorId,
       status: { in: ['EN_PROCESO', 'LISTO'] },
       isGrouped: false
     };
+
+    // Filtro conservador por matrizador SOLO cuando se proporciona (p. ej. flujo de MATRIZADOR)
+    if (matrizadorId) {
+      whereConditions.assignedToId = matrizadorId;
+    }
 
     // CRITERIO PRINCIPAL: Nombre del cliente (exacto) - OBLIGATORIO
     if (clientName) {
