@@ -266,21 +266,61 @@ async function getDocumentosEnProceso(req, res) {
 async function marcarComoListo(req, res) {
     try {
         const { id } = req.params;
+        
+        console.log('🎯 marcarComoListo iniciado:', {
+            documentId: id,
+            userId: req.user.id,
+            userRole: req.user.role,
+            timestamp: new Date().toISOString()
+        });
+        
         const document = await prisma.document.findUnique({ where: { id } });
 
         if (!document) {
+            console.log('❌ Documento no encontrado:', id);
             return res.status(404).json({ success: false, message: 'Documento no encontrado' });
         }
+        
+        console.log('📄 Documento encontrado:', {
+            id: document.id,
+            currentStatus: document.status,
+            protocolNumber: document.protocolNumber,
+            clientName: document.clientName
+        });
+        
         if (document.status !== 'EN_PROCESO') {
-            return res.status(400).json({ success: false, message: 'El documento no está en proceso' });
+            console.log('❌ Estado incorrecto:', {
+                expectedStatus: 'EN_PROCESO',
+                actualStatus: document.status
+            });
+            return res.status(400).json({ success: false, message: `El documento no está en proceso. Estado actual: ${document.status}` });
         }
 
         // Generar código único usando el servicio mejorado
+        console.log('🔐 Generando código de retiro...');
         const nuevoCodigo = await CodigoRetiroService.generarUnico();
+        console.log('✅ Código generado:', nuevoCodigo);
 
-        const updatedDocument = await prisma.document.update({
-            where: { id },
-            data: { status: 'LISTO', codigoRetiro: nuevoCodigo, updatedAt: new Date() }
+        console.log('💾 Actualizando documento en base de datos...');
+        // Usar transacción para evitar condiciones de carrera
+        const updatedDocument = await prisma.$transaction(async (tx) => {
+            // Verificar nuevamente el estado dentro de la transacción
+            const currentDoc = await tx.document.findUnique({ where: { id } });
+            
+            if (!currentDoc || currentDoc.status !== 'EN_PROCESO') {
+                throw new Error(`El documento ya no está en proceso. Estado actual: ${currentDoc?.status || 'NO_ENCONTRADO'}`);
+            }
+            
+            return await tx.document.update({
+                where: { id },
+                data: { status: 'LISTO', codigoRetiro: nuevoCodigo, updatedAt: new Date() }
+            });
+        });
+        
+        console.log('✅ Documento actualizado exitosamente:', {
+            id: updatedDocument.id,
+            newStatus: updatedDocument.status,
+            codigoRetiro: updatedDocument.codigoRetiro
         });
 
         // 📈 Registrar evento de generación de código de retiro
@@ -358,11 +398,19 @@ async function marcarComoListo(req, res) {
             console.error('⚠️ Error enviando WhatsApp (operación continúa):', whatsappError.message);
         }
 
+        console.log('🎉 Proceso completado exitosamente:', {
+            documentId: updatedDocument.id,
+            protocolNumber: updatedDocument.protocolNumber,
+            codigoRetiro: nuevoCodigo,
+            clientName: updatedDocument.clientName
+        });
+
         res.json({ 
             success: true, 
-            message: 'Documento marcado como listo', 
+            message: `Documento ${updatedDocument.protocolNumber} marcado como listo exitosamente`, 
             data: { 
                 document: updatedDocument,
+                codigoRetiro: nuevoCodigo,
                 whatsappSent: true // Siempre true para no exponer errores al frontend
             } 
         });
@@ -402,12 +450,24 @@ async function marcarGrupoListo(req, res) {
         // Generar código único para grupo usando el servicio mejorado
         const nuevoCodigo = await CodigoRetiroService.generarUnicoGrupo();
         
-        const updatedDocuments = await prisma.$transaction(
-            documentIds.map(id => prisma.document.update({
-                where: { id },
-                data: { status: 'LISTO', codigoRetiro: nuevoCodigo, isGrouped: true, groupVerificationCode: nuevoCodigo, updatedAt: new Date() }
-            }))
-        );
+        const updatedDocuments = await prisma.$transaction(async (tx) => {
+            // Verificar nuevamente que todos los documentos estén EN_PROCESO
+            const currentDocs = await tx.document.findMany({
+                where: { id: { in: documentIds } }
+            });
+            
+            const invalidDocs = currentDocs.filter(doc => doc.status !== 'EN_PROCESO');
+            if (invalidDocs.length > 0) {
+                throw new Error(`Algunos documentos ya no están en proceso: ${invalidDocs.map(d => `${d.protocolNumber}(${d.status})`).join(', ')}`);
+            }
+            
+            return await Promise.all(
+                documentIds.map(id => tx.document.update({
+                    where: { id },
+                    data: { status: 'LISTO', codigoRetiro: nuevoCodigo, isGrouped: true, groupVerificationCode: nuevoCodigo, updatedAt: new Date() }
+                }))
+            );
+        });
 
         // 📱 ENVIAR NOTIFICACIÓN WHATSAPP GRUPAL
         try {

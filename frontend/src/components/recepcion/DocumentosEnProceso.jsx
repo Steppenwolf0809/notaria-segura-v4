@@ -66,6 +66,7 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [actionType, setActionType] = useState(''); // 'individual' | 'grupal'
   const [documentoIndividual, setDocumentoIndividual] = useState(null);
+  const [processingRequest, setProcessingRequest] = useState(false); // Prevenir doble click
   
   // Estados para feedback
   const [snackbar, setSnackbar] = useState({
@@ -169,14 +170,31 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
   };
 
   const ejecutarMarcarListo = async () => {
+    if (processingRequest) {
+      console.log('🚫 Solicitud ya en proceso, ignorando...');
+      return;
+    }
+    
     try {
+      setProcessingRequest(true);
       let result;
       
+      console.log('🎯 Iniciando marcar como listo:', {
+        actionType,
+        documentoIndividual: documentoIndividual?.id,
+        selectedDocuments: selectedDocuments.length,
+        timestamp: new Date().toISOString()
+      });
+      
       if (actionType === 'individual' && documentoIndividual) {
+        console.log('📄 Marcando documento individual:', documentoIndividual.id);
         result = await receptionService.marcarComoListo(documentoIndividual.id);
       } else if (actionType === 'grupal' && selectedDocuments.length > 0) {
+        console.log('📁 Marcando grupo de documentos:', selectedDocuments);
         result = await receptionService.marcarGrupoListo(selectedDocuments);
       }
+
+      console.log('✅ Resultado del servidor:', result);
 
       if (result?.success) {
         setSnackbar({
@@ -185,21 +203,26 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
           severity: 'success'
         });
         
+        console.log('🔄 Recargando documentos...');
         // Recargar documentos y actualizar estadísticas
         await cargarDocumentos();
+        console.log('📊 Actualizando estadísticas...');
         onEstadisticasChange?.();
         setSelectedDocuments([]);
+        console.log('✅ Proceso completado exitosamente');
       } else {
+        console.error('❌ Error en resultado del servidor:', result);
         throw new Error(result?.error || 'Error inesperado');
       }
     } catch (error) {
-      console.error('Error marcando como listo:', error);
+      console.error('💥 Error marcando como listo:', error);
       setSnackbar({
         open: true,
         message: error.message || 'Error al marcar documento(s) como listo(s)',
         severity: 'error'
       });
     } finally {
+      setProcessingRequest(false);
       cerrarConfirmacion();
     }
   };
