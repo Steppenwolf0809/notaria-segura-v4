@@ -392,7 +392,15 @@ function DocumentosUnificados({ onEstadisticasChange }) {
       const sameId = doc.clientId ? d.clientId === doc.clientId : true;
       return sameName && sameId && !d.isGrouped;
     });
-    return sameClientDocs.length > 0;
+    // ✅ Deduplicar por protocolo para evitar contar duplicados y excluir principal
+    const seen = new Set();
+    const unique = sameClientDocs.filter(d => {
+      const key = d.protocolNumber || d.id;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    return unique.length > 0;
   };
 
   const getSelectedDocumentsAction = () => {
@@ -860,8 +868,18 @@ function DocumentosUnificados({ onEstadisticasChange }) {
                                     clientId: documento.clientId || ''
                                   });
                                   
-                                  // Excluir el documento principal y abrir solo si hay más de uno
-                                  const related = (result.groupableDocuments || []).filter(d => d.id !== documento.id);
+                                  // ✅ Excluir el documento principal y deduplicar por protocolo
+                                  const related = (result.groupableDocuments || [])
+                                    .filter(d => d.id !== documento.id)
+                                    .reduce((acc, d) => {
+                                      const key = d.protocolNumber || d.id;
+                                      if (!acc.seen.has(key)) {
+                                        acc.seen.add(key);
+                                        acc.items.push(d);
+                                      }
+                                      return acc;
+                                    }, { seen: new Set(), items: [] }).items;
+
                                   if (result.success && related.length > 0) {
                                     handleGroupDocuments(related, documento);
                                   } else {
@@ -894,7 +912,16 @@ function DocumentosUnificados({ onEstadisticasChange }) {
                                 px: 1
                               }}
                             >
-                              Agrupar
+                              {(() => {
+                                // Mostrar contador inline en el botón
+                                try {
+                                  const same = documentos.filter(d => d.id !== documento.id && ['EN_PROCESO','LISTO'].includes(d.status) && d.clientName === documento.clientName && (documento.clientId ? d.clientId === documento.clientId : true) && !d.isGrouped);
+                                  const uniqueCount = Array.from(new Set(same.map(d => d.protocolNumber || d.id))).length;
+                                  return uniqueCount > 0 ? `Agrupar (${uniqueCount})` : 'Agrupar';
+                                } catch {
+                                  return 'Agrupar';
+                                }
+                              })()}
                             </Button>
                           )
                         )}

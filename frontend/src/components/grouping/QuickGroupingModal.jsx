@@ -142,7 +142,8 @@ const QuickGroupingModal = ({
     setDocumentToEdit(null);
   };
 
-  const totalSelected = selectedDocuments.size + 1; // +1 por documento principal
+  // ✅ El total siempre es 1 (principal) + relacionados seleccionados
+  const totalSelected = 1 + selectedDocuments.size;
 
   // Usar documento principal actualizado si existe, sino el original
   const currentMainDocument = updatedMainDocument || mainDocument;
