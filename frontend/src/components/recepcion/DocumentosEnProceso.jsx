@@ -223,17 +223,19 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
     
     const docsSeleccionados = documentos.filter(doc => selectedDocuments.includes(doc.id));
     const clienteNames = [...new Set(docsSeleccionados.map(doc => doc.clientName))];
-    const clientePhones = [...new Set(docsSeleccionados.map(doc => doc.clientPhone))];
+    const clienteIds = [...new Set(docsSeleccionados.map(doc => doc.clientId).filter(Boolean))];
     
-    // Validar tanto por nombre como por teléfono para mayor precisión
-    return clienteNames.length === 1 && clientePhones.length === 1;
+    // Validar por nombre Y identificación (criterio correcto para agrupación)
+    return clienteNames.length === 1 && (clienteIds.length === 0 || clienteIds.length === 1);
   };
 
   // Detectar automáticamente documentos agrupables del mismo cliente
   const getDocumentosAgrupablesPorCliente = (documento) => {
     return documentos.filter(doc => 
       doc.id !== documento.id && 
-      (doc.clientName === documento.clientName || doc.clientPhone === documento.clientPhone) &&
+      doc.clientName === documento.clientName &&
+      // Si ambos tienen clientId, deben coincidir. Si uno no tiene, agrupar solo por nombre
+      (!documento.clientId || !doc.clientId || doc.clientId === documento.clientId) &&
       doc.status === 'EN_PROCESO'
     );
   };
@@ -249,7 +251,7 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
       // Mostrar mensaje informativo
       setSnackbar({
         open: true,
-        message: `✨ Se seleccionaron automáticamente ${idsToSelect.length} documentos del mismo cliente: ${documento.clientName}`,
+        message: `✨ Se seleccionaron automáticamente ${idsToSelect.length} documentos del mismo cliente: ${documento.clientName}${documento.clientId ? ` (ID: ${documento.clientId})` : ''}`,
         severity: 'info'
       });
     } else {
@@ -368,8 +370,8 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
             {selectedDocuments.length > 1 && !documentosSeleccionadosMismoCliente() && (
               <Alert severity="warning" sx={{ mt: 2 }}>
                 <AlertTitle>Documentos de diferentes clientes</AlertTitle>
-                Solo se pueden marcar como grupo documentos del mismo cliente. 
-                Seleccione documentos de un solo cliente para usar "Marcar Grupo Listo".
+                Solo se pueden marcar como grupo documentos del mismo cliente y con la misma identificación. 
+                Seleccione documentos que tengan <strong>el mismo nombre de cliente</strong> y <strong>la misma identificación (RUC/Cédula)</strong> para usar "Marcar Grupo Listo".
               </Alert>
             )}
           </CardContent>
@@ -420,6 +422,11 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
                         {documento.clientPhone && (
                           <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
                             📞 {documento.clientPhone}
+                          </Typography>
+                        )}
+                        {documento.clientId && (
+                          <Typography variant="caption" sx={{ display: 'block', color: 'primary.main', fontWeight: 500 }}>
+                            🆔 {documento.clientId}
                           </Typography>
                         )}
                       </Box>

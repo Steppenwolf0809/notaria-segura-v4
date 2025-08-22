@@ -54,6 +54,15 @@ const RecepcionCenter = () => {
   };
 
   /**
+   * Función para navegar a un documento desde alertas
+   */
+  const handleDocumentClick = (alerta) => {
+    console.log('Navegando a documento desde alerta:', alerta);
+    // Cambiar a la vista de documentos para buscar el documento específico
+    setCurrentView('documentos');
+  };
+
+  /**
    * Renderizar contenido según la vista actual
    */
   const renderContent = () => {
@@ -63,6 +72,7 @@ const RecepcionCenter = () => {
           <RecepcionDashboard 
             estadisticas={estadisticas} 
             onEstadisticasChange={onEstadisticasChange}
+            onDocumentClick={handleDocumentClick}
           />
         );
       
@@ -81,6 +91,7 @@ const RecepcionCenter = () => {
           <RecepcionDashboard 
             estadisticas={estadisticas} 
             onEstadisticasChange={onEstadisticasChange}
+            onDocumentClick={handleDocumentClick}
           />
         );
     }

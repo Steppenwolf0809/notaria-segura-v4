@@ -233,6 +233,7 @@ async function getDocumentosEnProceso(req, res) {
       protocolNumber: doc.protocolNumber,
       clientName: doc.clientName,
       clientPhone: doc.clientPhone,
+      clientId: doc.clientId,
       documentType: doc.documentType,
       status: doc.status,
       matrizador: doc.assignedTo ? `${doc.assignedTo.firstName} ${doc.assignedTo.lastName}` : 'No asignado',
@@ -387,8 +388,15 @@ async function marcarGrupoListo(req, res) {
         }
 
         const clientNames = [...new Set(documents.map(doc => doc.clientName))];
+        const clientIds = [...new Set(documents.map(doc => doc.clientId).filter(Boolean))];
+        
         if (clientNames.length > 1) {
             return res.status(400).json({ success: false, message: 'Todos los documentos deben ser del mismo cliente.' });
+        }
+        
+        // Si hay clientIds, deben ser todos iguales
+        if (clientIds.length > 1) {
+            return res.status(400).json({ success: false, message: 'Los documentos deben tener la misma identificación del cliente.' });
         }
 
         // Generar código único para grupo usando el servicio mejorado
