@@ -35,19 +35,19 @@ function AlertaItem({ alerta, onDocumentClick, showDetails = true }) {
         color: 'error',
         bgColor: '#ffebee',
         icon: <ErrorIcon />,
-        avatarColor: '#f44336'
+        avatarColor: '#d32f2f'
       },
       URGENTE: {
         color: 'warning',
-        bgColor: '#fff3e0',
+        bgColor: '#fff8e1',
         icon: <WarningIcon />,
-        avatarColor: '#ff9800'
+        avatarColor: '#f57c00'
       },
       ATENCION: {
         color: 'info',
         bgColor: '#e3f2fd',
         icon: <InfoIcon />,
-        avatarColor: '#2196f3'
+        avatarColor: '#1976d2'
       }
     };
     return configs[nivel] || configs.ATENCION;
@@ -67,13 +67,13 @@ function AlertaItem({ alerta, onDocumentClick, showDetails = true }) {
 
   const formatearTipoDocumento = (tipo) => {
     const tipos = {
-      PROTOCOLO: 'Protocolo',
-      DILIGENCIA: 'Diligencia',
-      CERTIFICACION: 'Certificación',
-      ARRENDAMIENTO: 'Arrendamiento',
-      OTROS: 'Otros'
+      PROTOCOLO: '📄 Protocolo',
+      DILIGENCIA: '⚖️ Diligencia',
+      CERTIFICACION: '📋 Certificación',
+      ARRENDAMIENTO: '🏠 Arrendamiento',
+      OTROS: '📎 Otros'
     };
-    return tipos[tipo] || tipo;
+    return tipos[tipo] || `📎 ${tipo}`;
   };
 
   const handleDocumentClick = () => {
@@ -125,20 +125,20 @@ function AlertaItem({ alerta, onDocumentClick, showDetails = true }) {
         }
         secondary={
           <Box>
-            <Typography variant="body2" color="text.primary" sx={{ fontWeight: 500 }}>
+            <Typography variant="body2" color="text.primary" sx={{ fontWeight: 600 }}>
               {alerta.clientName}
             </Typography>
             
             {showDetails && (
               <>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="text.primary" sx={{ opacity: 0.8, fontWeight: 500 }}>
                   {formatearTipoDocumento(alerta.documentType)}
                 </Typography>
                 
                 <Box display="flex" alignItems="center" gap={2} mt={0.5}>
                   <Box display="flex" alignItems="center" gap={0.5}>
                     <ScheduleIcon fontSize="small" color="action" />
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" color="text.primary" sx={{ opacity: 0.75, fontWeight: 500 }}>
                       {alerta.diasPendientes} día{alerta.diasPendientes !== 1 ? 's' : ''} pendiente{alerta.diasPendientes !== 1 ? 's' : ''}
                     </Typography>
                   </Box>
@@ -146,7 +146,7 @@ function AlertaItem({ alerta, onDocumentClick, showDetails = true }) {
                   {alerta.clientPhone && (
                     <Box display="flex" alignItems="center" gap={0.5}>
                       <PhoneIcon fontSize="small" color="action" />
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography variant="caption" color="text.primary" sx={{ opacity: 0.75, fontWeight: 500 }}>
                         {alerta.clientPhone}
                       </Typography>
                     </Box>
@@ -155,8 +155,8 @@ function AlertaItem({ alerta, onDocumentClick, showDetails = true }) {
 
                 <Typography 
                   variant="caption" 
-                  color="text.secondary" 
-                  sx={{ fontStyle: 'italic', display: 'block', mt: 0.5 }}
+                  color="text.primary" 
+                  sx={{ opacity: 0.7, fontStyle: 'italic', display: 'block', mt: 0.5, fontWeight: 500 }}
                 >
                   Listo desde: {formatearFecha(alerta.updatedAt)}
                 </Typography>
