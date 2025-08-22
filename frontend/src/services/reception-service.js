@@ -88,6 +88,26 @@ const receptionService = {
   },
 
   /**
+   * Obtener documentos EN_PROCESO para marcar como listos
+   * @param {Object} params - Parámetros de filtrado
+   * @returns {Promise<Object>} Lista de documentos en proceso
+   */
+  async getDocumentosEnProceso(params = {}) {
+    try {
+      const response = await api.get('/reception/documentos/en-proceso', { params });
+      return {
+        success: true,
+        data: response.data.data
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: receptionService.handleError(error)
+      };
+    }
+  },
+
+  /**
    * Marcar documento individual como listo
    * @param {string} documentId - ID del documento
    * @returns {Promise<Object>} Resultado de marcar como listo
@@ -116,6 +136,27 @@ const receptionService = {
   async marcarGrupoListo(documentIds) {
     try {
       const response = await api.post('/reception/documentos/marcar-grupo-listo', { documentIds });
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: receptionService.handleError(error)
+      };
+    }
+  },
+
+  /**
+   * Desagrupar documentos que están agrupados
+   * @param {Array} documentIds - IDs de documentos agrupados
+   * @returns {Promise<Object>} Resultado de desagrupar documentos
+   */
+  async desagruparDocumentos(documentIds) {
+    try {
+      const response = await api.post('/reception/documentos/desagrupar', { documentIds });
       return {
         success: true,
         data: response.data.data,

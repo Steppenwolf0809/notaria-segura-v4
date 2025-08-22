@@ -185,6 +185,83 @@ async function listarTodosDocumentos(req, res) {
   }
 }
 
+async function getDocumentosEnProceso(req, res) {
+  try {
+    const { search, matrizador, page = 1, limit = 10 } = req.query;
+    
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const take = parseInt(limit);
+
+    const where = {
+      status: 'EN_PROCESO'
+    };
+    
+    // PostgreSQL - Búsqueda case-insensitive con mode: 'insensitive'
+    if (search) {
+      where.OR = [
+        { clientName: { contains: search, mode: 'insensitive' } },
+        { clientPhone: { contains: search } },
+        { protocolNumber: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+    
+    if (matrizador) {
+      where.assignedToId = parseInt(matrizador);
+    }
+
+    const [documents, total] = await Promise.all([
+      prisma.document.findMany({
+        where,
+        include: {
+          assignedTo: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true
+            }
+          }
+        },
+        orderBy: { updatedAt: 'desc' },
+        skip,
+        take
+      }),
+      prisma.document.count({ where })
+    ]);
+
+    const formattedDocuments = documents.map(doc => ({
+      id: doc.id,
+      protocolNumber: doc.protocolNumber,
+      clientName: doc.clientName,
+      clientPhone: doc.clientPhone,
+      documentType: doc.documentType,
+      status: doc.status,
+      matrizador: doc.assignedTo ? `${doc.assignedTo.firstName} ${doc.assignedTo.lastName}` : 'No asignado',
+      matrizadorId: doc.assignedToId,
+      fechaCreacion: doc.createdAt,
+      fechaActualizacion: doc.updatedAt
+    }));
+
+    const totalPages = Math.ceil(total / take);
+
+    res.json({
+      success: true,
+      data: {
+        documents: formattedDocuments,
+        pagination: {
+          page: parseInt(page),
+          limit: take,
+          total,
+          totalPages
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error obteniendo documentos en proceso:', error);
+    res.status(500).json({ success: false, error: 'Error interno del servidor' });
+  }
+}
+
 async function marcarComoListo(req, res) {
     try {
         const { id } = req.params;
@@ -382,11 +459,120 @@ async function getAlertasRecepcion(req, res) {
   }
 }
 
+async function desagruparDocumentos(req, res) {
+    try {
+        const { documentIds } = req.body;
+        
+        if (!documentIds || !Array.isArray(documentIds) || documentIds.length === 0) {
+            return res.status(400).json({ success: false, message: 'Se requiere una lista de IDs de documentos.' });
+        }
+
+        // Verificar que los documentos existen y están agrupados
+        const documents = await prisma.document.findMany({
+            where: { 
+                id: { in: documentIds },
+                isGrouped: true
+            }
+        });
+
+        if (documents.length === 0) {
+            return res.status(400).json({ success: false, message: 'No se encontraron documentos agrupados para desagrupar.' });
+        }
+
+        // Generar códigos individuales para cada documento
+        const codigosIndividuales = await Promise.all(
+            documents.map(() => CodigoRetiroService.generarUnico())
+        );
+
+        // Desagrupar documentos - asignar códigos individuales
+        const updatedDocuments = await prisma.$transaction(
+            documents.map((doc, index) => prisma.document.update({
+                where: { id: doc.id },
+                data: { 
+                    isGrouped: false,
+                    documentGroupId: null,
+                    groupVerificationCode: null,
+                    codigoRetiro: codigosIndividuales[index],
+                    updatedAt: new Date()
+                }
+            }))
+        );
+
+        // Registrar evento de desagrupación
+        try {
+            await Promise.all(
+                documents.map(doc => 
+                    prisma.documentEvent.create({
+                        data: {
+                            documentId: doc.id,
+                            userId: req.user.id,
+                            eventType: 'DOCUMENT_UNGROUPED',
+                            description: `Documento desagrupado. Nuevo código: ${codigosIndividuales[documents.findIndex(d => d.id === doc.id)]}`,
+                            details: {
+                                previousGroupCode: doc.groupVerificationCode,
+                                newIndividualCode: codigosIndividuales[documents.findIndex(d => d.id === doc.id)],
+                                ungroupedBy: `${req.user.firstName || 'Sistema'} ${req.user.lastName || ''}`,
+                                userRole: req.user.role || 'RECEPCION',
+                                timestamp: new Date().toISOString()
+                            },
+                            ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+                            userAgent: req.get('User-Agent') || 'unknown'
+                        }
+                    })
+                )
+            );
+        } catch (auditError) {
+            console.error('Error registrando eventos de desagrupación:', auditError);
+        }
+
+        // Enviar notificaciones WhatsApp individuales
+        try {
+            const clienteData = {
+                clientName: documents[0].clientName,
+                clientPhone: documents[0].clientPhone
+            };
+
+            for (let i = 0; i < updatedDocuments.length; i++) {
+                const doc = updatedDocuments[i];
+                const documentoData = {
+                    tipoDocumento: doc.documentType,
+                    protocolNumber: doc.protocolNumber
+                };
+
+                await whatsappService.enviarDocumentoListo(
+                    clienteData, 
+                    documentoData, 
+                    codigosIndividuales[i]
+                );
+            }
+
+            console.log(`✅ ${updatedDocuments.length} notificaciones WhatsApp individuales enviadas`);
+        } catch (whatsappError) {
+            console.error('⚠️ Error enviando notificaciones WhatsApp de desagrupación:', whatsappError.message);
+        }
+
+        res.json({ 
+            success: true, 
+            message: `${updatedDocuments.length} documentos desagrupados exitosamente`, 
+            data: { 
+                documentsCount: updatedDocuments.length,
+                individualCodes: codigosIndividuales,
+                whatsappSent: true
+            } 
+        });
+    } catch (error) {
+        console.error('Error desagrupando documentos:', error);
+        res.status(500).json({ success: false, error: 'Error interno del servidor' });
+    }
+}
+
 export {
   getDashboardStats,
   getMatrizadores,
   listarTodosDocumentos,
+  getDocumentosEnProceso,
   marcarComoListo,
   marcarGrupoListo,
+  desagruparDocumentos,
   getAlertasRecepcion
 };

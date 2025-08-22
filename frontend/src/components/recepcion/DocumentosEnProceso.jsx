@@ -223,7 +223,39 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
     
     const docsSeleccionados = documentos.filter(doc => selectedDocuments.includes(doc.id));
     const clienteNames = [...new Set(docsSeleccionados.map(doc => doc.clientName))];
-    return clienteNames.length === 1;
+    const clientePhones = [...new Set(docsSeleccionados.map(doc => doc.clientPhone))];
+    
+    // Validar tanto por nombre como por teléfono para mayor precisión
+    return clienteNames.length === 1 && clientePhones.length === 1;
+  };
+
+  // Detectar automáticamente documentos agrupables del mismo cliente
+  const getDocumentosAgrupablesPorCliente = (documento) => {
+    return documentos.filter(doc => 
+      doc.id !== documento.id && 
+      (doc.clientName === documento.clientName || doc.clientPhone === documento.clientPhone) &&
+      doc.status === 'EN_PROCESO'
+    );
+  };
+
+  // Sugerir agrupación automática al seleccionar un documento
+  const handleSmartGroupSelection = (documento) => {
+    const agrupables = getDocumentosAgrupablesPorCliente(documento);
+    if (agrupables.length > 0) {
+      // Auto-seleccionar documentos del mismo cliente
+      const idsToSelect = [documento.id, ...agrupables.map(doc => doc.id)];
+      setSelectedDocuments(idsToSelect);
+      
+      // Mostrar mensaje informativo
+      setSnackbar({
+        open: true,
+        message: `✨ Se seleccionaron automáticamente ${idsToSelect.length} documentos del mismo cliente: ${documento.clientName}`,
+        severity: 'info'
+      });
+    } else {
+      // Seleccionar solo el documento individual
+      setSelectedDocuments([documento.id]);
+    }
   };
 
   if (loading) {
@@ -312,6 +344,17 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
                     Marcar Grupo Listo ({selectedDocuments.length})
                   </Button>
                   
+                  {selectedDocuments.length > 0 && (
+                    <Button
+                      variant="outlined"
+                      color="primary"
+                      onClick={() => setSelectedDocuments([])}
+                      sx={{ minWidth: 120 }}
+                    >
+                      Limpiar Selección
+                    </Button>
+                  )}
+                  
                   <Tooltip title="Refrescar">
                     <IconButton onClick={cargarDocumentos} color="primary">
                       <RefreshIcon />
@@ -369,9 +412,29 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
                     />
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                      {documento.clientName}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                          {documento.clientName}
+                        </Typography>
+                        {documento.clientPhone && (
+                          <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary' }}>
+                            📞 {documento.clientPhone}
+                          </Typography>
+                        )}
+                      </Box>
+                      {getDocumentosAgrupablesPorCliente(documento).length > 0 && (
+                        <Tooltip title={`${getDocumentosAgrupablesPorCliente(documento).length + 1} documentos del mismo cliente`}>
+                          <Chip 
+                            label={`+${getDocumentosAgrupablesPorCliente(documento).length}`}
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                            sx={{ fontSize: '0.75rem', height: '20px' }}
+                          />
+                        </Tooltip>
+                      )}
+                    </Box>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" color="primary">
@@ -387,7 +450,11 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
                     />
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2">
+                    <Typography variant="body2" sx={{ 
+                      fontFamily: 'monospace', 
+                      fontSize: '0.875rem',
+                      color: 'success.main'
+                    }}>
                       {documento.clientPhone}
                     </Typography>
                   </TableCell>
@@ -405,16 +472,33 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
                     />
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      color="success"
-                      startIcon={<CheckCircleIcon />}
-                      onClick={() => abrirConfirmacionIndividual(documento)}
-                      sx={{ minWidth: 120 }}
-                    >
-                      Marcar Listo
-                    </Button>
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        color="success"
+                        startIcon={<CheckCircleIcon />}
+                        onClick={() => abrirConfirmacionIndividual(documento)}
+                        sx={{ minWidth: 120 }}
+                      >
+                        Marcar Listo
+                      </Button>
+                      
+                      {getDocumentosAgrupablesPorCliente(documento).length > 0 && (
+                        <Tooltip title="Agrupar automáticamente con documentos del mismo cliente">
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            color="primary"
+                            startIcon={<GroupsIcon />}
+                            onClick={() => handleSmartGroupSelection(documento)}
+                            sx={{ minWidth: 100 }}
+                          >
+                            Agrupar
+                          </Button>
+                        </Tooltip>
+                      )}
+                    </Stack>
                   </TableCell>
                 </TableRow>
               ))}
