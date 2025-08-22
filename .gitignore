@@ -4,13 +4,15 @@ frontend/node_modules/
 prisma/node_modules/
 node_modules/
 
-# Environment variables - MANTENER estructura pero permitir archivos necesarios
+# Environment variables - NUNCA subir al repositorio
 .env
-.env.production
-.env.local
-backend/.env.production
-frontend/.env.production
-# Permitir .env de desarrollo para estructura, pero excluir solo los de producción
+.env.*
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
+**/.env
+**/.env.*
 
 # Build outputs
 dist/

@@ -9,7 +9,8 @@ import {
   Typography,
   IconButton,
   Box,
-  Tooltip
+  Tooltip,
+  useTheme
 } from '@mui/material';
 import {
   Warning as WarningIcon,
@@ -27,25 +28,26 @@ import {
  * @param {boolean} showDetails - Si mostrar detalles adicionales (default: true)
  */
 function AlertaItem({ alerta, onDocumentClick, showDetails = true }) {
+  const theme = useTheme();
   
   // Configuración de colores y iconos según nivel de alerta
   const getAlertConfig = (nivel) => {
     const configs = {
       CRITICA: {
         color: 'error',
-        bgColor: '#ffebee',
+        bgColor: theme.palette.mode === 'dark' ? '#3f1a1a' : '#ffebee',
         icon: <ErrorIcon />,
         avatarColor: '#d32f2f'
       },
       URGENTE: {
         color: 'warning',
-        bgColor: '#fff8e1',
+        bgColor: theme.palette.mode === 'dark' ? '#3f2a0a' : '#fff8e1',
         icon: <WarningIcon />,
         avatarColor: '#f57c00'
       },
       ATENCION: {
         color: 'info',
-        bgColor: '#e3f2fd',
+        bgColor: theme.palette.mode === 'dark' ? '#0f2847' : '#e3f2fd',
         icon: <InfoIcon />,
         avatarColor: '#1976d2'
       }
@@ -131,14 +133,26 @@ function AlertaItem({ alerta, onDocumentClick, showDetails = true }) {
             
             {showDetails && (
               <>
-                <Typography variant="body2" color="text.primary" sx={{ opacity: 0.8, fontWeight: 500 }}>
+                <Typography 
+                  variant="body2" 
+                  sx={{ 
+                    fontWeight: 500,
+                    color: (theme) => theme.palette.mode === 'dark' ? '#e2e8f0' : '#374151'
+                  }}
+                >
                   {formatearTipoDocumento(alerta.documentType)}
                 </Typography>
                 
                 <Box display="flex" alignItems="center" gap={2} mt={0.5}>
                   <Box display="flex" alignItems="center" gap={0.5}>
                     <ScheduleIcon fontSize="small" color="action" />
-                    <Typography variant="caption" color="text.primary" sx={{ opacity: 0.75, fontWeight: 500 }}>
+                    <Typography 
+                      variant="caption" 
+                      sx={{ 
+                        fontWeight: 500,
+                        color: (theme) => theme.palette.mode === 'dark' ? '#cbd5e1' : '#4b5563'
+                      }}
+                    >
                       {alerta.diasPendientes} día{alerta.diasPendientes !== 1 ? 's' : ''} pendiente{alerta.diasPendientes !== 1 ? 's' : ''}
                     </Typography>
                   </Box>
@@ -146,7 +160,13 @@ function AlertaItem({ alerta, onDocumentClick, showDetails = true }) {
                   {alerta.clientPhone && (
                     <Box display="flex" alignItems="center" gap={0.5}>
                       <PhoneIcon fontSize="small" color="action" />
-                      <Typography variant="caption" color="text.primary" sx={{ opacity: 0.75, fontWeight: 500 }}>
+                      <Typography 
+                        variant="caption" 
+                        sx={{ 
+                          fontWeight: 500,
+                          color: (theme) => theme.palette.mode === 'dark' ? '#cbd5e1' : '#4b5563'
+                        }}
+                      >
                         {alerta.clientPhone}
                       </Typography>
                     </Box>
@@ -155,8 +175,13 @@ function AlertaItem({ alerta, onDocumentClick, showDetails = true }) {
 
                 <Typography 
                   variant="caption" 
-                  color="text.primary" 
-                  sx={{ opacity: 0.7, fontStyle: 'italic', display: 'block', mt: 0.5, fontWeight: 500 }}
+                  sx={{ 
+                    fontStyle: 'italic', 
+                    display: 'block', 
+                    mt: 0.5, 
+                    fontWeight: 500,
+                    color: (theme) => theme.palette.mode === 'dark' ? '#94a3b8' : '#6b7280'
+                  }}
                 >
                   Listo desde: {formatearFecha(alerta.updatedAt)}
                 </Typography>
