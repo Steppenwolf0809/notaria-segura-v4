@@ -17,7 +17,9 @@
     "install:backend": "cd backend && npm install",
     "dev:frontend": "cd frontend && npm run dev",
     "dev:backend": "cd backend && npm run dev",
-    "start:backend": "cd backend && npm start"
+    "dev:both": "start cmd /k \"npm run dev:backend\" && start cmd /k \"npm run dev:frontend\"",
+    "start:backend": "cd backend && npm start",
+    "setup:dev": "npm run install:all && echo '✅ Dependencias instaladas' && echo '💡 Crea backend/.env basándote en backend/.env.example' && echo '🚀 Luego ejecuta: npm run dev'"
   },
   "keywords": [
     "notaria",

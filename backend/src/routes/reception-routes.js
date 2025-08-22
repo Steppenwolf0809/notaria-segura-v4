@@ -3,8 +3,10 @@ import { authenticateToken, requireRoles } from '../middleware/auth-middleware.j
 import {
   getMatrizadores,
   listarTodosDocumentos,
+  getDocumentosEnProceso,
   marcarComoListo,
   marcarGrupoListo,
+  desagruparDocumentos,
   getDashboardStats,
   getAlertasRecepcion
 } from '../controllers/reception-controller.js';
@@ -44,6 +46,17 @@ router.get('/dashboard', authenticateToken, requireRecepcion, getDashboardStats)
 router.get('/documentos/todos', authenticateToken, requireRecepcion, listarTodosDocumentos);
 
 /**
+ * @route GET /api/reception/documentos/en-proceso
+ * @desc Obtener documentos EN_PROCESO para marcar como listos
+ * @query search - Búsqueda por cliente, teléfono o protocolo
+ * @query matrizador - Filtro por ID de matrizador
+ * @query page - Número de página (default: 1)
+ * @query limit - Límite por página (default: 10)
+ * @access Private (RECEPCION only)
+ */
+router.get('/documentos/en-proceso', authenticateToken, requireRecepcion, getDocumentosEnProceso);
+
+/**
  * @route POST /api/reception/documentos/:id/marcar-listo
  * @desc Marcar documento individual como listo (EN_PROCESO → LISTO)
  * @param id - ID del documento a marcar como listo
@@ -58,6 +71,14 @@ router.post('/documentos/:id/marcar-listo', authenticateToken, requireRecepcion,
  * @access Private (RECEPCION only)
  */
 router.post('/documentos/marcar-grupo-listo', authenticateToken, requireRecepcion, marcarGrupoListo);
+
+/**
+ * @route POST /api/reception/documentos/desagrupar
+ * @desc Desagrupar documentos que están agrupados, asignando códigos individuales
+ * @body documentIds - Array de IDs de documentos agrupados
+ * @access Private (RECEPCION only)
+ */
+router.post('/documentos/desagrupar', authenticateToken, requireRecepcion, desagruparDocumentos);
 
 /**
  * @route GET /api/reception/matrizadores
