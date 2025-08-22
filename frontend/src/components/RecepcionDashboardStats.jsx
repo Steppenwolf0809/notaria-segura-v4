@@ -25,7 +25,7 @@ import AlertasModal from './alertas/AlertasModal';
 /**
  * Componente para mostrar estadísticas del dashboard de recepción
  */
-function RecepcionDashboardStats({ estadisticas, onEstadisticasChange }) {
+function RecepcionDashboardStats({ estadisticas, onEstadisticasChange, onDocumentClick }) {
   const [alertasModalOpen, setAlertasModalOpen] = useState(false);
   const stats = estadisticas || {
     documentosEnProceso: 0,
@@ -87,11 +87,7 @@ function RecepcionDashboardStats({ estadisticas, onEstadisticasChange }) {
         <Grid item xs={12}>
           <AlertasPanel
             userRole="RECEPCION"
-            onDocumentClick={(alerta) => {
-              console.log('Documento seleccionado:', alerta);
-              // Aquí puedes agregar lógica para navegar al documento
-              // Por ejemplo: onDocumentClick?.(alerta);
-            }}
+            onDocumentClick={onDocumentClick}
             compact={false}
             maxHeight={300}
           />
@@ -290,10 +286,7 @@ function RecepcionDashboardStats({ estadisticas, onEstadisticasChange }) {
         open={alertasModalOpen}
         onClose={() => setAlertasModalOpen(false)}
         userRole="RECEPCION"
-        onDocumentClick={(alerta) => {
-          console.log('Documento seleccionado desde modal:', alerta);
-          // Aquí puedes agregar lógica para navegar al documento
-        }}
+        onDocumentClick={onDocumentClick}
       />
     </Box>
   );
