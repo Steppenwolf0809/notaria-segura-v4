@@ -51,6 +51,7 @@ import ModalEntregaGrupal from './ModalEntregaGrupal';
 import QuickGroupingModal from '../grouping/QuickGroupingModal';
 import GroupInfoModal from '../shared/GroupInfoModal';
 import DocumentDetailModal from '../Documents/DocumentDetailModal';
+import GroupingDetector from '../grouping/GroupingDetector';
 import receptionService from '../../services/reception-service';
 import documentService from '../../services/document-service';
 import useDocumentStore from '../../store/document-store';
@@ -119,7 +120,7 @@ function DocumentosUnificados({ onEstadisticasChange }) {
   const [filters, setFilters] = useState({
     search: '',
     matrizador: '',
-    estado: 'LISTO', // 🎯 CONSERVADOR: Filtro por defecto para Recepción
+    estado: '', // 🎯 ACTUALIZADO: Mostrar todos los estados por defecto (Recepción ahora se enfoca en marcar como listo)
     fechaDesde: '',
     fechaHasta: '',
   });
@@ -263,19 +264,64 @@ function DocumentosUnificados({ onEstadisticasChange }) {
   const ejecutarMarcarListo = async () => {
     try {
       let result;
+      
+      console.log('🎯 Iniciando marcar como listo:', {
+        actionType,
+        documentoId: currentDocumento?.id,
+        selectedDocuments: selectedDocuments.length,
+        timestamp: new Date().toISOString()
+      });
+      
       if (actionType === 'individual' && currentDocumento) {
+        console.log('📄 Marcando documento individual:', currentDocumento.id);
         result = await receptionService.marcarComoListo(currentDocumento.id);
       } else if (actionType === 'grupal' && selectedDocuments.length > 0) {
+        console.log('📁 Marcando grupo de documentos:', selectedDocuments);
         result = await receptionService.marcarGrupoListo(selectedDocuments);
       }
 
-      if (result?.success) {
-        setSnackbar({ open: true, message: result.message, severity: 'success' });
+      console.log('✅ Resultado completo del servicio:', {
+        result,
+        type: typeof result,
+        success: result?.success,
+        error: result?.error,
+        message: result?.message,
+        keys: result ? Object.keys(result) : 'null/undefined'
+      });
+
+      // Verificar que result existe y es un objeto válido
+      if (!result) {
+        console.error('❌ Resultado del servicio es null/undefined');
+        throw new Error('El servicio no retornó una respuesta válida');
+      }
+
+      if (result.success === true) {
+        setSnackbar({ open: true, message: result.message || 'Documento(s) marcado(s) como listo(s) exitosamente', severity: 'success' });
+        console.log('🔄 Recargando documentos...');
         await cargarDocumentos();
+        console.log('📊 Actualizando estadísticas...');
         onEstadisticasChange?.();
         setSelectedDocuments([]);
+        console.log('✅ Proceso completado exitosamente');
       } else {
-        throw new Error(result?.error || 'Error inesperado');
+        console.error('❌ Error en resultado del servicio:', {
+          success: result?.success,
+          error: result?.error,
+          message: result?.message,
+          fullResult: result
+        });
+        
+        // Crear mensaje de error más específico
+        let errorMessage = 'Error inesperado al marcar como listo';
+        if (result?.error) {
+          errorMessage = result.error;
+        } else if (result?.message) {
+          errorMessage = result.message;
+        } else if (result.success === false && !result.error && !result.message) {
+          errorMessage = 'El servicio retornó un error sin mensaje específico';
+        }
+        
+        throw new Error(errorMessage);
       }
     } catch (error) {
       console.error('Error marcando como listo:', error);
@@ -634,13 +680,14 @@ function DocumentosUnificados({ onEstadisticasChange }) {
                 <TableCell sx={{ fontWeight: 'bold', py: 2 }}>Matrizador</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', py: 2 }}>Fecha Creación</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', py: 2 }}>Estado</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', py: 2, minWidth: 120 }}>Agrupación</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', py: 2 }}>Acciones</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {documentos.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                     <Typography 
                       sx={{ 
                         fontWeight: 500,
@@ -753,6 +800,40 @@ function DocumentosUnificados({ onEstadisticasChange }) {
                       </Typography>
                     </TableCell>
                     <TableCell><StatusIndicator status={documento.status} /></TableCell>
+                    <TableCell sx={{ textAlign: 'center', py: 1 }}>
+                      {/* Columna de Agrupación - Mostrar detector o estado de grupo */}
+                      {documento.isGrouped ? (
+                        <Tooltip title="Ver información del grupo">
+                          <Chip
+                            label="🔗 Agrupado"
+                            size="small"
+                            variant="filled"
+                            color="primary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenGroupInfo(documento);
+                            }}
+                            sx={{ 
+                              cursor: 'pointer',
+                              fontSize: '0.7rem',
+                              height: '24px',
+                              '& .MuiChip-label': { px: 1 }
+                            }}
+                          />
+                        </Tooltip>
+                      ) : (
+                        // Mostrar detector de agrupación solo para documentos EN_PROCESO y LISTO
+                        ['EN_PROCESO', 'LISTO'].includes(documento.status) && (
+                          <Box sx={{ minWidth: 100 }}>
+                            <GroupingDetector
+                              document={documento}
+                              onGroupDocuments={handleGroupDocuments}
+                              isVisible={true}
+                            />
+                          </Box>
+                        )
+                      )}
+                    </TableCell>
                     <TableCell sx={{ textAlign: 'center' }}>
                       {documento.status === 'LISTO' ? (
                         <Button 

@@ -2,39 +2,31 @@ import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
-  Tabs,
-  Tab,
   Alert,
-  CircularProgress
+  CircularProgress,
+  Button
 } from '@mui/material';
-import { 
-  ViewKanban as KanbanIcon,
-  List as ListIcon 
-} from '@mui/icons-material';
-import KanbanArchivo from './archivo/KanbanArchivo';
 import ListaArchivo from './archivo/ListaArchivo';
 import archivoService from '../services/archivo-service';
 import useAuth from '../hooks/use-auth';
-import { filterRecentlyDelivered, DELIVERY_FILTER_PERIODS } from '../utils/dateUtils';
 
 /**
  * Componente de Gestión de Archivo
  * Vista principal para documentos propios del archivo
- * Incluye toggle entre vista Kanban y Lista (como GestionDocumentos)
+ * Solo usa vista de lista (similar a Recepción)
  */
 const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
-  const [viewMode, setViewMode] = useState('kanban'); // 'kanban' | 'lista'
   const [documentos, setDocumentos] = useState([]);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
   const [error, setError] = useState(null);
   const { token } = useAuth();
 
   /**
-   * Cargar documentos al montar o cuando cambia el modo
+   * Cargar documentos al montar
    */
   useEffect(() => {
     cargarDocumentos();
-  }, [token, viewMode]);
+  }, [token]);
 
   /**
    * Cargar documentos propios
@@ -64,7 +56,7 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
   };
 
   /**
-   * Manejar cambio de estado de documento (drag & drop)
+   * Manejar cambio de estado de documento
    */
   const handleEstadoChange = async (documentoId, nuevoEstado) => {
     if (!token) return;
@@ -100,10 +92,13 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
   };
 
   /**
-   * Manejar cambio de vista
+   * Refrescar documentos (callback para componentes hijos)
    */
-  const handleViewChange = (event, newValue) => {
-    setViewMode(newValue);
+  const handleRefresh = () => {
+    cargarDocumentos();
+    if (onDataUpdate) {
+      onDataUpdate();
+    }
   };
 
   /**
@@ -114,21 +109,48 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
   };
 
   /**
-   * Agrupar documentos por estado para kanban
-   * FILTRO TEMPORAL: Solo documentos ENTREGADOS de los últimos 7 días
+   * Renderizar contenido principal
    */
-  const agruparDocumentosPorEstado = () => {
-    const entregados = documentos.filter(doc => doc.status === 'ENTREGADO');
-    const entregadosRecientes = filterRecentlyDelivered(entregados, DELIVERY_FILTER_PERIODS.WEEK);
-    
-    return {
-      EN_PROCESO: documentos.filter(doc => doc.status === 'EN_PROCESO'),
-      LISTO: documentos.filter(doc => doc.status === 'LISTO'),
-      ENTREGADO: entregadosRecientes
-    };
+  const renderContent = () => {
+    if (loadingDocuments) {
+      return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 400 }}>
+          <CircularProgress />
+          <Typography sx={{ ml: 2 }}>Cargando documentos...</Typography>
+        </Box>
+      );
+    }
+
+    if (error) {
+      return (
+        <Alert 
+          severity="error" 
+          action={
+            <Button 
+              color="inherit" 
+              size="small" 
+              onClick={cargarDocumentos}
+            >
+              Reintentar
+            </Button>
+          }
+        >
+          {error}
+        </Alert>
+      );
+    }
+
+    // Solo vista de lista (similar a Recepción)
+    return (
+      <ListaArchivo 
+        documentos={documentos}
+        onEstadoChange={handleEstadoChange}
+        onRefresh={handleRefresh}
+      />
+    );
   };
 
-  if (loading || loadingDocuments) {
+  if (loading) {
     return (
       <Box 
         sx={{ 
@@ -144,18 +166,18 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
   }
 
   return (
-    <Box>
-      {/* Header */}
+    <Box sx={{ height: '100%' }}>
+      {/* Header simplificado */}
       <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" gutterBottom sx={{ fontWeight: 600 }}>
-          📁 Mis Documentos de Archivo
+        <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
+          📄 Gestión de Documentos
         </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Gestiona tus documentos de archivo asignados
+        <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>
+          Vista unificada para gestionar, agrupar y entregar documentos.
         </Typography>
       </Box>
 
-      {/* Error */}
+      {/* Error Global */}
       {error && (
         <Alert 
           severity="error" 
@@ -166,49 +188,8 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
         </Alert>
       )}
 
-      {/* Toggle Vista */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-        <Tabs 
-          value={viewMode} 
-          onChange={handleViewChange}
-          sx={{
-            '& .MuiTab-root': {
-              textTransform: 'none',
-              fontWeight: 600,
-              fontSize: '1rem'
-            }
-          }}
-        >
-          <Tab 
-            value="kanban" 
-            label="Vista Kanban" 
-            icon={<KanbanIcon />}
-            iconPosition="start"
-          />
-          <Tab 
-            value="lista" 
-            label="Vista Lista" 
-            icon={<ListIcon />}
-            iconPosition="start"
-          />
-        </Tabs>
-      </Box>
-
-      {/* Contenido según vista */}
-      {viewMode === 'kanban' ? (
-        <KanbanArchivo 
-          documentos={agruparDocumentosPorEstado()}
-          estadisticas={dashboardData?.estadisticas}
-          onEstadoChange={handleEstadoChange}
-          onRefresh={cargarDocumentos}
-        />
-      ) : (
-        <ListaArchivo 
-          documentos={documentos}
-          onEstadoChange={handleEstadoChange}
-          onRefresh={cargarDocumentos}
-        />
-      )}
+      {/* Contenido principal */}
+      {renderContent()}
     </Box>
   );
 };

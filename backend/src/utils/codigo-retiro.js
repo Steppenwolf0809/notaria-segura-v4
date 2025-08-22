@@ -1,4 +1,6 @@
-import prisma from '../db.js';
+import { getPrismaClient } from '../db.js';
+
+const prisma = getPrismaClient();
 
 /**
  * Servicio para generar y validar códigos de retiro únicos
