@@ -84,13 +84,17 @@ class DocumentGroupingService {
     // 3. Sean del mismo cliente
     // 4. No estén ya agrupados
     
+    const whereBase = {
+      id: { in: documentIds },
+      status: { not: 'ENTREGADO' }, // Permitir EN_PROCESO y LISTO
+      isGrouped: false // No permitir re-agrupar
+    };
+    // Si viene matrizadorId (flujo de MATRIZADOR), restringir por asignación
+    if (matrizadorId) {
+      whereBase.assignedToId = matrizadorId;
+    }
     const documents = await prisma.document.findMany({
-      where: { 
-        id: { in: documentIds },
-        assignedToId: matrizadorId,
-        status: { not: 'ENTREGADO' }, // Permitir EN_PROCESO y LISTO
-        isGrouped: false // No permitir re-agrupar
-      }
+      where: whereBase
     });
     
     if (documents.length !== documentIds.length) {
@@ -101,10 +105,11 @@ class DocumentGroupingService {
     
     // Verificar mismo cliente
     const firstDoc = documents[0];
-    const sameClient = documents.every(doc => 
-      doc.clientPhone === firstDoc.clientPhone ||
-      doc.clientName.toLowerCase() === firstDoc.clientName.toLowerCase()
-    );
+    const sameClient = documents.every(doc => {
+      const sameName = doc.clientName?.trim().toLowerCase() === firstDoc.clientName?.trim().toLowerCase();
+      const sameId = !firstDoc.clientId || !doc.clientId ? true : doc.clientId === firstDoc.clientId;
+      return sameName && sameId;
+    });
     
     if (!sameClient) {
       throw new Error('Todos los documentos deben ser del mismo cliente');

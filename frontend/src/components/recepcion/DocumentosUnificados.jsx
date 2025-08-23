@@ -156,6 +156,8 @@ function DocumentosUnificados({ onEstadisticasChange }) {
   const [selectedGroupDocument, setSelectedGroupDocument] = useState(null);
   
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  // Cache de conteos de agrupables por cliente (clave: name|id)
+  const [groupableCountCache, setGroupableCountCache] = useState(new Map());
 
   const cargarDocumentos = useCallback(async () => {
     try {
@@ -549,6 +551,33 @@ function DocumentosUnificados({ onEstadisticasChange }) {
   // Calcular documentos paginados
   const documentosPaginados = documentos.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
   
+  // Prefetch de conteos por cliente para los documentos visibles
+  useEffect(() => {
+    const fetchCounts = async () => {
+      const candidates = documentosPaginados.filter(d => ['EN_PROCESO','LISTO'].includes(d.status) && !d.isGrouped);
+      for (const doc of candidates) {
+        const key = `${doc.clientName}|${doc.clientId || ''}`;
+        if (groupableCountCache.has(key)) continue;
+        try {
+          const result = await detectGroupableDocuments({ clientName: doc.clientName, clientId: doc.clientId || '' });
+          const uniqueCount = (result.groupableDocuments || []).reduce((acc, d) => {
+            const k = d.protocolNumber || d.id;
+            if (!acc.has(k)) acc.add(k);
+            return acc;
+          }, new Set()).size + 1; // incluir principal
+          setGroupableCountCache(prev => {
+            const next = new Map(prev);
+            next.set(key, uniqueCount);
+            return next;
+          });
+        } catch (e) {
+          // silencioso
+        }
+      }
+    };
+    fetchCounts();
+  }, [documentosPaginados, page, rowsPerPage]);
+
   // Verificar estado de selección para checkbox master
   const allVisualSelected = documentosPaginados.length > 0 && documentosPaginados.every(doc => visualSelection.has(doc.id));
   const someVisualSelected = documentosPaginados.some(doc => visualSelection.has(doc.id));
@@ -913,14 +942,14 @@ function DocumentosUnificados({ onEstadisticasChange }) {
                               }}
                             >
                               {(() => {
-                                // Mostrar contador inline en el botón
-                                try {
-                                  const same = documentos.filter(d => d.id !== documento.id && ['EN_PROCESO','LISTO'].includes(d.status) && d.clientName === documento.clientName && (documento.clientId ? d.clientId === documento.clientId : true) && !d.isGrouped);
-                                  const uniqueCount = Array.from(new Set(same.map(d => d.protocolNumber || d.id))).length;
-                                  return uniqueCount > 0 ? `Agrupar (${uniqueCount})` : 'Agrupar';
-                                } catch {
-                                  return 'Agrupar';
-                                }
+                                // Mostrar total devuelto por backend si está en caché (incluye principal)
+                                const key = `${documento.clientName}|${documento.clientId || ''}`;
+                                const count = groupableCountCache.get(key);
+                                if (count && count > 1) return `Agrupar (${count})`;
+                                // Fallback local (página actual)
+                                const same = documentos.filter(d => d.id !== documento.id && ['EN_PROCESO','LISTO'].includes(d.status) && d.clientName === documento.clientName && (documento.clientId ? d.clientId === documento.clientId : true) && !d.isGrouped);
+                                const uniqueCount = Array.from(new Set(same.map(d => d.protocolNumber || d.id))).length + 1;
+                                return uniqueCount > 1 ? `Agrupar (${uniqueCount})` : 'Agrupar';
                               })()}
                             </Button>
                           )
