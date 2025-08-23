@@ -1209,7 +1209,8 @@ async function createDocumentGroup(req, res) {
     }
 
     const { documentIds, verifiedPhone, notificationMessage } = req.body;
-    const matrizadorId = req.user.id;
+    // Para crear grupo: solo restringimos por asignación cuando el usuario es MATRIZADOR
+    const matrizadorId = req.user.role === 'MATRIZADOR' ? req.user.id : null;
     
     // NUEVA FUNCIONALIDAD: Crear grupo con estado configurable
     const markAsReady = req.body.markAsReady || false; // Por defecto solo agrupar
