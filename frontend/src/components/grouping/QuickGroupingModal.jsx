@@ -126,6 +126,13 @@ const QuickGroupingModal = ({
       setUpdatedMainDocument(updatedDocument);
       console.log('📝 Documento principal actualizado localmente');
     }
+    // También actualizar la lista de relatedDocuments si coincide
+    try {
+      const index = relatedDocuments.findIndex(d => d.id === updatedDocument.id);
+      if (index !== -1) {
+        relatedDocuments[index] = { ...relatedDocuments[index], ...updatedDocument };
+      }
+    } catch {}
     
     // 🎯 CORRECCIÓN: Notificar al componente padre para que actualice los datos
     if (onDocumentUpdated) {

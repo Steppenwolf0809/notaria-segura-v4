@@ -25,7 +25,7 @@ const getAuthHeaders = (token) => ({
  */
 
 /**
- * Obtener dashboard kanban con documentos propios
+ * Obtener dashboard con documentos propios
  */
 const getDashboard = async (token) => {
   try {
@@ -285,27 +285,6 @@ const formatearAlerta = (alerta) => {
   return alertas[alerta.nivel] || { texto: 'Normal', color: 'success', icono: '' };
 };
 
-/**
- * Obtener configuración de columnas kanban
- * CORREGIDO: Mismas columnas que matrizador (EN_PROCESO, LISTO, ENTREGADO)
- */
-const getColumnasKanban = () => [
-  {
-    id: 'EN_PROCESO',
-    titulo: 'En Proceso',
-    color: '#f59e0b'
-  },
-  {
-    id: 'LISTO',
-    titulo: 'Listo para Entrega',
-    color: '#10b981'
-  },
-  {
-    id: 'ENTREGADO',
-    titulo: 'Entregado',
-    color: '#6366f1'
-  }
-];
 
 /**
  * ============================================================================
@@ -330,8 +309,7 @@ const archivoService = {
   
   // Utilidades
   formatearEstado,
-  formatearAlerta,
-  getColumnasKanban
+  formatearAlerta
 };
 
 export default archivoService;

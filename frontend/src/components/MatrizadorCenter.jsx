@@ -7,13 +7,10 @@ import NotificationsHistory from './Documents/NotificationsHistory';
 import useDocumentStore from '../store/document-store';
 
 /**
- * Centro de Control Matrizador - COMPLETAMENTE CORREGIDO
- * Sigue EXACTAMENTE el prototipo con:
+ * Centro de Control Matrizador
  * - Layout con sidebar correcto
  * - Dashboard con KPIs horizontales 
- * - Kanban HORIZONTAL con 3 columnas lado a lado
- * - Toggle funcional Kanban/Lista
- * - Vista Lista completa
+ * - Vista Lista simplificada
  */
 const MatrizadorCenter = () => {
   const [currentView, setCurrentView] = useState('documents'); // Iniciar en documentos por defecto

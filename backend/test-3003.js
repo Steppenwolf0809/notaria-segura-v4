@@ -1,1 +1,0 @@
-const http = require('http'); const req = http.request({hostname: 'localhost', port: 3003, path: '/api/health'}, (res) => { console.log('✅ Backend corriendo en puerto 3003'); process.exit(0); }); req.on('error', () => { console.log('❌ Backend NO está en puerto 3003'); process.exit(1); }); req.end();

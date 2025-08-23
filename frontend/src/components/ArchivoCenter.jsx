@@ -9,9 +9,9 @@ import archivoService from '../services/archivo-service';
 import useAuth from '../hooks/use-auth';
 
 /**
- * Centro de Control Archivo - Siguiendo patrón de MatrizadorCenter
+ * Centro de Control Archivo
  * Funcionalidad dual:
- * - Dashboard kanban para documentos propios (como matrizador)
+ * - Dashboard para documentos propios
  * - Vista supervisión global de todos los documentos (solo lectura)
  */
 const ArchivoCenter = () => {
@@ -31,7 +31,7 @@ const ArchivoCenter = () => {
   }, [currentView, token]);
 
   /**
-   * Cargar datos del dashboard kanban
+   * Cargar datos del dashboard
    */
   const cargarDashboard = async () => {
     if (!token) return;

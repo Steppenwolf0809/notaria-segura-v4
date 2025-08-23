@@ -16,7 +16,7 @@ import CodigoRetiroService from '../utils/codigo-retiro.js';
 // ============================================================================
 
 /**
- * Dashboard kanban para documentos propios del archivo
+ * Dashboard para documentos propios del archivo
  * FUNCIONALIDAD: Idéntica a matrizador pero solo documentos asignados a archivo
  */
 async function dashboardArchivo(req, res) {
@@ -39,7 +39,7 @@ async function dashboardArchivo(req, res) {
       orderBy: { createdAt: 'desc' }
     });
 
-    // Agrupar por estado para el kanban
+    // Agrupar por estado
     const documentosPorEstado = {
       PENDIENTE: documentos.filter(doc => doc.status === 'PENDIENTE'),
       EN_PROCESO: documentos.filter(doc => doc.status === 'EN_PROCESO'),
@@ -140,7 +140,7 @@ async function listarMisDocumentos(req, res) {
 }
 
 /**
- * Cambiar estado de documento propio (drag & drop kanban)
+ * Cambiar estado de documento propio
  * FUNCIONALIDAD: Idéntica a matrizador pero solo documentos propios
  */
 async function cambiarEstadoDocumento(req, res) {
