@@ -44,10 +44,12 @@ import {
   MoreVert as MoreVertIcon,
   Phone as PhoneIcon,
   Clear as ClearIcon,
-  GroupWork as GroupWorkIcon
+  GroupWork as GroupWorkIcon,
+  Undo as UndoIcon
 } from '@mui/icons-material';
 import ModalEntrega from './ModalEntrega';
 import ModalEntregaGrupal from './ModalEntregaGrupal';
+import ReversionModal from './ReversionModal';
 import QuickGroupingModal from '../grouping/QuickGroupingModal';
 import GroupInfoModal from '../shared/GroupInfoModal';
 import DocumentDetailModal from '../Documents/DocumentDetailModal';
@@ -154,6 +156,10 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   // Estados para modal de información de grupo
   const [groupInfoModalOpen, setGroupInfoModalOpen] = useState(false);
   const [selectedGroupDocument, setSelectedGroupDocument] = useState(null);
+  
+  // Estados para modal de reversión
+  const [reversionModalOpen, setReversionModalOpen] = useState(false);
+  const [reversionLoading, setReversionLoading] = useState(false);
   
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   // Cache de conteos de agrupables por cliente (clave: name|id)
@@ -395,6 +401,61 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
       setSnackbar({ open: true, message: error.message || 'Error al marcar documento(s) como listo(s)', severity: 'error' });
     } finally {
       cerrarConfirmacion();
+    }
+  };
+
+  // Funciones de reversión de estado
+  const abrirReversionModal = (documento) => {
+    setCurrentDocumento(documento);
+    setReversionModalOpen(true);
+    handleMenuClose();
+  };
+
+  const cerrarReversionModal = () => {
+    if (!reversionLoading) {
+      setReversionModalOpen(false);
+      setCurrentDocumento(null);
+    }
+  };
+
+  const ejecutarReversion = async ({ documentId, newStatus, reversionReason }) => {
+    try {
+      setReversionLoading(true);
+      
+      console.log('🔄 Iniciando reversión de documento:', {
+        documentId,
+        newStatus,
+        reversionReason,
+        timestamp: new Date().toISOString()
+      });
+
+      const result = await receptionService.revertirEstadoDocumento(documentId, newStatus, reversionReason);
+
+      console.log('✅ Resultado de reversión:', result);
+
+      if (result.success) {
+        setSnackbar({ 
+          open: true, 
+          message: result.message || 'Documento revertido exitosamente', 
+          severity: 'success' 
+        });
+        
+        // Recargar documentos y estadísticas
+        await cargarDocumentos();
+        onEstadisticasChange?.();
+        cerrarReversionModal();
+      } else {
+        throw new Error(result.error || 'Error en la reversión del documento');
+      }
+    } catch (error) {
+      console.error('❌ Error en reversión:', error);
+      setSnackbar({ 
+        open: true, 
+        message: error.message || 'Error al revertir el documento', 
+        severity: 'error' 
+      });
+    } finally {
+      setReversionLoading(false);
     }
   };
 
@@ -1111,6 +1172,38 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
             <ListItemText>Info del Grupo</ListItemText>
           </MenuItem>
         )}
+        
+        {/* Separador visual para opciones de reversión */}
+        {currentDocumento && ['LISTO', 'ENTREGADO'].includes(currentDocumento.status) && (
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', my: 0.5 }} />
+        )}
+        
+        {/* Opciones de reversión según el estado actual */}
+        {currentDocumento?.status === 'LISTO' && (
+          <MenuItem 
+            onClick={() => abrirReversionModal(currentDocumento)}
+            sx={{ color: 'warning.main' }}
+          >
+            <ListItemIcon>
+              <UndoIcon fontSize="small" sx={{ color: 'warning.main' }} />
+            </ListItemIcon>
+            <ListItemText>Revertir a En Proceso</ListItemText>
+          </MenuItem>
+        )}
+        
+        {currentDocumento?.status === 'ENTREGADO' && (
+          <>
+            <MenuItem 
+              onClick={() => abrirReversionModal(currentDocumento)}
+              sx={{ color: 'warning.main' }}
+            >
+              <ListItemIcon>
+                <UndoIcon fontSize="small" sx={{ color: 'warning.main' }} />
+              </ListItemIcon>
+              <ListItemText>Revertir Estado</ListItemText>
+            </MenuItem>
+          </>
+        )}
       </Menu>
 
       <Dialog open={showConfirmDialog} onClose={cerrarConfirmacion} maxWidth="sm" fullWidth>
@@ -1184,6 +1277,15 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
           onDocumentUpdated={() => { cargarDocumentos(); }}
         />
       )}
+
+      {/* Modal de reversión de estado */}
+      <ReversionModal
+        open={reversionModalOpen}
+        onClose={cerrarReversionModal}
+        documento={currentDocumento}
+        onConfirm={ejecutarReversion}
+        loading={reversionLoading}
+      />
 
       {/* 🎯 NOTA INFORMATIVA: Checkboxes solo visuales para Recepción */}
       {visualSelection.size > 0 && (

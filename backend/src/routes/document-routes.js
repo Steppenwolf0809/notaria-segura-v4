@@ -31,7 +31,9 @@ import {
   markDocumentGroupAsReady,
   getGroupDocuments,
   // 🔓 Desagrupar documento
-  ungroupDocument
+  ungroupDocument,
+  // 🔄 Reversión de estado
+  revertDocumentStatus
 } from '../controllers/document-controller.js';
 
 // 🔄 NUEVAS IMPORTACIONES: Operaciones masivas
@@ -101,6 +103,9 @@ router.put('/group/status', authenticateToken, updateDocumentGroupStatus);
 
 // PUT /api/documents/:id/status - MATRIZADOR: Actualizar estado
 router.put('/:id/status', authenticateToken, updateDocumentStatus);
+
+// 🔄 POST /api/documents/:id/revert - Revertir estado de documento con razón
+router.post('/:id/revert', authenticateToken, revertDocumentStatus);
 
 // 🔓 PUT /api/documents/:id/ungroup - Desagrupar documento del grupo
 router.put('/:id/ungroup', authenticateToken, ungroupDocument);

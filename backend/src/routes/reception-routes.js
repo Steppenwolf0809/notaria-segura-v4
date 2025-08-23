@@ -8,7 +8,8 @@ import {
   marcarGrupoListo,
   desagruparDocumentos,
   getDashboardStats,
-  getAlertasRecepcion
+  getAlertasRecepcion,
+  revertirEstadoDocumento
 } from '../controllers/reception-controller.js';
 
 const router = express.Router();
@@ -93,6 +94,16 @@ router.get('/matrizadores', authenticateToken, requireRecepcion, getMatrizadores
  * @access Private (RECEPCION only)
  */
 router.get('/alertas', authenticateToken, requireRecepcion, getAlertasRecepcion);
+
+/**
+ * @route POST /api/reception/documentos/:id/revertir-estado
+ * @desc Revertir documento a estado anterior con razón obligatoria
+ * @param id - ID del documento a revertir
+ * @body newStatus - Nuevo estado (debe ser anterior al actual)
+ * @body reversionReason - Razón obligatoria para la reversión
+ * @access Private (RECEPCION only)
+ */
+router.post('/documentos/:id/revertir-estado', authenticateToken, requireRecepcion, revertirEstadoDocumento);
 
 // Ruta de prueba simple para verificar conectividad
 router.get('/test', (req, res) => {
