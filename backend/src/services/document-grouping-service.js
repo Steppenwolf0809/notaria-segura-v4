@@ -144,7 +144,7 @@ class DocumentGroupingService {
         clientEmail: bestEmail,
         documentsCount: documents.length,
         status: markAsReady ? 'READY' : 'IN_PROCESS', // Grupo en proceso si documentos están agrupados
-        createdBy: matrizadorId.toString()
+        createdBy: matrizadorId ? matrizadorId.toString() : 'RECEPCION'
       }
     });
     
@@ -155,7 +155,7 @@ class DocumentGroupingService {
       groupLeaderId: documents[0].id, // Primer documento es líder
       groupVerificationCode: verificationCode,
       groupCreatedAt: new Date(),
-      groupCreatedBy: matrizadorId.toString()
+      groupCreatedBy: matrizadorId ? matrizadorId.toString() : 'RECEPCION'
     };
     
     // Solo cambiar estado a LISTO si se solicita explícitamente

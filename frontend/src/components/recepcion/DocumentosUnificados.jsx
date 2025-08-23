@@ -564,7 +564,7 @@ function DocumentosUnificados({ onEstadisticasChange }) {
             const k = d.protocolNumber || d.id;
             if (!acc.has(k)) acc.add(k);
             return acc;
-          }, new Set()).size + 1; // incluir principal
+          }, new Set()).size; // el backend ya incluye al principal
           setGroupableCountCache(prev => {
             const next = new Map(prev);
             next.set(key, uniqueCount);
