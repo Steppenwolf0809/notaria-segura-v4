@@ -14,6 +14,7 @@ import useDocumentStore from '../store/document-store';
  */
 const MatrizadorCenter = () => {
   const [currentView, setCurrentView] = useState('documents'); // Iniciar en documentos por defecto
+  const [documentoEspecifico, setDocumentoEspecifico] = useState(null);
   const { 
     documents, 
     loading, 
@@ -38,15 +39,43 @@ const MatrizadorCenter = () => {
   };
 
   /**
+   * Función para navegar a un documento desde alertas
+   */
+  const handleDocumentClick = (alerta) => {
+    console.log('Navegando a documento desde alerta (MATRIZADOR):', alerta);
+    
+    // Preparar información del documento específico
+    const documentoTarget = {
+      id: alerta.id,
+      protocolNumber: alerta.protocolNumber,
+      clientName: alerta.clientName,
+      documentType: alerta.documentType,
+      isGrouped: alerta.isGrouped,
+      autoSearch: true
+    };
+
+    // Setear el documento específico para navegación
+    setDocumentoEspecifico(documentoTarget);
+    
+    // Cambiar a la vista de documentos
+    setCurrentView('documents');
+  };
+
+  /**
    * Renderizar contenido según la vista actual
    */
   const renderContent = () => {
     switch (currentView) {
       case 'dashboard':
-        return <MatrizadorDashboard />;
+        return <MatrizadorDashboard onDocumentClick={handleDocumentClick} />;
       
       case 'documents':
-        return <GestionDocumentos />;
+        return (
+          <GestionDocumentos 
+            documentoEspecifico={documentoEspecifico}
+            onDocumentoFound={() => setDocumentoEspecifico(null)}
+          />
+        );
       
       case 'history':
         return <NotificationsHistory />;

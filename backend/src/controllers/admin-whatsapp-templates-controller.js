@@ -9,11 +9,38 @@ import prisma from '../db.js';
  * Variables disponibles para templates
  */
 const AVAILABLE_VARIABLES = {
-  cliente: 'Nombre del cliente',
+  // Variables básicas existentes
+  cliente: 'Nombre del cliente (alias: nombreCompareciente)',
   documento: 'Tipo de documento',
   codigo: 'Código de verificación 4 dígitos',
-  notaria: 'Nombre de la notaría',
-  fecha: 'Fecha actual formateada'
+  notaria: 'Nombre de la notaría (alias: nombreNotariaCompleto)',
+  fecha: 'Fecha actual formateada (alias: fechaFormateada)',
+  
+  // Variables mejoradas y nuevas
+  nombreCompareciente: 'Nombre completo del compareciente/cliente',
+  nombreNotariaCompleto: 'Nombre oficial completo de la notaría',
+  fechaFormateada: 'Fecha legible (ej: "23 de agosto de 2025, 12:54 PM")',
+  horaEntrega: 'Hora de entrega formateada',
+  contactoConsultas: 'Teléfono/email para consultas',
+  
+  // Variables para códigos de escritura
+  codigosEscritura: 'Lista de códigos de escritura de documentos',
+  cantidadDocumentos: 'Número total de documentos',
+  listaDocumentosCompleta: 'Lista detallada con códigos específicos',
+  
+  // Variables condicionales
+  nombreRetirador: 'Nombre de quien retira el documento',
+  cedulaRetirador: 'Cédula de quien retira (solo si existe)',
+  seccionCedula: 'Línea completa "🆔 Cédula: XXXX" o vacía si no hay cédula',
+  tipoEntrega: 'Individual o múltiple (afecta formato)',
+  
+  // Variables de formato para entrega
+  documentosDetalle: 'Lista formateada de documentos entregados',
+  
+  // Variables para templates de entrega
+  receptor_nombre: 'Nombre de quien recibió el documento',
+  receptor_cedula: 'Cédula del receptor (opcional)',
+  receptor_relacion: 'Relación con el titular'
 };
 
 /**
@@ -21,33 +48,37 @@ const AVAILABLE_VARIABLES = {
  */
 const DEFAULT_TEMPLATES = {
   DOCUMENTO_LISTO: {
-    titulo: 'Documento Listo para Retiro (Predeterminado)',
-    mensaje: `🏛️ *{notaria}*
+    titulo: 'Documento Listo para Retiro (Mejorado)',
+    mensaje: `🏛️ *{nombreNotariaCompleto}*
 
-Estimado/a {cliente},
+Estimado/a {nombreCompareciente},
 
 Su documento está listo para retiro:
 📄 *Documento:* {documento}
 🔢 *Código de retiro:* {codigo}
+{codigosEscritura}
 
 ⚠️ *IMPORTANTE:* Presente este código al momento del retiro.
 
 📍 *Dirección:* Azuay E2-231 y Av Amazonas, Quito
 ⏰ *Horario:* Lunes a Viernes 8:00-17:00
 
+Para consultas: {contactoConsultas}
 ¡Gracias por confiar en nosotros!`
   },
   DOCUMENTO_ENTREGADO: {
-    titulo: 'Confirmación de Entrega (Predeterminado)',
-    mensaje: `🏛️ *{notaria}*
+    titulo: 'Confirmación de Entrega (Mejorado)',
+    mensaje: `🏛️ *{nombreNotariaCompleto}*
 
-Estimado/a {cliente},
+Estimado/a {nombreCompareciente},
 
-✅ Confirmamos la entrega de su documento:
-📄 *Documento:* {documento}
-👤 *Retirado por:* {cliente}
-📅 *Fecha y hora:* {fecha}
+✅ Confirmamos la entrega de {tipoEntrega}:
+{documentosDetalle}
+👤 *Retirado por:* {nombreRetirador}
+{seccionCedula}
+📅 *Fecha:* {fechaFormateada}
 
+Para consultas: {contactoConsultas}
 ¡Gracias por confiar en nuestros servicios!`
   }
 };
@@ -288,8 +319,9 @@ export const previewTemplate = async (req, res) => {
       });
     }
 
-    // Datos ejemplo para preview
+    // Datos ejemplo para preview (variables mejoradas)
     const datosEjemplo = {
+      // Variables básicas (compatibilidad)
       cliente: 'María García',
       documento: 'Protocolo de Compraventa',
       codigo: '1234',
@@ -300,7 +332,31 @@ export const previewTemplate = async (req, res) => {
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
-      })
+      }),
+      
+      // Variables mejoradas
+      nombreCompareciente: 'María García Pérez',
+      nombreNotariaCompleto: 'NOTARÍA DÉCIMO OCTAVA DEL CANTÓN QUITO',
+      fechaFormateada: '23 de agosto de 2025, 12:54 PM',
+      horaEntrega: '12:54 PM',
+      contactoConsultas: 'Tel: (02) 2234-567 | email@notaria18.gob.ec',
+      
+      // Variables de códigos
+      codigosEscritura: '📋 *Código de escritura:* 20251701018D00919',
+      cantidadDocumentos: '1',
+      listaDocumentosCompleta: '• Protocolo de Compraventa - Código: 20251701018D00919',
+      
+      // Variables condicionales (ejemplo con cédula)
+      nombreRetirador: 'María García Pérez',
+      cedulaRetirador: '1234567890',
+      seccionCedula: '🆔 *Cédula:* 1234567890',
+      tipoEntrega: 'su documento',
+      documentosDetalle: '📄 *Protocolo de Compraventa*\n📋 *Código:* 20251701018D00919',
+      
+      // Variables de entrega
+      receptor_nombre: 'María García Pérez',
+      receptor_cedula: '1234567890',
+      receptor_relacion: 'Titular'
     };
 
     // Reemplazar variables

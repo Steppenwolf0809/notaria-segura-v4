@@ -53,12 +53,29 @@ const RecepcionCenter = () => {
     cargarEstadisticas();
   };
 
+  // Estado para manejar navegación específica a documento
+  const [documentoEspecifico, setDocumentoEspecifico] = useState(null);
+
   /**
    * Función para navegar a un documento desde alertas
    */
   const handleDocumentClick = (alerta) => {
     console.log('Navegando a documento desde alerta:', alerta);
-    // Cambiar a la vista de documentos para buscar el documento específico
+    
+    // Preparar información del documento específico
+    const documentoTarget = {
+      id: alerta.id,
+      protocolNumber: alerta.protocolNumber,
+      clientName: alerta.clientName,
+      documentType: alerta.documentType,
+      isGrouped: alerta.isGrouped,
+      autoSearch: true // Flag para indicar que debe buscar automáticamente
+    };
+
+    // Setear el documento específico para navegación
+    setDocumentoEspecifico(documentoTarget);
+    
+    // Cambiar a la vista de documentos
     setCurrentView('documentos');
   };
 
@@ -79,7 +96,9 @@ const RecepcionCenter = () => {
       case 'documentos':
         return (
           <DocumentosUnificados 
-            onEstadisticasChange={onEstadisticasChange} 
+            onEstadisticasChange={onEstadisticasChange}
+            documentoEspecifico={documentoEspecifico}
+            onDocumentoFound={() => setDocumentoEspecifico(null)} // Limpiar después de encontrarlo
           />
         );
 

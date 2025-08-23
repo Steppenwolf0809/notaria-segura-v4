@@ -2664,16 +2664,73 @@ async function deliverDocument(req, res) {
       try {
         const whatsappService = await import('../services/whatsapp-service.js');
         
+        const fechaEntrega = new Date();
         const datosEntrega = {
+          // Variables básicas (compatibilidad)
           entregado_a: entregadoA,
           deliveredTo: entregadoA,
-          fecha: new Date(),
+          fecha: fechaEntrega,
           usuario_entrega: `${req.user.firstName} ${req.user.lastName}`,
+          
           // Claves adicionales que esperan los templates del servicio
           entregadoA,
           cedulaReceptor,
-          relacionTitular
+          relacionTitular,
+          
+          // Variables mejoradas para template
+          fechaEntrega: fechaEntrega,
+          nombreRetirador: entregadoA,
+          cedulaReceptor: cedulaReceptor,
+          cedula_receptor: cedulaReceptor,
+          relacionTitular: relacionTitular,
+          relacion_titular: relacionTitular,
+          
+          // Variables adicionales
+          verificacionManual: verificacionManual || false,
+          facturaPresenta: facturaPresenta || false,
+          observacionesEntrega: observacionesEntrega || '',
+          usuarioEntrega: `${req.user.firstName} ${req.user.lastName}`,
+          roleEntrega: req.user.role
         };
+
+        // Preparar información de documento/grupo para el template
+        let documentoData;
+        if (groupDocuments.length > 0) {
+          // Es una entrega grupal - incluir información de todos los documentos
+          const allDocuments = [updatedDocument, ...groupDocuments];
+          documentoData = {
+            // Compatibilidad
+            tipo_documento: `Grupo de ${allDocuments.length} documentos`,
+            tipoDocumento: `Grupo de ${allDocuments.length} documentos`,
+            numero_documento: updatedDocument.protocolNumber,
+            protocolNumber: updatedDocument.protocolNumber,
+            
+            // Para template mejorado
+            documentType: `Grupo de ${allDocuments.length} documentos`,
+            esGrupo: true,
+            cantidadDocumentos: allDocuments.length,
+            documentos: allDocuments.map(doc => ({
+              documentType: doc.documentType,
+              protocolNumber: doc.protocolNumber,
+              codigoEscritura: doc.protocolNumber // Usar protocolNumber como código
+            }))
+          };
+        } else {
+          // Entrega individual
+          documentoData = {
+            // Compatibilidad
+            tipo_documento: updatedDocument.documentType,
+            tipoDocumento: updatedDocument.documentType,
+            numero_documento: updatedDocument.protocolNumber,
+            protocolNumber: updatedDocument.protocolNumber,
+            
+            // Para template mejorado
+            documentType: updatedDocument.documentType,
+            esGrupo: false,
+            cantidadDocumentos: 1,
+            codigoEscritura: updatedDocument.protocolNumber // Usar protocolNumber como código
+          };
+        }
 
         const whatsappResult = await whatsappService.default.enviarDocumentoEntregado(
           {
@@ -2682,12 +2739,7 @@ async function deliverDocument(req, res) {
             telefono: updatedDocument.clientPhone,
             clientPhone: updatedDocument.clientPhone
           },
-          {
-            tipo_documento: updatedDocument.documentType,
-            tipoDocumento: updatedDocument.documentType,
-            numero_documento: updatedDocument.protocolNumber,
-            protocolNumber: updatedDocument.protocolNumber
-          },
+          documentoData,
           datosEntrega
         );
         
