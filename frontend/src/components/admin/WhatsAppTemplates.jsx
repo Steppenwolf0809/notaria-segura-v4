@@ -47,6 +47,7 @@ const TEMPLATE_TYPES = [
   { value: 'DOCUMENTO_ENTREGADO', label: 'Confirmación de Entrega' }
 ];
 
+// Fallback local por si el backend no provee el listado
 const AVAILABLE_VARIABLES = {
   cliente: 'Nombre del cliente',
   documento: 'Tipo de documento',
@@ -69,6 +70,8 @@ const WhatsAppTemplates = () => {
   const [currentTemplate, setCurrentTemplate] = useState(null);
   const [formData, setFormData] = useState({});
   const [formErrors, setFormErrors] = useState({});
+  // Variables disponibles desde backend (con fallback local)
+  const [availableVariables, setAvailableVariables] = useState(AVAILABLE_VARIABLES);
   
   const [preview, setPreview] = useState('');
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
@@ -83,6 +86,12 @@ const WhatsAppTemplates = () => {
       const response = await adminService.getWhatsAppTemplates(token);
       if (response.success) {
         setTemplates(response.data);
+        // Cargar variables disponibles del backend si vienen; usar fallback en caso contrario
+        if (response.availableVariables && typeof response.availableVariables === 'object') {
+          setAvailableVariables(response.availableVariables);
+        } else {
+          setAvailableVariables(AVAILABLE_VARIABLES);
+        }
       }
     } catch (err) {
       setError(err.message || 'Error al cargar templates');
@@ -445,7 +454,7 @@ const WhatsAppTemplates = () => {
                 <Box mt={2}>
                     <Typography variant="subtitle2" gutterBottom>Variables Disponibles</Typography>
                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                        {Object.entries(AVAILABLE_VARIABLES).map(([key, desc]) => (
+                        {Object.entries(availableVariables).map(([key, desc]) => (
                             <Tooltip key={key} title={desc}>
                                 <Chip
                                     label={`{${key}}`}
