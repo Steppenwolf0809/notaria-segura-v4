@@ -56,7 +56,7 @@ import ProgresoGeneral from './MatrizadorDashboard/ProgresoGeneral';
  * Dashboard ejecutivo mejorado para el rol Matrizador
  * Incluye KPIs, centro de control y navegación entre vistas
  */
-const MatrizadorDashboard = () => {
+const MatrizadorDashboard = ({ onDocumentClick }) => {
   const {
     documents,
     loading,

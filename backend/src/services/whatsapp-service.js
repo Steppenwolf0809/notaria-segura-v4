@@ -356,7 +356,7 @@ class WhatsAppService {
         const clientName = cliente.clientName || cliente.nombre;
         const clientPhone = cliente.clientPhone || cliente.telefono;
         
-        const mensaje = this.generarMensajeGrupoListo(cliente, documentos, codigo);
+        const mensaje = await this.generarMensajeGrupoListo(cliente, documentos, codigo);
 
         // Preparar datos para guardar en BD (igual que documentos individuales)
         const notificationData = {
@@ -468,14 +468,100 @@ class WhatsAppService {
     }
 
     /**
-     * Reemplazar variables en template de mensaje
+     * Formatear fecha de manera legible en español
+     */
+    formatearFechaLegible(fecha = new Date()) {
+        const meses = [
+            'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+            'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+        ];
+        
+        const dia = fecha.getDate();
+        const mes = meses[fecha.getMonth()];
+        const año = fecha.getFullYear();
+        const hora = fecha.toLocaleTimeString('es-EC', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        });
+        
+        return `${dia} de ${mes} de ${año}, ${hora}`;
+    }
+
+    /**
+     * Generar lista de códigos de escritura
+     */
+    generarCodigosEscritura(documentos) {
+        if (!Array.isArray(documentos) || documentos.length === 0) {
+            return '';
+        }
+        
+        // Si es un solo documento, mostrar código individual
+        if (documentos.length === 1) {
+            const codigo = this.extraerCodigoEscritura(documentos[0]);
+            return codigo ? `📋 *Código de escritura:* ${codigo}` : '';
+        }
+        
+        // Múltiples documentos - mostrar lista
+        const codigos = documentos.map(doc => this.extraerCodigoEscritura(doc)).filter(Boolean);
+        if (codigos.length === 0) return '';
+        
+        return '📋 *Códigos de escritura:*\n' + codigos.map((codigo, index) => `${index + 1}. ${codigo}`).join('\n');
+    }
+
+    /**
+     * Extraer código de escritura de un documento
+     */
+    extraerCodigoEscritura(documento) {
+        // Intentar obtener código de diferentes campos
+        return documento.codigoEscritura || 
+               documento.protocolNumber || 
+               documento.numero_documento ||
+               documento.numeroProtocolo ||
+               null;
+    }
+
+    /**
+     * Generar detalles de documentos para entrega
+     */
+    generarDocumentosDetalle(documentos, esGrupo = false) {
+        if (!Array.isArray(documentos)) {
+            // Documento individual
+            const tipoDoc = documentos.documentType || documentos.tipo_documento || documentos.tipoDocumento || 'Documento';
+            const codigo = this.extraerCodigoEscritura(documentos);
+            return `📄 *${tipoDoc}*${codigo ? `\n📋 *Código:* ${codigo}` : ''}`;
+        }
+        
+        if (documentos.length === 1) {
+            return this.generarDocumentosDetalle(documentos[0], false);
+        }
+        
+        // Múltiples documentos
+        return documentos.map((doc, index) => {
+            const tipoDoc = doc.documentType || doc.tipo_documento || doc.tipoDocumento || 'Documento';
+            const codigo = this.extraerCodigoEscritura(doc);
+            return `${index + 1}. 📄 *${tipoDoc}*${codigo ? ` - Código: ${codigo}` : ''}`;
+        }).join('\n');
+    }
+
+    /**
+     * Reemplazar variables en template de mensaje (versión mejorada)
      */
     replaceTemplateVariables(templateMessage, variables) {
         let mensaje = templateMessage;
         
-        // Variables disponibles
+        // Determinar si es entrega individual o múltiple
+        const esEntregaMultiple = variables.cantidadDocumentos > 1 || (variables.documentos && Array.isArray(variables.documentos) && variables.documentos.length > 1);
+        const tipoEntrega = esEntregaMultiple ? 'sus documentos' : 'su documento';
+        
+        // Generar sección de cédula condicional
+        const seccionCedula = (variables.receptor_cedula || variables.cedulaReceptor) ? 
+            `🆔 *Cédula:* ${variables.receptor_cedula || variables.cedulaReceptor}` : '';
+        
+        // Variables disponibles (expandidas)
         const availableVariables = {
-            cliente: variables.cliente || 'Cliente',
+            // Variables básicas (compatibilidad)
+            cliente: variables.cliente || variables.nombreCompareciente || 'Cliente',
             documento: variables.documento || 'Documento',
             codigo: variables.codigo || 'XXXX',
             notaria: this.notariaConfig.nombre,
@@ -486,9 +572,38 @@ class WhatsAppService {
                 hour: '2-digit',
                 minute: '2-digit'
             }),
-            receptor_nombre: variables.receptor_nombre || '',
-            receptor_cedula: variables.receptor_cedula || '',
-            receptor_relacion: variables.receptor_relacion || '',
+            
+            // Variables mejoradas
+            nombreCompareciente: variables.nombreCompareciente || variables.cliente || 'Cliente',
+            nombreNotariaCompleto: this.notariaConfig.nombre,
+            fechaFormateada: this.formatearFechaLegible(variables.fechaEntrega || new Date()),
+            horaEntrega: (variables.fechaEntrega || new Date()).toLocaleTimeString('es-EC', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            }),
+            contactoConsultas: process.env.NOTARIA_CONTACTO || 'Tel: (02) 2234-567',
+            
+            // Variables de códigos
+            codigosEscritura: this.generarCodigosEscritura(variables.documentos || [variables]),
+            cantidadDocumentos: variables.cantidadDocumentos || (variables.documentos ? variables.documentos.length : 1),
+            listaDocumentosCompleta: variables.documentos ? 
+                variables.documentos.map((doc, i) => `• ${doc.documentType || doc.tipo_documento || 'Documento'} - Código: ${this.extraerCodigoEscritura(doc) || 'N/A'}`).join('\n') :
+                `• ${variables.documento || 'Documento'} - Código: ${this.extraerCodigoEscritura(variables) || 'N/A'}`,
+            
+            // Variables condicionales
+            nombreRetirador: variables.receptor_nombre || variables.nombreRetirador || variables.entregado_a || variables.deliveredTo || variables.cliente || 'Cliente',
+            cedulaRetirador: variables.receptor_cedula || variables.cedulaReceptor || '',
+            seccionCedula: seccionCedula,
+            tipoEntrega: tipoEntrega,
+            
+            // Variables de formato para entrega
+            documentosDetalle: this.generarDocumentosDetalle(variables.documentos || variables, esEntregaMultiple),
+            
+            // Variables para templates de entrega (compatibilidad)
+            receptor_nombre: variables.receptor_nombre || variables.nombreRetirador || variables.entregado_a || variables.deliveredTo || '',
+            receptor_cedula: variables.receptor_cedula || variables.cedulaReceptor || '',
+            receptor_relacion: variables.receptor_relacion || variables.relacionTitular || '',
         };
 
         // Reemplazar cada variable
@@ -508,9 +623,15 @@ class WhatsAppService {
             const template = await getActiveTemplateByType('DOCUMENTO_LISTO');
             
             const variables = {
+                // Variables básicas
                 cliente: cliente.nombre || cliente.clientName || 'Cliente',
-                documento: documento.tipo_documento || documento.tipoDocumento || 'Documento',
-                codigo: codigo
+                documento: documento.tipo_documento || documento.tipoDocumento || documento.documentType || 'Documento',
+                codigo: codigo,
+                
+                // Variables mejoradas
+                nombreCompareciente: cliente.nombre || cliente.clientName || 'Cliente',
+                documentos: [documento], // Para generar códigos de escritura
+                cantidadDocumentos: 1
             };
 
             return this.replaceTemplateVariables(template.mensaje, variables);
@@ -528,20 +649,33 @@ class WhatsAppService {
         try {
             const template = await getActiveTemplateByType('DOCUMENTO_ENTREGADO');
             
+            const fechaEntrega = datosEntrega.fechaEntrega || datosEntrega.fecha || new Date();
+            
             const variables = {
+                // Variables básicas
                 cliente: cliente.nombre || cliente.clientName || 'Cliente',
-                documento: documento.tipo_documento || documento.tipoDocumento || 'Documento',
+                documento: documento.tipo_documento || documento.tipoDocumento || documento.documentType || 'Documento',
                 codigo: datosEntrega.codigo || '',
-                fecha: new Date().toLocaleDateString('es-EC', {
+                fecha: fechaEntrega.toLocaleDateString('es-EC', {
                     day: '2-digit',
                     month: '2-digit',
                     year: 'numeric',
                     hour: '2-digit',
                     minute: '2-digit'
                 }),
-                receptor_nombre: datosEntrega.entregadoA || '',
-                receptor_cedula: datosEntrega.cedulaReceptor || '',
-                receptor_relacion: datosEntrega.relacionTitular || '',
+                
+                // Variables mejoradas
+                nombreCompareciente: cliente.nombre || cliente.clientName || 'Cliente',
+                fechaEntrega: fechaEntrega,
+                documentos: [documento], // Para generar detalles
+                cantidadDocumentos: 1,
+                
+                // Variables de entrega
+                receptor_nombre: datosEntrega.entregadoA || datosEntrega.entregado_a || datosEntrega.deliveredTo || '',
+                receptor_cedula: datosEntrega.cedulaReceptor || datosEntrega.cedula_receptor || '',
+                receptor_relacion: datosEntrega.relacionTitular || datosEntrega.relacion_titular || '',
+                nombreRetirador: datosEntrega.entregadoA || datosEntrega.entregado_a || datosEntrega.deliveredTo || '',
+                cedulaReceptor: datosEntrega.cedulaReceptor || datosEntrega.cedula_receptor || ''
             };
 
             return this.replaceTemplateVariables(template.mensaje, variables);
@@ -607,7 +741,33 @@ Estimado/a ${nombreCliente},
     /**
      * Generar mensaje para grupo de documentos listos
      */
-    generarMensajeGrupoListo(cliente, documentos, codigo) {
+    async generarMensajeGrupoListo(cliente, documentos, codigo) {
+        try {
+            // Intentar usar template de BD si está disponible
+            const template = await getActiveTemplateByType('DOCUMENTO_LISTO');
+            
+            const variables = {
+                // Variables básicas
+                cliente: cliente.nombre || cliente.clientName || 'Cliente',
+                codigo: codigo,
+                
+                // Variables mejoradas para grupo
+                nombreCompareciente: cliente.nombre || cliente.clientName || 'Cliente',
+                documentos: Array.isArray(documentos) ? documentos : [documentos],
+                cantidadDocumentos: Array.isArray(documentos) ? documentos.length : 1
+            };
+            
+            return this.replaceTemplateVariables(template.mensaje, variables);
+        } catch (error) {
+            console.error('Error usando template de BD para grupo, usando fallback:', error);
+            return this.generarMensajeGrupoListoFallback(cliente, documentos, codigo);
+        }
+    }
+
+    /**
+     * Fallback para mensaje de grupo de documentos listos
+     */
+    generarMensajeGrupoListoFallback(cliente, documentos, codigo) {
         const nombreCliente = cliente.nombre || cliente.clientName || 'Cliente';
         const cantidad = Array.isArray(documentos) ? documentos.length : documentos;
 
@@ -617,12 +777,12 @@ Estimado/a ${nombreCliente},
             const maxListado = 5;
             const itemsDetallados = documentos.slice(0, maxListado).map((doc, index) => {
                 const tipoDocumento = doc.documentType || doc.tipo_documento || doc.tipoDocumento || 'Documento';
-                const numeroProtocolo = doc.protocolNumber || doc.numero_documento || '';
+                const numeroProtocolo = this.extraerCodigoEscritura(doc);
                 const detalleEspecifico = doc.detalle_documento || '';
 
                 const partes = [
                     `${index + 1}. ${tipoDocumento}`,
-                    numeroProtocolo ? `Protocolo: ${numeroProtocolo}` : null,
+                    numeroProtocolo ? `Código: ${numeroProtocolo}` : null,
                     detalleEspecifico ? `Detalle: ${detalleEspecifico}` : null
                 ].filter(Boolean);
 
@@ -637,19 +797,23 @@ Estimado/a ${nombreCliente},
             }
         }
 
+        // Generar códigos de escritura
+        const codigosEscritura = this.generarCodigosEscritura(documentos);
+
         return `🏛️ *${this.notariaConfig.nombre}*
 
 Estimado/a ${nombreCliente},
 
 Sus documentos están listos para retiro:
 📦 *Cantidad:* ${cantidad} documento(s)
-🔢 *Código de retiro:* ${codigo}${listaDocumentos}
+🔢 *Código de retiro:* ${codigo}${codigosEscritura ? '\n' + codigosEscritura : ''}${listaDocumentos}
 
 ⚠️ *IMPORTANTE:* Presente este código al momento del retiro.
 
 📍 *Dirección:* ${this.notariaConfig.direccion}
 ⏰ *Horario:* ${this.notariaConfig.horario}
 
+Para consultas: ${process.env.NOTARIA_CONTACTO || 'Tel: (02) 2234-567'}
 ¡Gracias por confiar en nosotros!`;
     }
 

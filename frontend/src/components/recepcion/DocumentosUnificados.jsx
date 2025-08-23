@@ -108,7 +108,7 @@ function formatLocalDate(dateString) {
   return date.toLocaleDateString('es-EC', { year: 'numeric', month: '2-digit', day: '2-digit' });
 }
 
-function DocumentosUnificados({ onEstadisticasChange }) {
+function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDocumentoFound }) {
   const { createDocumentGroup, detectGroupableDocuments } = useDocumentStore();
   const [documentos, setDocumentos] = useState([]);
   const [selectedDocuments, setSelectedDocuments] = useState([]); // Solo para visualización
@@ -159,6 +159,10 @@ function DocumentosUnificados({ onEstadisticasChange }) {
   // Cache de conteos de agrupables por cliente (clave: name|id)
   const [groupableCountCache, setGroupableCountCache] = useState(new Map());
 
+  // Estados para navegación específica desde alertas
+  const [highlightedDocument, setHighlightedDocument] = useState(null);
+  const [scrollToDocument, setScrollToDocument] = useState(null);
+
   const cargarDocumentos = useCallback(async () => {
     try {
       setLoading(true);
@@ -204,6 +208,59 @@ function DocumentosUnificados({ onEstadisticasChange }) {
     };
     cargarMatrizadores();
   }, []);
+
+  // Efecto para manejar navegación específica desde alertas
+  useEffect(() => {
+    if (documentoEspecifico && documentoEspecifico.autoSearch) {
+      console.log('🎯 Navegación específica a documento:', documentoEspecifico);
+      
+      // Aplicar filtro automático por código de protocolo
+      setFilters(prev => ({
+        ...prev,
+        search: documentoEspecifico.protocolNumber
+      }));
+      setSearchQuery(documentoEspecifico.protocolNumber);
+      
+      // Setear para highlight y scroll
+      setHighlightedDocument(documentoEspecifico.id);
+      setScrollToDocument(documentoEspecifico.id);
+      
+      // Resetear página a 0 para asegurar que encuentre el documento
+      setPage(0);
+    }
+  }, [documentoEspecifico]);
+
+  // Efecto para manejar scroll y highlight después de cargar documentos
+  useEffect(() => {
+    if (scrollToDocument && documentos.length > 0) {
+      // Buscar el documento en la lista actual
+      const foundDocument = documentos.find(doc => doc.id === scrollToDocument);
+      
+      if (foundDocument) {
+        console.log('✅ Documento encontrado en la lista actual:', foundDocument);
+        
+        // Hacer scroll al documento (con un pequeño delay para asegurar que el DOM esté actualizado)
+        setTimeout(() => {
+          const documentRow = document.querySelector(`[data-document-id="${scrollToDocument}"]`);
+          if (documentRow) {
+            documentRow.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'center' 
+            });
+            
+            // Limpiar estados después del scroll
+            setTimeout(() => {
+              setHighlightedDocument(null);
+              setScrollToDocument(null);
+              if (onDocumentoFound) {
+                onDocumentoFound();
+              }
+            }, 2000); // Mantener highlight por 2 segundos
+          }
+        }, 100);
+      }
+    }
+  }, [documentos, scrollToDocument, onDocumentoFound]);
   
   const handleFilterChange = (field, value) => {
     setFilters(prev => ({ ...prev, [field]: value }));
@@ -242,7 +299,6 @@ function DocumentosUnificados({ onEstadisticasChange }) {
 
   const handleMenuClose = () => {
     setMenuAnchorEl(null);
-    setCurrentDocumento(null);
   };
 
   const abrirConfirmacionIndividual = (documento) => {
@@ -763,10 +819,33 @@ function DocumentosUnificados({ onEstadisticasChange }) {
                     selected={visualSelection.has(documento.id)} 
                     hover
                     onClick={() => abrirDetalles(documento)}
+                    data-document-id={documento.id} // Para scroll automático
                     sx={{ 
                       cursor: 'pointer',
                       ...(visualSelection.has(documento.id) && {
                         bgcolor: 'action.selected'
+                      }),
+                      // Highlight para navegación específica desde alertas
+                      ...(highlightedDocument === documento.id && {
+                        bgcolor: 'warning.light',
+                        '&:hover': {
+                          bgcolor: 'warning.main'
+                        },
+                        animation: 'pulse 1.5s ease-in-out 3',
+                        '@keyframes pulse': {
+                          '0%': {
+                            transform: 'scale(1)',
+                            opacity: 1
+                          },
+                          '50%': {
+                            transform: 'scale(1.02)',
+                            opacity: 0.9
+                          },
+                          '100%': {
+                            transform: 'scale(1)',
+                            opacity: 1
+                          }
+                        }
                       })
                     }}
                   >

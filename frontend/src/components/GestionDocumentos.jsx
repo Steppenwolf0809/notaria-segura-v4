@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   Box,
   Typography
@@ -10,7 +10,7 @@ import useDebounce from '../hooks/useDebounce';
 /**
  * Componente principal de Gestión de Documentos
   */
-const GestionDocumentos = () => {
+const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
   
   // SEPARACIÓN DE ESTADOS: inputValue (inmediato) vs searchTerm (debounced)
   const [inputValue, setInputValue] = useState(''); // Estado local del input
@@ -38,6 +38,14 @@ const GestionDocumentos = () => {
   const handleTypeFilterChange = useCallback((e) => {
     setTypeFilter(e.target.value);
   }, []);
+
+  // Efecto para manejar navegación específica desde alertas
+  useEffect(() => {
+    if (documentoEspecifico && documentoEspecifico.autoSearch) {
+      console.log('🎯 Aplicando filtro automático en GestionDocumentos:', documentoEspecifico);
+      setInputValue(documentoEspecifico.protocolNumber);
+    }
+  }, [documentoEspecifico]);
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -71,6 +79,8 @@ const GestionDocumentos = () => {
           searchTerm={debouncedSearchTerm}
           statusFilter={statusFilter}
           typeFilter={typeFilter}
+          documentoEspecifico={documentoEspecifico}
+          onDocumentoFound={onDocumentoFound}
         />
       </Box>
     </Box>
