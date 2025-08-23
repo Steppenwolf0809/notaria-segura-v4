@@ -667,8 +667,12 @@ class WhatsAppService {
                 // Variables mejoradas
                 nombreCompareciente: cliente.nombre || cliente.clientName || 'Cliente',
                 fechaEntrega: fechaEntrega,
-                documentos: [documento], // Para generar detalles
-                cantidadDocumentos: 1,
+                documentos: (Array.isArray(datosEntrega.documentos) && datosEntrega.documentos.length > 0)
+                    ? datosEntrega.documentos
+                    : [documento],
+                cantidadDocumentos: (Array.isArray(datosEntrega.documentos) && datosEntrega.documentos.length > 0)
+                    ? datosEntrega.documentos.length
+                    : 1,
                 
                 // Variables de entrega
                 receptor_nombre: datosEntrega.entregadoA || datosEntrega.entregado_a || datosEntrega.deliveredTo || '',
