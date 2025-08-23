@@ -843,6 +843,44 @@ const documentService = {
         data: []
       };
     }
+  },
+
+  /**
+   * Revertir estado de documento (disponible para todos los roles)
+   * @param {string} documentId - ID del documento
+   * @param {string} newStatus - Nuevo estado (anterior al actual)
+   * @param {string} reversionReason - Razón obligatoria para la reversión
+   * @returns {Promise<Object>} Resultado de la reversión
+   */
+  async revertDocumentStatus(documentId, newStatus, reversionReason) {
+    try {
+      console.log('🔄 Revirtiendo estado de documento:', { documentId, newStatus, reversionReason });
+      
+      const response = await api.post(`/documents/${documentId}/revert`, {
+        newStatus,
+        reversionReason
+      });
+      
+      console.log('✅ Documento revertido exitosamente:', response.data);
+      
+      return {
+        success: true,
+        data: response.data.data || response.data,
+        message: response.data.message || 'Documento revertido exitosamente'
+      };
+    } catch (error) {
+      console.error('❌ Error revirtiendo estado del documento:', error);
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Error al revertir el estado del documento';
+      
+      return {
+        success: false,
+        error: errorMessage,
+        message: errorMessage
+      };
+    }
   }
 };
 

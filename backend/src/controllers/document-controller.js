@@ -3505,6 +3505,41 @@ async function getGroupDocuments(req, res) {
   }
 }
 
+/**
+ * Revertir estado de documento - Función general para todos los roles
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+async function revertDocumentStatus(req, res) {
+  try {
+    const { id } = req.params;
+    const { newStatus, reversionReason } = req.body;
+
+    console.log('🔄 revertDocumentStatus iniciado:', {
+      documentId: id,
+      newStatus,
+      reversionReason,
+      userId: req.user.id,
+      userRole: req.user.role
+    });
+
+    // Usar la función updateDocumentStatus existente que ya maneja reversiones
+    // Simplemente agregamos la lógica de reversión al body
+    req.body.status = newStatus;
+    req.body.reversionReason = reversionReason;
+
+    // Delegar a updateDocumentStatus que ya tiene toda la lógica
+    return await updateDocumentStatus(req, res);
+
+  } catch (error) {
+    console.error('Error en revertDocumentStatus:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+}
+
 export {
   uploadXmlDocument,
   uploadXmlDocumentsBatch,
@@ -3535,5 +3570,7 @@ export {
   markDocumentGroupAsReady,
   getGroupDocuments,
   // 🔓 Desagrupación
-  ungroupDocument
+  ungroupDocument,
+  // 🔄 Reversión de estado
+  revertDocumentStatus
 }; 

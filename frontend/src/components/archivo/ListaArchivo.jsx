@@ -204,6 +204,34 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
   };
 
   /**
+   * Verificar si hay más de un documento del mismo cliente disponible para agrupar
+   * Solo mostrar botón Agrupar si realmente hay documentos agrupables
+   */
+  const hasMoreThanOneForClient = (doc) => {
+    if (!doc) return false;
+    const sameClientDocs = documentos.filter(d => {
+      if (d.id === doc.id) return false; // Excluir el documento actual
+      if (!['EN_PROCESO', 'LISTO'].includes(d.status)) return false; // Solo documentos en proceso o listos
+      if (d.isGrouped) return false; // Excluir documentos ya agrupados
+      
+      const sameName = d.clientName === doc.clientName;
+      const sameId = doc.clientId ? d.clientId === doc.clientId : true;
+      return sameName && sameId;
+    });
+    
+    // Deduplicar por protocolo para evitar contar duplicados
+    const seen = new Set();
+    const uniqueDocs = sameClientDocs.filter(d => {
+      const protocol = d.protocolNumber || d.id;
+      if (seen.has(protocol)) return false;
+      seen.add(protocol);
+      return true;
+    });
+    
+    return uniqueDocs.length > 0; // Hay al menos un documento más del mismo cliente
+  };
+
+  /**
    * Abrir menú de acciones
    */
   const handleMenuOpen = (event, documento) => {
@@ -1041,8 +1069,8 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                           />
                         </Tooltip>
                       ) : (
-                        // Mostrar botón de agrupación para documentos EN_PROCESO y LISTO
-                        ['EN_PROCESO', 'LISTO'].includes(documento.status) && (
+                        // Mostrar botón de agrupación solo si hay documentos agrupables disponibles
+                        ['EN_PROCESO', 'LISTO'].includes(documento.status) && hasMoreThanOneForClient(documento) && (
                           <Button
                             size="small"
                             variant="outlined"
@@ -1096,10 +1124,30 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                               const key = `${documento.clientName}|${documento.clientId || ''}`;
                               const count = groupableCountCache.get(key);
                               if (count && count > 1) return `Agrupar (${count})`;
+                              
                               try {
-                                const same = documentos.filter(d => d.id !== documento.id && ['EN_PROCESO','LISTO'].includes(d.status) && d.clientName === documento.clientName && (documento.clientId ? d.clientId === documento.clientId : true) && !d.isGrouped);
-                                const uniqueCount = Array.from(new Set(same.map(d => d.protocolNumber || d.id))).length + 1;
-                                return uniqueCount > 1 ? `Agrupar (${uniqueCount})` : 'Agrupar';
+                                // Usar la misma lógica que hasMoreThanOneForClient pero contar
+                                const sameClientDocs = documentos.filter(d => {
+                                  if (d.id === documento.id) return false;
+                                  if (!['EN_PROCESO', 'LISTO'].includes(d.status)) return false;
+                                  if (d.isGrouped) return false;
+                                  
+                                  const sameName = d.clientName === documento.clientName;
+                                  const sameId = documento.clientId ? d.clientId === documento.clientId : true;
+                                  return sameName && sameId;
+                                });
+                                
+                                // Deduplicar por protocolo
+                                const seen = new Set();
+                                const uniqueDocs = sameClientDocs.filter(d => {
+                                  const protocol = d.protocolNumber || d.id;
+                                  if (seen.has(protocol)) return false;
+                                  seen.add(protocol);
+                                  return true;
+                                });
+                                
+                                const totalCount = uniqueDocs.length + 1; // +1 para incluir el documento actual
+                                return totalCount > 1 ? `Agrupar (${totalCount})` : 'Agrupar';
                               } catch {
                                 return 'Agrupar';
                               }

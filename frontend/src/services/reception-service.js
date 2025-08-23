@@ -319,6 +319,44 @@ const receptionService = {
   },
 
   /**
+   * Revertir estado de documento con razón obligatoria
+   * @param {string} documentId - ID del documento
+   * @param {string} newStatus - Nuevo estado (anterior al actual)
+   * @param {string} reversionReason - Razón obligatoria para la reversión
+   * @returns {Promise<Object>} Resultado de la reversión
+   */
+  async revertirEstadoDocumento(documentId, newStatus, reversionReason) {
+    try {
+      console.log('🔄 Enviando request para revertir estado:', { documentId, newStatus, reversionReason });
+      const response = await api.post(`/reception/documentos/${documentId}/revertir-estado`, {
+        newStatus,
+        reversionReason
+      });
+      
+      console.log('🔄 Respuesta de reversión:', response.data);
+
+      if (response.data.success === true) {
+        return {
+          success: true,
+          data: response.data.data,
+          message: response.data.message
+        };
+      } else {
+        return {
+          success: false,
+          error: response.data.error || response.data.message || 'Error en la reversión'
+        };
+      }
+    } catch (error) {
+      console.error('❌ Error en reversión de estado:', error);
+      return {
+        success: false,
+        error: receptionService.handleError(error)
+      };
+    }
+  },
+
+  /**
    * Obtener token de autenticación
    * @returns {string|null} Token de autenticación
    */
