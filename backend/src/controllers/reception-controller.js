@@ -893,6 +893,104 @@ async function revertirEstadoDocumento(req, res) {
     }
 }
 
+/**
+ * Obtener historial de notificaciones WhatsApp para recepción
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+async function getNotificationHistoryReception(req, res) {
+    try {
+        const {
+            page = 1,
+            limit = 10,
+            search = '',
+            status = '',
+            type = '',
+            dateFrom = '',
+            dateTo = ''
+        } = req.query;
+
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const take = parseInt(limit);
+
+        // Construir filtros
+        const where = {};
+
+        if (search) {
+            where.OR = [
+                { clientName: { contains: search, mode: 'insensitive' } },
+                { clientPhone: { contains: search } },
+                { messageBody: { contains: search, mode: 'insensitive' } }
+            ];
+        }
+
+        if (status) {
+            where.status = status;
+        }
+
+        if (type) {
+            where.messageType = type;
+        }
+
+        if (dateFrom || dateTo) {
+            where.createdAt = {};
+            if (dateFrom) where.createdAt.gte = new Date(dateFrom);
+            if (dateTo) where.createdAt.lte = new Date(dateTo);
+        }
+
+        // Obtener notificaciones
+        const notifications = await prisma.whatsAppNotification.findMany({
+            where,
+            skip,
+            take,
+            orderBy: { createdAt: 'desc' },
+            select: {
+                id: true,
+                documentId: true,
+                groupId: true,
+                clientName: true,
+                clientPhone: true,
+                messageType: true,
+                messageBody: true,
+                status: true,
+                messageId: true,
+                errorMessage: true,
+                createdAt: true,
+                sentAt: true
+            }
+        });
+
+        const totalCount = await prisma.whatsAppNotification.count({ where });
+
+        console.log('📱 Historial de notificaciones obtenido:', {
+            count: notifications.length,
+            total: totalCount,
+            page: parseInt(page),
+            userId: req.user.id
+        });
+
+        res.json({
+            success: true,
+            data: {
+                notifications,
+                pagination: {
+                    page: parseInt(page),
+                    limit: take,
+                    total: totalCount,
+                    totalPages: Math.ceil(totalCount / take)
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Error obteniendo historial de notificaciones:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error interno del servidor'
+        });
+    }
+}
+
 export {
   getDashboardStats,
   getMatrizadores,
@@ -902,5 +1000,6 @@ export {
   marcarGrupoListo,
   desagruparDocumentos,
   getAlertasRecepcion,
-  revertirEstadoDocumento
+  revertirEstadoDocumento,
+  getNotificationHistoryReception
 };

@@ -543,11 +543,23 @@ async function procesarEntregaDocumento(req, res) {
     
     if (documentoActualizado.clientPhone) {
       try {
+        // Preparar lista de documentos para el template (individual o grupal)
+        const documentosParaMensaje = groupDocuments.length > 0 
+          ? [documentoActualizado, ...groupDocuments]
+          : [documentoActualizado];
+
         const datosEntrega = {
           entregado_a: entregadoA,
           deliveredTo: entregadoA,
           fecha: new Date(),
-          usuario_entrega: `${req.user.firstName} ${req.user.lastName} (ARQUIVO)`
+          usuario_entrega: `${req.user.firstName} ${req.user.lastName} (ARQUIVO)`,
+          // Campos opcionales y condicionales
+          cedulaReceptor,
+          cedula_receptor: cedulaReceptor,
+          relacionTitular,
+          relacion_titular: relacionTitular,
+          documentos: documentosParaMensaje,
+          cantidadDocumentos: documentosParaMensaje.length
         };
 
         const whatsappResult = await whatsappService.enviarDocumentoEntregado(

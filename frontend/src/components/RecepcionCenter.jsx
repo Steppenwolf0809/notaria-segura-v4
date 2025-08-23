@@ -3,7 +3,7 @@ import { Box, Alert } from '@mui/material';
 import RecepcionLayout from './RecepcionLayout';
 import RecepcionDashboard from './RecepcionDashboard';
 import DocumentosUnificados from './recepcion/DocumentosUnificados';
-import NotificationsHistory from './Documents/NotificationsHistory';
+import NotificationHistory from './recepcion/NotificationHistory';
 import receptionService from '../services/reception-service';
 
 /**
@@ -103,7 +103,7 @@ const RecepcionCenter = () => {
         );
 
       case 'notificaciones':
-        return <NotificationsHistory />;
+        return <NotificationHistory />;
       
       default:
         return (

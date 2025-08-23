@@ -357,6 +357,31 @@ const receptionService = {
   },
 
   /**
+   * Obtener historial de notificaciones WhatsApp
+   * @param {Object} params - Parámetros de filtrado y paginación
+   * @returns {Promise<Object>} Historial de notificaciones
+   */
+  async getNotificationHistory(params = {}) {
+    try {
+      console.log('📱 Obteniendo historial de notificaciones:', params);
+      const response = await api.get('/reception/notificaciones', { params });
+      
+      console.log('📱 Historial de notificaciones obtenido:', response.data);
+      
+      return {
+        success: true,
+        data: response.data.data
+      };
+    } catch (error) {
+      console.error('❌ Error obteniendo historial de notificaciones:', error);
+      return {
+        success: false,
+        error: receptionService.handleError(error)
+      };
+    }
+  },
+
+  /**
    * Obtener token de autenticación
    * @returns {string|null} Token de autenticación
    */

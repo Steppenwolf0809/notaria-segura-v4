@@ -20,19 +20,19 @@ const getNotificationStats = async (req, res) => {
     const userId = req.user.id;
 
     // Estadísticas generales
-    const total = await prisma.notificationMessage.count();
-    const successful = await prisma.notificationMessage.count({
+    const total = await prisma.whatsAppNotification.count();
+    const successful = await prisma.whatsAppNotification.count({
       where: { status: 'SENT' }
     });
-    const failed = await prisma.notificationMessage.count({
+    const failed = await prisma.whatsAppNotification.count({
       where: { status: 'FAILED' }
     });
-    const pending = await prisma.notificationMessage.count({
+    const pending = await prisma.whatsAppNotification.count({
       where: { status: 'PENDING' }
     });
 
     // Distribución por tipo
-    const byType = await prisma.notificationMessage.groupBy({
+    const byType = await prisma.whatsAppNotification.groupBy({
       by: ['messageType'],
       _count: {
         messageType: true
@@ -48,7 +48,7 @@ const getNotificationStats = async (req, res) => {
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
 
-    const recentFailed = await prisma.notificationMessage.findMany({
+    const recentFailed = await prisma.whatsAppNotification.findMany({
       where: {
         status: 'FAILED',
         createdAt: {
@@ -145,7 +145,7 @@ const getNotificationHistory = async (req, res) => {
     }
 
     // Obtener notificaciones
-    const notifications = await prisma.notificationMessage.findMany({
+    const notifications = await prisma.whatsAppNotification.findMany({
       where,
       skip,
       take,
@@ -163,7 +163,7 @@ const getNotificationHistory = async (req, res) => {
       }
     });
 
-    const totalCount = await prisma.notificationMessage.count({ where });
+    const totalCount = await prisma.whatsAppNotification.count({ where });
 
     // Auditoría
     await auditLogger.log({
@@ -209,7 +209,7 @@ const retryNotification = async (req, res) => {
     const userId = req.user.id;
     const { notificationId } = req.params;
 
-    const notification = await prisma.notificationMessage.findUnique({
+    const notification = await prisma.whatsAppNotification.findUnique({
       where: { id: notificationId }
     });
 
@@ -228,7 +228,7 @@ const retryNotification = async (req, res) => {
     }
 
     // Actualizar estado a pendiente para reintento
-    await prisma.notificationMessage.update({
+    await prisma.whatsAppNotification.update({
       where: { id: notificationId },
       data: {
         status: 'PENDING',
@@ -290,7 +290,7 @@ const bulkNotificationOperation = async (req, res) => {
 
     if (operation === 'retry') {
       // Reintentar notificaciones fallidas
-      const result = await prisma.notificationMessage.updateMany({
+      const result = await prisma.whatsAppNotification.updateMany({
         where: {
           id: { in: notificationIds },
           status: 'FAILED'
@@ -304,7 +304,7 @@ const bulkNotificationOperation = async (req, res) => {
       successCount = result.count;
     } else if (operation === 'delete') {
       // Eliminar notificaciones
-      const result = await prisma.notificationMessage.deleteMany({
+      const result = await prisma.whatsAppNotification.deleteMany({
         where: {
           id: { in: notificationIds }
         }
@@ -574,7 +574,7 @@ const sendTestNotification = async (req, res) => {
     }
 
     // Crear registro de notificación de prueba
-    const testNotification = await prisma.notificationMessage.create({
+    const testNotification = await prisma.whatsAppNotification.create({
       data: {
         clientName: 'Prueba Sistema',
         clientPhone: testPhone,
@@ -773,7 +773,7 @@ const getFailedNotifications = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const failedNotifications = await prisma.notificationMessage.findMany({
+    const failedNotifications = await prisma.whatsAppNotification.findMany({
       where: { status: 'FAILED' },
       orderBy: { createdAt: 'desc' },
       take: 50,
@@ -822,7 +822,7 @@ const retryAllFailedNotifications = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    const result = await prisma.notificationMessage.updateMany({
+    const result = await prisma.whatsAppNotification.updateMany({
       where: { status: 'FAILED' },
       data: {
         status: 'PENDING',
@@ -921,7 +921,7 @@ const exportNotificationHistory = async (req, res) => {
       if (dateTo) where.createdAt.lte = new Date(dateTo);
     }
 
-    const notifications = await prisma.notificationMessage.findMany({
+    const notifications = await prisma.whatsAppNotification.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       select: {

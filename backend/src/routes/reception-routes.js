@@ -9,7 +9,8 @@ import {
   desagruparDocumentos,
   getDashboardStats,
   getAlertasRecepcion,
-  revertirEstadoDocumento
+  revertirEstadoDocumento,
+  getNotificationHistoryReception
 } from '../controllers/reception-controller.js';
 
 const router = express.Router();
@@ -94,6 +95,13 @@ router.get('/matrizadores', authenticateToken, requireRecepcion, getMatrizadores
  * @access Private (RECEPCION only)
  */
 router.get('/alertas', authenticateToken, requireRecepcion, getAlertasRecepcion);
+
+/**
+ * @route GET /api/reception/notificaciones
+ * @desc Obtener historial de notificaciones WhatsApp para recepción
+ * @access Private (RECEPCION only)
+ */
+router.get('/notificaciones', authenticateToken, requireRecepcion, getNotificationHistoryReception);
 
 /**
  * @route POST /api/reception/documentos/:id/revertir-estado
