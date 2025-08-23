@@ -52,7 +52,6 @@ import QuickGroupingModal from '../grouping/QuickGroupingModal';
 import GroupInfoModal from '../shared/GroupInfoModal';
 import useDocumentStore from '../../store/document-store';
 import GroupingDetector from '../grouping/GroupingDetector';
-import useDocumentStore from '../../store/document-store';
 // 🎯 NUEVOS IMPORTS PARA SELECCIÓN MÚLTIPLE
 import useBulkActions from '../../hooks/useBulkActions';
 import BulkActionToolbar from '../bulk/BulkActionToolbar';
