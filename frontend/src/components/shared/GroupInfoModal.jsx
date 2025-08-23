@@ -34,6 +34,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import useDocumentStore from '../../store/document-store';
 import useAuthStore from '../../store/auth-store';
+import documentService from '../../services/document-service';
 
 /**
  * Modal para mostrar información detallada de un grupo de documentos
@@ -48,20 +49,34 @@ const GroupInfoModal = ({ open, onClose, document }) => {
 
   // Cargar documentos del grupo cuando se abre el modal
   useEffect(() => {
-    if (open && document?.documentGroupId) {
-      setLoading(true);
-      try {
-        // Filtrar documentos del mismo grupo
-        const groupDocs = documents.filter(doc => 
-          doc.documentGroupId === document.documentGroupId && doc.isGrouped
-        );
-        setGroupDocuments(groupDocs);
-      } catch (error) {
-        console.error('Error cargando documentos del grupo:', error);
-      } finally {
-        setLoading(false);
+    const loadGroup = async () => {
+      if (open && document?.documentGroupId) {
+        setLoading(true);
+        try {
+          // 1) Intentar desde el store (rápido)
+          const fromStore = documents.filter(doc => 
+            doc.documentGroupId === document.documentGroupId && doc.isGrouped
+          );
+          if (fromStore.length > 0) {
+            setGroupDocuments(fromStore);
+            return;
+          }
+          // 2) Fallback desde el backend (Recepción/Archivo no siempre tienen el store cargado)
+          const resp = await documentService.getGroupDocuments(document.documentGroupId);
+          if (resp.success) {
+            setGroupDocuments(resp.data || []);
+          } else {
+            setGroupDocuments([]);
+          }
+        } catch (error) {
+          console.error('Error cargando documentos del grupo:', error);
+          setGroupDocuments([]);
+        } finally {
+          setLoading(false);
+        }
       }
-    }
+    };
+    loadGroup();
   }, [open, document, documents]);
 
   // Obtener información del grupo
@@ -80,7 +95,8 @@ const GroupInfoModal = ({ open, onClose, document }) => {
       clientPhone: firstDoc?.clientPhone || 'Sin teléfono',
       totalDocuments: groupDocuments.length,
       statusCounts,
-      verificationCode: firstDoc?.verificationCode || 'Sin código',
+      // Preferir el código a nivel de grupo si está disponible
+      verificationCode: firstDoc?.documentGroup?.verificationCode || firstDoc?.groupVerificationCode || 'Sin código',
       createdAt: Math.min(...groupDocuments.map(doc => new Date(doc.createdAt || Date.now()).getTime())),
       lastUpdatedAt: Math.max(...groupDocuments.map(doc => new Date(doc.updatedAt || doc.createdAt || Date.now()).getTime()))
     };

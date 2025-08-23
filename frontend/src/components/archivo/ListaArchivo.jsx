@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Paper,
@@ -50,6 +50,7 @@ import ModalEntrega from '../recepcion/ModalEntrega';
 import ModalEntregaGrupal from '../recepcion/ModalEntregaGrupal';
 import QuickGroupingModal from '../grouping/QuickGroupingModal';
 import GroupInfoModal from '../shared/GroupInfoModal';
+import useDocumentStore from '../../store/document-store';
 import GroupingDetector from '../grouping/GroupingDetector';
 import useDocumentStore from '../../store/document-store';
 // 🎯 NUEVOS IMPORTS PARA SELECCIÓN MÚLTIPLE
@@ -63,6 +64,8 @@ import BulkStatusChangeModal from '../bulk/BulkStatusChangeModal';
  */
 const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
   const { requiresConfirmation, createDocumentGroup, detectGroupableDocuments } = useDocumentStore();
+  // Cache de conteos por cliente (igual a Recepción)
+  const [groupableCountCache, setGroupableCountCache] = useState(new Map());
   
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -149,6 +152,31 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
     page * rowsPerPage,
     page * rowsPerPage + rowsPerPage
   );
+
+  // Prefetch de conteos de agrupación por cliente (global, no solo página)
+  useEffect(() => {
+    const fetchCounts = async () => {
+      const candidates = documentosPagina.filter(d => ['EN_PROCESO','LISTO'].includes(d.status) && !d.isGrouped);
+      for (const doc of candidates) {
+        const key = `${doc.clientName}|${doc.clientId || ''}`;
+        if (groupableCountCache.has(key)) continue;
+        try {
+          const result = await detectGroupableDocuments({ clientName: doc.clientName, clientId: doc.clientId || '' });
+          const uniqueCount = (result.groupableDocuments || []).reduce((acc, d) => {
+            const k = d.protocolNumber || d.id;
+            if (!acc.has(k)) acc.add(k);
+            return acc;
+          }, new Set()).size; // backend ya incluye principal
+          setGroupableCountCache(prev => {
+            const next = new Map(prev);
+            next.set(key, uniqueCount);
+            return next;
+          });
+        } catch {}
+      }
+    };
+    fetchCounts();
+  }, [documentosPagina, page, rowsPerPage]);
 
   /**
    * Manejar cambio de página
@@ -1029,7 +1057,18 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                                   clientId: documento.clientId || ''
                                 });
                                 
-                                const related = (result.groupableDocuments || []).filter(d => d.id !== documento.id);
+                                // Excluir el principal y deduplicar por protocolo
+                                const related = (result.groupableDocuments || [])
+                                  .filter(d => d.id !== documento.id)
+                                  .reduce((acc, d) => {
+                                    const key = d.protocolNumber || d.id;
+                                    if (!acc.seen.has(key)) {
+                                      acc.seen.add(key);
+                                      acc.items.push(d);
+                                    }
+                                    return acc;
+                                  }, { seen: new Set(), items: [] }).items;
+
                                 if (result.success && related.length > 0) {
                                   handleGroupDocuments(related, documento);
                                 } else {
@@ -1054,7 +1093,18 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                               px: 1
                             }}
                           >
-                            Agrupar
+                            {(() => {
+                              const key = `${documento.clientName}|${documento.clientId || ''}`;
+                              const count = groupableCountCache.get(key);
+                              if (count && count > 1) return `Agrupar (${count})`;
+                              try {
+                                const same = documentos.filter(d => d.id !== documento.id && ['EN_PROCESO','LISTO'].includes(d.status) && d.clientName === documento.clientName && (documento.clientId ? d.clientId === documento.clientId : true) && !d.isGrouped);
+                                const uniqueCount = Array.from(new Set(same.map(d => d.protocolNumber || d.id))).length + 1;
+                                return uniqueCount > 1 ? `Agrupar (${uniqueCount})` : 'Agrupar';
+                              } catch {
+                                return 'Agrupar';
+                              }
+                            })()}
                           </Button>
                         )
                       )}

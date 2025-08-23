@@ -123,7 +123,7 @@ const GroupingAlert = ({
     );
   }
 
-  // Variante COMPACT - Ultra-compacta para Kanban con área clickeable amplia
+  // Variante COMPACT - Ultra-compacta con área clickeable amplia
   if (variant === 'compact') {
     return (
       <Box

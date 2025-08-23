@@ -1682,7 +1682,8 @@ async function updateDocumentInfo(req, res) {
       clientName,
       clientPhone,
       clientEmail,
-      clientId
+      clientId,
+      actoPrincipalDescripcion
     } = req.body;
     
     console.log('📝 updateDocumentInfo iniciado:', {
@@ -1736,6 +1737,7 @@ async function updateDocumentInfo(req, res) {
       data: {
         detalle_documento: detalle_documento?.trim() || null,
         comentarios_recepcion: comentarios_recepcion?.trim() || null,
+        actoPrincipalDescripcion: actoPrincipalDescripcion?.trim() || document.actoPrincipalDescripcion,
         clientName: clientName.trim(),
         clientPhone: clientPhone?.trim() || null,
         clientEmail: clientEmail?.trim() || null,
@@ -1767,7 +1769,8 @@ async function updateDocumentInfo(req, res) {
               clientEmail,
               clientId,
               detalle_documento,
-              comentarios_recepcion
+              comentarios_recepcion,
+              actoPrincipalDescripcion
             },
             editedBy: `${req.user.firstName} ${req.user.lastName}`,
             editedByRole: req.user.role

@@ -1,1 +1,0 @@
-const http = require('http'); http.createServer((req, res) => { res.writeHead(200, {'Content-Type': 'application/json'}); res.end(JSON.stringify({status: 'ok', message: 'Backend funcionando en puerto 3003'})); }).listen(3003, () => console.log('✅ Servidor de prueba corriendo en puerto 3003'));

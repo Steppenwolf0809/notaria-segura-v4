@@ -27,7 +27,7 @@ const requireArchivo = requireRoles(['ARCHIVO']);
 
 /**
  * @route GET /api/archivo/dashboard
- * @desc Dashboard kanban con documentos propios del archivo
+ * @desc Dashboard con documentos propios del archivo
  * @access Private (ARCHIVO only)
  */
 router.get('/dashboard', authenticateToken, requireArchivo, dashboardArchivo);
@@ -45,7 +45,7 @@ router.get('/mis-documentos', authenticateToken, requireArchivo, listarMisDocume
 
 /**
  * @route POST /api/archivo/documentos/:id/estado
- * @desc Cambiar estado de documento propio (drag & drop kanban)
+ * @desc Cambiar estado de documento propio
  * @param id - ID del documento a actualizar
  * @body nuevoEstado - Nuevo estado del documento
  * @access Private (ARCHIVO only)

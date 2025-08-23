@@ -41,7 +41,8 @@
       "WebFetch(domain:express-rate-limit.github.io)",
       "Bash(echo:*)",
       "Bash(cat:*)",
-      "Bash(NODE_ENV=production npx prisma db push --accept-data-loss)"
+      "Bash(NODE_ENV=production npx prisma db push --accept-data-loss)",
+      "Bash(npx vite build:*)"
     ],
     "deny": []
   }
