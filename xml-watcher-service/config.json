@@ -1,0 +1,31 @@
+{
+  "apiUrl": "https://notaria-segura-v4-production.up.railway.app/api",
+  "credentials": {
+    "email": "sistema-caja@notaria.local",
+    "password": "SistemaCaja2024!"
+  },
+  "folders": {
+    "watch": "C:\\Users\\admlocal\\Desktop\\xmlcopiados",
+    "processed": "C:\\Users\\admlocal\\Desktop\\xmlcopiados\\processed",
+    "errors": "C:\\Users\\admlocal\\Desktop\\xmlcopiados\\errors",
+    "archived": "C:\\Users\\admlocal\\Desktop\\xmlcopiados\\archived"
+  },
+  "settings": {
+    "watchDelay": 5000,
+    "batchSize": 20,
+    "retryAttempts": 3,
+    "retryBackoffMs": 1500,
+    "maxConcurrent": 5,
+    "maxFileSizeMB": 5,
+    "logLevel": "INFO",
+    "cleanup": {
+      "enabled": true,
+      "keepProcessedDays": 30,
+      "keepErrorsDays": 90,
+      "compressOldFiles": true,
+      "cleanupHour": 2
+    }
+  }
+}
+
+

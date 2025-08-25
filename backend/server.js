@@ -7,6 +7,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { closePrismaClient } from './src/db.js'
 import { getConfig, isConfigurationComplete, debugConfiguration } from './src/config/environment.js'
+import xmlWatcherService from './src/services/xml-watcher-service.js'
 
 // Importar rutas implementadas
 import authRoutes from './src/routes/auth-routes.js'
@@ -311,6 +312,13 @@ const server = app.listen(PORT, () => {
     console.log('   ✅ Sistema de auditoría')
     console.log('   ✅ Notificaciones WhatsApp')
   }
+
+  // Iniciar watcher XML si está habilitado
+  try {
+    xmlWatcherService.start()
+  } catch (e) {
+    console.error('❌ No se pudo iniciar XML Watcher:', e)
+  }
 })
 
 // ============================================================================
@@ -331,6 +339,12 @@ process.on('SIGTERM', async () => {
 
 // Función de cierre ordenado
 async function gracefulShutdown() {
+  // Detener watcher primero
+  try {
+    await xmlWatcherService.stop()
+  } catch (e) {
+    console.warn('⚠️ Error deteniendo XML Watcher:', e)
+  }
   console.log('📊 Cerrando conexión con base de datos...')
   await closePrismaClient()
   
