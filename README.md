@@ -85,9 +85,9 @@ notaria-segura/
    - **Backend**: Copia `backend/.env.example` a `backend/.env` y rellena las variables:
      - `DATABASE_URL`: Cadena de conexión a tu base de datos PostgreSQL.
      - `JWT_SECRET`: Un secreto para firmar los tokens JWT.
-     - `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_NUMBER`: Credenciales de Twilio.
+     - `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`: Credenciales de Twilio (remitente WhatsApp en formato `whatsapp:+14155238886`).
    - **Frontend**: Copia `frontend/.env.example` a `frontend/.env` y rellena la variable:
-     - `VITE_API_URL`: La URL de tu backend (p. ej., `http://localhost:3000/api`).
+     - `VITE_API_URL`: La URL de tu backend (p. ej., `http://localhost:3001/api`).
 
 4. **Aplicar las migraciones de la base de datos**:
    ```bash
@@ -105,7 +105,7 @@ notaria-segura/
      npm run dev:frontend
      ```
 
-La aplicación frontend estará disponible en `http://localhost:5173` y el backend en `http://localhost:3000`.
+La aplicación frontend estará disponible en `http://localhost:5173` y el backend en `http://localhost:3001`.
 
 ### Usuarios de Prueba
 
