@@ -23,7 +23,11 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Button
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import {
   CheckCircle as SentIcon,
@@ -45,6 +49,8 @@ const NotificationHistory = () => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [selectedNotification, setSelectedNotification] = useState(null);
   
   // Estados de paginación y filtros
   const [page, setPage] = useState(0);
@@ -182,6 +188,16 @@ const NotificationHistory = () => {
     }
   };
 
+  const openPreview = (notification) => {
+    setSelectedNotification(notification);
+    setPreviewOpen(true);
+  };
+
+  const closePreview = () => {
+    setPreviewOpen(false);
+    setSelectedNotification(null);
+  };
+
   if (loading && notifications.length === 0) {
     return (
       <Box display="flex" justifyContent="center" alignItems="center" minHeight="300px">
@@ -274,12 +290,13 @@ const NotificationHistory = () => {
                   <TableCell>Mensaje</TableCell>
                   <TableCell>Enviado</TableCell>
                   <TableCell>Error</TableCell>
+                  <TableCell>Acciones</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {notifications.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                    <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
                       <Typography variant="body2" color="text.secondary">
                         {loading ? 'Cargando...' : 'No hay notificaciones para mostrar'}
                       </Typography>
@@ -349,6 +366,16 @@ const NotificationHistory = () => {
                           </Tooltip>
                         )}
                       </TableCell>
+                      <TableCell>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          startIcon={<WhatsAppIcon />}
+                          onClick={() => openPreview(notification)}
+                        >
+                          Ver mensaje
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -372,6 +399,30 @@ const NotificationHistory = () => {
           />
         </CardContent>
       </Card>
+
+      {/* Modal de vista previa del mensaje */}
+      <Dialog open={previewOpen} onClose={closePreview} maxWidth="sm" fullWidth>
+        <DialogTitle>Mensaje de WhatsApp</DialogTitle>
+        <DialogContent dividers>
+          {selectedNotification && (
+            <Box display="flex" flexDirection="column" gap={1}>
+              <Typography variant="body2"><strong>Cliente:</strong> {selectedNotification.clientName}</Typography>
+              <Typography variant="body2"><strong>Teléfono:</strong> {selectedNotification.clientPhone}</Typography>
+              <Typography variant="body2"><strong>Tipo:</strong> {getMessageTypeLabel(selectedNotification.messageType)}</Typography>
+              <Typography variant="body2"><strong>Estado:</strong> {getStatusLabel(selectedNotification.status)}</Typography>
+              <Box mt={2} p={2} sx={{ bgcolor: (t) => t.palette.background.default, borderRadius: 1 }}>
+                <Typography variant="subtitle2" gutterBottom>Contenido</Typography>
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
+                  {selectedNotification.messageBody || '(sin contenido)'}
+                </Typography>
+              </Box>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closePreview}>Cerrar</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
