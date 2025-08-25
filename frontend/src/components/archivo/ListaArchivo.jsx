@@ -370,10 +370,22 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
   /**
    * Cambiar estado del documento
    */
-  const handleCambiarEstado = async (nuevoEstado) => {
-    if (!selectedDocument) return;
+  const handleCambiarEstado = async (docOrNuevoEstado, maybeEstado) => {
+    // Soporta firma antigua handleCambiarEstado('LISTO') y nueva handleCambiarEstado(documento, 'LISTO')
+    let targetDoc;
+    let nuevoEstado;
+    if (typeof docOrNuevoEstado === 'string') {
+      targetDoc = selectedDocument;
+      nuevoEstado = docOrNuevoEstado;
+    } else {
+      targetDoc = docOrNuevoEstado;
+      nuevoEstado = maybeEstado;
+      setSelectedDocument(targetDoc);
+    }
 
-    console.log(`🚀 handleCambiarEstado: ${selectedDocument.protocolNumber} → ${nuevoEstado}`);
+    if (!targetDoc) return;
+
+    console.log(`🚀 handleCambiarEstado: ${targetDoc.protocolNumber} → ${nuevoEstado}`);
     
     // Verificar si requiere confirmación
     const confirmationInfo = requiresConfirmation(selectedDocument.status, nuevoEstado);
@@ -390,7 +402,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
     } else {
       // Proceder directamente
       try {
-        const response = await onEstadoChange(selectedDocument.id, nuevoEstado);
+        const response = await onEstadoChange(targetDoc.id, nuevoEstado);
         if (response.success && onRefresh) {
           onRefresh();
         }
@@ -602,8 +614,10 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
   /**
    * Entregar documento individual
    */
-  const handleSingleDelivery = () => {
-    if (!selectedDocument) return;
+  const handleSingleDelivery = (doc) => {
+    const targetDoc = doc || selectedDocument;
+    if (!targetDoc) return;
+    setSelectedDocument(targetDoc);
     setShowSingleDeliveryModal(true);
     handleMenuClose();
   };
@@ -989,9 +1003,14 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                       bgcolor: 'action.selected'
                     })
                   }}
+                  onClick={() => {
+                    setSelectedDocument(documento);
+                    setDetailModalOpen(true);
+                  }}
                 >
                   <TableCell padding="checkbox">
                     <Checkbox
+                      onClick={(e) => e.stopPropagation()}
                       checked={bulkActions.selectedDocuments.has(documento.id)}
                       onChange={() => bulkActions.toggleDocumentSelection(
                         documento.id, 
@@ -1175,7 +1194,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                           startIcon={<StatusIcon />}
                           onClick={(e) => { 
                             e.stopPropagation(); 
-                            handleCambiarEstado('LISTO');
+                            handleCambiarEstado(documento, 'LISTO');
                           }}
                         >
                           Marcar Listo
@@ -1190,7 +1209,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                           startIcon={<DeliveryIcon />}
                           onClick={(e) => { 
                             e.stopPropagation(); 
-                            handleSingleDelivery();
+                            handleSingleDelivery(documento);
                           }}
                         >
                           Entregar
