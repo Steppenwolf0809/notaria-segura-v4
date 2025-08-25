@@ -7,12 +7,12 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
-    "build:pkg": "pkg src/cli.cjs --target node18-win-x64 --output dist/xml-service.exe",
+    "build:pkg": "pkg . --target node18-win-x64 --output dist/xml-service.exe",
     "build:nexe": "nexe -i src/index.js -o dist/xml-service.exe -t windows-x64",
     "clean": "rimraf dist"
   },
   "bin": {
-    "xml-watcher-service": "src/cli.cjs"
+    "xml-watcher-service": "src/index.js"
   },
   "dependencies": {
     "axios": "^1.7.7",
