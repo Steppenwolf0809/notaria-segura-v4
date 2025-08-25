@@ -65,14 +65,14 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
       const response = await archivoService.cambiarEstadoDocumento(token, documentoId, nuevoEstado);
 
       if (response.success) {
-        // Actualizar documento en el estado local
-        setDocumentos(prev => 
-          prev.map(doc => 
-            doc.id === documentoId 
-              ? { ...doc, status: nuevoEstado }
-              : doc
-          )
-        );
+        // Usar documento actualizado del backend si viene en la respuesta
+        const updated = response.data?.documento;
+        if (updated) {
+          setDocumentos(prev => prev.map(doc => (doc.id === documentoId ? { ...doc, ...updated } : doc)));
+        } else {
+          // Fallback mínimo: solo estado
+          setDocumentos(prev => prev.map(doc => (doc.id === documentoId ? { ...doc, status: nuevoEstado } : doc)));
+        }
 
         // Actualizar dashboard si está disponible
         if (onDataUpdate) {
