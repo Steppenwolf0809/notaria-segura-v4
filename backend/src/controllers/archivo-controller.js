@@ -234,6 +234,13 @@ async function cambiarEstadoDocumento(req, res) {
     if (documento.isGrouped && documento.documentGroupId) {
       console.log(`🔗 Documento ${id} es parte de un grupo, sincronizando cambio de estado...`);
       
+      // Sincronización grupal: si el código fue generado solo para este documento,
+      // no propagar codigoRetiro al resto del grupo, solo el estado.
+      const dataGroupSync = { ...updateData };
+      if (codigoGenerado) {
+        delete dataGroupSync.codigoRetiro;
+      }
+
       // Actualizar todos los documentos del grupo
       await prisma.document.updateMany({
         where: {
@@ -241,7 +248,7 @@ async function cambiarEstadoDocumento(req, res) {
           isGrouped: true,
           assignedToId: userId // Solo documentos asignados al mismo usuario
         },
-        data: updateData
+        data: dataGroupSync
       });
       
       // Obtener todos los documentos actualizados del grupo
@@ -270,7 +277,7 @@ async function cambiarEstadoDocumento(req, res) {
     let whatsappSent = false;
     let whatsappError = null;
     
-    if (nuevoEstado === 'LISTO' && codigoGenerado) {
+    if (nuevoEstado === 'LISTO' && (codigoGenerado || updateData.codigoRetiro)) {
       try {
         const clienteData = {
           clientName: documento.clientName,
@@ -278,14 +285,14 @@ async function cambiarEstadoDocumento(req, res) {
         };
         
         const documentoData = {
-          tipoDocumento: documento.tipoDocumento,
+          tipoDocumento: documento.documentType,
           protocolNumber: documento.protocolNumber
         };
 
         const whatsappResult = await whatsappService.enviarDocumentoListo(
           clienteData, 
           documentoData, 
-          codigoGenerado
+          codigoGenerado || updateData.codigoRetiro
         );
 
         console.log('✅ Notificación WhatsApp enviada desde archivo:', whatsappResult.messageId || 'simulado');
@@ -443,7 +450,8 @@ async function procesarEntregaDocumento(req, res) {
         });
       }
       
-      if (documento.codigoRetiro !== codigoVerificacion) {
+      const expectedCode = documento.codigoRetiro || documento.verificationCode || documento.groupVerificationCode;
+      if (!expectedCode || expectedCode !== codigoVerificacion) {
         return res.status(400).json({
           success: false,
           message: 'Código de verificación incorrecto'

@@ -1,0 +1,45 @@
+{
+  "name": "xml-watcher-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Servicio standalone para monitorear carpeta y subir XMLs a Railway",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "build:pkg": "pkg . --target node18-win-x64 --output dist/xml-service.exe",
+    "build:nexe": "nexe -i src/index.js -o dist/xml-service.exe -t windows-x64",
+    "clean": "rimraf dist"
+  },
+  "bin": {
+    "xml-watcher-service": "src/index.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.7",
+    "chokidar": "^3.6.0",
+    "dotenv": "^16.4.5",
+    "form-data": "^4.0.0",
+    "fs-extra": "^11.2.0",
+    "p-queue": "^8.0.1",
+    "winston": "^3.13.0",
+    "winston-daily-rotate-file": "^5.0.0",
+    "yargs": "^17.7.2",
+    "adm-zip": "^0.5.12",
+    "pretty-bytes": "^6.1.1"
+  },
+  "devDependencies": {
+    "nexe": "^3.3.7",
+    "pkg": "^5.8.1",
+    "rimraf": "^5.0.5"
+  },
+  "pkg": {
+    "assets": [
+      "config.json"
+    ],
+    "targets": [
+      "node18-win-x64"
+    ]
+  }
+}
+
+

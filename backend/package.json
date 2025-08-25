@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@prisma/client": "^5.7.0",
+    "chokidar": "^3.6.0",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^2.4.0",
     "compression": "^1.8.1",

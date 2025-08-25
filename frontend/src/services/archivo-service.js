@@ -136,7 +136,8 @@ api.interceptors.request.use(
 
 const procesarEntrega = async (documentoId, entregaData) => {
   try {
-    const response = await api.post(`/arquivo/documentos/${documentoId}/entregar`, entregaData);
+    // Corrección de ruta: '/archivo' (no '/arquivo')
+    const response = await api.post(`/archivo/documentos/${documentoId}/entregar`, entregaData);
     return {
       success: true,
       data: response.data.data,
