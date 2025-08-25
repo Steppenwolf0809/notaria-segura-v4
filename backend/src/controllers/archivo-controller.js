@@ -732,9 +732,9 @@ async function supervisionGeneral(req, res) {
       prisma.document.count({ where })
     ]);
 
-    // Calcular alertas de tiempo para cada documento
+    // Calcular alertas de tiempo para cada documento (basado en fecha de creación para backlog)
     const documentosConAlertas = documentos.map(doc => {
-      const diasEnEstado = Math.floor((new Date() - new Date(doc.updatedAt)) / (1000 * 60 * 60 * 24));
+      const diasEnEstado = Math.floor((Date.now() - new Date(doc.createdAt).getTime()) / (1000 * 60 * 60 * 24));
       
       let alerta = { nivel: 'normal', icono: '', dias: diasEnEstado };
       
@@ -800,7 +800,7 @@ async function resumenGeneral(req, res) {
 
     // Obtener todos los documentos para calcular alertas
     const todosDocumentos = await prisma.document.findMany({
-      select: { updatedAt: true, status: true }
+      select: { createdAt: true, status: true }
     });
 
     // Calcular documentos con alertas
@@ -808,7 +808,7 @@ async function resumenGeneral(req, res) {
     let atrasadosRojo = 0;
 
     todosDocumentos.forEach(doc => {
-      const diasEnEstado = Math.floor((new Date() - new Date(doc.updatedAt)) / (1000 * 60 * 60 * 24));
+      const diasEnEstado = Math.floor((Date.now() - new Date(doc.createdAt).getTime()) / (1000 * 60 * 60 * 24));
       
       if (diasEnEstado >= 15) {
         atrasadosRojo++;
