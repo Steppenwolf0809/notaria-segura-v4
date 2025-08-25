@@ -12,7 +12,8 @@ class WhatsAppService {
     constructor() {
         this.client = null;
         this.isEnabled = process.env.WHATSAPP_ENABLED === 'true';
-        this.fromNumber = process.env.TWILIO_WHATSAPP_FROM;
+        // Compatibilidad: aceptar TWILIO_PHONE_NUMBER si TWILIO_WHATSAPP_FROM no está definido
+        this.fromNumber = process.env.TWILIO_WHATSAPP_FROM || process.env.TWILIO_PHONE_NUMBER;
         this.isDevelopment = process.env.NODE_ENV === 'development';
         
         // Configuración de la notaría

@@ -2564,7 +2564,9 @@ async function deliverDocument(req, res) {
         });
       }
 
-      const expectedCode = document.verificationCode || document.groupVerificationCode || document.codigoRetiro;
+      // Preferir el código que ve recepción en el frontend: codigoRetiro
+      // Fallback a verificationCode (flujo antiguo) y groupVerificationCode
+      const expectedCode = document.codigoRetiro || document.verificationCode || document.groupVerificationCode;
       if (!expectedCode || expectedCode !== codigoVerificacion) {
         return res.status(400).json({
           success: false,
