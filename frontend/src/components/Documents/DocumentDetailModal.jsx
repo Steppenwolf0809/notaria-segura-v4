@@ -694,6 +694,17 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
           Editar Información
         </Button>
         
+        {/* Botón para ver último WhatsApp */}
+        <Button
+          onClick={async () => { await loadLastWhatsapp(); setWhatsAppModalOpen(true); }}
+          variant="outlined"
+          startIcon={<WhatsAppIcon />}
+          disabled={!localDocument?.clientPhone}
+          sx={{ mr: 1 }}
+        >
+          Ver Mensaje
+        </Button>
+
         {actionConfig && (
           <Button
             onClick={handleAction}
@@ -741,6 +752,13 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
         onClose={() => setShowMatrizadorDeliveryModal(false)}
         document={localDocument}
         onDocumentDelivered={handleMatrizadorDelivered}
+      />
+
+      {/* Modal Preview WhatsApp */}
+      <WhatsAppPreviewModal
+        open={whatsAppModalOpen}
+        onClose={() => setWhatsAppModalOpen(false)}
+        notification={lastWhatsapp}
       />
     </Dialog>
   );

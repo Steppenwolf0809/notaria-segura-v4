@@ -29,6 +29,7 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import WhatsAppPreviewModal from '../Documents/WhatsAppPreviewModal';
 
 /**
  * Componente para mostrar el historial de notificaciones WhatsApp
@@ -41,6 +42,8 @@ const NotificationHistory = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
+  const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
+  const [selectedNotification, setSelectedNotification] = useState(null);
 
   /**
    * Cargar historial de notificaciones
@@ -200,6 +203,19 @@ ${notification.messageBody}`;
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  /**
+   * Abrir preview de mensaje WhatsApp
+   */
+  const handlePreview = (notification) => {
+    setSelectedNotification(notification);
+    setWhatsappModalOpen(true);
+  };
+
+  const handleClosePreview = () => {
+    setWhatsappModalOpen(false);
+    setSelectedNotification(null);
   };
 
   /**
@@ -369,6 +385,16 @@ ${notification.messageBody}`;
                     </TableCell>
                     
                     <TableCell>
+                      <Tooltip title="Ver mensaje">
+                        <IconButton
+                          size="small"
+                          color="success"
+                          onClick={() => handlePreview(notification)}
+                          sx={{ mr: 0.5 }}
+                        >
+                          <WhatsAppIcon sx={{ fontSize: 18 }} />
+                        </IconButton>
+                      </Tooltip>
                       <Tooltip title="Descargar mensaje">
                         <IconButton
                           size="small"
@@ -400,6 +426,13 @@ ${notification.messageBody}`;
           }
         />
       </Paper>
+      {/* Modal de preview de WhatsApp */}
+      <WhatsAppPreviewModal
+        open={whatsappModalOpen}
+        onClose={handleClosePreview}
+        notification={selectedNotification}
+      />
+
     </Box>
   );
 };
