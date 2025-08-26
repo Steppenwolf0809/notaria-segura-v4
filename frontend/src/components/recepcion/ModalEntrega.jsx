@@ -24,7 +24,7 @@ import archivoService from '../../services/archivo-service';
 
 /**
  * Modal para procesar entrega individual de documento, reconstruido con Material-UI
- * Ahora soporta tanto RECEPCIÓN como ARQUIVO usando el servicio correcto
+ * Ahora soporta tanto RECEPCIÓN como ARCHIVO usando el servicio correcto
  */
 function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'reception' }) {
   const [formData, setFormData] = useState({
@@ -101,7 +101,7 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
       setError(null);
 
       // Usar el servicio correcto según el tipo
-      const service = serviceType === 'arquivo' ? archivoService : receptionService;
+      const service = serviceType === 'archivo' ? archivoService : receptionService;
       const result = await service.procesarEntrega(documento.id, formData);
 
       if (result.success) {

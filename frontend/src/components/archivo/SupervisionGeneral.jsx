@@ -38,6 +38,7 @@ import {
   Person as PersonIcon
 } from '@mui/icons-material';
 import archivoService from '../../services/archivo-service';
+import DocumentDetailModal from '../Documents/DocumentDetailModal';
 import useAuth from '../../hooks/use-auth';
 import useDebounce from '../../hooks/useDebounce';
 
@@ -55,6 +56,8 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(20);
   const [totalDocuments, setTotalDocuments] = useState(0);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState(null);
   
   const [filtros, setFiltros] = useState({
     search: '',
@@ -147,6 +150,19 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
       console.error('Error:', error);
       setError('Error de conexión');
     }
+  };
+
+  /**
+   * Abrir modal de detalle en modo solo lectura
+   */
+  const handleOpenDetail = (doc) => {
+    setSelectedDocument(doc);
+    setDetailModalOpen(true);
+  };
+
+  const handleCloseDetail = () => {
+    setDetailModalOpen(false);
+    setSelectedDocument(null);
   };
 
   /**
@@ -550,7 +566,7 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
                   
                   <TableCell>
                     <Tooltip title="Ver detalles (solo lectura)">
-                      <IconButton size="small">
+                      <IconButton size="small" onClick={() => handleOpenDetail(documento)}>
                         <ViewIcon />
                       </IconButton>
                     </Tooltip>
@@ -586,6 +602,20 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
           }
         />
       </Paper>
+      {/* Modal de detalle reutilizando el componente general en modo lectura */}
+      {detailModalOpen && selectedDocument && (
+        <DocumentDetailModal
+          open={detailModalOpen}
+          onClose={handleCloseDetail}
+          document={selectedDocument}
+          onDocumentUpdated={() => {
+            // Refrescar lista por si cambió algo relevante
+            cargarDocumentos();
+            onDataUpdate?.();
+          }}
+        />
+      )}
+
     </Box>
   );
 };
