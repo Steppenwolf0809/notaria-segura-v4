@@ -374,7 +374,7 @@ async function cambiarEstadoDocumento(req, res) {
 }
 
 /**
- * Procesar entrega de documento propio (nueva funcionalidad ARQUIVO = RECEPCIÓN)
+ * Procesar entrega de documento propio (nueva funcionalidad ARCHIVO = RECEPCIÓN)
  * FUNCIONALIDAD: Equivalente a recepción pero para documentos de archivo
  */
 async function procesarEntregaDocumento(req, res) {
@@ -462,7 +462,7 @@ async function procesarEntregaDocumento(req, res) {
     // 🔗 NUEVA FUNCIONALIDAD: Si el documento está agrupado, entregar todos los documentos del grupo
     let groupDocuments = [];
     if (documento.isGrouped && documento.documentGroupId) {
-      console.log(`🔗 ARQUIVO: Documento ${documento.protocolNumber} está agrupado, entregando grupo completo`);
+      console.log(`🔗 ARCHIVO: Documento ${documento.protocolNumber} está agrupado, entregando grupo completo`);
       
       // Buscar todos los documentos del grupo que estén LISTO
       const groupDocsToDeliver = await prisma.document.findMany({
@@ -475,7 +475,7 @@ async function procesarEntregaDocumento(req, res) {
       });
 
       if (groupDocsToDeliver.length > 0) {
-        console.log(`🚚 ARQUIVO: Entregando ${groupDocsToDeliver.length + 1} documentos del grupo automáticamente`);
+        console.log(`🚚 ARCHIVO: Entregando ${groupDocsToDeliver.length + 1} documentos del grupo automáticamente`);
         
         // Actualizar todos los documentos del grupo
         await prisma.document.updateMany({
@@ -491,7 +491,7 @@ async function procesarEntregaDocumento(req, res) {
             facturaPresenta: facturaPresenta || false,
             fechaEntrega: new Date(),
             usuarioEntregaId: userId,
-            observacionesEntrega: observaciones || `Entregado grupalmente junto con ${documento.protocolNumber} por ARQUIVO`
+            observacionesEntrega: observaciones || `Entregado grupalmente junto con ${documento.protocolNumber} por ARCHIVO`
           }
         });
 
@@ -502,7 +502,7 @@ async function procesarEntregaDocumento(req, res) {
               documentId: doc.id,
               userId: userId,
               eventType: 'STATUS_CHANGED',
-              description: `Documento entregado grupalmente por ARQUIVO a ${entregadoA}`,
+              description: `Documento entregado grupalmente por ARCHIVO a ${entregadoA}`,
               metadata: {
                 entregadoA,
                 cedulaReceptor,
@@ -511,7 +511,7 @@ async function procesarEntregaDocumento(req, res) {
                 facturaPresenta: facturaPresenta || false,
                 deliveredWith: documento.protocolNumber,
                 groupDelivery: true,
-                deliveredBy: 'ARQUIVO'
+                deliveredBy: 'ARCHIVO'
               }
             }
           });
@@ -560,7 +560,7 @@ async function procesarEntregaDocumento(req, res) {
           entregado_a: entregadoA,
           deliveredTo: entregadoA,
           fecha: new Date(),
-          usuario_entrega: `${req.user.firstName} ${req.user.lastName} (ARQUIVO)`,
+          usuario_entrega: `${req.user.firstName} ${req.user.lastName} (ARCHIVO)`,
           // Campos opcionales y condicionales
           cedulaReceptor,
           cedula_receptor: cedulaReceptor,
@@ -590,12 +590,12 @@ async function procesarEntregaDocumento(req, res) {
         
         if (!whatsappResult.success) {
           whatsappError = whatsappResult.error;
-          console.error('Error enviando WhatsApp de entrega arquivo:', whatsappResult.error);
+          console.error('Error enviando WhatsApp de entrega archivo:', whatsappResult.error);
         } else {
-          console.log('📱 Notificação WhatsApp de entrega arquivo enviada exitosamente');
+          console.log('📱 Notificación WhatsApp de entrega archivo enviada exitosamente');
         }
       } catch (error) {
-        console.error('Error en servicio WhatsApp para entrega arquivo:', error);
+        console.error('Error en servicio WhatsApp para entrega archivo:', error);
         whatsappError = error.message;
       }
     }
@@ -645,7 +645,7 @@ async function procesarEntregaDocumento(req, res) {
     });
 
   } catch (error) {
-    console.error('Error procesando entrega arquivo:', error);
+    console.error('Error procesando entrega archivo:', error);
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor'

@@ -53,8 +53,8 @@ router.get('/mis-documentos', authenticateToken, requireArchivo, listarMisDocume
 router.post('/documentos/:id/estado', authenticateToken, requireArchivo, cambiarEstadoDocumento);
 
 /**
- * @route POST /api/arquivo/documentos/:id/entregar
- * @desc Procesar entrega de documento propio del arquivo (equivalente a recepción)
+ * @route POST /api/archivo/documentos/:id/entregar
+ * @desc Procesar entrega de documento propio del archivo (equivalente a recepción)
  * @param id - ID del documento a entregar
  * @body entregadoA - Nombre de quien retira el documento
  * @body cedulaReceptor - Cédula/ID de quien retira (opcional)
@@ -63,7 +63,7 @@ router.post('/documentos/:id/estado', authenticateToken, requireArchivo, cambiar
  * @body verificacionManual - Si es verificación manual (sin código)
  * @body facturaPresenta - Si presentó factura
  * @body observaciones - Observaciones adicionales
- * @access Private (ARQUIVO only)
+ * @access Private (ARCHIVO only)
  */
 router.post('/documentos/:id/entregar', authenticateToken, requireArchivo, procesarEntregaDocumento);
 

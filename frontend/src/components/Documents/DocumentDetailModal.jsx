@@ -41,7 +41,8 @@ import {
   Edit as EditIcon,
   History as HistoryIcon,
   Info as InfoIcon,
-  Notifications as NotificationIcon
+  Notifications as NotificationIcon,
+  WhatsApp as WhatsAppIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -51,6 +52,8 @@ import useDocumentStore from '../../store/document-store';
 import useAuthStore from '../../store/auth-store';
 import EditDocumentModal from './EditDocumentModal';
 import documentService from '../../services/document-service';
+import notificationsService from '../../services/notifications-service';
+import WhatsAppPreviewModal from './WhatsAppPreviewModal';
 
 /**
  * Componente DocumentDetailModal - Modal de detalle avanzado del documento
@@ -69,6 +72,8 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
   const [notificationPolicy, setNotificationPolicy] = useState(
     document?.notificationPolicy || 'automatica'
   );
+  const [whatsAppModalOpen, setWhatsAppModalOpen] = useState(false);
+  const [lastWhatsapp, setLastWhatsapp] = useState(null);
 
   // Actualizar documento local cuando cambie el prop
   useEffect(() => {
@@ -151,6 +156,24 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
     // Notificar al componente padre si existe callback
     if (onDocumentUpdated && deliveryData) {
       onDocumentUpdated(deliveryData);
+    }
+  };
+
+  /**
+   * Cargar último mensaje WhatsApp del documento para preview
+   */
+  const loadLastWhatsapp = async () => {
+    try {
+      const res = await notificationsService.getDocumentNotifications(localDocument.id);
+      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        // Ordenar por fecha descendente por seguridad
+        const sorted = [...res.data].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setLastWhatsapp(sorted[0]);
+      } else {
+        setLastWhatsapp(null);
+      }
+    } catch (e) {
+      setLastWhatsapp(null);
     }
   };
 

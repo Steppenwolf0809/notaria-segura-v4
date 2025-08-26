@@ -70,7 +70,7 @@ const getMisDocumentos = async (token, params = {}) => {
 };
 
 /**
- * Cambiar estado de documento propio (drag & drop)
+ 
  */
 const cambiarEstadoDocumento = async (token, documentoId, nuevoEstado) => {
   try {
@@ -136,7 +136,6 @@ api.interceptors.request.use(
 
 const procesarEntrega = async (documentoId, entregaData) => {
   try {
-    // Corrección de ruta: '/archivo' (no '/arquivo')
     const response = await api.post(`/archivo/documentos/${documentoId}/entregar`, entregaData);
     return {
       success: true,
