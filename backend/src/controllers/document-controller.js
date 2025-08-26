@@ -1,4 +1,5 @@
 import prisma from '../db.js';
+import { getReversionCleanupData, isValidStatus, isReversion as isReversionFn, STATUS_ORDER_LIST } from '../utils/status-transitions.js';
 import { parseXmlDocument, generateVerificationCode } from '../services/xml-parser-service.js';
 import DocumentGroupingService from '../services/document-grouping-service.js';
 import MatrizadorAssignmentService from '../services/matrizador-assignment-service.js';
@@ -434,8 +435,7 @@ async function updateDocumentStatus(req, res) {
     }
 
     // Validar estados válidos
-    const validStatuses = ['PENDIENTE', 'EN_PROCESO', 'LISTO', 'ENTREGADO'];
-    if (!validStatuses.includes(status)) {
+    if (!isValidStatus(status)) {
       return res.status(400).json({
         success: false,
         message: 'Estado no válido'
@@ -462,10 +462,10 @@ async function updateDocumentStatus(req, res) {
     });
 
     // Detectar si es una reversión (estado "hacia atrás")
-    const statusOrder = ['PENDIENTE', 'EN_PROCESO', 'LISTO', 'ENTREGADO'];
+    const statusOrder = STATUS_ORDER_LIST;
     const currentIndex = statusOrder.indexOf(document.status);
     const newIndex = statusOrder.indexOf(status);
-    const isReversion = newIndex < currentIndex;
+    const isReversion = isReversionFn(document.status, status);
 
     console.log('🔄 Análisis de cambio:', {
       currentStatus: document.status,
@@ -484,6 +484,11 @@ async function updateDocumentStatus(req, res) {
 
     // Preparar datos de actualización
     const updateData = { status };
+
+    // Aplicar limpieza cuando hay reversión (como en Recepción)
+    if (isReversion) {
+      Object.assign(updateData, getReversionCleanupData(document.status, status));
+    }
 
     // Verificar permisos según rol y estado
     if (req.user.role === 'MATRIZADOR') {
@@ -586,7 +591,8 @@ async function updateDocumentStatus(req, res) {
     let groupAffected = false;
     
     // Verificar si el documento pertenece a un grupo y si el cambio debe propagarse
-    if (document.documentGroupId && status === 'LISTO') {
+    // Ahora: si el usuario es MATRIZADOR y el documento está agrupado, propagamos SIEMPRE
+    if (document.documentGroupId && req.user.role === 'MATRIZADOR') {
       console.log('🔗 Documento agrupado detectado - Iniciando propagación de estado:', {
         documentGroupId: document.documentGroupId,
         newStatus: status
@@ -626,6 +632,11 @@ async function updateDocumentStatus(req, res) {
         const documentsToUpdate = [];
         for (const doc of groupDocuments) {
           const docUpdateData = { ...updateData };
+          // Limpieza por reversión debe ser por documento según su estado actual
+          if (isReversion) {
+            Object.assign(docUpdateData, getReversionCleanupData(doc.status, status));
+          }
+
           if (status === 'LISTO' && !doc.verificationCode) {
             docUpdateData.verificationCode = generateVerificationCode();
             console.log(`🎯 Código generado para ${doc.protocolNumber}: ${docUpdateData.verificationCode}`);

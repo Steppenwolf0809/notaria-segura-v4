@@ -2,6 +2,7 @@ import twilio from 'twilio';
 import { parsePhoneNumber } from 'libphonenumber-js';
 import prisma from '../db.js';
 import { getActiveTemplateByType } from '../controllers/admin-whatsapp-templates-controller.js';
+import { formatDateTime, formatTimeOnly, formatLongDateTime } from '../utils/timezone.js';
 
 /**
  * Servicio WhatsApp para notificaciones de la notaría
@@ -472,21 +473,7 @@ class WhatsAppService {
      * Formatear fecha de manera legible en español
      */
     formatearFechaLegible(fecha = new Date()) {
-        const meses = [
-            'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-            'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
-        ];
-        
-        const dia = fecha.getDate();
-        const mes = meses[fecha.getMonth()];
-        const año = fecha.getFullYear();
-        const hora = fecha.toLocaleTimeString('es-EC', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true
-        });
-        
-        return `${dia} de ${mes} de ${año}, ${hora}`;
+        return formatLongDateTime(fecha);
     }
 
     /**
@@ -566,23 +553,13 @@ class WhatsAppService {
             documento: variables.documento || 'Documento',
             codigo: variables.codigo || 'XXXX',
             notaria: this.notariaConfig.nombre,
-            fecha: variables.fecha || new Date().toLocaleDateString('es-EC', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-            }),
+            fecha: variables.fecha || formatDateTime(new Date()),
             
             // Variables mejoradas
             nombreCompareciente: variables.nombreCompareciente || variables.cliente || 'Cliente',
             nombreNotariaCompleto: this.notariaConfig.nombre,
             fechaFormateada: this.formatearFechaLegible(variables.fechaEntrega || new Date()),
-            horaEntrega: (variables.fechaEntrega || new Date()).toLocaleTimeString('es-EC', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true
-            }),
+            horaEntrega: formatTimeOnly(variables.fechaEntrega || new Date()),
             contactoConsultas: process.env.NOTARIA_CONTACTO || 'Tel: (02) 2234-567',
             
             // Variables de códigos
@@ -657,13 +634,7 @@ class WhatsAppService {
                 cliente: cliente.nombre || cliente.clientName || 'Cliente',
                 documento: documento.tipo_documento || documento.tipoDocumento || documento.documentType || 'Documento',
                 codigo: datosEntrega.codigo || '',
-                fecha: fechaEntrega.toLocaleDateString('es-EC', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                }),
+                fecha: formatDateTime(fechaEntrega),
                 
                 // Variables mejoradas
                 nombreCompareciente: cliente.nombre || cliente.clientName || 'Cliente',
@@ -723,13 +694,7 @@ Su documento está listo para retiro:
         const tipoDoc = documento.tipo_documento || documento.tipoDocumento || 'Documento';
         const numeroDoc = documento.numero_documento || documento.protocolNumber || '';
         const entregadoA = datosEntrega.entregado_a || datosEntrega.deliveredTo || 'Cliente';
-        const fecha = new Date().toLocaleDateString('es-EC', {
-            day: '2-digit',
-            month: '2-digit', 
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
+        const fecha = formatDateTime(new Date());
 
         return `🏛️ *${this.notariaConfig.nombre}*
 

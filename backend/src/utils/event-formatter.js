@@ -2,6 +2,7 @@
  * Utilidades para formatear eventos del historial de documentos
  * Convierte datos técnicos en mensajes legibles para el usuario
  */
+import { formatLongDateTime } from './timezone.js';
 
 /**
  * Formatea la descripción de un evento para mostrar al usuario
@@ -278,13 +279,8 @@ function formatEventDate(date) {
   }
   
   // Si fue hace más de una semana, mostrar fecha completa
-  return eventDate.toLocaleDateString('es-CO', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  // Mostrar en timezone local de la app (Ecuador por defecto)
+  return formatLongDateTime(eventDate);
 }
 
 /**
