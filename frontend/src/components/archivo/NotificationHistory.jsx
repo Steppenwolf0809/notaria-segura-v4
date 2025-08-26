@@ -30,6 +30,7 @@ import {
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import WhatsAppPreviewModal from '../Documents/WhatsAppPreviewModal';
+import notificationsService from '../../services/notifications-service';
 
 /**
  * Componente para mostrar el historial de notificaciones WhatsApp
@@ -37,6 +38,7 @@ import WhatsAppPreviewModal from '../Documents/WhatsAppPreviewModal';
  */
 const NotificationHistory = () => {
   const [notifications, setNotifications] = useState([]);
+  const [totalNotifications, setTotalNotifications] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(0);
@@ -51,52 +53,30 @@ const NotificationHistory = () => {
   const loadNotifications = async () => {
     setLoading(true);
     setError(null);
-    
     try {
-      // Simulación de datos - reemplazar con llamada real a API
-      const mockData = [
-        {
-          id: '1',
-          clientName: 'Juan Pérez',
-          clientPhone: '0991234567',
-          messageType: 'DOCUMENT_READY',
-          messageBody: 'Su documento CERTIFICACIÓN #2024-001 está listo para retiro',
-          status: 'SENT',
-          documentId: 'doc1',
-          protocolNumber: '2024-001',
-          sentAt: new Date(Date.now() - 3600000), // 1 hora atrás
-          createdAt: new Date(Date.now() - 3600000)
-        },
-        {
-          id: '2',
-          clientName: 'María González',
-          clientPhone: '0987654321',
-          messageType: 'DOCUMENT_DELIVERED',
-          messageBody: 'Su documento PROTOCOLO #2024-002 ha sido entregado',
-          status: 'SENT',
-          documentId: 'doc2',
-          protocolNumber: '2024-002',
-          sentAt: new Date(Date.now() - 7200000), // 2 horas atrás
-          createdAt: new Date(Date.now() - 7200000)
-        },
-        {
-          id: '3',
-          clientName: 'Carlos Rodríguez',
-          clientPhone: '0999888777',
-          messageType: 'DOCUMENT_READY',
-          messageBody: 'Su documento DILIGENCIA #2024-003 está listo para retiro',
-          status: 'FAILED',
-          documentId: 'doc3',
-          protocolNumber: '2024-003',
-          errorMessage: 'Número de teléfono inválido',
-          createdAt: new Date(Date.now() - 10800000) // 3 horas atrás
-        }
-      ];
+      const response = await notificationsService.getNotifications({
+        page,
+        limit: rowsPerPage,
+        search: searchTerm
+      });
 
-      setNotifications(mockData);
+      if (response.success) {
+        // Ordenar por fecha descendente por consistencia visual
+        const list = (response.data.notifications || []).sort(
+          (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+        );
+        setNotifications(list);
+        setTotalNotifications(response.data.pagination?.total || list.length);
+      } else {
+        setNotifications([]);
+        setTotalNotifications(0);
+        setError(response.message || 'Error al cargar el historial de notificaciones');
+      }
     } catch (error) {
       console.error('Error cargando historial de notificaciones:', error);
       setError('Error al cargar el historial de notificaciones');
+      setNotifications([]);
+      setTotalNotifications(0);
     } finally {
       setLoading(false);
     }
@@ -233,10 +213,10 @@ ${notification.messageBody}`;
     setPage(0);
   };
 
-  // Cargar datos al montar el componente
+  // Cargar datos al montar y al cambiar filtros/paginación
   useEffect(() => {
     loadNotifications();
-  }, []);
+  }, [page, rowsPerPage, searchTerm]);
 
   return (
     <Box>
@@ -321,19 +301,16 @@ ${notification.messageBody}`;
                     Cargando...
                   </TableCell>
                 </TableRow>
-              ) : paginatedNotifications.length === 0 ? (
+              ) : notifications.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} sx={{ textAlign: 'center', py: 4 }}>
                     <Typography color="text.secondary">
-                      {filteredNotifications.length === 0 
-                        ? 'No hay notificaciones registradas'
-                        : 'No hay notificaciones que coincidan con la búsqueda'
-                      }
+                      {searchTerm ? 'No hay notificaciones que coincidan con la búsqueda' : 'No hay notificaciones registradas'}
                     </Typography>
                   </TableCell>
                 </TableRow>
               ) : (
-                paginatedNotifications.map((notification) => (
+                notifications.map((notification) => (
                   <TableRow key={notification.id} hover>
                     <TableCell>
                       <Typography variant="body2" sx={{ fontWeight: 500 }}>
@@ -414,7 +391,7 @@ ${notification.messageBody}`;
         {/* Paginación */}
         <TablePagination
           component="div"
-          count={filteredNotifications.length}
+          count={totalNotifications}
           page={page}
           onPageChange={handleChangePage}
           rowsPerPage={rowsPerPage}

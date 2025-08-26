@@ -40,12 +40,14 @@ import {
   Link as LinkIcon,
   Info as InfoIcon
 } from '@mui/icons-material';
+import { Undo as UndoIcon } from '@mui/icons-material';
 import archivoService from '../../services/archivo-service';
 import documentService from '../../services/document-service';
 import { formatCurrency } from '../../utils/currencyUtils';
 import DocumentDetailModal from '../Documents/DocumentDetailModal';
 import EditDocumentModal from '../Documents/EditDocumentModal';
 import ConfirmationModal from '../Documents/ConfirmationModal';
+import ReversionModal from '../recepcion/ReversionModal';
 import ModalEntrega from '../recepcion/ModalEntrega';
 import ModalEntregaGrupal from '../recepcion/ModalEntregaGrupal';
 import QuickGroupingModal from '../grouping/QuickGroupingModal';
@@ -84,6 +86,8 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
   const [confirmationModalOpen, setConfirmationModalOpen] = useState(false);
   const [confirmationData, setConfirmationData] = useState(null);
   const [isConfirmationLoading, setIsConfirmationLoading] = useState(false);
+  const [reversionModalOpen, setReversionModalOpen] = useState(false);
+  const [reversionLoading, setReversionLoading] = useState(false);
 
   // 🔗 ESTADOS PARA AGRUPACIÓN (como en Recepción)
   const [showQuickGroupingModal, setShowQuickGroupingModal] = useState(false);
@@ -412,6 +416,39 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
     }
     
     handleMenuClose();
+  };
+
+  // Reversión de estados (similar a Recepción)
+  const abrirReversionModal = (documento) => {
+    setSelectedDocument(documento);
+    setReversionModalOpen(true);
+    handleMenuClose();
+  };
+
+  const cerrarReversionModal = () => {
+    if (!reversionLoading) {
+      setReversionModalOpen(false);
+      setSelectedDocument(null);
+    }
+  };
+
+  const ejecutarReversion = async ({ documentId, newStatus, reversionReason }) => {
+    try {
+      setReversionLoading(true);
+      const result = await archivoService.revertirEstadoDocumento(documentId, newStatus, reversionReason);
+      if (result.success) {
+        if (onRefresh) onRefresh();
+        cerrarReversionModal();
+      } else {
+        console.error('Error en reversión (archivo):', result.error);
+        alert(result.error || 'Error al revertir el documento');
+      }
+    } catch (error) {
+      console.error('Error en reversión (archivo):', error);
+      alert('Error inesperado al revertir el documento');
+    } finally {
+      setReversionLoading(false);
+    }
   };
 
   /**
@@ -1304,9 +1341,9 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
             Entregar Documento
           </MenuItem>
         )}
-        {selectedDocument?.status === 'ENTREGADO' && (
-          <MenuItem onClick={() => handleCambiarEstado('LISTO')}>
-            Revertir a Listo
+        {selectedDocument && ['LISTO', 'ENTREGADO'].includes(selectedDocument.status) && (
+          <MenuItem onClick={() => abrirReversionModal(selectedDocument)}>
+            <UndoIcon fontSize="small" style={{ marginRight: 8 }} /> Revertir Estado
           </MenuItem>
         )}
       </Menu>
@@ -1342,6 +1379,16 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
           newStatus={confirmationData.newStatus}
           confirmationInfo={confirmationData.confirmationInfo}
           isLoading={isConfirmationLoading}
+        />
+      )}
+
+      {reversionModalOpen && selectedDocument && (
+        <ReversionModal
+          open={reversionModalOpen}
+          onClose={cerrarReversionModal}
+          documento={selectedDocument}
+          onConfirm={ejecutarReversion}
+          loading={reversionLoading}
         />
       )}
 

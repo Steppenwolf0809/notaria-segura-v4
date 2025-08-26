@@ -8,7 +8,8 @@ import {
   supervisionGeneral,
   resumenGeneral,
   obtenerMatrizadores,
-  obtenerDetalleDocumento
+  obtenerDetalleDocumento,
+  revertirEstadoDocumentoArchivo
 } from '../controllers/archivo-controller.js';
 
 const router = express.Router();
@@ -66,6 +67,16 @@ router.post('/documentos/:id/estado', authenticateToken, requireArchivo, cambiar
  * @access Private (ARCHIVO only)
  */
 router.post('/documentos/:id/entregar', authenticateToken, requireArchivo, procesarEntregaDocumento);
+
+/**
+ * @route POST /api/archivo/documentos/:id/revertir-estado
+ * @desc Revertir documento a un estado anterior con razón obligatoria (propaga a grupos)
+ * @param id - ID del documento a revertir
+ * @body newStatus - Nuevo estado (anterior al actual)
+ * @body reversionReason - Razón obligatoria para la reversión
+ * @access Private (ARCHIVO only)
+ */
+router.post('/documentos/:id/revertir-estado', authenticateToken, requireArchivo, revertirEstadoDocumentoArchivo);
 
 /**
  * ============================================================================

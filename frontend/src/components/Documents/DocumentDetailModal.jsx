@@ -164,11 +164,11 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
    */
   const loadLastWhatsapp = async () => {
     try {
-      const res = await notificationsService.getDocumentNotifications(localDocument.id);
-      if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-        // Ordenar por fecha descendente por seguridad
-        const sorted = [...res.data].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        setLastWhatsapp(sorted[0]);
+      const res = await notificationsService.getNotifications({ search: localDocument.protocolNumber, limit: 10, page: 0 });
+      if (res.success && Array.isArray(res.data?.notifications)) {
+        const docs = res.data.notifications.filter(n => n.document?.id === localDocument.id || n.document?.protocolNumber === localDocument.protocolNumber);
+        const sorted = docs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setLastWhatsapp(sorted[0] || null);
       } else {
         setLastWhatsapp(null);
       }
