@@ -90,6 +90,30 @@ const cambiarEstadoDocumento = async (token, documentoId, nuevoEstado) => {
 };
 
 /**
+ * Revertir estado de documento (ARCHIVO)
+ * Propaga a documentos del mismo grupo asignados al mismo usuario
+ */
+const revertirEstadoDocumento = async (documentoId, newStatus, reversionReason) => {
+  try {
+    const response = await api.post(`/archivo/documentos/${documentoId}/revertir-estado`, {
+      newStatus,
+      reversionReason
+    });
+    return {
+      success: response.data?.success === true,
+      data: response.data?.data,
+      message: response.data?.message
+    };
+  } catch (error) {
+    console.error('Error revirtiendo estado (archivo):', error);
+    return {
+      success: false,
+      error: error.response?.data?.message || 'Error de conexión'
+    };
+  }
+};
+
+/**
  * Procesar entrega de documento (nueva funcionalidad ARQUIVO = RECEPCIÓN)
  */
 /**
@@ -297,6 +321,7 @@ const archivoService = {
   getDashboard,
   getMisDocumentos,
   cambiarEstadoDocumento,
+  revertirEstadoDocumento,
   procesarEntrega,
   
   // Supervisión global

@@ -1,6 +1,7 @@
 import prisma from '../db.js';
 import whatsappService from '../services/whatsapp-service.js';
 import CodigoRetiroService from '../utils/codigo-retiro.js';
+import { getReversionCleanupData, STATUS_ORDER_LIST } from '../utils/status-transitions.js';
 
 /**
  * CONTROLADOR DE ARCHIVO
@@ -960,6 +961,158 @@ async function obtenerDetalleDocumento(req, res) {
   }
 }
 
+/**
+ * Revertir estado de documento (ARCHIVO)
+ * - Solo sobre documentos asignados al usuario (archivo actúa como matrizador)
+ * - Propaga la reversión a documentos del mismo grupo asignados al mismo usuario
+ */
+async function revertirEstadoDocumentoArchivo(req, res) {
+  try {
+    const { id } = req.params;
+    const { newStatus, reversionReason } = req.body;
+    const userId = req.user.id;
+
+    if (!newStatus) {
+      return res.status(400).json({ success: false, message: 'El nuevo estado es obligatorio' });
+    }
+    if (!reversionReason || reversionReason.trim().length === 0) {
+      return res.status(400).json({ success: false, message: 'La razón de la reversión es obligatoria' });
+    }
+
+    // Buscar documento y verificar pertenencia al usuario ARCHIVO
+    const document = await prisma.document.findFirst({
+      where: { id, assignedToId: userId },
+      include: {
+        assignedTo: { select: { id: true, firstName: true, lastName: true } }
+      }
+    });
+
+    if (!document) {
+      return res.status(404).json({ success: false, message: 'Documento no encontrado o no asignado a usted' });
+    }
+
+    const statusOrder = STATUS_ORDER_LIST;
+    const currentIndex = statusOrder.indexOf(document.status);
+    const newIndex = statusOrder.indexOf(newStatus);
+
+    if (!statusOrder.includes(newStatus)) {
+      return res.status(400).json({ success: false, message: 'Estado no válido' });
+    }
+    if (newIndex >= currentIndex) {
+      return res.status(400).json({ success: false, message: 'Solo se pueden revertir estados hacia atrás en el flujo' });
+    }
+
+    // Si está agrupado, revertir todos los del grupo asignados al mismo usuario que estén por delante
+    if (document.isGrouped && document.documentGroupId) {
+      const groupDocuments = await prisma.document.findMany({
+        where: {
+          documentGroupId: document.documentGroupId,
+          isGrouped: true,
+          assignedToId: userId
+        }
+      });
+
+      const docsToRevert = groupDocuments.filter(doc => statusOrder.indexOf(doc.status) > newIndex);
+
+      if (docsToRevert.length === 0) {
+        return res.json({
+          success: true,
+          message: 'No hay documentos del grupo para revertir',
+          data: { groupAffected: true, documentsAffected: 0 }
+        });
+      }
+
+      const updates = await prisma.$transaction(async (tx) => {
+        const results = [];
+        for (const doc of docsToRevert) {
+          const cleanup = getReversionCleanupData(doc.status, newStatus);
+          const updated = await tx.document.update({
+            where: { id: doc.id },
+            data: { status: newStatus, updatedAt: new Date(), ...cleanup }
+          });
+          results.push({ before: doc, after: updated });
+        }
+        return results;
+      });
+
+      // Registrar eventos
+      try {
+        for (const upd of updates) {
+          await prisma.documentEvent.create({
+            data: {
+              documentId: upd.after.id,
+              userId: userId,
+              eventType: 'STATUS_REVERTED',
+              description: `Estado revertido de ${upd.before.status} a ${newStatus} por ${req.user.firstName} ${req.user.lastName} (ARCHIVO) - Razón: ${reversionReason} (propagación grupal)`,
+              details: {
+                previousStatus: upd.before.status,
+                newStatus,
+                isReversion: true,
+                reason: reversionReason,
+                groupPropagation: true,
+                revertedBy: `${req.user.firstName} ${req.user.lastName}`,
+                userRole: 'ARCHIVO',
+                codigoCleared: upd.before.status === 'LISTO' && newIndex < statusOrder.indexOf('LISTO'),
+                deliveryDataCleared: upd.before.status === 'ENTREGADO',
+                timestamp: new Date().toISOString()
+              },
+              ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+              userAgent: req.get('User-Agent') || 'unknown'
+            }
+          });
+        }
+      } catch (auditError) {
+        console.error('Error registrando eventos de reversión (archivo):', auditError);
+      }
+
+      return res.json({
+        success: true,
+        message: `${updates.length} documentos del grupo revertidos a ${newStatus}`,
+        data: { groupAffected: true, documentsAffected: updates.length, newStatus }
+      });
+    }
+
+    // Reversión individual
+    const updateData = { status: newStatus, updatedAt: new Date(), ...getReversionCleanupData(document.status, newStatus) };
+    const updatedDocument = await prisma.document.update({ where: { id }, data: updateData });
+
+    try {
+      await prisma.documentEvent.create({
+        data: {
+          documentId: updatedDocument.id,
+          userId: userId,
+          eventType: 'STATUS_REVERTED',
+          description: `Estado revertido de ${document.status} a ${newStatus} por ${req.user.firstName} ${req.user.lastName} (ARCHIVO) - Razón: ${reversionReason}`,
+          details: {
+            previousStatus: document.status,
+            newStatus,
+            isReversion: true,
+            reason: reversionReason,
+            revertedBy: `${req.user.firstName} ${req.user.lastName}`,
+            userRole: 'ARCHIVO',
+            codigoCleared: document.status === 'LISTO' && newIndex < statusOrder.indexOf('LISTO'),
+            deliveryDataCleared: document.status === 'ENTREGADO',
+            timestamp: new Date().toISOString()
+          },
+          ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown'
+        }
+      });
+    } catch (auditError) {
+      console.error('Error registrando evento de reversión (archivo):', auditError);
+    }
+
+    return res.json({
+      success: true,
+      message: `Documento ${updatedDocument.protocolNumber} revertido a ${newStatus}`,
+      data: { document: updatedDocument, groupAffected: false }
+    });
+  } catch (error) {
+    console.error('Error revirtiendo estado (archivo):', error);
+    return res.status(500).json({ success: false, message: 'Error interno del servidor' });
+  }
+}
+
 // ============================================================================
 // EXPORTAR FUNCIONES
 // ============================================================================
@@ -975,5 +1128,6 @@ export {
   supervisionGeneral,
   resumenGeneral,
   obtenerMatrizadores,
-  obtenerDetalleDocumento
+  obtenerDetalleDocumento,
+  revertirEstadoDocumentoArchivo
 };
