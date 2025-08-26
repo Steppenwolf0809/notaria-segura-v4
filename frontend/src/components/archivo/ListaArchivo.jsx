@@ -244,7 +244,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
    */
   const handleMenuClose = () => {
     setMenuAnchor(null);
-    setSelectedDocument(null);
+    // No limpiar selectedDocument aquí para evitar perder el target de acciones (ej. abrir modales)
   };
 
   /**
@@ -386,15 +386,15 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
     if (!targetDoc) return;
 
     console.log(`🚀 handleCambiarEstado: ${targetDoc.protocolNumber} → ${nuevoEstado}`);
-    
-    // Verificar si requiere confirmación
-    const confirmationInfo = requiresConfirmation(selectedDocument.status, nuevoEstado);
-    
+
+    // Verificar si requiere confirmación sobre el documento objetivo (evitar estado desfasado)
+    const confirmationInfo = requiresConfirmation(targetDoc.status, nuevoEstado);
+
     if (confirmationInfo.requiresConfirmation) {
       console.log('🎯 Cambio requiere confirmación, abriendo modal...');
       setConfirmationData({
-        document: selectedDocument,
-        currentStatus: selectedDocument.status,
+        document: targetDoc,
+        currentStatus: targetDoc.status,
         newStatus: nuevoEstado,
         confirmationInfo: confirmationInfo
       });
@@ -1349,9 +1349,13 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
       {showSingleDeliveryModal && selectedDocument && (
         <ModalEntrega
           documento={selectedDocument}
-          onClose={() => setShowSingleDeliveryModal(false)}
+          onClose={() => {
+            setShowSingleDeliveryModal(false);
+            setSelectedDocument(null);
+          }}
           onEntregaExitosa={() => {
             setShowSingleDeliveryModal(false);
+            setSelectedDocument(null);
             if (onRefresh) {
               onRefresh();
             }
