@@ -268,15 +268,37 @@ const useDocumentStore = create((set, get) => ({
       const result = await documentService.updateDocumentStatus(documentId, newStatus);
       
       if (result.success && result.data && result.data.document) {
-        // Actualizar documento en la lista local
         const currentDocuments = get().documents;
-        const updatedDocuments = currentDocuments.map(doc => 
-          doc.id === documentId ? { ...doc, ...result.data.document } : doc
-        );
-        
-        set({ 
+
+        // Si la operación fue grupal, actualizar todos los documentos del grupo
+        const groupInfo = result.data.groupOperation;
+        let updatedDocuments = currentDocuments;
+
+        if (groupInfo?.isGroupOperation && groupInfo?.groupId && Array.isArray(groupInfo?.allDocuments)) {
+          const groupId = groupInfo.groupId;
+          const docsById = new Map(groupInfo.allDocuments.map(d => [d.id, d]));
+
+          updatedDocuments = currentDocuments.map(doc => {
+            if (doc.documentGroupId === groupId) {
+              const updated = docsById.get(doc.id);
+              return updated ? { ...doc, ...updated } : doc;
+            }
+            // También actualizar el documento disparador por si no trae documentGroupId
+            if (doc.id === documentId) {
+              return { ...doc, ...result.data.document };
+            }
+            return doc;
+          });
+        } else {
+          // Actualización individual (comportamiento existente)
+          updatedDocuments = currentDocuments.map(doc => 
+            doc.id === documentId ? { ...doc, ...result.data.document } : doc
+          );
+        }
+
+        set({
           documents: updatedDocuments,
-          loading: false 
+          loading: false
         });
         
         // Devolver el resultado completo para que el modal pueda usarlo
@@ -481,12 +503,29 @@ const useDocumentStore = create((set, get) => ({
       if (result.success) {
         console.log('✅ STORE: Service respondió exitosamente');
         
-        // Actualizar documento en la lista local
         const currentDocuments = get().documents;
-        const updatedDocuments = currentDocuments.map(doc => 
-          doc.id === documentId ? { ...doc, ...result.data.document } : doc
-        );
-        
+        let updatedDocuments = currentDocuments;
+        const groupInfo = result.data?.groupOperation;
+
+        if (groupInfo?.isGroupOperation && groupInfo?.groupId && Array.isArray(groupInfo?.allDocuments)) {
+          const groupId = groupInfo.groupId;
+          const docsById = new Map(groupInfo.allDocuments.map(d => [d.id, d]));
+          updatedDocuments = currentDocuments.map(doc => {
+            if (doc.documentGroupId === groupId) {
+              const updated = docsById.get(doc.id);
+              return updated ? { ...doc, ...updated } : doc;
+            }
+            if (doc.id === documentId) {
+              return { ...doc, ...result.data.document };
+            }
+            return doc;
+          });
+        } else {
+          updatedDocuments = currentDocuments.map(doc => 
+            doc.id === documentId ? { ...doc, ...result.data.document } : doc
+          );
+        }
+
         console.log('📝 STORE: Actualizando documentos en el estado local');
         console.log('📊 STORE: Documento actualizado:', result.data.document);
         set({ 
