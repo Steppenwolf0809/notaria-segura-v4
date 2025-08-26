@@ -1,4 +1,5 @@
 import { getPrismaClient } from '../db.js';
+import { getReversionCleanupData, isValidStatus, isReversion as isReversionFn, STATUS_ORDER_LIST } from '../utils/status-transitions.js';
 
 const prisma = getPrismaClient();
 import whatsappService from '../services/whatsapp-service.js';
@@ -780,7 +781,7 @@ async function revertirEstadoDocumento(req, res) {
         }
 
         // Validar que es una reversión válida
-        const statusOrder = ['PENDIENTE', 'EN_PROCESO', 'LISTO', 'ENTREGADO'];
+        const statusOrder = STATUS_ORDER_LIST;
         const currentIndex = statusOrder.indexOf(document.status);
         const newIndex = statusOrder.indexOf(newStatus);
 
@@ -805,26 +806,8 @@ async function revertirEstadoDocumento(req, res) {
         });
 
         // Preparar datos de actualización
-        const updateData = { 
-            status: newStatus,
-            updatedAt: new Date()
-        };
-
-        // Si se revierte de LISTO hacia atrás, limpiar código de retiro
-        if (document.status === 'LISTO' && newIndex < statusOrder.indexOf('LISTO')) {
-            updateData.codigoRetiro = null;
-            updateData.verificationCode = null;
-        }
-
-        // Si se revierte de ENTREGADO, limpiar datos de entrega
-        if (document.status === 'ENTREGADO') {
-            updateData.usuarioEntregaId = null;
-            updateData.fechaEntrega = null;
-            updateData.entregadoA = null;
-            updateData.relacionTitular = null;
-            updateData.codigoRetiro = null;
-            updateData.verificationCode = null;
-        }
+        const updateData = { status: newStatus, updatedAt: new Date() };
+        Object.assign(updateData, getReversionCleanupData(document.status, newStatus));
 
         // Actualizar documento
         const updatedDocument = await prisma.$transaction(async (tx) => {
