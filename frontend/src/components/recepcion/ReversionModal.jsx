@@ -32,10 +32,10 @@ const ReversionModal = ({
   const [errors, setErrors] = useState({});
 
   // Opciones de estados anteriores basados en el estado actual
+  // Se elimina "PENDIENTE" porque no existe como estado válido para reversión en el sistema
   const getAvailableStates = (currentStatus) => {
-    const statusOrder = ['PENDIENTE', 'EN_PROCESO', 'LISTO', 'ENTREGADO'];
+    const statusOrder = ['EN_PROCESO', 'LISTO', 'ENTREGADO'];
     const statusLabels = {
-      'PENDIENTE': '⏳ Pendiente',
       'EN_PROCESO': '⚙️ En Proceso', 
       'LISTO': '✅ Listo',
       'ENTREGADO': '📦 Entregado'
