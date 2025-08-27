@@ -40,9 +40,7 @@ import {
   Schedule as ScheduleIcon,
   Edit as EditIcon,
   History as HistoryIcon,
-  Info as InfoIcon,
-  Notifications as NotificationIcon,
-  WhatsApp as WhatsAppIcon
+  Info as InfoIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -53,7 +51,9 @@ import useAuthStore from '../../store/auth-store';
 import EditDocumentModal from './EditDocumentModal';
 import documentService from '../../services/document-service';
 import notificationsService from '../../services/notifications-service';
-import WhatsAppPreviewModal from './WhatsAppPreviewModal';
+import NotificationPolicySelector from '../common/NotificationPolicySelector';
+import ImmediateDeliveryModal from '../common/ImmediateDeliveryModal';
+ 
 
 /**
  * Componente DocumentDetailModal - Modal de detalle avanzado del documento
@@ -68,18 +68,14 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [showMatrizadorDeliveryModal, setShowMatrizadorDeliveryModal] = useState(false);
+  const [showImmediateDeliveryModal, setShowImmediateDeliveryModal] = useState(false);
   const [localDocument, setLocalDocument] = useState(document);
-  const [notificationPolicy, setNotificationPolicy] = useState(
-    document?.notificationPolicy || 'automatica'
-  );
-  const [whatsAppModalOpen, setWhatsAppModalOpen] = useState(false);
-  const [lastWhatsapp, setLastWhatsapp] = useState(null);
+  
 
   // Actualizar documento local cuando cambie el prop
   useEffect(() => {
     if (document) {
       setLocalDocument(document);
-      setNotificationPolicy(document.notificationPolicy || 'automatica');
     }
   }, [document]);
 
@@ -159,23 +155,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
     }
   };
 
-  /**
-   * Cargar último mensaje WhatsApp del documento para preview
-   */
-  const loadLastWhatsapp = async () => {
-    try {
-      const res = await notificationsService.getNotifications({ search: localDocument.protocolNumber, limit: 10, page: 0 });
-      if (res.success && Array.isArray(res.data?.notifications)) {
-        const docs = res.data.notifications.filter(n => n.document?.id === localDocument.id || n.document?.protocolNumber === localDocument.protocolNumber);
-        const sorted = docs.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        setLastWhatsapp(sorted[0] || null);
-      } else {
-        setLastWhatsapp(null);
-      }
-    } catch (e) {
-      setLastWhatsapp(null);
-    }
-  };
+  
 
   /**
    * Manejar entrega de documento desde modal simplificado de matrizador
@@ -197,51 +177,6 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
     // Notificar al componente padre si existe callback
     if (onDocumentUpdated && deliveryData) {
       onDocumentUpdated(deliveryData);
-    }
-  };
-
-  /**
-   * 🔔 GUARDAR POLÍTICA DE NOTIFICACIÓN
-   * Actualiza la política para el documento o todo el grupo
-   */
-  const handleSaveNotificationPolicy = async () => {
-    try {
-      setActionLoading(true);
-      console.log('💾 Guardando política de notificación:', {
-        documentId: localDocument.id,
-        isGrouped: localDocument.isGrouped,
-        policy: notificationPolicy
-      });
-
-      // TODO: Implementar llamada al backend para guardar política
-      // Si es documento agrupado, debe afectar a todo el grupo
-      // if (localDocument.isGrouped) {
-      //   await documentService.updateGroupNotificationPolicy(localDocument.groupId, notificationPolicy);
-      // } else {
-      //   await documentService.updateNotificationPolicy(localDocument.id, notificationPolicy);
-      // }
-
-      // Simular guardado exitoso
-      setLocalDocument(prev => ({
-        ...prev,
-        notificationPolicy
-      }));
-
-      console.log('✅ Política de notificación actualizada exitosamente');
-      
-      // Notificar al componente padre
-      if (onDocumentUpdated) {
-        onDocumentUpdated({
-          ...localDocument,
-          notificationPolicy
-        });
-      }
-
-    } catch (error) {
-      console.error('❌ Error guardando política de notificación:', error);
-      // TODO: Mostrar mensaje de error al usuario
-    } finally {
-      setActionLoading(false);
     }
   };
 
@@ -272,6 +207,16 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
   const getActionButton = () => {
     switch (document.status) {
       case 'PENDIENTE':
+        // Si la política es de entrega inmediata, permitir saltar directamente a ENTREGADO
+        if (localDocument?.notificationPolicy === 'entrega_inmediata') {
+          return {
+            text: 'Entregar Inmediatamente',
+            action: 'ENTREGADO',
+            color: 'warning',
+            icon: <LocalShippingIcon />
+          };
+        }
+        
         return {
           text: 'Iniciar Procesamiento',
           action: 'EN_PROCESO',
@@ -279,6 +224,16 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
           icon: <ScheduleIcon />
         };
       case 'EN_PROCESO':
+        // Si la política es de entrega inmediata, permitir saltar directamente a ENTREGADO
+        if (localDocument?.notificationPolicy === 'entrega_inmediata') {
+          return {
+            text: 'Entregar Inmediatamente',
+            action: 'ENTREGADO',
+            color: 'warning',
+            icon: <LocalShippingIcon />
+          };
+        }
+        
         return {
           text: 'Marcar como Listo y Notificar',
           action: 'LISTO',
@@ -286,14 +241,52 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
           icon: <CheckCircleIcon />
         };
       case 'LISTO':
+        // Cambiar texto según política de notificación
+        const deliveryText = localDocument?.notificationPolicy === 'entrega_inmediata' 
+          ? 'Entregar Inmediatamente'
+          : 'Marcar como Entregado';
+        
         return {
-          text: 'Marcar como Entregado',
+          text: deliveryText,
           action: 'ENTREGADO',
-          color: 'default',
+          color: localDocument?.notificationPolicy === 'entrega_inmediata' ? 'warning' : 'default',
           icon: <LocalShippingIcon />
         };
       default:
         return null;
+    }
+  };
+
+  /**
+   * Obtener estado anterior disponible (para ARCHIVO)
+   */
+  const getPreviousStatus = (status) => {
+    const order = ['PENDIENTE', 'EN_PROCESO', 'LISTO', 'ENTREGADO'];
+    const idx = order.indexOf(status);
+    return idx > 0 ? order[idx - 1] : null;
+  };
+
+  /**
+   * Revertir estado al anterior con razón obligatoria (rol ARCHIVO)
+   */
+  const handleRevert = async (targetStatus) => {
+    if (!targetStatus) return;
+    const reason = prompt('Ingrese la razón para revertir el estado:');
+    if (!reason || !reason.trim()) return;
+    setActionLoading(true);
+    try {
+      const result = await documentService.revertDocumentStatus(document.id, targetStatus, reason.trim());
+      if (result.success) {
+        setLocalDocument(prev => ({ ...prev, status: targetStatus }));
+        alert(result.message || `Documento revertido a ${targetStatus}`);
+      } else {
+        const errorMsg = result.error || result.message || 'No se pudo revertir el estado';
+        alert('Error: ' + errorMsg);
+      }
+    } catch (error) {
+      alert('Error al revertir estado: ' + error.message);
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -304,9 +297,12 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
     const actionConfig = getActionButton();
     if (!actionConfig) return;
 
-    // Si es para marcar como entregado, abrir modal apropiado según rol
+    // Si es para marcar como entregado, verificar política de notificación
     if (actionConfig.action === 'ENTREGADO') {
-      if (user?.role === 'MATRIZADOR') {
+      // Si la política es de entrega inmediata, abrir modal específico
+      if (localDocument?.notificationPolicy === 'entrega_inmediata') {
+        setShowImmediateDeliveryModal(true);
+      } else if (user?.role === 'MATRIZADOR') {
         setShowMatrizadorDeliveryModal(true);
       } else {
         setShowDeliveryModal(true);
@@ -344,6 +340,9 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
           }
           
           alert(alertMessage);
+          if (typeof onClose === 'function') {
+            onClose();
+          }
         } else {
           alert(message);
         }
@@ -363,6 +362,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
   };
 
   const actionConfig = getActionButton();
+  const previousStatus = getPreviousStatus(localDocument?.status);
 
   return (
     <Dialog
@@ -600,59 +600,20 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
           </Box>
         )}
 
-        {/* 🔔 CONFIGURACIÓN DE NOTIFICACIÓN */}
-        <Box sx={{ 
-          p: 3, 
-          borderTop: (theme) => theme.palette.mode === 'dark' 
-            ? '1px solid rgba(255, 255, 255, 0.1)' 
-            : '1px solid #e0e0e0',
-          bgcolor: (theme) => theme.palette.mode === 'dark' 
-            ? 'rgba(255, 255, 255, 0.02)' 
-            : 'rgba(23, 162, 184, 0.02)'
-        }}>
-          <Typography variant="h6" sx={{ 
-            color: (theme) => theme.palette.mode === 'dark' ? '#fff' : '#162840', 
-            mb: 2, 
-            fontSize: '1rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1
-          }}>
-            <NotificationIcon sx={{ 
-              color: (theme) => theme.palette.mode === 'dark' ? '#17a2b8' : '#162840'
-            }} />
-            Configuración de Notificaciones
-            {localDocument.isGrouped && (
-              <Chip 
-                label="Afecta a todo el grupo" 
-                size="small" 
-                color="warning"
-                sx={{ ml: 1 }}
-              />
-            )}
-          </Typography>
-          
-          <FormControl fullWidth sx={{ maxWidth: 400 }}>
-            <InputLabel>Política de Notificación</InputLabel>
-            <Select
-              value={notificationPolicy}
-              onChange={(e) => setNotificationPolicy(e.target.value)}
-              label="Política de Notificación"
-            >
-              <MenuItem value="automatica">🔔 Notificar automáticamente</MenuItem>
-              <MenuItem value="no_notificar">🚫 No notificar</MenuItem>
-              <MenuItem value="entrega_inmediata">⚡ Entrega inmediata</MenuItem>
-            </Select>
-          </FormControl>
-
-          {localDocument.isGrouped && (
-            <Alert severity="info" sx={{ mt: 2 }}>
-              <Typography variant="body2">
-                ℹ️ Los cambios en la política de notificación se aplicarán a todos los documentos del grupo.
-              </Typography>
-            </Alert>
-          )}
-        </Box>
+        {/* 🔔 CONFIGURACIÓN DE NOTIFICACIÓN - COMPONENTE REUTILIZABLE */}
+        <NotificationPolicySelector 
+          document={localDocument}
+          onPolicyChange={handleNotificationPolicyChange}
+          autoSave={true}
+          sx={{ 
+            borderTop: (theme) => theme.palette.mode === 'dark' 
+              ? '1px solid rgba(255, 255, 255, 0.1)' 
+              : '1px solid #e0e0e0',
+            m: 3, 
+            mt: 0,
+            pt: 3
+          }}
+        />
       </DialogContent>
 
       {/* Acciones */}
@@ -673,16 +634,6 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
           Cerrar
         </Button>
         
-        {/* Botón de Guardar Política de Notificación */}
-        <Button
-          onClick={handleSaveNotificationPolicy}
-          variant="outlined"
-          startIcon={<NotificationIcon />}
-          disabled={actionLoading || notificationPolicy === (document?.notificationPolicy || 'automatica')}
-          sx={{ mr: 1 }}
-        >
-          {actionLoading ? 'Guardando...' : 'Guardar Política'}
-        </Button>
         
         {/* Botón de Edición - NUEVA FUNCIONALIDAD */}
         <Button
@@ -694,16 +645,19 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
           Editar Información
         </Button>
         
-        {/* Botón para ver último WhatsApp */}
-        <Button
-          onClick={async () => { await loadLastWhatsapp(); setWhatsAppModalOpen(true); }}
-          variant="outlined"
-          startIcon={<WhatsAppIcon />}
-          disabled={!localDocument?.clientPhone}
-          sx={{ mr: 1 }}
-        >
-          Ver Mensaje
-        </Button>
+        {/* Botón para regresar al estado anterior (solo ARCHIVO) */}
+        {user?.role === 'ARCHIVO' && previousStatus && (
+          <Button
+            onClick={() => handleRevert(previousStatus)}
+            variant="outlined"
+            color="warning"
+            startIcon={<HistoryIcon />}
+            disabled={actionLoading}
+            sx={{ mr: 1 }}
+          >
+            Regresar al estado anterior
+          </Button>
+        )}
 
         {actionConfig && (
           <Button
@@ -754,12 +708,33 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
         onDocumentDelivered={handleMatrizadorDelivered}
       />
 
-      {/* Modal Preview WhatsApp */}
-      <WhatsAppPreviewModal
-        open={whatsAppModalOpen}
-        onClose={() => setWhatsAppModalOpen(false)}
-        notification={lastWhatsapp}
+      {/* Modal de Entrega Inmediata */}
+      <ImmediateDeliveryModal
+        open={showImmediateDeliveryModal}
+        onClose={() => setShowImmediateDeliveryModal(false)}
+        document={localDocument}
+        onDocumentDelivered={(deliveryData) => {
+          console.log('Documento entregado inmediatamente:', deliveryData);
+          
+          // Actualizar documento local
+          if (deliveryData.document) {
+            setLocalDocument(prev => ({
+              ...prev,
+              ...deliveryData.document
+            }));
+          }
+          
+          // Cerrar modal
+          setShowImmediateDeliveryModal(false);
+          
+          // Notificar al componente padre
+          if (onDocumentUpdated && deliveryData) {
+            onDocumentUpdated(deliveryData);
+          }
+        }}
       />
+
+      
     </Dialog>
   );
 };
