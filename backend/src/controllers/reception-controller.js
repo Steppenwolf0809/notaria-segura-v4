@@ -730,234 +730,23 @@ async function desagruparDocumentos(req, res) {
 
 /**
  * Revertir estado de documento con razón obligatoria
- * Permite regresar un documento a un estado anterior
+ * Delega a la función central de revertDocumentStatus que maneja grupos automáticamente
  * @param {Object} req - Request object
  * @param {Object} res - Response object
  */
 async function revertirEstadoDocumento(req, res) {
     try {
-        const { id } = req.params;
-        const { newStatus, reversionReason } = req.body;
+        // Importar la función central de reversión
+        const { revertDocumentStatus } = await import('./document-controller.js');
         
-        console.log('🔄 revertirEstadoDocumento iniciado:', {
-            documentId: id,
-            newStatus,
-            reversionReason,
-            userId: req.user.id,
-            userRole: req.user.role,
-            timestamp: new Date().toISOString()
-        });
-
-        // Validaciones básicas
-        if (!newStatus) {
-            return res.status(400).json({
-                success: false,
-                message: 'El nuevo estado es obligatorio'
-            });
-        }
-
-        if (!reversionReason || reversionReason.trim().length === 0) {
-            return res.status(400).json({
-                success: false,
-                message: 'La razón de la reversión es obligatoria'
-            });
-        }
-
-        // Buscar el documento
-        const document = await prisma.document.findUnique({ 
-            where: { id },
-            include: {
-                assignedTo: {
-                    select: { id: true, firstName: true, lastName: true }
-                }
-            }
-        });
-
-        if (!document) {
-            return res.status(404).json({
-                success: false,
-                message: 'Documento no encontrado'
-            });
-        }
-
-        // Validar que es una reversión válida para el documento origen
-        const statusOrder = STATUS_ORDER_LIST;
-        const currentIndex = statusOrder.indexOf(document.status);
-        const newIndex = statusOrder.indexOf(newStatus);
-
-        if (!statusOrder.includes(newStatus)) {
-            return res.status(400).json({
-                success: false,
-                message: 'Estado no válido'
-            });
-        }
-
-        if (newIndex >= currentIndex) {
-            return res.status(400).json({
-                success: false,
-                message: 'Solo se pueden revertir estados hacia atrás en el flujo'
-            });
-        }
-
-        console.log('📊 Reversión validada:', {
-            currentStatus: document.status,
-            newStatus,
-            isValidReversion: true
-        });
-
-        // Si el documento pertenece a un grupo, propagar la reversión a todos los del grupo
-        if (document.documentGroupId) {
-            console.log('🔗 Documento agrupado - revirtiendo para todo el grupo', {
-                documentGroupId: document.documentGroupId
-            });
-
-            // Traer todos los documentos del grupo
-            const groupDocuments = await prisma.document.findMany({
-                where: { documentGroupId: document.documentGroupId },
-                include: {
-                    assignedTo: { select: { id: true, firstName: true, lastName: true } }
-                }
-            });
-
-            // Determinar cuáles deben revertirse (solo los con estado posterior al nuevo)
-            const docsToRevert = groupDocuments.filter(doc => statusOrder.indexOf(doc.status) > newIndex);
-
-            if (docsToRevert.length === 0) {
-                return res.json({
-                    success: true,
-                    message: 'No hay documentos del grupo para revertir',
-                    data: { affected: 0, groupAffected: true }
-                });
-            }
-
-            const updatedDocuments = await prisma.$transaction(async (tx) => {
-                const updates = [];
-                for (const doc of docsToRevert) {
-                    const cleanup = getReversionCleanupData(doc.status, newStatus);
-                    const data = { status: newStatus, updatedAt: new Date(), ...cleanup };
-                    const updated = await tx.document.update({
-                        where: { id: doc.id },
-                        data,
-                        include: {
-                            assignedTo: { select: { id: true, firstName: true, lastName: true } }
-                        }
-                    });
-                    updates.push({ before: doc, after: updated });
-                }
-                return updates;
-            });
-
-            // Registrar evento por cada documento
-            try {
-                for (const upd of updatedDocuments) {
-                    await prisma.documentEvent.create({
-                        data: {
-                            documentId: upd.after.id,
-                            userId: req.user.id,
-                            eventType: 'STATUS_REVERTED',
-                            description: `Estado revertido de ${upd.before.status} a ${newStatus} por ${req.user.firstName} ${req.user.lastName} (${req.user.role}) - Razón: ${reversionReason} (propagación grupal)`,
-                            details: {
-                                previousStatus: upd.before.status,
-                                newStatus: newStatus,
-                                isReversion: true,
-                                reason: reversionReason,
-                                groupPropagation: true,
-                                revertedBy: `${req.user.firstName} ${req.user.lastName}`,
-                                userRole: req.user.role,
-                                codigoCleared: upd.before.status === 'LISTO' && newIndex < statusOrder.indexOf('LISTO'),
-                                deliveryDataCleared: upd.before.status === 'ENTREGADO',
-                                timestamp: new Date().toISOString()
-                            },
-                            ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
-                            userAgent: req.get('User-Agent') || 'unknown'
-                        }
-                    });
-                }
-            } catch (auditError) {
-                console.error('Error registrando eventos de reversión grupal:', auditError);
-            }
-
-            console.log('✅ Reversión grupal completada:', {
-                groupId: document.documentGroupId,
-                documentsAffected: updatedDocuments.length
-            });
-
-            return res.json({
-                success: true,
-                message: `${updatedDocuments.length} documentos del grupo revertidos a ${newStatus}`,
-                data: {
-                    groupAffected: true,
-                    documentsAffected: updatedDocuments.length,
-                    newStatus
-                }
-            });
-        }
-
-        // Caso individual (no agrupado): comportamiento original
-        const updateData = { status: newStatus, updatedAt: new Date() };
-        Object.assign(updateData, getReversionCleanupData(document.status, newStatus));
-
-        const updatedDocument = await prisma.$transaction(async (tx) => {
-            return await tx.document.update({
-                where: { id },
-                data: updateData,
-                include: {
-                    assignedTo: {
-                        select: { id: true, firstName: true, lastName: true }
-                    }
-                }
-            });
-        });
-
-        console.log('✅ Documento revertido exitosamente:', {
-            id: updatedDocument.id,
-            previousStatus: document.status,
-            newStatus: updatedDocument.status,
-            protocolNumber: updatedDocument.protocolNumber
-        });
-
-        try {
-            await prisma.documentEvent.create({
-                data: {
-                    documentId: id,
-                    userId: req.user.id,
-                    eventType: 'STATUS_REVERTED',
-                    description: `Estado revertido de ${document.status} a ${newStatus} por ${req.user.firstName} ${req.user.lastName} (${req.user.role}) - Razón: ${reversionReason}`,
-                    details: {
-                        previousStatus: document.status,
-                        newStatus: newStatus,
-                        isReversion: true,
-                        reason: reversionReason,
-                        revertedBy: `${req.user.firstName} ${req.user.lastName}`,
-                        userRole: req.user.role,
-                        codigoCleared: document.status === 'LISTO' && newIndex < statusOrder.indexOf('LISTO'),
-                        deliveryDataCleared: document.status === 'ENTREGADO',
-                        timestamp: new Date().toISOString()
-                    },
-                    ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
-                    userAgent: req.get('User-Agent') || 'unknown'
-                }
-            });
-        } catch (auditError) {
-            console.error('Error registrando evento de reversión:', auditError);
-        }
-
-        return res.json({
-            success: true,
-            message: `Documento ${updatedDocument.protocolNumber} revertido de ${document.status} a ${newStatus} exitosamente`,
-            data: {
-                document: updatedDocument,
-                previousStatus: document.status,
-                newStatus: newStatus,
-                reversionReason: reversionReason
-            }
-        });
-
+        // Delegar a la función central que ya maneja toda la lógica de grupos
+        return await revertDocumentStatus(req, res);
+        
     } catch (error) {
-        console.error('Error revirtiendo estado del documento:', error);
-        return res.status(500).json({
+        console.error('Error en revertirEstadoDocumento (recepción):', error);
+        res.status(500).json({
             success: false,
-            error: 'Error interno del servidor'
+            message: 'Error interno del servidor'
         });
     }
 }
@@ -979,17 +768,17 @@ async function getNotificationHistoryReception(req, res) {
             dateTo = ''
         } = req.query;
 
-        const skip = (parseInt(page) - 1) * parseInt(limit);
-        const take = parseInt(limit);
+        const take = Math.min(parseInt(limit), 50);
+        const skip = (parseInt(page) - 1) * take;
 
-        // Construir filtros
-        const where = {};
+        const where = {
+            userId: req.user.id
+        };
 
         if (search) {
             where.OR = [
-                { clientName: { contains: search, mode: 'insensitive' } },
-                { clientPhone: { contains: search } },
-                { messageBody: { contains: search, mode: 'insensitive' } }
+                { phoneNumber: { contains: search } },
+                { messageText: { contains: search } }
             ];
         }
 
@@ -1003,24 +792,23 @@ async function getNotificationHistoryReception(req, res) {
 
         if (dateFrom || dateTo) {
             where.createdAt = {};
-            if (dateFrom) where.createdAt.gte = new Date(dateFrom);
-            if (dateTo) where.createdAt.lte = new Date(dateTo);
+            if (dateFrom) {
+                where.createdAt.gte = new Date(dateFrom);
+            }
+            if (dateTo) {
+                where.createdAt.lte = new Date(dateTo);
+            }
         }
 
-        // Obtener notificaciones
         const notifications = await prisma.whatsAppNotification.findMany({
             where,
-            skip,
             take,
+            skip,
             orderBy: { createdAt: 'desc' },
             select: {
                 id: true,
-                documentId: true,
-                groupId: true,
-                clientName: true,
-                clientPhone: true,
+                phoneNumber: true,
                 messageType: true,
-                messageBody: true,
                 status: true,
                 messageId: true,
                 errorMessage: true,

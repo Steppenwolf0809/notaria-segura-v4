@@ -131,6 +131,13 @@ const ReversionModal = ({
                   {documento.status}
                 </Box>
               </Typography>
+              
+              {/* Mostrar información de grupo si aplica */}
+              {documento.isGrouped && (
+                <Typography variant="body2" sx={{ mt: 1, color: 'primary.main', fontWeight: 'bold' }}>
+                  🔗 <strong>Documento agrupado:</strong> La reversión afectará a todos los documentos del grupo
+                </Typography>
+              )}
             </Box>
 
             {/* Alerta de advertencia */}
@@ -140,12 +147,15 @@ const ReversionModal = ({
               sx={{ mb: 3 }}
             >
               <Typography variant="body2">
-                <strong>¡Atención!</strong> Esta acción revertirá el documento a un estado anterior y puede:
+                <strong>¡Atención!</strong> Esta acción revertirá {documento.isGrouped ? 'TODOS los documentos del grupo' : 'el documento'} a un estado anterior y puede:
               </Typography>
               <Box component="ul" sx={{ mt: 1, mb: 0, pl: 2 }}>
                 <li>Eliminar códigos de verificación generados</li>
                 <li>Borrar información de entrega si aplica</li>
-                <li>Requerir volver a procesar el documento</li>
+                <li>Requerir volver a procesar {documento.isGrouped ? 'todos los documentos' : 'el documento'}</li>
+                {documento.isGrouped && (
+                  <li><strong>Afectar a todo el grupo de documentos relacionados</strong></li>
+                )}
               </Box>
             </Alert>
 

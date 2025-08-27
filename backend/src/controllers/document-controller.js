@@ -1,14 +1,13 @@
 import prisma from '../db.js';
-import { getReversionCleanupData, isValidStatus, isReversion as isReversionFn, STATUS_ORDER_LIST } from '../utils/status-transitions.js';
+import { getReversionCleanupData, isValidStatus, isReversion as isReversionFn } from '../utils/status-transitions.js';
 import { parseXmlDocument, generateVerificationCode } from '../services/xml-parser-service.js';
 import DocumentGroupingService from '../services/document-grouping-service.js';
 import MatrizadorAssignmentService from '../services/matrizador-assignment-service.js';
 import { 
   formatEventDescription, 
   getEventContextInfo, 
-  formatEventDate, 
   getEventTitle,
-  getEventIcon, 
+  getEventIcon,
   getEventColor 
 } from '../utils/event-formatter.js';
 // const WhatsAppService = require('../services/whatsapp-service.js'); // Descomentar cuando exista
@@ -462,9 +461,6 @@ async function updateDocumentStatus(req, res) {
     });
 
     // Detectar si es una reversión (estado "hacia atrás")
-    const statusOrder = STATUS_ORDER_LIST;
-    const currentIndex = statusOrder.indexOf(document.status);
-    const newIndex = statusOrder.indexOf(status);
     const isReversion = isReversionFn(document.status, status);
 
     console.log('🔄 Análisis de cambio:', {
@@ -1520,7 +1516,7 @@ async function uploadXmlDocumentsBatch(req, res) {
  */
 async function createSmartDocumentGroup(req, res) {
   try {
-    const { documentIds, notificationPolicy = 'automatica', skipValidation = false } = req.body;
+    const { documentIds, notificationPolicy = 'automatica' } = req.body;
     
     // Validar roles autorizados para agrupación inteligente
     if (!['MATRIZADOR', 'RECEPCION', 'ARCHIVO', 'ADMIN'].includes(req.user.role)) {
@@ -2186,7 +2182,7 @@ async function updateDocumentGroupStatus(req, res) {
           try {
             await prisma.documentEvent.create({
               data: {
-                documentId: groupData.documents[0].id, // Documento principal del grupo
+                documentId: updatedDocuments[0].id, // Documento principal del grupo
                 userId: req.user.id,
                 eventType: 'WHATSAPP_SENT',
                 description: `Notificación WhatsApp de entrega grupal enviada a ${updatedDocuments[0].clientPhone}`,
@@ -2911,42 +2907,7 @@ async function deliverDocument(req, res) {
  * @param {Object} document - Documento a editar
  * @returns {Object} - { canEdit: boolean, editableFields: Array }
  */
-function validateEditPermissions(user, document) {
-  const { role, id: userId } = user;
-  
-  // Definir campos editables por rol
-  const fieldsByRole = {
-    ADMIN: ['clientPhone', 'clientName', 'clientEmail', 'actoPrincipalDescripcion', 'detalle_documento', 'comentarios_recepcion'],
-    MATRIZADOR: ['clientPhone', 'clientName', 'clientEmail', 'actoPrincipalDescripcion', 'detalle_documento', 'comentarios_recepcion'],
-    ARCHIVO: ['clientPhone', 'clientName', 'clientEmail', 'actoPrincipalDescripcion', 'detalle_documento', 'comentarios_recepcion'],
-    RECEPCION: ['clientPhone', 'clientEmail', 'comentarios_recepcion'],
-    CAJA: [] // Caja no puede editar información de documento
-  };
-
-  // Verificar permisos específicos por rol
-  switch (role) {
-    case 'ADMIN':
-      return { canEdit: true, editableFields: fieldsByRole.ADMIN };
-      
-    case 'MATRIZADOR':
-    case 'ARCHIVO':
-      // Solo puede editar sus documentos asignados
-      if (document.assignedToId === userId) {
-        return { canEdit: true, editableFields: fieldsByRole[role] };
-      }
-      return { canEdit: false, editableFields: [], reason: 'Solo puedes editar documentos asignados a ti' };
-      
-    case 'RECEPCION':
-      // Solo documentos listos para entrega o entregados
-      if (['LISTO', 'ENTREGADO'].includes(document.status)) {
-        return { canEdit: true, editableFields: fieldsByRole.RECEPCION };
-      }
-      return { canEdit: false, editableFields: [], reason: 'Solo puedes editar documentos listos para entrega' };
-      
-    default:
-      return { canEdit: false, editableFields: [], reason: 'Sin permisos de edición' };
-  }
-}
+// (removido) validateEditPermissions: helper interno no utilizado
 
 /**
  * Validar datos de entrada para edición
@@ -2954,86 +2915,7 @@ function validateEditPermissions(user, document) {
  * @param {Array} allowedFields - Campos permitidos para el usuario
  * @returns {Object} - { isValid: boolean, errors: Array }
  */
-function validateEditData(data, allowedFields) {
-  const errors = [];
-
-  // Verificar que solo se envíen campos permitidos
-  const providedFields = Object.keys(data);
-  const unauthorizedFields = providedFields.filter(field => !allowedFields.includes(field));
-  
-  if (unauthorizedFields.length > 0) {
-    errors.push(`Campos no permitidos: ${unauthorizedFields.join(', ')}`);
-  }
-
-  // Validar formato de teléfono si se proporciona
-  if (data.clientPhone !== undefined) {
-    if (data.clientPhone && !/^[0-9+\-\s]{7,15}$/.test(data.clientPhone)) {
-      errors.push('Formato de teléfono inválido (7-15 dígitos, puede incluir +, -, espacios)');
-    }
-  }
-
-  // Validar longitud de campos de texto
-  if (data.detalle_documento !== undefined) {
-    if (data.detalle_documento && data.detalle_documento.length > 500) {
-      errors.push('Detalle del documento muy largo (máximo 500 caracteres)');
-    }
-  }
-
-  if (data.comentarios_recepcion !== undefined) {
-    if (data.comentarios_recepcion && data.comentarios_recepcion.length > 300) {
-      errors.push('Comentarios de recepción muy largos (máximo 300 caracteres)');
-    }
-  }
-
-  // Validar nombre del cliente
-  if (data.clientName !== undefined) {
-    if (!data.clientName || data.clientName.trim().length < 2) {
-      errors.push('Nombre del cliente debe tener al menos 2 caracteres');
-    }
-    if (data.clientName && data.clientName.length > 100) {
-      errors.push('Nombre del cliente muy largo (máximo 100 caracteres)');
-    }
-  }
-
-  // Validar acto principal descripción
-  if (data.actoPrincipalDescripcion !== undefined) {
-    if (!data.actoPrincipalDescripcion || data.actoPrincipalDescripcion.trim().length < 5) {
-      errors.push('Descripción del acto principal debe tener al menos 5 caracteres');
-    }
-    if (data.actoPrincipalDescripcion && data.actoPrincipalDescripcion.length > 300) {
-      errors.push('Descripción del acto principal muy larga (máximo 300 caracteres)');
-    }
-  }
-
-  // Validar valor del acto principal
-  if (data.actoPrincipalValor !== undefined) {
-    const valor = parseFloat(data.actoPrincipalValor);
-    if (isNaN(valor) || valor < 0) {
-      errors.push('Valor del acto principal debe ser un número mayor o igual a 0');
-    }
-    if (valor > 1000000) {
-      errors.push('Valor del acto principal muy alto (máximo $1,000,000)');
-    }
-  }
-
-  // Validar email del cliente
-  if (data.clientEmail !== undefined) {
-    if (data.clientEmail && data.clientEmail.trim() !== '') {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(data.clientEmail)) {
-        errors.push('Formato de email inválido');
-      }
-      if (data.clientEmail.length > 100) {
-        errors.push('Email muy largo (máximo 100 caracteres)');
-      }
-    }
-  }
-
-  return {
-    isValid: errors.length === 0,
-    errors
-  };
-}
+// (removido) validateEditData: helper interno no utilizado
 
 
 /**
@@ -3541,6 +3423,7 @@ async function getGroupDocuments(req, res) {
 
 /**
  * Revertir estado de documento - Función general para todos los roles
+ * Incluye manejo de grupos para ARCHIVO y otros roles
  * @param {Object} req - Request object
  * @param {Object} res - Response object
  */
@@ -3557,13 +3440,184 @@ async function revertDocumentStatus(req, res) {
       userRole: req.user.role
     });
 
-    // Usar la función updateDocumentStatus existente que ya maneja reversiones
-    // Simplemente agregamos la lógica de reversión al body
-    req.body.status = newStatus;
-    req.body.reversionReason = reversionReason;
+    // Obtener el documento con información de grupo
+    const document = await prisma.document.findUnique({
+      where: { id },
+      include: {
+        documentGroup: true,
+        assignedTo: {
+          select: { firstName: true, lastName: true }
+        }
+      }
+    });
 
-    // Delegar a updateDocumentStatus que ya tiene toda la lógica
-    return await updateDocumentStatus(req, res);
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Documento no encontrado'
+      });
+    }
+
+    // Verificar permisos según rol
+    if (!['ADMIN', 'ARCHIVO', 'MATRIZADOR', 'RECEPCION'].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para revertir estados'
+      });
+    }
+
+    // Si es MATRIZADOR, solo puede revertir sus propios documentos
+    if (req.user.role === 'MATRIZADOR' && document.assignedToId !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo puedes revertir documentos asignados a ti'
+      });
+    }
+
+    // Validar razón obligatoria
+    if (!reversionReason || reversionReason.trim().length < 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'Razón de reversión obligatoria (mínimo 5 caracteres)'
+      });
+    }
+
+    // 🔗 MANEJO DE GRUPOS: Si el documento está agrupado, revertir todo el grupo
+    let updatedDocuments = [];
+    let groupAffected = false;
+
+    if (document.documentGroupId && ['ARCHIVO', 'ADMIN'].includes(req.user.role)) {
+      console.log('🔗 Documento agrupado detectado - Iniciando reversión grupal:', {
+        documentGroupId: document.documentGroupId,
+        newStatus,
+        userRole: req.user.role
+      });
+
+      // Obtener todos los documentos del grupo
+      const groupDocuments = await prisma.document.findMany({
+        where: {
+          documentGroupId: document.documentGroupId
+        }
+      });
+
+      console.log(`📋 Revirtiendo ${groupDocuments.length} documentos del grupo`);
+
+      // Usar transacción para revertir todos los documentos del grupo
+      updatedDocuments = await prisma.$transaction(async (tx) => {
+        const updates = [];
+        
+        for (const doc of groupDocuments) {
+          const updated = await tx.document.update({
+            where: { id: doc.id },
+            data: {
+              status: newStatus,
+              // Limpiar campos específicos según el nuevo estado
+              ...(newStatus === 'EN_PROCESO' && {
+                verificationCode: null,
+                codigoRetiro: null,
+                entregadoA: null,
+                fechaEntrega: null,
+                usuarioEntregaId: null
+              })
+            },
+            include: {
+              assignedTo: {
+                select: { firstName: true, lastName: true }
+              }
+            }
+          });
+
+          // Registrar evento de auditoría para cada documento
+          await tx.documentEvent.create({
+            data: {
+              documentId: doc.id,
+              userId: req.user.id,
+              eventType: 'STATUS_CHANGED',
+              description: `Estado revertido grupalmente de ${doc.status} a ${newStatus} por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
+              details: {
+                previousStatus: doc.status,
+                newStatus,
+                reversionReason: reversionReason.trim(),
+                groupReversion: true,
+                documentGroupId: document.documentGroupId,
+                timestamp: new Date().toISOString()
+              },
+              ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+              userAgent: req.get('User-Agent') || 'unknown'
+            }
+          });
+
+          updates.push(updated);
+        }
+
+        return updates;
+      });
+
+      groupAffected = true;
+      console.log(`✅ ${updatedDocuments.length} documentos del grupo revertidos exitosamente`);
+
+    } else {
+      // Reversión individual (documento no agrupado o usuario MATRIZADOR/RECEPCION)
+      updatedDocuments = [await prisma.document.update({
+        where: { id },
+        data: {
+          status: newStatus,
+          // Limpiar campos específicos según el nuevo estado
+          ...(newStatus === 'EN_PROCESO' && {
+            verificationCode: null,
+            codigoRetiro: null,
+            entregadoA: null,
+            fechaEntrega: null,
+            usuarioEntregaId: null
+          })
+        },
+        include: {
+          assignedTo: {
+            select: { firstName: true, lastName: true }
+          }
+        }
+      })];
+
+      // Registrar evento de auditoría
+      await prisma.documentEvent.create({
+        data: {
+          documentId: id,
+          userId: req.user.id,
+          eventType: 'STATUS_CHANGED',
+          description: `Estado revertido de ${document.status} a ${newStatus} por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
+          details: {
+            previousStatus: document.status,
+            newStatus,
+            reversionReason: reversionReason.trim(),
+            groupReversion: false,
+            timestamp: new Date().toISOString()
+          },
+          ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown'
+        }
+      });
+    }
+
+    // Preparar mensaje de respuesta
+    const message = groupAffected 
+      ? `${updatedDocuments.length} documentos del grupo revertidos exitosamente de ${document.status} a ${newStatus}`
+      : `Estado revertido exitosamente de ${document.status} a ${newStatus}`;
+
+    res.json({
+      success: true,
+      message,
+      data: {
+        documents: updatedDocuments,
+        reversion: {
+          fromStatus: document.status,
+          toStatus: newStatus,
+          reason: reversionReason.trim(),
+          groupAffected,
+          documentsAffected: updatedDocuments.length,
+          reversedBy: `${req.user.firstName} ${req.user.lastName} (${req.user.role})`
+        }
+      }
+    });
 
   } catch (error) {
     console.error('Error en revertDocumentStatus:', error);
