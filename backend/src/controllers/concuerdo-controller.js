@@ -94,9 +94,14 @@ async function previewConcuerdo(req, res) {
     let actsData = Array.isArray(acts) && acts.length > 0
       ? acts
       : [{ tipoActo: tipoActo, otorgantes, beneficiarios }]
-    const notarioStr = String(notario || '').trim()
 
-    if (!tipo || otorgs.length === 0) {
+    // Validar que haya al menos un acto con tipo y con otorgante(s)
+    const hasValidAct = actsData.some(a => {
+      const tipo = PdfExtractorService.cleanActType(a?.tipoActo)
+      const ots = safeArray(a?.otorgantes)
+      return tipo && ots.length > 0
+    })
+    if (!hasValidAct) {
       return res.status(400).json({ success: false, message: 'Tipo de acto y al menos un otorgante son obligatorios' })
     }
 
@@ -178,7 +183,13 @@ async function generateDocuments(req, res) {
       ? acts
       : [{ tipoActo: tipoActo, otorgantes, beneficiarios }]
 
-    if (!tipo || otorgs.length === 0) {
+    // Validación mínima
+    const hasValidAct = actsData.some(a => {
+      const tipo = PdfExtractorService.cleanActType(a?.tipoActo)
+      const ots = safeArray(a?.otorgantes)
+      return tipo && ots.length > 0
+    })
+    if (!hasValidAct) {
       return res.status(400).json({ success: false, message: 'Tipo de acto y al menos un otorgante son obligatorios' })
     }
 
