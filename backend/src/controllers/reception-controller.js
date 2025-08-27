@@ -101,8 +101,7 @@ async function listarTodosDocumentos(req, res) {
         { protocolNumber: { contains: searchTerm, mode: 'insensitive' } },
         // Buscar por Acto Principal (solicitado)
         { actoPrincipalDescripcion: { contains: searchTerm, mode: 'insensitive' } },
-        // Extras útiles de búsqueda
-        { documentType: { contains: searchTerm, mode: 'insensitive' } },
+        // Extra útil de búsqueda (detalle editable)
         { detalle_documento: { contains: searchTerm, mode: 'insensitive' } }
       ];
     }
@@ -218,7 +217,6 @@ async function getDocumentosEnProceso(req, res) {
         { protocolNumber: { contains: searchTerm2, mode: 'insensitive' } },
         // Nueva condición: permitir buscar por Acto Principal
         { actoPrincipalDescripcion: { contains: searchTerm2, mode: 'insensitive' } },
-        { documentType: { contains: searchTerm2, mode: 'insensitive' } },
         { detalle_documento: { contains: searchTerm2, mode: 'insensitive' } }
       ];
     }
