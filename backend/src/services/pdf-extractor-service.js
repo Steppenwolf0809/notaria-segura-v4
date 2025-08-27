@@ -4,6 +4,76 @@
  */
 const PdfExtractorService = {
   /**
+   * Reordena "APELLIDOS NOMBRES" → "NOMBRES APELLIDOS" (heurística)
+   */
+  reorderName(nameUpper) {
+    if (!nameUpper) return ''
+    const tokens = String(nameUpper).trim().replace(/\s+/g, ' ').split(' ').filter(Boolean)
+    const n = tokens.length
+    if (n <= 1) return tokens.join(' ')
+    const particles = new Set(['DE','DEL','DELA','DELOS','DELAS','LA','LOS','LAS','SAN','SANTA'])
+    const female = new Set(['MARIA','ANA','ROSA','ELENA','FERNANDA','LUISA','VALERIA','CAMILA','GABRIELA','SOFIA','ISABEL','PATRICIA','VERONICA'])
+    const male   = new Set(['JOSE','JUAN','CARLOS','DANIEL','MIGUEL','DIEGO','ANDRES','LUIS','PEDRO','PABLO','FRANCISCO','JAVIER','FERNANDO','ROBERTO'])
+    const isParticle = (t) => particles.has(t)
+    const isProbableName = (t) => female.has(t) || male.has(t) || /[AEIO]$/.test(t)
+
+    let nameCount
+    if (n === 2) {
+      nameCount = 1
+    } else if (n === 3) {
+      const last = tokens[n-1], prev = tokens[n-2]
+      nameCount = (isProbableName(last) && isProbableName(prev)) ? 2 : 1
+    } else { // 4 o 5
+      const prev = tokens[n-2]
+      nameCount = isParticle(prev) ? 1 : 2
+    }
+    nameCount = Math.max(1, Math.min(2, nameCount))
+    const names = tokens.slice(-nameCount)
+    const surnames = tokens.slice(0, n - nameCount)
+    return (names.join(' ') + ' ' + surnames.join(' ')).replace(/\s+/g, ' ').trim()
+  },
+  /**
+   * Extrae nombres de personas en mayúsculas, eliminando metadatos y encabezados.
+   */
+  cleanPersonNames(raw) {
+    if (!raw) return []
+    // Normalizar
+    let upper = String(raw)
+      .replace(/[\t\r\f]+/g, ' ')
+      .replace(/ +/g, ' ')
+      .toUpperCase()
+      .trim()
+
+    // Eliminar encabezados conocidos
+    const headers = [
+      'PERSONA', 'NOMBRES', 'TIPO', 'INTERVINIENTE', 'DOCUMENTO', 'IDENTIDAD', 'NACIONALIDAD',
+      'CALIDAD', 'REPRESENTA', 'UBICACION', 'PROVINCIA', 'CANTON', 'DESCRIPCION', 'CUANTIA'
+    ]
+    const headerRegex = new RegExp(`\\b(?:${headers.join('|')})\\b`, 'g')
+    upper = upper.replace(headerRegex, ' ')
+
+    // Si existe NATURAL, recortar después de NATURAL y antes de POR SUS PROPIOS
+    const natIdx = upper.indexOf('NATURAL')
+    if (natIdx !== -1) {
+      let region = upper.slice(natIdx + 'NATURAL'.length)
+      const stop = region.indexOf('POR SUS PROPIOS')
+      if (stop !== -1) region = region.slice(0, stop)
+      upper = region.trim()
+    }
+
+    // Regex: 2 a 5 palabras en mayúsculas con acentos
+    const nameRegex = /([A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,}){1,4})/g
+    const names = []
+    let m
+    while ((m = nameRegex.exec(upper)) !== null) {
+      const candidate = m[1].replace(/\s+/g, ' ').trim()
+      if (!candidate) continue
+      const reordered = this.reorderName(candidate)
+      if (!names.includes(reordered)) names.push(reordered)
+    }
+    return names
+  },
+  /**
    * Extrae texto plano desde un Buffer de PDF
    * @param {Buffer} pdfBuffer
    * @returns {Promise<string>} texto extraído
@@ -134,18 +204,6 @@ const PdfExtractorService = {
     const beneficiariosRaw = getMatch(/(?:A FAVOR DE|BENEFICIARIO(?:S)?)[:\-]?\s*([\s\S]*?)(?:\n| NOTARIO| ACTO O CONTRATO|$)/)
     let notario = getMatch(/NOTARIO[:\-]?\s*([\s\S]*?)(?:\n|$)/)
 
-    const splitPeople = (s) => {
-      if (!s) return []
-      return s
-        .replace(/PERSONANOMBRES?\/RAZ[ÓO]N SOCIAL/gi, '')
-        .replace(/TIPO INTERVINIENTE/gi, '')
-        .replace(/DOCUMENTO DE IDENTIDAD\s*NO/gi, '')
-        .replace(/^S\s+/i, '')
-        .split(/\n|,|;| Y | E /)
-        .map((x) => x.trim())
-        .filter((x) => x && x.length > 1)
-    }
-
     // Limpieza de notario: quitar (A), AB., ABG. iniciales
     if (notario) {
       notario = notario
@@ -156,8 +214,8 @@ const PdfExtractorService = {
 
     return {
       tipoActo: tipoActo || '',
-      otorgantes: splitPeople(otorgantesRaw),
-      beneficiarios: splitPeople(beneficiariosRaw),
+      otorgantes: this.cleanPersonNames(otorgantesRaw),
+      beneficiarios: this.cleanPersonNames(beneficiariosRaw),
       notario: notario || undefined
     }
   },
@@ -200,16 +258,17 @@ const PdfExtractorService = {
       const startBenRegex = /(?:A\s+FAVOR\s+DE|BENEFICIARIO(?:S)?)\s*[:\-]?\s*/i
       const notarioRegex = /NOTARIO\s*[:\-]?\s*(.+?)(?:\.|$)/i
 
-      const otorgantesRaw = blockBetween(startOtRegex, startBenRegex)
-      const beneficiariosRaw = blockBetween(startBenRegex, /NOTARIO|\.$/i)
+      let otorgantesRaw = blockBetween(startOtRegex, startBenRegex)
+      let beneficiariosRaw = blockBetween(startBenRegex, /NOTARIO|\.$/i)
 
-      const splitPeople = (s) => {
-        if (!s) return []
-        return s
-          .replace(/\s+/g, ' ')
-          .split(/,|;|\s+Y\s+|\s+E\s+/i)
-          .map((x) => x.trim())
-          .filter((x) => x && x.length > 1)
+      // Afinar con ancla NATURAL dentro de la sección para otorgantes
+      const secUpper = section.toUpperCase()
+      const idxNat = secUpper.indexOf('NATURAL')
+      if (idxNat !== -1) {
+        let region = secUpper.slice(idxNat + 'NATURAL'.length)
+        const stop = region.search(/A\s+FAVOR\s+DE|BENEFICIARIO|NOTARIO|\.$/i)
+        if (stop !== -1) region = region.slice(0, stop)
+        otorgantesRaw = region
       }
 
       let notario
@@ -218,8 +277,8 @@ const PdfExtractorService = {
 
       acts.push({
         tipoActo: tipoActo || '',
-        otorgantes: splitPeople(otorgantesRaw),
-        beneficiarios: splitPeople(beneficiariosRaw),
+        otorgantes: this.cleanPersonNames(otorgantesRaw),
+        beneficiarios: this.cleanPersonNames(beneficiariosRaw),
         ...(notario ? { notario } : {})
       })
     }
@@ -235,4 +294,3 @@ const PdfExtractorService = {
 }
 
 export default PdfExtractorService
-

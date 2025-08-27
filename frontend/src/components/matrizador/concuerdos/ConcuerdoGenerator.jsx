@@ -66,12 +66,34 @@ export default function ConcuerdoGenerator() {
             {generating && 'Generando vista previa...'}
             {!generating && Array.isArray(extractedData?.previewDocs) && extractedData.previewDocs.length > 0 ? (
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 2 }}>
-                {extractedData.previewDocs.map((doc) => (
-                  <Paper key={doc.index} variant="outlined" sx={{ p: 2 }}>
-                    <Typography variant="subtitle2" sx={{ mb: 1 }}>{doc.title}</Typography>
-                    <div dangerouslySetInnerHTML={{ __html: atob(doc.contentBase64) }} />
-                  </Paper>
-                ))}
+                {extractedData.previewDocs.map((doc) => {
+                  // Decodificar base64 como UTF-8
+                  const decodeBase64Utf8 = (b64) => {
+                    try {
+                      const binStr = atob(b64);
+                      const len = binStr.length;
+                      const bytes = new Uint8Array(len);
+                      for (let i = 0; i < len; i++) bytes[i] = binStr.charCodeAt(i);
+                      return new TextDecoder('utf-8').decode(bytes);
+                    } catch (e) {
+                      try { return atob(b64); } catch { return ''; }
+                    }
+                  };
+                  const content = decodeBase64Utf8(doc.contentBase64 || '');
+                  const isPlain = String(doc.mimeType || '').startsWith('text/plain');
+                  return (
+                    <Paper key={doc.index} variant="outlined" sx={{ p: 2 }}>
+                      <Typography variant="subtitle2" sx={{ mb: 1 }}>{doc.title}</Typography>
+                      {isPlain ? (
+                        <Typography component="pre" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', m: 0 }}>
+                          {content}
+                        </Typography>
+                      ) : (
+                        <div dangerouslySetInnerHTML={{ __html: content }} />
+                      )}
+                    </Paper>
+                  );
+                })}
               </Box>
             ) : (
               <Typography variant="body2">Sin vista previa</Typography>
