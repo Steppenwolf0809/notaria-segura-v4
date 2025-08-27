@@ -12,6 +12,7 @@ import {
   revertirEstadoDocumento,
   getNotificationHistoryReception
 } from '../controllers/reception-controller.js';
+import { marcarVariosListos } from '../controllers/reception-bulk-controller.js';
 
 const router = express.Router();
 
@@ -73,6 +74,15 @@ router.post('/documentos/:id/marcar-listo', authenticateToken, requireRecepcion,
  * @access Private (RECEPCION only)
  */
 router.post('/documentos/marcar-grupo-listo', authenticateToken, requireRecepcion, marcarGrupoListo);
+
+/**
+ * @route POST /api/reception/documentos/marcar-listos
+ * @desc Marcar múltiples documentos (de uno o varios clientes) como LISTO.
+ *        Envío de WhatsApp: un mensaje por cada cliente.
+ * @body { documentIds: string[], sendNotifications?: boolean }
+ * @access Private (RECEPCION only)
+ */
+router.post('/documentos/marcar-listos', authenticateToken, requireRecepcion, marcarVariosListos);
 
 /**
  * @route POST /api/reception/documentos/desagrupar
