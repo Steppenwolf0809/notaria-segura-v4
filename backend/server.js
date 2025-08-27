@@ -17,6 +17,7 @@ import adminRoutes from './src/routes/admin-routes.js'
 import archivoRoutes from './src/routes/archivo-routes.js'
 import receptionRoutes from './src/routes/reception-routes.js'
 import alertasRoutes from './src/routes/alertas-routes.js'
+import concuerdoRoutes from './src/routes/concuerdo-routes.js'
 
 // Cargar variables de entorno
 dotenv.config({ path: './.env' })
@@ -192,6 +193,9 @@ app.use('/api/reception', receptionRoutes)
 
 // RUTAS DE ALERTAS (/api/alertas/*)
 app.use('/api/alertas', alertasRoutes)
+
+// RUTAS DE CONCUERDOS (/api/concuerdos/*)
+app.use('/api/concuerdos', concuerdoRoutes)
 
 // ============================================================================
 // SERVIR ARCHIVOS ESTÁTICOS DEL FRONTEND

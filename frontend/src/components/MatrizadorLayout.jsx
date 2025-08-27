@@ -106,6 +106,12 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
       icon: <HistoryIcon />,
       view: 'history',
       active: currentView === 'history'
+    },
+    {
+      text: 'Generar Concuerdos',
+      icon: <DocumentsIcon />,
+      view: 'concuerdos',
+      active: currentView === 'concuerdos'
     }
   ];
 
