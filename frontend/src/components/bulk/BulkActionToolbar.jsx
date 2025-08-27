@@ -14,7 +14,6 @@ import {
 import {
   Close as CloseIcon,
   CheckCircle as CheckCircleIcon,
-  Group as GroupIcon,
   Send as SendIcon,
   PlayArrow as PlayArrowIcon,
   Warning as WarningIcon
@@ -40,19 +39,6 @@ const BulkActionToolbar = ({
     if (!commonStatus || validTransitions.length === 0) return [];
 
     const buttons = [];
-
-    // EN_PROCESO → AGRUPADO
-    if (commonStatus === 'EN_PROCESO' && validTransitions.includes('AGRUPADO')) {
-      buttons.push({
-        key: 'agrupado',
-        label: 'Agrupar Documentos',
-        icon: <GroupIcon />,
-        color: 'info',
-        variant: 'outlined',
-        targetStatus: 'AGRUPADO',
-        description: 'Agrupar documentos seleccionados sin marcar como listos'
-      });
-    }
 
     // EN_PROCESO → LISTO
     if (commonStatus === 'EN_PROCESO' && validTransitions.includes('LISTO')) {
