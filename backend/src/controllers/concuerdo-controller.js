@@ -18,6 +18,7 @@ async function uploadPdf(req, res) {
     }
 
     const { mimetype, buffer, size, originalname } = req.file
+    console.log('📄 uploadPdf recibido:', { name: originalname, size, mimetype })
     if (mimetype !== 'application/pdf' && !originalname.toLowerCase().endsWith('.pdf')) {
       return res.status(400).json({ success: false, message: 'Formato inválido. Solo se permiten archivos PDF' })
     }
@@ -29,6 +30,9 @@ async function uploadPdf(req, res) {
     }
 
     const text = await PdfExtractorService.extractText(buffer)
+    if (!text || text.length < 5) {
+      return res.status(400).json({ success: false, message: 'No se pudo extraer texto legible del PDF. Verifique que no sea una imagen escaneada.' })
+    }
 
     return res.json({
       success: true,
