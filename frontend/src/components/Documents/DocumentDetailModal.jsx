@@ -347,6 +347,11 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
           verificationCode: result.data?.document?.verificationCode || prev.verificationCode
         }));
 
+        // Notificar al componente padre si existe callback
+        if (onDocumentUpdated && result.data) {
+          onDocumentUpdated(result.data);
+        }
+
         // Mostrar mensaje de éxito
         const message = result.message || `Documento actualizado a: ${actionConfig.action}`;
         

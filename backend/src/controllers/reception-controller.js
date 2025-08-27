@@ -95,7 +95,9 @@ async function listarTodosDocumentos(req, res) {
       where.OR = [
         { clientName: { contains: search, mode: 'insensitive' } },
         { clientPhone: { contains: search } },
-        { protocolNumber: { contains: search, mode: 'insensitive' } }
+        { protocolNumber: { contains: search, mode: 'insensitive' } },
+        // Nueva condición: permitir buscar por Acto Principal
+        { actoPrincipalDescripcion: { contains: search, mode: 'insensitive' } }
       ];
     }
     
@@ -204,7 +206,9 @@ async function getDocumentosEnProceso(req, res) {
       where.OR = [
         { clientName: { contains: search, mode: 'insensitive' } },
         { clientPhone: { contains: search } },
-        { protocolNumber: { contains: search, mode: 'insensitive' } }
+        { protocolNumber: { contains: search, mode: 'insensitive' } },
+        // Nueva condición: permitir buscar por Acto Principal
+        { actoPrincipalDescripcion: { contains: search, mode: 'insensitive' } }
       ];
     }
     
