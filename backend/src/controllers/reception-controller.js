@@ -1,10 +1,25 @@
 import { getPrismaClient } from '../db.js';
+import { Prisma } from '@prisma/client';
 import { getReversionCleanupData, isValidStatus, isReversion as isReversionFn, STATUS_ORDER_LIST } from '../utils/status-transitions.js';
 
 const prisma = getPrismaClient();
 import whatsappService from '../services/whatsapp-service.js';
 import CodigoRetiroService from '../utils/codigo-retiro.js';
 import AlertasService from '../services/alertas-service.js';
+
+// Cache simple para soporte de unaccent
+let UNACCENT_SUPPORTED = null;
+async function supportsUnaccentFn() {
+  if (UNACCENT_SUPPORTED !== null) return UNACCENT_SUPPORTED;
+  try {
+    await prisma.$queryRaw`SELECT unaccent('áéíóúÁÉÍÓÚ')`;
+    UNACCENT_SUPPORTED = true;
+  } catch (e) {
+    console.warn('Extensión unaccent no disponible. Búsqueda acento-insensible desactivada.');
+    UNACCENT_SUPPORTED = false;
+  }
+  return UNACCENT_SUPPORTED;
+}
 
 async function getDashboardStats(req, res) {
   try {
@@ -90,21 +105,8 @@ async function listarTodosDocumentos(req, res) {
 
     const where = {};
     
-    // PostgreSQL - Búsqueda case-insensitive con mode: 'insensitive'
+    // PostgreSQL - Búsqueda case-insensitive y acento-insensitive (si hay extensión unaccent)
     const searchTerm = (search || '').trim();
-    if (searchTerm) {
-      where.OR = [
-        { clientName: { contains: searchTerm, mode: 'insensitive' } },
-        { clientPhone: { contains: searchTerm } },
-        { clientEmail: { contains: searchTerm, mode: 'insensitive' } },
-        { clientId: { contains: searchTerm, mode: 'insensitive' } },
-        { protocolNumber: { contains: searchTerm, mode: 'insensitive' } },
-        // Buscar por Acto Principal (solicitado)
-        { actoPrincipalDescripcion: { contains: searchTerm, mode: 'insensitive' } },
-        // Extra útil de búsqueda (detalle editable)
-        { detalle_documento: { contains: searchTerm, mode: 'insensitive' } }
-      ];
-    }
     
     if (matrizador) {
       where.assignedToId = parseInt(matrizador);
@@ -123,6 +125,98 @@ async function listarTodosDocumentos(req, res) {
         const hasta = new Date(fechaHasta);
         hasta.setDate(hasta.getDate() + 1);
         where.createdAt.lt = hasta;
+      }
+    }
+    // Si hay término de búsqueda, intentar búsqueda acento-insensible con unaccent
+    if (searchTerm) {
+      const supportsUnaccent = await supportsUnaccentFn();
+      if (supportsUnaccent) {
+        const pattern = `%${searchTerm}%`;
+        // Construir cláusulas adicionales según filtros
+        const filterClauses = [];
+        if (estado) filterClauses.push(Prisma.sql`d."status"::text = ${estado}`);
+        if (matrizador) filterClauses.push(Prisma.sql`d."assignedToId" = ${parseInt(matrizador)}`);
+        if (fechaDesde) filterClauses.push(Prisma.sql`d."createdAt" >= ${new Date(fechaDesde)}`);
+        if (fechaHasta) {
+          const hasta = new Date(fechaHasta); hasta.setDate(hasta.getDate() + 1);
+          filterClauses.push(Prisma.sql`d."createdAt" < ${hasta}`);
+        }
+
+        const whereSql = Prisma.sql`${Prisma.join([
+          Prisma.sql`(
+            unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
+            unaccent(d."clientEmail") ILIKE unaccent(${pattern}) OR
+            unaccent(d."clientId") ILIKE unaccent(${pattern}) OR
+            unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
+            unaccent(d."actoPrincipalDescripcion") ILIKE unaccent(${pattern}) OR
+            unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
+            d."clientPhone" ILIKE ${pattern}
+          )`,
+          ...filterClauses
+        ], Prisma.sql` AND `)}`;
+
+        const documents = await prisma.$queryRaw`
+          SELECT d.*, u.id as "_assignedToId", u."firstName" as "_assignedToFirstName", u."lastName" as "_assignedToLastName"
+          FROM "documents" d
+          LEFT JOIN "users" u ON u.id = d."assignedToId"
+          WHERE ${whereSql}
+          ORDER BY d."createdAt" DESC
+          OFFSET ${skip} LIMIT ${take}
+        `;
+        const countRows = await prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${whereSql}`;
+        const total = Array.isArray(countRows) ? (countRows[0]?.count || 0) : (countRows?.count || 0);
+
+        const formattedDocuments = documents.map(doc => ({
+          id: doc.id,
+          protocolNumber: doc.protocolNumber,
+          clientName: doc.clientName,
+          clientPhone: doc.clientPhone,
+          clientEmail: doc.clientEmail,
+          clientId: doc.clientId,
+          documentType: doc.documentType,
+          status: doc.status,
+          isGrouped: doc.isGrouped,
+          documentGroupId: doc.documentGroupId,
+          groupVerificationCode: doc.groupVerificationCode,
+          matrizador: doc._assignedToFirstName ? `${doc._assignedToFirstName} ${doc._assignedToLastName}` : 'No asignado',
+          matrizadorId: doc.assignedToId,
+          codigoRetiro: doc.codigoRetiro,
+          verificationCode: doc.verificationCode,
+          fechaCreacion: doc.createdAt,
+          fechaEntrega: doc.fechaEntrega,
+          actoPrincipalDescripcion: doc.actoPrincipalDescripcion,
+          actoPrincipalValor: doc.totalFactura,
+          totalFactura: doc.totalFactura,
+          matrizadorName: doc.matrizadorName,
+          detalle_documento: doc.detalle_documento,
+          comentarios_recepcion: doc.comentarios_recepcion
+        }));
+
+        const totalPages = Math.ceil(total / take);
+
+        return res.json({
+          success: true,
+          data: {
+            documents: formattedDocuments,
+            pagination: {
+              page: parseInt(page),
+              limit: take,
+              total,
+              totalPages
+            }
+          }
+        });
+      } else {
+        // Si no hay unaccent, usar el filtro estándar case-insensitive
+        where.OR = [
+          { clientName: { contains: searchTerm, mode: 'insensitive' } },
+          { clientPhone: { contains: searchTerm } },
+          { clientEmail: { contains: searchTerm, mode: 'insensitive' } },
+          { clientId: { contains: searchTerm, mode: 'insensitive' } },
+          { protocolNumber: { contains: searchTerm, mode: 'insensitive' } },
+          { actoPrincipalDescripcion: { contains: searchTerm, mode: 'insensitive' } },
+          { detalle_documento: { contains: searchTerm, mode: 'insensitive' } }
+        ];
       }
     }
 
@@ -206,19 +300,76 @@ async function getDocumentosEnProceso(req, res) {
       status: 'EN_PROCESO'
     };
     
-    // PostgreSQL - Búsqueda case-insensitive con mode: 'insensitive'
+    // PostgreSQL - Búsqueda case-insensitive y acento-insensitive (si hay extensión unaccent)
     const searchTerm2 = (search || '').trim();
     if (searchTerm2) {
-      where.OR = [
-        { clientName: { contains: searchTerm2, mode: 'insensitive' } },
-        { clientPhone: { contains: searchTerm2 } },
-        { clientEmail: { contains: searchTerm2, mode: 'insensitive' } },
-        { clientId: { contains: searchTerm2, mode: 'insensitive' } },
-        { protocolNumber: { contains: searchTerm2, mode: 'insensitive' } },
-        // Nueva condición: permitir buscar por Acto Principal
-        { actoPrincipalDescripcion: { contains: searchTerm2, mode: 'insensitive' } },
-        { detalle_documento: { contains: searchTerm2, mode: 'insensitive' } }
-      ];
+      const supportsUnaccent = await supportsUnaccentFn();
+      if (supportsUnaccent) {
+        const pattern = `%${searchTerm2}%`;
+        const baseFilter = Prisma.sql`d."status" = 'EN_PROCESO'`;
+        const whereSql = Prisma.sql`${Prisma.join([
+          baseFilter,
+          Prisma.sql`(
+            unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
+            unaccent(d."clientEmail") ILIKE unaccent(${pattern}) OR
+            unaccent(d."clientId") ILIKE unaccent(${pattern}) OR
+            unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
+            unaccent(d."actoPrincipalDescripcion") ILIKE unaccent(${pattern}) OR
+            unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
+            d."clientPhone" ILIKE ${pattern}
+          )`
+        ], Prisma.sql` AND `)}`;
+
+        const documents = await prisma.$queryRaw`
+          SELECT d.*, u.id as "_assignedToId", u."firstName" as "_assignedToFirstName", u."lastName" as "_assignedToLastName"
+          FROM "documents" d
+          LEFT JOIN "users" u ON u.id = d."assignedToId"
+          WHERE ${whereSql}
+          ORDER BY d."updatedAt" DESC
+          OFFSET ${skip} LIMIT ${take}
+        `;
+        const countRows = await prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${whereSql}`;
+        const total = Array.isArray(countRows) ? (countRows[0]?.count || 0) : (countRows?.count || 0);
+
+        const formattedDocuments = documents.map(doc => ({
+          id: doc.id,
+          protocolNumber: doc.protocolNumber,
+          clientName: doc.clientName,
+          clientPhone: doc.clientPhone,
+          clientId: doc.clientId,
+          documentType: doc.documentType,
+          status: doc.status,
+          matrizador: doc._assignedToFirstName ? `${doc._assignedToFirstName} ${doc._assignedToLastName}` : 'No asignado',
+          matrizadorId: doc.assignedToId,
+          fechaCreacion: doc.createdAt,
+          fechaActualizacion: doc.updatedAt
+        }));
+
+        const totalPages = Math.ceil(total / take);
+
+        return res.json({
+          success: true,
+          data: {
+            documents: formattedDocuments,
+            pagination: {
+              page: parseInt(page),
+              limit: take,
+              total,
+              totalPages
+            }
+          }
+        });
+      } else {
+        where.OR = [
+          { clientName: { contains: searchTerm2, mode: 'insensitive' } },
+          { clientPhone: { contains: searchTerm2 } },
+          { clientEmail: { contains: searchTerm2, mode: 'insensitive' } },
+          { clientId: { contains: searchTerm2, mode: 'insensitive' } },
+          { protocolNumber: { contains: searchTerm2, mode: 'insensitive' } },
+          { actoPrincipalDescripcion: { contains: searchTerm2, mode: 'insensitive' } },
+          { detalle_documento: { contains: searchTerm2, mode: 'insensitive' } }
+        ];
+      }
     }
     
     if (matrizador) {

@@ -1,4 +1,5 @@
 import prisma from '../db.js';
+import { Prisma } from '@prisma/client';
 import whatsappService from '../services/whatsapp-service.js';
 import CodigoRetiroService from '../utils/codigo-retiro.js';
 import { getReversionCleanupData, STATUS_ORDER_LIST } from '../utils/status-transitions.js';
@@ -88,12 +89,56 @@ async function listarMisDocumentos(req, res) {
     };
 
     // Aplicar filtros adicionales
-    if (search) {
-      where.OR = [
-        { clientName: { contains: search, mode: 'insensitive' } },
-        { clientPhone: { contains: search } },
-        { protocolNumber: { contains: search, mode: 'insensitive' } }
-      ];
+    const searchTerm = (search || '').trim();
+    if (searchTerm) {
+      const supportsUnaccent = await supportsUnaccentFn();
+      if (supportsUnaccent) {
+        // Consulta por raw para acentos
+        const pattern = `%${searchTerm}%`;
+        const documents = await prisma.$queryRaw`
+          SELECT d.*
+          FROM "documents" d
+          WHERE d."assignedToId" = ${req.user.id} AND (
+            unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
+            unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
+            unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
+            d."clientPhone" ILIKE ${pattern}
+          )
+          ORDER BY d."updatedAt" DESC
+          OFFSET ${(parseInt(page) - 1) * parseInt(limit)} LIMIT ${parseInt(limit)}
+        `;
+        const countRows = await prisma.$queryRaw`
+          SELECT COUNT(*)::int AS count
+          FROM "documents" d
+          WHERE d."assignedToId" = ${req.user.id} AND (
+            unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
+            unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
+            unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
+            d."clientPhone" ILIKE ${pattern}
+          )
+        `;
+        const total = Array.isArray(countRows) ? (countRows[0]?.count || 0) : (countRows?.count || 0);
+
+        return res.json({
+          success: true,
+          data: {
+            documentos: documents,
+            pagination: {
+              currentPage: parseInt(page),
+              totalPages: Math.ceil(total / parseInt(limit)),
+              totalDocuments: total,
+              limit: parseInt(limit)
+            }
+          }
+        });
+      } else {
+        where.OR = [
+          { clientName: { contains: searchTerm, mode: 'insensitive' } },
+          { clientPhone: { contains: searchTerm } },
+          { protocolNumber: { contains: searchTerm, mode: 'insensitive' } },
+          { detalle_documento: { contains: searchTerm, mode: 'insensitive' } }
+        ];
+      }
     }
 
     if (estado && estado !== 'TODOS') {
@@ -684,22 +729,78 @@ async function supervisionGeneral(req, res) {
     // Construir filtros
     const where = {};
 
-    if (search) {
-      // Para SQLite: buscar en múltiples variaciones para simular insensitive
-      const searchLower = search.toLowerCase();
-      const searchUpper = search.toUpperCase();
-      const searchCapitalized = search.charAt(0).toUpperCase() + search.slice(1).toLowerCase();
-      
-      where.OR = [
-        { clientName: { contains: search } },
-        { clientName: { contains: searchLower } },
-        { clientName: { contains: searchUpper } },
-        { clientName: { contains: searchCapitalized } },
-        { clientPhone: { contains: search } },
-        { protocolNumber: { contains: search } },
-        { protocolNumber: { contains: searchLower } },
-        { protocolNumber: { contains: searchUpper } }
-      ];
+    const searchTerm = (search || '').trim();
+    if (searchTerm) {
+      const supportsUnaccent = await supportsUnaccentFn();
+      if (supportsUnaccent) {
+        const pattern = `%${searchTerm}%`;
+        const filterClauses = [];
+        if (matrizador && matrizador !== 'TODOS') filterClauses.push(Prisma.sql`d."assignedToId" = ${parseInt(matrizador)}`);
+        if (estado && estado !== 'TODOS') filterClauses.push(Prisma.sql`d."status"::text = ${estado}`);
+        if (fechaDesde) filterClauses.push(Prisma.sql`d."createdAt" >= ${new Date(fechaDesde)}`);
+        if (fechaHasta) filterClauses.push(Prisma.sql`d."createdAt" <= ${new Date(fechaHasta)}`);
+        const whereSql = Prisma.sql`${Prisma.join([
+          Prisma.sql`(
+            unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
+            unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
+            unaccent(d."actoPrincipalDescripcion") ILIKE unaccent(${pattern}) OR
+            unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
+            d."clientPhone" ILIKE ${pattern}
+          )`,
+          ...filterClauses
+        ], Prisma.sql` AND `)}`;
+
+        const documentos = await prisma.$queryRaw`
+          SELECT d.*, au.id as "_assignedToId", au."firstName" as "_assignedToFirstName", au."lastName" as "_assignedToLastName"
+          FROM "documents" d
+          LEFT JOIN "users" au ON au.id = d."assignedToId"
+          WHERE ${whereSql}
+          ORDER BY d."updatedAt" DESC
+          OFFSET ${(parseInt(page) - 1) * parseInt(limit)} LIMIT ${parseInt(limit)}
+        `;
+        const countRows = await prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${whereSql}`;
+        const total = Array.isArray(countRows) ? (countRows[0]?.count || 0) : (countRows?.count || 0);
+
+        const documentosConAlertas = documentos.map(doc => {
+          const diasEnEstado = Math.floor((Date.now() - new Date(doc.updatedAt).getTime()) / (1000 * 60 * 60 * 24));
+          let alerta = { nivel: 'normal', icono: '', dias: diasEnEstado };
+          if (diasEnEstado >= 15) alerta = { nivel: 'roja', icono: '🔥', dias: diasEnEstado };
+          else if (diasEnEstado >= 7) alerta = { nivel: 'amarilla', icono: '⚠️', dias: diasEnEstado };
+          return { ...doc, alerta };
+        });
+
+        // Filtrar por alertas si se especifica
+        let documentosFiltrados = documentosConAlertas;
+        if (alerta && alerta !== 'TODAS') {
+          documentosFiltrados = documentosConAlertas.filter(doc => {
+            if (alerta === 'ROJAS') return doc.alerta.nivel === 'roja';
+            if (alerta === 'AMARILLAS') return doc.alerta.nivel === 'amarilla';
+            if (alerta === 'NORMALES') return doc.alerta.nivel === 'normal';
+            return true;
+          });
+        }
+
+        return res.json({
+          success: true,
+          data: {
+            documentos: documentosFiltrados,
+            pagination: {
+              currentPage: parseInt(page),
+              totalPages: Math.ceil(total / parseInt(limit)),
+              totalDocuments: total,
+              limit: parseInt(limit)
+            }
+          }
+        });
+      } else {
+        where.OR = [
+          { clientName: { contains: searchTerm, mode: 'insensitive' } },
+          { clientPhone: { contains: searchTerm } },
+          { protocolNumber: { contains: searchTerm, mode: 'insensitive' } },
+          { actoPrincipalDescripcion: { contains: searchTerm, mode: 'insensitive' } },
+          { detalle_documento: { contains: searchTerm, mode: 'insensitive' } }
+        ];
+      }
     }
 
     if (matrizador && matrizador !== 'TODOS') {
@@ -786,6 +887,20 @@ async function supervisionGeneral(req, res) {
       message: 'Error interno del servidor'
     });
   }
+}
+
+// Cache simple para soporte de unaccent
+let UNACCENT_SUPPORTED = null;
+async function supportsUnaccentFn() {
+  if (UNACCENT_SUPPORTED !== null) return UNACCENT_SUPPORTED;
+  try {
+    await prisma.$queryRaw`SELECT unaccent('áéíóúÁÉÍÓÚ')`;
+    UNACCENT_SUPPORTED = true;
+  } catch (e) {
+    console.warn('Extensión unaccent no disponible en ARCHIVO.');
+    UNACCENT_SUPPORTED = false;
+  }
+  return UNACCENT_SUPPORTED;
 }
 
 /**

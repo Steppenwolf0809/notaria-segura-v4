@@ -7,6 +7,19 @@ import { PrismaClient } from '@prisma/client';
 
 let prisma = null;
 
+async function ensureExtensions(client) {
+  try {
+    // Intentar habilitar extensión unaccent para búsquedas acento-insensibles
+    // No falla si ya existe o si no hay permisos
+    await client.$executeRaw`CREATE EXTENSION IF NOT EXISTS unaccent`;
+  } catch (e) {
+    // Silencioso: en algunos entornos no se permite CREATE EXTENSION
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('Aviso: no se pudo habilitar extensión unaccent:', e.message);
+    }
+  }
+}
+
 function createPrismaClient() {
   return new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
@@ -17,6 +30,8 @@ function createPrismaClient() {
 export function getPrismaClient() {
   if (!prisma) {
     prisma = createPrismaClient();
+    // Intentar asegurar extensiones útiles en segundo plano (no bloquear)
+    ensureExtensions(prisma).catch(() => {});
   }
   return prisma;
 }
