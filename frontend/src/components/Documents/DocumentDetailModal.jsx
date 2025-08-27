@@ -181,6 +181,30 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
   };
 
   /**
+   * Manejar cambio de política de notificación
+   * Se ejecuta automáticamente al cambiar la política en el componente NotificationPolicySelector
+   */
+  const handleNotificationPolicyChange = (newPolicy, updatedData) => {
+    console.log('🔔 Política de notificación cambiada:', { newPolicy, updatedData });
+    
+    // Actualizar documento local
+    setLocalDocument(prev => ({
+      ...prev,
+      notificationPolicy: newPolicy,
+      ...(updatedData || {})
+    }));
+
+    // Notificar al componente padre si existe callback
+    if (onDocumentUpdated) {
+      onDocumentUpdated({
+        ...localDocument,
+        notificationPolicy: newPolicy,
+        ...(updatedData || {})
+      });
+    }
+  };
+
+  /**
    * Formatear moneda
    */
   const formatCurrency = (value) => {
