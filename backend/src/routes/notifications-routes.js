@@ -10,7 +10,7 @@ const router = express.Router();
  */
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const { page = 0, limit = 25, search, status, type, documentId } = req.query;
+    const { page = 0, limit = 25, search, status, type, documentId, dateFrom, dateTo } = req.query;
     const userRole = req.user.role;
     const userId = req.user.id;
     
@@ -56,6 +56,13 @@ router.get('/', authenticateToken, async (req, res) => {
     // Filtro específico por documento
     if (documentId) {
       where.documentId = documentId;
+    }
+
+    // Filtros por fecha (createdAt)
+    if (dateFrom || dateTo) {
+      where.createdAt = {};
+      if (dateFrom) where.createdAt.gte = new Date(dateFrom);
+      if (dateTo) where.createdAt.lte = new Date(dateTo);
     }
 
     // Obtener notificaciones con paginación

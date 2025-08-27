@@ -10,7 +10,8 @@ const PdfExtractorService = {
    */
   async extractText(pdfBuffer) {
     try {
-      const pdf = (await import('pdf-parse')).default
+      const mod = await import('pdf-parse')
+      const pdf = mod?.default || mod
       const data = await pdf(pdfBuffer)
       // Limpiar y normalizar espacios
       const text = (data.text || '')

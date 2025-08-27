@@ -13,41 +13,44 @@ export default function useConcuerdoGenerator() {
   const handleUpload = useCallback(async () => {
     if (!pdfFile) return
     setUploading(true)
-    const res = await concuerdoService.uploadPDF(pdfFile)
-    setUploading(false)
-    if (res.success) {
+    try {
+      const res = await concuerdoService.uploadPDF(pdfFile)
+      if (!res.success) throw new Error(res.error || 'Error subiendo PDF')
       setExtractedText(res.data.text || '')
       // Extraer datos básicos automáticamente
       setExtracting(true)
       const parsed = await concuerdoService.extractData(res.data.text || '')
+      if (!parsed.success) throw new Error(parsed.error || 'Error extrayendo datos')
+      setExtractedData(parsed.data)
+      setStep(1)
+    } finally {
       setExtracting(false)
-      if (parsed.success) {
-        setExtractedData(parsed.data)
-        setStep(1)
-      }
+      setUploading(false)
     }
   }, [pdfFile])
 
   const handleExtract = useCallback(async () => {
     if (!extractedText) return
     setExtracting(true)
-    const parsed = await concuerdoService.extractData(extractedText)
-    setExtracting(false)
-    if (parsed.success) {
+    try {
+      const parsed = await concuerdoService.extractData(extractedText)
+      if (!parsed.success) throw new Error(parsed.error || 'Error extrayendo datos')
       setExtractedData(parsed.data)
       setStep(1)
+    } finally {
+      setExtracting(false)
     }
   }, [extractedText])
 
   const preview = useCallback(async (data) => {
     setGenerating(true)
-    const res = await concuerdoService.previewConcuerpo?.(data)
-    // fallback por error tipográfico
-    const response = res && res.success !== undefined ? res : await concuerdoService.previewConcuerdo(data)
-    setGenerating(false)
-    if (response.success) {
+    try {
+      const response = await concuerdoService.previewConcuerdo(data)
+      if (!response.success) throw new Error(response.error || 'Error generando vista previa')
       setExtractedData({ ...data, previewText: response.data.previewText })
       setStep(2)
+    } finally {
+      setGenerating(false)
     }
   }, [])
 

@@ -90,11 +90,34 @@ const NotificationsHistory = () => {
     });
     
     try {
+      // Calcular rango de fechas para el backend según dateFilter
+      let dateFrom = '';
+      let dateTo = '';
+      if (dateFilter) {
+        const now = new Date();
+        switch (dateFilter) {
+          case 'today':
+            dateFrom = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+            break;
+          case 'week':
+            dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+            break;
+          case 'month':
+            dateFrom = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+            break;
+          default:
+            dateFrom = '';
+        }
+        // dateTo puede omitirse (hasta ahora)
+      }
+
       const response = await notificationsService.getNotifications({
         page,
         limit: rowsPerPage,
         search: searchTerm,
-        status: statusFilter
+        status: statusFilter,
+        dateFrom,
+        dateTo
       });
 
       console.log('📊 NOTIFICACIONES: Respuesta del backend:', response);
@@ -125,7 +148,7 @@ const NotificationsHistory = () => {
     if (user) {
       loadNotifications();
     }
-  }, [page, rowsPerPage, searchTerm, statusFilter, user?.id]);
+  }, [page, rowsPerPage, searchTerm, statusFilter, dateFilter, user?.id]);
 
   // Usar las notificaciones reales en lugar del array vacío
   const realNotifications = notifications;
@@ -190,44 +213,23 @@ const NotificationsHistory = () => {
   const filteredNotifications = useMemo(() => {
     let filtered = [...realNotifications];
 
-    // Búsqueda por texto
+    // Búsqueda por texto (coincide con el esquema real del backend)
     if (searchTerm.trim()) {
       const searchLower = searchTerm.toLowerCase();
-      filtered = filtered.filter(notification =>
-        (notification.cliente || '').toLowerCase().includes(searchLower) ||
-        (notification.documento || '').toLowerCase().includes(searchLower) ||
-        (notification.telefono || '').includes(searchTerm)
+      filtered = filtered.filter((n) =>
+        (n.clientName || '').toLowerCase().includes(searchLower) ||
+        (n.document?.protocolNumber || '').toLowerCase().includes(searchLower) ||
+        (n.clientPhone || '').includes(searchTerm) ||
+        (n.messageBody || '').toLowerCase().includes(searchLower)
       );
     }
 
-    // Filtro por estado
+    // Filtro por estado (valores: SENT | FAILED | PENDING | SIMULATED)
     if (statusFilter) {
-      filtered = filtered.filter(notification => notification.estadoEnvio === statusFilter);
+      filtered = filtered.filter((n) => n.status === statusFilter);
     }
 
-    // Filtro por fecha
-    if (dateFilter) {
-      const now = new Date();
-      let startDate;
-
-      switch (dateFilter) {
-        case 'today':
-          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-          break;
-        case 'week':
-          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-          break;
-        case 'month':
-          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-          break;
-        default:
-          startDate = null;
-      }
-
-      if (startDate) {
-        filtered = filtered.filter(notification => new Date(notification.fechaHora) >= startDate);
-      }
-    }
+    // Nota: el filtrado por fecha se realiza en el backend para mantener paginación y totales coherentes
 
     return filtered;
   }, [realNotifications, searchTerm, statusFilter, dateFilter]);
@@ -443,9 +445,10 @@ const NotificationsHistory = () => {
                 label="Estado"
               >
                 <MenuItem value="">Todos</MenuItem>
-                <MenuItem value="enviado">Exitosa</MenuItem>
-                <MenuItem value="fallido">Fallida</MenuItem>
-                <MenuItem value="pendiente">Pendiente</MenuItem>
+                <MenuItem value="SENT">Exitosa</MenuItem>
+                <MenuItem value="FAILED">Fallida</MenuItem>
+                <MenuItem value="PENDING">Pendiente</MenuItem>
+                <MenuItem value="SIMULATED">Simulada</MenuItem>
               </Select>
             </FormControl>
 
