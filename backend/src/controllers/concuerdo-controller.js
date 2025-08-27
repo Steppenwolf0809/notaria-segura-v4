@@ -89,7 +89,20 @@ async function previewConcuerdo(req, res) {
       ? v.map((x) => String(x || '').trim()).filter(Boolean)
       : String(v || '').split(/\n|,|;/).map((x) => x.trim()).filter(Boolean)
 
-    const tipo = String(tipoActo || '').trim()
+    const cleanActType = (s) => {
+      const txt = String(s || '').toUpperCase().replace(/\s+/g, ' ').trim()
+      const cutKeys = [' FECHA', ' OTORGANTE', ' OTORGADO', ' A FAVOR', ' PERSONA ', ' UBICACI', ' PROVINCIA', ' CANTON', ' PARROQUIA', ' DESCRIP', ' CUANT', ' DOCUMENTO']
+      let base = txt
+      for (const k of cutKeys) {
+        const i = base.indexOf(k)
+        if (i !== -1) base = base.slice(0, i)
+      }
+      base = base.replace(/\bPERSONA\s+NATURAL\b/g, '').replace(/\bPERSONA\s+JUR[IÍ]DICA\b/g, '')
+      base = base.replace(/\s+/g, ' ').trim()
+      return base
+    }
+
+    const tipo = cleanActType(tipoActo)
     const otorgs = safeArray(otorgantes)
     const benefs = safeArray(beneficiarios)
     const notarioStr = String(notario || '').trim()
@@ -98,22 +111,19 @@ async function previewConcuerdo(req, res) {
       return res.status(400).json({ success: false, message: 'Tipo de acto y al menos un otorgante son obligatorios' })
     }
 
-    const verboOtorgar = otorgs.length > 1 ? 'otorgan' : 'otorga'
-
-    const humanJoin = (arr) => {
-      if (arr.length === 1) return arr[0]
-      if (arr.length === 2) return `${arr[0]} y ${arr[1]}`
-      return `${arr.slice(0, -1).join(', ')} y ${arr[arr.length - 1]}`
+    const firstToken = (full) => String(full || '').trim().split(/\s+/)[0]?.toUpperCase() || ''
+    const isFemale = (n) => {
+      const token = firstToken(n)
+      const femaleList = new Set(['MARIA','ANA','ROSA','ELENA','FERNANDA','LUISA','VALERIA','CAMILA','GABRIELA','SOFIA','ISABEL','PATRICIA','VERONICA'])
+      return femaleList.has(token) || token.endsWith('A')
     }
+    const otRaw = otorgs[0]
+    const beRaw = benefs[0]
+    const otTrat = isFemale(otRaw) ? 'la señora' : 'el señor'
+    const beTrat = isFemale(beRaw) ? 'la señora' : 'el señor'
 
-    const otorgantesTexto = humanJoin(otorgs)
-    const beneficiariosTexto = benefs.length ? humanJoin(benefs) : ''
-
-    // Construcción de texto (sin fecha, numeración de copias)
-    let preview = `Se otorgó ante mí, en fe de ello confiero esta ${numeroCopias === 1 ? 'COPIA CERTIFICADA' : `${numeroCopias} COPIAS CERTIFICADAS`} de la escritura pública de ${tipo} que ${verboOtorgar} ${otorgantesTexto}`
-    if (beneficiariosTexto) preview += `, a favor de ${beneficiariosTexto}`
-    preview += ', la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.'
-    if (notarioStr) preview += ` (Notario: ${notarioStr}).`
+    // Usar plantilla exacta con PRIMERA como vista previa base
+    const preview = `Se otorgó ante mí, en fe de ello confiero esta PRIMERA COPIA CERTIFICADA de la escritura pública de ${tipo} que otorga ${otTrat} ${otRaw}${beRaw ? ` a favor de ${beTrat} ${beRaw}` : ''}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.`
 
     // Generar múltiples vistas previas individuales
     const copies = Math.max(1, Math.min(10, parseInt(numeroCopias || 2)))
@@ -146,7 +156,19 @@ async function generateDocuments(req, res) {
       ? v.map((x) => String(x || '').trim()).filter(Boolean)
       : String(v || '').split(/\n|,|;/).map((x) => x.trim()).filter(Boolean)
 
-    const tipo = String(tipoActo || '').trim()
+    const cleanActType = (s) => {
+      const txt = String(s || '').toUpperCase().replace(/\s+/g, ' ').trim()
+      const cutKeys = [' FECHA', ' OTORGANTE', ' OTORGADO', ' A FAVOR', ' PERSONA ', ' UBICACI', ' PROVINCIA', ' CANTON', ' PARROQUIA', ' DESCRIP', ' CUANT', ' DOCUMENTO']
+      let base = txt
+      for (const k of cutKeys) {
+        const i = base.indexOf(k)
+        if (i !== -1) base = base.slice(0, i)
+      }
+      base = base.replace(/\bPERSONA\s+NATURAL\b/g, '').replace(/\bPERSONA\s+JUR[IÍ]DICA\b/g, '')
+      base = base.replace(/\s+/g, ' ').trim()
+      return base
+    }
+    const tipo = cleanActType(tipoActo)
     const otorgs = safeArray(otorgantes)
     const benefs = safeArray(beneficiarios)
 
@@ -156,13 +178,11 @@ async function generateDocuments(req, res) {
 
     const copies = Math.max(1, Math.min(10, parseInt(numCopias || 2)))
 
+    const firstToken2 = (full) => String(full || '').trim().split(/\s+/)[0]?.toUpperCase() || ''
     const isFemaleName = (full) => {
-      if (!full) return false
-      const tokens = String(full).trim().toUpperCase().split(/\s+/)
-      const firstName = tokens[tokens.length - 1] || ''
-      const femaleList = ['MARIA','ANA','ROSA','ELENA','FERNANDA','LUISA','VALERIA','CAMILA','GABRIELA','SOFIA','ISABEL','PATRICIA']
-      if (femaleList.includes(firstName)) return true
-      return firstName.endsWith('A')
+      const first = firstToken2(full)
+      const femaleList = new Set(['MARIA','ANA','ROSA','ELENA','FERNANDA','LUISA','VALERIA','CAMILA','GABRIELA','SOFIA','ISABEL','PATRICIA','VERONICA'])
+      return femaleList.has(first) || first.endsWith('A')
     }
 
     const otRaw = (Array.isArray(otorgs) && otorgs.length) ? otorgs[0] : ''
@@ -170,7 +190,7 @@ async function generateDocuments(req, res) {
     const otGenero = isFemaleName(otRaw) ? 'la señora' : 'el señor'
     const beGenero = isFemaleName(beRaw) ? 'la señora' : 'el señor'
 
-    const buildTexto = (rotuloPalabra) => `Se otorgó ante mí, en fe de ello confiero esta ${rotuloPalabra} COPIA CERTIFICADA de la escritura pública de ${tipo} que otorga ${otGenero} ${otRaw} a favor de ${beGenero} ${beRaw}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.`
+    const buildTexto = (rotuloPalabra) => `Se otorgó ante mí, en fe de ello confiero esta ${rotuloPalabra} COPIA CERTIFICADA de la escritura pública de ${tipo} que otorga ${otGenero} ${otRaw}${beRaw ? ` a favor de ${beGenero} ${beRaw}` : ''}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.`
 
     const documents = []
     for (let i = 0; i < copies; i++) {
