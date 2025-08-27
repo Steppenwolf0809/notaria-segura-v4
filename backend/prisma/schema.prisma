@@ -107,6 +107,9 @@ model Document {
   groupDeliveredTo     String?    // Quien recibió el grupo
   individualDelivered  Boolean @default(false) // Si se entregó individualmente
 
+  // CONFIGURACIÓN DE NOTIFICACIONES
+  notificationPolicy   String  @default("automatica") // "automatica", "no_notificar", "entrega_inmediata"
+
   // CAMPOS ESPECÍFICOS DE RECEPCIÓN
   codigoRetiro         String?    // Código de 4 dígitos para retiro (individual o grupal)
   entregadoA           String?    // Nombre de quien retira el documento
