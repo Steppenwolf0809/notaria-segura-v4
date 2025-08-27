@@ -1,4 +1,5 @@
 import prisma from '../db.js';
+import { Prisma } from '@prisma/client';
 import { 
   logAdminAction,
   logUserListAccess,
@@ -30,15 +31,8 @@ async function getAllDocumentsOversight(req, res) {
 
     // Construir filtros WHERE
     const where = {};
-    
-    // Filtro por búsqueda
-    if (search) {
-      where.OR = [
-        { protocolNumber: { contains: search } },
-        { clientName: { contains: search } },
-        { documentType: { contains: search } }
-      ];
-    }
+
+    const searchTerm = (search || '').trim();
 
     // Filtro por estado
     if (status) {
@@ -67,34 +61,100 @@ async function getAllDocumentsOversight(req, res) {
       orderBy.createdAt = 'desc';
     }
 
-    // Ejecutar consultas
-    const [documents, totalCount] = await Promise.all([
-      prisma.document.findMany({
-        where,
-        skip: offset,
-        take: limitNum,
-        orderBy,
-        include: {
-          assignedTo: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true
-            }
-          },
-          createdBy: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true
-            }
-          }
+    // Ejecutar consultas con búsqueda acento-insensible si aplica
+    let documents;
+    let totalCount;
+    if (searchTerm) {
+      const supportsUnaccent = await supportsUnaccentFn();
+      if (supportsUnaccent) {
+        const pattern = `%${searchTerm}%`;
+        const filterClauses = [];
+        if (where.status) filterClauses.push(Prisma.sql`d."status"::text = ${where.status}`);
+        if (where.documentType) filterClauses.push(Prisma.sql`d."documentType"::text = ${where.documentType}`);
+        if (where.assignedToId === null) {
+          filterClauses.push(Prisma.sql`d."assignedToId" IS NULL`);
+        } else if (typeof where.assignedToId === 'number') {
+          filterClauses.push(Prisma.sql`d."assignedToId" = ${where.assignedToId}`);
         }
-      }),
-      prisma.document.count({ where })
-    ]);
+
+        const whereSql = Prisma.sql`${Prisma.join([
+          Prisma.sql`(
+            unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
+            unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
+            unaccent(d."actoPrincipalDescripcion") ILIKE unaccent(${pattern}) OR
+            unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern})
+          )`,
+          ...filterClauses
+        ], Prisma.sql` AND `)}`;
+
+        documents = await prisma.$queryRaw`
+          SELECT d.*, 
+                 au.id   AS "_assignedToId", au."firstName" AS "_assignedToFirstName", au."lastName" AS "_assignedToLastName", au.email AS "_assignedToEmail",
+                 cu.id   AS "_createdById",  cu."firstName"  AS "_createdByFirstName",  cu."lastName"  AS "_createdByLastName",  cu.email AS "_createdByEmail"
+          FROM "documents" d
+          LEFT JOIN "users" au ON au.id = d."assignedToId"
+          LEFT JOIN "users" cu ON cu.id = d."createdById"
+          WHERE ${whereSql}
+          ORDER BY d."${Prisma.raw(orderBy.updatedAt ? 'updatedAt' : 'createdAt')}" ${Prisma.raw(orderBy.updatedAt === 'asc' || orderBy.createdAt === 'asc' ? 'ASC' : 'DESC')}
+          OFFSET ${offset} LIMIT ${limitNum}
+        `;
+        const countRows = await prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${whereSql}`;
+        totalCount = Array.isArray(countRows) ? (countRows[0]?.count || 0) : (countRows?.count || 0);
+
+        // Adaptar include manual
+        documents = documents.map(d => ({
+          ...d,
+          assignedTo: d._assignedToId ? {
+            id: d._assignedToId,
+            firstName: d._assignedToFirstName,
+            lastName: d._assignedToLastName,
+            email: d._assignedToEmail
+          } : null,
+          createdBy: d._createdById ? {
+            id: d._createdById,
+            firstName: d._createdByFirstName,
+            lastName: d._createdByLastName,
+            email: d._createdByEmail
+          } : null
+        }));
+      } else {
+        // Fallback Prisma estándar
+        where.OR = [
+          { protocolNumber: { contains: searchTerm, mode: 'insensitive' } },
+          { clientName: { contains: searchTerm, mode: 'insensitive' } },
+          { actoPrincipalDescripcion: { contains: searchTerm, mode: 'insensitive' } },
+          { detalle_documento: { contains: searchTerm, mode: 'insensitive' } }
+        ];
+        [documents, totalCount] = await Promise.all([
+          prisma.document.findMany({
+            where,
+            skip: offset,
+            take: limitNum,
+            orderBy,
+            include: {
+              assignedTo: { select: { id: true, firstName: true, lastName: true, email: true } },
+              createdBy:  { select: { id: true, firstName: true, lastName: true, email: true } }
+            }
+          }),
+          prisma.document.count({ where })
+        ]);
+      }
+    } else {
+      // Sin búsqueda
+      [documents, totalCount] = await Promise.all([
+        prisma.document.findMany({
+          where,
+          skip: offset,
+          take: limitNum,
+          orderBy,
+          include: {
+            assignedTo: { select: { id: true, firstName: true, lastName: true, email: true } },
+            createdBy:  { select: { id: true, firstName: true, lastName: true, email: true } }
+          }
+        }),
+        prisma.document.count({ where })
+      ]);
+    }
 
     // Calcular estadísticas básicas
     const stats = await getBasicDocumentStats();
@@ -131,6 +191,20 @@ async function getAllDocumentsOversight(req, res) {
       message: 'Error interno del servidor'
     });
   }
+}
+
+// Cache simple para soporte de unaccent
+let UNACCENT_SUPPORTED = null;
+async function supportsUnaccentFn() {
+  if (UNACCENT_SUPPORTED !== null) return UNACCENT_SUPPORTED;
+  try {
+    await prisma.$queryRaw`SELECT unaccent('áéíóúÁÉÍÓÚ')`;
+    UNACCENT_SUPPORTED = true;
+  } catch (e) {
+    console.warn('Extensión unaccent no disponible en ADMIN Oversight.');
+    UNACCENT_SUPPORTED = false;
+  }
+  return UNACCENT_SUPPORTED;
 }
 
 /**
@@ -416,12 +490,20 @@ async function exportDocuments(req, res) {
     // Construir filtros
     const where = {};
     
-    if (search) {
-      where.OR = [
-        { protocolNumber: { contains: search } },
-        { clientName: { contains: search } },
-        { documentType: { contains: search } }
-      ];
+    const searchTerm = (search || '').trim();
+    if (searchTerm) {
+      const supportsUnaccent = await supportsUnaccentFn();
+      if (supportsUnaccent) {
+        // Más abajo ejecutamos consulta con $queryRaw y luego formateamos igual
+        // Para mantener consistencia, construiremos los datos desde query bruta
+      } else {
+        where.OR = [
+          { protocolNumber: { contains: searchTerm, mode: 'insensitive' } },
+          { clientName: { contains: searchTerm, mode: 'insensitive' } },
+          { actoPrincipalDescripcion: { contains: searchTerm, mode: 'insensitive' } },
+          { detalle_documento: { contains: searchTerm, mode: 'insensitive' } }
+        ];
+      }
     }
 
     if (status) where.status = status;
@@ -434,18 +516,46 @@ async function exportDocuments(req, res) {
       }
     }
 
-    const documents = await prisma.document.findMany({
-      where,
-      include: {
-        assignedTo: {
-          select: { firstName: true, lastName: true }
+    let documents;
+    if (searchTerm && (await supportsUnaccentFn())) {
+      const pattern = `%${searchTerm}%`;
+      const filterClauses = [];
+      if (status) filterClauses.push(Prisma.sql`d."status"::text = ${status}`);
+      if (type) filterClauses.push(Prisma.sql`d."documentType"::text = ${type}`);
+      if (matrizador === 'unassigned') {
+        filterClauses.push(Prisma.sql`d."assignedToId" IS NULL`);
+      } else if (matrizador) {
+        filterClauses.push(Prisma.sql`d."assignedToId" = ${parseInt(matrizador)}`);
+      }
+      const whereSql = Prisma.sql`${Prisma.join([
+        Prisma.sql`(
+          unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
+          unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
+          unaccent(d."actoPrincipalDescripcion") ILIKE unaccent(${pattern}) OR
+          unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern})
+        )`,
+        ...filterClauses
+      ], Prisma.sql` AND `)}`;
+      documents = await prisma.$queryRaw`
+        SELECT d.*, 
+               au."firstName" AS "_assignedToFirstName", au."lastName" AS "_assignedToLastName",
+               cu."firstName" AS "_createdByFirstName", cu."lastName" AS "_createdByLastName"
+        FROM "documents" d
+        LEFT JOIN "users" au ON au.id = d."assignedToId"
+        LEFT JOIN "users" cu ON cu.id = d."createdById"
+        WHERE ${whereSql}
+        ORDER BY d."createdAt" DESC
+      `;
+    } else {
+      documents = await prisma.document.findMany({
+        where,
+        include: {
+          assignedTo: { select: { firstName: true, lastName: true } },
+          createdBy:  { select: { firstName: true, lastName: true } }
         },
-        createdBy: {
-          select: { firstName: true, lastName: true }
-        }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
+        orderBy: { createdAt: 'desc' }
+      });
+    }
 
     // Formatear datos para exportación
     const exportData = documents.map(doc => ({
@@ -454,10 +564,12 @@ async function exportDocuments(req, res) {
       'Teléfono': doc.clientPhone || '',
       'Tipo Documento': doc.documentType || '',
       'Estado': doc.status || '',
-      'Matrizador Asignado': doc.assignedTo ? 
-        `${doc.assignedTo.firstName} ${doc.assignedTo.lastName}` : 'Sin asignar',
-      'Creado Por': doc.createdBy ? 
-        `${doc.createdBy.firstName} ${doc.createdBy.lastName}` : 'N/A',
+      'Matrizador Asignado': doc.assignedTo 
+        ? `${doc.assignedTo.firstName} ${doc.assignedTo.lastName}`
+        : (doc._assignedToFirstName ? `${doc._assignedToFirstName} ${doc._assignedToLastName}` : 'Sin asignar'),
+      'Creado Por': doc.createdBy 
+        ? `${doc.createdBy.firstName} ${doc.createdBy.lastName}`
+        : (doc._createdByFirstName ? `${doc._createdByFirstName} ${doc._createdByLastName}` : 'N/A'),
       'Fecha Creación': doc.createdAt ? 
         new Date(doc.createdAt).toLocaleDateString('es-ES') : '',
       'Última Actualización': doc.updatedAt ? 
