@@ -3488,7 +3488,9 @@ async function revertDocumentStatus(req, res) {
     let updatedDocuments = [];
     let groupAffected = false;
 
-    if (document.documentGroupId && ['ARCHIVO', 'ADMIN'].includes(req.user.role)) {
+    // Si el documento está agrupado y el rol permite operaciones grupales,
+    // propagar la reversión a todo el grupo. Ahora incluye RECEPCION.
+    if (document.documentGroupId && ['ARCHIVO', 'ADMIN', 'RECEPCION'].includes(req.user.role)) {
       console.log('🔗 Documento agrupado detectado - Iniciando reversión grupal:', {
         documentGroupId: document.documentGroupId,
         newStatus,

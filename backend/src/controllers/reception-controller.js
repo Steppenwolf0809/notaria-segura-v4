@@ -91,13 +91,19 @@ async function listarTodosDocumentos(req, res) {
     const where = {};
     
     // PostgreSQL - Búsqueda case-insensitive con mode: 'insensitive'
-    if (search) {
+    const searchTerm = (search || '').trim();
+    if (searchTerm) {
       where.OR = [
-        { clientName: { contains: search, mode: 'insensitive' } },
-        { clientPhone: { contains: search } },
-        { protocolNumber: { contains: search, mode: 'insensitive' } },
-        // Nueva condición: permitir buscar por Acto Principal
-        { actoPrincipalDescripcion: { contains: search, mode: 'insensitive' } }
+        { clientName: { contains: searchTerm, mode: 'insensitive' } },
+        { clientPhone: { contains: searchTerm } },
+        { clientEmail: { contains: searchTerm, mode: 'insensitive' } },
+        { clientId: { contains: searchTerm, mode: 'insensitive' } },
+        { protocolNumber: { contains: searchTerm, mode: 'insensitive' } },
+        // Buscar por Acto Principal (solicitado)
+        { actoPrincipalDescripcion: { contains: searchTerm, mode: 'insensitive' } },
+        // Extras útiles de búsqueda
+        { documentType: { contains: searchTerm, mode: 'insensitive' } },
+        { detalle_documento: { contains: searchTerm, mode: 'insensitive' } }
       ];
     }
     
@@ -202,13 +208,18 @@ async function getDocumentosEnProceso(req, res) {
     };
     
     // PostgreSQL - Búsqueda case-insensitive con mode: 'insensitive'
-    if (search) {
+    const searchTerm2 = (search || '').trim();
+    if (searchTerm2) {
       where.OR = [
-        { clientName: { contains: search, mode: 'insensitive' } },
-        { clientPhone: { contains: search } },
-        { protocolNumber: { contains: search, mode: 'insensitive' } },
+        { clientName: { contains: searchTerm2, mode: 'insensitive' } },
+        { clientPhone: { contains: searchTerm2 } },
+        { clientEmail: { contains: searchTerm2, mode: 'insensitive' } },
+        { clientId: { contains: searchTerm2, mode: 'insensitive' } },
+        { protocolNumber: { contains: searchTerm2, mode: 'insensitive' } },
         // Nueva condición: permitir buscar por Acto Principal
-        { actoPrincipalDescripcion: { contains: search, mode: 'insensitive' } }
+        { actoPrincipalDescripcion: { contains: searchTerm2, mode: 'insensitive' } },
+        { documentType: { contains: searchTerm2, mode: 'insensitive' } },
+        { detalle_documento: { contains: searchTerm2, mode: 'insensitive' } }
       ];
     }
     
