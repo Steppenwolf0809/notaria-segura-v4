@@ -116,8 +116,10 @@ function HistorialEntregas() {
   // Orden en memoria por fechaEntrega
   const entregasOrdenadas = useMemo(() => {
     const sorted = [...entregas].sort((a, b) => {
-      const aVal = new Date(a.fechaEntrega || a.createdAt).getTime();
-      const bVal = new Date(b.fechaEntrega || b.createdAt).getTime();
+      let aVal = a.fechaEntrega || a.createdAt;
+      let bVal = b.fechaEntrega || b.createdAt;
+      aVal = new Date(aVal).getTime();
+      bVal = new Date(bVal).getTime();
       return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
     });
     return sorted;

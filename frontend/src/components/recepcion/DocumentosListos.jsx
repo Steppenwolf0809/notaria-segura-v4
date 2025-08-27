@@ -188,11 +188,19 @@ function DocumentosListos({ onEstadisticasChange }) {
   // Documentos ordenados en memoria por createdAt/fechaCreacion
   const documentosOrdenados = useMemo(() => {
     const keyCandidates = ['createdAt', 'fechaCreacion', 'created_at'];
-    const fechaKey = sortBy && keyCandidates.includes(sortBy) ? sortBy : (documentos[0]?.createdAt ? 'createdAt' : (documentos[0]?.fechaCreacion ? 'fechaCreacion' : 'createdAt'));
+    const defaultKey = documentos[0]?.createdAt ? 'createdAt' : (documentos[0]?.fechaCreacion ? 'fechaCreacion' : 'createdAt');
+    const field = sortBy || defaultKey;
     const sorted = [...documentos].sort((a, b) => {
-      const aVal = new Date(a[fechaKey] || a.createdAt || a.fechaCreacion).getTime();
-      const bVal = new Date(b[fechaKey] || b.createdAt || b.fechaCreacion).getTime();
-      return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+      let aVal = a[field] ?? a[defaultKey] ?? a.createdAt ?? a.fechaCreacion;
+      let bVal = b[field] ?? b[defaultKey] ?? b.createdAt ?? b.fechaCreacion;
+      if (keyCandidates.includes(field)) {
+        aVal = new Date(aVal).getTime();
+        bVal = new Date(bVal).getTime();
+      } else if (typeof aVal === 'string') {
+        aVal = aVal.toLowerCase();
+        bVal = (bVal || '').toLowerCase();
+      }
+      return sortOrder === 'asc' ? (aVal > bVal ? 1 : -1) : (aVal < bVal ? 1 : -1);
     });
     return sorted;
   }, [documentos, sortBy, sortOrder]);

@@ -30,6 +30,68 @@ const PdfExtractorService = {
     let notarioNombre
     let notariaNumero
 
+    // Utilidad: normaliza texto (sin acentos) y mapea ordinales en español → número
+    const toAsciiUpper = (s) => String(s || '')
+      .normalize('NFD')
+      .replace(/\p{Diacritic}+/gu, '')
+      .toUpperCase()
+      .trim()
+
+    const unitOrdinals = new Map([
+      ['PRIMER', 1], ['PRIMERA', 1], ['PRIMERO', 1], ['UNO', 1], ['UNA', 1],
+      ['SEGUNDA', 2], ['SEGUNDO', 2], ['DOS', 2],
+      ['TERCERA', 3], ['TERCERO', 3], ['TRES', 3],
+      ['CUARTA', 4], ['CUARTO', 4], ['CUATRO', 4],
+      ['QUINTA', 5], ['QUINTO', 5], ['CINCO', 5],
+      ['SEXTA', 6], ['SEXTO', 6], ['SEIS', 6],
+      ['SEPTIMA', 7], ['SEPTIMO', 7], ['SIETE', 7],
+      ['OCTAVA', 8], ['OCTAVO', 8], ['OCHO', 8],
+      ['NOVENA', 9], ['NOVENO', 9], ['NUEVE', 9]
+    ])
+    const tensOrdinals = new Map([
+      ['DECIMA', 10], ['DECIMO', 10],
+      ['VIGESIMA', 20], ['VIGESIMO', 20],
+      ['TRIGESIMA', 30], ['TRIGESIMO', 30],
+      ['CUADRAGESIMA', 40], ['CUADRAGESIMO', 40],
+      ['QUINCUAGESIMA', 50], ['QUINCUAGESIMO', 50]
+    ])
+    const teenOrdinals = new Map([
+      ['UNDECIMA', 11], ['UNDECIMO', 11], ['UNDECIMAPRIMERA', 11], ['UNDECIMOPRIMERA', 11],
+      ['DUODECIMA', 12], ['DUODECIMO', 12],
+      ['DECIMOTERCERA', 13], ['DECIMOTERCERO', 13], ['DECIMO TERCERA', 13],
+      ['DECIMOCUARTA', 14], ['DECIMOCUARTO', 14], ['DECIMO CUARTA', 14],
+      ['DECIMOQUINTA', 15], ['DECIMOQUINTO', 15], ['DECIMO QUINTA', 15],
+      ['DECIMOSEXTA', 16], ['DECIMOSEXTO', 16], ['DECIMO SEXTA', 16],
+      ['DECIMOSEPTIMA', 17], ['DECIMOSEPTIMO', 17], ['DECIMO SEPTIMA', 17],
+      ['DECIMOOCTAVA', 18], ['DECIMOOCTAVO', 18], ['DECIMO OCTAVA', 18], ['DECIMO OCTAVO', 18],
+      ['DECIMONOVENA', 19], ['DECIMONOVENO', 19], ['DECIMO NOVENA', 19]
+    ])
+    const parseOrdinalWords = (s) => {
+      const base = toAsciiUpper(s).replace(/[^A-Z\s]/g, ' ').replace(/\s+/g, ' ').trim()
+      if (!base) return undefined
+      // Casos combinados pegados: DECIMOQUINTA, VIGESIMOPRIMERA, etc.
+      const glued = base.replace(/\s+/g, '')
+      if (teenOrdinals.has(glued)) return String(teenOrdinals.get(glued))
+      // Tens + unit: e.g., DECIMA OCTAVA → 10 + 8; VIGESIMA SEGUNDA → 20 + 2
+      const tokens = base.split(' ')
+      let total = 0
+      for (const t of tokens) {
+        if (teenOrdinals.has(t)) { total = teenOrdinals.get(t); continue }
+        if (tensOrdinals.has(t)) { total += tensOrdinals.get(t); continue }
+        if (unitOrdinals.has(t)) { total += unitOrdinals.get(t); continue }
+        // Combinados pegados dentro de un token
+        const tt = t
+        for (const [k, v] of tensOrdinals.entries()) {
+          if (tt.startsWith(k)) {
+            total += v
+            const rest = tt.slice(k.length)
+            if (unitOrdinals.has(rest)) total += unitOrdinals.get(rest)
+          }
+        }
+      }
+      return total > 0 ? String(total) : undefined
+    }
+
     for (let idx = 0; idx < lines.length; idx++) {
       const line = lines[idx]
       const m = line.match(/\(\s*A\s*\)\s*([A-ZÁÉÍÓÚÑ\s\.]\S.*)$/i)
@@ -58,8 +120,19 @@ const PdfExtractorService = {
       if (m2) notarioNombre = m2[1].replace(/^ABG\.?\s*/i, '').trim()
     }
     if (!notariaNumero) {
-      const n2 = text.toUpperCase().match(/NOTAR[ÍI]A\s*(?:N°|Nº|NO\.?|NUMERO)?\s*(\d{1,3})/)
-      if (n2) notariaNumero = n2[1]
+      const upper = text.toUpperCase()
+      // Caso 1: formato numérico
+      const n2 = upper.match(/NOTAR[ÍI]A\s*(?:N°|Nº|NO\.?|NUMERO)?\s*(\d{1,3})/)
+      if (n2) {
+        notariaNumero = n2[1]
+      } else {
+        // Caso 2: ordinal en palabras, ej. "NOTARÍA DÉCIMA OCTAVA DEL CANTON QUITO"
+        const mOrdinal = upper.match(/NOTAR[ÍI]A\s+([A-ZÁÉÍÓÚÑ\s]{3,40}?)\s+DEL\s+CANT[ÓO]N/)
+        if (mOrdinal && mOrdinal[1]) {
+          const numFromWords = parseOrdinalWords(mOrdinal[1])
+          if (numFromWords) notariaNumero = numFromWords
+        }
+      }
     }
 
     return { notarioNombre, notariaNumero }
@@ -301,7 +374,8 @@ const PdfExtractorService = {
     let match
     while ((match = actRegex.exec(upper)) !== null) {
       const fullSection = match[0]
-      const tipoActo = this.cleanActType((match[1] || '').trim())
+      const tipoActoRaw = (match[1] || '').trim()
+      const tipoActo = this.cleanActType(tipoActoRaw)
 
       // Dentro de la sección, buscar otorgantes y beneficiarios
       const section = fullSection
@@ -336,12 +410,35 @@ const PdfExtractorService = {
       const notMatch = section.match(notarioRegex)
       if (notMatch && notMatch[1]) notario = notMatch[1].trim()
 
-      acts.push({
-        tipoActo: tipoActo || '',
-        otorgantes: this.cleanPersonNames(otorgantesRaw),
-        beneficiarios: this.cleanPersonNames(beneficiariosRaw),
-        ...(notario ? { notario } : {})
-      })
+      // Intentar dividir múltiples actos dentro de una sola sección "ACTO O CONTRATO"
+      const splitMultiActs = (s) => {
+        const base = String(s || '').replace(/\s+/g, ' ').trim()
+        if (!base) return []
+        // Separadores comunes y listas numeradas
+        let tmp = base
+          .replace(/\b\d+\s*[\).:-]\s*/g, '|') // 1), 2., 3:
+          .replace(/\s+[-–—]\s+/g, '|')
+          .replace(/\s+Y\s+/g, '|')
+          .replace(/\s+E\s+/g, '|')
+          .replace(/\s*[,;/]\s*/g, '|')
+        const parts = tmp.split('|').map(p => this.cleanActType(p)).filter(p => p && p.length >= 3)
+        // Descartar duplicados triviales
+        return Array.from(new Set(parts))
+      }
+
+      const multi = splitMultiActs(tipoActoRaw)
+      const actsTitles = multi.length > 1 ? multi : [tipoActo]
+
+      const otClean = this.cleanPersonNames(otorgantesRaw)
+      const beClean = this.cleanPersonNames(beneficiariosRaw)
+      for (const title of actsTitles) {
+        acts.push({
+          tipoActo: title || '',
+          otorgantes: otClean,
+          beneficiarios: beClean,
+          ...(notario ? { notario } : {})
+        })
+      }
     }
 
     // Si no detectó ninguna sección "ACTO O CONTRATO", intentar con parseSimpleData
