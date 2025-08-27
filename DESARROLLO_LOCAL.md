@@ -187,6 +187,15 @@ npm run db:push
 npm run db:seed
 ```
 
+## Watcher de XML (standalone)
+
+- El watcher que sube XML automáticamente desde el PC de CAJA es un servicio externo ubicado en `xml-watcher-service/`.
+- La API expone los endpoints `POST /api/documents/upload-xml` y `POST /api/documents/upload-xml-batch` que el watcher consume.
+- Se removieron del backend módulos duplicados del watcher para evitar confusión.
+- Para usarlo en local o producción de escritorio:
+  - Configura `xml-watcher-service/config.json` con la URL de la API y credenciales de un usuario `CAJA`.
+  - Construye/ejecuta según el README en `xml-watcher-service/`.
+
 ## 🚀 Deploy vs Desarrollo
 
 ### Desarrollo Local
