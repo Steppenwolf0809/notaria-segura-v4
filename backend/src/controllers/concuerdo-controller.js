@@ -61,12 +61,13 @@ async function extractData(req, res) {
       return res.status(400).json({ success: false, message: 'Texto del PDF inválido o vacío' })
     }
 
-    const parsed = PdfExtractorService.parseSimpleData(text)
+    const { acts } = PdfExtractorService.parseAdvancedData(text)
+    const parsed = acts[0] || { tipoActo: '', otorgantes: [], beneficiarios: [] }
 
     return res.json({
       success: true,
       message: 'Datos extraídos correctamente',
-      data: parsed
+      data: { ...parsed, acts }
     })
   } catch (error) {
     console.error('Error en extractData:', error)
@@ -112,7 +113,16 @@ async function previewConcuerdo(req, res) {
     preview += ', la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.'
     if (notarioStr) preview += ` (Notario: ${notarioStr}).`
 
-    return res.json({ success: true, data: { previewText: preview } })
+    // Generar múltiples vistas previas individuales
+    const copies = Math.max(1, Math.min(10, parseInt(numeroCopias || 2)))
+    const previews = Array.from({ length: copies }, (_, idx) => {
+      const n = idx + 1
+      const rotulo = n === 1 ? 'PRIMERA COPIA' : n === 2 ? 'SEGUNDA COPIA' : `${n}ª COPIA`
+      const content = `${rotulo}:\n\n${preview}`
+      return { index: n, title: rotulo, text: content }
+    })
+
+    return res.json({ success: true, data: { previewText: preview, previews } })
   } catch (error) {
     console.error('Error en previewConcuerdo:', error)
     return res.status(500).json({ success: false, message: 'Error generando vista previa' })
@@ -120,5 +130,71 @@ async function previewConcuerdo(req, res) {
 }
 
 export { uploadPdf, extractData, previewConcuerdo }
+/**
+ * Generar múltiples documentos (copias) numerados
+ * POST /api/concuerdos/generate-documents
+ * body: { tipoActo, otorgantes, beneficiarios, numCopias, notario?, format? }
+ */
+async function generateDocuments(req, res) {
+  try {
+    const { tipoActo, otorgantes, beneficiarios, numCopias = 2, notario, format = 'html' } = req.body || {}
+
+    const safeArray = (v) => Array.isArray(v)
+      ? v.map((x) => String(x || '').trim()).filter(Boolean)
+      : String(v || '').split(/\n|,|;/).map((x) => x.trim()).filter(Boolean)
+
+    const tipo = String(tipoActo || '').trim()
+    const otorgs = safeArray(otorgantes)
+    const benefs = safeArray(beneficiarios)
+
+    if (!tipo || otorgs.length === 0) {
+      return res.status(400).json({ success: false, message: 'Tipo de acto y al menos un otorgante son obligatorios' })
+    }
+
+    const copies = Math.max(1, Math.min(10, parseInt(numCopias || 2)))
+
+    const buildHtml = (title, body) => `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
+      <style>body{font-family: Arial, sans-serif; line-height:1.5; padding:24px} h1{font-size:18px} .meta{color:#666;font-size:12px}</style></head>
+      <body><h1>${title}</h1><div>${body}</div><div class=\"meta\">Generado por Notaría Segura</div></body></html>`
+
+    const verboOtorgar = otorgs.length > 1 ? 'otorgan' : 'otorga'
+    const humanJoin = (arr) => {
+      if (arr.length === 1) return arr[0]
+      if (arr.length === 2) return `${arr[0]} y ${arr[1]}`
+      return `${arr.slice(0, -1).join(', ')} y ${arr[arr.length - 1]}`
+    }
+    const otorgantesTexto = humanJoin(otorgs)
+    const beneficiariosTexto = benefs.length ? `, a favor de ${humanJoin(benefs)}` : ''
+    const notarioStr = notario ? ` (Notario: ${String(notario).trim()})` : ''
+
+    const baseParagraph = `Se otorgó ante mí, en fe de ello confiero esta COPIA CERTIFICADA de la escritura pública de ${tipo} que ${verboOtorgar} ${otorgantesTexto}${beneficiariosTexto}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.${notarioStr}.`
+
+    const documents = []
+    for (let i = 0; i < copies; i++) {
+      const n = i + 1
+      const rotulo = n === 1 ? 'PRIMERA_COPIA' : n === 2 ? 'SEGUNDA_COPIA' : `${n}_COPIA`
+      const title = `${rotulo.replace('_', ' ')} - ${tipo}`
+      let mimeType = 'text/html'
+      let filename = `CONCUERDO_${rotulo}.html`
+      let contentString = buildHtml(title, `<p>${baseParagraph}</p>`)
+
+      if (format === 'txt') {
+        mimeType = 'text/plain'
+        filename = `CONCUERDO_${rotulo}.txt`
+        contentString = `${title}\n\n${baseParagraph}`
+      }
+
+      const contentBase64 = Buffer.from(contentString, 'utf8').toString('base64')
+      documents.push({ index: n, title, filename, mimeType, contentBase64, simulated: format !== 'pdf' })
+    }
+
+    return res.json({ success: true, data: { documents } })
+  } catch (error) {
+    console.error('Error generando documentos de concuerdo:', error)
+    return res.status(500).json({ success: false, message: 'Error generando documentos' })
+  }
+}
+
+export { generateDocuments }
 
 

@@ -45,9 +45,19 @@ export default function useConcuerdoGenerator() {
   const preview = useCallback(async (data) => {
     setGenerating(true)
     try {
-      const response = await concuerdoService.previewConcuerdo(data)
-      if (!response.success) throw new Error(response.error || 'Error generando vista previa')
-      setExtractedData({ ...data, previewText: response.data.previewText })
+      // Generar documentos en formato HTML como vista previa
+      const numCopias = data?.numeroCopias ?? 2
+      const resp = await concuerdoService.generateDocuments({
+        tipoActo: data?.tipoActo,
+        otorgantes: data?.otorgantes,
+        beneficiarios: data?.beneficiarios,
+        notario: data?.notario,
+        numCopias,
+        format: 'html'
+      })
+      if (!resp.success) throw new Error(resp.error || 'Error generando documentos')
+
+      setExtractedData({ ...data, previewDocs: resp.data.documents })
       setStep(2)
     } finally {
       setGenerating(false)
