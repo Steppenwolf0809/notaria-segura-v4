@@ -160,7 +160,7 @@ const PdfExtractorService = {
       beneficiarios: splitPeople(beneficiariosRaw),
       notario: notario || undefined
     }
-  }
+  },
 
   /**
    * Parser avanzado: detecta múltiples actos y busca etiquetas comunes
