@@ -37,7 +37,7 @@ import {
   History as HistoryIcon,
   Speed as SpeedIcon
 } from '@mui/icons-material';
-import DocumentCard from './DocumentCard';
+// import DocumentCard from './DocumentCard';
 import NotificationsHistory from './Documents/NotificationsHistory';
 import useDocumentStore from '../store/document-store';
 import useStats from '../hooks/useStats';
@@ -140,13 +140,7 @@ const MatrizadorDashboard = ({ onDocumentClick }) => {
   //   sorting: { field: 'createdAt', direction: 'desc' }
   // });
 
-  /**
-   * Documentos por estado
-   */
-  const pendingDocs = getDocumentsByStatus('PENDIENTE');
-  const inProgressDocs = getDocumentsByStatus('EN_PROCESO');
-  const readyDocs = getDocumentsByStatus('LISTO');
-  const deliveredDocs = getDocumentsByStatus('ENTREGADO');
+  // Vista detallada por estado eliminada para evitar listas infinitas.
 
   // KPICard component removed - now using superior visual components from KPISection
 
@@ -190,43 +184,7 @@ const MatrizadorDashboard = ({ onDocumentClick }) => {
     </Card>
   );
 
-  /**
-   * Sección de documentos por estado
-   */
-  const DocumentSection = ({ title, documents, icon: Icon, color, emptyMessage }) => (
-    <Box sx={{ mb: 4 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-        <Icon sx={{ mr: 1, color }} />
-        <Typography variant="h6" sx={{ color, fontWeight: 'bold' }}>
-          {title}
-        </Typography>
-        <Chip 
-          label={documents.length} 
-          size="small" 
-          sx={{ ml: 1, bgcolor: color, color: 'white' }}
-        />
-      </Box>
-      
-      {documents.length === 0 ? (
-        <EmptyState 
-          title={`No hay documentos ${title.toLowerCase()}`}
-          message={emptyMessage}
-          icon={Icon}
-        />
-      ) : (
-        <Grid container spacing={3}>
-          {documents.map((document) => (
-            <Grid item xs={12} sm={6} lg={4} key={document.id}>
-              <DocumentCard 
-                document={document} 
-                onStatusChange={handleStatusChange}
-              />
-            </Grid>
-          ))}
-        </Grid>
-      )}
-    </Box>
-  );
+  // Sección de documentos por estado eliminada.
 
   /**
    * Renderizar vista según la pestaña seleccionada
@@ -349,59 +307,7 @@ const MatrizadorDashboard = ({ onDocumentClick }) => {
       {/* Renderizar Vista Actual */}
       {(!loading || documents.length > 0) && renderCurrentView()}
 
-      {/* Vista Clásica de Documentos (Solo visible en Dashboard) */}
-      {currentView === 0 && !loading && documents.length > 0 && (
-        <Box sx={{ mt: 4 }}>
-          <Divider sx={{ mb: 3 }} />
-          <Typography variant="h5" sx={{ mb: 3, color: 'text.primary', fontWeight: 'bold' }}>
-            Vista Detallada por Estado
-          </Typography>
-
-          {/* Documentos En Proceso (Prioritarios) */}
-          {inProgressDocs.length > 0 && (
-            <DocumentSection
-              title="En Proceso"
-              documents={inProgressDocs}
-              icon={ScheduleIcon}
-              color="info.main"
-              emptyMessage="No hay documentos en proceso actualmente"
-            />
-          )}
-
-          {/* Documentos Pendientes */}
-          {pendingDocs.length > 0 && (
-            <DocumentSection
-              title="Pendientes"
-              documents={pendingDocs}
-              icon={AssignmentIcon}
-              color="warning.main"
-              emptyMessage="No hay documentos pendientes"
-            />
-          )}
-
-          {/* Documentos Listos */}
-          {readyDocs.length > 0 && (
-            <DocumentSection
-              title="Listos para Entrega"
-              documents={readyDocs}
-              icon={CheckCircleIcon}
-              color="success.main"
-              emptyMessage="No hay documentos listos para entrega"
-            />
-          )}
-
-          {/* Documentos Entregados */}
-          {deliveredDocs.length > 0 && (
-            <DocumentSection
-              title="Entregados"
-              documents={deliveredDocs}
-              icon={LocalShippingIcon}
-              color="grey.600"
-              emptyMessage="No hay documentos entregados"
-            />
-          )}
-        </Box>
-      )}
+      {/* Vista clásica por estado eliminada para mejorar rendimiento */}
     </Box>
   );
 };
