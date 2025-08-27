@@ -52,6 +52,7 @@ export default function useConcuerdoGenerator() {
         otorgantes: data?.otorgantes,
         beneficiarios: data?.beneficiarios,
         notario: data?.notario,
+        notariaNumero: data?.notariaNumero,
         numCopias,
         format: 'html'
       })

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Box,
   Card,
@@ -33,7 +33,8 @@ import {
   Menu,
   ListItemIcon,
   ListItemText,
-  InputAdornment
+  InputAdornment,
+  TableSortLabel
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -132,6 +133,9 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
+  // Orden
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortOrder, setSortOrder] = useState('desc');
 
   const [showModalEntrega, setShowModalEntrega] = useState(false);
   const [showEntregaGrupal, setShowEntregaGrupal] = useState(false);
@@ -180,10 +184,13 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
         ...(filters.estado && { estado: filters.estado }),
         ...(filters.fechaDesde && { fechaDesde: filters.fechaDesde }),
         ...(filters.fechaHasta && { fechaHasta: filters.fechaHasta }),
+        sortBy: sortBy,
+        sortOrder: sortOrder
       };
       const result = await receptionService.getTodosDocumentos(params);
       if (result.success) {
-        setDocumentos(result.data.documents || []);
+        const docs = result.data.documents || [];
+        setDocumentos(docs);
         setTotalPages(result.data.pagination?.totalPages || 1);
         setError(null);
       } else {
@@ -195,7 +202,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
     } finally {
       setLoading(false);
     }
-  }, [page, rowsPerPage, filters]);
+  }, [page, rowsPerPage, filters, sortBy, sortOrder]);
 
   useEffect(() => {
     cargarDocumentos();
@@ -493,6 +500,24 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
+  
+  // Alternar orden por fecha
+  const toggleSortOrder = () => {
+    setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+  };
+
+  // Documentos ordenados en memoria por fecha
+  const documentosOrdenados = useMemo(() => {
+    const fechaKey = sortBy && ['createdAt','fechaCreacion','created_at'].includes(sortBy) 
+      ? sortBy 
+      : (documentos[0]?.fechaCreacion ? 'fechaCreacion' : 'createdAt');
+    const sorted = [...documentos].sort((a, b) => {
+      const aVal = new Date(a[fechaKey] || a.createdAt || a.fechaCreacion).getTime();
+      const bVal = new Date(b[fechaKey] || b.createdAt || b.fechaCreacion).getTime();
+      return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+    });
+    return sorted;
+  }, [documentos, sortBy, sortOrder]);
   const cerrarSnackbar = () => setSnackbar({ ...snackbar, open: false });
 
   const documentosSeleccionadosMismoCliente = () => {
@@ -772,6 +797,15 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                    </Select>
                  </FormControl>
               </Grid>
+              <Grid item xs={12} sm={6} md={2} sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+                <Button 
+                  variant="outlined" 
+                  onClick={toggleSortOrder}
+                  sx={{ textTransform: 'none' }}
+                >
+                  {sortOrder === 'asc' ? 'Fecha ↑' : 'Fecha ↓'}
+                </Button>
+              </Grid>
 
               {/* Fila 2 */}
               <Grid item xs={12} sm={6} md={3}>
@@ -854,7 +888,18 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                 </TableCell>
                 <TableCell sx={{ fontWeight: 'bold', py: 2 }}>Cliente / Documento</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', py: 2 }}>Matrizador</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', py: 2 }}>Fecha Creación</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', py: 2 }}>
+                  <TableSortLabel
+                    active={['createdAt','fechaCreacion'].includes(sortBy)}
+                    direction={['createdAt','fechaCreacion'].includes(sortBy) ? sortOrder : 'asc'}
+                    onClick={() => {
+                      setSortBy(documentos[0]?.fechaCreacion ? 'fechaCreacion' : 'createdAt');
+                      toggleSortOrder();
+                    }}
+                  >
+                    Fecha Creación
+                  </TableSortLabel>
+                </TableCell>
                 <TableCell sx={{ fontWeight: 'bold', py: 2, minWidth: 120 }}>Estado / Agrupación</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', py: 2 }}>Acciones</TableCell>
               </TableRow>
@@ -874,7 +919,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                   </TableCell>
                 </TableRow>
               ) : (
-                documentos.map((documento) => (
+                documentosOrdenados.map((documento) => (
                   <TableRow 
                     key={documento.id} 
                     selected={visualSelection.has(documento.id)} 

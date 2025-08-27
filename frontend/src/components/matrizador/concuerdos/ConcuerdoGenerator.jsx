@@ -63,6 +63,17 @@ export default function ConcuerdoGenerator() {
           <Box>
             <Typography variant="subtitle1" sx={{ mb: 1 }}>Vista previa de copias</Typography>
             <Divider sx={{ mb: 2 }} />
+            {(extractedData?.notario || extractedData?.notariaNumero) && (
+              <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" color="text.secondary">Datos de notaría</Typography>
+                {extractedData?.notario && (
+                  <Typography variant="body2">Notario: {extractedData.notario}</Typography>
+                )}
+                {extractedData?.notariaNumero && (
+                  <Typography variant="body2">Notaría N° {extractedData.notariaNumero}</Typography>
+                )}
+              </Box>
+            )}
             {generating && 'Generando vista previa...'}
             {!generating && Array.isArray(extractedData?.previewDocs) && extractedData.previewDocs.length > 0 ? (
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 2 }}>
