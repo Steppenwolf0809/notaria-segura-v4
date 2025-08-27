@@ -30,6 +30,16 @@ export default function ExtractedDataForm({ data, setData, loading, onBack, onPr
           <TextField
             fullWidth
             type="number"
+            inputProps={{ min: 1 }}
+            label="Notaría N° (opcional)"
+            value={data?.notariaNumero || ''}
+            onChange={(e) => setData({ ...data, notariaNumero: e.target.value })}
+          />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
+            type="number"
             inputProps={{ min: 1, max: 10 }}
             label="Número de copias (por defecto 2)"
             value={data?.numeroCopias ?? 2}

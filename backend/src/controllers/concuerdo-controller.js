@@ -64,12 +64,13 @@ async function extractData(req, res) {
 
     const { acts } = PdfExtractorService.parseAdvancedData(text)
     const parsed = acts[0] || { tipoActo: '', otorgantes: [], beneficiarios: [] }
+    const { notarioNombre, notariaNumero } = PdfExtractorService.extractNotaryInfo(text)
 
     res.set('Content-Type', 'application/json; charset=utf-8')
     return res.json({
       success: true,
       message: 'Datos extraídos correctamente',
-      data: { ...parsed, acts }
+      data: { ...parsed, acts, notario: notarioNombre, notariaNumero }
     })
   } catch (error) {
     console.error('Error en extractData:', error)
@@ -83,28 +84,16 @@ async function extractData(req, res) {
  */
 async function previewConcuerdo(req, res) {
   try {
-    const { tipoActo, otorgantes, beneficiarios, notario, numeroCopias = 2 } = req.body || {}
+    const { tipoActo, otorgantes, beneficiarios, acts, notario, notariaNumero, numeroCopias = 2 } = req.body || {}
 
     const safeArray = (v) => Array.isArray(v)
       ? v.map((x) => String(x || '').trim()).filter(Boolean)
       : String(v || '').split(/\n|,|;/).map((x) => x.trim()).filter(Boolean)
 
-    const cleanActType = (s) => {
-      const txt = String(s || '').toUpperCase().replace(/\s+/g, ' ').trim()
-      const cutKeys = [' FECHA', ' OTORGANTE', ' OTORGADO', ' A FAVOR', ' PERSONA ', ' UBICACI', ' PROVINCIA', ' CANTON', ' PARROQUIA', ' DESCRIP', ' CUANT', ' DOCUMENTO']
-      let base = txt
-      for (const k of cutKeys) {
-        const i = base.indexOf(k)
-        if (i !== -1) base = base.slice(0, i)
-      }
-      base = base.replace(/\bPERSONA\s+NATURAL\b/g, '').replace(/\bPERSONA\s+JUR[IÍ]DICA\b/g, '')
-      base = base.replace(/\s+/g, ' ').trim()
-      return base
-    }
-
-    const tipo = cleanActType(tipoActo)
-    const otorgs = safeArray(otorgantes)
-    const benefs = safeArray(beneficiarios)
+    // Preparar fuente de actos (usar acts si viene; si no, construir con el acto único)
+    let actsData = Array.isArray(acts) && acts.length > 0
+      ? acts
+      : [{ tipoActo: tipoActo, otorgantes, beneficiarios }]
     const notarioStr = String(notario || '').trim()
 
     if (!tipo || otorgs.length === 0) {
@@ -117,13 +106,41 @@ async function previewConcuerdo(req, res) {
       const femaleList = new Set(['MARIA','ANA','ROSA','ELENA','FERNANDA','LUISA','VALERIA','CAMILA','GABRIELA','SOFIA','ISABEL','PATRICIA','VERONICA'])
       return femaleList.has(token) || token.endsWith('A')
     }
-    const otRaw = otorgs[0]
-    const beRaw = benefs[0]
-    const otTrat = isFemale(otRaw) ? 'la señora' : 'el señor'
-    const beTrat = isFemale(beRaw) ? 'la señora' : 'el señor'
+    // Construir texto por actos con conectores "y de"
+    const humanJoin = (arr) => {
+      const list = arr.filter(Boolean)
+      if (list.length <= 1) return list[0] || ''
+      if (list.length === 2) return `${list[0]} y ${list[1]}`
+      return `${list.slice(0, -1).join(', ')} y ${list[list.length - 1]}`
+    }
 
-    // Usar plantilla exacta con PRIMERA como vista previa base
-    const preview = `Se otorgó ante mí, en fe de ello confiero esta PRIMERA COPIA CERTIFICADA de la escritura pública de ${tipo} que otorga ${otTrat} ${otRaw}${beRaw ? ` a favor de ${beTrat} ${beRaw}` : ''}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.`
+    // Generar segmentos por acto
+    const segments = actsData.map((a) => {
+      const tipo = PdfExtractorService.cleanActType(a.tipoActo)
+      const otList = safeArray(a.otorgantes)
+      const beList = safeArray(a.beneficiarios)
+      const otRaw = otList[0] || ''
+      const beRaw = beList[0] || ''
+      const otTrat = isFemale(otRaw) ? 'la señora' : 'el señor'
+      const beTrat = isFemale(beRaw) ? 'la señora' : 'el señor'
+      const otTexto = humanJoin(otList)
+      const beTexto = humanJoin(beList)
+      const base = `de la escritura pública de ${tipo} que otorga ${otTrat} ${otTexto}`
+      return beTexto ? `${base} a favor de ${beTrat} ${beTexto}` : base
+    })
+
+    const actsText = segments.length > 0
+      ? segments[0] + segments.slice(1).map(s => ` y ${s.replace(/^de la escritura pública de /i, 'de ')}`).join('')
+      : ''
+
+    const suffixNotaria = (() => {
+      const parts = []
+      if (notario && String(notario).trim()) parts.push(`Notario: ${String(notario).trim()}`)
+      if (notariaNumero && String(notariaNumero).trim()) parts.push(`Notaría N° ${String(notariaNumero).trim()}`)
+      return parts.length ? ' ' + parts.join('. ') + '.' : ''
+    })()
+
+    const preview = `Se otorgó ante mí, en fe de ello confiero esta PRIMERA COPIA CERTIFICADA ${actsText}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.${suffixNotaria}`
 
     // Generar múltiples vistas previas individuales
     const copies = Math.max(1, Math.min(10, parseInt(numeroCopias || 2)))
@@ -150,27 +167,16 @@ export { uploadPdf, extractData, previewConcuerdo }
  */
 async function generateDocuments(req, res) {
   try {
-    const { tipoActo, otorgantes, beneficiarios, numCopias = 2 } = req.body || {}
+    const { tipoActo, otorgantes, beneficiarios, acts, notario, notariaNumero, numCopias = 2 } = req.body || {}
 
     const safeArray = (v) => Array.isArray(v)
       ? v.map((x) => String(x || '').trim()).filter(Boolean)
       : String(v || '').split(/\n|,|;/).map((x) => x.trim()).filter(Boolean)
 
-    const cleanActType = (s) => {
-      const txt = String(s || '').toUpperCase().replace(/\s+/g, ' ').trim()
-      const cutKeys = [' FECHA', ' OTORGANTE', ' OTORGADO', ' A FAVOR', ' PERSONA ', ' UBICACI', ' PROVINCIA', ' CANTON', ' PARROQUIA', ' DESCRIP', ' CUANT', ' DOCUMENTO']
-      let base = txt
-      for (const k of cutKeys) {
-        const i = base.indexOf(k)
-        if (i !== -1) base = base.slice(0, i)
-      }
-      base = base.replace(/\bPERSONA\s+NATURAL\b/g, '').replace(/\bPERSONA\s+JUR[IÍ]DICA\b/g, '')
-      base = base.replace(/\s+/g, ' ').trim()
-      return base
-    }
-    const tipo = cleanActType(tipoActo)
-    const otorgs = safeArray(otorgantes)
-    const benefs = safeArray(beneficiarios)
+    // Preparar fuente de actos
+    let actsData = Array.isArray(acts) && acts.length > 0
+      ? acts
+      : [{ tipoActo: tipoActo, otorgantes, beneficiarios }]
 
     if (!tipo || otorgs.length === 0) {
       return res.status(400).json({ success: false, message: 'Tipo de acto y al menos un otorgante son obligatorios' })
@@ -185,12 +191,39 @@ async function generateDocuments(req, res) {
       return femaleList.has(first) || first.endsWith('A')
     }
 
-    const otRaw = (Array.isArray(otorgs) && otorgs.length) ? otorgs[0] : ''
-    const beRaw = (Array.isArray(benefs) && benefs.length) ? benefs[0] : ''
-    const otGenero = isFemaleName(otRaw) ? 'la señora' : 'el señor'
-    const beGenero = isFemaleName(beRaw) ? 'la señora' : 'el señor'
+    const humanJoin = (arr) => {
+      const list = (arr || []).filter(Boolean)
+      if (list.length <= 1) return list[0] || ''
+      if (list.length === 2) return `${list[0]} y ${list[1]}`
+      return `${list.slice(0, -1).join(', ')} y ${list[list.length - 1]}`
+    }
 
-    const buildTexto = (rotuloPalabra) => `Se otorgó ante mí, en fe de ello confiero esta ${rotuloPalabra} COPIA CERTIFICADA de la escritura pública de ${tipo} que otorga ${otGenero} ${otRaw}${beRaw ? ` a favor de ${beGenero} ${beRaw}` : ''}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.`
+    const buildActsText = () => {
+      const segs = actsData.map((a) => {
+        const tipo = PdfExtractorService.cleanActType(a.tipoActo)
+        const ots = safeArray(a.otorgantes)
+        const bes = safeArray(a.beneficiarios)
+        const otRaw = ots[0] || ''
+        const beRaw = bes[0] || ''
+        const otGenero = isFemaleName(otRaw) ? 'la señora' : 'el señor'
+        const beGenero = isFemaleName(beRaw) ? 'la señora' : 'el señor'
+        const otTexto = humanJoin(ots)
+        const beTexto = humanJoin(bes)
+        const base = `de la escritura pública de ${tipo} que otorga ${otGenero} ${otTexto}`
+        return beTexto ? `${base} a favor de ${beGenero} ${beTexto}` : base
+      })
+      if (segs.length === 0) return ''
+      return segs[0] + segs.slice(1).map(s => ` y ${s.replace(/^de la escritura pública de /i, 'de ')}`).join('')
+    }
+
+    const suffixNotaria = (() => {
+      const parts = []
+      if (notario && String(notario).trim()) parts.push(`Notario: ${String(notario).trim()}`)
+      if (notariaNumero && String(notariaNumero).trim()) parts.push(`Notaría N° ${String(notariaNumero).trim()}`)
+      return parts.length ? ' ' + parts.join('. ') + '.' : ''
+    })()
+
+    const buildTexto = (rotuloPalabra) => `Se otorgó ante mí, en fe de ello confiero esta ${rotuloPalabra} COPIA CERTIFICADA ${buildActsText()}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.${suffixNotaria}`
 
     const documents = []
     for (let i = 0; i < copies; i++) {

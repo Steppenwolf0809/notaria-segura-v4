@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Card,
@@ -27,7 +27,8 @@ import {
   Stack,
   Grid,
   Tabs,
-  Tab
+  Tab,
+  TableSortLabel
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -62,6 +63,9 @@ function DocumentosListos({ onEstadisticasChange }) {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
+  // Orden
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortOrder, setSortOrder] = useState('desc');
 
   // Estados para modales
   const [showModalEntrega, setShowModalEntrega] = useState(false);
@@ -87,7 +91,10 @@ function DocumentosListos({ onEstadisticasChange }) {
         limit: rowsPerPage.toString(),
         ...(filters.search && { search: filters.search }),
         ...(filters.matrizador && { matrizador: filters.matrizador }),
-        ...(filters.estado && { estado: filters.estado })
+        ...(filters.estado && { estado: filters.estado }),
+        // Si el backend soporta orden, lo enviamos; si no, ordenaremos en memoria
+        sortBy: sortBy,
+        sortOrder: sortOrder
       };
 
       // Usar diferentes endpoints según la pestaña
@@ -96,7 +103,8 @@ function DocumentosListos({ onEstadisticasChange }) {
         : await receptionService.getTodosDocumentos(params);
 
       if (result.success) {
-        setDocumentos(result.data.documents || []);
+        const docs = result.data.documents || [];
+        setDocumentos(docs);
         setTotalPages(result.data.pagination?.totalPages || 1);
         setError(null);
       } else {
@@ -171,6 +179,23 @@ function DocumentosListos({ onEstadisticasChange }) {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
+
+  // Alternar orden por fecha
+  const toggleSortOrder = () => {
+    setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+  };
+
+  // Documentos ordenados en memoria por createdAt/fechaCreacion
+  const documentosOrdenados = useMemo(() => {
+    const keyCandidates = ['createdAt', 'fechaCreacion', 'created_at'];
+    const fechaKey = sortBy && keyCandidates.includes(sortBy) ? sortBy : (documentos[0]?.createdAt ? 'createdAt' : (documentos[0]?.fechaCreacion ? 'fechaCreacion' : 'createdAt'));
+    const sorted = [...documentos].sort((a, b) => {
+      const aVal = new Date(a[fechaKey] || a.createdAt || a.fechaCreacion).getTime();
+      const bVal = new Date(b[fechaKey] || b.createdAt || b.fechaCreacion).getTime();
+      return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+    });
+    return sorted;
+  }, [documentos, sortBy, sortOrder]);
 
   const handleTabChange = (event, newValue) => {
     setCurrentTab(newValue);
@@ -311,6 +336,14 @@ function DocumentosListos({ onEstadisticasChange }) {
               {/* Botones de acción */}
               <Grid item xs={12} md={currentTab === 1 ? 2 : 5}>
                 <Stack direction="row" spacing={2} justifyContent="flex-end">
+                  <Button
+                    variant="outlined"
+                    onClick={toggleSortOrder}
+                    title="Ordenar por fecha"
+                    sx={{ textTransform: 'none' }}
+                  >
+                    {sortOrder === 'asc' ? 'Fecha ↑' : 'Fecha ↓'}
+                  </Button>
                   {/* Solo mostrar botón de entrega grupal en pestaña "Listos" */}
                   {currentTab === 0 && (
                     <Button
@@ -367,6 +400,20 @@ function DocumentosListos({ onEstadisticasChange }) {
                 <TableCell sx={{ fontWeight: 'bold' }}>Tipo</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Teléfono</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Matrizador</TableCell>
+                {/* Fecha en ambas pestañas */}
+                <TableCell sx={{ fontWeight: 'bold' }}>
+                  <TableSortLabel
+                    active={['createdAt','fechaCreacion','created_at'].includes(sortBy)}
+                    direction={['createdAt','fechaCreacion','created_at'].includes(sortBy) ? sortOrder : 'asc'}
+                    onClick={() => {
+                      const candidate = documentos[0]?.createdAt ? 'createdAt' : (documentos[0]?.fechaCreacion ? 'fechaCreacion' : 'createdAt');
+                      setSortBy(candidate);
+                      toggleSortOrder();
+                    }}
+                  >
+                    Fecha
+                  </TableSortLabel>
+                </TableCell>
                 {/* Estado solo en pestaña "Todos" */}
                 {currentTab === 1 && (
                   <TableCell sx={{ fontWeight: 'bold' }}>Estado</TableCell>
@@ -385,7 +432,7 @@ function DocumentosListos({ onEstadisticasChange }) {
               </TableRow>
             </TableHead>
             <TableBody>
-              {documentos.map((documento) => (
+              {documentosOrdenados.map((documento) => (
                 <TableRow 
                   key={documento.id}
                   selected={currentTab === 0 && selectedDocuments.includes(documento.id)}
@@ -427,6 +474,18 @@ function DocumentosListos({ onEstadisticasChange }) {
                   <TableCell>
                     <Typography variant="body2">
                       {documento.matrizador}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2">
+                      {new Date(documento.createdAt || documento.fechaCreacion).toLocaleDateString('es-EC', {
+                        day: '2-digit', month: '2-digit', year: 'numeric'
+                      })}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {new Date(documento.createdAt || documento.fechaCreacion).toLocaleTimeString('es-EC', {
+                        hour: '2-digit', minute: '2-digit'
+                      })}
                     </Typography>
                   </TableCell>
                   

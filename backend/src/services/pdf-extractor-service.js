@@ -4,6 +4,67 @@
  */
 const PdfExtractorService = {
   /**
+   * Limpia el tipo de acto para eliminar metadata (PERSONA NATURAL, FECHA, etc.)
+   */
+  cleanActType(s) {
+    const txt = String(s || '').toUpperCase().replace(/\s+/g, ' ').trim()
+    const cutKeys = [' FECHA', ' OTORGANTE', ' OTORGADO', ' A FAVOR', ' PERSONA ', ' UBICACI', ' PROVINCIA', ' CANTON', ' PARROQUIA', ' DESCRIP', ' CUANT', ' DOCUMENTO']
+    let base = txt
+    for (const k of cutKeys) {
+      const i = base.indexOf(k)
+      if (i !== -1) base = base.slice(0, i)
+    }
+    base = base.replace(/\bPERSONA\s+NATURAL\b/g, '').replace(/\bPERSONA\s+JUR[IÍ]DICA\b/g, '')
+    base = base.replace(/\s+/g, ' ').trim()
+    return base
+  },
+
+  /**
+   * Extrae nombre de notario (después de (A)) y número de notaría (línea siguiente o inmediata)
+   */
+  extractNotaryInfo(rawText) {
+    if (!rawText) return { notarioNombre: undefined, notariaNumero: undefined }
+    // Trabajar con saltos de línea para mayor precisión
+    const text = String(rawText).replace(/\r/g, '').replace(/[\t\f]+/g, ' ')
+    const lines = text.split(/\n+/)
+    let notarioNombre
+    let notariaNumero
+
+    for (let idx = 0; idx < lines.length; idx++) {
+      const line = lines[idx]
+      const m = line.match(/\(\s*A\s*\)\s*([A-ZÁÉÍÓÚÑ\s\.]\S.*)$/i)
+      if (m) {
+        // Nombre completo después de (A)
+        let nombre = m[1].toUpperCase().trim()
+        nombre = nombre.replace(/^ABG\.?\s*/i, '').replace(/^AB\.?\s*/i, '').replace(/^DR\.?\s*/i, '').replace(/^LCDO\.?\s*/i, '')
+        // Cortar si trae algo como NOTARIA en la misma línea
+        const cut = nombre.search(/NOTAR[ÍI]A|Nº|N°|NO\.?/i)
+        if (cut !== -1) nombre = nombre.slice(0, cut).trim()
+        notarioNombre = nombre
+
+        // Buscar número de notaría en la misma o siguiente línea(s)
+        for (let j = idx; j < Math.min(idx + 3, lines.length); j++) {
+          const l = lines[j].toUpperCase()
+          const n = l.match(/NOTAR[ÍI]A\s*(?:N°|Nº|NO\.?|NUMERO)?\s*(\d{1,3})/i)
+          if (n) { notariaNumero = n[1]; break }
+        }
+        break
+      }
+    }
+
+    // Fallback: buscar globalmente si no se encontró con (A)
+    if (!notarioNombre) {
+      const m2 = text.toUpperCase().match(/\(\s*A\s*\)\s*([A-ZÁÉÍÓÚÑ\s\.]\S.*)/)
+      if (m2) notarioNombre = m2[1].replace(/^ABG\.?\s*/i, '').trim()
+    }
+    if (!notariaNumero) {
+      const n2 = text.toUpperCase().match(/NOTAR[ÍI]A\s*(?:N°|Nº|NO\.?|NUMERO)?\s*(\d{1,3})/)
+      if (n2) notariaNumero = n2[1]
+    }
+
+    return { notarioNombre, notariaNumero }
+  },
+  /**
    * Reordena "APELLIDOS NOMBRES" → "NOMBRES APELLIDOS" (heurística)
    */
   reorderName(nameUpper) {
@@ -199,7 +260,7 @@ const PdfExtractorService = {
     }
 
     // Regex básicos y tolerantes (Sprint 1) respetando saltos de línea
-    const tipoActo = getMatch(/ACTO O CONTRATO[:\-]?\s*([\s\S]*?)(?:\n| FECHA| OTORGADO POR| OTORGANTE| OTORGANTES| A FAVOR DE| BENEFICIARIO|$)/)
+    const tipoActo = this.cleanActType(getMatch(/ACTO O CONTRATO[:\-]?\s*([\s\S]*?)(?:\n| FECHA| OTORGADO POR| OTORGANTE| OTORGANTES| A FAVOR DE| BENEFICIARIO|$)/))
     const otorgantesRaw = getMatch(/(?:OTORGADO POR|OTORGANTE|OTORGANTES)[:\-]?\s*([\s\S]*?)(?:\n| A FAVOR DE| BENEFICIARIO| NOTARIO| ACTO O CONTRATO|$)/)
     const beneficiariosRaw = getMatch(/(?:A FAVOR DE|BENEFICIARIO(?:S)?)[:\-]?\s*([\s\S]*?)(?:\n| NOTARIO| ACTO O CONTRATO|$)/)
     let notario = getMatch(/NOTARIO[:\-]?\s*([\s\S]*?)(?:\n|$)/)
@@ -240,7 +301,7 @@ const PdfExtractorService = {
     let match
     while ((match = actRegex.exec(upper)) !== null) {
       const fullSection = match[0]
-      const tipoActo = (match[1] || '').trim()
+      const tipoActo = this.cleanActType((match[1] || '').trim())
 
       // Dentro de la sección, buscar otorgantes y beneficiarios
       const section = fullSection

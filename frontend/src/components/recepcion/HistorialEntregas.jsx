@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Card,
@@ -24,7 +24,8 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  TableSortLabel
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -47,6 +48,8 @@ function HistorialEntregas() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
+  // Orden
+  const [sortOrder, setSortOrder] = useState('desc');
   const [filters, setFilters] = useState({
     search: '',
     fechaInicio: '',
@@ -69,7 +72,9 @@ function HistorialEntregas() {
         ...(filters.search && { search: filters.search }),
         ...(filters.fechaInicio && { fechaInicio: filters.fechaInicio }),
         ...(filters.fechaFin && { fechaFin: filters.fechaFin }),
-        ...(filters.usuarioEntrega && { usuarioEntrega: filters.usuarioEntrega })
+        ...(filters.usuarioEntrega && { usuarioEntrega: filters.usuarioEntrega }),
+        sortBy: 'fechaEntrega',
+        sortOrder: sortOrder
       };
 
       const result = await receptionService.getHistorialEntregas(params);
@@ -102,6 +107,21 @@ function HistorialEntregas() {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
+
+  // Alternar orden por fecha
+  const toggleSortOrder = () => {
+    setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+  };
+
+  // Orden en memoria por fechaEntrega
+  const entregasOrdenadas = useMemo(() => {
+    const sorted = [...entregas].sort((a, b) => {
+      const aVal = new Date(a.fechaEntrega || a.createdAt).getTime();
+      const bVal = new Date(b.fechaEntrega || b.createdAt).getTime();
+      return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
+    });
+    return sorted;
+  }, [entregas, sortOrder]);
 
   const formatFecha = (fecha) => {
     return new Date(fecha).toLocaleString('es-ES', {
@@ -199,7 +219,10 @@ function HistorialEntregas() {
               </Grid>
               
               {/* Botón refrescar */}
-              <Grid item xs={12} md={1}>
+              <Grid item xs={12} md={1.5} sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'flex-end' }}>
+                <Button variant="outlined" onClick={toggleSortOrder} sx={{ textTransform: 'none' }}>
+                  {sortOrder === 'asc' ? 'Fecha ↑' : 'Fecha ↓'}
+                </Button>
                 <Tooltip title="Refrescar">
                   <IconButton onClick={cargarHistorial} color="primary" size="large">
                     <RefreshIcon />
@@ -230,7 +253,15 @@ function HistorialEntregas() {
             <Table>
               <TableHead>
                 <TableRow sx={{ bgcolor: 'grey.50' }}>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Fecha</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>
+                    <TableSortLabel
+                      active={true}
+                      direction={sortOrder}
+                      onClick={toggleSortOrder}
+                    >
+                      Fecha
+                    </TableSortLabel>
+                  </TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>Cliente</TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>Protocolo</TableCell>
                   <TableCell sx={{ fontWeight: 'bold' }}>Tipo</TableCell>
@@ -242,7 +273,7 @@ function HistorialEntregas() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {entregas.map((entrega) => (
+                {entregasOrdenadas.map((entrega) => (
                   <TableRow key={entrega.id} hover>
                     <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
