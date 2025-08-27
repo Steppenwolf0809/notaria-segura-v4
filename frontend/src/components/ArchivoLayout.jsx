@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Drawer,
@@ -13,7 +13,8 @@ import {
   ListItemIcon,
   ListItemText,
   Avatar,
-  Container
+  Container,
+  Tooltip
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -22,7 +23,9 @@ import {
   Visibility as SupervisionIcon,
   WhatsApp as WhatsAppIcon,
   Logout as LogoutIcon,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  KeyboardDoubleArrowLeft as CollapseIcon,
+  KeyboardDoubleArrowRight as ExpandIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import ThemeToggle from './ThemeToggle';
@@ -31,6 +34,7 @@ import ChangePassword from './ChangePassword';
 
 // Ancho del sidebar
 const DRAWER_WIDTH = 240;
+const COLLAPSED_DRAWER_WIDTH = 60;
 
 /**
  * Layout principal del Archivo siguiendo patrón de MatrizadorLayout
@@ -40,6 +44,19 @@ const DRAWER_WIDTH = 240;
  */
 const ArchivoLayout = ({ children, currentView, onViewChange }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Cargar y guardar estado del sidebar como en otros roles
+  useEffect(() => {
+    const savedCollapsed = localStorage.getItem('archivo-sidebar-collapsed');
+    if (savedCollapsed !== null) {
+      setSidebarCollapsed(JSON.parse(savedCollapsed));
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem('archivo-sidebar-collapsed', JSON.stringify(sidebarCollapsed));
+  }, [sidebarCollapsed]);
+
   const [showChangePassword, setShowChangePassword] = useState(false);
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
   const { isDarkMode } = useThemeStore();
@@ -49,6 +66,13 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
    */
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
+  };
+
+  /**
+   * Toggle del sidebar colapsable (desktop)
+   */
+  const handleSidebarToggle = () => {
+    setSidebarCollapsed(!sidebarCollapsed);
   };
 
   /**
@@ -111,6 +135,7 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
       flexDirection: 'column',
       backgroundColor: !isDarkMode ? '#1A5799' : undefined,
       color: !isDarkMode ? '#ffffff' : undefined,
+      transition: 'all 0.3s ease',
     }}>
       {/* Header del Sidebar */}
       <Box sx={{ 
@@ -120,28 +145,50 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
         minHeight: '64px',
         display: 'flex',
         alignItems: 'center',
+        justifyContent: sidebarCollapsed ? 'center' : 'space-between',
         flexShrink: 0,
+        gap: 1,
       }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-          <Avatar sx={{ 
-            bgcolor: 'white', 
-            color: 'primary.main', 
-            mr: 1, 
-            fontSize: '1rem',
-            width: 36,
-            height: 36
-          }}>
+        {!sidebarCollapsed ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+            <Avatar sx={{ 
+              bgcolor: 'white', 
+              color: 'primary.main', 
+              mr: 1, 
+              fontSize: '1rem',
+              width: 36,
+              height: 36
+            }}>
+              📁
+            </Avatar>
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 'bold', lineHeight: 1.2 }}>
+                Notaría Segura
+              </Typography>
+              <Typography variant="caption" sx={{ opacity: 0.9, lineHeight: 1 }}>
+                Archivo
+              </Typography>
+            </Box>
+          </Box>
+        ) : (
+          <Avatar sx={{ bgcolor: 'white', color: 'primary.main', fontSize: '1rem' }}>
             📁
           </Avatar>
-          <Box>
-            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', lineHeight: 1.2 }}>
-              Notaría Segura
-            </Typography>
-            <Typography variant="caption" sx={{ opacity: 0.9, lineHeight: 1 }}>
-              Archivo
-            </Typography>
-          </Box>
-        </Box>
+        )}
+        <Tooltip title={sidebarCollapsed ? 'Expandir sidebar' : 'Colapsar sidebar'} placement="right">
+          <IconButton
+            onClick={handleSidebarToggle}
+            sx={{
+              color: 'white',
+              bgcolor: 'rgba(255, 255, 255, 0.1)',
+              '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.2)' },
+              transition: 'all 0.2s ease',
+            }}
+            size="small"
+          >
+            {sidebarCollapsed ? <ExpandIcon /> : <CollapseIcon />}
+          </IconButton>
+        </Tooltip>
       </Box>
       
       <Divider sx={{ borderColor: !isDarkMode ? 'rgba(255, 255, 255, 0.2)' : undefined }} />
@@ -156,6 +203,7 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
                 sx={{
                   borderRadius: 1,
                   py: 1.5, // Botones más altos
+                  px: sidebarCollapsed ? 1.5 : 2,
                   bgcolor: item.active 
                     ? (!isDarkMode ? '#468BE6' : 'primary.main')
                     : 'transparent',
@@ -166,27 +214,32 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
                     bgcolor: item.active 
                       ? (!isDarkMode ? '#1A5799' : 'primary.dark')
                       : (!isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'action.hover')
-                  }
+                  },
+                  justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                  transition: 'all 0.2s ease',
                 }}
               >
                 <ListItemIcon sx={{ 
                   color: item.active 
                     ? 'white' 
                     : (!isDarkMode ? '#93BFEF' : 'primary.main'),
-                  minWidth: 40 
+                  minWidth: sidebarCollapsed ? 'unset' : 40,
+                  justifyContent: 'center'
                 }}>
                   {item.icon}
                 </ListItemIcon>
-                <ListItemText 
-                  primary={item.text}
-                  primaryTypographyProps={{
-                    variant: 'body2',
-                    fontWeight: item.active ? 'bold' : 'medium',
-                    color: item.active 
-                      ? 'white' 
-                      : (!isDarkMode ? '#ffffff' : 'inherit')
-                  }}
-                />
+                {!sidebarCollapsed && (
+                  <ListItemText 
+                    primary={item.text}
+                    primaryTypographyProps={{
+                      variant: 'body2',
+                      fontWeight: item.active ? 'bold' : 'medium',
+                      color: item.active 
+                        ? 'white' 
+                        : (!isDarkMode ? '#ffffff' : 'inherit')
+                    }}
+                  />
+                )}
               </ListItemButton>
             </ListItem>
           ))}
@@ -329,7 +382,11 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
       {/* Sidebar - Desktop */}
       <Box
         component="nav"
-        sx={{ width: { md: DRAWER_WIDTH }, flexShrink: { md: 0 } }}
+        sx={{ 
+          width: { md: sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH }, 
+          flexShrink: { md: 0 },
+          transition: 'width 0.3s ease'
+        }}
       >
         {/* Drawer móvil */}
         <Drawer
@@ -356,7 +413,7 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
             display: { xs: 'none', md: 'block' },
             '& .MuiDrawer-paper': { 
               boxSizing: 'border-box', 
-              width: DRAWER_WIDTH,
+              width: sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH,
               border: 'none',
               borderRight: '1px solid',
               borderColor: 'divider'
@@ -373,7 +430,7 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
         component="main"
         sx={{
           flexGrow: 1,
-          width: { md: `calc(100% - ${DRAWER_WIDTH}px)` },
+          width: { md: `calc(100% - ${sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH}px)` },
           height: '100vh',
           overflow: 'hidden',
           display: 'flex',
@@ -381,7 +438,11 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
         }}
       >
         {/* Espaciado para App Bar móvil */}
-        <Toolbar sx={{ display: { md: 'none' } }} />
+        <Toolbar 
+          sx={{ 
+            display: { md: 'none' }
+          }} 
+        />
         
         {/* Área de contenido con scroll */}
         <Container 

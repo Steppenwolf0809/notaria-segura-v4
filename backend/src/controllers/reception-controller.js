@@ -446,8 +446,11 @@ async function marcarComoListo(req, res) {
             });
         }
 
-        // 📱 ENVIAR NOTIFICACIÓN WHATSAPP
+        // 📱 ENVIAR NOTIFICACIÓN WHATSAPP (respetar política no_notificar)
         try {
+            if (document.notificationPolicy === 'no_notificar') {
+                console.log('🔕 RECEPCIÓN: Política no_notificar activa, se omite WhatsApp (LISTO)');
+            } else {
             const clienteData = {
                 clientName: document.clientName,
                 clientPhone: document.clientPhone
@@ -476,6 +479,7 @@ async function marcarComoListo(req, res) {
                 );
 
                 console.log('✅ Notificación WhatsApp enviada:', whatsappResult.messageId || 'simulado');
+            }
             }
         } catch (whatsappError) {
             // No fallar la operación principal si WhatsApp falla
@@ -567,6 +571,9 @@ async function marcarGrupoListo(req, res) {
         try {
             // Tomar datos del primer documento (todos son del mismo cliente)
             const primerDocumento = documents[0];
+            if (primerDocumento.notificationPolicy === 'no_notificar') {
+                console.log('🔕 RECEPCIÓN: Política no_notificar activa, omitimos WhatsApp grupal (LISTO)');
+            } else {
             const clienteData = {
                 clientName: primerDocumento.clientName,
                 clientPhone: primerDocumento.clientPhone
@@ -579,6 +586,7 @@ async function marcarGrupoListo(req, res) {
             );
 
             console.log('✅ Notificación WhatsApp grupal enviada:', whatsappResult.messageId || 'simulado');
+            }
         } catch (whatsappError) {
             // No fallar la operación principal si WhatsApp falla
             console.error('⚠️ Error enviando WhatsApp grupal (operación continúa):', whatsappError.message);
