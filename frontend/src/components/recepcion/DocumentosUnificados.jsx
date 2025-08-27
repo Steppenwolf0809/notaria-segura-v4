@@ -1135,8 +1135,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                           </Typography>
                         )}
                         
-                        {/* Menú de opciones adicionales */}
-                        {/* Botón de revertir estado (directo) */}
+                        {/* Botón de revertir estado (directo) - SIEMPRE VISIBLE para LISTO/ENTREGADO */}
                         {['LISTO', 'ENTREGADO'].includes(documento.status) && (
                           <Tooltip title={
                             documento.isGrouped 
@@ -1151,7 +1150,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                                 abrirReversionModal(documento);
                               }}
                               sx={{ 
-                                mr: 0.5,
+                                ml: 1, // Margen izquierdo para separarlo
                                 // Indicador visual para documentos agrupados
                                 ...(documento.isGrouped && {
                                   border: '2px solid',

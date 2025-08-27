@@ -742,7 +742,9 @@ async function updateDocumentStatus(req, res) {
     let whatsappError = null;
     let whatsappResults = [];
     
-    if (status === 'LISTO') {
+    if (status === 'LISTO' && updatedDocument?.notificationPolicy === 'no_notificar') {
+      console.log('🔕 Política de notificación: no_notificar. Se omite envío de WhatsApp (LISTO).');
+    } else if (status === 'LISTO') {
       try {
         // Importar el servicio de WhatsApp
         const whatsappService = await import('../services/whatsapp-service.js');
@@ -856,7 +858,7 @@ async function updateDocumentStatus(req, res) {
     }
 
     // NUEVA FUNCIONALIDAD: Enviar notificación WhatsApp para entrega directa de MATRIZADOR/ARCHIVO
-    if (status === 'ENTREGADO' && ['MATRIZADOR', 'ARCHIVO'].includes(req.user.role) && updatedDocument.clientPhone) {
+    if (status === 'ENTREGADO' && ['MATRIZADOR', 'ARCHIVO'].includes(req.user.role) && updatedDocument.clientPhone && updatedDocument.notificationPolicy !== 'no_notificar') {
       try {
         // Importar el servicio de WhatsApp
         const whatsappService = await import('../services/whatsapp-service.js');

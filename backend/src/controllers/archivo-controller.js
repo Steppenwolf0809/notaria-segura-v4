@@ -279,6 +279,10 @@ async function cambiarEstadoDocumento(req, res) {
     let whatsappError = null;
     
     if (nuevoEstado === 'LISTO' && (codigoGenerado || updateData.codigoRetiro)) {
+      // Respetar política de no notificar
+      if (documento.notificationPolicy === 'no_notificar') {
+        console.log('🔕 ARCHIVO: Política no_notificar activa, omitimos WhatsApp (LISTO)');
+      } else {
       try {
         const clienteData = {
           clientName: documento.clientName,
@@ -304,9 +308,9 @@ async function cambiarEstadoDocumento(req, res) {
         whatsappError = error.message;
       }
     }
-
+    }
     // 📱 ENVIAR NOTIFICACIÓN WHATSAPP si se marca como ENTREGADO
-    if (nuevoEstado === 'ENTREGADO' && documento.clientPhone) {
+    if (nuevoEstado === 'ENTREGADO' && documento.clientPhone && documento.notificationPolicy !== 'no_notificar') {
       try {
         // Preparar datos de entrega
         const datosEntrega = {

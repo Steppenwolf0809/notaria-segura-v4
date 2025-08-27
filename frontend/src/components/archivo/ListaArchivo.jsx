@@ -1311,19 +1311,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                         </IconButton>
                       </Tooltip>
 
-                      {/* Menú de opciones adicionales (simplificado) */}
-                      <Tooltip title="Más opciones">
-                        <IconButton
-                          size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedDocument(documento);
-                            handleMenuOpen(e, documento);
-                          }}
-                        >
-                          <MoreIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
+                      {/* Menú contextual eliminado: acciones ya están disponibles como botones en la lista */}
                     </Box>
                   </TableCell>
                 </TableRow>
@@ -1361,35 +1349,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
         />
       </Paper>
 
-      {/* Menú de acciones funcional */}
-      <Menu
-        anchorEl={menuAnchor}
-        open={Boolean(menuAnchor)}
-        onClose={handleMenuClose}
-      >
-        <MenuItem onClick={handleVerDetalles}>
-          Ver Detalles
-        </MenuItem>
-        <MenuItem onClick={handleEditar}>
-          Editar
-        </MenuItem>
-        <Divider />
-        {selectedDocument?.status === 'EN_PROCESO' && (
-          <MenuItem onClick={() => handleCambiarEstado('LISTO')}>
-            Marcar como Listo
-          </MenuItem>
-        )}
-        {selectedDocument?.status === 'LISTO' && (
-          <MenuItem onClick={() => handleCambiarEstado('ENTREGADO')}>
-            Marcar como Entregado
-          </MenuItem>
-        )}
-        {selectedDocument?.status === 'LISTO' && (
-          <MenuItem onClick={handleSingleDelivery}>
-            Entregar Documento
-          </MenuItem>
-        )}
-      </Menu>
+      {/* Menú contextual eliminado completamente */}
 
       {/* Modal de detalles del documento */}
       {detailModalOpen && selectedDocument && (
