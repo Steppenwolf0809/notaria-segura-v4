@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Alert } from '@mui/material';
 import MatrizadorLayout from './MatrizadorLayout';
 import MatrizadorDashboard from './MatrizadorDashboard';
+import ConcuerdoGenerator from './matrizador/concuerdos/ConcuerdoGenerator.jsx';
 import GestionDocumentos from './GestionDocumentos';
 import NotificationsHistory from './Documents/NotificationsHistory';
 import useDocumentStore from '../store/document-store';
@@ -79,6 +80,9 @@ const MatrizadorCenter = () => {
       
       case 'history':
         return <NotificationsHistory />;
+      
+      case 'concuerdos':
+        return <ConcuerdoGenerator />;
       
       default:
         return <MatrizadorDashboard />;

@@ -470,7 +470,7 @@ async function updateDocumentStatus(req, res) {
       requiresReason: isReversion
     });
 
-    // Para reversiones, requerir razón obligatoria
+    // Para reversiones, requerir razón obligatoria para todos los roles
     if (isReversion && !req.body.reversionReason) {
       return res.status(400).json({
         success: false,
@@ -599,7 +599,8 @@ async function updateDocumentStatus(req, res) {
         const groupDocuments = await prisma.document.findMany({
           where: {
             documentGroupId: document.documentGroupId,
-            status: { not: 'ENTREGADO' } // Solo documentos no entregados
+            // En reversión, incluir también documentos ENTREGADO para permitir ENTREGADO -> LISTO
+            ...(isReversion ? {} : { status: { not: 'ENTREGADO' } })
           },
           include: {
             createdBy: {
@@ -1976,58 +1977,98 @@ async function updateDocumentGroupStatus(req, res) {
       }
     }
 
-    // Preparar datos de actualización
-    const updateData = { status: newStatus };
+    // Detectar si hay reversión para algún documento y exigir razón
+    const STATUS_ORDER = ['PENDIENTE', 'EN_PROCESO', 'LISTO', 'ENTREGADO'];
+    const idx = (s) => STATUS_ORDER.indexOf(s);
+    const isAnyReversion = groupDocuments.some(doc => idx(newStatus) < idx(doc.status));
+    if (isAnyReversion && (!reversionReason || !reversionReason.trim())) {
+      return res.status(400).json({
+        success: false,
+        message: 'Las reversiones de estado por grupo requieren especificar una razón'
+      });
+    }
 
-    // Generar códigos de verificación si se marca como LISTO
-    if (newStatus === 'LISTO') {
-      // Para grupos, usar el código del grupo
-      const groupCode = groupDocuments[0].documentGroup?.verificationCode;
-      if (groupCode) {
-        updateData.verificationCode = groupCode;
+    // Preparar actualizaciones por documento (permite limpieza por reversión específica)
+    const groupCodeForReady = groupDocuments[0]?.documentGroup?.verificationCode || null;
+    const docsUpdatesPayload = groupDocuments.map(doc => {
+      const updateData = { status: newStatus };
+
+      // Limpieza específica por documento si es reversión
+      if (idx(newStatus) < idx(doc.status)) {
+        Object.assign(updateData, getReversionCleanupData(doc.status, newStatus));
       }
-    }
 
-    // Si se marca como ENTREGADO, registrar datos de entrega
-    if (newStatus === 'ENTREGADO') {
-      updateData.usuarioEntregaId = req.user.id;
-      updateData.fechaEntrega = new Date();
-      updateData.entregadoA = deliveredTo || `Entrega por ${req.user.role.toLowerCase()}`;
-      updateData.relacionTitular = 'directo';
-    }
+      // Generar/propagar código si pasa a LISTO
+      if (newStatus === 'LISTO') {
+        if (groupCodeForReady) {
+          updateData.verificationCode = groupCodeForReady;
+        } else if (!doc.verificationCode) {
+          updateData.verificationCode = generateVerificationCode();
+        }
+      }
 
-    // Actualizar todos los documentos del grupo
-    console.log('📝 Actualizando documentos con datos:', updateData);
-    const updateResult = await prisma.document.updateMany({
-      where: { 
-        documentGroupId,
-        isGrouped: true
-      },
-      data: updateData
+      // Datos de entrega si pasa a ENTREGADO
+      if (newStatus === 'ENTREGADO') {
+        updateData.usuarioEntregaId = req.user.id;
+        updateData.fechaEntrega = new Date();
+        updateData.entregadoA = deliveredTo || `Entrega por ${req.user.role.toLowerCase()}`;
+        updateData.relacionTitular = 'directo';
+      }
+
+      return { id: doc.id, previousStatus: doc.status, data: updateData };
     });
-    
+
+    // Actualización transaccional por documento y registro de eventos
+    const updatedDocuments = await prisma.$transaction(async (tx) => {
+      const updated = [];
+      for (const u of docsUpdatesPayload) {
+        const docUpdated = await tx.document.update({
+          where: { id: u.id },
+          data: u.data,
+          include: {
+            documentGroup: true,
+            assignedTo: { select: { id: true, firstName: true, lastName: true } }
+          }
+        });
+        updated.push({ doc: docUpdated, previousStatus: u.previousStatus });
+      }
+      return updated;
+    });
+
     console.log('✅ Documentos actualizados:', {
-      count: updateResult.count,
+      count: updatedDocuments.length,
       newStatus
     });
 
-    // Obtener documentos actualizados
-    const updatedDocuments = await prisma.document.findMany({
-      where: { 
-        documentGroupId,
-        isGrouped: true
-      },
-      include: {
-        documentGroup: true,
-        assignedTo: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true
+    // Registrar eventos de auditoría STATUS_CHANGED por documento
+    try {
+      for (const { doc, previousStatus } of updatedDocuments) {
+        await prisma.documentEvent.create({
+          data: {
+            documentId: doc.id,
+            userId: req.user.id,
+            eventType: 'STATUS_CHANGED',
+            description: `Estado cambiado de ${previousStatus} a ${newStatus} por ${req.user.firstName} ${req.user.lastName} (${req.user.role})${(idx(newStatus) < idx(previousStatus) && reversionReason) ? ` - Razón: ${reversionReason.trim()}` : ''}`,
+            details: {
+              previousStatus,
+              newStatus,
+              groupOperation: true,
+              groupId: documentGroupId,
+              reason: (idx(newStatus) < idx(previousStatus) && reversionReason) ? reversionReason.trim() : null,
+              timestamp: new Date().toISOString()
+            },
+            ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+            userAgent: req.get('User-Agent') || 'unknown'
           }
-        }
+        });
       }
-    });
+    } catch (auditError) {
+      console.error('Error registrando eventos de cambio de estado por grupo:', auditError);
+    }
+
+    // Para compatibilidad con lógica de notificaciones y respuesta
+    const updatedDocsOnly = updatedDocuments.map(u => u.doc);
+    const updateResult = { count: updatedDocsOnly.length };
 
     // Enviar notificación grupal si corresponde
     let whatsappSent = false;
@@ -2036,27 +2077,27 @@ async function updateDocumentGroupStatus(req, res) {
     console.log('🔍 Verificando condiciones iniciales para WhatsApp grupal:', {
       newStatus,
       isListo: newStatus === 'LISTO',
-      hasClientPhone: !!updatedDocuments[0]?.clientPhone,
-      clientPhone: updatedDocuments[0]?.clientPhone,
-      hasDocumentGroupOriginal: !!updatedDocuments[0]?.documentGroup,
-      documentGroupId: updatedDocuments[0]?.documentGroupId,
-      documentGroupOriginal: updatedDocuments[0]?.documentGroup ? {
-        id: updatedDocuments[0].documentGroup.id,
-        verificationCode: updatedDocuments[0].documentGroup.verificationCode
+      hasClientPhone: !!updatedDocsOnly[0]?.clientPhone,
+      clientPhone: updatedDocsOnly[0]?.clientPhone,
+      hasDocumentGroupOriginal: !!updatedDocsOnly[0]?.documentGroup,
+      documentGroupId: updatedDocsOnly[0]?.documentGroupId,
+      documentGroupOriginal: updatedDocsOnly[0]?.documentGroup ? {
+        id: updatedDocsOnly[0].documentGroup.id,
+        verificationCode: updatedDocsOnly[0].documentGroup.verificationCode
       } : null
     });
     
     // 🔧 CORRECCIÓN: Verificar/obtener documentGroup si no está presente
-    let documentGroupForWhatsApp = updatedDocuments[0]?.documentGroup;
+    let documentGroupForWhatsApp = updatedDocsOnly[0]?.documentGroup;
     
-    if (newStatus === 'LISTO' && updatedDocuments[0]?.clientPhone && !documentGroupForWhatsApp && updatedDocuments[0]?.documentGroupId) {
+    if (newStatus === 'LISTO' && updatedDocsOnly[0]?.clientPhone && !documentGroupForWhatsApp && updatedDocsOnly[0]?.documentGroupId) {
       console.log('🔄 documentGroup no incluido, obteniendo manualmente...', {
-        documentGroupId: updatedDocuments[0].documentGroupId
+        documentGroupId: updatedDocsOnly[0].documentGroupId
       });
       
       try {
         documentGroupForWhatsApp = await prisma.documentGroup.findUnique({
-          where: { id: updatedDocuments[0].documentGroupId }
+          where: { id: updatedDocsOnly[0].documentGroupId }
         });
         
         console.log('✅ DocumentGroup obtenido manualmente:', {
@@ -2074,22 +2115,22 @@ async function updateDocumentGroupStatus(req, res) {
       hasClientPhone: !!updatedDocuments[0]?.clientPhone,
       hasDocumentGroup: !!documentGroupForWhatsApp,
       willSendWhatsApp: newStatus === 'LISTO' && 
-                        !!updatedDocuments[0]?.clientPhone && 
+                        !!updatedDocsOnly[0]?.clientPhone && 
                         !!documentGroupForWhatsApp
     });
-    
-    if (newStatus === 'LISTO' && updatedDocuments[0]?.clientPhone && documentGroupForWhatsApp) {
+
+    if (newStatus === 'LISTO' && updatedDocsOnly[0]?.clientPhone && documentGroupForWhatsApp) {
       try {
         const whatsappService = await import('../services/whatsapp-service.js');
         
         const cliente = {
-          nombre: updatedDocuments[0].clientName,
-          telefono: updatedDocuments[0].clientPhone
+          nombre: updatedDocsOnly[0].clientName,
+          telefono: updatedDocsOnly[0].clientPhone
         };
 
         const whatsappResult = await whatsappService.default.enviarGrupoDocumentosListo(
           cliente,
-          updatedDocuments,
+          updatedDocsOnly,
           documentGroupForWhatsApp.verificationCode
         );
         
@@ -2113,18 +2154,18 @@ async function updateDocumentGroupStatus(req, res) {
           problema: newStatus !== 'LISTO' ? `Estado actual '${newStatus}' no es 'LISTO'` : null
         },
         clientPhone: {
-          valor: updatedDocuments[0]?.clientPhone,
-          existe: !!updatedDocuments[0]?.clientPhone,
-          problema: !updatedDocuments[0]?.clientPhone ? 'clientPhone está vacío o undefined' : null
+          valor: updatedDocsOnly[0]?.clientPhone,
+          existe: !!updatedDocsOnly[0]?.clientPhone,
+          problema: !updatedDocsOnly[0]?.clientPhone ? 'clientPhone está vacío o undefined' : null
         },
         documentGroup: {
-          existeOriginal: !!updatedDocuments[0]?.documentGroup,
+          existeOriginal: !!updatedDocsOnly[0]?.documentGroup,
           existeCorregido: !!documentGroupForWhatsApp,
-          documentGroupId: updatedDocuments[0]?.documentGroupId,
-          isGrouped: updatedDocuments[0]?.isGrouped,
-          grupoOriginal: updatedDocuments[0]?.documentGroup ? {
-            id: updatedDocuments[0].documentGroup.id,
-            verificationCode: updatedDocuments[0].documentGroup.verificationCode
+          documentGroupId: updatedDocsOnly[0]?.documentGroupId,
+          isGrouped: updatedDocsOnly[0]?.isGrouped,
+          grupoOriginal: updatedDocsOnly[0]?.documentGroup ? {
+            id: updatedDocsOnly[0].documentGroup.id,
+            verificationCode: updatedDocsOnly[0].documentGroup.verificationCode
           } : null,
           grupoCorregido: documentGroupForWhatsApp ? {
             id: documentGroupForWhatsApp.id,
@@ -2134,22 +2175,22 @@ async function updateDocumentGroupStatus(req, res) {
         },
         resumenProblemas: [
           newStatus !== 'LISTO' ? `Estado: ${newStatus}` : null,
-          !updatedDocuments[0]?.clientPhone ? 'Sin teléfono' : null,
+          !updatedDocsOnly[0]?.clientPhone ? 'Sin teléfono' : null,
           !documentGroupForWhatsApp ? 'Sin documentGroup (ni original ni fallback)' : null
         ].filter(Boolean)
       });
     }
 
     // 🆕 CORRECCIÓN: Enviar notificación WhatsApp para estado ENTREGADO
-    if (newStatus === 'ENTREGADO' && updatedDocuments[0]?.clientPhone) {
+    if (newStatus === 'ENTREGADO' && updatedDocsOnly[0]?.clientPhone) {
       try {
         const whatsappService = await import('../services/whatsapp-service.js');
         
         const cliente = {
-          nombre: updatedDocuments[0].clientName,
-          clientName: updatedDocuments[0].clientName,
-          telefono: updatedDocuments[0].clientPhone,
-          clientPhone: updatedDocuments[0].clientPhone
+          nombre: updatedDocsOnly[0].clientName,
+          clientName: updatedDocsOnly[0].clientName,
+          telefono: updatedDocsOnly[0].clientPhone,
+          clientPhone: updatedDocsOnly[0].clientPhone
         };
 
         const datosEntrega = {
@@ -2164,8 +2205,8 @@ async function updateDocumentGroupStatus(req, res) {
         const whatsappResult = await whatsappService.default.enviarDocumentoEntregado(
           cliente,
           {
-            tipo_documento: `Grupo de ${updatedDocuments.length} documento(s)`,
-            tipoDocumento: `Grupo de ${updatedDocuments.length} documento(s)`,
+            tipo_documento: `Grupo de ${updatedDocsOnly.length} documento(s)`,
+            tipoDocumento: `Grupo de ${updatedDocsOnly.length} documento(s)`,
             numero_documento: documentGroupId,
             protocolNumber: documentGroupId
           },
@@ -2184,12 +2225,12 @@ async function updateDocumentGroupStatus(req, res) {
           try {
             await prisma.documentEvent.create({
               data: {
-                documentId: updatedDocuments[0].id, // Documento principal del grupo
+                documentId: updatedDocsOnly[0].id, // Documento principal del grupo
                 userId: req.user.id,
                 eventType: 'WHATSAPP_SENT',
-                description: `Notificación WhatsApp de entrega grupal enviada a ${updatedDocuments[0].clientPhone}`,
+                description: `Notificación WhatsApp de entrega grupal enviada a ${updatedDocsOnly[0].clientPhone}`,
                 details: {
-                  phoneNumber: updatedDocuments[0].clientPhone,
+                  phoneNumber: updatedDocsOnly[0].clientPhone,
                   messageType: 'GROUP_DELIVERY',
                   deliveredTo: deliveredTo || `Entrega grupal por ${req.user.role.toLowerCase()}`,
                   deliveredBy: `${req.user.firstName} ${req.user.lastName}`,
@@ -2220,11 +2261,11 @@ async function updateDocumentGroupStatus(req, res) {
         documentsUpdated: updateResult.count,
         newStatus,
         groupId: documentGroupId,
-        documents: updatedDocuments,
+        documents: updatedDocsOnly,
         whatsapp: {
           sent: whatsappSent,
           error: whatsappError,
-          phone: updatedDocuments[0]?.clientPhone
+          phone: updatedDocsOnly[0]?.clientPhone
         }
       }
     });

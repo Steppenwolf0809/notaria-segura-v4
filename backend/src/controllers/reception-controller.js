@@ -207,15 +207,16 @@ async function listarTodosDocumentos(req, res) {
           }
         });
       } else {
-        // Si no hay unaccent, usar el filtro estándar case-insensitive
+        // Si no hay unaccent, usar filtros compatibles con todos los proveedores (sin 'mode')
+        // Nota: Esto puede ser sensible a mayúsculas/minúsculas en algunos motores (p.ej. SQLite)
         where.OR = [
-          { clientName: { contains: searchTerm, mode: 'insensitive' } },
+          { clientName: { contains: searchTerm } },
           { clientPhone: { contains: searchTerm } },
-          { clientEmail: { contains: searchTerm, mode: 'insensitive' } },
-          { clientId: { contains: searchTerm, mode: 'insensitive' } },
-          { protocolNumber: { contains: searchTerm, mode: 'insensitive' } },
-          { actoPrincipalDescripcion: { contains: searchTerm, mode: 'insensitive' } },
-          { detalle_documento: { contains: searchTerm, mode: 'insensitive' } }
+          { clientEmail: { contains: searchTerm } },
+          { clientId: { contains: searchTerm } },
+          { protocolNumber: { contains: searchTerm } },
+          { actoPrincipalDescripcion: { contains: searchTerm } },
+          { detalle_documento: { contains: searchTerm } }
         ];
       }
     }
@@ -360,14 +361,15 @@ async function getDocumentosEnProceso(req, res) {
           }
         });
       } else {
+        // Filtros compatibles con todos los proveedores (sin 'mode')
         where.OR = [
-          { clientName: { contains: searchTerm2, mode: 'insensitive' } },
+          { clientName: { contains: searchTerm2 } },
           { clientPhone: { contains: searchTerm2 } },
-          { clientEmail: { contains: searchTerm2, mode: 'insensitive' } },
-          { clientId: { contains: searchTerm2, mode: 'insensitive' } },
-          { protocolNumber: { contains: searchTerm2, mode: 'insensitive' } },
-          { actoPrincipalDescripcion: { contains: searchTerm2, mode: 'insensitive' } },
-          { detalle_documento: { contains: searchTerm2, mode: 'insensitive' } }
+          { clientEmail: { contains: searchTerm2 } },
+          { clientId: { contains: searchTerm2 } },
+          { protocolNumber: { contains: searchTerm2 } },
+          { actoPrincipalDescripcion: { contains: searchTerm2 } },
+          { detalle_documento: { contains: searchTerm2 } }
         ];
       }
     }

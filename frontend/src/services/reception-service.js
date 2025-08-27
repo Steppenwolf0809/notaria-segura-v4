@@ -406,7 +406,8 @@ const receptionService = {
    */
   handleError: (error) => {
     if (error.response) {
-      return error.response.data?.message || 'Error del servidor';
+      // Preferir mensaje estructurado del backend
+      return error.response.data?.error || error.response.data?.message || 'Error del servidor';
     } else if (error.request) {
       return 'Error de conexión - Verifique su internet o el servidor';
     } else {
