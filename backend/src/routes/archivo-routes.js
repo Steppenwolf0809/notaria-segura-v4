@@ -11,6 +11,7 @@ import {
   obtenerDetalleDocumento,
   revertirEstadoDocumentoArchivo
 } from '../controllers/archivo-controller.js';
+import { marcarVariosListosArchivo } from '../controllers/archivo-bulk-controller.js';
 
 const router = express.Router();
 
@@ -52,6 +53,13 @@ router.get('/mis-documentos', authenticateToken, requireArchivo, listarMisDocume
  * @access Private (ARCHIVO only)
  */
 router.post('/documentos/:id/estado', authenticateToken, requireArchivo, cambiarEstadoDocumento);
+
+/**
+ * @route POST /api/archivo/documentos/marcar-listos
+ * @desc Cambiar a LISTO varios documentos asignados (archivo) con WhatsApp por cliente
+ * @access Private (ARCHIVO only)
+ */
+router.post('/documentos/marcar-listos', authenticateToken, requireArchivo, marcarVariosListosArchivo);
 
 /**
  * @route POST /api/archivo/documentos/:id/entregar
