@@ -5,7 +5,7 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "start": "npx prisma db push --accept-data-loss && node prisma/seed.js && node server.js",
+    "start": "npx prisma db push --accept-data-loss && node server.js",
     "build": "npx prisma generate",
     "start:prod": "npx prisma generate && npx prisma db push --accept-data-loss && node server.js",
     "dev": "nodemon server.js",
