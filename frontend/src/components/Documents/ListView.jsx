@@ -48,7 +48,7 @@ import ModalEntregaMatrizador from '../matrizador/ModalEntregaMatrizador.jsx';
  * Tabla completa con todas las funcionalidades + checkboxes para cambios masivos
  */
 const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
-  const { documents, updateDocumentStatus, updateDocument, createDocumentGroup, detectGroupableDocuments } = useDocumentStore();
+  const { documents, updateDocumentStatus, updateDocument, createDocumentGroup, detectGroupableDocuments, fetchMyDocuments } = useDocumentStore();
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [page, setPage] = useState(0);
@@ -301,13 +301,16 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
       // Filtrar opciones para evitar duplicados de fromStatus/toStatus
       const { fromStatus, toStatus, ...cleanOptions } = actionData.options || {};
       
-      await bulkActions.executeBulkStatusChange(
+      const result = await bulkActions.executeBulkStatusChange(
         filteredAndSortedDocuments, 
         actionData.toStatus, 
         cleanOptions
       );
       
-      // Refrescar la vista (el hook ya limpia la selección)
+      // Refrescar la lista para reflejar estados actualizados
+      if (result && result.success && typeof fetchMyDocuments === 'function') {
+        await fetchMyDocuments();
+      }
       console.log('✅ Cambio masivo completado en ListView');
     } catch (error) {
       console.error('❌ Error en cambio masivo:', error);

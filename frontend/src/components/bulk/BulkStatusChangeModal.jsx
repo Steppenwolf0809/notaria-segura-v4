@@ -25,7 +25,6 @@ import {
 import {
   Close as CloseIcon,
   CheckCircle as CheckIcon,
-  Group as GroupIcon,
   Send as SendIcon,
   Description as DocumentIcon,
   Phone as PhoneIcon,
@@ -52,15 +51,6 @@ const BulkStatusChangeModal = ({
   // Configuración específica por tipo de transición
   const transitionConfig = useMemo(() => {
     const configs = {
-      'EN_PROCESO->AGRUPADO': {
-        title: 'Agrupar Documentos',
-        description: 'Los documentos seleccionados serán agrupados pero no marcados como listos',
-        icon: <GroupIcon sx={{ color: 'info.main' }} />,
-        color: 'info',
-        actionLabel: 'Agrupar Documentos',
-        showNotificationOption: false,
-        warningMessage: 'Los documentos quedarán en estado AGRUPADO. Posteriormente podrán ser marcados como listos.'
-      },
       'EN_PROCESO->LISTO': {
         title: 'Marcar Como Listo',
         description: 'Los documentos serán marcados como listos para entrega',
