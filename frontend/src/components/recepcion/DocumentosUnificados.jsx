@@ -1136,12 +1136,41 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                         )}
                         
                         {/* Menú de opciones adicionales */}
+                        {/* Botón de revertir estado (directo) */}
+                        {['LISTO', 'ENTREGADO'].includes(documento.status) && (
+                          <Tooltip title={
+                            documento.isGrouped 
+                              ? "Revertir estado (afectará todo el grupo)" 
+                              : "Revertir al estado anterior"
+                          }>
+                            <IconButton
+                              size="small"
+                              color="warning"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                abrirReversionModal(documento);
+                              }}
+                              sx={{ 
+                                mr: 0.5,
+                                // Indicador visual para documentos agrupados
+                                ...(documento.isGrouped && {
+                                  border: '2px solid',
+                                  borderColor: 'warning.main',
+                                  borderRadius: '50%'
+                                })
+                              }}
+                            >
+                              <UndoIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+
                         <IconButton 
                           size="small"
                           aria-label="more actions" 
                           onClick={(event) => { event.stopPropagation(); handleMenuOpen(event, documento); }}
                         >
-                          <MoreVertIcon />
+                          <MoreVertIcon fontSize="small" />
                         </IconButton>
                       </Box>
                     </TableCell>
@@ -1178,32 +1207,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
           <Box sx={{ borderBottom: 1, borderColor: 'divider', my: 0.5 }} />
         )}
         
-        {/* Opciones de reversión según el estado actual */}
-        {currentDocumento?.status === 'LISTO' && (
-          <MenuItem 
-            onClick={() => abrirReversionModal(currentDocumento)}
-            sx={{ color: 'warning.main' }}
-          >
-            <ListItemIcon>
-              <UndoIcon fontSize="small" sx={{ color: 'warning.main' }} />
-            </ListItemIcon>
-            <ListItemText>Revertir a En Proceso</ListItemText>
-          </MenuItem>
-        )}
-        
-        {currentDocumento?.status === 'ENTREGADO' && (
-          <>
-            <MenuItem 
-              onClick={() => abrirReversionModal(currentDocumento)}
-              sx={{ color: 'warning.main' }}
-            >
-              <ListItemIcon>
-                <UndoIcon fontSize="small" sx={{ color: 'warning.main' }} />
-              </ListItemIcon>
-              <ListItemText>Revertir Estado</ListItemText>
-            </MenuItem>
-          </>
-        )}
       </Menu>
 
       <Dialog open={showConfirmDialog} onClose={cerrarConfirmacion} maxWidth="sm" fullWidth>

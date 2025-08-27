@@ -38,9 +38,10 @@ import {
   LocalShipping as DeliveryIcon,
   ChangeCircle as StatusIcon,
   Link as LinkIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
+  Undo as UndoIcon,
+  Visibility as ViewIcon
 } from '@mui/icons-material';
-import { Undo as UndoIcon } from '@mui/icons-material';
 import archivoService from '../../services/archivo-service';
 import documentService from '../../services/document-service';
 import { formatCurrency } from '../../utils/currencyUtils';
@@ -1265,17 +1266,64 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                         </Typography>
                       )}
                       
-                      {/* Menú de opciones adicionales */}
-                      <IconButton
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedDocument(documento);
-                          handleMenuOpen(e, documento);
-                        }}
-                      >
-                        <MoreIcon />
-                      </IconButton>
+                      {/* Botón de revertir estado (directo) */}
+                      {['LISTO', 'ENTREGADO'].includes(documento.status) && (
+                        <Tooltip title={
+                          documento.isGrouped 
+                            ? "Revertir estado (afectará todo el grupo)" 
+                            : "Revertir al estado anterior"
+                        }>
+                          <IconButton
+                            size="small"
+                            color="warning"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              abrirReversionModal(documento);
+                            }}
+                            sx={{ 
+                              mr: 0.5,
+                              // Indicador visual para documentos agrupados
+                              ...(documento.isGrouped && {
+                                border: '2px solid',
+                                borderColor: 'warning.main',
+                                borderRadius: '50%'
+                              })
+                            }}
+                          >
+                            <UndoIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                      
+                      {/* Botón de ver detalles */}
+                      <Tooltip title="Ver detalles del documento">
+                        <IconButton
+                          size="small"
+                          color="primary"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedDocument(documento);
+                            setDetailModalOpen(true);
+                          }}
+                          sx={{ mr: 0.5 }}
+                        >
+                          <ViewIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+
+                      {/* Menú de opciones adicionales (simplificado) */}
+                      <Tooltip title="Más opciones">
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedDocument(documento);
+                            handleMenuOpen(e, documento);
+                          }}
+                        >
+                          <MoreIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                     </Box>
                   </TableCell>
                 </TableRow>
@@ -1339,11 +1387,6 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
         {selectedDocument?.status === 'LISTO' && (
           <MenuItem onClick={handleSingleDelivery}>
             Entregar Documento
-          </MenuItem>
-        )}
-        {selectedDocument && ['LISTO', 'ENTREGADO'].includes(selectedDocument.status) && (
-          <MenuItem onClick={() => abrirReversionModal(selectedDocument)}>
-            <UndoIcon fontSize="small" style={{ marginRight: 8 }} /> Revertir Estado
           </MenuItem>
         )}
       </Menu>

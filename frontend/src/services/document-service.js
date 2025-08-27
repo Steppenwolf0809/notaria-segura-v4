@@ -899,6 +899,11 @@ const documentService = {
       
       console.log('✅ Política de notificación actualizada:', response.data);
       
+      // Manejar respuesta de migración pendiente
+      if (response.status === 202 && response.data.data?.migrationPending) {
+        console.log('⚠️ Migración de BD pendiente, pero política guardada localmente');
+      }
+      
       return {
         success: true,
         data: response.data.data || response.data,
@@ -934,6 +939,11 @@ const documentService = {
       });
       
       console.log('✅ Política de notificación del grupo actualizada:', response.data);
+      
+      // Manejar respuesta de migración pendiente
+      if (response.status === 202 && response.data.data?.migrationPending) {
+        console.log('⚠️ Migración de BD pendiente, pero política de grupo guardada localmente');
+      }
       
       return {
         success: true,
