@@ -14,21 +14,21 @@ import {
   Typography,
   Avatar,
   Tooltip,
-  Menu,
-  MenuItem,
   TableSortLabel,
-  ListItemIcon,
-  ListItemText,
   Checkbox,
-  Alert
+  Alert,
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import {
   Visibility as ViewIcon,
-  MoreVert as MoreIcon,
-  Edit as EditIcon,
-  Delete as DeleteIcon,
   Phone as PhoneIcon,
-  GroupWork as GroupWorkIcon
+  Undo as UndoIcon,
+  CheckCircle as CheckCircleIcon,
+  Send as SendIcon
 } from '@mui/icons-material';
 import useDocumentStore from '../../store/document-store';
 import DocumentDetailModal from './DocumentDetailModal';
@@ -40,6 +40,8 @@ import GroupInfoModal from '../shared/GroupInfoModal';
 import useBulkActions from '../../hooks/useBulkActions';
 import BulkActionToolbar from '../bulk/BulkActionToolbar';
 import BulkStatusChangeModal from '../bulk/BulkStatusChangeModal';
+import ReversionModal from '../recepcion/ReversionModal';
+import ModalEntregaMatrizador from '../matrizador/ModalEntregaMatrizador.jsx';
 
 /**
  * Vista Lista - EXACTA AL PROTOTIPO + SELECCIÓN MÚLTIPLE
@@ -53,8 +55,11 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [orderBy, setOrderBy] = useState('createdAt');
   const [order, setOrder] = useState('desc');
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [selectedRowId, setSelectedRowId] = useState(null);
+  // Estados para modales y acciones
+  const [confirmListoOpen, setConfirmListoOpen] = useState(false);
+  const [entregaOpen, setEntregaOpen] = useState(false);
+  const [reversionOpen, setReversionOpen] = useState(false);
+  const [currentDocumento, setCurrentDocumento] = useState(null);
 
   // 🔗 Estados para agrupación rápida reutilizando modal existente
   const [showQuickGroupingModal, setShowQuickGroupingModal] = useState(false);
@@ -182,25 +187,26 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
     }
   };
 
-  /**
-   * Manejar menú de acciones
-   */
-  const handleMenuOpen = (event, documentId) => {
-    setAnchorEl(event.currentTarget);
-    setSelectedRowId(documentId);
+  // Abrir/ cerrar modales
+  const openConfirmListo = (doc) => { setCurrentDocumento(doc); setConfirmListoOpen(true); };
+  const closeConfirmListo = () => { setConfirmListoOpen(false); setCurrentDocumento(null); };
+  const openEntrega = (doc) => { setCurrentDocumento(doc); setEntregaOpen(true); };
+  const closeEntrega = () => { setEntregaOpen(false); setCurrentDocumento(null); };
+  const openReversion = (doc) => { setCurrentDocumento(doc); setReversionOpen(true); };
+  const closeReversion = () => { setReversionOpen(false); setCurrentDocumento(null); };
+
+  // Confirmar marcar como LISTO
+  const handleConfirmMarcarListo = async () => {
+    if (!currentDocumento) return;
+    await updateDocumentStatus(currentDocumento.id, 'LISTO');
+    closeConfirmListo();
   };
 
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-    setSelectedRowId(null);
-  };
-
-  /**
-   * Cambiar estado del documento
-   */
-  const handleStatusChange = async (documentId, newStatus) => {
-    await updateDocumentStatus(documentId, newStatus);
-    handleMenuClose();
+  // Confirmar entrega (ENTREGADO) para matrizador
+  const handleConfirmEntrega = async ({ deliveredTo }) => {
+    if (!currentDocumento) return;
+    await updateDocumentStatus(currentDocumento.id, 'ENTREGADO', { deliveredTo });
+    closeEntrega();
   };
 
   /**
@@ -225,7 +231,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
       // Silencioso para no ensuciar la vista lista
       console.error('Error detectando agrupables (ListView):', e);
     } finally {
-      handleMenuClose();
+      // No menu to close; keep UX silent
     }
   };
 
@@ -514,32 +520,52 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
                         {document.actoPrincipalDescripcion}
                       </Typography>
                     </TableCell>
-                    <TableCell align="center">
-                      <Box sx={{ display: 'flex', justifyContent: 'center', gap: 0.5 }}>
-                        <Tooltip title="Ver detalles">
-                          <IconButton 
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openDetailModal(document);
-                            }}
-                          >
-                            <ViewIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Más opciones">
-                          <IconButton 
-                            size="small"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleMenuOpen(e, document.id);
-                            }}
-                          >
-                            <MoreIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      </Box>
-                    </TableCell>
+                <TableCell align="center">
+                  <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
+                    {/* Ver detalles */}
+                    <Tooltip title="Ver detalles">
+                      <IconButton 
+                        size="small"
+                        onClick={(e) => { e.stopPropagation(); openDetailModal(document); }}
+                      >
+                        <ViewIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    {/* Botón principal según estado */}
+                    {document.status === 'EN_PROCESO' && (
+                      <Button
+                        size="small"
+                        variant="contained"
+                        color="success"
+                        startIcon={<CheckCircleIcon />}
+                        onClick={(e) => { e.stopPropagation(); openConfirmListo(document); }}
+                        sx={{ textTransform: 'none' }}
+                      >
+                        Marcar Listo
+                      </Button>
+                    )}
+                    {document.status === 'LISTO' && (
+                      <Button
+                        size="small"
+                        variant="contained"
+                        color="primary"
+                        startIcon={<SendIcon />}
+                        onClick={(e) => { e.stopPropagation(); openEntrega(document); }}
+                        sx={{ textTransform: 'none' }}
+                      >
+                        Entregar
+                      </Button>
+                    )}
+                    {/* Revertir estado: visible para LISTO o ENTREGADO */}
+                    {['LISTO','ENTREGADO'].includes(document.status) && (
+                      <Tooltip title={document.isGrouped ? 'Revertir (afectará al grupo)' : 'Revertir estado'}>
+                        <IconButton size="small" color="warning" onClick={(e) => { e.stopPropagation(); openReversion(document); }}>
+                          <UndoIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                  </Box>
+                </TableCell>
                   </TableRow>
                 );
               })}
@@ -563,39 +589,48 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
         />
       </Paper>
 
-      {/* Menú de acciones */}
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleMenuClose}
-      >
-        <MenuItem onClick={() => handleStatusChange(selectedRowId, 'EN_PROCESO')}>
-          <EditIcon sx={{ mr: 1, fontSize: 16 }} />
-          Marcar En Proceso
-        </MenuItem>
-        <MenuItem onClick={() => handleStatusChange(selectedRowId, 'LISTO')}>
-          <EditIcon sx={{ mr: 1, fontSize: 16 }} />
-          Marcar Listo
-        </MenuItem>
-        <MenuItem onClick={() => handleStatusChange(selectedRowId, 'ENTREGADO')}>
-          <EditIcon sx={{ mr: 1, fontSize: 16 }} />
-          Marcar Entregado
-        </MenuItem>
-        {/* Agrupar documentos del mismo cliente (EN_PROCESO o LISTO) */}
-        {(() => {
-          const doc = documents.find(d => d.id === selectedRowId);
-          const canGroup = doc && !doc.isGrouped && (doc.status === 'EN_PROCESO' || doc.status === 'LISTO');
-          if (!canGroup) return null;
-          return (
-            <MenuItem onClick={() => handleOpenGroupingFromDocument(doc)}>
-              <ListItemIcon>
-                <GroupWorkIcon fontSize="small" />
-              </ListItemIcon>
-              <ListItemText>Agrupar documentos</ListItemText>
-            </MenuItem>
-          );
-        })()}
-      </Menu>
+      {/* Modal de confirmación para marcar LISTO */}
+      <Dialog open={confirmListoOpen} onClose={closeConfirmListo} maxWidth="xs" fullWidth>
+        <DialogTitle>Marcar como LISTO</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            ¿Confirmas marcar el documento como LISTO para entrega?
+          </Typography>
+          {currentDocumento?.isGrouped && (
+            <Alert severity="info" sx={{ mt: 2 }}>
+              Documento agrupado: este cambio puede propagarse a su grupo.
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeConfirmListo}>Cancelar</Button>
+          <Button onClick={handleConfirmMarcarListo} variant="contained" color="success">Confirmar</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal de entrega de Matrizador (sin código) */}
+      {entregaOpen && currentDocumento && (
+        <ModalEntregaMatrizador
+          open={entregaOpen}
+          onClose={closeEntrega}
+          documento={currentDocumento}
+          onConfirm={handleConfirmEntrega}
+        />
+      )}
+
+      {/* Modal de reversión de estado */}
+      {reversionOpen && currentDocumento && (
+        <ReversionModal
+          open={reversionOpen}
+          onClose={closeReversion}
+          documento={currentDocumento}
+          loading={false}
+          onConfirm={async ({ documentId, newStatus, reversionReason }) => {
+            await updateDocumentStatus(documentId, newStatus, { reversionReason });
+            closeReversion();
+          }}
+        />
+      )}
 
       {/* Modal de Detalle */}
       <DocumentDetailModal
