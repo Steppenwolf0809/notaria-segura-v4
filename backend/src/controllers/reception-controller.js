@@ -945,14 +945,15 @@ async function getNotificationHistoryReception(req, res) {
         const take = Math.min(parseInt(limit), 50);
         const skip = (parseInt(page) - 1) * take;
 
-        const where = {
-            userId: req.user.id
-        };
+        // Mostrar historial sin restringir por usuario creador,
+        // ya que las notificaciones pueden ser generadas por diferentes roles/servicios
+        const where = {};
 
         if (search) {
             where.OR = [
-                { phoneNumber: { contains: search } },
-                { messageText: { contains: search } }
+                { clientName: { contains: search, mode: 'insensitive' } },
+                { clientPhone: { contains: search } },
+                { messageBody: { contains: search, mode: 'insensitive' } }
             ];
         }
 
@@ -981,8 +982,10 @@ async function getNotificationHistoryReception(req, res) {
             orderBy: { createdAt: 'desc' },
             select: {
                 id: true,
-                phoneNumber: true,
+                clientName: true,
+                clientPhone: true,
                 messageType: true,
+                messageBody: true,
                 status: true,
                 messageId: true,
                 errorMessage: true,
@@ -996,8 +999,7 @@ async function getNotificationHistoryReception(req, res) {
         console.log('📱 Historial de notificaciones obtenido:', {
             count: notifications.length,
             total: totalCount,
-            page: parseInt(page),
-            userId: req.user.id
+            page: parseInt(page)
         });
 
         res.json({

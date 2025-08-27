@@ -29,10 +29,22 @@ export default function PDFUploader({ file, setFile, onUpload, loading, onExtrac
       )}
 
       <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
-        <Button onClick={() => onUpload()} variant="contained" disabled={!file || loading}>
+        <Button onClick={async () => {
+          try {
+            await onUpload()
+          } catch (e) {
+            alert(e?.message || 'Error subiendo PDF')
+          }
+        }} variant="contained" disabled={!file || loading}>
           Subir y extraer texto
         </Button>
-        <Button onClick={() => onExtract()} variant="outlined" disabled={!canExtract || loading}>
+        <Button onClick={async () => {
+          try {
+            await onExtract()
+          } catch (e) {
+            alert(e?.message || 'Error extrayendo datos')
+          }
+        }} variant="outlined" disabled={!canExtract || loading}>
           Reintentar extracción
         </Button>
       </Box>

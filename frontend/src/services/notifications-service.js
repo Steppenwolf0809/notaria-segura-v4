@@ -81,7 +81,9 @@ class NotificationsService {
         limit = 25,
         search = '',
         status = '',
-        type = ''
+        type = '',
+        dateFrom = '',
+        dateTo = ''
       } = params;
 
       const queryParams = new URLSearchParams();
@@ -91,6 +93,8 @@ class NotificationsService {
       if (search) queryParams.append('search', search);
       if (status) queryParams.append('status', status);
       if (type) queryParams.append('type', type);
+      if (dateFrom) queryParams.append('dateFrom', dateFrom);
+      if (dateTo) queryParams.append('dateTo', dateTo);
 
       const response = await this.api.get(`/?${queryParams.toString()}`);
       
