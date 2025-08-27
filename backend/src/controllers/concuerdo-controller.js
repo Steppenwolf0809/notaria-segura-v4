@@ -80,7 +80,7 @@ async function extractData(req, res) {
  */
 async function previewConcuerdo(req, res) {
   try {
-    const { tipoActo, otorgantes, beneficiarios, notario } = req.body || {}
+    const { tipoActo, otorgantes, beneficiarios, notario, numeroCopias = 2 } = req.body || {}
 
     const safeArray = (v) => Array.isArray(v)
       ? v.map((x) => String(x || '').trim()).filter(Boolean)
@@ -106,7 +106,8 @@ async function previewConcuerdo(req, res) {
     const otorgantesTexto = humanJoin(otorgs)
     const beneficiariosTexto = benefs.length ? humanJoin(benefs) : ''
 
-    let preview = `Se otorgó ante mí, en fe de ello confiero esta COPIA CERTIFICADA de la escritura pública de ${tipo} que ${verboOtorgar} ${otorgantesTexto}`
+    // Construcción de texto (sin fecha, numeración de copias)
+    let preview = `Se otorgó ante mí, en fe de ello confiero esta ${numeroCopias === 1 ? 'COPIA CERTIFICADA' : `${numeroCopias} COPIAS CERTIFICADAS`} de la escritura pública de ${tipo} que ${verboOtorgar} ${otorgantesTexto}`
     if (beneficiariosTexto) preview += `, a favor de ${beneficiariosTexto}`
     preview += ', la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.'
     if (notarioStr) preview += ` (Notario: ${notarioStr}).`

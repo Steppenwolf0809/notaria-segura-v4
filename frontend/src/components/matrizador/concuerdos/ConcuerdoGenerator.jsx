@@ -63,9 +63,12 @@ export default function ConcuerdoGenerator() {
           <Box>
             <Typography variant="subtitle1" sx={{ mb: 1 }}>Vista previa</Typography>
             <Divider sx={{ mb: 2 }} />
-            <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+            <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', mb: 2 }}>
               {generating ? 'Generando vista previa...' : (extractedData?.previewText || 'Sin vista previa')}
             </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button variant="outlined" onClick={() => setStep(1)} disabled={generating}>Editar</Button>
+            </Box>
           </Box>
         )}
       </Paper>
