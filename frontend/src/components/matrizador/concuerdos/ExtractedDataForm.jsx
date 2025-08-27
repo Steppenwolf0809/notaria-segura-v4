@@ -29,6 +29,16 @@ export default function ExtractedDataForm({ data, setData, loading, onBack, onPr
         <Grid item xs={12} md={6}>
           <TextField
             fullWidth
+            type="number"
+            inputProps={{ min: 1, max: 10 }}
+            label="Número de copias (por defecto 2)"
+            value={data?.numeroCopias ?? 2}
+            onChange={(e) => setData({ ...data, numeroCopias: Math.max(1, parseInt(e.target.value || 2)) })}
+          />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <TextField
+            fullWidth
             label="Otorgantes (uno por línea)"
             value={(data?.otorgantes || []).join('\n')}
             onChange={(e) => setData({ ...data, otorgantes: e.target.value.split('\n') })}

@@ -34,7 +34,10 @@ const PdfExtractorService = {
           const data = await pdfParse(pdfBuffer)
           const text = (data.text || '')
             .replace(/\u0000/g, ' ')
-            .replace(/\s+/g, ' ')
+            .replace(/\r/g, '')
+            .replace(/[\t\f]+/g, ' ')
+            .replace(/ +/g, ' ')
+            .replace(/ *\n */g, '\n')
             .trim()
           return text
         } catch (e) {
@@ -66,7 +69,10 @@ const PdfExtractorService = {
           }
           return out
             .replace(/\u0000/g, ' ')
-            .replace(/\s+/g, ' ')
+            .replace(/\r/g, '')
+            .replace(/[\t\f]+/g, ' ')
+            .replace(/ +/g, ' ')
+            .replace(/ *\n */g, '\n')
             .trim()
         } catch (e) {
           return ''
@@ -114,7 +120,6 @@ const PdfExtractorService = {
     }
 
     const normalized = text
-      .replace(/\s+/g, ' ')
       .replace(/\s*:\s*/g, ': ')
       .toUpperCase()
 
@@ -123,18 +128,30 @@ const PdfExtractorService = {
       return m && m[1] ? m[1].trim() : ''
     }
 
-    // Regex básicos y tolerantes (Sprint 1):
-    const tipoActo = getMatch(/ACTO O CONTRATO[:\-]?\s*(.+?)(?: OTORGADO POR| OTORGANTE| OTORGANTES| A FAVOR DE| BENEFICIARIO|$)/)
-    const otorgantesRaw = getMatch(/(?:OTORGADO POR|OTORGANTE|OTORGANTES)[:\-]?\s*(.+?)(?: A FAVOR DE| BENEFICIARIO| NOTARIO|\.)/)
-    const beneficiariosRaw = getMatch(/(?:A FAVOR DE|BENEFICIARIO(?:S)?)[:\-]?\s*(.+?)(?: NOTARIO|\.)/)
-    const notario = getMatch(/NOTARIO[:\-]?\s*(.+?)(?:\.|$)/)
+    // Regex básicos y tolerantes (Sprint 1) respetando saltos de línea
+    const tipoActo = getMatch(/ACTO O CONTRATO[:\-]?\s*([\s\S]*?)(?:\n| FECHA| OTORGADO POR| OTORGANTE| OTORGANTES| A FAVOR DE| BENEFICIARIO|$)/)
+    const otorgantesRaw = getMatch(/(?:OTORGADO POR|OTORGANTE|OTORGANTES)[:\-]?\s*([\s\S]*?)(?:\n| A FAVOR DE| BENEFICIARIO| NOTARIO| ACTO O CONTRATO|$)/)
+    const beneficiariosRaw = getMatch(/(?:A FAVOR DE|BENEFICIARIO(?:S)?)[:\-]?\s*([\s\S]*?)(?:\n| NOTARIO| ACTO O CONTRATO|$)/)
+    let notario = getMatch(/NOTARIO[:\-]?\s*([\s\S]*?)(?:\n|$)/)
 
     const splitPeople = (s) => {
       if (!s) return []
       return s
-        .split(/,|;| Y | E /)
+        .replace(/PERSONANOMBRES?\/RAZ[ÓO]N SOCIAL/gi, '')
+        .replace(/TIPO INTERVINIENTE/gi, '')
+        .replace(/DOCUMENTO DE IDENTIDAD\s*NO/gi, '')
+        .replace(/^S\s+/i, '')
+        .split(/\n|,|;| Y | E /)
         .map((x) => x.trim())
         .filter((x) => x && x.length > 1)
+    }
+
+    // Limpieza de notario: quitar (A), AB., ABG. iniciales
+    if (notario) {
+      notario = notario
+        .replace(/^\(A\)\s*/i, '')
+        .replace(/^ABG?\.?\s*/i, '')
+        .trim()
     }
 
     return {
