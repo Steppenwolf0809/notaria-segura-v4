@@ -106,10 +106,15 @@ async function previewConcuerdo(req, res) {
     }
 
     const firstToken = (full) => String(full || '').trim().split(/\s+/)[0]?.toUpperCase() || ''
-    const isFemale = (n) => {
-      const token = firstToken(n)
-      const femaleList = new Set(['MARIA','ANA','ROSA','ELENA','FERNANDA','LUISA','VALERIA','CAMILA','GABRIELA','SOFIA','ISABEL','PATRICIA','VERONICA'])
-      return femaleList.has(token) || token.endsWith('A')
+    const isFemale = (full) => {
+      const token = firstToken(full)
+      const tokens = String(full || '').trim().toUpperCase().split(/\s+/)
+      const femaleList = new Set(['MARIA','ANA','ROSA','ELENA','FERNANDA','LUISA','VALERIA','CAMILA','GABRIELA','SOFIA','ISABEL','PATRICIA','VERONICA','SUSAN','MAGDALENA','CARMEN','TERESA','BEATRIZ','ELIZABETH','ELIZABET','NOELIA','PAULA','PAOLA','MERCEDES','PILAR','GUADALUPE'])
+      if (femaleList.has(token)) return true
+      // Si cualquiera de los tokens es femenino claro (p.ej. MAGDALENA), considerar femenino
+      if (tokens.some(t => femaleList.has(t))) return true
+      // Heurística: nombres terminados en 'A' suelen ser femeninos
+      return token.endsWith('A')
     }
     // Construir texto por actos con conectores "y de"
     const humanJoin = (arr) => {
@@ -141,7 +146,7 @@ async function previewConcuerdo(req, res) {
     const suffixNotaria = (() => {
       const parts = []
       if (notario && String(notario).trim()) parts.push(`Notario: ${String(notario).trim()}`)
-      if (notariaNumero && String(notariaNumero).trim()) parts.push(`Notaría N° ${String(notariaNumero).trim()}`)
+      if (notariaNumero && String(notariaNumero).trim()) parts.push(`Notaría ${String(notariaNumero).trim()}`)
       return parts.length ? ' ' + parts.join('. ') + '.' : ''
     })()
 
@@ -198,8 +203,11 @@ async function generateDocuments(req, res) {
     const firstToken2 = (full) => String(full || '').trim().split(/\s+/)[0]?.toUpperCase() || ''
     const isFemaleName = (full) => {
       const first = firstToken2(full)
-      const femaleList = new Set(['MARIA','ANA','ROSA','ELENA','FERNANDA','LUISA','VALERIA','CAMILA','GABRIELA','SOFIA','ISABEL','PATRICIA','VERONICA'])
-      return femaleList.has(first) || first.endsWith('A')
+      const tokens = String(full || '').trim().toUpperCase().split(/\s+/)
+      const femaleList = new Set(['MARIA','ANA','ROSA','ELENA','FERNANDA','LUISA','VALERIA','CAMILA','GABRIELA','SOFIA','ISABEL','PATRICIA','VERONICA','SUSAN','MAGDALENA','CARMEN','TERESA','BEATRIZ','ELIZABETH','ELIZABET','NOELIA','PAULA','PAOLA','MERCEDES','PILAR','GUADALUPE'])
+      if (femaleList.has(first)) return true
+      if (tokens.some(t => femaleList.has(t))) return true
+      return first.endsWith('A')
     }
 
     const humanJoin = (arr) => {
@@ -230,7 +238,7 @@ async function generateDocuments(req, res) {
     const suffixNotaria = (() => {
       const parts = []
       if (notario && String(notario).trim()) parts.push(`Notario: ${String(notario).trim()}`)
-      if (notariaNumero && String(notariaNumero).trim()) parts.push(`Notaría N° ${String(notariaNumero).trim()}`)
+      if (notariaNumero && String(notariaNumero).trim()) parts.push(`Notaría ${String(notariaNumero).trim()}`)
       return parts.length ? ' ' + parts.join('. ') + '.' : ''
     })()
 

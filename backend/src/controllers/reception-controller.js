@@ -98,7 +98,31 @@ async function getMatrizadores(req, res) {
 
 async function listarTodosDocumentos(req, res) {
   try {
-    const { search, matrizador, estado, fechaDesde, fechaHasta, page = 1, limit = 10 } = req.query;
+    const { search, matrizador, estado, fechaDesde, fechaHasta, page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+    // Normalizar y mapear campo de ordenamiento permitido
+    const mapSortField = (field) => {
+      switch ((field || '').toString()) {
+        case 'createdAt':
+        case 'fechaCreacion':
+          return 'createdAt';
+        case 'updatedAt':
+          return 'updatedAt';
+        case 'clientName':
+          return 'clientName';
+        case 'protocolNumber':
+          return 'protocolNumber';
+        case 'documentType':
+          return 'documentType';
+        case 'status':
+          return 'status';
+        case 'fechaEntrega':
+          return 'fechaEntrega';
+        default:
+          return 'createdAt';
+      }
+    };
+    const mappedSortField = mapSortField(sortBy);
+    const mappedSortOrder = (sortOrder === 'asc') ? 'asc' : 'desc';
     
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const take = parseInt(limit);
@@ -155,12 +179,27 @@ async function listarTodosDocumentos(req, res) {
           ...filterClauses
         ], Prisma.sql` AND `)}`;
 
+        // Preparar ORDER BY seguro (solo campos permitidos)
+        const fieldSql = (() => {
+          switch (mappedSortField) {
+            case 'createdAt': return Prisma.sql`d."createdAt"`;
+            case 'updatedAt': return Prisma.sql`d."updatedAt"`;
+            case 'clientName': return Prisma.sql`d."clientName"`;
+            case 'protocolNumber': return Prisma.sql`d."protocolNumber"`;
+            case 'documentType': return Prisma.sql`d."documentType"`;
+            case 'status': return Prisma.sql`d."status"`;
+            case 'fechaEntrega': return Prisma.sql`d."fechaEntrega"`;
+            default: return Prisma.sql`d."createdAt"`;
+          }
+        })();
+        const directionSql = mappedSortOrder === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+
         const documents = await prisma.$queryRaw`
           SELECT d.*, u.id as "_assignedToId", u."firstName" as "_assignedToFirstName", u."lastName" as "_assignedToLastName"
           FROM "documents" d
           LEFT JOIN "users" u ON u.id = d."assignedToId"
           WHERE ${whereSql}
-          ORDER BY d."createdAt" DESC
+          ORDER BY ${fieldSql} ${directionSql}
           OFFSET ${skip} LIMIT ${take}
         `;
         const countRows = await prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${whereSql}`;
@@ -233,7 +272,7 @@ async function listarTodosDocumentos(req, res) {
             }
           }
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { [mappedSortField]: mappedSortOrder },
         skip,
         take
       }),

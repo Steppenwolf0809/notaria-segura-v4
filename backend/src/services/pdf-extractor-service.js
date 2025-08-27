@@ -104,11 +104,15 @@ const PdfExtractorService = {
         if (cut !== -1) nombre = nombre.slice(0, cut).trim()
         notarioNombre = nombre
 
-        // Buscar número de notaría en la misma o siguiente línea(s)
+        // Buscar texto de notaría en la misma o siguientes líneas
         for (let j = idx; j < Math.min(idx + 3, lines.length); j++) {
-          const l = lines[j].toUpperCase()
-          const n = l.match(/NOTAR[ÍI]A\s*(?:N°|Nº|NO\.?|NUMERO)?\s*(\d{1,3})/i)
-          if (n) { notariaNumero = n[1]; break }
+          const l = lines[j].toUpperCase().trim()
+          // Capturar todo lo que sigue a "NOTARÍA " hasta fin de línea
+          const mNum = l.match(/NOTAR[ÍI]A\s*(.+)$/i)
+          if (mNum && mNum[1]) {
+            notariaNumero = mNum[1].replace(/\s+/g, ' ').trim().replace(/[\.;,]+$/,'')
+            break
+          }
         }
         break
       }
@@ -121,17 +125,10 @@ const PdfExtractorService = {
     }
     if (!notariaNumero) {
       const upper = text.toUpperCase()
-      // Caso 1: formato numérico
-      const n2 = upper.match(/NOTAR[ÍI]A\s*(?:N°|Nº|NO\.?|NUMERO)?\s*(\d{1,3})/)
-      if (n2) {
-        notariaNumero = n2[1]
-      } else {
-        // Caso 2: ordinal en palabras, ej. "NOTARÍA DÉCIMA OCTAVA DEL CANTON QUITO"
-        const mOrdinal = upper.match(/NOTAR[ÍI]A\s+([A-ZÁÉÍÓÚÑ\s]{3,40}?)\s+DEL\s+CANT[ÓO]N/)
-        if (mOrdinal && mOrdinal[1]) {
-          const numFromWords = parseOrdinalWords(mOrdinal[1])
-          if (numFromWords) notariaNumero = numFromWords
-        }
+      // Capturar texto posterior a NOTARÍA, preferentemente completo
+      const mAny = upper.match(/NOTAR[ÍI]A\s+([^\n]+?)(?:\n|$)/)
+      if (mAny && mAny[1]) {
+        notariaNumero = mAny[1].replace(/\s+/g, ' ').trim().replace(/[\.;,]+$/,'')
       }
     }
 
@@ -369,7 +366,7 @@ const PdfExtractorService = {
     const upper = text.toUpperCase()
 
     // Encontrar posiciones de secciones de ACTO O CONTRATO
-    const actRegex = /ACTO\s+O\s+CONTRATO\s*[:\-]?\s*(.+?)(?=ACTO\s+O\s+CONTRATO\s*[:\-]?|$)/gis
+    const actRegex = /ACTO(?:S)?\s+O\s+CONTRATO(?:S)?\s*[:\-]?\s*(.+?)(?=ACTO(?:S)?\s+O\s+CONTRATO(?:S)?\s*[:\-]?|$)/gis
     const acts = []
     let match
     while ((match = actRegex.exec(upper)) !== null) {
@@ -421,7 +418,17 @@ const PdfExtractorService = {
           .replace(/\s+Y\s+/g, '|')
           .replace(/\s+E\s+/g, '|')
           .replace(/\s*[,;/]\s*/g, '|')
-        const parts = tmp.split('|').map(p => this.cleanActType(p)).filter(p => p && p.length >= 3)
+        let parts = tmp.split('|').map(p => this.cleanActType(p)).filter(p => p && p.length >= 3)
+        // Caso especial: REVOCATORIA embebida sin separadores
+        if (parts.length <= 1) {
+          const up = base.toUpperCase()
+          const idxRev = up.indexOf('REVOCATORIA')
+          if (idxRev > 0) {
+            const p1 = this.cleanActType(base.slice(0, idxRev))
+            const p2 = this.cleanActType(base.slice(idxRev))
+            parts = [p1, p2].filter(Boolean)
+          }
+        }
         // Descartar duplicados triviales
         return Array.from(new Set(parts))
       }

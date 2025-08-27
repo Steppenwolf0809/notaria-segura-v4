@@ -506,6 +506,15 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
     setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
   };
 
+  const setSortField = (field) => {
+    if (sortBy === field) {
+      setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(field);
+      setSortOrder('asc');
+    }
+  };
+
   // Documentos ordenados en memoria por fecha
   const documentosOrdenados = useMemo(() => {
     const dateKeys = ['createdAt','fechaCreacion','created_at'];
@@ -896,7 +905,15 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                     color="primary"
                   />
                 </TableCell>
-                <TableCell sx={{ fontWeight: 'bold', py: 2 }}>Cliente / Documento</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', py: 2 }}>
+                  <TableSortLabel
+                    active={sortBy === 'clientName'}
+                    direction={sortBy === 'clientName' ? sortOrder : 'asc'}
+                    onClick={() => setSortField('clientName')}
+                  >
+                    Cliente / Documento
+                  </TableSortLabel>
+                </TableCell>
                 <TableCell sx={{ fontWeight: 'bold', py: 2 }}>Matrizador</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', py: 2 }}>
                   <TableSortLabel
