@@ -33,7 +33,10 @@ import {
   // 🔓 Desagrupar documento
   ungroupDocument,
   // 🔄 Reversión de estado
-  revertDocumentStatus
+  revertDocumentStatus,
+  // 🔔 Políticas de notificación
+  updateNotificationPolicy,
+  updateGroupNotificationPolicy
 } from '../controllers/document-controller.js';
 
 // 🔄 NUEVAS IMPORTACIONES: Operaciones masivas
@@ -168,6 +171,13 @@ router.get('/group/:groupId',
   authenticateToken,
   getGroupDocuments
 );
+
+// 🔔 RUTAS DE POLÍTICAS DE NOTIFICACIÓN
+// PUT /api/documents/:id/notification-policy - Actualizar política de notificación de documento
+router.put('/:id/notification-policy', authenticateToken, updateNotificationPolicy);
+
+// PUT /api/documents/group/:groupId/notification-policy - Actualizar política de notificación de grupo
+router.put('/group/:groupId/notification-policy', authenticateToken, updateGroupNotificationPolicy);
 
 
 /**

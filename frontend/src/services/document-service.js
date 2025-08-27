@@ -881,6 +881,122 @@ const documentService = {
         message: errorMessage
       };
     }
+  },
+
+  /**
+   * Actualizar política de notificación de un documento individual
+   * @param {string} documentId - ID del documento
+   * @param {string} policy - Política de notificación ('automatica', 'no_notificar', 'entrega_inmediata')
+   * @returns {Promise<Object>} Resultado de la actualización
+   */
+  async updateNotificationPolicy(documentId, policy) {
+    try {
+      console.log('🔔 Actualizando política de notificación:', { documentId, policy });
+      
+      const response = await api.put(`/documents/${documentId}/notification-policy`, {
+        notificationPolicy: policy
+      });
+      
+      console.log('✅ Política de notificación actualizada:', response.data);
+      
+      return {
+        success: true,
+        data: response.data.data || response.data,
+        message: response.data.message || 'Política de notificación actualizada exitosamente'
+      };
+    } catch (error) {
+      console.error('❌ Error actualizando política de notificación:', error);
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Error al actualizar la política de notificación';
+      
+      return {
+        success: false,
+        error: errorMessage,
+        message: errorMessage
+      };
+    }
+  },
+
+  /**
+   * Actualizar política de notificación de un grupo de documentos
+   * @param {string} groupId - ID del grupo
+   * @param {string} policy - Política de notificación ('automatica', 'no_notificar', 'entrega_inmediata')
+   * @returns {Promise<Object>} Resultado de la actualización
+   */
+  async updateGroupNotificationPolicy(groupId, policy) {
+    try {
+      console.log('🔔 Actualizando política de notificación del grupo:', { groupId, policy });
+      
+      const response = await api.put(`/documents/group/${groupId}/notification-policy`, {
+        notificationPolicy: policy
+      });
+      
+      console.log('✅ Política de notificación del grupo actualizada:', response.data);
+      
+      return {
+        success: true,
+        data: response.data.data || response.data,
+        message: response.data.message || 'Política de notificación del grupo actualizada exitosamente'
+      };
+    } catch (error) {
+      console.error('❌ Error actualizando política de notificación del grupo:', error);
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Error al actualizar la política de notificación del grupo';
+      
+      return {
+        success: false,
+        error: errorMessage,
+        message: errorMessage
+      };
+    }
+  },
+
+  /**
+   * Marcar documento como entregado inmediatamente (para política de entrega inmediata)
+   * @param {string} documentId - ID del documento
+   * @param {Object} deliveryData - Datos mínimos de entrega
+   * @returns {Promise<Object>} Resultado de la entrega inmediata
+   */
+  async markAsDeliveredImmediate(documentId, deliveryData = {}) {
+    try {
+      console.log('⚡ Marcando documento como entregado inmediatamente:', { documentId, deliveryData });
+      
+      const immediateDeliveryData = {
+        entregadoA: deliveryData.entregadoA || 'Cliente',
+        relacionTitular: 'titular',
+        verificacionManual: true,
+        codigoVerificacion: '',
+        facturaPresenta: false,
+        observacionesEntrega: deliveryData.observacionesEntrega || 'Entrega inmediata automática',
+        immediateDelivery: true
+      };
+
+      const response = await api.post(`/documents/${documentId}/deliver`, immediateDeliveryData);
+      
+      console.log('✅ Documento marcado como entregado inmediatamente:', response.data);
+      
+      return {
+        success: true,
+        data: response.data.data || response.data,
+        message: response.data.message || 'Documento entregado inmediatamente'
+      };
+    } catch (error) {
+      console.error('❌ Error en entrega inmediata:', error);
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Error al marcar documento como entregado';
+      
+      return {
+        success: false,
+        error: errorMessage,
+        message: errorMessage
+      };
+    }
   }
 };
 

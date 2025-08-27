@@ -2558,12 +2558,26 @@ async function deliverDocument(req, res) {
       }
     }
 
-    // Verificar que el documento esté LISTO
-    if (document.status !== 'LISTO') {
+    // Verificar que el documento esté LISTO o permitir entrega inmediata
+    const { immediateDelivery } = req.body;
+    if (!immediateDelivery && document.status !== 'LISTO') {
       return res.status(400).json({
         success: false,
         message: 'Solo se pueden entregar documentos que estén LISTO'
       });
+    }
+
+    // Si es entrega inmediata, validar permisos y estados permitidos
+    if (immediateDelivery) {
+      const allowedStatuses = ['PENDIENTE', 'EN_PROCESO', 'LISTO'];
+      if (!allowedStatuses.includes(document.status)) {
+        return res.status(400).json({
+          success: false,
+          message: 'No se puede realizar entrega inmediata de documentos ya entregados'
+        });
+      }
+
+      console.log(`⚡ Entrega inmediata solicitada para documento ${document.protocolNumber} (estado actual: ${document.status})`);
     }
 
     // Verificar código de verificación si no es manual (aceptar individual o grupal)
@@ -2796,15 +2810,20 @@ async function deliverDocument(req, res) {
 
     // Registrar evento de auditoría
     try {
+      const eventDescription = immediateDelivery 
+        ? `Documento entregado INMEDIATAMENTE a ${entregadoA} por ${req.user.firstName} ${req.user.lastName} (${req.user.role}) - Estado anterior: ${document.status}`
+        : `Documento entregado a ${entregadoA} por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`;
+      
       await prisma.documentEvent.create({
         data: {
           documentId: id,
           userId: req.user.id,
           eventType: 'STATUS_CHANGED',
-          description: `Documento entregado a ${entregadoA} por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
+          description: eventDescription,
           details: {
-            previousStatus: 'LISTO',
+            previousStatus: immediateDelivery ? document.status : 'LISTO',
             newStatus: 'ENTREGADO',
+            immediateDelivery: immediateDelivery || false,
             entregadoA,
             cedulaReceptor,
             relacionTitular,
@@ -2825,9 +2844,11 @@ async function deliverDocument(req, res) {
 
     // Preparar mensaje de respuesta
     const totalDelivered = 1 + groupDocuments.length;
-    let message = totalDelivered > 1 
-      ? `${totalDelivered} documentos entregados exitosamente (entrega grupal)`
-      : 'Documento entregado exitosamente';
+    let message = immediateDelivery 
+      ? 'Documento entregado inmediatamente (sin notificación previa)'
+      : totalDelivered > 1 
+        ? `${totalDelivered} documentos entregados exitosamente (entrega grupal)`
+        : 'Documento entregado exitosamente';
     
     if (whatsappSent) {
       message += ' y notificación WhatsApp enviada';
@@ -3553,6 +3574,202 @@ async function revertDocumentStatus(req, res) {
   }
 }
 
+/**
+ * 🔔 ACTUALIZAR POLÍTICA DE NOTIFICACIÓN DE DOCUMENTO INDIVIDUAL
+ * Permite cambiar la política de notificación de un documento específico
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+async function updateNotificationPolicy(req, res) {
+  try {
+    const { id } = req.params;
+    const { notificationPolicy } = req.body;
+
+    // Validar política
+    const validPolicies = ['automatica', 'no_notificar', 'entrega_inmediata'];
+    if (!validPolicies.includes(notificationPolicy)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Política de notificación no válida'
+      });
+    }
+
+    // Verificar que el documento existe y el usuario tiene permisos
+    const document = await prisma.document.findUnique({
+      where: { id },
+      include: {
+        assignedTo: true
+      }
+    });
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Documento no encontrado'
+      });
+    }
+
+    // Verificar permisos según rol
+    const userRole = req.user.role;
+    if (!['ADMIN', 'MATRIZADOR', 'RECEPCION', 'ARCHIVO', 'CAJA'].includes(userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para actualizar políticas de notificación'
+      });
+    }
+
+    // Si es matrizador, solo puede modificar sus propios documentos o sin asignar
+    if (userRole === 'MATRIZADOR' && document.assignedToId && document.assignedToId !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo puedes modificar la política de tus documentos asignados'
+      });
+    }
+
+    // Actualizar la política de notificación
+    const updatedDocument = await prisma.document.update({
+      where: { id },
+      data: { notificationPolicy },
+      include: {
+        assignedTo: {
+          select: { firstName: true, lastName: true }
+        }
+      }
+    });
+
+    console.log(`🔔 Política de notificación actualizada: ${document.protocolNumber} -> ${notificationPolicy}`);
+
+    res.json({
+      success: true,
+      message: `Política de notificación actualizada a: ${notificationPolicy}`,
+      data: {
+        document: updatedDocument,
+        previousPolicy: document.notificationPolicy,
+        newPolicy: notificationPolicy
+      }
+    });
+
+  } catch (error) {
+    console.error('Error actualizando política de notificación:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+}
+
+/**
+ * 🔔 ACTUALIZAR POLÍTICA DE NOTIFICACIÓN DE GRUPO
+ * Permite cambiar la política de notificación de todos los documentos de un grupo
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+async function updateGroupNotificationPolicy(req, res) {
+  try {
+    const { groupId } = req.params;
+    const { notificationPolicy } = req.body;
+
+    // Validar política
+    const validPolicies = ['automatica', 'no_notificar', 'entrega_inmediata'];
+    if (!validPolicies.includes(notificationPolicy)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Política de notificación no válida'
+      });
+    }
+
+    // Verificar que el grupo existe
+    const documentGroup = await prisma.documentGroup.findUnique({
+      where: { id: groupId },
+      include: {
+        documents: {
+          include: {
+            assignedTo: true
+          }
+        }
+      }
+    });
+
+    if (!documentGroup) {
+      return res.status(404).json({
+        success: false,
+        message: 'Grupo de documentos no encontrado'
+      });
+    }
+
+    if (documentGroup.documents.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'El grupo no tiene documentos'
+      });
+    }
+
+    // Verificar permisos según rol
+    const userRole = req.user.role;
+    if (!['ADMIN', 'MATRIZADOR', 'RECEPCION', 'ARCHIVO', 'CAJA'].includes(userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para actualizar políticas de notificación'
+      });
+    }
+
+    // Si es matrizador, verificar que tiene al menos un documento asignado en el grupo
+    if (userRole === 'MATRIZADOR') {
+      const hasAssignedDoc = documentGroup.documents.some(doc => 
+        doc.assignedToId === req.user.id
+      );
+      
+      if (!hasAssignedDoc) {
+        return res.status(403).json({
+          success: false,
+          message: 'Solo puedes modificar la política de grupos que incluyan tus documentos'
+        });
+      }
+    }
+
+    // Actualizar la política en todos los documentos del grupo usando transacción
+    const result = await prisma.$transaction(async (tx) => {
+      // Actualizar todos los documentos del grupo
+      const updateResult = await tx.document.updateMany({
+        where: { documentGroupId: groupId },
+        data: { notificationPolicy }
+      });
+
+      // Obtener documentos actualizados para la respuesta
+      const updatedDocuments = await tx.document.findMany({
+        where: { documentGroupId: groupId },
+        include: {
+          assignedTo: {
+            select: { firstName: true, lastName: true }
+          }
+        }
+      });
+
+      return { updateResult, updatedDocuments };
+    });
+
+    console.log(`🔔 Política de grupo actualizada: Grupo ${groupId} -> ${notificationPolicy} (${result.updateResult.count} documentos)`);
+
+    res.json({
+      success: true,
+      message: `Política de notificación actualizada para ${result.updateResult.count} documentos del grupo`,
+      data: {
+        groupId,
+        documentsUpdated: result.updateResult.count,
+        newPolicy: notificationPolicy,
+        documents: result.updatedDocuments
+      }
+    });
+
+  } catch (error) {
+    console.error('Error actualizando política de grupo:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+}
+
 export {
   uploadXmlDocument,
   uploadXmlDocumentsBatch,
@@ -3585,5 +3802,8 @@ export {
   // 🔓 Desagrupación
   ungroupDocument,
   // 🔄 Reversión de estado
-  revertDocumentStatus
+  revertDocumentStatus,
+  // 🔔 Políticas de notificación
+  updateNotificationPolicy,
+  updateGroupNotificationPolicy
 }; 
