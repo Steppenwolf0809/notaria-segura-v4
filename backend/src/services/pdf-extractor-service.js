@@ -161,8 +161,78 @@ const PdfExtractorService = {
       notario: notario || undefined
     }
   }
+
+  /**
+   * Parser avanzado: detecta múltiples actos y busca etiquetas comunes
+   * - Soporta múltiples ocurrencias de "ACTO O CONTRATO"
+   * - Extrae bloques entre "OTORGADO POR"/"OTORGANTES" y "A FAVOR DE"/"BENEFICIARIO(S)"
+   * - Considera etiquetas "NOMBRES/RAZÓN SOCIAL" y variaciones
+   * @param {string} rawText
+   * @returns {{ acts: Array<{ tipoActo: string, otorgantes: string[], beneficiarios: string[], notario?: string }>} }
+   */
+  parseAdvancedData(rawText) {
+    if (!rawText || typeof rawText !== 'string') return { acts: [] }
+
+    const text = rawText.replace(/\s+/g, ' ').trim()
+    const upper = text.toUpperCase()
+
+    // Encontrar posiciones de secciones de ACTO O CONTRATO
+    const actRegex = /ACTO\s+O\s+CONTRATO\s*[:\-]?\s*(.+?)(?=ACTO\s+O\s+CONTRATO\s*[:\-]?|$)/gis
+    const acts = []
+    let match
+    while ((match = actRegex.exec(upper)) !== null) {
+      const fullSection = match[0]
+      const tipoActo = (match[1] || '').trim()
+
+      // Dentro de la sección, buscar otorgantes y beneficiarios
+      const section = fullSection
+
+      const blockBetween = (startRegex, endRegex) => {
+        const s = section.search(startRegex)
+        if (s === -1) return ''
+        const afterStart = section.slice(s)
+        const e = afterStart.search(endRegex)
+        return e === -1 ? afterStart.replace(startRegex, '') : afterStart.slice(0, e).replace(startRegex, '')
+      }
+
+      // Variantes de etiquetas
+      const startOtRegex = /(?:OTORGADO\s+POR|OTORGANTE(?:S)?|NOMBRES\s*\/\s*RAZ[ÓO]N\s+SOCIAL)\s*[:\-]?\s*/i
+      const startBenRegex = /(?:A\s+FAVOR\s+DE|BENEFICIARIO(?:S)?)\s*[:\-]?\s*/i
+      const notarioRegex = /NOTARIO\s*[:\-]?\s*(.+?)(?:\.|$)/i
+
+      const otorgantesRaw = blockBetween(startOtRegex, startBenRegex)
+      const beneficiariosRaw = blockBetween(startBenRegex, /NOTARIO|\.$/i)
+
+      const splitPeople = (s) => {
+        if (!s) return []
+        return s
+          .replace(/\s+/g, ' ')
+          .split(/,|;|\s+Y\s+|\s+E\s+/i)
+          .map((x) => x.trim())
+          .filter((x) => x && x.length > 1)
+      }
+
+      let notario
+      const notMatch = section.match(notarioRegex)
+      if (notMatch && notMatch[1]) notario = notMatch[1].trim()
+
+      acts.push({
+        tipoActo: tipoActo || '',
+        otorgantes: splitPeople(otorgantesRaw),
+        beneficiarios: splitPeople(beneficiariosRaw),
+        ...(notario ? { notario } : {})
+      })
+    }
+
+    // Si no detectó ninguna sección "ACTO O CONTRATO", intentar con parseSimpleData
+    if (acts.length === 0) {
+      const single = this.parseSimpleData(rawText)
+      return { acts: [single] }
+    }
+
+    return { acts }
+  }
 }
 
 export default PdfExtractorService
-
 

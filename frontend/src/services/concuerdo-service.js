@@ -76,6 +76,16 @@ const concuerdoService = {
       return { success: false, error: message };
     }
   },
+
+  async generateDocuments(data) {
+    try {
+      const response = await api.post('/concuerdos/generate-documents', data);
+      return { success: true, data: response.data.data };
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Error generando documentos';
+      return { success: false, error: message };
+    }
+  },
 };
 
 export default concuerdoService;

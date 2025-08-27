@@ -61,12 +61,22 @@ export default function ConcuerdoGenerator() {
 
         {step === 2 && (
           <Box>
-            <Typography variant="subtitle1" sx={{ mb: 1 }}>Vista previa</Typography>
+            <Typography variant="subtitle1" sx={{ mb: 1 }}>Vista previa de copias</Typography>
             <Divider sx={{ mb: 2 }} />
-            <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', mb: 2 }}>
-              {generating ? 'Generando vista previa...' : (extractedData?.previewText || 'Sin vista previa')}
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 1 }}>
+            {generating && 'Generando vista previa...'}
+            {!generating && Array.isArray(extractedData?.previewDocs) && extractedData.previewDocs.length > 0 ? (
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 2 }}>
+                {extractedData.previewDocs.map((doc) => (
+                  <Paper key={doc.index} variant="outlined" sx={{ p: 2 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 1 }}>{doc.title}</Typography>
+                    <div dangerouslySetInnerHTML={{ __html: atob(doc.contentBase64) }} />
+                  </Paper>
+                ))}
+              </Box>
+            ) : (
+              <Typography variant="body2">Sin vista previa</Typography>
+            )}
+            <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
               <Button variant="outlined" onClick={() => setStep(1)} disabled={generating}>Editar</Button>
             </Box>
           </Box>
