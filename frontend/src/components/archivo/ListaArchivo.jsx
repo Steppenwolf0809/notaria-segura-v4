@@ -1358,6 +1358,16 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
           onClose={handleCloseDetailModal}
           document={selectedDocument}
           userRole="archivo"
+          onDocumentUpdated={(updated) => {
+            // Sincronizar fila seleccionada en la tabla
+            if (updated?.document) {
+              setSelectedDocument(prev => ({ ...prev, ...updated.document }));
+            }
+            // Refrescar la lista para reflejar el nuevo estado
+            if (onRefresh) {
+              onRefresh();
+            }
+          }}
         />
       )}
 

@@ -727,7 +727,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                 <TextField 
                   fullWidth 
                   size="small" 
-                  placeholder="Buscar por cliente, teléfono, protocolo..."
+                  placeholder="Buscar por cliente, teléfono, protocolo o acto principal..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   InputProps={{
@@ -934,6 +934,19 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                         >
                           Doc: {documento.protocolNumber} | {documento.documentType}
                         </Typography>
+                        {/* Acto Principal visible para Recepción */}
+                        {documento.actoPrincipalDescripcion && (
+                          <Typography
+                            variant="caption"
+                            component="div"
+                            sx={{
+                              mt: 0.25,
+                              color: (theme) => theme.palette.mode === 'dark' ? '#9ca3af' : '#6b7280'
+                            }}
+                          >
+                            Acto: {documento.actoPrincipalDescripcion}
+                          </Typography>
+                        )}
                         {documento.clientPhone && (
                           <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
                              <PhoneIcon sx={{ fontSize: '0.8rem', color: 'action.active', mr: 0.5 }} />
