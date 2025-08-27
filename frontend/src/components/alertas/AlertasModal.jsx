@@ -109,9 +109,9 @@ function AlertasModal({ open, onClose, userRole, onDocumentClick }) {
     if (searchTerm.trim()) {
       const search = searchTerm.toLowerCase();
       filtered = filtered.filter(a => 
-        a.protocolNumber.toLowerCase().includes(search) ||
-        a.clientName.toLowerCase().includes(search) ||
-        a.documentType.toLowerCase().includes(search)
+        (a.protocolNumber || '').toLowerCase().includes(search) ||
+        (a.clientName || '').toLowerCase().includes(search) ||
+        (a.documentType || '').toLowerCase().includes(search)
       );
     }
 

@@ -87,9 +87,9 @@ const NotificationHistory = () => {
    */
   const filteredNotifications = notifications.filter(notification =>
     !searchTerm || 
-    notification.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    notification.clientPhone.includes(searchTerm) ||
-    notification.protocolNumber?.toLowerCase().includes(searchTerm.toLowerCase())
+    (notification.clientName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (notification.clientPhone || '').includes(searchTerm) ||
+    (notification.protocolNumber || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   /**

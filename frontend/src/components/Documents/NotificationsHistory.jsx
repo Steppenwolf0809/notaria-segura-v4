@@ -194,9 +194,9 @@ const NotificationsHistory = () => {
     if (searchTerm.trim()) {
       const searchLower = searchTerm.toLowerCase();
       filtered = filtered.filter(notification =>
-        notification.cliente.toLowerCase().includes(searchLower) ||
-        notification.documento.toLowerCase().includes(searchLower) ||
-        notification.telefono.includes(searchTerm)
+        (notification.cliente || '').toLowerCase().includes(searchLower) ||
+        (notification.documento || '').toLowerCase().includes(searchLower) ||
+        (notification.telefono || '').includes(searchTerm)
       );
     }
 
