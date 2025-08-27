@@ -15,7 +15,7 @@ import {
 } from '@mui/material';
 import {
   Close as CloseIcon,
-  Flash as FlashIcon
+  FlashOn as FlashIcon
 } from '@mui/icons-material';
 import documentService from '../../services/document-service';
 
