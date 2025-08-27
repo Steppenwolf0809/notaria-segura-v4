@@ -42,7 +42,8 @@
       "Bash(echo:*)",
       "Bash(cat:*)",
       "Bash(NODE_ENV=production npx prisma db push --accept-data-loss)",
-      "Bash(npx vite build:*)"
+      "Bash(npx vite build:*)",
+      "Bash(sed:*)"
     ],
     "deny": []
   }
