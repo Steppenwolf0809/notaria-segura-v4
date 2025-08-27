@@ -36,8 +36,13 @@ async function uploadPdf(req, res) {
       data: { text }
     })
   } catch (error) {
-    console.error('Error en uploadPdf:', error)
-    return res.status(500).json({ success: false, message: 'Error procesando PDF' })
+    console.error('Error en uploadPdf:', error?.message || error)
+    if (error?.cause) console.error('Causa:', error.cause?.message || error.cause)
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Error procesando PDF',
+      details: process.env.NODE_ENV !== 'production' ? (error?.cause?.message || error?.message) : undefined
+    })
   }
 }
 
