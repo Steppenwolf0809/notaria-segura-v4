@@ -127,7 +127,7 @@ export async function bulkMarkReady({ documentIds, actor, sendNotifications = tr
         data: {
           documentId: d.id,
           userId: actor.id,
-          eventType: 'STATUS_CHANGE_BULK',
+          eventType: 'STATUS_CHANGED',
           description: `Cambio masivo de EN_PROCESO a LISTO (${actor.firstName || ''} ${actor.lastName || ''} - ${actor.role})`,
           details: {
             fromStatus: 'EN_PROCESO',
