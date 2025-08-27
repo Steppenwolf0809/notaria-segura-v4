@@ -185,6 +185,16 @@ function DocumentosListos({ onEstadisticasChange }) {
     setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
   };
 
+  // Cambiar campo de orden
+  const setSortField = (field) => {
+    if (sortBy === field) {
+      setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(field);
+      setSortOrder('asc');
+    }
+  };
+
   // Documentos ordenados en memoria por createdAt/fechaCreacion
   const documentosOrdenados = useMemo(() => {
     const keyCandidates = ['createdAt', 'fechaCreacion', 'created_at'];
@@ -403,8 +413,24 @@ function DocumentosListos({ onEstadisticasChange }) {
                     />
                   </TableCell>
                 )}
-                <TableCell sx={{ fontWeight: 'bold' }}>Cliente</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Documento</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>
+                  <TableSortLabel
+                    active={sortBy === 'clientName'}
+                    direction={sortBy === 'clientName' ? sortOrder : 'asc'}
+                    onClick={() => setSortField('clientName')}
+                  >
+                    Cliente
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>
+                  <TableSortLabel
+                    active={sortBy === 'protocolNumber'}
+                    direction={sortBy === 'protocolNumber' ? sortOrder : 'asc'}
+                    onClick={() => setSortField('protocolNumber')}
+                  >
+                    Documento
+                  </TableSortLabel>
+                </TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Tipo</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Teléfono</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Matrizador</TableCell>
