@@ -2,6 +2,8 @@
  * Servicio de extracción y parsing básico de PDFs de extractos notariales
  * Sprint 1: Casos simples (un solo acto)
  */
+import pdfParse from 'pdf-parse';
+
 const PdfExtractorService = {
   /**
    * Extrae texto plano desde un Buffer de PDF
@@ -10,9 +12,16 @@ const PdfExtractorService = {
    */
   async extractText(pdfBuffer) {
     try {
-      const mod = await import('pdf-parse')
-      const pdf = mod?.default || mod
-      const data = await pdf(pdfBuffer)
+      // Validación simple de cabecera PDF
+      if (!pdfBuffer || pdfBuffer.length < 5) {
+        throw new Error('Archivo vacío o corrupto')
+      }
+      const header = pdfBuffer.toString('ascii', 0, 4)
+      if (header !== '%PDF') {
+        throw new Error('El archivo no parece ser un PDF válido')
+      }
+
+      const data = await pdfParse(pdfBuffer)
       // Limpiar y normalizar espacios
       const text = (data.text || '')
         .replace(/\u0000/g, ' ')
