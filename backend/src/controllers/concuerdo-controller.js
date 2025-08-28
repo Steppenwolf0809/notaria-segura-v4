@@ -65,13 +65,13 @@ async function extractData(req, res) {
 
     const { acts } = PdfExtractorService.parseAdvancedData(text)
     const parsed = acts[0] || { tipoActo: '', otorgantes: [], beneficiarios: [] }
-    const { notarioNombre, notariaNumero } = PdfExtractorService.extractNotaryInfo(text)
+    const { notarioNombre, notariaNumero, notariaNumeroDigit, notarioSuplente } = PdfExtractorService.extractNotaryInfo(text)
 
     res.set('Content-Type', 'application/json; charset=utf-8')
     return res.json({
       success: true,
       message: 'Datos extraídos correctamente',
-      data: { ...parsed, acts, notario: notarioNombre, notariaNumero }
+      data: { ...parsed, acts, notario: notarioNombre, notarioSuplente, notariaNumero, notariaNumeroDigit }
     })
   } catch (error) {
     console.error('Error en extractData:', error)
@@ -85,7 +85,7 @@ async function extractData(req, res) {
  */
 async function previewConcuerdo(req, res) {
   try {
-    const { tipoActo, otorgantes, beneficiarios, acts, notario, notariaNumero, numeroCopias = 2 } = req.body || {}
+    const { tipoActo, otorgantes, beneficiarios, acts, notario, notariaNumero, notarioSuplente, numeroCopias = 2 } = req.body || {}
 
     const safeArray = (v) => Array.isArray(v)
       ? v.map((x) => String(x || '').trim()).filter(Boolean)
@@ -144,31 +144,38 @@ async function previewConcuerdo(req, res) {
       return res.status(400).json({ success: false, message: 'Tipo de acto y al menos un otorgante son obligatorios' })
     }
 
-    const firstAct = actsData[0]
-    const engineData = {
+    const engineActs = actsData.map((a) => ({
+      tipo: PdfExtractorService.cleanActType(a?.tipoActo || a?.tipo),
+      otorgantes: expandComparecientes(a?.otorgantes).map(normalizeCompareciente),
+      beneficiarios: expandComparecientes(a?.beneficiarios).map(normalizeCompareciente)
+    }))
+
+    const engineDataBase = {
       notario,
       notarioNombre: notario,
+      notarioSuplente: Boolean(notarioSuplente),
       notaria: notariaNumero || req.body?.notaria,
       notariaNumero: notariaNumero || req.body?.notaria,
-      actos: [{
-        tipo: PdfExtractorService.cleanActType(firstAct?.tipoActo || firstAct?.tipo),
-        otorgantes: expandComparecientes(firstAct?.otorgantes).map(normalizeCompareciente),
-        beneficiarios: expandComparecientes(firstAct?.beneficiarios).map(normalizeCompareciente)
-      }]
+      actos: []
     }
 
     // Si el frontend proporciona representantes (string o array), asociar al primer otorgante jurídico
     const repsRaw = req.body?.representantes || req.body?.representantesOtorgantes
-    if (repsRaw) {
-      const reps = Array.isArray(repsRaw) ? repsRaw : String(repsRaw).split(/\n|,|;/).map(s => s.trim()).filter(Boolean)
-      const ots = engineData.actos[0].otorgantes
-      const findJuridicaIdx = ots.findIndex(o => /JUR[IÍ]DICA/i.test(o?.tipo_persona || ''))
-      const idx = findJuridicaIdx !== -1 ? findJuridicaIdx : 0
-      if (ots[idx]) ots[idx].representantes = reps
-    }
+    const actsPrepared = engineActs.map((act) => {
+      const copy = JSON.parse(JSON.stringify(act))
+      if (repsRaw) {
+        const reps = Array.isArray(repsRaw) ? repsRaw : String(repsRaw).split(/\n|,|;/).map(s => s.trim()).filter(Boolean)
+        const ots = copy.otorgantes
+        const findJuridicaIdx = ots.findIndex(o => /JUR[IÍ]DICA/i.test(o?.tipo_persona || ''))
+        const idx = findJuridicaIdx !== -1 ? findJuridicaIdx : 0
+        if (ots[idx]) ots[idx].representantes = reps
+      }
+      return copy
+    })
 
-    const { text } = await ExtractoTemplateEngine.render('poder-universal.txt', engineData, { NUMERO_COPIA: 'PRIMERA' })
-    const engineInfo = { template: 'poder-universal', acto: engineData.actos[0].tipo }
+    // Preparar vista previa combinando todos los actos en cada copia
+    const firstAct = actsPrepared[0]
+    const engineInfo = { template: 'poder-universal', acto: firstAct?.tipo, actosCount: actsPrepared.length }
 
     const copies = Math.max(1, Math.min(10, parseInt(numeroCopias || 2)))
     const rotulo = (n) => (n === 1 ? 'PRIMERA COPIA' : n === 2 ? 'SEGUNDA COPIA' : `${n}ª COPIA`)
@@ -177,12 +184,19 @@ async function previewConcuerdo(req, res) {
       const n = i + 1
       const rot = rotulo(n)
       const override = { NUMERO_COPIA: rot.split(' ')[0] }
-      const { text: t } = await ExtractoTemplateEngine.render('poder-universal.txt', engineData, override)
-      previews.push({ index: n, title: rot, text: `${rot}:\n\n${t}` })
+      // Renderizar cada acto por separado y concatenar con una línea divisoria
+      const rendered = []
+      for (const act of actsPrepared) {
+        const engineData = { ...engineDataBase, actos: [act] }
+        const { text: t } = await ExtractoTemplateEngine.render('poder-universal.txt', engineData, override)
+        rendered.push(t)
+      }
+      const combined = rendered.join('\n\n—\n\n')
+      previews.push({ index: n, title: rot, text: `${rot}:\n\n${combined}` })
     }
 
     res.set('Content-Type', 'application/json; charset=utf-8')
-    return res.json({ success: true, data: { previewText: text, previews, engine: engineInfo } })
+    return res.json({ success: true, data: { previews, engine: engineInfo } })
   } catch (error) {
     console.error('Error en previewConcuerdo:', error)
     return res.status(500).json({ success: false, message: 'Error generando vista previa' })
@@ -197,7 +211,7 @@ export { uploadPdf, extractData, previewConcuerdo }
  */
 async function generateDocuments(req, res) {
   try {
-    const { tipoActo, otorgantes, beneficiarios, acts, notario, notariaNumero, numCopias = 2 } = req.body || {}
+    const { tipoActo, otorgantes, beneficiarios, acts, notario, notariaNumero, notarioSuplente, numCopias = 2 } = req.body || {}
 
     const safeArray = (v) => Array.isArray(v)
       ? v.map((x) => String(x || '').trim()).filter(Boolean)
@@ -254,39 +268,51 @@ async function generateDocuments(req, res) {
       return res.status(400).json({ success: false, message: 'Tipo de acto y al menos un otorgante son obligatorios' })
     }
 
-    const firstAct = actsData[0]
-    const engineData = {
+    const engineActs = actsData.map((a) => ({
+      tipo: PdfExtractorService.cleanActType(a?.tipoActo || a?.tipo),
+      otorgantes: expandComparecientes(a?.otorgantes).map(normalizeCompareciente),
+      beneficiarios: expandComparecientes(a?.beneficiarios).map(normalizeCompareciente)
+    }))
+
+    const engineDataBase = {
       notario,
       notarioNombre: notario,
+      notarioSuplente: Boolean(notarioSuplente),
       notaria: notariaNumero || req.body?.notaria,
       notariaNumero: notariaNumero || req.body?.notaria,
-      actos: [{
-        tipo: PdfExtractorService.cleanActType(firstAct?.tipoActo || firstAct?.tipo),
-        otorgantes: expandComparecientes(firstAct?.otorgantes).map(normalizeCompareciente),
-        beneficiarios: expandComparecientes(firstAct?.beneficiarios).map(normalizeCompareciente)
-      }]
+      actos: []
     }
 
     // Asociar representantes si vienen del frontend
     const repsRaw = req.body?.representantes || req.body?.representantesOtorgantes
-    if (repsRaw) {
-      const reps = Array.isArray(repsRaw) ? repsRaw : String(repsRaw).split(/\n|,|;/).map(s => s.trim()).filter(Boolean)
-      const ots = engineData.actos[0].otorgantes
-      const findJuridicaIdx = ots.findIndex(o => /JUR[IÍ]DICA/i.test(o?.tipo_persona || ''))
-      const idx = findJuridicaIdx !== -1 ? findJuridicaIdx : 0
-      if (ots[idx]) ots[idx].representantes = reps
-    }
+    const actsPrepared = engineActs.map((act) => {
+      const copy = JSON.parse(JSON.stringify(act))
+      if (repsRaw) {
+        const reps = Array.isArray(repsRaw) ? repsRaw : String(repsRaw).split(/\n|,|;/).map(s => s.trim()).filter(Boolean)
+        const ots = copy.otorgantes
+        const findJuridicaIdx = ots.findIndex(o => /JUR[IÍ]DICA/i.test(o?.tipo_persona || ''))
+        const idx = findJuridicaIdx !== -1 ? findJuridicaIdx : 0
+        if (ots[idx]) ots[idx].representantes = reps
+      }
+      return copy
+    })
 
     const copies = Math.max(1, Math.min(10, parseInt(numCopias || 2)))
     const documents = []
-    const engineInfo = { template: 'poder-universal', acto: engineData.actos[0].tipo }
+    const engineInfo = { template: 'poder-universal', acto: actsPrepared?.[0]?.tipo, actosCount: actsPrepared.length }
     for (let i = 0; i < copies; i++) {
       const n = i + 1
       const rotuloPalabra = n === 1 ? 'PRIMERA' : n === 2 ? 'SEGUNDA' : `${n}ª`
-      const { text } = await ExtractoTemplateEngine.render('poder-universal.txt', engineData, { NUMERO_COPIA: rotuloPalabra })
+      const rendered = []
+      for (const act of actsPrepared) {
+        const engineData = { ...engineDataBase, actos: [act] }
+        const { text } = await ExtractoTemplateEngine.render('poder-universal.txt', engineData, { NUMERO_COPIA: rotuloPalabra })
+        rendered.push(text)
+      }
+      const combined = rendered.join('\n\n—\n\n')
       const filename = `CONCUERDO_${rotuloPalabra}_COPIA.txt`
       const mimeType = 'text/plain; charset=utf-8'
-      const contentBase64 = Buffer.from(text, 'utf8').toString('base64')
+      const contentBase64 = Buffer.from(combined, 'utf8').toString('base64')
       documents.push({ index: n, title: `${rotuloPalabra} COPIA`, filename, mimeType, contentBase64 })
     }
 
