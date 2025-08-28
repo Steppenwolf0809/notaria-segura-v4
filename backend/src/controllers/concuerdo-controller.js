@@ -1,5 +1,6 @@
 import PdfExtractorService from '../services/pdf-extractor-service.js'
 import { ExtractoTemplateEngine } from '../services/extractos/index.js'
+import { buildActPhrase, normalizeActTypeForDisplay } from '../services/extractos/phrase-builder.js'
 
 /**
  * Controlador de Generador de Concuerdos (Sprint 1)
@@ -199,12 +200,13 @@ async function previewConcuerdo(req, res) {
     }
     const rotulo = (n) => `${ordinalWord(n)} COPIA`
     const previews = []
+    const shouldCombine = Array.isArray(actsPrepared) && actsPrepared.length > 1 && req.body?.combine !== false
     for (let i = 0; i < copies; i++) {
       const n = i + 1
       const rot = rotulo(n)
       const override = { NUMERO_COPIA: ordinalWord(n) }
-      // Si hay múltiples actos y se solicita combinación, construir un solo párrafo con un encabezado
-      if (Array.isArray(actsPrepared) && actsPrepared.length > 1 && req.body?.combine) {
+      // Si hay múltiples actos y no se desactiva, construir un solo párrafo con un encabezado
+      if (shouldCombine) {
         const phrases = []
         let footerNotario = ''
         let footerNotaria = ''
@@ -214,20 +216,7 @@ async function previewConcuerdo(req, res) {
           const v = variables || {}
           footerNotario = v.NOMBRE_NOTARIO || footerNotario
           footerNotaria = v.NOTARIA || footerNotaria
-          const isRev = /REVOCATORIA/i.test(v.TIPO_ACTO || '')
-          let phrase
-          if (isRev) {
-            const commaOrEmpty = (v.FRASE_REPRESENTACION || '').trim().length > 0 ? '' : ','
-            phrase = `**${v.TIPO_ACTO || ''}** otorgado por ${v.TRATAMIENTO_OTORGANTES || ''} **${v.NOMBRES_OTORGANTES || ''}**${v.FRASE_REPRESENTACION || ''}${commaOrEmpty} ${v.CONTRACCION_A_FAVOR || ''} ${v.TRATAMIENTO_BENEFICIARIOS || ''} **${v.NOMBRES_BENEFICIARIOS || ''}**`
-          } else {
-            phrase = `**${v.TIPO_ACTO || ''}** que ${v.VERBO_OTORGAR || ''} ${v.TRATAMIENTO_OTORGANTES || ''} **${v.NOMBRES_OTORGANTES || ''}**${v.FRASE_REPRESENTACION || ''} ${v.CONTRACCION_A_FAVOR || ''} ${v.TRATAMIENTO_BENEFICIARIOS || ''} **${v.NOMBRES_BENEFICIARIOS || ''}**`
-          }
-          phrase = phrase
-            .replace(/\s+/g, ' ')
-            .replace(/\s+,/g, ',')
-            .replace(/,\s*,/g, ', ')
-            .trim()
-          phrases.push(phrase)
+          phrases.push(buildActPhrase(v))
         }
         const connector = phrases.slice(1).map(p => `y de ${p}`).join('; ')
         const body = phrases.length > 1 ? `${phrases[0]}; ${connector}` : phrases[0]
@@ -404,7 +393,8 @@ async function generateDocuments(req, res) {
       console.log(`📝 [concuerdos] Procesando copia ${n}/${copies}: ${rotuloPalabra}`)
       let combined
       try {
-        if (Array.isArray(actsPrepared) && actsPrepared.length > 1 && req.body?.combine) {
+        const shouldCombine = Array.isArray(actsPrepared) && actsPrepared.length > 1 && req.body?.combine !== false
+        if (shouldCombine) {
           console.log('🔀 [concuerdos] Modo combinado activado para múltiples actos')
           // Construir frases por acto sin encabezado repetido usando variables del engine
           const phrases = []
@@ -418,14 +408,7 @@ async function generateDocuments(req, res) {
             const v = variables || {}
             footerNotario = v.NOMBRE_NOTARIO || footerNotario
             footerNotaria = v.NOTARIA || footerNotaria
-            const isRev = /REVOCATORIA/i.test(v.TIPO_ACTO || '')
-            let phrase
-            if (isRev) {
-              phrase = `**${v.TIPO_ACTO || ''}** otorgado por ${v.TRATAMIENTO_OTORGANTES || ''} **${v.NOMBRES_OTORGANTES || ''}**${v.FRASE_REPRESENTACION || ''}, ${v.CONTRACCION_A_FAVOR || ''} ${v.TRATAMIENTO_BENEFICIARIOS || ''} **${v.NOMBRES_BENEFICIARIOS || ''}**`
-            } else {
-              phrase = `**${v.TIPO_ACTO || ''}** que ${v.VERBO_OTORGAR || ''} ${v.TRATAMIENTO_OTORGANTES || ''} **${v.NOMBRES_OTORGANTES || ''}**${v.FRASE_REPRESENTACION || ''} ${v.CONTRACCION_A_FAVOR || ''} ${v.TRATAMIENTO_BENEFICIARIOS || ''} **${v.NOMBRES_BENEFICIARIOS || ''}**`
-            }
-            phrase = phrase.replace(/\s+/g, ' ').replace(/\s+,/g, ',').trim()
+            const phrase = buildActPhrase(v)
             phrases.push(phrase)
           }
           const connector = phrases.slice(1).map(p => `y de ${p}`).join('; ')
