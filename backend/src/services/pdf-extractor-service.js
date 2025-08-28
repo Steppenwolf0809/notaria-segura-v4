@@ -238,8 +238,33 @@ const PdfExtractorService = {
     const natRe = /NATURAL\s+([A-ZÁÉÍÓÚÑ\s]{3,80}?)\s+POR\s+SUS\s+PROPIOS/gi
     let nm
     while ((nm = natRe.exec(upperBase)) !== null) {
-      const candidate = nm[1].replace(/\s+/g, ' ').trim()
-      if (candidate) tableNames.push(this.reorderName(candidate))
+      // Limpiar encabezados dentro del bloque capturado y detectar nombre real
+      let block = nm[1].replace(/\s+/g, ' ').trim()
+      if (!block) continue
+      // Remover encabezados conocidos y términos de tabla
+      const headerTokens = [
+        'PERSONA','NOMBRES','RAZON','RAZÓN','SOCIAL','TIPO','INTERVINIENTE','DOCUMENTO','IDENTIDAD','NACIONALIDAD','CALIDAD','REPRESENTA','REPRESENTE','NO','Nº','N°','NUMERO','NÚMERO','UBICACION','UBICACIÓN','PROVINCIA','CANTON','CANTÓN','PARROQUIA','DESCRIPCION','DESCRIPCIÓN','CUANTIA','CUANTÍA'
+      ]
+      const headerBlockRe = new RegExp(`\\b(?:${headerTokens.join('|')})\\b`, 'g')
+      block = block.replace(headerBlockRe, ' ').replace(/\s+/g, ' ').trim()
+      // Buscar primera secuencia de 2 a 5 palabras válidas
+      const nameRegexLocal = /([A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,}){1,4})/
+      const mName = block.match(nameRegexLocal)
+      if (!mName) continue
+      let candidate = (mName[1] || '').replace(/\s+/g, ' ').trim()
+      if (!candidate) continue
+      // Filtrar tokens basura
+      const badTokens = new Set(['POR','SUS','PROPIOS','DERECHOS','PASAPORTE','CEDULA','CÉDULA','MANDANTE','MANDATARIO','PETICIONARIO','ECUATORIA','ECUATORIANA','ECUATORIANO','COLOMBIANA','COLOMBIANO','PERUANA','PERUANO','VENEZOLANA','VENEZOLANO','RAZON','RAZÓN','SOCIAL','SOCIALTIPO','TIPO','INTERVINIENTE','NO','Nº','N°','NUMERO','NÚMERO'])
+      const particles = new Set(['DE','DEL','DELA','DELOS','DELAS','LA','LOS','LAS'])
+      const toks = candidate.split(' ').filter(Boolean)
+      const tokensOk = toks.filter(t => !badTokens.has(t))
+      if (tokensOk.length < 2) continue
+      // Permitir partículas cortas solo si hay al menos 2 tokens "reales"
+      const realTokens = tokensOk.filter(t => t.length > 2 || particles.has(t))
+      if (realTokens.length < 2) continue
+      const cleaned = realTokens.join(' ')
+      const reordered = this.reorderName(cleaned)
+      if (reordered && !tableNames.includes(reordered)) tableNames.push(reordered)
     }
 
     let upper = upperBase
@@ -248,7 +273,7 @@ const PdfExtractorService = {
     const removePhrases = [
       'POR SUS PROPIOS DERECHOS', 'POR SUS PROPIOS', 'DERECHOS',
       'PASAPORTE', 'CÉDULA', 'CEDULA', 'PPT', 'DOC', 'IDENTIDAD', 'NO IDENTIFICACION', 'N IDENTIFICACION',
-      'IDENTIFICACION', 'IDENTIFICACIÓN', 'QUE LE REPRESENTA', 'QUE REPRESENTA',
+      'IDENTIFICACION', 'IDENTIFICACIÓN', 'QUE LE REPRESENTA', 'QUE REPRESENTA', 'LE REPRESENTA', 'LEREPRESENTA',
       'NACIONALIDAD', 'ECUATORIANA', 'ECUATORIANO', 'ECUATORIA', 'COLOMBIANA', 'COLOMBIANO', 'COLOMBIAN', 'PERUANA', 'PERUANO', 'VENEZOLANA', 'VENEZOLANO', 'ARGENTINA', 'ARGENTINO', 'CHILENA', 'CHILENO', 'BRASILEÑA', 'BRASILEÑO',
       'MANDANTE', 'MANDATARIO', 'PETICIONARIO', 'REPRESENTA', 'REPRESENTE',
       'UBICACION', 'UBICACIÓN', 'PROVINCIA', 'CANTON', 'CANTÓN', 'PARROQUIA', 'DESCRIPCION', 'DESCRIPCIÓN', 'CUANTIA', 'CUANTÍA'
@@ -276,12 +301,15 @@ const PdfExtractorService = {
       if (!candidate) continue
       // Filtrar candidatos que contienen dígitos o palabras no-nombre típicas
       if (/\d/.test(candidate)) continue
-      const badTokens = new Set(['POR','SUS','PROPIOS','DERECHOS','PASAPORTE','CEDULA','CÉDULA','MANDANTE','MANDATARIO','PETICIONARIO','ECUATORIA','ECUATORIANA','ECUATORIANO','COLOMBIANA','COLOMBIANO','PERUANA','PERUANO','VENEZOLANA','VENEZOLANO','RAZON','RAZÓN','SOCIAL','NO','Nº','N°','NUMERO','NÚMERO'])
+      const badTokens = new Set(['POR','SUS','PROPIOS','DERECHOS','PASAPORTE','CEDULA','CÉDULA','MANDANTE','MANDATARIO','PETICIONARIO','ECUATORIA','ECUATORIANA','ECUATORIANO','COLOMBIANA','COLOMBIANO','PERUANA','PERUANO','VENEZOLANA','VENEZOLANO','RAZON','RAZÓN','SOCIAL','SOCIALTIPO','TIPO','INTERVINIENTE','NO','Nº','N°','NUMERO','NÚMERO'])
       const toks = candidate.split(' ')
       if (toks.some(t => badTokens.has(t))) continue
       // Quitar partículas de 1-2 letras no permitidas
       const particles = new Set(['DE','DEL','DELA','DELOS','DELAS','LA','LOS','LAS'])
-      const cleaned = toks.filter(t => t.length > 2 || particles.has(t)).join(' ')
+      const filtered = toks.filter(t => !badTokens.has(t))
+      const cleaned = filtered.filter(t => t.length > 2 || particles.has(t)).join(' ')
+      // Debe quedar al menos 2 tokens reales
+      if (cleaned.split(' ').filter(Boolean).length < 2) continue
       const reordered = this.reorderName(cleaned)
       if (!names.includes(reordered)) names.push(reordered)
     }
@@ -568,13 +596,23 @@ const PdfExtractorService = {
       }
     }
 
-    // Si no detectó ninguna sección "ACTO O CONTRATO", intentar con parseSimpleData
-    if (acts.length === 0) {
+    // Filtrar actos válidos por palabras clave y descartar basura como INDETERMINADA
+    const ALLOW = ['PODER', 'REVOCATORIA', 'COMPRAVENTA']
+    const filtered = acts.filter((a) => {
+      const t = String(a?.tipoActo || '').toUpperCase()
+      if (!t || /INDETERMINADA/.test(t)) return false
+      return ALLOW.some(k => t.includes(k))
+    })
+
+    // Si no detectó ninguna sección válida, intentar con parseSimpleData
+    if (filtered.length === 0) {
       const single = this.parseSimpleData(rawText)
-      return { acts: [single] }
+      const t = String(single?.tipoActo || '').toUpperCase()
+      if (t && !/INDETERMINADA/.test(t) && ALLOW.some(k => t.includes(k))) return { acts: [single] }
+      return { acts: [] }
     }
 
-    return { acts }
+    return { acts: filtered }
   }
 }
 

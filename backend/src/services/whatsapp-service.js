@@ -332,7 +332,9 @@ class WhatsAppService {
                 tipo_documento: document.documentType,
                 tipoDocumento: document.documentType,
                 numero_documento: document.protocolNumber,
-                protocolNumber: document.protocolNumber
+                protocolNumber: document.protocolNumber,
+                actoPrincipalDescripcion: document.actoPrincipalDescripcion,
+                actoPrincipalValor: document.actoPrincipalValor
             };
 
             // Usar el código de verificación existente o generar uno temporal
@@ -542,6 +544,18 @@ class WhatsAppService {
         const esEntregaMultiple = variables.cantidadDocumentos > 1 || (variables.documentos && Array.isArray(variables.documentos) && variables.documentos.length > 1);
         const tipoEntrega = esEntregaMultiple ? 'sus documentos' : 'su documento';
         
+        // Detectar acto principal desde diferentes fuentes
+        const firstDoc = Array.isArray(variables.documentos) && variables.documentos.length > 0
+            ? variables.documentos[0]
+            : variables;
+        const actoPrincipalDetectado = variables.actoPrincipal
+            || variables.actoPrincipalDescripcion
+            || firstDoc?.actoPrincipalDescripcion
+            || '';
+        const actoPrincipalValorDetectado = variables.actoPrincipalValor
+            || firstDoc?.actoPrincipalValor
+            || '';
+
         // Generar sección de cédula condicional
         const seccionCedula = (variables.receptor_cedula || variables.cedulaReceptor) ? 
             `🆔 *Cédula:* ${variables.receptor_cedula || variables.cedulaReceptor}` : '';
@@ -561,6 +575,8 @@ class WhatsAppService {
             fechaFormateada: this.formatearFechaLegible(variables.fechaEntrega || new Date()),
             horaEntrega: formatTimeOnly(variables.fechaEntrega || new Date()),
             contactoConsultas: process.env.NOTARIA_CONTACTO || 'Tel: (02) 2234-567',
+            actoPrincipal: actoPrincipalDetectado,
+            actoPrincipalValor: actoPrincipalValorDetectado,
             
             // Variables de códigos
             codigosEscritura: this.generarCodigosEscritura(variables.documentos || [variables]),
@@ -609,7 +625,10 @@ class WhatsAppService {
                 // Variables mejoradas
                 nombreCompareciente: cliente.nombre || cliente.clientName || 'Cliente',
                 documentos: [documento], // Para generar códigos de escritura
-                cantidadDocumentos: 1
+                cantidadDocumentos: 1,
+                // Acto principal
+                actoPrincipal: documento.actoPrincipalDescripcion || '',
+                actoPrincipalValor: documento.actoPrincipalValor || documento.totalFactura || ''
             };
 
             return this.replaceTemplateVariables(template.mensaje, variables);
@@ -645,6 +664,9 @@ class WhatsAppService {
                 cantidadDocumentos: (Array.isArray(datosEntrega.documentos) && datosEntrega.documentos.length > 0)
                     ? datosEntrega.documentos.length
                     : 1,
+                // Acto principal (individual o primer doc del grupo)
+                actoPrincipal: documento.actoPrincipalDescripcion || (Array.isArray(datosEntrega.documentos) && datosEntrega.documentos[0]?.actoPrincipalDescripcion) || '',
+                actoPrincipalValor: documento.actoPrincipalValor || (Array.isArray(datosEntrega.documentos) && datosEntrega.documentos[0]?.actoPrincipalValor) || '',
                 
                 // Variables de entrega
                 receptor_nombre: datosEntrega.entregadoA || datosEntrega.entregado_a || datosEntrega.deliveredTo || '',
