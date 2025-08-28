@@ -47,7 +47,7 @@ export default function ConcuerdoGenerator() {
 
   const handleDownload = async (format = 'rtf') => {
     try {
-      const payload = { ...buildPayload(), format }
+      const payload = { ...buildPayload(), format, bundle: true }
       const resp = await (await import('../../../services/concuerdo-service.js')).default.generateDocuments(payload)
       if (!resp.success) throw new Error(resp.error || 'Error generando documentos')
       const docs = resp.data.documents || []
@@ -78,7 +78,7 @@ export default function ConcuerdoGenerator() {
 
   const handlePrint = async () => {
     try {
-      const payload = { ...buildPayload(), format: 'html' }
+      const payload = { ...buildPayload(), format: 'html', bundle: true }
       const resp = await (await import('../../../services/concuerdo-service.js')).default.generateDocuments(payload)
       if (!resp.success) throw new Error(resp.error || 'Error generando documentos')
       const docs = resp.data.documents || []
