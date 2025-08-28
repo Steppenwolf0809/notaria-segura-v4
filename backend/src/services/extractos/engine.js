@@ -273,7 +273,7 @@ function buildVariables({ data, reglasGenero }) {
   const CONTRACCION_A_FAVOR = contraccionAFavor(bes, tieneRep)
   // Para beneficiarios usamos el sustantivo sin artículo, pues la contracción lo aporta
   const TRATAMIENTO_BENEFICIARIOS = sustantivoGrupo(bes)
-  const isRevocatoria = /REVOCATORIA/i.test(TIPO_ACTO || '')
+  const isRevocatoria = /REVOCATORIA/i.test(tipoActo || '')
   const NOMBRES_BENEFICIARIOS = nombresConjuncion(bes, { keepOriginalOrder: isRevocatoria })
 
   const NOMBRE_NOTARIO = (() => {
