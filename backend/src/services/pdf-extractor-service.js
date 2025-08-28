@@ -193,30 +193,90 @@ const PdfExtractorService = {
     return { notarioNombre, notariaNumero, notariaNumeroDigit, notarioSuplente }
   },
   /**
-   * Reordena "APELLIDOS NOMBRES" → "NOMBRES APELLIDOS" (heurística)
+   * Inteligente reordenamiento de nombres: detecta si ya están en orden correcto
+   * o si necesitan reordenarse de "APELLIDOS NOMBRES" → "NOMBRES APELLIDOS"
    */
   reorderName(nameUpper) {
     if (!nameUpper) return ''
     const tokens = String(nameUpper).trim().replace(/\s+/g, ' ').split(' ').filter(Boolean)
     const n = tokens.length
     if (n <= 1) return tokens.join(' ')
-    const particles = new Set(['DE','DEL','DELA','DELOS','DELAS','LA','LOS','LAS','SAN','SANTA'])
-    const female = new Set(['MARIA','ANA','ROSA','ELENA','FERNANDA','LUISA','VALERIA','CAMILA','GABRIELA','SOFIA','ISABEL','PATRICIA','VERONICA'])
-    const male   = new Set(['JOSE','JUAN','CARLOS','DANIEL','MIGUEL','DIEGO','ANDRES','LUIS','PEDRO','PABLO','FRANCISCO','JAVIER','FERNANDO','ROBERTO'])
-    const isParticle = (t) => particles.has(t)
-    const isProbableName = (t) => female.has(t) || male.has(t) || /[AEIO]$/.test(t)
 
+    // Detectar empresas - no deben reordenarse
+    const companyTokens = new Set(['S.A.', 'LTDA', 'LTDA.', 'CIA', 'CIA.', 'CORP', 'CORP.', 'INC', 'INC.', 'EMPRESA', 'COMPAÑIA', 'COMPANIA', 'CONSTRUCTORA', 'COMERCIAL', 'INDUSTRIAL'])
+    if (tokens.some(token => companyTokens.has(token))) {
+      return tokens.join(' ')
+    }
+
+    const particles = new Set(['DE','DEL','DELA','DELOS','DELAS','LA','LOS','LAS','SAN','SANTA','VON','VAN','DA','DI'])
+    const female = new Set(['MARIA','ANA','ROSA','ELENA','FERNANDA','LUISA','VALERIA','CAMILA','GABRIELA','SOFIA','ISABEL','PATRICIA','VERONICA','CARMEN','LUZ'])
+    const male = new Set(['JOSE','JUAN','CARLOS','DANIEL','MIGUEL','DIEGO','ANDRES','LUIS','PEDRO','PABLO','FRANCISCO','JAVIER','FERNANDO','ROBERTO','ANTONIO','MANUEL'])
+    
+    const isParticle = (t) => particles.has(t)
+    const isProbableName = (t) => female.has(t) || male.has(t)
+    const endsWithVowel = (t) => /[AEIO]$/.test(t)
+
+    // Detectar si ya están en orden correcto (nombres primero)
+    const firstToken = tokens[0]
+    const lastToken = tokens[n-1]
+    
+    // Si el primer token es claramente un nombre, probablemente ya está bien ordenado
+    if (isProbableName(firstToken)) {
+      return tokens.join(' ')
+    }
+
+    // Si el último token es claramente un nombre y el primero no, necesita reordenarse
+    if (isProbableName(lastToken) && !isProbableName(firstToken)) {
+      // Proceder con reordenamiento
+    } else if (n >= 3) {
+      // Para nombres de 3+ tokens, revisar si los últimos son nombres
+      const secondToLast = tokens[n-2]
+      if (isProbableName(lastToken) && isProbableName(secondToLast)) {
+        // Los últimos dos son nombres, reordenar
+      } else if (isProbableName(firstToken) || endsWithVowel(firstToken)) {
+        // Ya parece estar bien ordenado
+        return tokens.join(' ')
+      }
+    } else {
+      // Para nombres de 2 tokens, si el último termina en vocal y es probable nombre
+      if (endsWithVowel(lastToken) && !isProbableName(firstToken)) {
+        // Reordenar
+      } else {
+        return tokens.join(' ')
+      }
+    }
+
+    // Determinar cuántos tokens son nombres vs apellidos
     let nameCount
     if (n === 2) {
       nameCount = 1
     } else if (n === 3) {
       const last = tokens[n-1], prev = tokens[n-2]
       nameCount = (isProbableName(last) && isProbableName(prev)) ? 2 : 1
-    } else { // 4 o 5
+    } else if (n === 4) {
+      // Para 4 tokens, usualmente 2 nombres + 2 apellidos
+      const last = tokens[n-1], prev = tokens[n-2]
+      nameCount = (isProbableName(last) && isProbableName(prev)) ? 2 : 1
+    } else {
+      // Para 5+ tokens, detectar por partículas
       const prev = tokens[n-2]
       nameCount = isParticle(prev) ? 1 : 2
     }
+    
     nameCount = Math.max(1, Math.min(2, nameCount))
+    
+    // Manejar partículas en apellidos compuestos
+    let surnameStart = 0
+    let surnameEnd = n - nameCount
+    
+    // Encontrar partículas al inicio que son parte del apellido
+    for (let i = 0; i < surnameEnd - 1; i++) {
+      if (isParticle(tokens[i]) && !isParticle(tokens[i + 1])) {
+        // Mantener la partícula con el apellido
+        continue
+      }
+    }
+    
     const names = tokens.slice(-nameCount)
     const surnames = tokens.slice(0, n - nameCount)
     return (names.join(' ') + ' ' + surnames.join(' ')).replace(/\s+/g, ' ').trim()
@@ -296,13 +356,25 @@ const PdfExtractorService = {
       if (reordered && !tableNames.includes(reordered)) tableNames.push(reordered)
     }
 
-    // Patrón 4: Jurídica + Nombre en líneas consecutivas
-    const juridicaRe = /JUR[IÍ]DICA\s*\n?\s*([A-ZÁÉÍÓÚÑ\s\.]{3,50}?)\s*(?:REPRESENTADO|TIPO|DOCUMENTO|\n|$)/gi
+    // Patrón 4: Jurídica + Nombre en líneas consecutivas (mejorado)
+    const juridicaRe = /(?:PERSONA\s+)?JUR[IÍ]DICA\s*\n?\s*([A-ZÁÉÍÓÚÑ\s\.\-&]{3,80}?)\s*(?:REPRESENTADO|REPRESENTADA|TIPO|DOCUMENTO|RUC|\n|$)/gi
     let jr
     while ((jr = juridicaRe.exec(upperBase)) !== null) {
       let name = jr[1].replace(/\s+/g, ' ').trim()
       if (name && name.length > 2 && !tableNames.includes(name)) {
         tableNames.push(name)
+      }
+    }
+
+
+    // Patrón 6: Detectar empresas después de personas que las representan
+    // Formato: "PERSONA_NATURAL [datos] EMPRESA S.A."
+    const afterPersonRe = /(?:MARIA|JUAN|JOSE|ANA|CARLOS|ELENA|LUIS|PEDRO|JORGE|FERNANDO)\s+[A-ZÁÉÍÓÚÑ\s]+\s+([A-ZÁÉÍÓÚÑ\s\.\-&]+(?:S\.?A\.?|LTDA\.?|CIA\.?|CORP\.?))\s*(?:REPRESENTADO|RUC|MANDANTE|\n|$)/gi
+    let ap
+    while ((ap = afterPersonRe.exec(upperBase)) !== null) {
+      let companyName = ap[1].replace(/\s+/g, ' ').trim()
+      if (companyName && companyName.length > 5 && !tableNames.includes(companyName)) {
+        tableNames.push(companyName)
       }
     }
 
