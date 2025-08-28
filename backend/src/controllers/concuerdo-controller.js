@@ -1,4 +1,5 @@
 import PdfExtractorService from '../services/pdf-extractor-service.js'
+import { ExtractoTemplateEngine } from '../services/extractos/index.js'
 
 /**
  * Controlador de Generador de Concuerdos (Sprint 1)
@@ -90,14 +91,28 @@ async function previewConcuerdo(req, res) {
       ? v.map((x) => String(x || '').trim()).filter(Boolean)
       : String(v || '').split(/\n|,|;/).map((x) => x.trim()).filter(Boolean)
 
-    // Preparar fuente de actos (usar acts si viene; si no, construir con el acto único)
-    let actsData = Array.isArray(acts) && acts.length > 0
+    const guessTipoPersona = (name) => {
+      const s = String(name || '').toUpperCase()
+      const keys = [' CIA', 'CIA.', ' LTDA', ' S.A', ' S.A.', ' BANCO', ' FIDEICOMISO', ' CONSTRUCTORA', ' CORPORACION', ' COMPAÑIA', ' COMPAÑÍA', ' GRUPO']
+      return keys.some(k => s.includes(k)) ? 'Jurídica' : 'Natural'
+    }
+    const normalizeCompareciente = (c) => {
+      if (c && typeof c === 'object' && !Array.isArray(c)) {
+        const nombre = String(c.nombre || c.fullname || c.text || '').trim()
+        const tipo_persona = c.tipo_persona || c.tipoPersona || c.tipo || guessTipoPersona(nombre)
+        const representante = c.representante || c.apoderado || undefined
+        return { ...c, nombre, tipo_persona, representante }
+      }
+      const nombre = String(c || '').trim()
+      return { nombre, tipo_persona: guessTipoPersona(nombre) }
+    }
+
+    const actsData = Array.isArray(acts) && acts.length > 0
       ? acts
       : [{ tipoActo: tipoActo, otorgantes, beneficiarios }]
 
-    // Validar que haya al menos un acto con tipo y con otorgante(s)
     const hasValidAct = actsData.some(a => {
-      const tipo = PdfExtractorService.cleanActType(a?.tipoActo)
+      const tipo = PdfExtractorService.cleanActType(a?.tipoActo || a?.tipo)
       const ots = safeArray(a?.otorgantes)
       return tipo && ots.length > 0
     })
@@ -105,64 +120,32 @@ async function previewConcuerdo(req, res) {
       return res.status(400).json({ success: false, message: 'Tipo de acto y al menos un otorgante son obligatorios' })
     }
 
-    const firstToken = (full) => String(full || '').trim().split(/\s+/)[0]?.toUpperCase() || ''
-    const isFemale = (full) => {
-      const token = firstToken(full)
-      const tokens = String(full || '').trim().toUpperCase().split(/\s+/)
-      const femaleList = new Set(['MARIA','ANA','ROSA','ELENA','FERNANDA','LUISA','VALERIA','CAMILA','GABRIELA','SOFIA','ISABEL','PATRICIA','VERONICA','SUSAN','MAGDALENA','CARMEN','TERESA','BEATRIZ','ELIZABETH','ELIZABET','NOELIA','PAULA','PAOLA','MERCEDES','PILAR','GUADALUPE'])
-      if (femaleList.has(token)) return true
-      // Si cualquiera de los tokens es femenino claro (p.ej. MAGDALENA), considerar femenino
-      if (tokens.some(t => femaleList.has(t))) return true
-      // Heurística: nombres terminados en 'A' suelen ser femeninos
-      return token.endsWith('A')
-    }
-    // Construir texto por actos con conectores "y de"
-    const humanJoin = (arr) => {
-      const list = arr.filter(Boolean)
-      if (list.length <= 1) return list[0] || ''
-      if (list.length === 2) return `${list[0]} y ${list[1]}`
-      return `${list.slice(0, -1).join(', ')} y ${list[list.length - 1]}`
+    const firstAct = actsData[0]
+    const engineData = {
+      notario,
+      notaria: notariaNumero,
+      actos: [{
+        tipo: PdfExtractorService.cleanActType(firstAct?.tipoActo || firstAct?.tipo),
+        otorgantes: safeArray(firstAct?.otorgantes).map(normalizeCompareciente),
+        beneficiarios: safeArray(firstAct?.beneficiarios).map(normalizeCompareciente)
+      }]
     }
 
-    // Generar segmentos por acto
-    const segments = actsData.map((a) => {
-      const tipo = PdfExtractorService.cleanActType(a.tipoActo)
-      const otList = safeArray(a.otorgantes)
-      const beList = safeArray(a.beneficiarios)
-      const otRaw = otList[0] || ''
-      const beRaw = beList[0] || ''
-      const otTrat = isFemale(otRaw) ? 'la señora' : 'el señor'
-      const beTrat = isFemale(beRaw) ? 'la señora' : 'el señor'
-      const otTexto = humanJoin(otList)
-      const beTexto = humanJoin(beList)
-      const base = `de la escritura pública de ${tipo} que otorga ${otTrat} ${otTexto}`
-      return beTexto ? `${base} a favor de ${beTrat} ${beTexto}` : base
-    })
+    const { text } = await ExtractoTemplateEngine.render('poder-universal.txt', engineData, { NUMERO_COPIA: 'PRIMERA' })
 
-    const actsText = segments.length > 0
-      ? segments[0] + segments.slice(1).map(s => ` y ${s.replace(/^de la escritura pública de /i, 'de ')}`).join('')
-      : ''
-
-    const suffixNotaria = (() => {
-      const parts = []
-      if (notario && String(notario).trim()) parts.push(`Notario: ${String(notario).trim()}`)
-      if (notariaNumero && String(notariaNumero).trim()) parts.push(`Notaría ${String(notariaNumero).trim()}`)
-      return parts.length ? ' ' + parts.join('. ') + '.' : ''
-    })()
-
-    const preview = `Se otorgó ante mí, en fe de ello confiero esta PRIMERA COPIA CERTIFICADA ${actsText}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.${suffixNotaria}`
-
-    // Generar múltiples vistas previas individuales
     const copies = Math.max(1, Math.min(10, parseInt(numeroCopias || 2)))
-    const previews = Array.from({ length: copies }, (_, idx) => {
-      const n = idx + 1
-      const rotulo = n === 1 ? 'PRIMERA COPIA' : n === 2 ? 'SEGUNDA COPIA' : `${n}ª COPIA`
-      const content = `${rotulo}:\n\n${preview}`
-      return { index: n, title: rotulo, text: content }
-    })
+    const rotulo = (n) => (n === 1 ? 'PRIMERA COPIA' : n === 2 ? 'SEGUNDA COPIA' : `${n}ª COPIA`)
+    const previews = []
+    for (let i = 0; i < copies; i++) {
+      const n = i + 1
+      const rot = rotulo(n)
+      const override = { NUMERO_COPIA: rot.split(' ')[0] }
+      const { text: t } = await ExtractoTemplateEngine.render('poder-universal.txt', engineData, override)
+      previews.push({ index: n, title: rot, text: `${rot}:\n\n${t}` })
+    }
 
     res.set('Content-Type', 'application/json; charset=utf-8')
-    return res.json({ success: true, data: { previewText: preview, previews } })
+    return res.json({ success: true, data: { previewText: text, previews } })
   } catch (error) {
     console.error('Error en previewConcuerdo:', error)
     return res.status(500).json({ success: false, message: 'Error generando vista previa' })
@@ -183,14 +166,28 @@ async function generateDocuments(req, res) {
       ? v.map((x) => String(x || '').trim()).filter(Boolean)
       : String(v || '').split(/\n|,|;/).map((x) => x.trim()).filter(Boolean)
 
-    // Preparar fuente de actos
-    let actsData = Array.isArray(acts) && acts.length > 0
+    const guessTipoPersona = (name) => {
+      const s = String(name || '').toUpperCase()
+      const keys = [' CIA', 'CIA.', ' LTDA', ' S.A', ' S.A.', ' BANCO', ' FIDEICOMISO', ' CONSTRUCTORA', ' CORPORACION', ' COMPAÑIA', ' COMPAÑÍA', ' GRUPO']
+      return keys.some(k => s.includes(k)) ? 'Jurídica' : 'Natural'
+    }
+    const normalizeCompareciente = (c) => {
+      if (c && typeof c === 'object' && !Array.isArray(c)) {
+        const nombre = String(c.nombre || c.fullname || c.text || '').trim()
+        const tipo_persona = c.tipo_persona || c.tipoPersona || c.tipo || guessTipoPersona(nombre)
+        const representante = c.representante || c.apoderado || undefined
+        return { ...c, nombre, tipo_persona, representante }
+      }
+      const nombre = String(c || '').trim()
+      return { nombre, tipo_persona: guessTipoPersona(nombre) }
+    }
+
+    const actsData = Array.isArray(acts) && acts.length > 0
       ? acts
       : [{ tipoActo: tipoActo, otorgantes, beneficiarios }]
 
-    // Validación mínima
     const hasValidAct = actsData.some(a => {
-      const tipo = PdfExtractorService.cleanActType(a?.tipoActo)
+      const tipo = PdfExtractorService.cleanActType(a?.tipoActo || a?.tipo)
       const ots = safeArray(a?.otorgantes)
       return tipo && ots.length > 0
     })
@@ -198,60 +195,26 @@ async function generateDocuments(req, res) {
       return res.status(400).json({ success: false, message: 'Tipo de acto y al menos un otorgante son obligatorios' })
     }
 
+    const firstAct = actsData[0]
+    const engineData = {
+      notario,
+      notaria: notariaNumero,
+      actos: [{
+        tipo: PdfExtractorService.cleanActType(firstAct?.tipoActo || firstAct?.tipo),
+        otorgantes: safeArray(firstAct?.otorgantes).map(normalizeCompareciente),
+        beneficiarios: safeArray(firstAct?.beneficiarios).map(normalizeCompareciente)
+      }]
+    }
+
     const copies = Math.max(1, Math.min(10, parseInt(numCopias || 2)))
-
-    const firstToken2 = (full) => String(full || '').trim().split(/\s+/)[0]?.toUpperCase() || ''
-    const isFemaleName = (full) => {
-      const first = firstToken2(full)
-      const tokens = String(full || '').trim().toUpperCase().split(/\s+/)
-      const femaleList = new Set(['MARIA','ANA','ROSA','ELENA','FERNANDA','LUISA','VALERIA','CAMILA','GABRIELA','SOFIA','ISABEL','PATRICIA','VERONICA','SUSAN','MAGDALENA','CARMEN','TERESA','BEATRIZ','ELIZABETH','ELIZABET','NOELIA','PAULA','PAOLA','MERCEDES','PILAR','GUADALUPE'])
-      if (femaleList.has(first)) return true
-      if (tokens.some(t => femaleList.has(t))) return true
-      return first.endsWith('A')
-    }
-
-    const humanJoin = (arr) => {
-      const list = (arr || []).filter(Boolean)
-      if (list.length <= 1) return list[0] || ''
-      if (list.length === 2) return `${list[0]} y ${list[1]}`
-      return `${list.slice(0, -1).join(', ')} y ${list[list.length - 1]}`
-    }
-
-    const buildActsText = () => {
-      const segs = actsData.map((a) => {
-        const tipo = PdfExtractorService.cleanActType(a.tipoActo)
-        const ots = safeArray(a.otorgantes)
-        const bes = safeArray(a.beneficiarios)
-        const otRaw = ots[0] || ''
-        const beRaw = bes[0] || ''
-        const otGenero = isFemaleName(otRaw) ? 'la señora' : 'el señor'
-        const beGenero = isFemaleName(beRaw) ? 'la señora' : 'el señor'
-        const otTexto = humanJoin(ots)
-        const beTexto = humanJoin(bes)
-        const base = `de la escritura pública de ${tipo} que otorga ${otGenero} ${otTexto}`
-        return beTexto ? `${base} a favor de ${beGenero} ${beTexto}` : base
-      })
-      if (segs.length === 0) return ''
-      return segs[0] + segs.slice(1).map(s => ` y ${s.replace(/^de la escritura pública de /i, 'de ')}`).join('')
-    }
-
-    const suffixNotaria = (() => {
-      const parts = []
-      if (notario && String(notario).trim()) parts.push(`Notario: ${String(notario).trim()}`)
-      if (notariaNumero && String(notariaNumero).trim()) parts.push(`Notaría ${String(notariaNumero).trim()}`)
-      return parts.length ? ' ' + parts.join('. ') + '.' : ''
-    })()
-
-    const buildTexto = (rotuloPalabra) => `Se otorgó ante mí, en fe de ello confiero esta ${rotuloPalabra} COPIA CERTIFICADA ${buildActsText()}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.${suffixNotaria}`
-
     const documents = []
     for (let i = 0; i < copies; i++) {
       const n = i + 1
       const rotuloPalabra = n === 1 ? 'PRIMERA' : n === 2 ? 'SEGUNDA' : `${n}ª`
-      const texto = buildTexto(rotuloPalabra)
+      const { text } = await ExtractoTemplateEngine.render('poder-universal.txt', engineData, { NUMERO_COPIA: rotuloPalabra })
       const filename = `CONCUERDO_${rotuloPalabra}_COPIA.txt`
       const mimeType = 'text/plain; charset=utf-8'
-      const contentBase64 = Buffer.from(texto, 'utf8').toString('base64')
+      const contentBase64 = Buffer.from(text, 'utf8').toString('base64')
       documents.push({ index: n, title: `${rotuloPalabra} COPIA`, filename, mimeType, contentBase64 })
     }
 

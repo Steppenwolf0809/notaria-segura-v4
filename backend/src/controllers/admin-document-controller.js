@@ -82,10 +82,18 @@ async function getAllDocumentsOversight(req, res) {
             unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
             unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
             unaccent(d."actoPrincipalDescripcion") ILIKE unaccent(${pattern}) OR
-            unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern})
+            unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
+            d."clientPhone" ILIKE ${pattern} OR
+            d."clientEmail" ILIKE ${pattern} OR
+            unaccent(COALESCE(d."clientId", '')) ILIKE unaccent(${pattern})
           )`,
           ...filterClauses
         ], Prisma.sql` AND `)}`;
+
+        const fieldSql = (sortBy === 'updatedAt') 
+          ? Prisma.sql`d."updatedAt"`
+          : Prisma.sql`d."createdAt"`;
+        const directionSql = sortOrder === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
 
         documents = await prisma.$queryRaw`
           SELECT d.*, 
@@ -95,7 +103,7 @@ async function getAllDocumentsOversight(req, res) {
           LEFT JOIN "users" au ON au.id = d."assignedToId"
           LEFT JOIN "users" cu ON cu.id = d."createdById"
           WHERE ${whereSql}
-          ORDER BY d."${Prisma.raw(orderBy.updatedAt ? 'updatedAt' : 'createdAt')}" ${Prisma.raw(orderBy.updatedAt === 'asc' || orderBy.createdAt === 'asc' ? 'ASC' : 'DESC')}
+          ORDER BY ${fieldSql} ${directionSql}
           OFFSET ${offset} LIMIT ${limitNum}
         `;
         const countRows = await prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${whereSql}`;
@@ -123,7 +131,10 @@ async function getAllDocumentsOversight(req, res) {
           { protocolNumber: { contains: searchTerm, mode: 'insensitive' } },
           { clientName: { contains: searchTerm, mode: 'insensitive' } },
           { actoPrincipalDescripcion: { contains: searchTerm, mode: 'insensitive' } },
-          { detalle_documento: { contains: searchTerm, mode: 'insensitive' } }
+          { detalle_documento: { contains: searchTerm, mode: 'insensitive' } },
+          { clientPhone: { contains: searchTerm } },
+          { clientEmail: { contains: searchTerm, mode: 'insensitive' } },
+          { clientId: { contains: searchTerm, mode: 'insensitive' } }
         ];
         [documents, totalCount] = await Promise.all([
           prisma.document.findMany({

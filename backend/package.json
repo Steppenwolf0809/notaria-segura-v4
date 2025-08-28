@@ -7,7 +7,8 @@
   "scripts": {
     "start": "npx prisma db push --accept-data-loss && node server.js",
     "build": "npx prisma generate",
-    "start:prod": "npx prisma generate && npx prisma db push --accept-data-loss && node server.js",
+    "start:prod": "npx prisma generate && (npx prisma migrate deploy || npx prisma db push --accept-data-loss) && node server.js",
+    "start:railway": "npx prisma generate && (npx prisma migrate deploy || npx prisma db push --accept-data-loss) && node server.js",
     "dev": "nodemon server.js",
     "db:generate": "npx prisma generate",
     "db:migrate": "npx prisma migrate dev",
