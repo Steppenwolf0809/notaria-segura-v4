@@ -128,20 +128,18 @@ async function previewConcuerdo(req, res) {
 
     const guessTipoPersona = (name) => {
       const s = String(name || '').toUpperCase()
-      // Ampliamos heurística para compañías/entidades del Ecuador
-      const keys = [
-        ' CIA', 'CIA.', ' CÍA', 'CÍA.', ' LTDA', 'L.T.D.A', ' L T D A',
-        ' S.A', ' S.A.', ' S A', 'S.A.', 'S.A.S', ' S.A.S', ' SAS', ' S.A.C', ' S.A.C.',
-        ' BANCO', ' FIDEICOMISO', ' CONSTRUCTORA', ' CORPORACION', ' CORPORACIÓN',
-        ' COMPAÑIA', ' COMPAÑÍA', ' EMPRESA PÚBLICA', ' EMPRESA PUBLICA', ' EP ', ' EP.',
-        ' MUNICIPIO', ' GAD', ' GOBIERNO AUTONOMO DESCENTRALIZADO', ' GOBIERNO AUTÓNOMO DESCENTRALIZADO',
-        ' UNIVERSIDAD', ' FUNDACION', ' FUNDACIÓN', ' ASOCIACION', ' ASOCIACIÓN',
-        ' COOPERATIVA', ' COOP', ' COOP.', ' CONSORCIO', ' CLUB '
+      // Detectar tokens típicos de entidades usando límites de palabra
+      const entityTokens = [
+        'CIA', 'CÍA', 'LTDA', 'L.T.D.A', 'S.A', 'S.A.S', 'S.A.C', 'SAS', 'SA',
+        'BANCO', 'FIDEICOMISO', 'CONSTRUCTORA', 'CORPORACION', 'CORPORACIÓN',
+        'COMPAÑIA', 'COMPAÑÍA', 'EMPRESA PÚBLICA', 'EMPRESA PUBLICA', 'EP',
+        'MUNICIPIO', 'GAD', 'GOBIERNO AUTONOMO DESCENTRALIZADO', 'GOBIERNO AUTÓNOMO DESCENTRALIZADO',
+        'UNIVERSIDAD', 'FUNDACION', 'FUNDACIÓN', 'ASOCIACION', 'ASOCIACIÓN',
+        'COOPERATIVA', 'COOP', 'CONSORCIO', 'CLUB'
       ]
-      if (keys.some(k => s.includes(k))) return 'Jurídica'
-      // Si accidentalmente llega el identificador en el nombre
+      const pattern = new RegExp(`\\b(${entityTokens.join('|').replace(/\./g, '\\.')})\\b`)
+      if (pattern.test(s)) return 'Jurídica'
       if (/\bRUC\b/.test(s)) return 'Jurídica'
-      // Si aparece un número de 13 dígitos, presumir RUC
       if (/\b\d{13}\b/.test(s)) return 'Jurídica'
       return 'Natural'
     }
@@ -346,16 +344,16 @@ async function generateDocuments(req, res) {
 
     const guessTipoPersona = (name) => {
       const s = String(name || '').toUpperCase()
-      const keys = [
-        ' CIA', 'CIA.', ' CÍA', 'CÍA.', ' LTDA', 'L.T.D.A', ' L T D A',
-        ' S.A', ' S.A.', ' S A', 'S.A.', 'S.A.S', ' S.A.S', ' SAS', ' S.A.C', ' S.A.C.',
-        ' BANCO', ' FIDEICOMISO', ' CONSTRUCTORA', ' CORPORACION', ' CORPORACIÓN',
-        ' COMPAÑIA', ' COMPAÑÍA', ' EMPRESA PÚBLICA', ' EMPRESA PUBLICA', ' EP ', ' EP.',
-        ' MUNICIPIO', ' GAD', ' GOBIERNO AUTONOMO DESCENTRALIZADO', ' GOBIERNO AUTÓNOMO DESCENTRALIZADO',
-        ' UNIVERSIDAD', ' FUNDACION', ' FUNDACIÓN', ' ASOCIACION', ' ASOCIACIÓN',
-        ' COOPERATIVA', ' COOP', ' COOP.', ' CONSORCIO', ' CLUB '
+      const entityTokens = [
+        'CIA', 'CÍA', 'LTDA', 'L.T.D.A', 'S.A', 'S.A.S', 'S.A.C', 'SAS', 'SA',
+        'BANCO', 'FIDEICOMISO', 'CONSTRUCTORA', 'CORPORACION', 'CORPORACIÓN',
+        'COMPAÑIA', 'COMPAÑÍA', 'EMPRESA PÚBLICA', 'EMPRESA PUBLICA', 'EP',
+        'MUNICIPIO', 'GAD', 'GOBIERNO AUTONOMO DESCENTRALIZADO', 'GOBIERNO AUTÓNOMO DESCENTRALIZADO',
+        'UNIVERSIDAD', 'FUNDACION', 'FUNDACIÓN', 'ASOCIACION', 'ASOCIACIÓN',
+        'COOPERATIVA', 'COOP', 'CONSORCIO', 'CLUB'
       ]
-      if (keys.some(k => s.includes(k))) return 'Jurídica'
+      const pattern = new RegExp(`\\b(${entityTokens.join('|').replace(/\./g, '\\.')})\\b`)
+      if (pattern.test(s)) return 'Jurídica'
       if (/\bRUC\b/.test(s)) return 'Jurídica'
       if (/\b\d{13}\b/.test(s)) return 'Jurídica'
       return 'Natural'
