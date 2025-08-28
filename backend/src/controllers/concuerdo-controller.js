@@ -230,13 +230,25 @@ export { uploadPdf, extractData, previewConcuerdo }
  */
 async function generateDocuments(req, res) {
   try {
-    console.log('[concuerdos] POST /generate-documents body:', {
+    console.log('🔍 [concuerdos] POST /generate-documents - INICIO')
+    console.log('📋 [concuerdos] req.body completo:', JSON.stringify(req.body, null, 2))
+    console.log('[concuerdos] POST /generate-documents body keys:', {
       keys: Object.keys(req.body || {}),
       numCopias: req.body?.numCopias,
       combine: req.body?.combine,
       actsLen: Array.isArray(req.body?.acts) ? req.body.acts.length : 0
     })
     const { tipoActo, otorgantes, beneficiarios, acts, notario, notariaNumero, notarioSuplente, numCopias = 2 } = req.body || {}
+    console.log('🎯 [concuerdos] Variables extraídas del body:', {
+      tipoActo,
+      otorgantes: Array.isArray(otorgantes) ? `Array[${otorgantes.length}]` : typeof otorgantes,
+      beneficiarios: Array.isArray(beneficiarios) ? `Array[${beneficiarios.length}]` : typeof beneficiarios,
+      acts: Array.isArray(acts) ? `Array[${acts.length}]` : typeof acts,
+      notario,
+      notariaNumero,
+      notarioSuplente,
+      numCopias
+    })
 
     const safeArray = (v) => Array.isArray(v)
       ? v.map((x) => String(x || '').trim()).filter(Boolean)
@@ -284,21 +296,33 @@ async function generateDocuments(req, res) {
       ? acts
       : [{ tipoActo: tipoActo, otorgantes, beneficiarios }]
 
+    console.log('📊 [concuerdos] Procesando actos:', actsData.length)
+    actsData.forEach((act, index) => {
+      console.log(`🎭 [concuerdos] Acto ${index + 1}:`, {
+        tipoActo: act?.tipoActo || act?.tipo,
+        otorgantes: Array.isArray(act?.otorgantes) ? `Array[${act.otorgantes.length}]` : typeof act?.otorgantes,
+        beneficiarios: Array.isArray(act?.beneficiarios) ? `Array[${act.beneficiarios.length}]` : typeof act?.beneficiarios
+      })
+    })
+
     const hasValidAct = actsData.some(a => {
       const tipo = PdfExtractorService.cleanActType(a?.tipoActo || a?.tipo)
       const ots = safeArray(a?.otorgantes)
+      console.log(`✅ [concuerdos] Validando acto: tipo="${tipo}", otorgantes=${ots.length}`)
       return tipo && ots.length > 0
     })
     if (!hasValidAct) {
-      console.error('[concuerdos] generate-documents: validación fallida', { actsData })
+      console.error('❌ [concuerdos] generate-documents: validación fallida', { actsData })
       return res.status(400).json({ success: false, message: 'Tipo de acto y al menos un otorgante son obligatorios', details: { actsData } })
     }
+    console.log('✅ [concuerdos] Validación de actos exitosa')
 
     const engineActs = actsData.map((a) => ({
       tipo: PdfExtractorService.cleanActType(a?.tipoActo || a?.tipo),
       otorgantes: expandComparecientes(a?.otorgantes).map(normalizeCompareciente),
       beneficiarios: expandComparecientes(a?.beneficiarios).map(normalizeCompareciente)
     }))
+    console.log('🔧 [concuerdos] engineActs procesados:', JSON.stringify(engineActs, null, 2))
 
     const engineDataBase = {
       notario,
@@ -308,6 +332,7 @@ async function generateDocuments(req, res) {
       notariaNumero: notariaNumero || req.body?.notaria,
       actos: []
     }
+    console.log('🏗️ [concuerdos] engineDataBase calculado:', JSON.stringify(engineDataBase, null, 2))
 
     // Asociar representantes si vienen del frontend
     const repsRaw = req.body?.representantes || req.body?.representantesOtorgantes
@@ -340,36 +365,50 @@ async function generateDocuments(req, res) {
       }
       return map[n] || String(n)
     }
+    console.log(`📄 [concuerdos] Generando ${copies} copias de documentos`)
     for (let i = 0; i < copies; i++) {
       const n = i + 1
       const rotuloPalabra = ordinalWord(n)
+      console.log(`📝 [concuerdos] Procesando copia ${n}/${copies}: ${rotuloPalabra}`)
       let combined
-      if (Array.isArray(actsPrepared) && actsPrepared.length > 1 && req.body?.combine) {
-        // Construir frases por acto sin encabezado repetido usando variables del engine
-        const phrases = []
-        let footerNotario = ''
-        let footerNotaria = ''
-        for (const act of actsPrepared) {
-          const engineData = { ...engineDataBase, actos: [act] }
-          const { variables } = await ExtractoTemplateEngine.render('poder-universal.txt', engineData, { NUMERO_COPIA: rotuloPalabra })
-          const v = variables || {}
-          footerNotario = v.NOMBRE_NOTARIO || footerNotario
-          footerNotaria = v.NOTARIA || footerNotaria
-          const phrase = `**${v.TIPO_ACTO || ''}** que ${v.VERBO_OTORGAR || ''} ${v.TRATAMIENTO_OTORGANTES || ''} **${v.NOMBRES_OTORGANTES || ''}**${v.FRASE_REPRESENTACION || ''} ${v.CONTRACCION_A_FAVOR || ''} ${v.TRATAMIENTO_BENEFICIARIOS || ''} **${v.NOMBRES_BENEFICIARIOS || ''}**`.replace(/\s+/g, ' ').trim()
-          phrases.push(phrase)
+      try {
+        if (Array.isArray(actsPrepared) && actsPrepared.length > 1 && req.body?.combine) {
+          console.log('🔀 [concuerdos] Modo combinado activado para múltiples actos')
+          // Construir frases por acto sin encabezado repetido usando variables del engine
+          const phrases = []
+          let footerNotario = ''
+          let footerNotaria = ''
+          for (const act of actsPrepared) {
+            const engineData = { ...engineDataBase, actos: [act] }
+            console.log(`🎯 [concuerdos] Renderizando acto con ExtractoTemplateEngine:`, JSON.stringify(engineData, null, 2))
+            const { variables } = await ExtractoTemplateEngine.render('poder-universal.txt', engineData, { NUMERO_COPIA: rotuloPalabra })
+            console.log(`✅ [concuerdos] Variables generadas por engine:`, JSON.stringify(variables, null, 2))
+            const v = variables || {}
+            footerNotario = v.NOMBRE_NOTARIO || footerNotario
+            footerNotaria = v.NOTARIA || footerNotaria
+            const phrase = `**${v.TIPO_ACTO || ''}** que ${v.VERBO_OTORGAR || ''} ${v.TRATAMIENTO_OTORGANTES || ''} **${v.NOMBRES_OTORGANTES || ''}**${v.FRASE_REPRESENTACION || ''} ${v.CONTRACCION_A_FAVOR || ''} ${v.TRATAMIENTO_BENEFICIARIOS || ''} **${v.NOMBRES_BENEFICIARIOS || ''}**`.replace(/\s+/g, ' ').trim()
+            phrases.push(phrase)
+          }
+          const connector = phrases.slice(1).map(p => `y de ${p}`).join('; ')
+          const body = phrases.length > 1 ? `${phrases[0]}; ${connector}` : phrases[0]
+          combined = `Se otorgó ante mí, en fe de ello confiero esta **${rotuloPalabra} COPIA CERTIFICADA** de la escritura pública de ${body}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.\n\n${footerNotario}\n${footerNotaria}\n`
+        } else {
+          console.log('📋 [concuerdos] Modo clásico: render individual por acto')
+          // Render clásico por acto y concatenado con separador
+          const rendered = []
+          for (const act of actsPrepared) {
+            const engineData = { ...engineDataBase, actos: [act] }
+            console.log(`🎯 [concuerdos] Renderizando acto individual:`, JSON.stringify(engineData, null, 2))
+            const { text } = await ExtractoTemplateEngine.render('poder-universal.txt', engineData, { NUMERO_COPIA: rotuloPalabra })
+            console.log(`✅ [concuerdos] Texto generado (primeros 200 chars):`, text?.substring(0, 200) + '...')
+            rendered.push(text)
+          }
+          combined = rendered.join('\n\n—\n\n')
         }
-        const connector = phrases.slice(1).map(p => `y de ${p}`).join('; ')
-        const body = phrases.length > 1 ? `${phrases[0]}; ${connector}` : phrases[0]
-        combined = `Se otorgó ante mí, en fe de ello confiero esta **${rotuloPalabra} COPIA CERTIFICADA** de la escritura pública de ${body}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.\n\n${footerNotario}\n${footerNotaria}\n`
-      } else {
-        // Render clásico por acto y concatenado con separador
-        const rendered = []
-        for (const act of actsPrepared) {
-          const engineData = { ...engineDataBase, actos: [act] }
-          const { text } = await ExtractoTemplateEngine.render('poder-universal.txt', engineData, { NUMERO_COPIA: rotuloPalabra })
-          rendered.push(text)
-        }
-        combined = rendered.join('\n\n—\n\n')
+        console.log(`✅ [concuerdos] Documento ${n} generado exitosamente (${combined?.length || 0} caracteres)`)
+      } catch (templateError) {
+        console.error(`❌ [concuerdos] Error al generar documento ${n}:`, templateError?.stack || templateError)
+        throw templateError
       }
       const filename = `CONCUERDO_${rotuloPalabra}_COPIA.txt`
       const mimeType = 'text/plain; charset=utf-8'
@@ -377,13 +416,20 @@ async function generateDocuments(req, res) {
       documents.push({ index: n, title: `${rotuloPalabra} COPIA`, filename, mimeType, contentBase64 })
     }
 
+    console.log(`🎉 [concuerdos] ¡Generación completada exitosamente! ${documents.length} documentos creados`)
     res.set('Content-Type', 'application/json; charset=utf-8')
     return res.json({ success: true, data: { documents, engine: engineInfo } })
   } catch (error) {
-    console.error('Error generando documentos de concuerdo:', error?.stack || error)
+    console.error('💥 [concuerdos] Error generando documentos de concuerdo:', error?.stack || error)
+    console.error('💥 [concuerdos] Error name:', error?.name)
+    console.error('💥 [concuerdos] Error message:', error?.message)
+    if (error?.cause) {
+      console.error('💥 [concuerdos] Error cause:', error.cause)
+    }
     return res.status(500).json({
       success: false,
       message: 'Error generando documentos',
+      errorType: error?.name || 'Unknown',
       details: process.env.NODE_ENV !== 'production' ? (error?.stack || error?.message || String(error)) : undefined
     })
   }
