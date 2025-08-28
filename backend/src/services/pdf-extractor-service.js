@@ -566,10 +566,19 @@ const PdfExtractorService = {
       return m && m[1] ? m[1].trim() : ''
     }
 
-    // Regex básicos y tolerantes (Sprint 1) respetando saltos de línea
-    const tipoActo = this.cleanActType(getMatch(/ACTO O CONTRATO[:\-]?\s*([\s\S]*?)(?:\n| FECHA| OTORGADO POR| OTORGANTE| OTORGANTES| A FAVOR DE| BENEFICIARIO|$)/))
-    const otorgantesRaw = getMatch(/(?:OTORGADO POR|OTORGANTE|OTORGANTES)[:\-]?\s*([\s\S]*?)(?:\n| A FAVOR DE| BENEFICIARIO| NOTARIO| ACTO O CONTRATO|$)/)
-    const beneficiariosRaw = getMatch(/(?:A FAVOR DE|BENEFICIARIO(?:S)?)[:\-]?\s*([\s\S]*?)(?:\n| NOTARIO| ACTO O CONTRATO|$)/)
+    // Regex básicos y tolerantes (Sprint 1) preservando bloques multi-línea
+    // 1) Título de acto: admitir también "ACTO:" cuando no viene "CONTRATO"
+    const tipoActo = this.cleanActType(
+      getMatch(/ACTO(?:\s+O\s+CON\s*-?\s*TRATO)?[:\-]?\s*([\s\S]*?)(?:\n| FECHA| OTORGADO\s+POR| OTORGANTE| OTORGANTES| A\s+FAVOR\s+DE| BENEFICIARIO|$)/)
+    )
+    // 2) Otorgantes: no cortar en salto de línea; parar sólo en siguientes etiquetas conocidas
+    const otorgantesRaw = getMatch(
+      /(?:OTORGADO\s+POR|OTORGANTE(?:S)?|OTORGANTES|COMPARECIENTE(?:S)?|INTERVINIENTE(?:S)?|NOMBRES\s*\/\s*RAZ[ÓO]N\s+SOCIAL)[:\-]?\s*([\s\S]*?)(?:A\s+FAVOR\s+DE|BENEFICIARIO(?:S)?|NOTARIO|ACTO\s+O\s+CON|ACTO\s*:|EXTRACTO|$)/
+    )
+    // 3) Beneficiarios: idem, parar en NOTARIO/ACTO/fin
+    const beneficiariosRaw = getMatch(
+      /(?:A\s+FAVOR\s+DE|BENEFICIARIO(?:S)?)[:\-]?\s*([\s\S]*?)(?:NOTARIO|ACTO\s+O\s+CON|ACTO\s*:|EXTRACTO|$)/
+    )
     let notario = getMatch(/NOTARIO[:\-]?\s*([\s\S]*?)(?:\n|$)/)
 
     // Limpieza de notario: quitar (A), AB., ABG. iniciales
@@ -580,9 +589,19 @@ const PdfExtractorService = {
         .trim()
     }
 
+    // Fallback: si no se logró capturar otorgantes por etiqueta, tratar de anclar desde "NATURAL"
+    let otorgantesList = this.cleanPersonNames(otorgantesRaw)
+    if ((!otorgantesList || otorgantesList.length === 0) && /\bNATURAL\b/i.test(normalized)) {
+      // Tomar desde el primer NATURAL hasta "A FAVOR"/"BENEFICIARIO"/"NOTARIO"/fin
+      const afterNat = normalized.slice(normalized.indexOf('NATURAL') + 'NATURAL'.length)
+      const cutIdx = afterNat.search(/A\s+FAVOR\s+DE|BENEFICIARIO|NOTARIO|ACTO\s+O\s+CON|ACTO\s*:|EXTRACTO|$/i)
+      const natBlock = cutIdx === -1 ? afterNat : afterNat.slice(0, cutIdx)
+      otorgantesList = this.cleanPersonNames(natBlock)
+    }
+
     return {
       tipoActo: tipoActo || '',
-      otorgantes: this.cleanPersonNames(otorgantesRaw),
+      otorgantes: otorgantesList,
       beneficiarios: this.cleanPersonNames(beneficiariosRaw),
       notario: notario || undefined
     }
