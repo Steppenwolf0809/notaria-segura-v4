@@ -47,11 +47,16 @@ function detectNaturalGender(name) {
   const up = String(name || '').toUpperCase()
   // Intentar reordenar para tener primero el nombre de pila
   const reordered = PdfExtractorService.reorderName(up)
-  const first = String(reordered || '').trim().split(/\s+/)[0] || ''
+  const tokens = String(reordered || '').trim().split(/\s+/).filter(Boolean)
+  const first = tokens[0] || ''
   const maleList = new Set([
     'JOSE','JUAN','CARLOS','DANIEL','MIGUEL','DIEGO','ANDRES','LUIS','PEDRO','PABLO','FRANCISCO','JAVIER','FERNANDO','ROBERTO','WILLIAM','STALIN','IGNACIO','ENRIQUE','EDUARDO','ANTONIO','RAFAEL','RICARDO','ALFREDO','MARCO','OSCAR','GUSTAVO'
   ])
+  // Si el primer token es nombre masculino conocido
   if (maleList.has(first)) return 'M'
+  // Si cualquier token es masculino conocido, priorizar masculino (evita falsos positivos por apellidos terminados en "A")
+  if (tokens.some(t => maleList.has(t))) return 'M'
+  // Si detectamos femenino por heurística, usar F; de lo contrario M por defecto
   return isFemaleName(reordered) ? 'F' : 'M'
 }
 

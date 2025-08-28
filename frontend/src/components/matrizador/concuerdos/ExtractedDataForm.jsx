@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Box, TextField, Button, Grid, Typography, Stack, FormControlLabel, Checkbox, Tabs, Tab, Divider } from '@mui/material'
 
-export default function ExtractedDataForm({ data, setData, loading, onBack, onPreview }) {
+export default function ExtractedDataForm({ data, setData, loading, onBack, onPreview, onNew }) {
   const [actIndex, setActIndex] = useState(data?.uiActIndex || 0)
 
   const acts = Array.isArray(data?.acts) && data.acts.length > 0
@@ -134,6 +134,7 @@ export default function ExtractedDataForm({ data, setData, loading, onBack, onPr
 
       <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
         <Button variant="outlined" onClick={onBack} disabled={loading}>Volver</Button>
+        <Button variant="text" color="error" onClick={onNew} disabled={loading}>Nuevo</Button>
         <Button
           variant="contained"
           onClick={() => onPreview({

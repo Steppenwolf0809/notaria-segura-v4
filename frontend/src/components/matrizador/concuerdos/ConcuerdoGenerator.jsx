@@ -20,8 +20,86 @@ export default function ConcuerdoGenerator() {
     handleUpload,
     handleExtract,
     preview,
-    generating
+    generating,
+    reset
   } = useConcuerdoGenerator()
+
+  const buildPayload = () => {
+    const data = extractedData || {}
+    const numCopias = data?.numeroCopias ?? 2
+    const base = {
+      notario: data?.notario,
+      notariaNumero: data?.notariaNumero,
+      notarioSuplente: Boolean(data?.notarioSuplente),
+      representantes: data?.representantes,
+      numCopias,
+    }
+    if (Array.isArray(data?.acts) && data.acts.length > 0) {
+      return { ...base, acts: data.acts }
+    }
+    return {
+      ...base,
+      tipoActo: data?.tipoActo,
+      otorgantes: data?.otorgantes,
+      beneficiarios: data?.beneficiarios,
+    }
+  }
+
+  const handleDownload = async (format = 'rtf') => {
+    try {
+      const payload = { ...buildPayload(), format }
+      const resp = await (await import('../../../services/concuerdo-service.js')).default.generateDocuments(payload)
+      if (!resp.success) throw new Error(resp.error || 'Error generando documentos')
+      const docs = resp.data.documents || []
+      let warnedFallback = false
+      for (const d of docs) {
+        if (format === 'docx' && d?.mimeType && d.mimeType !== 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' && !warnedFallback) {
+          alert('DOCX no disponible en el servidor. Se descargará en formato RTF como alternativa.')
+          warnedFallback = true
+        }
+        const byteChars = atob(d.contentBase64)
+        const byteNumbers = new Array(byteChars.length)
+        for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i)
+        const byteArray = new Uint8Array(byteNumbers)
+        const blob = new Blob([byteArray], { type: d.mimeType || 'application/octet-stream' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = d.filename || 'document'
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        URL.revokeObjectURL(url)
+      }
+    } catch (e) {
+      alert(e.message || String(e))
+    }
+  }
+
+  const handlePrint = async () => {
+    try {
+      const payload = { ...buildPayload(), format: 'html' }
+      const resp = await (await import('../../../services/concuerdo-service.js')).default.generateDocuments(payload)
+      if (!resp.success) throw new Error(resp.error || 'Error generando documentos')
+      const docs = resp.data.documents || []
+      // Abrir la primera copia en una ventana para imprimir (el usuario puede guardar como PDF o Word desde allí)
+      const first = docs[0]
+      if (!first) return
+      const html = atob(first.contentBase64)
+      const w = window.open('', '_blank')
+      if (!w) return alert('Bloqueado por el navegador. Habilita pop-ups para imprimir.')
+      w.document.open()
+      w.document.write(html)
+      w.document.close()
+      w.focus()
+      // Dar un pequeño delay para que cargue estilos antes de imprimir
+      setTimeout(() => {
+        w.print()
+      }, 200)
+    } catch (e) {
+      alert(e.message || String(e))
+    }
+  }
 
   return (
     <Box>
@@ -56,6 +134,7 @@ export default function ConcuerdoGenerator() {
             loading={extracting || generating}
             onBack={() => setStep(0)}
             onPreview={preview}
+            onNew={reset}
           />
         )}
 
@@ -116,8 +195,13 @@ export default function ConcuerdoGenerator() {
             ) : (
               <Typography variant="body2">Sin vista previa</Typography>
             )}
-            <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
+            <Box sx={{ display: 'flex', gap: 1, mt: 2, flexWrap: 'wrap' }}>
               <Button variant="outlined" onClick={() => setStep(1)} disabled={generating}>Editar</Button>
+              <Button variant="contained" color="primary" onClick={() => handleDownload('docx')} disabled={generating}>Descargar DOCX</Button>
+              <Button variant="outlined" color="primary" onClick={() => handleDownload('rtf')} disabled={generating}>Descargar RTF (Word)</Button>
+              <Button variant="outlined" color="secondary" onClick={() => handleDownload('txt')} disabled={generating}>Descargar TXT</Button>
+              <Button variant="outlined" onClick={handlePrint} disabled={generating}>Imprimir / Guardar PDF</Button>
+              <Button variant="text" color="error" onClick={reset} disabled={generating}>Nuevo</Button>
             </Box>
           </Box>
         )}
@@ -125,5 +209,3 @@ export default function ConcuerdoGenerator() {
     </Box>
   )
 }
-
-
