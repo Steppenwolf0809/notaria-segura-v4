@@ -1,6 +1,7 @@
 import PdfExtractorService from '../services/pdf-extractor-service.js'
 import { ExtractoTemplateEngine } from '../services/extractos/index.js'
 import { buildActPhrase, normalizeActTypeForDisplay } from '../services/extractos/phrase-builder.js'
+import { generateDocxFromText } from '../services/docx-generator.js'
 
 /**
  * Controlador de Generador de Concuerdos (Sprint 1)
@@ -100,9 +101,9 @@ async function previewConcuerdo(req, res) {
     // Normaliza posibles bloques sucios (con encabezados de tabla) → lista de nombres
     const extractFromBlock = (block) => {
       const s = String(block || '')
-      const m1 = s.match(/NOMBRES\s*\/\s*RAZ[ÓO]N\s+SOCIAL\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ0-9\s\.,\-\&]+?)(?=\s+(?:TIPO\s+INTERVINIENTE|DOCUMENTO|NACIONALIDAD|CALIDAD)|$)/i)
+      const m1 = s.match(/NOMBRES\s*\/\s*RAZ[ÓO]N\s+SOCIAL\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ0-9\s\.,\-\&]+?)(?=\s+(?:TIPO\s+INTERVINIENTE|DOCUMENTO|NACIONALIDAD|CALIDAD|REPRESENTAD[OA]\s+POR|RUC)|$)/i)
       if (m1 && m1[1]) return [m1[1].replace(/\s+/g, ' ').trim()]
-      const m2 = s.match(/NOMBRES\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]+?)(?=\s+(?:TIPO\s+INTERVINIENTE|DOCUMENTO|NACIONALIDAD|CALIDAD)|$)/i)
+      const m2 = s.match(/NOMBRES\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]+?)(?=\s+(?:TIPO\s+INTERVINIENTE|DOCUMENTO|NACIONALIDAD|CALIDAD|REPRESENTAD[OA]\s+POR|RUC)|$)/i)
       if (m2 && m2[1]) return [m2[1].replace(/\s+/g, ' ').trim()]
       return null
     }
@@ -113,9 +114,13 @@ async function previewConcuerdo(req, res) {
       const joined = arr.join(' ')
       const hasHeaders = /RAZ[ÓO]N\s+SOCIAL|NOMBRES\s*\/|TIPO\s+INTERVINIENTE|NACIONALIDAD|CALIDAD/i.test(joined)
       if (arr.length === 1 && (arr[0].length > 40 || hasHeaders)) {
-        const direct = extractFromBlock(arr[0])
+        const s = arr[0]
+        const direct = extractFromBlock(s)
         if (direct && direct.length) return direct.map(n => ({ nombre: n }))
-        const names = PdfExtractorService.cleanPersonNames(arr[0])
+        // Extraer RAZÓN SOCIAL antes de "REPRESENTADO POR" si existe
+        const mJ = s.match(/RAZ[ÓO]N\s+SOCIAL\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ0-9\s\.,\-\&]+?)\s+(?:REPRESENTAD[OA]\s+POR|RUC)/i)
+        if (mJ && mJ[1]) return [{ nombre: mJ[1].replace(/\s+/g, ' ').trim(), tipo_persona: 'Jurídica' }]
+        const names = PdfExtractorService.cleanPersonNames(s)
         return names.map(n => ({ nombre: n }))
       }
       return arr.map(n => ({ nombre: n }))
@@ -123,8 +128,22 @@ async function previewConcuerdo(req, res) {
 
     const guessTipoPersona = (name) => {
       const s = String(name || '').toUpperCase()
-      const keys = [' CIA', 'CIA.', ' LTDA', ' S.A', ' S.A.', ' BANCO', ' FIDEICOMISO', ' CONSTRUCTORA', ' CORPORACION', ' COMPAÑIA', ' COMPAÑÍA', ' GRUPO']
-      return keys.some(k => s.includes(k)) ? 'Jurídica' : 'Natural'
+      // Ampliamos heurística para compañías/entidades del Ecuador
+      const keys = [
+        ' CIA', 'CIA.', ' CÍA', 'CÍA.', ' LTDA', 'L.T.D.A', ' L T D A',
+        ' S.A', ' S.A.', ' S A', 'S.A.S', ' S.A.S', ' SAS', ' S.A.C', ' S.A.C.',
+        ' BANCO', ' FIDEICOMISO', ' CONSTRUCTORA', ' CORPORACION', ' CORPORACIÓN',
+        ' COMPAÑIA', ' COMPAÑÍA', ' EMPRESA PÚBLICA', ' EMPRESA PUBLICA', ' EP ', ' EP.',
+        ' MUNICIPIO', ' GAD', ' GOBIERNO AUTONOMO DESCENTRALIZADO', ' GOBIERNO AUTÓNOMO DESCENTRALIZADO',
+        ' UNIVERSIDAD', ' FUNDACION', ' FUNDACIÓN', ' ASOCIACION', ' ASOCIACIÓN',
+        ' COOPERATIVA', ' COOP', ' COOP.', ' CONSORCIO', ' CLUB '
+      ]
+      if (keys.some(k => s.includes(k))) return 'Jurídica'
+      // Si accidentalmente llega el identificador en el nombre
+      if (/\bRUC\b/.test(s)) return 'Jurídica'
+      // Si aparece un número de 13 dígitos, presumir RUC
+      if (/\b\d{13}\b/.test(s)) return 'Jurídica'
+      return 'Natural'
     }
     const normalizeCompareciente = (c) => {
       if (c && typeof c === 'object' && !Array.isArray(c)) {
@@ -135,6 +154,29 @@ async function previewConcuerdo(req, res) {
       }
       const nombre = String(c || '').trim()
       return { nombre, tipo_persona: guessTipoPersona(nombre) }
+    }
+
+    // Si en los otorgantes hay una entidad y naturales, mover los naturales a representantes de la entidad
+    const attachRepresentantesIfJuridica = (comparecientes, repsFromBody) => {
+      const arr = Array.isArray(comparecientes) ? comparecientes.map(normalizeCompareciente) : []
+      if (arr.length === 0) return arr
+      const juridicasIdx = []
+      const naturalesIdx = []
+      arr.forEach((p, i) => (/JUR[IÍ]DICA/i.test(p?.tipo_persona || '') ? juridicasIdx : naturalesIdx).push(i))
+      if (juridicasIdx.length === 0 || naturalesIdx.length === 0) return arr
+      // Tomar la primera jurídica como principal otorgante
+      const j = arr[juridicasIdx[0]]
+      const naturalesNombres = naturalesIdx.map(i => arr[i]?.nombre).filter(Boolean)
+      const reps = (Array.isArray(repsFromBody) && repsFromBody.length > 0)
+        ? repsFromBody
+        : naturalesNombres
+      if (reps.length > 0) {
+        const unique = [...new Set([...(Array.isArray(j.representantes) ? j.representantes : []), ...reps])]
+        j.representantes = unique
+      }
+      // Conservar sólo jurídicas como otorgantes
+      const onlyJuridicas = juridicasIdx.map(i => arr[i])
+      return onlyJuridicas
     }
 
     const actsData = Array.isArray(acts) && acts.length > 0
@@ -150,11 +192,16 @@ async function previewConcuerdo(req, res) {
       return res.status(400).json({ success: false, message: 'Tipo de acto y al menos un otorgante son obligatorios' })
     }
 
-    const engineActs = actsData.map((a) => ({
-      tipo: PdfExtractorService.cleanActType(a?.tipoActo || a?.tipo),
-      otorgantes: expandComparecientes(a?.otorgantes).map(normalizeCompareciente),
-      beneficiarios: expandComparecientes(a?.beneficiarios).map(normalizeCompareciente)
-    }))
+    const engineActs = actsData.map((a) => {
+      const tipo = PdfExtractorService.cleanActType(a?.tipoActo || a?.tipo)
+      const otsBase = expandComparecientes(a?.otorgantes)
+      const besBase = expandComparecientes(a?.beneficiarios)
+      // Adjuntar representantes si corresponde (persona jurídica detectada)
+      const repsRaw = req.body?.representantes || req.body?.representantesOtorgantes
+      const ots = attachRepresentantesIfJuridica(otsBase, Array.isArray(repsRaw) ? repsRaw : String(repsRaw || '').split(/\n|,|;/).map(s => s.trim()).filter(Boolean))
+      const bes = besBase.map(normalizeCompareciente)
+      return { tipo, otorgantes: ots, beneficiarios: bes }
+    })
 
     const engineDataBase = {
       notario,
@@ -299,8 +346,19 @@ async function generateDocuments(req, res) {
 
     const guessTipoPersona = (name) => {
       const s = String(name || '').toUpperCase()
-      const keys = [' CIA', 'CIA.', ' LTDA', ' S.A', ' S.A.', ' BANCO', ' FIDEICOMISO', ' CONSTRUCTORA', ' CORPORACION', ' COMPAÑIA', ' COMPAÑÍA', ' GRUPO']
-      return keys.some(k => s.includes(k)) ? 'Jurídica' : 'Natural'
+      const keys = [
+        ' CIA', 'CIA.', ' CÍA', 'CÍA.', ' LTDA', 'L.T.D.A', ' L T D A',
+        ' S.A', ' S.A.', ' S A', 'S.A.S', ' S.A.S', ' SAS', ' S.A.C', ' S.A.C.',
+        ' BANCO', ' FIDEICOMISO', ' CONSTRUCTORA', ' CORPORACION', ' CORPORACIÓN',
+        ' COMPAÑIA', ' COMPAÑÍA', ' EMPRESA PÚBLICA', ' EMPRESA PUBLICA', ' EP ', ' EP.',
+        ' MUNICIPIO', ' GAD', ' GOBIERNO AUTONOMO DESCENTRALIZADO', ' GOBIERNO AUTÓNOMO DESCENTRALIZADO',
+        ' UNIVERSIDAD', ' FUNDACION', ' FUNDACIÓN', ' ASOCIACION', ' ASOCIACIÓN',
+        ' COOPERATIVA', ' COOP', ' COOP.', ' CONSORCIO', ' CLUB '
+      ]
+      if (keys.some(k => s.includes(k))) return 'Jurídica'
+      if (/\bRUC\b/.test(s)) return 'Jurídica'
+      if (/\b\d{13}\b/.test(s)) return 'Jurídica'
+      return 'Natural'
     }
     const normalizeCompareciente = (c) => {
       if (c && typeof c === 'object' && !Array.isArray(c)) {
@@ -432,9 +490,73 @@ async function generateDocuments(req, res) {
         console.error(`❌ [concuerdos] Error al generar documento ${n}:`, templateError?.stack || templateError)
         throw templateError
       }
-      const filename = `CONCUERDO_${rotuloPalabra}_COPIA.txt`
-      const mimeType = 'text/plain; charset=utf-8'
-      const contentBase64 = Buffer.from(combined, 'utf8').toString('base64')
+      // Formateo de salida: txt (por defecto), html o rtf
+      const requestedFormat = String(req.body?.format || '').toLowerCase()
+      const fmt = ['html', 'rtf', 'txt', 'docx'].includes(requestedFormat) ? requestedFormat : 'txt'
+
+      const toHtml = (text) => {
+        // Convertir **negritas** a <strong>
+        const esc = (s) => String(s || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+        const bolded = esc(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"/><title>${rotuloPalabra} COPIA</title>
+<style>
+  @media print { body { margin: 2cm; } }
+  body { font-family: 'Times New Roman', serif; line-height: 1.4; }
+  .doc { white-space: pre-wrap; font-size: 12pt; }
+  h1 { font-size: 14pt; margin: 0 0 12px 0; }
+</style></head><body>
+<h1>${rotuloPalabra} COPIA</h1>
+<div class="doc">${bolded}</div>
+</body></html>`
+      }
+
+      const toRtf = (text) => {
+        // Convertir **negritas** y saltos de línea a RTF básico con soporte unicode
+        const escapeRtf = (s) => String(s || '')
+          .replace(/\\/g, '\\\\')
+          .replace(/[{}]/g, (m) => '\\' + m)
+        const toUnicode = (s) => s.replace(/[\u0080-\uFFFF]/g, (ch) => `\\u${ch.charCodeAt(0)}?`)
+        // Reemplazo de **texto** por {\b texto}
+        const withBold = text.replace(/\*\*(.+?)\*\*/g, (m, p1) => `{\\b ${p1}}`)
+        const withParas = withBold.replace(/\r?\n/g, '\\par\n')
+        const payload = toUnicode(escapeRtf(withParas))
+        return `{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Times New Roman;}}\\fs24 ${payload}` + `}`
+      }
+
+      let filename, mimeType, payload
+      if (fmt === 'html') {
+        filename = `CONCUERDO_${rotuloPalabra}_COPIA.html`
+        mimeType = 'text/html; charset=utf-8'
+        payload = toHtml(combined)
+      } else if (fmt === 'docx') {
+        try {
+          const buf = await generateDocxFromText({ title: `${rotuloPalabra} COPIA`, bodyText: combined })
+          filename = `CONCUERDO_${rotuloPalabra}_COPIA.docx`
+          mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          // Notar: Buffer ya es binario; convertimos a base64 desde el buffer directamente
+          const contentBase64 = Buffer.from(buf).toString('base64')
+          documents.push({ index: n, title: `${rotuloPalabra} COPIA`, filename, mimeType, contentBase64 })
+          continue
+        } catch (e) {
+          // Si no está instalada la librería docx, caemos a RTF sin romper el flujo
+          console.warn('[concuerdos] DOCX no disponible, haciendo fallback a RTF:', e?.code || e?.message)
+          filename = `CONCUERDO_${rotuloPalabra}_COPIA.rtf`
+          mimeType = 'application/rtf'
+          payload = toRtf(combined)
+        }
+      } else if (fmt === 'rtf') {
+        filename = `CONCUERDO_${rotuloPalabra}_COPIA.rtf`
+        mimeType = 'application/rtf'
+        payload = toRtf(combined)
+      } else {
+        filename = `CONCUERDO_${rotuloPalabra}_COPIA.txt`
+        mimeType = 'text/plain; charset=utf-8'
+        payload = combined
+      }
+      const contentBase64 = Buffer.from(payload, 'utf8').toString('base64')
       documents.push({ index: n, title: `${rotuloPalabra} COPIA`, filename, mimeType, contentBase64 })
     }
 
@@ -458,5 +580,3 @@ async function generateDocuments(req, res) {
 }
 
 export { generateDocuments }
-
-

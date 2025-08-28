@@ -273,9 +273,9 @@ const PdfExtractorService = {
     const removePhrases = [
       'POR SUS PROPIOS DERECHOS', 'POR SUS PROPIOS', 'DERECHOS',
       'PASAPORTE', 'CÉDULA', 'CEDULA', 'PPT', 'DOC', 'IDENTIDAD', 'NO IDENTIFICACION', 'N IDENTIFICACION',
-      'IDENTIFICACION', 'IDENTIFICACIÓN', 'QUE LE REPRESENTA', 'QUE REPRESENTA', 'LE REPRESENTA', 'LEREPRESENTA',
+      'IDENTIFICACION', 'IDENTIFICACIÓN', 'QUE LE REPRESENTA', 'QUE REPRESENTA', 'LE REPRESENTA', 'LEREPRESENTA', 'QUE SUSCRIBE',
       'NACIONALIDAD', 'ECUATORIANA', 'ECUATORIANO', 'ECUATORIA', 'COLOMBIANA', 'COLOMBIANO', 'COLOMBIAN', 'PERUANA', 'PERUANO', 'VENEZOLANA', 'VENEZOLANO', 'ARGENTINA', 'ARGENTINO', 'CHILENA', 'CHILENO', 'BRASILEÑA', 'BRASILEÑO',
-      'MANDANTE', 'MANDATARIO', 'PETICIONARIO', 'REPRESENTA', 'REPRESENTE',
+      'MANDANTE', 'MANDATARIO', 'PETICIONARIO', 'REPRESENTA', 'REPRESENTE', 'EN CALIDAD DE',
       'UBICACION', 'UBICACIÓN', 'PROVINCIA', 'CANTON', 'CANTÓN', 'PARROQUIA', 'DESCRIPCION', 'DESCRIPCIÓN', 'CUANTIA', 'CUANTÍA'
     ]
     for (const phrase of removePhrases) {
@@ -287,13 +287,15 @@ const PdfExtractorService = {
     const headers = [
       'PERSONA', 'NOMBRES', 'RAZON', 'RAZÓN', 'SOCIAL', 'TIPO', 'INTERVINIENTE', 'DOCUMENTO', 'IDENTIDAD', 'NACIONALIDAD',
       'CALIDAD', 'REPRESENTA', 'UBICACION', 'UBICACIÓN', 'PROVINCIA', 'CANTON', 'CANTÓN', 'PARROQUIA', 'DESCRIPCION', 'DESCRIPCIÓN', 'CUANTIA', 'CUANTÍA', 'NATURAL', 'IDENTIFICACION', 'IDENTIFICACIÓN',
-      'OBJETO', 'OBSERVACIONES', 'EXTRACTO', 'ESCRITURA', 'NO', 'N°', 'Nº', 'NUMERO', 'NÚMERO', 'PICHINCHA', 'QUITO', 'IÑAQUITO'
+      'OBJETO', 'OBSERVACIONES', 'EXTRACTO', 'ESCRITURA', 'NO', 'N°', 'Nº', 'NUMERO', 'NÚMERO', 'PICHINCHA', 'QUITO', 'IÑAQUITO',
+      'RUC', 'RAZON SOCIAL', 'RAZÓN SOCIAL'
     ]
     const headerRegex = new RegExp(`\\b(?:${headers.join('|')})\\b`, 'g')
     upper = upper.replace(headerRegex, ' ')
 
     // Regex: 2 a 5 palabras en mayúsculas con acentos
-    const nameRegex = /([A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,}){1,4})/g
+    // Permitir guiones y puntos intermedios en apellidos compuestos, y eliminar dobles espacios
+    const nameRegex = /([A-ZÁÉÍÓÚÑ]{2,}(?:[\s\.-]+[A-ZÁÉÍÓÚÑ]{2,}){1,4})/g
     const names = []
     let m
     while ((m = nameRegex.exec(upper)) !== null) {

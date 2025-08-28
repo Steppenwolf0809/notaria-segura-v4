@@ -83,6 +83,14 @@ export default function useConcuerdoGenerator() {
     }
   }, [])
 
+  const reset = useCallback(() => {
+    try { localStorage.removeItem('concuerdo-draft') } catch {}
+    setStep(0)
+    setPdfFile(null)
+    setExtractedText('')
+    setExtractedData({ tipoActo: '', otorgantes: [], beneficiarios: [], notario: '' })
+  }, [])
+
   return {
     step,
     setStep,
@@ -97,6 +105,7 @@ export default function useConcuerdoGenerator() {
     handleUpload,
     handleExtract,
     preview
+    , reset
   }
 }
 
