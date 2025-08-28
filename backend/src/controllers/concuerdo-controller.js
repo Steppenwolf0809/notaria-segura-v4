@@ -203,15 +203,47 @@ async function previewConcuerdo(req, res) {
       const n = i + 1
       const rot = rotulo(n)
       const override = { NUMERO_COPIA: ordinalWord(n) }
-      // Renderizar cada acto por separado y concatenar con una línea divisoria
-      const rendered = []
-      for (const act of actsPrepared) {
-        const engineData = { ...engineDataBase, actos: [act] }
-        const { text: t } = await ExtractoTemplateEngine.render('poder-universal.txt', engineData, override)
-        rendered.push(t)
+      // Si hay múltiples actos y se solicita combinación, construir un solo párrafo con un encabezado
+      if (Array.isArray(actsPrepared) && actsPrepared.length > 1 && req.body?.combine) {
+        const phrases = []
+        let footerNotario = ''
+        let footerNotaria = ''
+        for (const act of actsPrepared) {
+          const engineData = { ...engineDataBase, actos: [act] }
+          const { variables } = await ExtractoTemplateEngine.render('poder-universal.txt', engineData, override)
+          const v = variables || {}
+          footerNotario = v.NOMBRE_NOTARIO || footerNotario
+          footerNotaria = v.NOTARIA || footerNotaria
+          const isRev = /REVOCATORIA/i.test(v.TIPO_ACTO || '')
+          let phrase
+          if (isRev) {
+            const commaOrEmpty = (v.FRASE_REPRESENTACION || '').trim().length > 0 ? '' : ','
+            phrase = `**${v.TIPO_ACTO || ''}** otorgado por ${v.TRATAMIENTO_OTORGANTES || ''} **${v.NOMBRES_OTORGANTES || ''}**${v.FRASE_REPRESENTACION || ''}${commaOrEmpty} ${v.CONTRACCION_A_FAVOR || ''} ${v.TRATAMIENTO_BENEFICIARIOS || ''} **${v.NOMBRES_BENEFICIARIOS || ''}**`
+          } else {
+            phrase = `**${v.TIPO_ACTO || ''}** que ${v.VERBO_OTORGAR || ''} ${v.TRATAMIENTO_OTORGANTES || ''} **${v.NOMBRES_OTORGANTES || ''}**${v.FRASE_REPRESENTACION || ''} ${v.CONTRACCION_A_FAVOR || ''} ${v.TRATAMIENTO_BENEFICIARIOS || ''} **${v.NOMBRES_BENEFICIARIOS || ''}**`
+          }
+          phrase = phrase
+            .replace(/\s+/g, ' ')
+            .replace(/\s+,/g, ',')
+            .replace(/,\s*,/g, ', ')
+            .trim()
+          phrases.push(phrase)
+        }
+        const connector = phrases.slice(1).map(p => `y de ${p}`).join('; ')
+        const body = phrases.length > 1 ? `${phrases[0]}; ${connector}` : phrases[0]
+        const combined = `Se otorgó ante mí, en fe de ello confiero esta **${ordinalWord(n)} COPIA CERTIFICADA** de la escritura pública de ${body}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.\n\n${footerNotario}\n${footerNotaria}\n`
+        previews.push({ index: n, title: rot, text: `${rot}:\n\n${combined}` })
+      } else {
+        // Modo clásico: render individual por acto y concatenado con separador
+        const rendered = []
+        for (const act of actsPrepared) {
+          const engineData = { ...engineDataBase, actos: [act] }
+          const { text: t } = await ExtractoTemplateEngine.render('poder-universal.txt', engineData, override)
+          rendered.push(t)
+        }
+        const combined = rendered.join('\n\n—\n\n')
+        previews.push({ index: n, title: rot, text: `${rot}:\n\n${combined}` })
       }
-      const combined = rendered.join('\n\n—\n\n')
-      previews.push({ index: n, title: rot, text: `${rot}:\n\n${combined}` })
     }
 
     res.set('Content-Type', 'application/json; charset=utf-8')
@@ -386,7 +418,14 @@ async function generateDocuments(req, res) {
             const v = variables || {}
             footerNotario = v.NOMBRE_NOTARIO || footerNotario
             footerNotaria = v.NOTARIA || footerNotaria
-            const phrase = `**${v.TIPO_ACTO || ''}** que ${v.VERBO_OTORGAR || ''} ${v.TRATAMIENTO_OTORGANTES || ''} **${v.NOMBRES_OTORGANTES || ''}**${v.FRASE_REPRESENTACION || ''} ${v.CONTRACCION_A_FAVOR || ''} ${v.TRATAMIENTO_BENEFICIARIOS || ''} **${v.NOMBRES_BENEFICIARIOS || ''}**`.replace(/\s+/g, ' ').trim()
+            const isRev = /REVOCATORIA/i.test(v.TIPO_ACTO || '')
+            let phrase
+            if (isRev) {
+              phrase = `**${v.TIPO_ACTO || ''}** otorgado por ${v.TRATAMIENTO_OTORGANTES || ''} **${v.NOMBRES_OTORGANTES || ''}**${v.FRASE_REPRESENTACION || ''}, ${v.CONTRACCION_A_FAVOR || ''} ${v.TRATAMIENTO_BENEFICIARIOS || ''} **${v.NOMBRES_BENEFICIARIOS || ''}**`
+            } else {
+              phrase = `**${v.TIPO_ACTO || ''}** que ${v.VERBO_OTORGAR || ''} ${v.TRATAMIENTO_OTORGANTES || ''} **${v.NOMBRES_OTORGANTES || ''}**${v.FRASE_REPRESENTACION || ''} ${v.CONTRACCION_A_FAVOR || ''} ${v.TRATAMIENTO_BENEFICIARIOS || ''} **${v.NOMBRES_BENEFICIARIOS || ''}**`
+            }
+            phrase = phrase.replace(/\s+/g, ' ').replace(/\s+,/g, ',').trim()
             phrases.push(phrase)
           }
           const connector = phrases.slice(1).map(p => `y de ${p}`).join('; ')
