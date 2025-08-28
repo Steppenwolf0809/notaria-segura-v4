@@ -1,5 +1,5 @@
 import React from 'react'
-import { Box, TextField, Button, Grid, Typography, Chip, Stack } from '@mui/material'
+import { Box, TextField, Button, Grid, Typography, Chip, Stack, FormControlLabel, Checkbox } from '@mui/material'
 
 export default function ExtractedDataForm({ data, setData, loading, onBack, onPreview }) {
   const handleChange = (field) => (e) => {
@@ -35,11 +35,16 @@ export default function ExtractedDataForm({ data, setData, loading, onBack, onPr
         <Grid item xs={12} md={6}>
           <TextField
             fullWidth
-            type="number"
-            inputProps={{ min: 1 }}
-            label="Notaría N° (opcional)"
+            label="Notaría (texto)"
+            placeholder="Ej.: DÉCIMA OCTAVA DEL CANTÓN QUITO"
             value={data?.notariaNumero || ''}
             onChange={(e) => setData({ ...data, notariaNumero: e.target.value })}
+          />
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <FormControlLabel
+            control={<Checkbox checked={Boolean(data?.notarioSuplente)} onChange={(e) => setData({ ...data, notarioSuplente: e.target.checked })} />}
+            label="Notario(a) suplente"
           />
         </Grid>
         <Grid item xs={12} md={6}>

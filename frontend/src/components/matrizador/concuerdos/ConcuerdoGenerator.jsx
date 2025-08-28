@@ -65,7 +65,8 @@ export default function ConcuerdoGenerator() {
             <Divider sx={{ mb: 2 }} />
             {extractedData?.engine && (
               <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                <Chip size="small" label={`Acto: ${extractedData.engine.acto}`} color="primary" />
+                <Chip size="small" label={`Acto principal: ${extractedData.engine.acto}`} color="primary" />
+                <Chip size="small" label={`Actos detectados: ${extractedData.engine.actosCount || 1}`} variant="outlined" />
                 <Chip size="small" label={`Template: ${extractedData.engine.template}`} variant="outlined" />
               </Box>
             )}
@@ -73,10 +74,10 @@ export default function ConcuerdoGenerator() {
               <Box sx={{ mb: 2 }}>
                 <Typography variant="subtitle2" color="text.secondary">Datos de notaría</Typography>
                 {extractedData?.notario && (
-                  <Typography variant="body2">Notario: {extractedData.notario}</Typography>
+                  <Typography variant="body2">{extractedData?.notarioSuplente ? 'Notario(a) suplente:' : 'Notario(a):'} {extractedData.notario}</Typography>
                 )}
                 {extractedData?.notariaNumero && (
-                  <Typography variant="body2">Notaría N° {extractedData.notariaNumero}</Typography>
+                  <Typography variant="body2">Notaría: {extractedData.notariaNumero}</Typography>
                 )}
               </Box>
             )}

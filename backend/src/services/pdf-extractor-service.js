@@ -29,6 +29,7 @@ const PdfExtractorService = {
     const lines = text.split(/\n+/)
     let notarioNombre
     let notariaNumero
+    let notarioSuplente = false
 
     // Utilidad: normaliza texto (sin acentos) y mapea ordinales en español → número
     const toAsciiUpper = (s) => String(s || '')
@@ -98,13 +99,25 @@ const PdfExtractorService = {
       const nLine = line.match(/NOTARIO\s*\(\s*A\s*\)\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\.]*)$/i)
       if (nLine) {
         let nombre = nLine[1].toUpperCase().trim()
+        // Detectar SUPLENTE
+        if (/^SUPLENTE\b/.test(nombre)) {
+          notarioSuplente = true
+          nombre = nombre.replace(/^SUPLENTE\s+/, '')
+        } else if (/\bSUPLENTE\b/.test(nombre)) {
+          notarioSuplente = true
+          nombre = nombre.replace(/\bSUPLENTE\b\s*/g, ' ').replace(/\s+/g, ' ').trim()
+        }
         nombre = nombre.replace(/^ABG\.?\s*/i, '').replace(/^AB\.?\s*/i, '').replace(/^DR\.?\s*/i, '').replace(/^LCDO\.?\s*/i, '')
         notarioNombre = nombre.replace(/\s+/g, ' ').trim()
         // Buscar texto de notaría cercano
         for (let j = idx; j < Math.min(idx + 4, lines.length); j++) {
           const l = lines[j].toUpperCase().trim()
           const mNum = l.match(/NOTAR[ÍI]A\s*(.+)$/i)
-          if (mNum && mNum[1]) { notariaNumero = mNum[1].replace(/\s+/g, ' ').trim().replace(/[\.;,]+$/,''); break }
+          if (mNum && mNum[1]) {
+            const raw = mNum[1].replace(/\s+/g, ' ').trim().replace(/[\.;,]+$/,'')
+            notariaNumero = raw
+            break
+          }
         }
         continue
       }
@@ -112,6 +125,13 @@ const PdfExtractorService = {
       if (m) {
         // Nombre completo después de (A)
         let nombre = m[1].toUpperCase().trim()
+        if (/^SUPLENTE\b/.test(nombre)) {
+          notarioSuplente = true
+          nombre = nombre.replace(/^SUPLENTE\s+/, '')
+        } else if (/\bSUPLENTE\b/.test(nombre)) {
+          notarioSuplente = true
+          nombre = nombre.replace(/\bSUPLENTE\b\s*/g, ' ').replace(/\s+/g, ' ').trim()
+        }
         nombre = nombre.replace(/^ABG\.?\s*/i, '').replace(/^AB\.?\s*/i, '').replace(/^DR\.?\s*/i, '').replace(/^LCDO\.?\s*/i, '')
         // Cortar si trae algo como NOTARIA en la misma línea
         const cut = nombre.search(/NOTAR[ÍI]A|Nº|N°|NO\.?/i)
@@ -134,9 +154,16 @@ const PdfExtractorService = {
 
     // Fallback: buscar globalmente si no se encontró con (A)
     if (!notarioNombre) {
-      // Intentar captura global NOTARIO(A)
-      const n3 = text.toUpperCase().match(/NOTARIO\s*\(\s*A\s*\)\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\.]*)/)
-      if (n3 && n3[1]) notarioNombre = n3[1].replace(/^ABG\.?\s*/i, '').trim()
+      // Intentar captura global NOTARIO(A) SUPLENTE
+      const sup = text.toUpperCase().match(/NOTARIO\s*\(\s*A\s*\)\s*SUPLENTE\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\.]*)/)
+      if (sup && sup[1]) {
+        notarioSuplente = true
+        notarioNombre = sup[1].replace(/^ABG\.?\s*/i, '').trim()
+      }
+      if (!notarioNombre) {
+        const n3 = text.toUpperCase().match(/NOTARIO\s*\(\s*A\s*\)\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\.]*)/)
+        if (n3 && n3[1]) notarioNombre = n3[1].replace(/^ABG\.?\s*/i, '').trim()
+      }
     }
     if (!notarioNombre) {
       const m2 = text.toUpperCase().match(/\(\s*A\s*\)\s*([A-ZÁÉÍÓÚÑ\s\.]\S.*)/)
@@ -151,7 +178,19 @@ const PdfExtractorService = {
       }
     }
 
-    return { notarioNombre, notariaNumero }
+    // Derivar número de notaría en dígitos cuando viene en palabras (e.g., DÉCIMA OCTAVA → 18)
+    let notariaNumeroDigit
+    if (notariaNumero) {
+      const parsed = parseOrdinalWords(notariaNumero)
+      if (parsed) notariaNumeroDigit = parsed
+      // Aceptar formas "N° 18", "NO. 18"
+      const numInline = String(notariaNumero)
+        .replace(/,/g, ' ')
+        .match(/\b(?:N[º°O\.]\s*)?(\d{1,3})\b/)
+      if (!notariaNumeroDigit && numInline && numInline[1]) notariaNumeroDigit = numInline[1]
+    }
+
+    return { notarioNombre, notariaNumero, notariaNumeroDigit, notarioSuplente }
   },
   /**
    * Reordena "APELLIDOS NOMBRES" → "NOMBRES APELLIDOS" (heurística)
@@ -210,7 +249,7 @@ const PdfExtractorService = {
       'POR SUS PROPIOS DERECHOS', 'POR SUS PROPIOS', 'DERECHOS',
       'PASAPORTE', 'CÉDULA', 'CEDULA', 'PPT', 'DOC', 'IDENTIDAD', 'NO IDENTIFICACION', 'N IDENTIFICACION',
       'IDENTIFICACION', 'IDENTIFICACIÓN', 'QUE LE REPRESENTA', 'QUE REPRESENTA',
-      'NACIONALIDAD', 'ECUATORIANA', 'ECUATORIANO', 'ECUATORIA', 'COLOMBIANA', 'COLOMBIANO', 'PERUANA', 'PERUANO', 'VENEZOLANA', 'VENEZOLANO', 'ARGENTINA', 'ARGENTINO', 'CHILENA', 'CHILENO', 'BRASILEÑA', 'BRASILEÑO',
+      'NACIONALIDAD', 'ECUATORIANA', 'ECUATORIANO', 'ECUATORIA', 'COLOMBIANA', 'COLOMBIANO', 'COLOMBIAN', 'PERUANA', 'PERUANO', 'VENEZOLANA', 'VENEZOLANO', 'ARGENTINA', 'ARGENTINO', 'CHILENA', 'CHILENO', 'BRASILEÑA', 'BRASILEÑO',
       'MANDANTE', 'MANDATARIO', 'PETICIONARIO', 'REPRESENTA', 'REPRESENTE',
       'UBICACION', 'UBICACIÓN', 'PROVINCIA', 'CANTON', 'CANTÓN', 'PARROQUIA', 'DESCRIPCION', 'DESCRIPCIÓN', 'CUANTIA', 'CUANTÍA'
     ]

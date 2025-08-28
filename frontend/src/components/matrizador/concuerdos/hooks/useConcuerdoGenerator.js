@@ -53,6 +53,8 @@ export default function useConcuerdoGenerator() {
         beneficiarios: data?.beneficiarios,
         notario: data?.notario,
         notariaNumero: data?.notariaNumero,
+        notarioSuplente: Boolean(data?.notarioSuplente),
+        acts: Array.isArray(data?.acts) ? data.acts : undefined,
         representantes: data?.representantes,
         numCopias,
         format: 'html'

@@ -266,12 +266,21 @@ function buildVariables({ data, reglasGenero }) {
   const TRATAMIENTO_BENEFICIARIOS = sustantivoGrupo(bes)
   const NOMBRES_BENEFICIARIOS = nombresConjuncion(bes)
 
-  const NOMBRE_NOTARIO = String(data?.notario || data?.notarioNombre || '').toUpperCase()
+  const NOMBRE_NOTARIO = (() => {
+    const base = String(data?.notario || data?.notarioNombre || '').trim()
+    const isSuplente = Boolean(data?.notarioSuplente)
+    const full = isSuplente ? `NOTARIO(A) SUPLENTE ${base}` : base
+    return String(full || '').toUpperCase()
+  })()
   const NOTARIA = (() => {
     const raw = String(data?.notaria || data?.notariaNumero || '').trim()
     if (!raw) return ''
-    const up = raw.toUpperCase()
-    return up.startsWith('NOTAR') ? up : `NOTARÍA ${up}`
+    // Sin acentos por preferencia del cliente y sin prefijos automáticos
+    const upNoAccents = raw
+      .normalize('NFD')
+      .replace(/\p{Diacritic}+/gu, '')
+      .toUpperCase()
+    return upNoAccents
   })()
 
   const NUMERO_COPIA = 'PRIMERA'
