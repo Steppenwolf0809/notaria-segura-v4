@@ -674,7 +674,9 @@ async function marcarComoListo(req, res) {
                 // Notificación individual
                 const documentoData = {
                     tipoDocumento: document.tipoDocumento,
-                    protocolNumber: document.protocolNumber
+                    protocolNumber: document.protocolNumber,
+                    actoPrincipalDescripcion: document.actoPrincipalDescripcion,
+                    actoPrincipalValor: document.actoPrincipalValor
                 };
 
                 const whatsappResult = await whatsappService.enviarDocumentoListo(
@@ -911,7 +913,9 @@ async function desagruparDocumentos(req, res) {
                 const doc = updatedDocuments[i];
                 const documentoData = {
                     tipoDocumento: doc.documentType,
-                    protocolNumber: doc.protocolNumber
+                    protocolNumber: doc.protocolNumber,
+                    actoPrincipalDescripcion: doc.actoPrincipalDescripcion,
+                    actoPrincipalValor: doc.actoPrincipalValor
                 };
 
                 await whatsappService.enviarDocumentoListo(

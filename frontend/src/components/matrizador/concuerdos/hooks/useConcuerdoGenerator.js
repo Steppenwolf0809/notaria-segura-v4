@@ -1,14 +1,29 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import concuerdoService from '../../../../services/concuerdo-service.js'
 
 export default function useConcuerdoGenerator() {
-  const [step, setStep] = useState(0)
+  const loadDraft = () => {
+    try {
+      const raw = localStorage.getItem('concuerdo-draft')
+      return raw ? JSON.parse(raw) : null
+    } catch { return null }
+  }
+  const draft = loadDraft()
+  const [step, setStep] = useState(draft?.step || 0)
   const [pdfFile, setPdfFile] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [extracting, setExtracting] = useState(false)
   const [generating, setGenerating] = useState(false)
-  const [extractedText, setExtractedText] = useState('')
-  const [extractedData, setExtractedData] = useState({ tipoActo: '', otorgantes: [], beneficiarios: [], notario: '' })
+  const [extractedText, setExtractedText] = useState(draft?.extractedText || '')
+  const [extractedData, setExtractedData] = useState(draft?.extractedData || { tipoActo: '', otorgantes: [], beneficiarios: [], notario: '' })
+
+  // Persist to localStorage
+  useEffect(() => {
+    try {
+      const payload = { step, extractedText, extractedData }
+      localStorage.setItem('concuerdo-draft', JSON.stringify(payload))
+    } catch {}
+  }, [step, extractedText, extractedData])
 
   const handleUpload = useCallback(async () => {
     if (!pdfFile) return
@@ -83,6 +98,12 @@ export default function useConcuerdoGenerator() {
     handleExtract,
     preview
   }
+}
+
+// Persistencia básica de estado
+// Nota: este hook corre en cliente; guardamos cada cambio relevante
+if (typeof window !== 'undefined') {
+  // Monkey-patch setState to persist; en entorno real se podría usar useEffect
 }
 
 

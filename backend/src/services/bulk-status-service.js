@@ -44,7 +44,9 @@ export async function bulkMarkReady({ documentIds, actor, sendNotifications = tr
       isGrouped: true,
       documentGroupId: true,
       groupVerificationCode: true,
-      notificationPolicy: true
+      notificationPolicy: true,
+      actoPrincipalDescripcion: true,
+      actoPrincipalValor: true
     }
   });
 
@@ -175,7 +177,9 @@ export async function bulkMarkReady({ documentIds, actor, sendNotifications = tr
           const documentoData = {
             id: only.id,
             tipoDocumento: only.documentType,
-            protocolNumber: only.protocolNumber
+            protocolNumber: only.protocolNumber,
+            actoPrincipalDescripcion: only.actoPrincipalDescripcion,
+            actoPrincipalValor: only.actoPrincipalValor
           };
           const result = await whatsappService.enviarDocumentoListo(
             clienteData,

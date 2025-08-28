@@ -178,12 +178,26 @@ async function previewConcuerdo(req, res) {
     const engineInfo = { template: 'poder-universal', acto: firstAct?.tipo, actosCount: actsPrepared.length }
 
     const copies = Math.max(1, Math.min(10, parseInt(numeroCopias || 2)))
-    const rotulo = (n) => (n === 1 ? 'PRIMERA COPIA' : n === 2 ? 'SEGUNDA COPIA' : `${n}ª COPIA`)
+    const ordinalWord = (n) => {
+      const map = {
+        1: 'PRIMERA', 2: 'SEGUNDA', 3: 'TERCERA', 4: 'CUARTA', 5: 'QUINTA',
+        6: 'SEXTA', 7: 'SÉPTIMA', 8: 'OCTAVA', 9: 'NOVENA', 10: 'DÉCIMA',
+        11: 'UNDÉCIMA', 12: 'DUODÉCIMA',
+        13: 'DÉCIMA TERCERA', 14: 'DÉCIMA CUARTA', 15: 'DÉCIMA QUINTA', 16: 'DÉCIMA SEXTA',
+        17: 'DÉCIMA SÉPTIMA', 18: 'DÉCIMA OCTAVA', 19: 'DÉCIMA NOVENA',
+        20: 'VIGÉSIMA',
+        21: 'VIGÉSIMA PRIMERA', 22: 'VIGÉSIMA SEGUNDA', 23: 'VIGÉSIMA TERCERA', 24: 'VIGÉSIMA CUARTA', 25: 'VIGÉSIMA QUINTA',
+        26: 'VIGÉSIMA SEXTA', 27: 'VIGÉSIMA SÉPTIMA', 28: 'VIGÉSIMA OCTAVA', 29: 'VIGÉSIMA NOVENA',
+        30: 'TRIGÉSIMA'
+      }
+      return map[n] || String(n)
+    }
+    const rotulo = (n) => `${ordinalWord(n)} COPIA`
     const previews = []
     for (let i = 0; i < copies; i++) {
       const n = i + 1
       const rot = rotulo(n)
-      const override = { NUMERO_COPIA: rot.split(' ')[0] }
+      const override = { NUMERO_COPIA: ordinalWord(n) }
       // Renderizar cada acto por separado y concatenar con una línea divisoria
       const rendered = []
       for (const act of actsPrepared) {
@@ -209,7 +223,7 @@ export { uploadPdf, extractData, previewConcuerdo }
  * POST /api/concuerdos/generate-documents
  * body: { tipoActo, otorgantes, beneficiarios, numCopias, notario?, format? }
  */
-async function generateDocuments(req, res) {
+  async function generateDocuments(req, res) {
   try {
     const { tipoActo, otorgantes, beneficiarios, acts, notario, notariaNumero, notarioSuplente, numCopias = 2 } = req.body || {}
 
@@ -300,16 +314,51 @@ async function generateDocuments(req, res) {
     const copies = Math.max(1, Math.min(10, parseInt(numCopias || 2)))
     const documents = []
     const engineInfo = { template: 'poder-universal', acto: actsPrepared?.[0]?.tipo, actosCount: actsPrepared.length }
+    const ordinalWord = (n) => {
+      const map = {
+        1: 'PRIMERA', 2: 'SEGUNDA', 3: 'TERCERA', 4: 'CUARTA', 5: 'QUINTA',
+        6: 'SEXTA', 7: 'SÉPTIMA', 8: 'OCTAVA', 9: 'NOVENA', 10: 'DÉCIMA',
+        11: 'UNDÉCIMA', 12: 'DUODÉCIMA',
+        13: 'DÉCIMA TERCERA', 14: 'DÉCIMA CUARTA', 15: 'DÉCIMA QUINTA', 16: 'DÉCIMA SEXTA',
+        17: 'DÉCIMA SÉPTIMA', 18: 'DÉCIMA OCTAVA', 19: 'DÉCIMA NOVENA',
+        20: 'VIGÉSIMA',
+        21: 'VIGÉSIMA PRIMERA', 22: 'VIGÉSIMA SEGUNDA', 23: 'VIGÉSIMA TERCERA', 24: 'VIGÉSIMA CUARTA', 25: 'VIGÉSIMA QUINTA',
+        26: 'VIGÉSIMA SEXTA', 27: 'VIGÉSIMA SÉPTIMA', 28: 'VIGÉSIMA OCTAVA', 29: 'VIGÉSIMA NOVENA',
+        30: 'TRIGÉSIMA'
+      }
+      return map[n] || String(n)
+    }
     for (let i = 0; i < copies; i++) {
       const n = i + 1
-      const rotuloPalabra = n === 1 ? 'PRIMERA' : n === 2 ? 'SEGUNDA' : `${n}ª`
-      const rendered = []
-      for (const act of actsPrepared) {
-        const engineData = { ...engineDataBase, actos: [act] }
-        const { text } = await ExtractoTemplateEngine.render('poder-universal.txt', engineData, { NUMERO_COPIA: rotuloPalabra })
-        rendered.push(text)
+      const rotuloPalabra = ordinalWord(n)
+      let combined
+      if (Array.isArray(actsPrepared) && actsPrepared.length > 1 && req.body?.combine) {
+        // Construir frases por acto sin encabezado repetido usando variables del engine
+        const phrases = []
+        let footerNotario = ''
+        let footerNotaria = ''
+        for (const act of actsPrepared) {
+          const engineData = { ...engineDataBase, actos: [act] }
+          const { variables } = await ExtractoTemplateEngine.render('poder-universal.txt', engineData, { NUMERO_COPIA: rotuloPalabra })
+          const v = variables || {}
+          footerNotario = v.NOMBRE_NOTARIO || footerNotario
+          footerNotaria = v.NOTARIA || footerNotaria
+          const phrase = `**${v.TIPO_ACTO || ''}** que ${v.VERBO_OTORGAR || ''} ${v.TRATAMIENTO_OTORGANTES || ''} **${v.NOMBRES_OTORGANTES || ''}**${v.FRASE_REPRESENTACION || ''} ${v.CONTRACCION_A_FAVOR || ''} ${v.TRATAMIENTO_BENEFICIARIOS || ''} **${v.NOMBRES_BENEFICIARIOS || ''}**`.replace(/\s+/g, ' ').trim()
+          phrases.push(phrase)
+        }
+        const connector = phrases.slice(1).map(p => `y de ${p}`).join('; ')
+        const body = phrases.length > 1 ? `${phrases[0]}; ${connector}` : phrases[0]
+        combined = `Se otorgó ante mí, en fe de ello confiero esta **${rotuloPalabra} COPIA CERTIFICADA** de la escritura pública de ${body}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.\n\n${footerNotario}\n${footerNotaria}\n`
+      } else {
+        // Render clásico por acto y concatenado con separador
+        const rendered = []
+        for (const act of actsPrepared) {
+          const engineData = { ...engineDataBase, actos: [act] }
+          const { text } = await ExtractoTemplateEngine.render('poder-universal.txt', engineData, { NUMERO_COPIA: rotuloPalabra })
+          rendered.push(text)
+        }
+        combined = rendered.join('\n\n—\n\n')
       }
-      const combined = rendered.join('\n\n—\n\n')
       const filename = `CONCUERDO_${rotuloPalabra}_COPIA.txt`
       const mimeType = 'text/plain; charset=utf-8'
       const contentBase64 = Buffer.from(combined, 'utf8').toString('base64')

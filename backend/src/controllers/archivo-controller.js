@@ -640,7 +640,9 @@ async function procesarEntregaDocumento(req, res) {
             tipo_documento: documentoActualizado.documentType,
             tipoDocumento: documentoActualizado.documentType,
             numero_documento: documentoActualizado.protocolNumber,
-            protocolNumber: documentoActualizado.protocolNumber
+            protocolNumber: documentoActualizado.protocolNumber,
+            actoPrincipalDescripcion: documentoActualizado.actoPrincipalDescripcion,
+            actoPrincipalValor: documentoActualizado.actoPrincipalValor
           },
           datosEntrega
         );

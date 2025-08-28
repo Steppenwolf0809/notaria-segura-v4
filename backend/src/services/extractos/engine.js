@@ -175,7 +175,12 @@ function sustantivoGrupo(personas) {
 
 // 5) Conjunción de nombres
 function nombresConjuncion(personas, opts = {}) {
-  const names = (personas || []).map(p => p._tipo === 'JURIDICA' ? String(p?.nombre || '').toUpperCase().replace(/\s+/g, ' ').trim() : normalizeName(p?.nombre))
+  const keepOriginal = Boolean(opts.keepOriginalOrder)
+  const names = (personas || []).map(p => {
+    if (p._tipo === 'JURIDICA') return String(p?.nombre || '').toUpperCase().replace(/\s+/g, ' ').trim()
+    const up = String(p?.nombre || '').toUpperCase().replace(/\s+/g, ' ').trim()
+    return keepOriginal ? up : normalizeName(up)
+  })
   return humanJoin(names)
 }
 
@@ -268,7 +273,8 @@ function buildVariables({ data, reglasGenero }) {
   const CONTRACCION_A_FAVOR = contraccionAFavor(bes, tieneRep)
   // Para beneficiarios usamos el sustantivo sin artículo, pues la contracción lo aporta
   const TRATAMIENTO_BENEFICIARIOS = sustantivoGrupo(bes)
-  const NOMBRES_BENEFICIARIOS = nombresConjuncion(bes)
+  const isRevocatoria = /REVOCATORIA/i.test(TIPO_ACTO || '')
+  const NOMBRES_BENEFICIARIOS = nombresConjuncion(bes, { keepOriginalOrder: isRevocatoria })
 
   const NOMBRE_NOTARIO = (() => {
     const base = String(data?.notario || data?.notarioNombre || '').trim()

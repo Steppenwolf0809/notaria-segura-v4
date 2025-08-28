@@ -1,8 +1,8 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Box, TextField, Button, Grid, Typography, Stack, FormControlLabel, Checkbox, Tabs, Tab, Divider } from '@mui/material'
 
 export default function ExtractedDataForm({ data, setData, loading, onBack, onPreview }) {
-  const [actIndex, setActIndex] = useState(0)
+  const [actIndex, setActIndex] = useState(data?.uiActIndex || 0)
 
   const acts = Array.isArray(data?.acts) && data.acts.length > 0
     ? data.acts
@@ -19,6 +19,22 @@ export default function ExtractedDataForm({ data, setData, loading, onBack, onPr
     setData({ ...data, acts: newActs })
   }
 
+  // Inicializar selección por acto (por defecto todos incluidos)
+  const selectedActs = Array.isArray(data?.selectedActs) && data.selectedActs.length === acts.length
+    ? data.selectedActs
+    : Array.from({ length: acts.length }, () => true)
+
+  const toggleSelected = (idx) => (e) => {
+    const next = selectedActs.map((v, i) => (i === idx ? e.target.checked : v))
+    setData({ ...data, selectedActs: next })
+  }
+
+  // Persistir UI: pestaña activa en el estado global (para que sobreviva al paso)
+  useEffect(() => {
+    setData(prev => ({ ...prev, uiActIndex: actIndex }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [actIndex])
+
   return (
     <Box>
       <Typography variant="subtitle1" sx={{ mb: 2 }}>Revisar y editar datos extraídos</Typography>
@@ -30,6 +46,15 @@ export default function ExtractedDataForm({ data, setData, loading, onBack, onPr
             ))}
           </Tabs>
           <Divider sx={{ mt: 1 }} />
+          <Box sx={{ mt: 1 }}>
+            {acts.map((a, i) => (
+              <FormControlLabel
+                key={`chk-${i}`}
+                control={<Checkbox checked={selectedActs[i]} onChange={toggleSelected(i)} />}
+                label={`Incluir en concuerdo (Acto ${i + 1}: ${a?.tipoActo || a?.tipo || '—'})`}
+              />
+            ))}
+          </Box>
         </Box>
       ) : null}
       <Grid container spacing={2}>
@@ -124,6 +149,25 @@ export default function ExtractedDataForm({ data, setData, loading, onBack, onPr
           disabled={loading || !(currentAct?.tipoActo || currentAct?.tipo) || !((currentAct?.otorgantes || []).length)}
         >
           Generar vista previa (acto actual)
+        </Button>
+        <Button
+          variant="contained"
+          color="secondary"
+          onClick={() => onPreview({
+            acts: acts
+              .map((a, i) => ({ a, i }))
+              .filter(({ i }) => selectedActs[i])
+              .map(({ a }) => ({ tipoActo: a?.tipoActo || a?.tipo, otorgantes: a?.otorgantes || [], beneficiarios: a?.beneficiarios || [] })),
+            notario: data?.notario,
+            notariaNumero: data?.notariaNumero,
+            notarioSuplente: data?.notarioSuplente,
+            representantes: data?.representantes,
+            numeroCopias: data?.numeroCopias ?? 2,
+            combine: true
+          })}
+          disabled={loading || !(selectedActs.some(Boolean))}
+        >
+          Vista previa combinada
         </Button>
       </Box>
     </Box>

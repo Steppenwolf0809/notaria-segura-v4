@@ -2792,7 +2792,9 @@ async function deliverDocument(req, res) {
             documentos: allDocuments.map(doc => ({
               documentType: doc.documentType,
               protocolNumber: doc.protocolNumber,
-              codigoEscritura: doc.protocolNumber // Usar protocolNumber como código
+              codigoEscritura: doc.protocolNumber, // Usar protocolNumber como código
+              actoPrincipalDescripcion: doc.actoPrincipalDescripcion,
+              actoPrincipalValor: doc.actoPrincipalValor
             }))
           };
         } else {
@@ -2808,7 +2810,9 @@ async function deliverDocument(req, res) {
             documentType: updatedDocument.documentType,
             esGrupo: false,
             cantidadDocumentos: 1,
-            codigoEscritura: updatedDocument.protocolNumber // Usar protocolNumber como código
+            codigoEscritura: updatedDocument.protocolNumber, // Usar protocolNumber como código
+            actoPrincipalDescripcion: updatedDocument.actoPrincipalDescripcion,
+            actoPrincipalValor: updatedDocument.actoPrincipalValor
           };
         }
 
