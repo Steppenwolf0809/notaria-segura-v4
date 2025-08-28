@@ -429,6 +429,8 @@ async function generateDocuments(req, res) {
 
     const copies = Math.max(1, Math.min(10, parseInt(numCopias || 2)))
     const documents = []
+    const bundle = Boolean(req.body?.bundle || req.body?.singleFile)
+    const bundleEntries = []
     const engineInfo = { template: 'poder-universal', acto: actsPrepared?.[0]?.tipo, actosCount: actsPrepared.length }
     const ordinalWord = (n) => {
       const map = {
@@ -490,6 +492,9 @@ async function generateDocuments(req, res) {
         console.error(`❌ [concuerdos] Error al generar documento ${n}:`, templateError?.stack || templateError)
         throw templateError
       }
+      // Registrar para bundling y, si bundle=true, saltar creación individual
+      bundleEntries.push({ title: `${rotuloPalabra} COPIA`, text: combined })
+      if (bundle) continue
       // Formateo de salida: txt (por defecto), html o rtf
       const requestedFormat = String(req.body?.format || '').toLowerCase()
       const fmt = ['html', 'rtf', 'txt', 'docx'].includes(requestedFormat) ? requestedFormat : 'txt'
@@ -557,6 +562,103 @@ async function generateDocuments(req, res) {
       }
       const contentBase64 = Buffer.from(payload, 'utf8').toString('base64')
       documents.push({ index: n, title: `${rotuloPalabra} COPIA`, filename, mimeType, contentBase64 })
+    }
+
+    // Si bundle=true, construir un único archivo con todas las copias
+    if (bundle && bundleEntries.length) {
+      const requestedFormat = String(req.body?.format || '').toLowerCase()
+      const fmt = ['html', 'rtf', 'txt', 'docx'].includes(requestedFormat) ? requestedFormat : 'txt'
+
+      const toHtmlBundle = (entries) => {
+        const headerTitle = [
+          (notariaNumero ? `Notaría: ${notariaNumero}` : ''),
+          (notario ? `Notario(a): ${notario}` : '')
+        ].filter(Boolean).join(' · ')
+        const footerText = `Fecha de impresión: ${new Date().toLocaleDateString('es-EC')}`
+        const esc = (s) => String(s || '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+        const section = (title, text, first) => {
+          const bolded = esc(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+          const pb = first ? '' : 'page-break-before: always;'
+          return `<section style=\"${pb}\">
+  <div class=\"hdr\">${esc(headerTitle)}</div>
+  <h1>${esc(title)}</h1>
+  <div class=\"doc\">${bolded}</div>
+  <div class=\"ftr\">${esc(footerText)}</div>
+</section>`
+        }
+        const body = entries.map((e, idx) => section(e.title, e.text, idx === 0)).join('\n')
+        return `<!DOCTYPE html><html lang=\"es\"><head><meta charset=\"utf-8\"/><title>Concuerdo</title>
+<style>
+  @media print { body { margin: 2cm; } section{ page-break-inside: avoid; } }
+  body { font-family: Arial, sans-serif; line-height: 1.5; }
+  .doc { white-space: pre-wrap; font-size: 14pt; text-align: justify; }
+  h1 { font-size: 16pt; margin: 0 0 12px 0; font-family: Arial, sans-serif; }
+  .hdr { font-size: 10pt; color: #444; margin-bottom: 6px; }
+  .ftr { font-size: 10pt; color: #666; margin-top: 10px; }
+</style></head><body>
+${body}
+</body></html>`
+      }
+
+      const toRtfBundle = (entries) => {
+        const escapeRtf = (s) => String(s || '')
+          .replace(/\\/g, '\\\\')
+          .replace(/[{}]/g, (m) => '\\' + m)
+        const toUnicode = (s) => s.replace(/[\u0080-\uFFFF]/g, (ch) => `\\u${ch.charCodeAt(0)}?`)
+        const sections = entries.map((e, idx) => {
+          const title = toUnicode(escapeRtf(e.title))
+          const bodyBold = e.text.replace(/\*\*(.+?)\*\*/g, (m, p1) => `{\\b ${p1}}`)
+          const body = toUnicode(escapeRtf(bodyBold))
+          const paras = body.split(/\r?\n/).map(line => `\\qj\\sl420\\slmult1 ${line}`).join('\\par\n')
+          const page = idx === 0 ? '' : '\\page\n'
+          const hdr = toUnicode(escapeRtf([notariaNumero ? `Notaría: ${notariaNumero}` : '', notario ? `Notario(a): ${notario}` : ''].filter(Boolean).join(' · ')))
+          const ftr = toUnicode(escapeRtf(`Fecha de impresión: ${new Date().toLocaleDateString('es-EC')}`))
+          return `${page}${hdr}\\par\n{\\b ${title}}\\par\n${paras}\\par\n${ftr}`
+        }).join('\\par\n')
+        return `{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Arial;}}\\f0\\fs28\n${sections}\n}`
+      }
+
+      let filename, mimeType, contentBase64
+      if (fmt === 'html') {
+        filename = 'CONCUERDO_COPIAS_UNIDAS.html'
+        mimeType = 'text/html; charset=utf-8'
+        const payload = toHtmlBundle(bundleEntries)
+        contentBase64 = Buffer.from(payload, 'utf8').toString('base64')
+      } else if (fmt === 'rtf') {
+        filename = 'CONCUERDO_COPIAS_UNIDAS.rtf'
+        mimeType = 'application/rtf'
+        const payload = toRtfBundle(bundleEntries)
+        contentBase64 = Buffer.from(payload, 'utf8').toString('base64')
+      } else if (fmt === 'docx') {
+        try {
+          const { generateDocxFromCopies } = await import('../services/docx-generator.js')
+          const headerTitle = [
+            (notariaNumero ? `Notaría: ${notariaNumero}` : ''),
+            (notario ? `Notario(a): ${notario}` : ''),
+          ].filter(Boolean).join(' · ')
+          const footerText = `Fecha de impresión: ${new Date().toLocaleDateString('es-EC')}`
+          const buf = await generateDocxFromCopies({ copies: bundleEntries, headerTitle, footerText })
+          filename = 'CONCUERDO_COPIAS_UNIDAS.docx'
+          mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+          contentBase64 = Buffer.from(buf).toString('base64')
+        } catch (e) {
+          // Fallback a RTF si no está docx
+          filename = 'CONCUERDO_COPIAS_UNIDAS.rtf'
+          mimeType = 'application/rtf'
+          const payload = toRtfBundle(bundleEntries)
+          contentBase64 = Buffer.from(payload, 'utf8').toString('base64')
+        }
+      } else { // txt
+        filename = 'CONCUERDO_COPIAS_UNIDAS.txt'
+        mimeType = 'text/plain; charset=utf-8'
+        const payload = bundleEntries.map((e, idx) => (idx ? '\f\n' : '') + e.title + '\n\n' + e.text).join('\n\n')
+        contentBase64 = Buffer.from(payload, 'utf8').toString('base64')
+      }
+      documents.length = 0
+      documents.push({ index: 1, title: 'COPIAS UNIDAS', filename, mimeType, contentBase64 })
     }
 
     console.log(`🎉 [concuerdos] ¡Generación completada exitosamente! ${documents.length} documentos creados`)
