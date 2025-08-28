@@ -401,6 +401,21 @@ class DataQualityValidator {
   }
 
   /**
+   * Determina el tipo de persona basado en el nombre
+   */
+  guessTipoPersona(name) {
+    const s = String(name || '').toUpperCase()
+    const entityTokens = [
+      'FUNDACION', 'FUNDACIÓN', 'S.A.', 'SA', 'LTDA', 'CIA', 'CÍA',
+      'CORPORACION', 'CORPORACIÓN', 'EMPRESA', 'ASOCIACION', 'ASOCIACIÓN',
+      'COOPERATIVA', 'UNIVERSIDAD', 'MUNICIPIO', 'GAD', 'EP'
+    ]
+    
+    const pattern = new RegExp(`\\b(${entityTokens.join('|').replace(/\./g, '\\.')})\\b`)
+    return pattern.test(s) ? 'Jurídica' : 'Natural'
+  }
+
+  /**
    * Log condicional para debugging
    */
   log(...args) {
