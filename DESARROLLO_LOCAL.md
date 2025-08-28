@@ -218,6 +218,29 @@ npm run db:seed
 2. **Nunca subas .env**: Está en `.gitignore` por seguridad
 3. **Railway no se afecta**: Usa su propia configuración
 4. **SQLite es suficiente**: Para desarrollo local funciona perfecto
+
+## 🧠 OCR para Concuerdos (Opcional)
+
+Para PDFs escaneados (sin texto embebido) puedes habilitar OCR con Tesseract.
+
+- Variables en `backend/.env`:
+  - `OCR_ENABLED=true`
+  - `OCR_LANGS=spa`
+  - `OCR_PSM=6` (modo de segmentación recomendado)
+  - `PDF_OCR_DPI=300` (resolución de rasterizado)
+  - `OCR_MAX_PAGES=5` (límite de páginas a procesar)
+
+- Requisitos de sistema (recomendado):
+  - `tesseract` (CLI)
+  - `pdftoppm` o `pdftocairo` (para convertir PDF→PNG)
+
+En Windows, puedes instalar con paquete de Tesseract y Xpdf/Poppler; en macOS con Homebrew (`brew install tesseract poppler`); en Debian/Ubuntu: `sudo apt install tesseract-ocr poppler-utils`.
+
+Si las herramientas no están instaladas, el backend degrada de forma segura (no usa OCR).
+
+Endpoint de verificación OCR
+- `GET /api/concuerdos/ocr-health` (requiere rol MATRIZADOR):
+  - Devuelve disponibilidad de `tesseract`/`pdftoppm` y configuración activa.
 5. **WhatsApp opcional**: Puedes deshabilitarlo en desarrollo
 
 ## 🆘 ¿Necesitas ayuda?

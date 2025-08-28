@@ -3,6 +3,7 @@ import { ExtractoTemplateEngine } from '../services/extractos/index.js'
 import { buildActPhrase, normalizeActTypeForDisplay } from '../services/extractos/phrase-builder.js'
 import { generateDocxFromText } from '../services/docx-generator.js'
 import DataQualityValidator from '../services/data-quality-validator.js'
+import ocrService from '../services/ocr-service.js'
 
 /**
  * Controlador de Generador de Concuerdos (Sprint 1)
@@ -33,9 +34,23 @@ async function uploadPdf(req, res) {
       return res.status(400).json({ success: false, message: 'El archivo PDF es demasiado grande (máximo 10MB)' })
     }
 
-    const text = await PdfExtractorService.extractText(buffer)
+    let text = ''
+    try {
+      text = await PdfExtractorService.extractText(buffer)
+    } catch {}
+
+    // Si no hay texto o es demasiado corto, intentar OCR si está habilitado
+    let ocrUsed = false
+    if ((!text || text.length < 50) && (process.env.OCR_ENABLED || 'false') !== 'false') {
+      const ocr = await ocrService.ocrPdf(buffer)
+      if (ocr && ocr.text && ocr.text.trim().length > 10) {
+        text = ocr.text
+        ocrUsed = true
+      }
+    }
+
     if (!text || text.length < 5) {
-      return res.status(400).json({ success: false, message: 'No se pudo extraer texto legible del PDF. Verifique que no sea una imagen escaneada.' })
+      return res.status(400).json({ success: false, message: 'No se pudo extraer texto legible del PDF. Active OCR o verifique que el PDF no sea una imagen escaneada.' })
     }
 
     res.set('Content-Type', 'application/json; charset=utf-8')
@@ -44,6 +59,7 @@ async function uploadPdf(req, res) {
       message: 'Texto extraído correctamente',
       data: { 
         text,
+        ocrUsed,
         // Incluir buffer para parser avanzado (limitado a 5MB)
         buffer: size <= 5 * 1024 * 1024 ? buffer.toString('base64') : null
       }
@@ -83,8 +99,8 @@ async function extractData(req, res) {
     // Debug: mostrar preview del texto extraído
     console.log('📝 Preview texto extraído (primeros 500 chars):', text.substring(0, 500).replace(/\n/g, '\\n'))
     
-    const { acts } = await PdfExtractorService.parseAdvancedData(text, pdfBuffer)
-    const parsed = acts[0] || { tipoActo: '', otorgantes: [], beneficiarios: [] }
+    let { acts } = await PdfExtractorService.parseAdvancedData(text, pdfBuffer)
+    let parsed = acts[0] || { tipoActo: '', otorgantes: [], beneficiarios: [] }
     const { notarioNombre, notariaNumero, notariaNumeroDigit, notarioSuplente } = PdfExtractorService.extractNotaryInfo(text)
     
     // Debug: mostrar datos extraídos antes de validación
@@ -98,7 +114,24 @@ async function extractData(req, res) {
 
     // Validar calidad de los datos extraídos
     const validator = new DataQualityValidator()
-    const validation = validator.validateMultipleActs(acts)
+    let validation = validator.validateMultipleActs(acts)
+
+    // Si la calidad es baja o no hay actos, intentar OCR y reparsear
+    const allowOcr = (process.env.OCR_ENABLED || 'false') !== 'false'
+    const lowQuality = validation.overallConfidence === 'low' || validation.overallConfidence === 'very_low' || acts.length === 0
+    let ocrTried = false
+    if (allowOcr && lowQuality && pdfBuffer) {
+      const ocr = await ocrService.ocrPdf(pdfBuffer)
+      if (ocr && ocr.text && ocr.text.trim().length > 10) {
+        ocrTried = true
+        const reParsed = await PdfExtractorService.parseAdvancedData(ocr.text, pdfBuffer)
+        if (reParsed?.acts?.length) {
+          acts = reParsed.acts
+          parsed = acts[0]
+          validation = validator.validateMultipleActs(acts)
+        }
+      }
+    }
     
     // Log de calidad para monitoreo
     if (validation.overallConfidence === 'low' || validation.overallConfidence === 'very_low') {
@@ -132,7 +165,8 @@ async function extractData(req, res) {
           warnings: validation.validations.flatMap(v => v.warnings),
           suggestions: validation.validations.flatMap(v => v.suggestions),
           autoFixes: validation.validations.reduce((acc, v) => ({ ...acc, ...v.autoFixes }), {})
-        }
+        },
+        ocr: { tried: ocrTried, enabled: allowOcr }
       }
     })
   } catch (error) {
@@ -846,3 +880,18 @@ ${body}
 }
 
 export { generateDocuments }
+
+/**
+ * GET /api/concuerdos/ocr-health
+ * Devuelve el estado de OCR (tesseract/pdftoppm) y configuración activa.
+ */
+async function getOcrHealth(req, res) {
+  try {
+    const status = await ocrService.getHealth()
+    return res.json({ success: true, data: status })
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Error obteniendo estado OCR' })
+  }
+}
+
+export { getOcrHealth }
