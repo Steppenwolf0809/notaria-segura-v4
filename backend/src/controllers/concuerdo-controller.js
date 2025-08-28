@@ -85,6 +85,11 @@ async function extractData(req, res) {
  */
 async function previewConcuerdo(req, res) {
   try {
+    console.log('[concuerdos] POST /preview body:', {
+      keys: Object.keys(req.body || {}),
+      numeroCopias: req.body?.numeroCopias,
+      actsLen: Array.isArray(req.body?.acts) ? req.body.acts.length : 0
+    })
     const { tipoActo, otorgantes, beneficiarios, acts, notario, notariaNumero, notarioSuplente, numeroCopias = 2 } = req.body || {}
 
     const safeArray = (v) => Array.isArray(v)
@@ -212,8 +217,8 @@ async function previewConcuerdo(req, res) {
     res.set('Content-Type', 'application/json; charset=utf-8')
     return res.json({ success: true, data: { previews, engine: engineInfo } })
   } catch (error) {
-    console.error('Error en previewConcuerdo:', error)
-    return res.status(500).json({ success: false, message: 'Error generando vista previa' })
+    console.error('Error en previewConcuerdo:', error?.stack || error)
+    return res.status(500).json({ success: false, message: 'Error generando vista previa', details: process.env.NODE_ENV !== 'production' ? (error?.stack || error?.message) : undefined })
   }
 }
 
@@ -223,8 +228,14 @@ export { uploadPdf, extractData, previewConcuerdo }
  * POST /api/concuerdos/generate-documents
  * body: { tipoActo, otorgantes, beneficiarios, numCopias, notario?, format? }
  */
-  async function generateDocuments(req, res) {
+async function generateDocuments(req, res) {
   try {
+    console.log('[concuerdos] POST /generate-documents body:', {
+      keys: Object.keys(req.body || {}),
+      numCopias: req.body?.numCopias,
+      combine: req.body?.combine,
+      actsLen: Array.isArray(req.body?.acts) ? req.body.acts.length : 0
+    })
     const { tipoActo, otorgantes, beneficiarios, acts, notario, notariaNumero, notarioSuplente, numCopias = 2 } = req.body || {}
 
     const safeArray = (v) => Array.isArray(v)
@@ -279,7 +290,8 @@ export { uploadPdf, extractData, previewConcuerdo }
       return tipo && ots.length > 0
     })
     if (!hasValidAct) {
-      return res.status(400).json({ success: false, message: 'Tipo de acto y al menos un otorgante son obligatorios' })
+      console.error('[concuerdos] generate-documents: validación fallida', { actsData })
+      return res.status(400).json({ success: false, message: 'Tipo de acto y al menos un otorgante son obligatorios', details: { actsData } })
     }
 
     const engineActs = actsData.map((a) => ({
@@ -368,8 +380,12 @@ export { uploadPdf, extractData, previewConcuerdo }
     res.set('Content-Type', 'application/json; charset=utf-8')
     return res.json({ success: true, data: { documents, engine: engineInfo } })
   } catch (error) {
-    console.error('Error generando documentos de concuerdo:', error)
-    return res.status(500).json({ success: false, message: 'Error generando documentos' })
+    console.error('Error generando documentos de concuerdo:', error?.stack || error)
+    return res.status(500).json({
+      success: false,
+      message: 'Error generando documentos',
+      details: process.env.NODE_ENV !== 'production' ? (error?.stack || error?.message || String(error)) : undefined
+    })
   }
 }
 

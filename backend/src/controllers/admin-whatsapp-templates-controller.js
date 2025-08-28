@@ -22,6 +22,8 @@ const AVAILABLE_VARIABLES = {
   fechaFormateada: 'Fecha legible (ej: "23 de agosto de 2025, 12:54 PM")',
   horaEntrega: 'Hora de entrega formateada',
   contactoConsultas: 'Teléfono/email para consultas',
+  actoPrincipal: 'Descripción del acto principal del trámite',
+  actoPrincipalValor: 'Valor del acto principal (monto)',
   
   // Variables para códigos de escritura
   codigosEscritura: 'Lista de códigos de escritura de documentos',
@@ -340,6 +342,8 @@ export const previewTemplate = async (req, res) => {
       fechaFormateada: '23 de agosto de 2025, 12:54 PM',
       horaEntrega: '12:54 PM',
       contactoConsultas: 'Tel: (02) 2234-567 | email@notaria18.gob.ec',
+      actoPrincipal: 'Compraventa de inmueble',
+      actoPrincipalValor: '150.00',
       
       // Variables de códigos
       codigosEscritura: '📋 *Código de escritura:* 20251701018D00919',

@@ -49,14 +49,34 @@ const TEMPLATE_TYPES = [
 
 // Fallback local por si el backend no provee el listado
 const AVAILABLE_VARIABLES = {
+  // Básicas
   cliente: 'Nombre del cliente',
   documento: 'Tipo de documento',
   codigo: 'Código de verificación 4 dígitos',
   notaria: 'Nombre de la notaría',
   fecha: 'Fecha actual formateada',
+  
+  // Mejoradas
+  nombreCompareciente: 'Nombre completo del compareciente/cliente',
+  nombreNotariaCompleto: 'Nombre oficial completo de la notaría',
+  fechaFormateada: 'Fecha legible',
+  horaEntrega: 'Hora de entrega formateada',
+  contactoConsultas: 'Teléfono/email para consultas',
+  actoPrincipal: 'Descripción del acto principal del trámite',
+  actoPrincipalValor: 'Valor del acto principal (monto)',
+
+  // Códigos y listas
+  codigosEscritura: 'Lista de códigos de escritura',
+  cantidadDocumentos: 'Número total de documentos',
+  listaDocumentosCompleta: 'Lista detallada con códigos',
+  documentosDetalle: 'Lista formateada de documentos',
+
+  // Entrega
   receptor_nombre: 'Nombre de quien retira',
   receptor_cedula: 'Cédula de quien retira',
-  receptor_relacion: 'Relación de quien retira con el titular',
+  receptor_relacion: 'Relación con el titular',
+  seccionCedula: 'Línea completa de cédula (si existe)',
+  tipoEntrega: 'Texto para individual/múltiple'
 };
 
 const WhatsAppTemplates = () => {
