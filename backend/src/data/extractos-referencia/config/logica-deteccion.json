@@ -1,0 +1,19 @@
+{
+  "procesamiento_universal": {
+    "paso_1": "extraer_datos_del_extracto",
+    "paso_2": "determinar_tipos_persona_y_generos", 
+    "paso_3": "calcular_variables_dinamicas",
+    "paso_4": "aplicar_template_universal",
+    "resultado": "concuerdo_gramaticalmente_correcto"
+  },
+  "ya_no_necesita": [
+    "diferenciar_entre_natural_vs_juridica",
+    "seleccionar_template_especifico",
+    "logica_compleja_de_deteccion"
+  ],
+  "ventajas": [
+    "un_solo_template_para_mantener",
+    "casos_complejos_automaticamente_manejados",
+    "menos_codigo_menos_bugs"
+  ]
+}

@@ -10,7 +10,7 @@ const router = express.Router();
  */
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const { page = 0, limit = 25, search, status, type, documentId, dateFrom, dateTo } = req.query;
+    const { page = 0, limit = 25, search, status, type, documentId, dateFrom, dateTo, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
     const userRole = req.user.role;
     const userId = req.user.id;
     
@@ -66,10 +66,22 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 
     // Obtener notificaciones con paginación
+    // Mapear campo de orden permitido
+    const mapSortField = (field) => {
+      switch ((field || '').toString()) {
+        case 'clientName': return 'clientName';
+        case 'createdAt': return 'createdAt';
+        case 'sentAt': return 'sentAt';
+        default: return 'createdAt';
+      }
+    };
+    const mappedSortField = mapSortField(sortBy);
+    const mappedSortOrder = sortOrder === 'asc' ? 'asc' : 'desc';
+
     const [notifications, total] = await Promise.all([
       prisma.whatsAppNotification.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { [mappedSortField]: mappedSortOrder },
         skip: parseInt(page) * parseInt(limit),
         take: parseInt(limit),
         include: {

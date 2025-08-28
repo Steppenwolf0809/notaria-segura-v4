@@ -1,0 +1,36 @@
+{
+  "nombres_base": {
+    "femeninos": ["MARIA", "SUSAN", "ANA", "CRISTINA", "MERCEDES", "PAULINA", "ADELINA", "MYRIAM", "GABRIELA"],
+    "masculinos": ["JUAN", "CARLOS", "JOSE", "LUIS", "MARCOS", "WILLIAM", "STALIN", "IGNACIO", "FRANCISCO", "DIEGO", "ANDRES", "ENRIQUE"]
+  },
+  "empresas": {
+    "femeninas": ["COMPAÑIA", "SOCIEDAD", "CONSTRUCTORA", "CORPORACION"],
+    "masculinos": ["BANCO", "FIDEICOMISO", "GRUPO"]
+  },
+  "reglas_plurales": {
+    "todos_masculinos": "los señores",
+    "todos_femeninos": "las señoras", 
+    "mixto": "los señores",
+    "empresas_femeninas": "las compañías",
+  },
+  "tratamientos_singular": {
+    "persona_natural_f": "la señora",
+    "persona_natural_m": "el señor",
+    "empresa_f": "la compañía", 
+    "empresa_m": "el"
+  },
+  "algoritmos_deteccion": {
+    "terminaciones_femeninas": ["A", "IANA", "INA", "ELA"],
+    "terminaciones_masculinas": ["O", "OS", "AN", "ON"],
+    "nombres_compuestos": {
+      "maria_X": "femenino",
+      "juan_X": "masculino", 
+      "jose_maria": "masculino"
+    }
+  },
+  "casos_especiales": {
+    "extranjeros": "revisar_manualmente",
+    "nombres_unisex": ["ALEJANDRO/A", "ANDREA"],
+    "fallback": "masculino_por_defecto"
+  }
+}

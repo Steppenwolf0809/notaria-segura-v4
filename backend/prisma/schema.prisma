@@ -177,6 +177,11 @@ model DocumentEvent {
   eventType       EventType                      // Tipo de evento
   description     String                         // Descripción del evento
   details         Json?                          // Detalles adicionales del evento (campo anterior, nuevo valor, etc.)
+  // Detalles enriquecidos de entrega (compatibles hacia atrás)
+  personaRetiro        String?    // Nombre completo de quien retira
+  cedulaRetiro         String?    // Cédula/identificación de quien retira
+  metodoVerificacion   String?    // codigo_whatsapp | cedula | telefono | manual
+  observacionesRetiro  String?    // Observaciones del retiro
   ipAddress       String?                        // IP desde donde se realizó la acción
   userAgent       String?                        // User agent del navegador
   createdAt       DateTime  @default(now())
@@ -193,6 +198,7 @@ enum EventType {
   DOCUMENT_CREATED      // Documento creado desde XML
   DOCUMENT_ASSIGNED     // Documento asignado a matrizador
   STATUS_CHANGED        // Estado del documento cambiado
+  STATUS_UNDO           // Cambio deshecho por error humano/sistema
   INFO_EDITED          // Información del documento editada (NUEVA FUNCIONALIDAD)
   GROUP_CREATED        // Documento agrupado
   GROUP_DELIVERED      // Grupo de documentos entregado

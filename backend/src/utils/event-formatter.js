@@ -13,13 +13,19 @@ import { formatLongDateTime } from './timezone.js';
  * @returns {string} Descripción formateada
  */
 function formatEventDescription(event) {
-  const { eventType, details = {}, user } = event;
+  const { eventType, details = {}, user, personaRetiro, cedulaRetiro, metodoVerificacion, observacionesRetiro } = event;
   
   // Nombre del usuario que ejecutó la acción
   const userName = user ? `${user.firstName} ${user.lastName}` : 'Sistema';
   const userRole = user?.role || 'SISTEMA';
 
   switch (eventType) {
+    case 'STATUS_UNDO': {
+      const from = details?.revertedFrom || details?.reverted_to || details?.fromStatus || 'desconocido';
+      const to = details?.revertedTo || details?.reverted_to || details?.toStatus || 'desconocido';
+      const originalBy = details?.originalChangedBy?.name ? ` (original por ${details.originalChangedBy.name})` : '';
+      return `Cambio deshecho: ${translateStatus(from)} → ${translateStatus(to)} por ${userName}${originalBy}`;
+    }
     case 'DOCUMENT_CREATED':
       if (details.source === 'XML_UPLOAD') {
         return `Documento creado desde archivo XML por ${userName}`;
@@ -57,13 +63,13 @@ function formatEventDescription(event) {
             return `Documento completado por ${completedBy} y listo para entrega`;
           }
         case 'ENTREGADO':
-          const deliveredTo = details.deliveredTo || details.clientName || 'cliente';
+          const deliveredTo = personaRetiro || details.entregadoA || details.deliveredTo || details.clientName || 'cliente';
           const deliveredBy = details.deliveredBy || userName;
-          
+          const metodo = metodoVerificacion || details.metodoVerificacion || (details.verificacionManual ? 'verificación manual' : (details.verificationCode || details.codigoRetiro || details.groupVerificationCode) ? 'código WhatsApp' : 'verificación');
           if (details.migration) {
-            return `Documento entregado a ${deliveredTo}`;
+            return `Documento entregado a ${deliveredTo} (método: ${metodo})`;
           } else {
-            return `Documento entregado a ${deliveredTo} por ${deliveredBy}`;
+            return `Documento entregado a ${deliveredTo} por ${deliveredBy} (método: ${metodo})`;
           }
         default:
           if (previousStatus && newStatus) {
@@ -159,10 +165,19 @@ function translateFieldName(fieldName) {
  * Obtiene información contextual adicional para mostrar en el timeline
  */
 function getEventContextInfo(event) {
-  const { eventType, details = {} } = event;
+  const { eventType, details = {}, personaRetiro, cedulaRetiro, metodoVerificacion, observacionesRetiro } = event;
   const contextInfo = [];
 
   switch (eventType) {
+    case 'STATUS_UNDO': {
+      const from = details?.revertedFrom || details?.fromStatus;
+      const to = details?.revertedTo || details?.toStatus;
+      if (from && to) contextInfo.push(`Revertido: ${translateStatus(from)} → ${translateStatus(to)}`);
+      if (details?.originalChangedBy?.name) contextInfo.push(`Original por: ${details.originalChangedBy.name}`);
+      if (typeof details?.whatsappWasSent !== 'undefined') contextInfo.push(`WhatsApp previo: ${details.whatsappWasSent ? 'Sí' : 'No'}`);
+      if (details?.verificationCodeCleared) contextInfo.push('Código limpiado');
+      break;
+    }
     case 'DOCUMENT_CREATED':
       if (details.documentType) {
         contextInfo.push(`Tipo: ${details.documentType}`);
@@ -183,18 +198,23 @@ function getEventContextInfo(event) {
 
     case 'STATUS_CHANGED':
       if (details.newStatus === 'ENTREGADO') {
-        if (details.verificationCode) {
-          contextInfo.push(`Código: ${details.verificationCode}`);
-        }
-        if (details.relationship && details.relationship !== 'titular') {
-          contextInfo.push(`Relación: ${translateRelationship(details.relationship)}`);
-        }
-        if (details.invoicePresented) {
-          contextInfo.push('Con factura');
-        }
-        if (details.manualVerification) {
-          contextInfo.push('Verificación manual');
-        }
+        // Mostrar nombre e identificación del retirador
+        const quien = personaRetiro || details.entregadoA || details.deliveredTo;
+        if (quien) contextInfo.push(`Retiró: ${quien}`);
+        const idnum = cedulaRetiro || details.cedulaReceptor || details.cedula_receptor;
+        if (idnum) contextInfo.push(`Cédula: ${idnum}`);
+        // Método de verificación
+        const metodo = metodoVerificacion || details.metodoVerificacion || (details.verificacionManual ? 'manual' : (details.verificationCode || details.codigoRetiro || details.groupVerificationCode) ? 'código WhatsApp' : null);
+        if (metodo) contextInfo.push(`Método: ${normalizeVerificationMethod(metodo)}`);
+        // Relación con titular
+        const rel = details.relacionTitular || details.relationship;
+        if (rel && rel !== 'titular') contextInfo.push(`Relación: ${translateRelationship(rel)}`);
+        // Factura y banderas
+        if (details.invoicePresented || details.facturaPresenta) contextInfo.push('Con factura');
+        if (details.manualVerification || details.verificacionManual) contextInfo.push('Verificación manual');
+        // Observaciones
+        const obs = observacionesRetiro || details.observacionesEntrega;
+        if (obs) contextInfo.push(`Obs: ${truncate(obs, 80)}`);
       }
       break;
 
@@ -245,6 +265,25 @@ function formatCurrency(amount) {
   }).format(amount);
 }
 
+// Normaliza etiquetas de método de verificación a texto legible
+function normalizeVerificationMethod(method) {
+  const map = {
+    'codigo': 'Código WhatsApp',
+    'codigo_whatsapp': 'Código WhatsApp',
+    'whatsapp': 'Código WhatsApp',
+    'cedula': 'Cédula',
+    'telefono': 'Teléfono',
+    'manual': 'Verificación manual'
+  };
+  return map[(method || '').toString().toLowerCase()] || method;
+}
+
+function truncate(text, max) {
+  if (!text) return '';
+  const s = text.toString();
+  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
+}
+
 /**
  * Formatea fechas de manera legible
  */
@@ -286,11 +325,16 @@ function formatEventDate(date) {
 /**
  * Obtiene el título apropiado para cada tipo de evento
  */
-function getEventTitle(eventType) {
+function getEventTitle(eventType, details = {}) {
+  if (eventType === 'STATUS_CHANGED') {
+    if (details?.newStatus === 'ENTREGADO') return 'Entrega Registrada';
+    if (details?.newStatus === 'LISTO') return 'Listo para Entrega';
+    return 'Estado Actualizado';
+  }
   const titleMap = {
     'DOCUMENT_CREATED': 'Documento Creado',
     'DOCUMENT_ASSIGNED': 'Documento Asignado',
-    'STATUS_CHANGED': 'Estado Actualizado',
+    'STATUS_UNDO': 'Cambio Deshecho',
     'INFO_EDITED': 'Información Editada',
     'GROUP_CREATED': 'Grupo Creado',
     'GROUP_DELIVERED': 'Grupo Entregado',
@@ -303,11 +347,16 @@ function getEventTitle(eventType) {
 /**
  * Obtiene el ícono apropiado para cada tipo de evento
  */
-function getEventIcon(eventType) {
+function getEventIcon(eventType, details = {}) {
+  if (eventType === 'STATUS_CHANGED') {
+    if (details?.newStatus === 'ENTREGADO') return 'delivery';
+    if (details?.newStatus === 'LISTO') return 'check_circle';
+    return 'play';
+  }
   const iconMap = {
     'DOCUMENT_CREATED': 'create',
     'DOCUMENT_ASSIGNED': 'assignment',
-    'STATUS_CHANGED': 'play',
+    'STATUS_UNDO': 'warning',
     'INFO_EDITED': 'edit',
     'GROUP_CREATED': 'group',
     'GROUP_DELIVERED': 'delivery',
@@ -329,6 +378,8 @@ function getEventColor(eventType, details = {}) {
     case 'STATUS_CHANGED':
       if (details.newStatus === 'ENTREGADO') return 'success';
       if (details.newStatus === 'LISTO') return 'success';
+      return 'warning';
+    case 'STATUS_UNDO':
       return 'warning';
     case 'INFO_EDITED':
       return 'info';

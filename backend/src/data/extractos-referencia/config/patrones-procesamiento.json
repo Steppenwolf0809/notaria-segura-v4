@@ -1,0 +1,13 @@
+{
+  "todos_los_poderes": {
+    "template_base": "poder-universal.txt",
+    "procesamiento": "dinamico_inteligente",
+    "maneja_casos": [
+      "poder_natural_simple",
+      "poder_natural_con_representacion", 
+      "poder_juridica_simple",
+      "poder_juridica_multiple",
+      "casos_complejos_multiple_otorgantes_beneficiarios"
+    ]
+  }
+}

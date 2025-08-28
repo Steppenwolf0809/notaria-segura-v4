@@ -1,0 +1,16 @@
+{
+  "representacion_patterns": {
+    "sin_representacion": "",
+    "representacion_simple": " {{VERBO_REPRESENTAR}} por {{TRATAMIENTO_REPRESENTANTE}} **{{NOMBRE_REPRESENTANTE}}**",
+    "representacion_multiple": " {{VERBO_REPRESENTAR}} por {{TRATAMIENTO_REPRESENTANTES}} **{{NOMBRES_REPRESENTANTES}}**",
+    "representacion_mixta": " {{VERBO_REPRESENTAR}} por {{TRATAMIENTO_REPRESENTANTE_1}} **{{NOMBRE_REPRESENTANTE_1}}** y {{TRATAMIENTO_REPRESENTANTE_2}} **{{NOMBRE_REPRESENTANTE_2}}**"
+  },
+  "seleccion_fragmento": {
+    "condiciones": [
+      "if (!hay_representantes) → sin_representacion",
+      "if (representantes.length == 1) → representacion_simple", 
+      "if (representantes.length > 1 && mismo_tratamiento) → representacion_multiple",
+      "if (representantes.length > 1 && diferente_tratamiento) → representacion_mixta"
+    ]
+  }
+}

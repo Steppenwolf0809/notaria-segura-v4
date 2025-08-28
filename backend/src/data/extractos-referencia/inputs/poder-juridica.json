@@ -1,0 +1,31 @@
+{
+  "tipo_documento": "extracto_notarial",
+  "patron": "poderes_genericos",
+  "tipos_aplicables": ["PODER GENERAL PERSONA JURÍDICA", "PODER ESPECIAL PERSONA JURÍDICA", "PROCURACIÓN JUDICIAL PERSONA JURÍDICA"],
+  "notario": "GLENDA ELIZABETH ZAPATA SILVA",
+  "notaria": "DÉCIMA OCTAVA DEL CANTON QUITO",
+  "escritura": "20251701018P01979",
+  "fecha": "25 DE AGOSTO DEL 2025, (13:10)",
+  "actos": [{
+    "tipo": "PODER ESPECIAL PERSONA JURÍDICA",
+    "otorgantes": [{
+      "nombre": "SIGMAEC CIA LTDA",
+      "tipo_persona": "Jurídica", 
+      "representante": "JOSE IGNACIO BORBOLLA PERTIERRA",
+      "documento": "RUC 1790032442001",
+      "calidad": "MANDANTE"
+    }],
+    "beneficiarios": [{
+      "nombre": "MENA MONTERO WILLIAM STALIN",
+      "tipo_persona": "Natural",
+      "documento": "CÉDULA 0502685530", 
+      "calidad": "MANDATARIO(A)"
+    }]
+  }],
+  "ubicacion": {
+    "provincia": "PICHINCHA",
+    "canton": "QUITO", 
+    "parroquia": "IÑAQUITO"
+  },
+  "cuantia": "INDETERMINADA"
+}

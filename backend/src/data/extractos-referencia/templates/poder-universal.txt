@@ -1,0 +1,4 @@
+Se otorgó ante mí, en fe de ello confiero esta **{{NUMERO_COPIA}} COPIA CERTIFICADA** de la escritura pública de **{{TIPO_ACTO}}** que {{VERBO_OTORGAR}} {{TRATAMIENTO_OTORGANTES}} **{{NOMBRES_OTORGANTES}}**{{FRASE_REPRESENTACION}}, {{CONTRACCION_A_FAVOR}} {{TRATAMIENTO_BENEFICIARIOS}} **{{NOMBRES_BENEFICIARIOS}}**, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.
+
+**{{NOMBRE_NOTARIO}}**
+**{{NOTARIA}}**
