@@ -48,7 +48,9 @@ export default function useConcuerdoGenerator() {
     if (!extractedText) return
     setExtracting(true)
     try {
-      const parsed = await concuerdoService.extractData(extractedText)
+      // Pasar el buffer del PDF si está disponible para el parser tabular
+      const buffer = extractedText.buffer || null
+      const parsed = await concuerdoService.extractData(extractedText.text || extractedText, buffer)
       if (!parsed.success) throw new Error(parsed.error || 'Error extrayendo datos')
       setExtractedData(parsed.data)
       setStep(1)
