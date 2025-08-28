@@ -460,29 +460,35 @@ const PdfExtractorService = {
       .trim()
     const upper = text.toUpperCase()
 
-    // Encontrar índices de encabezados ACTO O CONTRATO (singular/plural y con guiones)
-    const headerRe = /ACTO(?:S)?\s+O\s+CON\s*-?\s*TRATO(?:S)?\s*[:\-]?/gi
-    const headers = []
-    let hm
-    while ((hm = headerRe.exec(upper)) !== null) {
-      // Relajar: aceptar cualquier aparición; luego se secciona por siguiente cabecera
-      const idx = hm.index
-      headers.push({ index: idx, length: hm[0].length })
-    }
-    if (headers.length === 0) {
-      // Fallback simple
-      const single = this.parseSimpleData(text)
-      return { acts: [single] }
-    }
-
-    const sliceSection = (startIdx, endIdx) => upper.slice(startIdx, endIdx === -1 ? undefined : endIdx)
+    // 1) Segmentar por “EXTRACTO Escritura N°:” para múltiples actos en un mismo PDF
+    const segmentRe = /EXTRACTO\s*ESCRITURA\s*N[°ºO\.]?\s*:\s*/i
+    const rawSegments = text.split(segmentRe).map(s => s.trim()).filter(Boolean)
+    const segments = rawSegments.length > 0 ? rawSegments : [text]
 
     const acts = []
-    for (let i = 0; i < headers.length; i++) {
-      const start = headers[i].index
-      const end = i + 1 < headers.length ? headers[i + 1].index : -1
-      const section = sliceSection(start, end)
-      if (!section) continue
+    for (const seg of segments) {
+      const segUpper = seg.toUpperCase()
+      // Encontrar encabezados dentro del segmento
+      const headerRe = /ACTO(?:S)?\s+O\s+CON\s*-?\s*TRATO(?:S)?\s*[:\-]?/gi
+      const headers = []
+      let hm
+      while ((hm = headerRe.exec(segUpper)) !== null) {
+        const idx = hm.index
+        headers.push({ index: idx, length: hm[0].length })
+      }
+      // Si no hay encabezados, intentar simple dentro del segmento
+      if (headers.length === 0) {
+        const single = this.parseSimpleData(seg)
+        if (single?.tipoActo || (single?.otorgantes?.length || single?.beneficiarios?.length)) acts.push(single)
+        continue
+      }
+
+      const sliceSection = (startIdx, endIdx) => segUpper.slice(startIdx, endIdx === -1 ? undefined : endIdx)
+      for (let i = 0; i < headers.length; i++) {
+        const start = headers[i].index
+        const end = i + 1 < headers.length ? headers[i + 1].index : -1
+        const section = sliceSection(start, end)
+        if (!section) continue
 
       // Título del acto: desde fin del encabezado hasta FECHA/OTORG/FIN DE LÍNEA
       const titleMatch = section.match(/ACTO(?:S)?\s+O\s+CON\s*-?\s*TRATO(?:S)?\s*[:\-]?\s*([\s\S]*?)(?:\n| FECHA| OTORGADO\s+POR| OTORGANTE| OTORGANTES|$)/i)
@@ -551,13 +557,14 @@ const PdfExtractorService = {
 
       const otClean = this.cleanPersonNames(otorgantesRaw)
       const beClean = this.cleanPersonNames(beneficiariosRaw)
-      for (const title of actsTitles) {
-        acts.push({
-          tipoActo: title || '',
-          otorgantes: otClean,
-          beneficiarios: beClean,
-          ...(notario ? { notario } : {})
-        })
+        for (const title of actsTitles) {
+          acts.push({
+            tipoActo: title || '',
+            otorgantes: otClean,
+            beneficiarios: beClean,
+            ...(notario ? { notario } : {})
+          })
+        }
       }
     }
 

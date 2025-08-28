@@ -65,9 +65,9 @@ export default function ConcuerdoGenerator() {
             <Divider sx={{ mb: 2 }} />
             {extractedData?.engine && (
               <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                <Chip size="small" label={`Acto principal: ${extractedData.engine.acto}`} color="primary" />
-                <Chip size="small" label={`Actos detectados: ${extractedData.engine.actosCount || 1}`} variant="outlined" />
-                <Chip size="small" label={`Template: ${extractedData.engine.template}`} variant="outlined" />
+                <span className="badge bg-primary">Acto principal: {extractedData.engine.acto}</span>
+                <span className="badge bg-secondary">Actos detectados: {extractedData.engine.actosCount || 1}</span>
+                <span className="badge bg-light text-dark">Template: {extractedData.engine.template}</span>
               </Box>
             )}
             {(extractedData?.notario || extractedData?.notariaNumero) && (

@@ -1,27 +1,44 @@
-import React from 'react'
-import { Box, TextField, Button, Grid, Typography, Chip, Stack, FormControlLabel, Checkbox } from '@mui/material'
+import React, { useMemo, useState } from 'react'
+import { Box, TextField, Button, Grid, Typography, Stack, FormControlLabel, Checkbox, Tabs, Tab, Divider } from '@mui/material'
 
 export default function ExtractedDataForm({ data, setData, loading, onBack, onPreview }) {
+  const [actIndex, setActIndex] = useState(0)
+
+  const acts = Array.isArray(data?.acts) && data.acts.length > 0
+    ? data.acts
+    : [{ tipoActo: data?.tipoActo || '', otorgantes: data?.otorgantes || [], beneficiarios: data?.beneficiarios || [] }]
+
+  const currentAct = acts[Math.min(actIndex, acts.length - 1)] || acts[0]
+
   const handleChange = (field) => (e) => {
     setData({ ...data, [field]: e.target.value })
+  }
+
+  const updateAct = (updates) => {
+    const newActs = acts.map((a, idx) => idx === actIndex ? { ...a, ...updates } : a)
+    setData({ ...data, acts: newActs })
   }
 
   return (
     <Box>
       <Typography variant="subtitle1" sx={{ mb: 2 }}>Revisar y editar datos extraídos</Typography>
-      {data?.tipoActo && (
-        <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-          <Chip label={`Acto detectado: ${data.tipoActo}`} color="primary" size="small" />
-          <Chip label="Template: Poder universal" variant="outlined" size="small" />
-        </Stack>
-      )}
+      {acts.length > 1 ? (
+        <Box sx={{ mb: 2 }}>
+          <Tabs value={actIndex} onChange={(_, v) => setActIndex(v)} variant="scrollable" scrollButtons allowScrollButtonsMobile>
+            {acts.map((a, i) => (
+              <Tab key={i} label={`Acto ${i + 1}`} />
+            ))}
+          </Tabs>
+          <Divider sx={{ mt: 1 }} />
+        </Box>
+      ) : null}
       <Grid container spacing={2}>
         <Grid item xs={12} md={6}>
           <TextField
             fullWidth
             label="Tipo de Acto"
-            value={data?.tipoActo || ''}
-            onChange={handleChange('tipoActo')}
+            value={currentAct?.tipoActo || currentAct?.tipo || ''}
+            onChange={(e) => updateAct({ tipoActo: e.target.value })}
           />
         </Grid>
         <Grid item xs={12} md={6}>
@@ -61,8 +78,8 @@ export default function ExtractedDataForm({ data, setData, loading, onBack, onPr
           <TextField
             fullWidth
             label="Otorgantes (uno por línea)"
-            value={(data?.otorgantes || []).join('\n')}
-            onChange={(e) => setData({ ...data, otorgantes: e.target.value.split('\n') })}
+            value={Array.isArray(currentAct?.otorgantes) ? currentAct.otorgantes.join('\n') : ''}
+            onChange={(e) => updateAct({ otorgantes: e.target.value.split('\n').filter(Boolean) })}
             multiline
             minRows={4}
           />
@@ -71,8 +88,8 @@ export default function ExtractedDataForm({ data, setData, loading, onBack, onPr
           <TextField
             fullWidth
             label="Beneficiarios (uno por línea)"
-            value={(data?.beneficiarios || []).join('\n')}
-            onChange={(e) => setData({ ...data, beneficiarios: e.target.value.split('\n') })}
+            value={Array.isArray(currentAct?.beneficiarios) ? currentAct.beneficiarios.join('\n') : ''}
+            onChange={(e) => updateAct({ beneficiarios: e.target.value.split('\n').filter(Boolean) })}
             multiline
             minRows={4}
           />
@@ -92,8 +109,21 @@ export default function ExtractedDataForm({ data, setData, loading, onBack, onPr
 
       <Box sx={{ display: 'flex', gap: 1, mt: 2 }}>
         <Button variant="outlined" onClick={onBack} disabled={loading}>Volver</Button>
-        <Button variant="contained" onClick={() => onPreview(data)} disabled={loading || !data?.tipoActo || !(data?.otorgantes?.length)}>
-          Generar vista previa
+        <Button
+          variant="contained"
+          onClick={() => onPreview({
+            tipoActo: currentAct?.tipoActo || currentAct?.tipo,
+            otorgantes: currentAct?.otorgantes || [],
+            beneficiarios: currentAct?.beneficiarios || [],
+            notario: data?.notario,
+            notariaNumero: data?.notariaNumero,
+            notarioSuplente: data?.notarioSuplente,
+            representantes: data?.representantes,
+            numeroCopias: data?.numeroCopias ?? 2
+          })}
+          disabled={loading || !(currentAct?.tipoActo || currentAct?.tipo) || !((currentAct?.otorgantes || []).length)}
+        >
+          Generar vista previa (acto actual)
         </Button>
       </Box>
     </Box>

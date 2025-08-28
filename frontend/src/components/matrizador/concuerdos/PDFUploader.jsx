@@ -1,12 +1,34 @@
-import React, { useCallback } from 'react'
+import React, { useCallback, useState } from 'react'
 import { Box, Button, Typography, LinearProgress } from '@mui/material'
 import CloudUploadIcon from '@mui/icons-material/CloudUpload'
 
 export default function PDFUploader({ file, setFile, onUpload, loading, onExtract, canExtract }) {
+  const [dragActive, setDragActive] = useState(false)
+
   const onFileChange = useCallback((e) => {
     const f = e.target.files?.[0]
     if (f) setFile(f)
   }, [setFile])
+
+  const onDrop = useCallback((e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragActive(false)
+    const f = e.dataTransfer?.files?.[0]
+    if (f && f.type === 'application/pdf') setFile(f)
+  }, [setFile])
+
+  const onDragOver = useCallback((e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragActive(true)
+  }, [])
+
+  const onDragLeave = useCallback((e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragActive(false)
+  }, [])
 
   return (
     <Box>
@@ -23,6 +45,27 @@ export default function PDFUploader({ file, setFile, onUpload, loading, onExtrac
           {file ? 'Cambiar archivo' : 'Seleccionar PDF'}
         </Button>
       </label>
+
+      <Box
+        onDrop={onDrop}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        sx={{
+          mt: 2,
+          p: 3,
+          border: '2px dashed',
+          borderRadius: 2,
+          borderColor: dragActive ? 'primary.main' : 'divider',
+          backgroundColor: dragActive ? 'action.hover' : 'transparent',
+          textAlign: 'center',
+          transition: 'all 0.15s ease-in-out'
+        }}
+      >
+        <Typography variant="body2" color="text.secondary">
+          Arrastra y suelta aquí tu archivo PDF
+        </Typography>
+        <Typography variant="caption" color="text.disabled">o usa el botón “Seleccionar PDF”</Typography>
+      </Box>
 
       {file && (
         <Typography variant="body2" sx={{ mt: 1 }}>Archivo seleccionado: {file.name}</Typography>
