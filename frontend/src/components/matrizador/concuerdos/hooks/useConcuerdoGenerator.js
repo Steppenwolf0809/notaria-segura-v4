@@ -53,12 +53,13 @@ export default function useConcuerdoGenerator() {
         beneficiarios: data?.beneficiarios,
         notario: data?.notario,
         notariaNumero: data?.notariaNumero,
+        representantes: data?.representantes,
         numCopias,
         format: 'html'
       })
       if (!resp.success) throw new Error(resp.error || 'Error generando documentos')
 
-      setExtractedData({ ...data, previewDocs: resp.data.documents })
+      setExtractedData({ ...data, previewDocs: resp.data.documents, engine: resp.data.engine })
       setStep(2)
     } finally {
       setGenerating(false)

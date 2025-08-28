@@ -63,6 +63,12 @@ export default function ConcuerdoGenerator() {
           <Box>
             <Typography variant="subtitle1" sx={{ mb: 1 }}>Vista previa de copias</Typography>
             <Divider sx={{ mb: 2 }} />
+            {extractedData?.engine && (
+              <Box sx={{ mb: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                <Chip size="small" label={`Acto: ${extractedData.engine.acto}`} color="primary" />
+                <Chip size="small" label={`Template: ${extractedData.engine.template}`} variant="outlined" />
+              </Box>
+            )}
             {(extractedData?.notario || extractedData?.notariaNumero) && (
               <Box sx={{ mb: 2 }}>
                 <Typography variant="subtitle2" color="text.secondary">Datos de notaría</Typography>

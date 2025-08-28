@@ -91,6 +91,30 @@ async function previewConcuerdo(req, res) {
       ? v.map((x) => String(x || '').trim()).filter(Boolean)
       : String(v || '').split(/\n|,|;/).map((x) => x.trim()).filter(Boolean)
 
+    // Normaliza posibles bloques sucios (con encabezados de tabla) → lista de nombres
+    const extractFromBlock = (block) => {
+      const s = String(block || '')
+      const m1 = s.match(/NOMBRES\s*\/\s*RAZ[ÓO]N\s+SOCIAL\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ0-9\s\.,\-\&]+?)(?=\s+(?:TIPO\s+INTERVINIENTE|DOCUMENTO|NACIONALIDAD|CALIDAD)|$)/i)
+      if (m1 && m1[1]) return [m1[1].replace(/\s+/g, ' ').trim()]
+      const m2 = s.match(/NOMBRES\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]+?)(?=\s+(?:TIPO\s+INTERVINIENTE|DOCUMENTO|NACIONALIDAD|CALIDAD)|$)/i)
+      if (m2 && m2[1]) return [m2[1].replace(/\s+/g, ' ').trim()]
+      return null
+    }
+    const expandComparecientes = (raw) => {
+      const arr = safeArray(raw)
+      if (arr.length === 0) return []
+      // Si llega un único bloque largo con encabezados conocidos, limpiarlo
+      const joined = arr.join(' ')
+      const hasHeaders = /RAZ[ÓO]N\s+SOCIAL|NOMBRES\s*\/|TIPO\s+INTERVINIENTE|NACIONALIDAD|CALIDAD/i.test(joined)
+      if (arr.length === 1 && (arr[0].length > 40 || hasHeaders)) {
+        const direct = extractFromBlock(arr[0])
+        if (direct && direct.length) return direct.map(n => ({ nombre: n }))
+        const names = PdfExtractorService.cleanPersonNames(arr[0])
+        return names.map(n => ({ nombre: n }))
+      }
+      return arr.map(n => ({ nombre: n }))
+    }
+
     const guessTipoPersona = (name) => {
       const s = String(name || '').toUpperCase()
       const keys = [' CIA', 'CIA.', ' LTDA', ' S.A', ' S.A.', ' BANCO', ' FIDEICOMISO', ' CONSTRUCTORA', ' CORPORACION', ' COMPAÑIA', ' COMPAÑÍA', ' GRUPO']
@@ -123,15 +147,28 @@ async function previewConcuerdo(req, res) {
     const firstAct = actsData[0]
     const engineData = {
       notario,
-      notaria: notariaNumero,
+      notarioNombre: notario,
+      notaria: notariaNumero || req.body?.notaria,
+      notariaNumero: notariaNumero || req.body?.notaria,
       actos: [{
         tipo: PdfExtractorService.cleanActType(firstAct?.tipoActo || firstAct?.tipo),
-        otorgantes: safeArray(firstAct?.otorgantes).map(normalizeCompareciente),
-        beneficiarios: safeArray(firstAct?.beneficiarios).map(normalizeCompareciente)
+        otorgantes: expandComparecientes(firstAct?.otorgantes).map(normalizeCompareciente),
+        beneficiarios: expandComparecientes(firstAct?.beneficiarios).map(normalizeCompareciente)
       }]
     }
 
+    // Si el frontend proporciona representantes (string o array), asociar al primer otorgante jurídico
+    const repsRaw = req.body?.representantes || req.body?.representantesOtorgantes
+    if (repsRaw) {
+      const reps = Array.isArray(repsRaw) ? repsRaw : String(repsRaw).split(/\n|,|;/).map(s => s.trim()).filter(Boolean)
+      const ots = engineData.actos[0].otorgantes
+      const findJuridicaIdx = ots.findIndex(o => /JUR[IÍ]DICA/i.test(o?.tipo_persona || ''))
+      const idx = findJuridicaIdx !== -1 ? findJuridicaIdx : 0
+      if (ots[idx]) ots[idx].representantes = reps
+    }
+
     const { text } = await ExtractoTemplateEngine.render('poder-universal.txt', engineData, { NUMERO_COPIA: 'PRIMERA' })
+    const engineInfo = { template: 'poder-universal', acto: engineData.actos[0].tipo }
 
     const copies = Math.max(1, Math.min(10, parseInt(numeroCopias || 2)))
     const rotulo = (n) => (n === 1 ? 'PRIMERA COPIA' : n === 2 ? 'SEGUNDA COPIA' : `${n}ª COPIA`)
@@ -145,7 +182,7 @@ async function previewConcuerdo(req, res) {
     }
 
     res.set('Content-Type', 'application/json; charset=utf-8')
-    return res.json({ success: true, data: { previewText: text, previews } })
+    return res.json({ success: true, data: { previewText: text, previews, engine: engineInfo } })
   } catch (error) {
     console.error('Error en previewConcuerdo:', error)
     return res.status(500).json({ success: false, message: 'Error generando vista previa' })
@@ -166,6 +203,28 @@ async function generateDocuments(req, res) {
       ? v.map((x) => String(x || '').trim()).filter(Boolean)
       : String(v || '').split(/\n|,|;/).map((x) => x.trim()).filter(Boolean)
 
+    const extractFromBlock = (block) => {
+      const s = String(block || '')
+      const m1 = s.match(/NOMBRES\s*\/\s*RAZ[ÓO]N\s+SOCIAL\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ0-9\s\.,\-\&]+?)(?=\s+(?:TIPO\s+INTERVINIENTE|DOCUMENTO|NACIONALIDAD|CALIDAD)|$)/i)
+      if (m1 && m1[1]) return [m1[1].replace(/\s+/g, ' ').trim()]
+      const m2 = s.match(/NOMBRES\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s]+?)(?=\s+(?:TIPO\s+INTERVINIENTE|DOCUMENTO|NACIONALIDAD|CALIDAD)|$)/i)
+      if (m2 && m2[1]) return [m2[1].replace(/\s+/g, ' ').trim()]
+      return null
+    }
+    const expandComparecientes = (raw) => {
+      const arr = safeArray(raw)
+      if (arr.length === 0) return []
+      const joined = arr.join(' ')
+      const hasHeaders = /RAZ[ÓO]N\s+SOCIAL|NOMBRES\s*\/|TIPO\s+INTERVINIENTE|NACIONALIDAD|CALIDAD/i.test(joined)
+      if (arr.length === 1 && (arr[0].length > 40 || hasHeaders)) {
+        const direct = extractFromBlock(arr[0])
+        if (direct && direct.length) return direct.map(n => ({ nombre: n }))
+        const names = PdfExtractorService.cleanPersonNames(arr[0])
+        return names.map(n => ({ nombre: n }))
+      }
+      return arr.map(n => ({ nombre: n }))
+    }
+
     const guessTipoPersona = (name) => {
       const s = String(name || '').toUpperCase()
       const keys = [' CIA', 'CIA.', ' LTDA', ' S.A', ' S.A.', ' BANCO', ' FIDEICOMISO', ' CONSTRUCTORA', ' CORPORACION', ' COMPAÑIA', ' COMPAÑÍA', ' GRUPO']
@@ -198,16 +257,29 @@ async function generateDocuments(req, res) {
     const firstAct = actsData[0]
     const engineData = {
       notario,
-      notaria: notariaNumero,
+      notarioNombre: notario,
+      notaria: notariaNumero || req.body?.notaria,
+      notariaNumero: notariaNumero || req.body?.notaria,
       actos: [{
         tipo: PdfExtractorService.cleanActType(firstAct?.tipoActo || firstAct?.tipo),
-        otorgantes: safeArray(firstAct?.otorgantes).map(normalizeCompareciente),
-        beneficiarios: safeArray(firstAct?.beneficiarios).map(normalizeCompareciente)
+        otorgantes: expandComparecientes(firstAct?.otorgantes).map(normalizeCompareciente),
+        beneficiarios: expandComparecientes(firstAct?.beneficiarios).map(normalizeCompareciente)
       }]
+    }
+
+    // Asociar representantes si vienen del frontend
+    const repsRaw = req.body?.representantes || req.body?.representantesOtorgantes
+    if (repsRaw) {
+      const reps = Array.isArray(repsRaw) ? repsRaw : String(repsRaw).split(/\n|,|;/).map(s => s.trim()).filter(Boolean)
+      const ots = engineData.actos[0].otorgantes
+      const findJuridicaIdx = ots.findIndex(o => /JUR[IÍ]DICA/i.test(o?.tipo_persona || ''))
+      const idx = findJuridicaIdx !== -1 ? findJuridicaIdx : 0
+      if (ots[idx]) ots[idx].representantes = reps
     }
 
     const copies = Math.max(1, Math.min(10, parseInt(numCopias || 2)))
     const documents = []
+    const engineInfo = { template: 'poder-universal', acto: engineData.actos[0].tipo }
     for (let i = 0; i < copies; i++) {
       const n = i + 1
       const rotuloPalabra = n === 1 ? 'PRIMERA' : n === 2 ? 'SEGUNDA' : `${n}ª`
@@ -219,7 +291,7 @@ async function generateDocuments(req, res) {
     }
 
     res.set('Content-Type', 'application/json; charset=utf-8')
-    return res.json({ success: true, data: { documents } })
+    return res.json({ success: true, data: { documents, engine: engineInfo } })
   } catch (error) {
     console.error('Error generando documentos de concuerdo:', error)
     return res.status(500).json({ success: false, message: 'Error generando documentos' })

@@ -266,7 +266,7 @@ function buildVariables({ data, reglasGenero }) {
   const TRATAMIENTO_BENEFICIARIOS = sustantivoGrupo(bes)
   const NOMBRES_BENEFICIARIOS = nombresConjuncion(bes)
 
-  const NOMBRE_NOTARIO = String(data?.notario || data?.notaria || data?.notarioNombre || '').toUpperCase()
+  const NOMBRE_NOTARIO = String(data?.notario || data?.notarioNombre || '').toUpperCase()
   const NOTARIA = (() => {
     const raw = String(data?.notaria || data?.notariaNumero || '').trim()
     if (!raw) return ''
