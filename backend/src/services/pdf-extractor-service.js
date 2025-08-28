@@ -1,6 +1,9 @@
+import NotarialTableParser from './notarial-table-parser.js'
+
 /**
  * Servicio de extracción y parsing básico de PDFs de extractos notariales
  * Sprint 1: Casos simples (un solo acto)
+ * Incluye parser tabular avanzado como fallback
  */
 const PdfExtractorService = {
   /**
@@ -608,14 +611,14 @@ const PdfExtractorService = {
   },
 
   /**
-   * Parser avanzado: detecta múltiples actos y busca etiquetas comunes
-   * - Soporta múltiples ocurrencias de "ACTO O CONTRATO"
-   * - Extrae bloques entre "OTORGADO POR"/"OTORGANTES" y "A FAVOR DE"/"BENEFICIARIO(S)"
-   * - Considera etiquetas "NOMBRES/RAZÓN SOCIAL" y variaciones
+   * Parser avanzado con fallback tabular
+   * - Intenta extracción por texto plano primero
+   * - Si falla, usa parser tabular con coordenadas PDF.js
    * @param {string} rawText
+   * @param {Buffer} pdfBuffer - Buffer opcional para fallback tabular
    * @returns {{ acts: Array<{ tipoActo: string, otorgantes: string[], beneficiarios: string[], notario?: string }>} }
    */
-  parseAdvancedData(rawText) {
+  async parseAdvancedData(rawText, pdfBuffer = null) {
     if (!rawText || typeof rawText !== 'string') return { acts: [] }
 
     // Normalizar preservando saltos de línea
@@ -819,10 +822,76 @@ const PdfExtractorService = {
       const single = this.parseSimpleData(rawText)
       const t = String(single?.tipoActo || '').toUpperCase()
       if (t && !/INDETERMINADA/.test(t) && ALLOW.some(k => t.includes(k))) return { acts: [single] }
+      
+      // Último recurso: parser tabular si tenemos el buffer
+      if (pdfBuffer) {
+        console.log('[PdfExtractorService] Fallback: usando parser tabular avanzado')
+        try {
+          const tableParser = new NotarialTableParser()
+          const structuredData = await tableParser.parseStructuredData(pdfBuffer)
+          
+          if (structuredData.length > 0) {
+            const tabularActs = this.convertStructuredDataToActs(structuredData, rawText)
+            if (tabularActs.length > 0) {
+              console.log(`[PdfExtractorService] Parser tabular extrajo ${tabularActs.length} actos`)
+              return { acts: tabularActs }
+            }
+          }
+        } catch (error) {
+          console.warn('[PdfExtractorService] Error en parser tabular:', error.message)
+        }
+      }
+      
       return { acts: [] }
     }
 
     return { acts: filtered }
+  },
+
+  /**
+   * Convierte datos estructurados del parser tabular a formato de actos
+   */
+  convertStructuredDataToActs(structuredData, rawText) {
+    const acts = []
+    
+    // Extraer tipo de acto del texto raw
+    const tipoActo = this.cleanActType(
+      (rawText.match(/ACTO(?:\s+O\s+CON\s*-?\s*TRATO)?[:\-]?\s*([\s\S]*?)(?:\n| FECHA| OTORGADO\s+POR)/i)?.[1] || '').trim()
+    ) || 'PODER ESPECIAL' // Fallback común
+    
+    let otorgantes = []
+    let beneficiarios = []
+    
+    // Combinar entidades por tipo
+    for (const section of structuredData) {
+      if (section.type === 'otorgantes' && section.entities) {
+        otorgantes.push(...section.entities)
+      } else if (section.type === 'beneficiarios' && section.entities) {
+        beneficiarios.push(...section.entities)
+      }
+    }
+    
+    // Si no encontramos separación clara, usar la primera sección como otorgantes
+    if (otorgantes.length === 0 && structuredData.length > 0) {
+      otorgantes = structuredData[0].entities || []
+    }
+    
+    if (otorgantes.length > 0 || beneficiarios.length > 0) {
+      acts.push({
+        tipoActo,
+        otorgantes: otorgantes.map(o => ({
+          nombre: o.nombre,
+          tipo_persona: o.tipo_persona,
+          ...(o.representantes?.length > 0 ? { representantes: o.representantes } : {})
+        })),
+        beneficiarios: beneficiarios.map(b => ({
+          nombre: b.nombre,
+          tipo_persona: b.tipo_persona
+        }))
+      })
+    }
+    
+    return acts
   }
 }
 

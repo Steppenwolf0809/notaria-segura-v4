@@ -2,6 +2,7 @@ import PdfExtractorService from '../services/pdf-extractor-service.js'
 import { ExtractoTemplateEngine } from '../services/extractos/index.js'
 import { buildActPhrase, normalizeActTypeForDisplay } from '../services/extractos/phrase-builder.js'
 import { generateDocxFromText } from '../services/docx-generator.js'
+import DataQualityValidator from '../services/data-quality-validator.js'
 
 /**
  * Controlador de Generador de Concuerdos (Sprint 1)
@@ -41,7 +42,11 @@ async function uploadPdf(req, res) {
     return res.json({
       success: true,
       message: 'Texto extraído correctamente',
-      data: { text }
+      data: { 
+        text,
+        // Incluir buffer para parser avanzado (limitado a 5MB)
+        buffer: size <= 5 * 1024 * 1024 ? buffer.toString('base64') : null
+      }
     })
   } catch (error) {
     console.error('Error en uploadPdf:', error?.message || error)
@@ -60,20 +65,63 @@ async function uploadPdf(req, res) {
  */
 async function extractData(req, res) {
   try {
-    const { text } = req.body || {}
+    const { text, buffer } = req.body || {}
     if (!text || typeof text !== 'string' || text.trim().length < 5) {
       return res.status(400).json({ success: false, message: 'Texto del PDF inválido o vacío' })
     }
 
-    const { acts } = PdfExtractorService.parseAdvancedData(text)
+    // Intentar obtener el buffer del PDF si está disponible en la sesión
+    let pdfBuffer = null
+    if (buffer && typeof buffer === 'string') {
+      try {
+        pdfBuffer = Buffer.from(buffer, 'base64')
+      } catch (e) {
+        console.warn('No se pudo decodificar buffer PDF para parser avanzado')
+      }
+    }
+
+    const { acts } = await PdfExtractorService.parseAdvancedData(text, pdfBuffer)
     const parsed = acts[0] || { tipoActo: '', otorgantes: [], beneficiarios: [] }
     const { notarioNombre, notariaNumero, notariaNumeroDigit, notarioSuplente } = PdfExtractorService.extractNotaryInfo(text)
+
+    // Validar calidad de los datos extraídos
+    const validator = new DataQualityValidator()
+    const validation = validator.validateMultipleActs(acts)
+    
+    // Log de calidad para monitoreo
+    if (validation.overallConfidence === 'low' || validation.overallConfidence === 'very_low') {
+      console.warn(`⚠️ Baja calidad de extracción detectada (${Math.round(validation.overallScore * 100)}%)`)
+      validation.validations.forEach((v, i) => {
+        if (v.issues.length > 0) {
+          console.warn(`  Acto ${i}: ${v.issues.join(', ')}`)
+        }
+      })
+    } else {
+      console.log(`✅ Extracción validada con calidad ${validation.overallConfidence} (${Math.round(validation.overallScore * 100)}%)`)
+    }
 
     res.set('Content-Type', 'application/json; charset=utf-8')
     return res.json({
       success: true,
       message: 'Datos extraídos correctamente',
-      data: { ...parsed, acts, notario: notarioNombre, notarioSuplente, notariaNumero, notariaNumeroDigit }
+      data: { 
+        ...parsed, 
+        acts, 
+        notario: notarioNombre, 
+        notarioSuplente, 
+        notariaNumero, 
+        notariaNumeroDigit,
+        // Incluir información de validación
+        validation: {
+          score: validation.overallScore,
+          confidence: validation.overallConfidence,
+          summary: validation.summary,
+          issues: validation.validations.flatMap(v => v.issues),
+          warnings: validation.validations.flatMap(v => v.warnings),
+          suggestions: validation.validations.flatMap(v => v.suggestions),
+          autoFixes: validation.validations.reduce((acc, v) => ({ ...acc, ...v.autoFixes }), {})
+        }
+      }
     })
   } catch (error) {
     console.error('Error en extractData:', error)
@@ -288,7 +336,89 @@ async function previewConcuerdo(req, res) {
   }
 }
 
-export { uploadPdf, extractData, previewConcuerdo }
+/**
+ * POST /api/concuerdos/apply-fixes
+ * Aplica correcciones automáticas sugeridas por el validador
+ */
+async function applyAutoFixes(req, res) {
+  try {
+    const { actData, fixes } = req.body || {}
+    
+    if (!actData || !fixes || typeof fixes !== 'object') {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Datos del acto y correcciones requeridas' 
+      })
+    }
+
+    console.log('🔧 Aplicando correcciones automáticas:', Object.keys(fixes))
+
+    // Crear copia del acto para aplicar correcciones
+    const correctedAct = JSON.parse(JSON.stringify(actData))
+
+    // Aplicar correcciones automáticas
+    for (const [field, value] of Object.entries(fixes)) {
+      if (field === 'tipoActo') {
+        correctedAct.tipoActo = value
+      } else if (field.endsWith('_nombre')) {
+        // Correcciones de nombres de entidades
+        const match = field.match(/^(otorgantes|beneficiarios)\[(\d+)\]_nombre/)
+        if (match) {
+          const [, tipo, index] = match
+          const idx = parseInt(index)
+          if (correctedAct[tipo] && correctedAct[tipo][idx]) {
+            correctedAct[tipo][idx].nombre = value
+          }
+        }
+      } else if (field.endsWith('_tipo_persona')) {
+        // Correcciones de tipo de persona
+        const match = field.match(/^(otorgantes|beneficiarios)\[(\d+)\]_tipo_persona/)
+        if (match) {
+          const [, tipo, index] = match
+          const idx = parseInt(index)
+          if (correctedAct[tipo] && correctedAct[tipo][idx]) {
+            correctedAct[tipo][idx].tipo_persona = value
+          }
+        }
+      } else if (field.endsWith('_nombre_capitalized')) {
+        // Correcciones de capitalización
+        const match = field.match(/^(otorgantes|beneficiarios)\[(\d+)\]_nombre_capitalized/)
+        if (match) {
+          const [, tipo, index] = match
+          const idx = parseInt(index)
+          if (correctedAct[tipo] && correctedAct[tipo][idx]) {
+            correctedAct[tipo][idx].nombre = value
+          }
+        }
+      }
+    }
+
+    // Re-validar después de las correcciones
+    const validator = new DataQualityValidator()
+    const newValidation = validator.validateActData(correctedAct)
+
+    console.log(`✅ Correcciones aplicadas. Calidad mejorada: ${Math.round(newValidation.score * 100)}%`)
+
+    res.set('Content-Type', 'application/json; charset=utf-8')
+    return res.json({
+      success: true,
+      message: 'Correcciones aplicadas exitosamente',
+      data: {
+        correctedAct,
+        validation: newValidation,
+        appliedFixes: Object.keys(fixes)
+      }
+    })
+  } catch (error) {
+    console.error('Error aplicando correcciones:', error)
+    return res.status(500).json({ 
+      success: false, 
+      message: 'Error aplicando correcciones automáticas' 
+    })
+  }
+}
+
+export { uploadPdf, extractData, previewConcuerdo, applyAutoFixes }
 /**
  * Generar múltiples documentos (copias) numerados
  * POST /api/concuerdos/generate-documents

@@ -1,7 +1,7 @@
 import express from 'express'
 import multer from 'multer'
 import { authenticateToken, requireRoles } from '../middleware/auth-middleware.js'
-import { uploadPdf, extractData, previewConcuerdo, generateDocuments } from '../controllers/concuerdo-controller.js'
+import { uploadPdf, extractData, previewConcuerdo, generateDocuments, applyAutoFixes } from '../controllers/concuerdo-controller.js'
 
 const router = express.Router()
 
@@ -30,6 +30,9 @@ router.post('/preview', authenticateToken, requireMatrizador, previewConcuerdo)
 
 // POST /api/concuerdos/generate-documents
 router.post('/generate-documents', authenticateToken, requireMatrizador, generateDocuments)
+
+// POST /api/concuerdos/apply-fixes
+router.post('/apply-fixes', authenticateToken, requireMatrizador, applyAutoFixes)
 
 // Manejo de errores de multer
 router.use((error, req, res, next) => {

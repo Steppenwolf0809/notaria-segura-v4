@@ -2,6 +2,7 @@ import React from 'react'
 import { Box, Stepper, Step, StepLabel, Paper, Typography, Divider, Button } from '@mui/material'
 import PDFUploader from './PDFUploader.jsx'
 import ExtractedDataForm from './ExtractedDataForm.jsx'
+import DataValidationPanel from './DataValidationPanel.jsx'
 import useConcuerdoGenerator from './hooks/useConcuerdoGenerator.js'
 
 const steps = ['Subir PDF', 'Revisar datos', 'Generar']
@@ -128,14 +129,47 @@ export default function ConcuerdoGenerator() {
         )}
 
         {step === 1 && (
-          <ExtractedDataForm
-            data={extractedData}
-            setData={setExtractedData}
-            loading={extracting || generating}
-            onBack={() => setStep(0)}
-            onPreview={preview}
-            onNew={reset}
-          />
+          <Box>
+            {/* Panel de validación de datos */}
+            {extractedData?.validation && (
+              <DataValidationPanel
+                validation={extractedData.validation}
+                onApplyFixes={async (fixes) => {
+                  // Llamar al endpoint de correcciones automáticas
+                  try {
+                    const concuerdoService = (await import('../../../services/concuerdo-service.js')).default
+                    const response = await concuerdoService.applyAutoFixes({
+                      actData: extractedData,
+                      fixes
+                    })
+                    
+                    if (response.success) {
+                      // Actualizar los datos con las correcciones
+                      setExtractedData({
+                        ...extractedData,
+                        ...response.data.correctedAct,
+                        validation: response.data.validation
+                      })
+                    } else {
+                      throw new Error(response.message || 'Error aplicando correcciones')
+                    }
+                  } catch (error) {
+                    console.error('Error aplicando correcciones:', error)
+                    throw error
+                  }
+                }}
+              />
+            )}
+            
+            <ExtractedDataForm
+              data={extractedData}
+              setData={setExtractedData}
+              loading={extracting || generating}
+              onBack={() => setStep(0)}
+              onPreview={preview}
+              onNew={reset}
+            />
+          </Box>
         )}
 
         {step === 2 && (

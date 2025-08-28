@@ -57,9 +57,13 @@ const concuerdoService = {
     }
   },
 
-  async extractData(text) {
+  async extractData(text, buffer = null) {
     try {
-      const response = await api.post('/concuerdos/extract-data', { text });
+      const payload = { text }
+      if (buffer) {
+        payload.buffer = buffer
+      }
+      const response = await api.post('/concuerdos/extract-data', payload);
       return { success: true, data: response.data.data };
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Error extrayendo datos';
@@ -83,6 +87,16 @@ const concuerdoService = {
       return { success: true, data: response.data.data };
     } catch (error) {
       const message = error.response?.data?.message || error.message || 'Error generando documentos';
+      return { success: false, error: message };
+    }
+  },
+
+  async applyAutoFixes(data) {
+    try {
+      const response = await api.post('/concuerdos/apply-fixes', data);
+      return { success: true, data: response.data.data };
+    } catch (error) {
+      const message = error.response?.data?.message || error.message || 'Error aplicando correcciones';
       return { success: false, error: message };
     }
   },
