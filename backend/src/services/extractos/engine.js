@@ -5,9 +5,13 @@
 
 import fs from 'fs/promises'
 import path from 'path'
+import { fileURLToPath } from 'url'
 import PdfExtractorService from '../pdf-extractor-service.js'
 
-const ROOT_DIR = path.resolve(process.cwd(), 'backend', 'src', 'data', 'extractos-referencia')
+// Resolver rutas de forma robusta (independiente del cwd)
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const ROOT_DIR = path.resolve(__dirname, '..', '..', 'data', 'extractos-referencia')
 const TEMPLATES_DIR = path.join(ROOT_DIR, 'templates')
 const CONFIG_DIR = path.join(ROOT_DIR, 'config')
 

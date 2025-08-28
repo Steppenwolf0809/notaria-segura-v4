@@ -465,12 +465,9 @@ const PdfExtractorService = {
     const headers = []
     let hm
     while ((hm = headerRe.exec(upper)) !== null) {
-      // Solo considerar si está al inicio o precedido por salto de línea
+      // Relajar: aceptar cualquier aparición; luego se secciona por siguiente cabecera
       const idx = hm.index
-      const before = idx > 0 ? upper[idx - 1] : '\n'
-      if (before === '\n') {
-        headers.push({ index: idx, length: hm[0].length })
-      }
+      headers.push({ index: idx, length: hm[0].length })
     }
     if (headers.length === 0) {
       // Fallback simple
