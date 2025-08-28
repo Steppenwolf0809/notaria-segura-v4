@@ -1,4 +1,5 @@
 import prisma from '../db.js';
+import cache from '../services/cache-service.js';
 import { Prisma } from '@prisma/client';
 import { 
   logAdminAction,
@@ -61,81 +62,106 @@ async function getAllDocumentsOversight(req, res) {
       orderBy.createdAt = 'desc';
     }
 
-    // Ejecutar consultas con búsqueda acento-insensible si aplica
+    // Ejecutar consultas con caché para mejorar tiempos de respuesta
     let documents;
     let totalCount;
-    if (searchTerm) {
-      const supportsUnaccent = await supportsUnaccentFn();
-      if (supportsUnaccent) {
-        const pattern = `%${searchTerm}%`;
-        const filterClauses = [];
-        if (where.status) filterClauses.push(Prisma.sql`d."status"::text = ${where.status}`);
-        if (where.documentType) filterClauses.push(Prisma.sql`d."documentType"::text = ${where.documentType}`);
-        if (where.assignedToId === null) {
-          filterClauses.push(Prisma.sql`d."assignedToId" IS NULL`);
-        } else if (typeof where.assignedToId === 'number') {
-          filterClauses.push(Prisma.sql`d."assignedToId" = ${where.assignedToId}`);
+    const cacheKey = cache.key({
+      scope: 'admin:oversight', page: pageNum, limit: limitNum,
+      search: searchTerm, status, type, matrizador, overdueOnly,
+      sortBy, sortOrder
+    });
+    const cached = await cache.get(cacheKey);
+    if (cached) {
+      ({ documents, totalCount } = cached);
+    } else {
+      if (searchTerm) {
+        const supportsUnaccent = await supportsUnaccentFn();
+        if (supportsUnaccent) {
+          const pattern = `%${searchTerm}%`;
+          const filterClauses = [];
+          if (where.status) filterClauses.push(Prisma.sql`d."status"::text = ${where.status}`);
+          if (where.documentType) filterClauses.push(Prisma.sql`d."documentType"::text = ${where.documentType}`);
+          if (where.assignedToId === null) {
+            filterClauses.push(Prisma.sql`d."assignedToId" IS NULL`);
+          } else if (typeof where.assignedToId === 'number') {
+            filterClauses.push(Prisma.sql`d."assignedToId" = ${where.assignedToId}`);
+          }
+
+          const whereSql = Prisma.sql`${Prisma.join([
+            Prisma.sql`(
+              unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
+              unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
+              unaccent(d."actoPrincipalDescripcion") ILIKE unaccent(${pattern}) OR
+              unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
+              d."clientPhone" ILIKE ${pattern} OR
+              d."clientEmail" ILIKE ${pattern} OR
+              unaccent(COALESCE(d."clientId", '')) ILIKE unaccent(${pattern})
+            )`,
+            ...filterClauses
+          ], Prisma.sql` AND `)}`;
+
+          const fieldSql = (sortBy === 'updatedAt') 
+            ? Prisma.sql`d."updatedAt"`
+            : Prisma.sql`d."createdAt"`;
+          const directionSql = sortOrder === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+
+          documents = await prisma.$queryRaw`
+            SELECT d.*, 
+                   au.id   AS "_assignedToId", au."firstName" AS "_assignedToFirstName", au."lastName" AS "_assignedToLastName", au.email AS "_assignedToEmail",
+                   cu.id   AS "_createdById",  cu."firstName"  AS "_createdByFirstName",  cu."lastName"  AS "_createdByLastName",  cu.email AS "_createdByEmail"
+            FROM "documents" d
+            LEFT JOIN "users" au ON au.id = d."assignedToId"
+            LEFT JOIN "users" cu ON cu.id = d."createdById"
+            WHERE ${whereSql}
+            ORDER BY ${fieldSql} ${directionSql}
+            OFFSET ${offset} LIMIT ${limitNum}
+          `;
+          const countRows = await prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${whereSql}`;
+          totalCount = Array.isArray(countRows) ? (countRows[0]?.count || 0) : (countRows?.count || 0);
+
+          // Adaptar include manual
+          documents = documents.map(d => ({
+            ...d,
+            assignedTo: d._assignedToId ? {
+              id: d._assignedToId,
+              firstName: d._assignedToFirstName,
+              lastName: d._assignedToLastName,
+              email: d._assignedToEmail
+            } : null,
+            createdBy: d._createdById ? {
+              id: d._createdById,
+              firstName: d._createdByFirstName,
+              lastName: d._createdByLastName,
+              email: d._createdByEmail
+            } : null
+          }));
+        } else {
+          // Fallback Prisma estándar
+          where.OR = [
+            { protocolNumber: { contains: searchTerm, mode: 'insensitive' } },
+            { clientName: { contains: searchTerm, mode: 'insensitive' } },
+            { actoPrincipalDescripcion: { contains: searchTerm, mode: 'insensitive' } },
+            { detalle_documento: { contains: searchTerm, mode: 'insensitive' } },
+            { clientPhone: { contains: searchTerm } },
+            { clientEmail: { contains: searchTerm, mode: 'insensitive' } },
+            { clientId: { contains: searchTerm, mode: 'insensitive' } }
+          ];
+          [documents, totalCount] = await Promise.all([
+            prisma.document.findMany({
+              where,
+              skip: offset,
+              take: limitNum,
+              orderBy,
+              include: {
+                assignedTo: { select: { id: true, firstName: true, lastName: true, email: true } },
+                createdBy:  { select: { id: true, firstName: true, lastName: true, email: true } }
+              }
+            }),
+            prisma.document.count({ where })
+          ]);
         }
-
-        const whereSql = Prisma.sql`${Prisma.join([
-          Prisma.sql`(
-            unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
-            unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
-            unaccent(d."actoPrincipalDescripcion") ILIKE unaccent(${pattern}) OR
-            unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
-            d."clientPhone" ILIKE ${pattern} OR
-            d."clientEmail" ILIKE ${pattern} OR
-            unaccent(COALESCE(d."clientId", '')) ILIKE unaccent(${pattern})
-          )`,
-          ...filterClauses
-        ], Prisma.sql` AND `)}`;
-
-        const fieldSql = (sortBy === 'updatedAt') 
-          ? Prisma.sql`d."updatedAt"`
-          : Prisma.sql`d."createdAt"`;
-        const directionSql = sortOrder === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
-
-        documents = await prisma.$queryRaw`
-          SELECT d.*, 
-                 au.id   AS "_assignedToId", au."firstName" AS "_assignedToFirstName", au."lastName" AS "_assignedToLastName", au.email AS "_assignedToEmail",
-                 cu.id   AS "_createdById",  cu."firstName"  AS "_createdByFirstName",  cu."lastName"  AS "_createdByLastName",  cu.email AS "_createdByEmail"
-          FROM "documents" d
-          LEFT JOIN "users" au ON au.id = d."assignedToId"
-          LEFT JOIN "users" cu ON cu.id = d."createdById"
-          WHERE ${whereSql}
-          ORDER BY ${fieldSql} ${directionSql}
-          OFFSET ${offset} LIMIT ${limitNum}
-        `;
-        const countRows = await prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${whereSql}`;
-        totalCount = Array.isArray(countRows) ? (countRows[0]?.count || 0) : (countRows?.count || 0);
-
-        // Adaptar include manual
-        documents = documents.map(d => ({
-          ...d,
-          assignedTo: d._assignedToId ? {
-            id: d._assignedToId,
-            firstName: d._assignedToFirstName,
-            lastName: d._assignedToLastName,
-            email: d._assignedToEmail
-          } : null,
-          createdBy: d._createdById ? {
-            id: d._createdById,
-            firstName: d._createdByFirstName,
-            lastName: d._createdByLastName,
-            email: d._createdByEmail
-          } : null
-        }));
       } else {
-        // Fallback Prisma estándar
-        where.OR = [
-          { protocolNumber: { contains: searchTerm, mode: 'insensitive' } },
-          { clientName: { contains: searchTerm, mode: 'insensitive' } },
-          { actoPrincipalDescripcion: { contains: searchTerm, mode: 'insensitive' } },
-          { detalle_documento: { contains: searchTerm, mode: 'insensitive' } },
-          { clientPhone: { contains: searchTerm } },
-          { clientEmail: { contains: searchTerm, mode: 'insensitive' } },
-          { clientId: { contains: searchTerm, mode: 'insensitive' } }
-        ];
+        // Sin búsqueda
         [documents, totalCount] = await Promise.all([
           prisma.document.findMany({
             where,
@@ -150,21 +176,8 @@ async function getAllDocumentsOversight(req, res) {
           prisma.document.count({ where })
         ]);
       }
-    } else {
-      // Sin búsqueda
-      [documents, totalCount] = await Promise.all([
-        prisma.document.findMany({
-          where,
-          skip: offset,
-          take: limitNum,
-          orderBy,
-          include: {
-            assignedTo: { select: { id: true, firstName: true, lastName: true, email: true } },
-            createdBy:  { select: { id: true, firstName: true, lastName: true, email: true } }
-          }
-        }),
-        prisma.document.count({ where })
-      ]);
+      // Guardar en caché
+      await cache.set(cacheKey, { documents, totalCount }, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'search:admin:oversight'] });
     }
 
     // Calcular estadísticas básicas

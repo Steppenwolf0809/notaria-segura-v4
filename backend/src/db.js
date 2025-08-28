@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import cache from './services/cache-service.js';
 
 /**
  * Singleton PrismaClient instance
@@ -30,6 +31,29 @@ function createPrismaClient() {
 export function getPrismaClient() {
   if (!prisma) {
     prisma = createPrismaClient();
+    // Invalidador de caché: cualquier mutación de Document y tablas relacionadas.
+    prisma.$use(async (params, next) => {
+      const result = await next(params);
+      try {
+        const action = params?.action;
+        const model = (params?.model || '').toString();
+        const isMutation = ['create','update','delete','upsert','createMany','updateMany','deleteMany'].includes(action);
+        const modelsToWatch = new Set([
+          'Document','document',
+          'DocumentEvent','documentEvent',
+          'DocumentGroup','documentGroup',
+          'GroupMember','groupMember',
+          'WhatsAppNotification','whatsAppNotification'
+        ]);
+        if (isMutation && modelsToWatch.has(model)) {
+          // Invalidar todas las búsquedas de documentos
+          cache.invalidateByTag('documents').catch(() => {});
+        }
+      } catch (e) {
+        // No romper la request si falla la invalidación
+      }
+      return result;
+    });
     // Intentar asegurar extensiones útiles en segundo plano (no bloquear)
     ensureExtensions(prisma).catch(() => {});
   }

@@ -841,6 +841,14 @@ const PdfExtractorService = {
           console.warn('[PdfExtractorService] Error en parser tabular:', error.message)
         }
       }
+
+      // Fallback final: extracción agresiva por patrones cuando todo falla
+      console.log('[PdfExtractorService] Fallback final: extracción agresiva')
+      const desperateAct = this.parseDesperatePatterns(rawText)
+      if (desperateAct && (desperateAct.otorgantes.length > 0 || desperateAct.beneficiarios.length > 0)) {
+        console.log(`[PdfExtractorService] Extracción agresiva encontró ${desperateAct.otorgantes.length} otorgantes, ${desperateAct.beneficiarios.length} beneficiarios`)
+        return { acts: [desperateAct] }
+      }
       
       return { acts: [] }
     }
@@ -892,6 +900,177 @@ const PdfExtractorService = {
     }
     
     return acts
+  },
+
+  /**
+   * Parser desesperado: extrae nombres usando patrones muy amplios
+   * Solo se usa cuando todos los otros métodos fallan
+   */
+  parseDesperatePatterns(rawText) {
+    if (!rawText) return null
+
+    console.log('[parseDesperatePatterns] Iniciando extracción agresiva')
+    
+    const text = String(rawText).toUpperCase()
+    const allNames = []
+    
+    // Patrón 1: Buscar cualquier secuencia de nombres que parezca persona
+    const namePatterns = [
+      // Nombres completos típicos (2-4 palabras)
+      /([A-ZÁÉÍÓÚÑ]{3,}(?:\s+[A-ZÁÉÍÓÚÑ]{3,}){1,3})(?=\s+(?:POR\s+SUS|CEDULA|ECUATORIAN|REPRESENTADO|RUC|\d{10,13}))/g,
+      // Empresas con palabras clave
+      /([A-ZÁÉÍÓÚÑ\s\.&-]+(?:FUNDACI[ÓO]N|EMPRESA|CORPORACI[ÓO]N|ASOCIACI[ÓO]N|S\.A\.|LTDA|CIA)[A-ZÁÉÍÓÚÑ\s\.&-]*)/g,
+      // Nombres después de NATURAL
+      /NATURAL\s+([A-ZÁÉÍÓÚÑ\s]{6,50}?)(?=\s+(?:POR\s+SUS|CEDULA|ECUATORIAN|REPRESENTADO|$))/g,
+      // Nombres en contexto de tabla (más flexible)
+      /(?:^|\n)\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\.&-]{8,60}?)(?=\s+(?:ECUATORIAN|MANDATARIO|CEDULA|RUC|\d{10,13}|$))/gm
+    ]
+    
+    for (const pattern of namePatterns) {
+      let match
+      while ((match = pattern.exec(text)) !== null) {
+        const candidate = match[1].trim()
+        if (candidate && this.isValidNameCandidate(candidate)) {
+          allNames.push(candidate)
+        }
+      }
+    }
+    
+    // Limpiar y deduplicar nombres
+    const cleanedNames = [...new Set(allNames)]
+      .map(name => this.cleanDesperateName(name))
+      .filter(name => name && name.length >= 3)
+      .slice(0, 10) // Limitar a 10 para evitar spam
+    
+    console.log(`[parseDesperatePatterns] Encontrados ${cleanedNames.length} nombres candidatos:`, cleanedNames)
+    
+    if (cleanedNames.length === 0) return null
+    
+    // Intentar separar otorgantes vs beneficiarios por contexto
+    const otorgantes = []
+    const beneficiarios = []
+    
+    for (const name of cleanedNames) {
+      // Buscar contexto del nombre en el texto original
+      const nameRegex = new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
+      const match = text.match(nameRegex)
+      
+      if (match) {
+        const index = text.indexOf(match[0].toUpperCase())
+        const before = text.slice(Math.max(0, index - 100), index)
+        const after = text.slice(index, Math.min(text.length, index + 200))
+        
+        // Heurística: si aparece antes "A FAVOR" o después de "OTORGADO POR", es beneficiario
+        if (/A\s+FAVOR|BENEFICIARIO/i.test(before) || /FAVOR.*DE/i.test(before)) {
+          beneficiarios.push({
+            nombre: name,
+            tipo_persona: this.guessTipoPersona(name)
+          })
+        } else {
+          otorgantes.push({
+            nombre: name,
+            tipo_persona: this.guessTipoPersona(name)
+          })
+        }
+      } else {
+        // Si no hay contexto claro, asumir otorgante
+        otorgantes.push({
+          nombre: name,
+          tipo_persona: this.guessTipoPersona(name)
+        })
+      }
+    }
+    
+    // Si todos fueron a una categoría, redistribuir
+    if (otorgantes.length === 0 && beneficiarios.length > 0) {
+      otorgantes.push(beneficiarios.shift())
+    }
+    
+    const tipoActo = this.extractDesperateActType(text) || 'PODER ESPECIAL'
+    
+    return {
+      tipoActo,
+      otorgantes,
+      beneficiarios
+    }
+  },
+
+  /**
+   * Valida si un candidato a nombre es válido
+   */
+  isValidNameCandidate(name) {
+    const trimmed = name.trim()
+    
+    // Debe tener al menos 6 caracteres
+    if (trimmed.length < 6) return false
+    
+    // No debe ser solo números
+    if (/^\d+$/.test(trimmed)) return false
+    
+    // No debe contener demasiados espacios consecutivos
+    if (/\s{3,}/.test(trimmed)) return false
+    
+    // Debe tener al menos 2 palabras o ser una empresa conocida
+    const words = trimmed.split(/\s+/).filter(Boolean)
+    if (words.length < 2 && !/FUNDACI[ÓO]N|EMPRESA|S\.A\.|LTDA|CIA/i.test(trimmed)) {
+      return false
+    }
+    
+    // No debe contener palabras comunes de encabezados
+    const badWords = ['PERSONA', 'NATURAL', 'JURIDICA', 'JURÍDICA', 'TIPO', 'INTERVINIENTE', 'DOCUMENTO', 'NACIONALIDAD', 'CALIDAD', 'REPRESENTA', 'UBICACION', 'PROVINCIA', 'CANTON', 'PARROQUIA']
+    if (badWords.some(bad => trimmed.includes(bad))) return false
+    
+    return true
+  },
+
+  /**
+   * Limpia un nombre extraído desesperadamente
+   */
+  cleanDesperateName(name) {
+    return name
+      .replace(/\s+/g, ' ')
+      .replace(/^(PERSONA\s+)?(NATURAL|JUR[IÍ]DICA)\s+/i, '')
+      .replace(/\s+(POR\s+SUS\s+PROPIOS|REPRESENTADO|RUC|CEDULA).*$/i, '')
+      .replace(/\s+(ECUATORIAN|MANDATARIO).*$/i, '')
+      .trim()
+  },
+
+  /**
+   * Extrae tipo de acto desesperadamente
+   */
+  extractDesperateActType(text) {
+    // Buscar patrones comunes de actos
+    const patterns = [
+      /PODER\s+(?:GENERAL|ESPECIAL|UNIVERSAL)/i,
+      /REVOCATORIA\s+DE\s+PODER/i,
+      /COMPRAVENTA/i,
+      /TESTAMENTO/i,
+      /DONACI[ÓO]N/i
+    ]
+    
+    for (const pattern of patterns) {
+      const match = text.match(pattern)
+      if (match) {
+        return match[0].toUpperCase()
+      }
+    }
+    
+    return null
+  },
+
+  /**
+   * Determina tipo de persona (reutilizado desde concuerdo-controller pero más simple)
+   */
+  guessTipoPersona(name) {
+    const s = String(name || '').toUpperCase()
+    const entityTokens = [
+      'FUNDACION', 'FUNDACIÓN', 'S.A.', 'SA', 'LTDA', 'CIA', 'CÍA',
+      'CORPORACION', 'CORPORACIÓN', 'EMPRESA', 'ASOCIACION', 'ASOCIACIÓN',
+      'COOPERATIVA', 'UNIVERSIDAD', 'MUNICIPIO', 'GAD', 'EP'
+    ]
+    
+    const pattern = new RegExp(`\\b(${entityTokens.join('|').replace(/\./g, '\\.')})\\b`)
+    return pattern.test(s) ? 'Jurídica' : 'Natural'
   }
 }
 
