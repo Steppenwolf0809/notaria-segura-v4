@@ -678,15 +678,38 @@ const PdfExtractorService = {
       let otorgantesRaw = blockBetween(startOtRegex, startBenRegex)
       let beneficiariosRaw = blockBetween(startBenRegex, /NOTARIO|ACTO\s+O\s+CON|EXTRACTO|\n\s*ESCRITURA|\.$/i)
 
-      // Afinar con ancla NATURAL dentro de la sección para otorgantes
+      // Fallbacks para otorgantes:
+      // 1) Variante de etiqueta "OTORGADO POR" que a veces aparece como "OTORGADO  POR" o con salto raro
+      if (!otorgantesRaw || otorgantesRaw.trim().length < 3) {
+        const altStart = section.search(/OTORGAD[OA]\s+POR\s*[:\-]?/i)
+        if (altStart !== -1) {
+          const after = section.slice(altStart)
+          const e = after.search(/A\s+FAVOR\s+DE|BENEFICIARIO|NOTARIO|ACTO\s+O\s+CON|EXTRACTO|\n\s*ESCRITURA|\.$/i)
+          otorgantesRaw = e === -1 ? after.replace(/OTORGAD[OA]\s+POR\s*[:\-]?/i, '') : after.slice(0, e).replace(/OTORGAD[OA]\s+POR\s*[:\-]?/i, '')
+        }
+      }
+
+      // 2) Afinar con ancla NATURAL dentro de la sección para otorgantes
       const secUpper = section.toUpperCase()
       const idxNat = secUpper.indexOf('NATURAL')
-      // Solo aplicar afinamiento por NATURAL si no logramos capturar nada con el bloque estándar
       if ((!otorgantesRaw || otorgantesRaw.trim().length < 3) && idxNat !== -1) {
         let region = secUpper.slice(idxNat + 'NATURAL'.length)
         const stop = region.search(/A\s+FAVOR\s+DE|BENEFICIARIO|NOTARIO|ACTO\s+O\s+CON|\.$/i)
         if (stop !== -1) region = region.slice(0, stop)
         otorgantesRaw = region
+      }
+
+      // 3) En algunos PDFs falta la etiqueta y sólo hay tabla; tomar bloque desde "OTORGANTES" hasta siguiente encabezado
+      if (!otorgantesRaw || otorgantesRaw.trim().length < 3) {
+        const idxHeader = secUpper.search(/\bOTORGANTES?\b/i)
+        if (idxHeader !== -1) {
+          let region = section.slice(idxHeader)
+          const stop = region.search(/A\s+FAVOR\s+DE|BENEFICIARIO|NOTARIO|ACTO\s+O\s+CON|EXTRACTO|\n\s*ESCRITURA|\.$/i)
+          region = stop === -1 ? region : region.slice(0, stop)
+          // Eliminar la palabra OTORGANTES y dos puntos si existen
+          region = region.replace(/OTORGANTES?\s*[:\-]?/i, '')
+          otorgantesRaw = region
+        }
       }
 
       let notario
@@ -723,6 +746,13 @@ const PdfExtractorService = {
       const actsTitles = multi.length > 1 ? multi : [tipoActo]
 
       const otClean = this.cleanPersonNames(otorgantesRaw)
+      // Si seguimos sin detectar, hacer una última búsqueda global de patrones de tabla dentro de la sección
+      if ((!otClean || otClean.length === 0) && /NATURAL|RAZ[ÓO]N\s+SOCIAL|APELLIDOS?/i.test(secUpper)) {
+        const lastTry = this.cleanPersonNames(section)
+        if (lastTry && lastTry.length) {
+          otClean.push(...lastTry.filter(n => !otClean.includes(n)))
+        }
+      }
       const beClean = this.cleanPersonNames(beneficiariosRaw)
       
       // Extraer representantes de formato tabla
@@ -749,6 +779,14 @@ const PdfExtractorService = {
             ...(notario ? { notario } : {})
           }
           
+          // Log condicional para diagnóstico cuando no se detectan otorgantes
+          if (!actData.otorgantes || actData.otorgantes.length === 0) {
+            try {
+              const preview = (otorgantesRaw || section || '').toString().slice(0, 160).replace(/\s+/g, ' ').trim()
+              console.warn('[parseAdvancedData] Otorgantes no detectados. Título:', actData.tipoActo, '| Preview bloque:', preview)
+            } catch (_) { /* noop */ }
+          }
+
           // Agregar representantes si hay otorgantes jurídicos
           if (representantes.length > 0 && otClean.length > 0) {
             // Buscar el primer otorgante que parezca ser jurídico
