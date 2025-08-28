@@ -1,5 +1,5 @@
 import React from 'react'
-import { Box, TextField, Button, Grid, Typography } from '@mui/material'
+import { Box, TextField, Button, Grid, Typography, Chip, Stack } from '@mui/material'
 
 export default function ExtractedDataForm({ data, setData, loading, onBack, onPreview }) {
   const handleChange = (field) => (e) => {
@@ -9,6 +9,12 @@ export default function ExtractedDataForm({ data, setData, loading, onBack, onPr
   return (
     <Box>
       <Typography variant="subtitle1" sx={{ mb: 2 }}>Revisar y editar datos extraídos</Typography>
+      {data?.tipoActo && (
+        <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+          <Chip label={`Acto detectado: ${data.tipoActo}`} color="primary" size="small" />
+          <Chip label="Template: Poder universal" variant="outlined" size="small" />
+        </Stack>
+      )}
       <Grid container spacing={2}>
         <Grid item xs={12} md={6}>
           <TextField
@@ -64,6 +70,17 @@ export default function ExtractedDataForm({ data, setData, loading, onBack, onPr
             onChange={(e) => setData({ ...data, beneficiarios: e.target.value.split('\n') })}
             multiline
             minRows={4}
+          />
+        </Grid>
+        <Grid item xs={12}>
+          <TextField
+            fullWidth
+            label="Representante(s) de otorgante(s) jurídica(s) (opcional, uno por línea)"
+            value={(data?.representantes || []).join('\n')}
+            onChange={(e) => setData({ ...data, representantes: e.target.value.split('\n').filter(Boolean) })}
+            helperText="Si el otorgante es una compañía/entidad, indique su(s) representante(s)."
+            multiline
+            minRows={3}
           />
         </Grid>
       </Grid>
