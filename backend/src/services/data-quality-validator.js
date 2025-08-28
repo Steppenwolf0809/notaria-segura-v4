@@ -127,8 +127,19 @@ class DataQualityValidator {
    * Valida una entidad individual
    */
   validateSingleEntity(entity, context, validation) {
-    if (!entity || typeof entity !== 'object') {
-      validation.issues.push(`${context}: Entidad inválida`)
+    if (!entity) {
+      validation.issues.push(`${context}: Entidad faltante`)
+      validation.score -= 0.2
+      return
+    }
+
+    // Convertir string a objeto si es necesario
+    if (typeof entity === 'string') {
+      entity = { nombre: entity, tipo_persona: this.guessTipoPersona(entity) }
+    }
+
+    if (typeof entity !== 'object') {
+      validation.issues.push(`${context}: Entidad inválida (${typeof entity})`)
       validation.score -= 0.2
       return
     }

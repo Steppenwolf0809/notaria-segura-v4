@@ -80,9 +80,21 @@ async function extractData(req, res) {
       }
     }
 
+    // Debug: mostrar preview del texto extraído
+    console.log('📝 Preview texto extraído (primeros 500 chars):', text.substring(0, 500).replace(/\n/g, '\\n'))
+    
     const { acts } = await PdfExtractorService.parseAdvancedData(text, pdfBuffer)
     const parsed = acts[0] || { tipoActo: '', otorgantes: [], beneficiarios: [] }
     const { notarioNombre, notariaNumero, notariaNumeroDigit, notarioSuplente } = PdfExtractorService.extractNotaryInfo(text)
+    
+    // Debug: mostrar datos extraídos antes de validación
+    console.log('🔍 Datos extraídos antes de validación:', {
+      tipoActo: parsed.tipoActo,
+      otorgantes: parsed.otorgantes?.length || 0,
+      beneficiarios: parsed.beneficiarios?.length || 0,
+      otorgantesPreview: parsed.otorgantes?.slice(0, 2),
+      beneficiariosPreview: parsed.beneficiarios?.slice(0, 2)
+    })
 
     // Validar calidad de los datos extraídos
     const validator = new DataQualityValidator()
@@ -356,6 +368,20 @@ async function applyAutoFixes(req, res) {
     // Crear copia del acto para aplicar correcciones
     const correctedAct = JSON.parse(JSON.stringify(actData))
 
+    // Normalizar arrays de entidades (convertir strings a objetos si es necesario)
+    const normalizeEntities = (entities) => {
+      if (!Array.isArray(entities)) return []
+      return entities.map(entity => {
+        if (typeof entity === 'string') {
+          return { nombre: entity, tipo_persona: 'Natural' }
+        }
+        return entity || {}
+      })
+    }
+
+    correctedAct.otorgantes = normalizeEntities(correctedAct.otorgantes)
+    correctedAct.beneficiarios = normalizeEntities(correctedAct.beneficiarios)
+
     // Aplicar correcciones automáticas
     for (const [field, value] of Object.entries(fixes)) {
       if (field === 'tipoActo') {
@@ -367,6 +393,9 @@ async function applyAutoFixes(req, res) {
           const [, tipo, index] = match
           const idx = parseInt(index)
           if (correctedAct[tipo] && correctedAct[tipo][idx]) {
+            if (typeof correctedAct[tipo][idx] === 'string') {
+              correctedAct[tipo][idx] = { nombre: correctedAct[tipo][idx], tipo_persona: 'Natural' }
+            }
             correctedAct[tipo][idx].nombre = value
           }
         }
@@ -377,7 +406,11 @@ async function applyAutoFixes(req, res) {
           const [, tipo, index] = match
           const idx = parseInt(index)
           if (correctedAct[tipo] && correctedAct[tipo][idx]) {
-            correctedAct[tipo][idx].tipo_persona = value
+            if (typeof correctedAct[tipo][idx] === 'string') {
+              correctedAct[tipo][idx] = { nombre: correctedAct[tipo][idx], tipo_persona: value }
+            } else {
+              correctedAct[tipo][idx].tipo_persona = value
+            }
           }
         }
       } else if (field.endsWith('_nombre_capitalized')) {
@@ -387,7 +420,11 @@ async function applyAutoFixes(req, res) {
           const [, tipo, index] = match
           const idx = parseInt(index)
           if (correctedAct[tipo] && correctedAct[tipo][idx]) {
-            correctedAct[tipo][idx].nombre = value
+            if (typeof correctedAct[tipo][idx] === 'string') {
+              correctedAct[tipo][idx] = { nombre: value, tipo_persona: 'Natural' }
+            } else {
+              correctedAct[tipo][idx].nombre = value
+            }
           }
         }
       }

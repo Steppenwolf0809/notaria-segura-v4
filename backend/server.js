@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url'
 import { closePrismaClient } from './src/db.js'
 import { getConfig, isConfigurationComplete, debugConfiguration } from './src/config/environment.js'
 import xmlWatcherService from './src/services/xml-watcher-service.js'
+import cache from './src/services/cache-service.js'
 
 // Importar rutas implementadas
 import authRoutes from './src/routes/auth-routes.js'
@@ -323,6 +324,17 @@ const server = app.listen(PORT, () => {
   } catch (e) {
     console.error('❌ No se pudo iniciar XML Watcher:', e)
   }
+
+  // Intentar conexión a Redis si está configurado (fallback a memoria si falla)
+  cache.connectRedisIfConfigured()
+    .then((connected) => {
+      if (connected) {
+        console.log('⚡ Caché: conectado a Redis');
+      } else {
+        console.log('⚡ Caché: usando almacenamiento en memoria');
+      }
+    })
+    .catch(() => console.log('⚠️ Caché: uso de memoria por defecto'))
 })
 
 // ============================================================================

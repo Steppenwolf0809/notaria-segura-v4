@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import whatsappService from '../services/whatsapp-service.js';
 import CodigoRetiroService from '../utils/codigo-retiro.js';
 import { getReversionCleanupData, STATUS_ORDER_LIST } from '../utils/status-transitions.js';
+import cache from '../services/cache-service.js';
 
 /**
  * CONTROLADOR DE ARCHIVO
@@ -88,6 +89,13 @@ async function listarMisDocumentos(req, res) {
       assignedToId: userId
     };
 
+    // Caché por usuario + filtros
+    const cacheKey = cache.key({ scope: 'archivo:mis-documentos', userId, page: parseInt(page), limit: parseInt(limit), search, estado });
+    const cached = await cache.get(cacheKey);
+    if (cached) {
+      return res.json({ success: true, data: cached });
+    }
+
     // Aplicar filtros adicionales
     const searchTerm = (search || '').trim();
     if (searchTerm) {
@@ -119,18 +127,17 @@ async function listarMisDocumentos(req, res) {
         `;
         const total = Array.isArray(countRows) ? (countRows[0]?.count || 0) : (countRows?.count || 0);
 
-        return res.json({
-          success: true,
-          data: {
-            documentos: documents,
-            pagination: {
-              currentPage: parseInt(page),
-              totalPages: Math.ceil(total / parseInt(limit)),
-              totalDocuments: total,
-              limit: parseInt(limit)
-            }
+        const payload = {
+          documentos: documents,
+          pagination: {
+            currentPage: parseInt(page),
+            totalPages: Math.ceil(total / parseInt(limit)),
+            totalDocuments: total,
+            limit: parseInt(limit)
           }
-        });
+        };
+        await cache.set(cacheKey, payload, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'search:archivo:mis-documentos', `user:${userId}`] });
+        return res.json({ success: true, data: payload });
       } else {
         where.OR = [
           { clientName: { contains: searchTerm, mode: 'insensitive' } },
@@ -163,18 +170,17 @@ async function listarMisDocumentos(req, res) {
       prisma.document.count({ where })
     ]);
 
-    res.json({
-      success: true,
-      data: {
-        documentos,
-        pagination: {
-          currentPage: parseInt(page),
-          totalPages: Math.ceil(total / parseInt(limit)),
-          totalDocuments: total,
-          limit: parseInt(limit)
-        }
+    const payload = {
+      documentos,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / parseInt(limit)),
+        totalDocuments: total,
+        limit: parseInt(limit)
       }
-    });
+    };
+    await cache.set(cacheKey, payload, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'search:archivo:mis-documentos', `user:${userId}`] });
+    res.json({ success: true, data: payload });
 
   } catch (error) {
     console.error('Error listando documentos archivo:', error);

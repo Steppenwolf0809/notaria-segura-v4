@@ -51,6 +51,7 @@ import {
   adminRateLimit,
   addRateLimitHeaders
 } from '../middleware/rate-limiter.js';
+import cache from '../services/cache-service.js';
 
 const router = express.Router();
 
@@ -399,5 +400,19 @@ router.post('/whatsapp-templates/preview', previewTemplate);
  * @access Private (ADMIN only)
  */
 router.post('/whatsapp-templates/initialize', initializeDefaultTemplates);
+
+/**
+ * @route GET /api/admin/cache/metrics
+ * @desc Métricas del sistema de caché (hit rate, backend, claves)
+ * @access Private (ADMIN only)
+ */
+router.get('/cache/metrics', (req, res) => {
+  try {
+    const stats = cache.getStats();
+    res.json({ success: true, data: stats });
+  } catch (e) {
+    res.status(500).json({ success: false, error: 'No se pudieron obtener métricas de caché' });
+  }
+});
 
 export default router;

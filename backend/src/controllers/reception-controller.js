@@ -6,6 +6,7 @@ const prisma = getPrismaClient();
 import whatsappService from '../services/whatsapp-service.js';
 import CodigoRetiroService from '../utils/codigo-retiro.js';
 import AlertasService from '../services/alertas-service.js';
+import cache from '../services/cache-service.js';
 
 // Cache simple para soporte de unaccent
 let UNACCENT_SUPPORTED = null;
@@ -151,6 +152,25 @@ async function listarTodosDocumentos(req, res) {
         where.createdAt.lt = hasta;
       }
     }
+    // Clave de caché (incluye filtros y orden)
+    const cacheKey = cache.key({
+      scope: 'reception:todos',
+      page: parseInt(page),
+      limit: take,
+      search: searchTerm,
+      matrizador: matrizador ? parseInt(matrizador) : null,
+      estado,
+      fechaDesde: fechaDesde || null,
+      fechaHasta: fechaHasta || null,
+      sortBy: mappedSortField,
+      sortOrder: mappedSortOrder
+    });
+
+    const cached = await cache.get(cacheKey);
+    if (cached) {
+      return res.json({ success: true, data: cached });
+    }
+
     // Si hay término de búsqueda, intentar búsqueda acento-insensible con unaccent
     if (searchTerm) {
       const supportsUnaccent = await supportsUnaccentFn();
@@ -233,18 +253,17 @@ async function listarTodosDocumentos(req, res) {
 
         const totalPages = Math.ceil(total / take);
 
-        return res.json({
-          success: true,
-          data: {
-            documents: formattedDocuments,
-            pagination: {
-              page: parseInt(page),
-              limit: take,
-              total,
-              totalPages
-            }
+        const payload = {
+          documents: formattedDocuments,
+          pagination: {
+            page: parseInt(page),
+            limit: take,
+            total,
+            totalPages
           }
-        });
+        };
+        await cache.set(cacheKey, payload, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'search:reception:todos'] });
+        return res.json({ success: true, data: payload });
       } else {
         // Si no hay unaccent, usar filtros compatibles con todos los proveedores (sin 'mode')
         // Nota: Esto puede ser sensible a mayúsculas/minúsculas en algunos motores (p.ej. SQLite)
@@ -310,18 +329,17 @@ async function listarTodosDocumentos(req, res) {
 
     const totalPages = Math.ceil(total / take);
 
-    res.json({
-      success: true,
-      data: {
-        documents: formattedDocuments,
-        pagination: {
-          page: parseInt(page),
-          limit: take,
-          total,
-          totalPages
-        }
+    const payload = {
+      documents: formattedDocuments,
+      pagination: {
+        page: parseInt(page),
+        limit: take,
+        total,
+        totalPages
       }
-    });
+    };
+    await cache.set(cacheKey, payload, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'search:reception:todos'] });
+    res.json({ success: true, data: payload });
 
   } catch (error) {
     console.error('Error listando todos los documentos:', error);
@@ -340,6 +358,19 @@ async function getDocumentosEnProceso(req, res) {
       status: 'EN_PROCESO'
     };
     
+    // Clave de caché (incluye filtros)
+    const cacheKey = cache.key({
+      scope: 'reception:en_proceso',
+      page: parseInt(page),
+      limit: take,
+      search: searchTerm2,
+      matrizador: matrizador ? parseInt(matrizador) : null
+    });
+    const cached = await cache.get(cacheKey);
+    if (cached) {
+      return res.json({ success: true, data: cached });
+    }
+
     // PostgreSQL - Búsqueda case-insensitive y acento-insensitive (si hay extensión unaccent)
     const searchTerm2 = (search || '').trim();
     if (searchTerm2) {
@@ -386,19 +417,17 @@ async function getDocumentosEnProceso(req, res) {
         }));
 
         const totalPages = Math.ceil(total / take);
-
-        return res.json({
-          success: true,
-          data: {
-            documents: formattedDocuments,
-            pagination: {
-              page: parseInt(page),
-              limit: take,
-              total,
-              totalPages
-            }
+        const payload = {
+          documents: formattedDocuments,
+          pagination: {
+            page: parseInt(page),
+            limit: take,
+            total,
+            totalPages
           }
-        });
+        };
+        await cache.set(cacheKey, payload, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'search:reception:en_proceso'] });
+        return res.json({ success: true, data: payload });
       } else {
         // Filtros compatibles con todos los proveedores (sin 'mode')
         where.OR = [
@@ -452,18 +481,17 @@ async function getDocumentosEnProceso(req, res) {
 
     const totalPages = Math.ceil(total / take);
 
-    res.json({
-      success: true,
-      data: {
-        documents: formattedDocuments,
-        pagination: {
-          page: parseInt(page),
-          limit: take,
-          total,
-          totalPages
-        }
+    const payload = {
+      documents: formattedDocuments,
+      pagination: {
+        page: parseInt(page),
+        limit: take,
+        total,
+        totalPages
       }
-    });
+    };
+    await cache.set(cacheKey, payload, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'search:reception:en_proceso'] });
+    res.json({ success: true, data: payload });
 
   } catch (error) {
     console.error('Error obteniendo documentos en proceso:', error);
