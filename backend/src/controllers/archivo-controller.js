@@ -457,6 +457,11 @@ async function procesarEntregaDocumento(req, res) {
       });
     }
 
+    // Determinar método de verificación para auditoría enriquecida
+    const computedVerificationMethod = verificacionManual
+      ? (req.body.metodoVerificacion || (cedulaReceptor ? 'cedula' : 'manual'))
+      : 'codigo_whatsapp';
+
     // Buscar documento y verificar que pertenece al archivo (con información de grupo)
     const documento = await prisma.document.findFirst({
       where: {
@@ -553,7 +558,7 @@ async function procesarEntregaDocumento(req, res) {
               userId: userId,
               eventType: 'STATUS_CHANGED',
               description: `Documento entregado grupalmente por ARCHIVO a ${entregadoA}`,
-              metadata: {
+              details: {
                 entregadoA,
                 cedulaReceptor,
                 relacionTitular,
@@ -562,7 +567,11 @@ async function procesarEntregaDocumento(req, res) {
                 deliveredWith: documento.protocolNumber,
                 groupDelivery: true,
                 deliveredBy: 'ARCHIVO'
-              }
+              },
+              personaRetiro: entregadoA,
+              cedulaRetiro: cedulaReceptor || undefined,
+              metodoVerificacion: computedVerificationMethod,
+              observacionesRetiro: (observaciones || `Entregado grupalmente junto con ${documento.protocolNumber} por ARCHIVO`)
             }
           });
         }

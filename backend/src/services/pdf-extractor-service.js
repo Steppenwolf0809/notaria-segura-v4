@@ -94,6 +94,20 @@ const PdfExtractorService = {
 
     for (let idx = 0; idx < lines.length; idx++) {
       const line = lines[idx]
+      // Caso 1: línea con NOTARIO(A) Nombre Apellidos
+      const nLine = line.match(/NOTARIO\s*\(\s*A\s*\)\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\.]*)$/i)
+      if (nLine) {
+        let nombre = nLine[1].toUpperCase().trim()
+        nombre = nombre.replace(/^ABG\.?\s*/i, '').replace(/^AB\.?\s*/i, '').replace(/^DR\.?\s*/i, '').replace(/^LCDO\.?\s*/i, '')
+        notarioNombre = nombre.replace(/\s+/g, ' ').trim()
+        // Buscar texto de notaría cercano
+        for (let j = idx; j < Math.min(idx + 4, lines.length); j++) {
+          const l = lines[j].toUpperCase().trim()
+          const mNum = l.match(/NOTAR[ÍI]A\s*(.+)$/i)
+          if (mNum && mNum[1]) { notariaNumero = mNum[1].replace(/\s+/g, ' ').trim().replace(/[\.;,]+$/,''); break }
+        }
+        continue
+      }
       const m = line.match(/\(\s*A\s*\)\s*([A-ZÁÉÍÓÚÑ\s\.]\S.*)$/i)
       if (m) {
         // Nombre completo después de (A)
@@ -119,6 +133,11 @@ const PdfExtractorService = {
     }
 
     // Fallback: buscar globalmente si no se encontró con (A)
+    if (!notarioNombre) {
+      // Intentar captura global NOTARIO(A)
+      const n3 = text.toUpperCase().match(/NOTARIO\s*\(\s*A\s*\)\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\.]*)/)
+      if (n3 && n3[1]) notarioNombre = n3[1].replace(/^ABG\.?\s*/i, '').trim()
+    }
     if (!notarioNombre) {
       const m2 = text.toUpperCase().match(/\(\s*A\s*\)\s*([A-ZÁÉÍÓÚÑ\s\.]\S.*)/)
       if (m2) notarioNombre = m2[1].replace(/^ABG\.?\s*/i, '').trim()
@@ -169,28 +188,45 @@ const PdfExtractorService = {
   cleanPersonNames(raw) {
     if (!raw) return []
     // Normalizar
-    let upper = String(raw)
+    const upperBase = String(raw)
       .replace(/[\t\r\f]+/g, ' ')
       .replace(/ +/g, ' ')
       .toUpperCase()
       .trim()
 
+    // Extraer nombres usando patrón por filas tipo tabla: NATURAL <NOMBRES> POR SUS PROPIOS
+    const tableNames = []
+    const natRe = /NATURAL\s+([A-ZÁÉÍÓÚÑ\s]{3,80}?)\s+POR\s+SUS\s+PROPIOS/gi
+    let nm
+    while ((nm = natRe.exec(upperBase)) !== null) {
+      const candidate = nm[1].replace(/\s+/g, ' ').trim()
+      if (candidate) tableNames.push(this.reorderName(candidate))
+    }
+
+    let upper = upperBase
+
+    // Remover frases y términos que no son nombres
+    const removePhrases = [
+      'POR SUS PROPIOS DERECHOS', 'POR SUS PROPIOS', 'DERECHOS',
+      'PASAPORTE', 'CÉDULA', 'CEDULA', 'PPT', 'DOC', 'IDENTIDAD', 'NO IDENTIFICACION', 'N IDENTIFICACION',
+      'IDENTIFICACION', 'IDENTIFICACIÓN', 'QUE LE REPRESENTA', 'QUE REPRESENTA',
+      'NACIONALIDAD', 'ECUATORIANA', 'ECUATORIANO', 'ECUATORIA', 'COLOMBIANA', 'COLOMBIANO', 'PERUANA', 'PERUANO', 'VENEZOLANA', 'VENEZOLANO', 'ARGENTINA', 'ARGENTINO', 'CHILENA', 'CHILENO', 'BRASILEÑA', 'BRASILEÑO',
+      'MANDANTE', 'MANDATARIO', 'PETICIONARIO', 'REPRESENTA', 'REPRESENTE',
+      'UBICACION', 'UBICACIÓN', 'PROVINCIA', 'CANTON', 'CANTÓN', 'PARROQUIA', 'DESCRIPCION', 'DESCRIPCIÓN', 'CUANTIA', 'CUANTÍA'
+    ]
+    for (const phrase of removePhrases) {
+      const re = new RegExp(`\\b${phrase}\\b`, 'g')
+      upper = upper.replace(re, ' ')
+    }
+
     // Eliminar encabezados conocidos
     const headers = [
-      'PERSONA', 'NOMBRES', 'TIPO', 'INTERVINIENTE', 'DOCUMENTO', 'IDENTIDAD', 'NACIONALIDAD',
-      'CALIDAD', 'REPRESENTA', 'UBICACION', 'PROVINCIA', 'CANTON', 'DESCRIPCION', 'CUANTIA'
+      'PERSONA', 'NOMBRES', 'RAZON', 'RAZÓN', 'SOCIAL', 'TIPO', 'INTERVINIENTE', 'DOCUMENTO', 'IDENTIDAD', 'NACIONALIDAD',
+      'CALIDAD', 'REPRESENTA', 'UBICACION', 'UBICACIÓN', 'PROVINCIA', 'CANTON', 'CANTÓN', 'PARROQUIA', 'DESCRIPCION', 'DESCRIPCIÓN', 'CUANTIA', 'CUANTÍA', 'NATURAL', 'IDENTIFICACION', 'IDENTIFICACIÓN',
+      'OBJETO', 'OBSERVACIONES', 'EXTRACTO', 'ESCRITURA', 'NO', 'N°', 'Nº', 'NUMERO', 'NÚMERO', 'PICHINCHA', 'QUITO', 'IÑAQUITO'
     ]
     const headerRegex = new RegExp(`\\b(?:${headers.join('|')})\\b`, 'g')
     upper = upper.replace(headerRegex, ' ')
-
-    // Si existe NATURAL, recortar después de NATURAL y antes de POR SUS PROPIOS
-    const natIdx = upper.indexOf('NATURAL')
-    if (natIdx !== -1) {
-      let region = upper.slice(natIdx + 'NATURAL'.length)
-      const stop = region.indexOf('POR SUS PROPIOS')
-      if (stop !== -1) region = region.slice(0, stop)
-      upper = region.trim()
-    }
 
     // Regex: 2 a 5 palabras en mayúsculas con acentos
     const nameRegex = /([A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,}){1,4})/g
@@ -199,8 +235,22 @@ const PdfExtractorService = {
     while ((m = nameRegex.exec(upper)) !== null) {
       const candidate = m[1].replace(/\s+/g, ' ').trim()
       if (!candidate) continue
-      const reordered = this.reorderName(candidate)
+      // Filtrar candidatos que contienen dígitos o palabras no-nombre típicas
+      if (/\d/.test(candidate)) continue
+      const badTokens = new Set(['POR','SUS','PROPIOS','DERECHOS','PASAPORTE','CEDULA','CÉDULA','MANDANTE','MANDATARIO','PETICIONARIO','ECUATORIA','ECUATORIANA','ECUATORIANO','COLOMBIANA','COLOMBIANO','PERUANA','PERUANO','VENEZOLANA','VENEZOLANO','RAZON','RAZÓN','SOCIAL','NO','Nº','N°','NUMERO','NÚMERO'])
+      const toks = candidate.split(' ')
+      if (toks.some(t => badTokens.has(t))) continue
+      // Quitar partículas de 1-2 letras no permitidas
+      const particles = new Set(['DE','DEL','DELA','DELOS','DELAS','LA','LOS','LAS'])
+      const cleaned = toks.filter(t => t.length > 2 || particles.has(t)).join(' ')
+      const reordered = this.reorderName(cleaned)
       if (!names.includes(reordered)) names.push(reordered)
+    }
+    // Si se detectaron por patrón de tabla, priorizarlos
+    if (tableNames.length > 0) {
+      const out = []
+      for (const t of tableNames) if (!out.includes(t)) out.push(t)
+      return out
     }
     return names
   },
@@ -362,20 +412,46 @@ const PdfExtractorService = {
   parseAdvancedData(rawText) {
     if (!rawText || typeof rawText !== 'string') return { acts: [] }
 
-    const text = rawText.replace(/\s+/g, ' ').trim()
+    // Normalizar preservando saltos de línea
+    const text = String(rawText)
+      .replace(/\r/g, '')
+      .replace(/[\t\f]+/g, ' ')
+      .replace(/ +/g, ' ')
+      .replace(/ *\n */g, '\n')
+      .trim()
     const upper = text.toUpperCase()
 
-    // Encontrar posiciones de secciones de ACTO O CONTRATO
-    const actRegex = /ACTO(?:S)?\s+O\s+CONTRATO(?:S)?\s*[:\-]?\s*(.+?)(?=ACTO(?:S)?\s+O\s+CONTRATO(?:S)?\s*[:\-]?|$)/gis
-    const acts = []
-    let match
-    while ((match = actRegex.exec(upper)) !== null) {
-      const fullSection = match[0]
-      const tipoActoRaw = (match[1] || '').trim()
-      const tipoActo = this.cleanActType(tipoActoRaw)
+    // Encontrar índices de encabezados ACTO O CONTRATO (singular/plural y con guiones)
+    const headerRe = /ACTO(?:S)?\s+O\s+CON\s*-?\s*TRATO(?:S)?\s*[:\-]?/gi
+    const headers = []
+    let hm
+    while ((hm = headerRe.exec(upper)) !== null) {
+      // Solo considerar si está al inicio o precedido por salto de línea
+      const idx = hm.index
+      const before = idx > 0 ? upper[idx - 1] : '\n'
+      if (before === '\n') {
+        headers.push({ index: idx, length: hm[0].length })
+      }
+    }
+    if (headers.length === 0) {
+      // Fallback simple
+      const single = this.parseSimpleData(text)
+      return { acts: [single] }
+    }
 
-      // Dentro de la sección, buscar otorgantes y beneficiarios
-      const section = fullSection
+    const sliceSection = (startIdx, endIdx) => upper.slice(startIdx, endIdx === -1 ? undefined : endIdx)
+
+    const acts = []
+    for (let i = 0; i < headers.length; i++) {
+      const start = headers[i].index
+      const end = i + 1 < headers.length ? headers[i + 1].index : -1
+      const section = sliceSection(start, end)
+      if (!section) continue
+
+      // Título del acto: desde fin del encabezado hasta FECHA/OTORG/FIN DE LÍNEA
+      const titleMatch = section.match(/ACTO(?:S)?\s+O\s+CON\s*-?\s*TRATO(?:S)?\s*[:\-]?\s*([\s\S]*?)(?:\n| FECHA| OTORGADO\s+POR| OTORGANTE| OTORGANTES|$)/i)
+      const tipoActoRaw = titleMatch && titleMatch[1] ? titleMatch[1].trim() : ''
+      const tipoActo = this.cleanActType(tipoActoRaw)
 
       const blockBetween = (startRegex, endRegex) => {
         const s = section.search(startRegex)
@@ -386,19 +462,20 @@ const PdfExtractorService = {
       }
 
       // Variantes de etiquetas
-      const startOtRegex = /(?:OTORGADO\s+POR|OTORGANTE(?:S)?|NOMBRES\s*\/\s*RAZ[ÓO]N\s+SOCIAL)\s*[:\-]?\s*/i
+      const startOtRegex = /(?:OTORGADO\s+POR|OTORGANTE(?:S)?|OTORGANTES|NOMBRES\s*\/\s*RAZ[ÓO]N\s+SOCIAL)\s*[:\-]?\s*/i
       const startBenRegex = /(?:A\s+FAVOR\s+DE|BENEFICIARIO(?:S)?)\s*[:\-]?\s*/i
-      const notarioRegex = /NOTARIO\s*[:\-]?\s*(.+?)(?:\.|$)/i
+      const notarioRegex = /NOTARIO\s*\(\s*A\s*\)\s*[:\-]?\s*(.+?)(?:\n|\.|$)/i
 
       let otorgantesRaw = blockBetween(startOtRegex, startBenRegex)
-      let beneficiariosRaw = blockBetween(startBenRegex, /NOTARIO|\.$/i)
+      let beneficiariosRaw = blockBetween(startBenRegex, /NOTARIO|ACTO\s+O\s+CON|EXTRACTO|\n\s*ESCRITURA|\.$/i)
 
       // Afinar con ancla NATURAL dentro de la sección para otorgantes
       const secUpper = section.toUpperCase()
       const idxNat = secUpper.indexOf('NATURAL')
-      if (idxNat !== -1) {
+      // Solo aplicar afinamiento por NATURAL si no logramos capturar nada con el bloque estándar
+      if ((!otorgantesRaw || otorgantesRaw.trim().length < 3) && idxNat !== -1) {
         let region = secUpper.slice(idxNat + 'NATURAL'.length)
-        const stop = region.search(/A\s+FAVOR\s+DE|BENEFICIARIO|NOTARIO|\.$/i)
+        const stop = region.search(/A\s+FAVOR\s+DE|BENEFICIARIO|NOTARIO|ACTO\s+O\s+CON|\.$/i)
         if (stop !== -1) region = region.slice(0, stop)
         otorgantesRaw = region
       }
@@ -415,7 +492,7 @@ const PdfExtractorService = {
         let tmp = base
           .replace(/\b\d+\s*[\).:-]\s*/g, '|') // 1), 2., 3:
           .replace(/\s+[-–—]\s+/g, '|')
-          .replace(/\s+Y\s+/g, '|')
+          .replace(/\s+Y\/?O?\s+/g, '|')
           .replace(/\s+E\s+/g, '|')
           .replace(/\s*[,;/]\s*/g, '|')
         let parts = tmp.split('|').map(p => this.cleanActType(p)).filter(p => p && p.length >= 3)

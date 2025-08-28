@@ -945,10 +945,13 @@ async function updateDocumentStatus(req, res) {
             userRole: req.user.role,
             deliveryType: status === 'ENTREGADO' && ['MATRIZADOR', 'ARCHIVO'].includes(req.user.role) ? 'DIRECT_DELIVERY' : 'STANDARD_DELIVERY',
             entregadoA: status === 'ENTREGADO' ? updateData.entregadoA : undefined,
+            metodoVerificacion: status === 'ENTREGADO' && ['MATRIZADOR', 'ARCHIVO'].includes(req.user.role) ? 'manual' : undefined,
             isReversion,
             reason: req.body.reversionReason || null,
             timestamp: new Date().toISOString()
           },
+          personaRetiro: status === 'ENTREGADO' ? (updateData.entregadoA || undefined) : undefined,
+          metodoVerificacion: status === 'ENTREGADO' && ['MATRIZADOR', 'ARCHIVO'].includes(req.user.role) ? 'manual' : undefined,
           ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
           userAgent: req.get('User-Agent') || 'unknown'
         }
@@ -2639,6 +2642,11 @@ async function deliverDocument(req, res) {
       }
     }
 
+    // Determinar método de verificación para auditoría enriquecida
+    const computedVerificationMethod = verificacionManual
+      ? (metodoVerificacion || (cedulaReceptor ? 'cedula' : 'manual'))
+      : 'codigo_whatsapp';
+
     // Si el documento está agrupado, entregar todos los documentos del grupo
     let groupDocuments = [];
     if (document.documentGroup && Array.isArray(document.documentGroup.documents)) {
@@ -2686,10 +2694,16 @@ async function deliverDocument(req, res) {
                 relacionTitular,
                 verificacionManual: verificacionManual || false,
                 facturaPresenta: facturaPresenta || false,
+                metodoVerificacion: computedVerificationMethod,
+                verificationCode: verificacionManual ? undefined : (codigoVerificacion || document.codigoRetiro || document.verificationCode || document.groupVerificationCode),
                 deliveredWith: document.protocolNumber,
                 groupDelivery: true,
                 timestamp: new Date().toISOString()
-              }
+              },
+              personaRetiro: entregadoA,
+              cedulaRetiro: cedulaReceptor || undefined,
+              metodoVerificacion: computedVerificationMethod,
+              observacionesRetiro: (observacionesEntrega || `Entregado grupalmente junto con ${document.protocolNumber}`)
             }
           });
         }
@@ -2869,10 +2883,16 @@ async function deliverDocument(req, res) {
             verificacionManual,
             facturaPresenta,
             observacionesEntrega,
+            metodoVerificacion: computedVerificationMethod,
+            verificationCode: verificacionManual ? undefined : (codigoVerificacion || updatedDocument.codigoRetiro || updatedDocument.verificationCode || updatedDocument.groupVerificationCode),
             whatsappSent,
             whatsappError,
             timestamp: new Date().toISOString()
           },
+          personaRetiro: entregadoA,
+          cedulaRetiro: cedulaReceptor || undefined,
+          metodoVerificacion: computedVerificationMethod,
+          observacionesRetiro: observacionesEntrega || undefined,
           ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
           userAgent: req.get('User-Agent') || 'unknown'
         }
@@ -3310,7 +3330,7 @@ async function getDocumentHistory(req, res) {
       return {
         id: event.id,
         type: event.eventType,
-        title: getEventTitle(event.eventType),
+        title: getEventTitle(event.eventType, event.details),
         description: formattedDescription,
         timestamp: event.createdAt,
         user: {
@@ -3318,10 +3338,15 @@ async function getDocumentHistory(req, res) {
           name: `${event.user.firstName} ${event.user.lastName}`,
           role: event.user.role
         },
-        icon: getEventIcon(event.eventType),
+        icon: getEventIcon(event.eventType, event.details),
         color: getEventColor(event.eventType, event.details),
         contextInfo: contextInfo, // Información adicional para mostrar
         details: event.details, // Detalles técnicos (solo para debug si es necesario)
+        // Campos enriquecidos para UI si existen
+        ...(event.personaRetiro && { personaRetiro: event.personaRetiro }),
+        ...(event.cedulaRetiro && { cedulaRetiro: event.cedulaRetiro }),
+        ...(event.metodoVerificacion && { metodoVerificacion: event.metodoVerificacion }),
+        ...(event.observacionesRetiro && { observacionesRetiro: event.observacionesRetiro }),
         // Omitir metadata técnica innecesaria para el usuario final
         ...(userRole === 'ADMIN' && { 
           metadata: {

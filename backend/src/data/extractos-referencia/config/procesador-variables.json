@@ -1,0 +1,47 @@
+{
+  "variables_dinamicas": {
+    "VERBO_OTORGAR": {
+      "logica": "cantidad_otorgantes == 1 ? 'otorga' : 'otorgan'",
+      "casos": {
+        "singular": "otorga",
+        "plural": "otorgan"
+      }
+    },
+    "VERBO_REPRESENTAR": {
+      "logica": "cantidad_otorgantes == 1 ? conjugar_genero(otorgante.genero) : 'representados'",
+      "casos": {
+        "singular_femenino": "representada",
+        "singular_masculino": "representado", 
+        "singular_empresa_femenina": "representada",
+        "singular_empresa_masculina": "representado",
+        "plural": "representados"
+      }
+    },
+    "CONTRACCION_A_FAVOR": {
+      "logica": "beneficiario.tratamiento.startsWith('el') ? 'al' : 'a'",
+      "casos": {
+        "masculino_singular": "al señor",
+        "femenino_singular": "a la señora",
+        "masculino_plural": "a los señores", 
+        "femenino_plural": "a las señoras",
+        "empresa_femenina": "a la compañía",
+        "empresa_masculina": "al"
+      }
+    },
+    "CONJUNCION_NOMBRES": {
+      "logica": "unir_nombres_con_conjunciones(nombres_array)",
+      "casos": {
+        "dos_nombres": "{{NOMBRE1}} y {{NOMBRE2}}",
+        "tres_mas": "{{NOMBRE1}}, {{NOMBRE2}} y {{NOMBRE3}}"
+      }
+    }
+  },
+  "reglas_procesamiento": [
+    "1. Contar cantidad de otorgantes/beneficiarios",
+    "2. Determinar género de cada persona/empresa", 
+    "3. Aplicar reglas de plurales a verbos",
+    "4. Resolver contracciones de artículos",
+    "5. Generar conjunciones entre nombres",
+    "6. Reemplazar variables en template"
+  ]
+}

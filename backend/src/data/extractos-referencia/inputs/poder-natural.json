@@ -1,0 +1,50 @@
+{
+  "tipo_documento": "extracto_notarial",
+  "notario": "GLENDA ELIZABETH ZAPATA SILVA",
+  "notaria": "DÉCIMA OCTAVA DEL CANTON QUITO",
+  "escritura": "20251701018P01386",
+  "patron": "poderes_genericos",
+  "tipos_aplicables": [
+    "PODER GENERAL PERSONA NATURAL",
+    "PODER ESPECIAL PERSONA NATURAL",
+    "PROCURACIÓN JUDICIAL PERSONA NATURAL"
+  ],
+  "actos": [
+    {
+      "tipo": "PODER GENERAL",
+      "fecha": "27 DE JUNIO DEL 2025, (15:49)",
+      "otorgantes": [
+        {
+          "nombre": "SUSAN MAGDALENA GUTIERREZ FABRE",
+          "tipo_persona": "Natural",
+          "tipo_interviniente": "POR SUS PROPIOS DERECHOS",
+          "documento": "CÉDULA",
+          "numero": "1234567890",
+          "nacionalidad": "ECUATORIANA",
+          "calidad": "MANDANTE"
+        }
+      ],
+      "beneficiarios": [
+        {
+          "nombre": "MARIA CRISTINA PUENTE SALINAS",
+          "tipo_persona": "Natural", 
+          "tipo_interviniente": "POR SUS PROPIOS DERECHOS",
+          "documento": "CÉDULA",
+          "numero": "0987654321",
+          "nacionalidad": "ECUATORIANA",
+          "calidad": "MANDATARIO(A)"
+        }
+      ]
+    }
+  ],
+  "ubicacion": {
+    "provincia": "PICHINCHA",
+    "canton": "QUITO", 
+    "parroquia": "IÑAQUITO"
+  },
+  "cuantia": "INDETERMINADA",
+  "metadata": {
+    "procesado_el": "2025-01-15T10:30:00Z",
+    "version_parser": "1.0"
+  }
+}

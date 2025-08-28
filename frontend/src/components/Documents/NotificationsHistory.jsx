@@ -25,7 +25,8 @@ import {
   Paper,
   Button,
   Grid,
-  CircularProgress
+  CircularProgress,
+  TableSortLabel
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -60,6 +61,9 @@ const NotificationsHistory = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [loading, setLoading] = useState(false);
+  // Ordenamiento
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortOrder, setSortOrder] = useState('desc');
 
   // Estados para datos reales
   const [notifications, setNotifications] = useState([]);
@@ -117,7 +121,9 @@ const NotificationsHistory = () => {
         search: searchTerm,
         status: statusFilter,
         dateFrom,
-        dateTo
+        dateTo,
+        sortBy,
+        sortOrder
       });
 
       console.log('📊 NOTIFICACIONES: Respuesta del backend:', response);
@@ -148,7 +154,7 @@ const NotificationsHistory = () => {
     if (user) {
       loadNotifications();
     }
-  }, [page, rowsPerPage, searchTerm, statusFilter, dateFilter, user?.id]);
+  }, [page, rowsPerPage, searchTerm, statusFilter, dateFilter, sortBy, sortOrder, user?.id]);
 
   // Usar las notificaciones reales en lugar del array vacío
   const realNotifications = notifications;
@@ -286,6 +292,17 @@ const NotificationsHistory = () => {
    */
   const handleRowsPerPageChange = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  // Cambiar campo/dirección de orden
+  const handleSort = (field) => {
+    if (sortBy === field) {
+      setSortOrder((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(field);
+      setSortOrder('asc');
+    }
     setPage(0);
   };
 
@@ -485,8 +502,24 @@ const NotificationsHistory = () => {
           <Table stickyHeader>
             <TableHead>
               <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>Fecha y Hora</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Cliente</TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>
+                  <TableSortLabel
+                    active={sortBy === 'createdAt'}
+                    direction={sortBy === 'createdAt' ? sortOrder : 'asc'}
+                    onClick={() => handleSort('createdAt')}
+                  >
+                    Fecha y Hora
+                  </TableSortLabel>
+                </TableCell>
+                <TableCell sx={{ fontWeight: 'bold' }}>
+                  <TableSortLabel
+                    active={sortBy === 'clientName'}
+                    direction={sortBy === 'clientName' ? sortOrder : 'asc'}
+                    onClick={() => handleSort('clientName')}
+                  >
+                    Cliente
+                  </TableSortLabel>
+                </TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Documento</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Teléfono</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Estado</TableCell>

@@ -83,7 +83,9 @@ class NotificationsService {
         status = '',
         type = '',
         dateFrom = '',
-        dateTo = ''
+        dateTo = '',
+        sortBy = '',
+        sortOrder = ''
       } = params;
 
       const queryParams = new URLSearchParams();
@@ -95,6 +97,8 @@ class NotificationsService {
       if (type) queryParams.append('type', type);
       if (dateFrom) queryParams.append('dateFrom', dateFrom);
       if (dateTo) queryParams.append('dateTo', dateTo);
+      if (sortBy) queryParams.append('sortBy', sortBy);
+      if (sortOrder) queryParams.append('sortOrder', sortOrder);
 
       const response = await this.api.get(`/?${queryParams.toString()}`);
       
