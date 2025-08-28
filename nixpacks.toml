@@ -15,7 +15,7 @@ cmds = [
 ]
 
 [start]
-cmd = "cd backend && npm start"
+cmd = "cd backend && npm run start:railway"
 
 [variables]
 NODE_ENV = "production"
