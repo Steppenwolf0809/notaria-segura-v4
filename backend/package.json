@@ -8,7 +8,7 @@
     "start": "npx prisma db push --accept-data-loss && node server.js",
     "build": "npx prisma generate",
     "start:prod": "npx prisma generate && (npx prisma migrate deploy || npx prisma db push --accept-data-loss) && node server.js",
-    "start:railway": "npx prisma generate && (npx prisma migrate deploy || npx prisma db push --accept-data-loss) && node server.js",
+    "start:railway": "npx prisma generate && npx prisma db push --accept-data-loss && node server.js",
     "dev": "nodemon server.js",
     "db:generate": "npx prisma generate",
     "db:migrate": "npx prisma migrate dev",
@@ -26,13 +26,13 @@
     "db:sync": "npx prisma db push --accept-data-loss"
   },
   "dependencies": {
-    "docx": "^8.5.0",
     "@prisma/client": "^5.7.0",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^2.4.0",
     "chokidar": "^3.6.0",
     "compression": "^1.8.1",
     "cors": "^2.8.0",
+    "docx": "^8.5.0",
     "dotenv": "^16.3.0",
     "express": "^4.18.0",
     "express-rate-limit": "^8.0.1",
@@ -43,6 +43,7 @@
     "pdf-parse": "^1.1.1",
     "pdfjs-dist": "^3.11.174",
     "pg": "^8.11.0",
+    "redis": "^5.8.2",
     "twilio": "^4.19.0",
     "xml2js": "^0.6.2",
     "zod": "^4.0.17"
@@ -59,4 +60,4 @@
   ],
   "author": "Notaría Segura",
   "license": "PRIVATE"
-  }
+}
