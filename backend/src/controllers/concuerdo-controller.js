@@ -131,7 +131,7 @@ async function previewConcuerdo(req, res) {
       // Ampliamos heurística para compañías/entidades del Ecuador
       const keys = [
         ' CIA', 'CIA.', ' CÍA', 'CÍA.', ' LTDA', 'L.T.D.A', ' L T D A',
-        ' S.A', ' S.A.', ' S A', 'S.A.S', ' S.A.S', ' SAS', ' S.A.C', ' S.A.C.',
+        ' S.A', ' S.A.', ' S A', 'S.A.', 'S.A.S', ' S.A.S', ' SAS', ' S.A.C', ' S.A.C.',
         ' BANCO', ' FIDEICOMISO', ' CONSTRUCTORA', ' CORPORACION', ' CORPORACIÓN',
         ' COMPAÑIA', ' COMPAÑÍA', ' EMPRESA PÚBLICA', ' EMPRESA PUBLICA', ' EP ', ' EP.',
         ' MUNICIPIO', ' GAD', ' GOBIERNO AUTONOMO DESCENTRALIZADO', ' GOBIERNO AUTÓNOMO DESCENTRALIZADO',
@@ -348,7 +348,7 @@ async function generateDocuments(req, res) {
       const s = String(name || '').toUpperCase()
       const keys = [
         ' CIA', 'CIA.', ' CÍA', 'CÍA.', ' LTDA', 'L.T.D.A', ' L T D A',
-        ' S.A', ' S.A.', ' S A', 'S.A.S', ' S.A.S', ' SAS', ' S.A.C', ' S.A.C.',
+        ' S.A', ' S.A.', ' S A', 'S.A.', 'S.A.S', ' S.A.S', ' SAS', ' S.A.C', ' S.A.C.',
         ' BANCO', ' FIDEICOMISO', ' CONSTRUCTORA', ' CORPORACION', ' CORPORACIÓN',
         ' COMPAÑIA', ' COMPAÑÍA', ' EMPRESA PÚBLICA', ' EMPRESA PUBLICA', ' EP ', ' EP.',
         ' MUNICIPIO', ' GAD', ' GOBIERNO AUTONOMO DESCENTRALIZADO', ' GOBIERNO AUTÓNOMO DESCENTRALIZADO',
@@ -514,16 +514,15 @@ async function generateDocuments(req, res) {
       }
 
       const toRtf = (text) => {
-        // Convertir **negritas** y saltos de línea a RTF básico con soporte unicode
+        // Convertir **negritas** y saltos de línea a RTF básico con codificación ANSI
         const escapeRtf = (s) => String(s || '')
           .replace(/\\/g, '\\\\')
           .replace(/[{}]/g, (m) => '\\' + m)
-        const toUnicode = (s) => s.replace(/[\u0080-\uFFFF]/g, (ch) => `\\u${ch.charCodeAt(0)}?`)
         // Reemplazo de **texto** por {\b texto}
         const withBold = text.replace(/\*\*(.+?)\*\*/g, (m, p1) => `{\\b ${p1}}`)
         const withParas = withBold.replace(/\r?\n/g, '\\par\n')
-        const payload = toUnicode(escapeRtf(withParas))
-        return `{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Times New Roman;}}\\fs24 ${payload}` + `}`
+        const payload = escapeRtf(withParas)
+        return `{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0 Times New Roman;}}\\fs24 ${payload}}`
       }
 
       let filename, mimeType, payload

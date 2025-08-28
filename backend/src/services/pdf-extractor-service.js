@@ -235,6 +235,8 @@ const PdfExtractorService = {
 
     // Extraer nombres usando patrón por filas tipo tabla: NATURAL <NOMBRES> POR SUS PROPIOS
     const tableNames = []
+    
+    // Patrón 1: Personas naturales tradicional
     const natRe = /NATURAL\s+([A-ZÁÉÍÓÚÑ\s]{3,80}?)\s+POR\s+SUS\s+PROPIOS/gi
     let nm
     while ((nm = natRe.exec(upperBase)) !== null) {
@@ -267,6 +269,43 @@ const PdfExtractorService = {
       if (reordered && !tableNames.includes(reordered)) tableNames.push(reordered)
     }
 
+    // Patrón 2: Extracción específica de tablas estructuradas (formato moderno)
+    // Buscar líneas "Nombres/Razón social: NOMBRE" directamente
+    const razSocialRe = /NOMBRES?\s*\/?\s*RAZ[ÓO]N\s+SOCIAL\s*[:\-]\s*([A-ZÁÉÍÓÚÑ\s\.]{3,80}?)(?:\s+TIPO|\s+REPRESENTADO|\s+DOCUMENTO|\s+NACIONALIDAD|\n|$)/gi
+    let rs
+    while ((rs = razSocialRe.exec(upperBase)) !== null) {
+      let name = rs[1].replace(/\s+/g, ' ').trim()
+      if (name && name.length > 2) {
+        // No aplicar reorderName a empresas que ya están bien ordenadas
+        if (/S\.A\.|LTDA|CIA|CORP/i.test(name)) {
+          if (!tableNames.includes(name)) tableNames.push(name)
+        } else {
+          const reordered = this.reorderName(name)
+          if (reordered && !tableNames.includes(reordered)) tableNames.push(reordered)
+        }
+      }
+    }
+
+    // Patrón 3: "APELLIDOS Y NOMBRES: ..." (formato persona natural)
+    const apellNombresRe = /APELLIDOS?\s*(?:Y|E)\s*NOMBRES?\s*[:\-]\s*([A-ZÁÉÍÓÚÑ\s\.]{3,80}?)(?:\s+DOCUMENTO|\s+NACIONALIDAD|\s+CALIDAD|\n|$)/gi
+    let an
+    while ((an = apellNombresRe.exec(upperBase)) !== null) {
+      let name = an[1].replace(/\s+/g, ' ').trim()
+      if (!name) continue
+      const reordered = this.reorderName(name)
+      if (reordered && !tableNames.includes(reordered)) tableNames.push(reordered)
+    }
+
+    // Patrón 4: Jurídica + Nombre en líneas consecutivas
+    const juridicaRe = /JUR[IÍ]DICA\s*\n?\s*([A-ZÁÉÍÓÚÑ\s\.]{3,50}?)\s*(?:REPRESENTADO|TIPO|DOCUMENTO|\n|$)/gi
+    let jr
+    while ((jr = juridicaRe.exec(upperBase)) !== null) {
+      let name = jr[1].replace(/\s+/g, ' ').trim()
+      if (name && name.length > 2 && !tableNames.includes(name)) {
+        tableNames.push(name)
+      }
+    }
+
     let upper = upperBase
 
     // Remover frases y términos que no son nombres
@@ -295,7 +334,8 @@ const PdfExtractorService = {
 
     // Regex: 2 a 5 palabras en mayúsculas con acentos
     // Permitir guiones y puntos intermedios en apellidos compuestos, y eliminar dobles espacios
-    const nameRegex = /([A-ZÁÉÍÓÚÑ]{2,}(?:[\s\.-]+[A-ZÁÉÍÓÚÑ]{2,}){1,4})/g
+    // Mejorado para capturar empresas con S.A., LTDA., CIA., etc.
+    const nameRegex = /([A-ZÁÉÍÓÚÑ]{2,}(?:[\s\.-]+[A-ZÁÉÍÓÚÑ\.]{1,}){1,6})/g
     const names = []
     let m
     while ((m = nameRegex.exec(upper)) !== null) {
@@ -306,14 +346,20 @@ const PdfExtractorService = {
       const badTokens = new Set(['POR','SUS','PROPIOS','DERECHOS','PASAPORTE','CEDULA','CÉDULA','MANDANTE','MANDATARIO','PETICIONARIO','ECUATORIA','ECUATORIANA','ECUATORIANO','COLOMBIANA','COLOMBIANO','PERUANA','PERUANO','VENEZOLANA','VENEZOLANO','RAZON','RAZÓN','SOCIAL','SOCIALTIPO','TIPO','INTERVINIENTE','NO','Nº','N°','NUMERO','NÚMERO'])
       const toks = candidate.split(' ')
       if (toks.some(t => badTokens.has(t))) continue
-      // Quitar partículas de 1-2 letras no permitidas
+      // Quitar partículas de 1-2 letras no permitidas, pero conservar tokens de empresas
       const particles = new Set(['DE','DEL','DELA','DELOS','DELAS','LA','LOS','LAS'])
+      const companyTokens = new Set(['S.A.', 'SA', 'S.A', 'LTDA', 'LTDA.', 'L.T.D.A.', 'CIA', 'CIA.', 'CÍA', 'CÍA.', 'S.A.S', 'SAS', 'CORP', 'CORP.', 'INC', 'INC.'])
       const filtered = toks.filter(t => !badTokens.has(t))
-      const cleaned = filtered.filter(t => t.length > 2 || particles.has(t)).join(' ')
-      // Debe quedar al menos 2 tokens reales
-      if (cleaned.split(' ').filter(Boolean).length < 2) continue
-      const reordered = this.reorderName(cleaned)
-      if (!names.includes(reordered)) names.push(reordered)
+      const cleaned = filtered.filter(t => t.length > 2 || particles.has(t) || companyTokens.has(t)).join(' ')
+      // Debe quedar al menos 2 tokens reales, excepto para empresas reconocibles
+      const cleanedTokens = cleaned.split(' ').filter(Boolean)
+      const hasCompanyToken = cleanedTokens.some(t => companyTokens.has(t))
+      if (cleanedTokens.length < 2 && !hasCompanyToken) continue
+      // Si tiene token de empresa, permitir aunque sea un solo token válido + empresa
+      if (hasCompanyToken && cleanedTokens.length < 1) continue
+      // No reordenar empresas que ya están en orden correcto
+      const finalName = hasCompanyToken ? cleaned : this.reorderName(cleaned)
+      if (!names.includes(finalName)) names.push(finalName)
     }
     // Si se detectaron por patrón de tabla, priorizarlos
     if (tableNames.length > 0) {
@@ -533,8 +579,8 @@ const PdfExtractorService = {
         return e === -1 ? afterStart.replace(startRegex, '') : afterStart.slice(0, e).replace(startRegex, '')
       }
 
-      // Variantes de etiquetas
-      const startOtRegex = /(?:OTORGADO\s+POR|OTORGANTE(?:S)?|OTORGANTES|NOMBRES\s*\/\s*RAZ[ÓO]N\s+SOCIAL)\s*[:\-]?\s*/i
+      // Variantes de etiquetas (ampliado: COMPARECIENTE/INTERVINIENTE)
+      const startOtRegex = /(?:OTORGADO\s+POR|OTORGANTE(?:S)?|OTORGANTES|COMPARECIENTE(?:S)?|INTERVINIENTE(?:S)?|NOMBRES\s*\/\s*RAZ[ÓO]N\s+SOCIAL)\s*[:\-]?\s*/i
       const startBenRegex = /(?:A\s+FAVOR\s+DE|BENEFICIARIO(?:S)?)\s*[:\-]?\s*/i
       const notarioRegex = /NOTARIO\s*\(\s*A\s*\)\s*[:\-]?\s*(.+?)(?:\n|\.|$)/i
 
@@ -587,13 +633,46 @@ const PdfExtractorService = {
 
       const otClean = this.cleanPersonNames(otorgantesRaw)
       const beClean = this.cleanPersonNames(beneficiariosRaw)
+      
+      // Extraer representantes de formato tabla
+      const representantes = []
+      const reprMatch = section.match(/PERSONA\s+QUE\s+LE\s+REPRESENTA\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s\.]{3,50}?)(?:\s+A\s+FAVOR|\n|$)/gi)
+      if (reprMatch) {
+        for (const match of reprMatch) {
+          const nameMatch = match.match(/REPRESENTA\s*[:\-]?\s*(.+?)(?:\s+A\s+FAVOR|\n|$)/i)
+          if (nameMatch && nameMatch[1]) {
+            const name = nameMatch[1].trim()
+            // Solo agregar si no es la misma empresa (evitar loops)
+            if (name && !otClean.includes(name) && !/S\.A\.|LTDA|CIA/i.test(name)) {
+              representantes.push(name)
+            }
+          }
+        }
+      }
+      
         for (const title of actsTitles) {
-          acts.push({
+          const actData = {
             tipoActo: title || '',
             otorgantes: otClean,
             beneficiarios: beClean,
             ...(notario ? { notario } : {})
-          })
+          }
+          
+          // Agregar representantes si hay otorgantes jurídicos
+          if (representantes.length > 0 && otClean.length > 0) {
+            // Buscar el primer otorgante que parezca ser jurídico
+            const juridicoIdx = otClean.findIndex(ot => /S\.A\.|LTDA|CIA|CORP/i.test(ot))
+            if (juridicoIdx !== -1) {
+              // Convertir a formato objeto si es necesario
+              const otorgantesObj = otClean.map((nombre, idx) => ({
+                nombre,
+                ...(idx === juridicoIdx && representantes.length > 0 ? { representantes } : {})
+              }))
+              actData.otorgantes = otorgantesObj
+            }
+          }
+          
+          acts.push(actData)
         }
       }
     }
