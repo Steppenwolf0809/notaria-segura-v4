@@ -250,6 +250,11 @@ class NotarialTableParser {
       return null
     }
     
+    // Filtrar filas que no parecen entidades válidas
+    if (!this.isValidEntityRow(fullText)) {
+      return null
+    }
+    
     const entity = {
       nombre: '',
       tipo_persona: 'Natural',
@@ -305,11 +310,66 @@ class NotarialTableParser {
     const headers = [
       'PERSONA', 'NOMBRES', 'RAZÓN SOCIAL', 'TIPO', 'INTERVINIENTE',
       'DOCUMENTO', 'IDENTIDAD', 'NACIONALIDAD', 'CALIDAD', 'REPRESENTA',
-      'OTORGADO POR', 'A FAVOR DE'
+      'OTORGADO POR', 'A FAVOR DE', 'UBICACIÓN', 'PROVINCIA', 'CANTÓN',
+      'ESCRITURA N°', 'FECHA DE OTORGAMIENTO', 'ACTO O CONTRATO'
     ]
     
     const upperText = text.toUpperCase()
-    return headers.some(header => upperText.includes(header))
+    
+    // Es encabezado si contiene cualquier header
+    if (headers.some(header => upperText.includes(header))) return true
+    
+    // Es encabezado si contiene solo fechas
+    if (/^\d{1,2}\s+DE\s+\w+\s+DEL\s+\d{4}/.test(upperText)) return true
+    
+    // Es encabezado si contiene números de escritura
+    if (/^\d{16,}[A-Z]\d+$/.test(upperText.replace(/\s/g, ''))) return true
+    
+    // Es encabezado si es muy corto y genérico
+    if (text.trim().length < 3) return true
+    
+    return false
+  }
+
+  /**
+   * Determina si una fila representa una entidad válida
+   */
+  isValidEntityRow(text) {
+    const upperText = text.toUpperCase().trim()
+    
+    // Debe tener contenido mínimo
+    if (upperText.length < 5) return false
+    
+    // Debe contener al menos indicadores de entidad válida
+    const validIndicators = [
+      /NATURAL\s+[A-ZÁÉÍÓÚÑ]/i,  // "NATURAL NOMBRE"
+      /JUR[IÍ]DICA\s+[A-ZÁÉÍÓÚÑ]/i,  // "JURÍDICA EMPRESA"
+      /[A-ZÁÉÍÓÚÑ]{3,}\s+[A-ZÁÉÍÓÚÑ]{3,}/i,  // Al menos 2 palabras de 3+ letras
+      /\d{10,13}/,  // Número de cédula o RUC
+      /CÉDULA|RUC|PASAPORTE/i  // Indicadores de documento
+    ]
+    
+    if (!validIndicators.some(indicator => indicator.test(upperText))) {
+      return false
+    }
+    
+    // No debe ser solo metadata
+    const metadataPatterns = [
+      /^FACTURA\s*:/i,
+      /^EXTRACTO$/i,
+      /^NOTARIO\s*\(/i,
+      /^NOTARÍA\s+/i,
+      /^UBICACIÓN$/i,
+      /^CUANTÍA\s*:/i,
+      /^_+$/,  // Solo guiones
+      /^\s*$/, // Solo espacios
+    ]
+    
+    if (metadataPatterns.some(pattern => pattern.test(upperText))) {
+      return false
+    }
+    
+    return true
   }
 
   /**

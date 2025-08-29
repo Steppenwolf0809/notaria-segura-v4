@@ -103,8 +103,14 @@ export default function ExtractedDataForm({ data, setData, loading, onBack, onPr
           <TextField
             fullWidth
             label="Otorgantes (uno por línea)"
-            value={Array.isArray(currentAct?.otorgantes) ? currentAct.otorgantes.join('\n') : ''}
-            onChange={(e) => updateAct({ otorgantes: e.target.value.split('\n').filter(Boolean) })}
+            value={Array.isArray(currentAct?.otorgantes) 
+              ? currentAct.otorgantes.map(o => 
+                  typeof o === 'object' && o !== null ? o.nombre : String(o)
+                ).join('\n') 
+              : ''}
+            onChange={(e) => updateAct({ 
+              otorgantes: e.target.value.split('\n').filter(Boolean).map(nombre => ({ nombre }))
+            })}
             multiline
             minRows={4}
           />
@@ -113,8 +119,14 @@ export default function ExtractedDataForm({ data, setData, loading, onBack, onPr
           <TextField
             fullWidth
             label="Beneficiarios (uno por línea)"
-            value={Array.isArray(currentAct?.beneficiarios) ? currentAct.beneficiarios.join('\n') : ''}
-            onChange={(e) => updateAct({ beneficiarios: e.target.value.split('\n').filter(Boolean) })}
+            value={Array.isArray(currentAct?.beneficiarios) 
+              ? currentAct.beneficiarios.map(b => 
+                  typeof b === 'object' && b !== null ? b.nombre : String(b)
+                ).join('\n') 
+              : ''}
+            onChange={(e) => updateAct({ 
+              beneficiarios: e.target.value.split('\n').filter(Boolean).map(nombre => ({ nombre }))
+            })}
             multiline
             minRows={4}
           />
@@ -158,7 +170,11 @@ export default function ExtractedDataForm({ data, setData, loading, onBack, onPr
             acts: acts
               .map((a, i) => ({ a, i }))
               .filter(({ i }) => selectedActs[i])
-              .map(({ a }) => ({ tipoActo: a?.tipoActo || a?.tipo, otorgantes: a?.otorgantes || [], beneficiarios: a?.beneficiarios || [] })),
+              .map(({ a }) => ({ 
+                tipoActo: a?.tipoActo || a?.tipo, 
+                otorgantes: a?.otorgantes || [], 
+                beneficiarios: a?.beneficiarios || [] 
+              })),
             notario: data?.notario,
             notariaNumero: data?.notariaNumero,
             notarioSuplente: data?.notarioSuplente,

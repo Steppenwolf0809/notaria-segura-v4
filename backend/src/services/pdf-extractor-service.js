@@ -371,6 +371,20 @@ const PdfExtractorService = {
       }
     }
 
+    // Patrón 5: Formato tabular específico para nombres como "PAREDES MONTUFAR CAMILO"
+    // Buscar secuencias que parezcan apellidos + nombres después de "NATURAL"
+    const tabularNamesRe = /NATURAL\s+([A-ZÁÉÍÓÚÑ]+\s+[A-ZÁÉÍÓÚÑ]+\s+[A-ZÁÉÍÓÚÑ]+(?:\s+[A-ZÁÉÍÓÚÑ]+)?)\s+POR\s+SUS\s+PROPIOS/gi
+    let tn
+    while ((tn = tabularNamesRe.exec(upperBase)) !== null) {
+      let name = tn[1].replace(/\s+/g, ' ').trim()
+      if (name && name.split(' ').length >= 3) {
+        const reordered = this.reorderName(name)
+        if (reordered && !tableNames.includes(reordered)) {
+          tableNames.push(reordered)
+        }
+      }
+    }
+
 
     // Patrón 6: Detectar empresas después de personas que las representan
     // Formato: "PERSONA_NATURAL [datos] EMPRESA S.A."
@@ -700,6 +714,16 @@ const PdfExtractorService = {
       let otorgantesRaw = blockBetween(startOtRegex, startBenRegex)
       let beneficiariosRaw = blockBetween(startBenRegex, /NOTARIO|ACTO\s+O\s+CON|EXTRACTO|\n\s*ESCRITURA|\.$/i)
 
+      // Debug: log secciones para diagnosticar mejor la extracción
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('🔍 Debug secciones:')
+        console.log('  - Otorgantes raw (length):', otorgantesRaw?.length || 0)
+        console.log('  - Beneficiarios raw (length):', beneficiariosRaw?.length || 0)
+        if (beneficiariosRaw) {
+          console.log('  - Beneficiarios preview:', beneficiariosRaw.substring(0, 150))
+        }
+      }
+
       // Fallbacks para otorgantes:
       // 1) Variante de etiqueta "OTORGADO POR" que a veces aparece como "OTORGADO  POR" o con salto raro
       if (!otorgantesRaw || otorgantesRaw.trim().length < 3) {
@@ -793,6 +817,24 @@ const PdfExtractorService = {
         }
       }
       let beClean = this.cleanPersonNames(beneficiariosRaw)
+      
+      // Fallback mejorado para beneficiarios en formato tabular
+      if ((!beClean || beClean.length === 0) && /A\s+FAVOR\s+DE/i.test(section)) {
+        console.log('🔍 Fallback: Buscando beneficiarios en formato tabular')
+        
+        // Buscar desde "A FAVOR DE" hasta el final de la sección o siguiente encabezado
+        const aFavorIdx = section.search(/A\s+FAVOR\s+DE/i)
+        if (aFavorIdx !== -1) {
+          const afterAFavor = section.slice(aFavorIdx + 11) // después de "A FAVOR DE"
+          const endIdx = afterAFavor.search(/NOTARIO|ACTO\s+O\s+CON|EXTRACTO|\n\s*ESCRITURA|$/)
+          const benefRegion = endIdx === -1 ? afterAFavor : afterAFavor.slice(0, endIdx)
+          
+          console.log('🔍 Región A FAVOR DE encontrada:', benefRegion.substring(0, 200))
+          beClean = this.cleanPersonNames(benefRegion)
+          console.log('🔍 Beneficiarios extraídos del fallback:', beClean)
+        }
+      }
+      
       // Heurística anti-duplicación: si no existe etiqueta clara de beneficiarios
       // o si la lista coincide con otorgantes, limpiar beneficiarios.
       const hasBenefLabel = /A\s+FAVOR\s+DE|BENEFICIARIO(?:S)?/i.test(section)
@@ -950,26 +992,25 @@ const PdfExtractorService = {
   convertStructuredDataToActs(structuredData, rawText) {
     const acts = []
     
-    // Extraer tipo de acto del texto raw
-    const tipoActo = this.cleanActType(
-      (rawText.match(/ACTO(?:\s+O\s+CON\s*-?\s*TRATO)?[:\-]?\s*([\s\S]*?)(?:\n| FECHA| OTORGADO\s+POR)/i)?.[1] || '').trim()
-    ) || 'PODER ESPECIAL' // Fallback común
+    // Extraer tipo de acto con múltiples estrategias
+    const tipoActo = this.extractRealActType(rawText)
     
     let otorgantes = []
     let beneficiarios = []
     
-    // Combinar entidades por tipo
+    // Combinar entidades por tipo y filtrar válidas
     for (const section of structuredData) {
       if (section.type === 'otorgantes' && section.entities) {
-        otorgantes.push(...section.entities)
+        otorgantes.push(...section.entities.filter(this.isValidEntityForExtraction))
       } else if (section.type === 'beneficiarios' && section.entities) {
-        beneficiarios.push(...section.entities)
+        beneficiarios.push(...section.entities.filter(this.isValidEntityForExtraction))
       }
     }
     
     // Si no encontramos separación clara, usar la primera sección como otorgantes
     if (otorgantes.length === 0 && structuredData.length > 0) {
-      otorgantes = structuredData[0].entities || []
+      const allEntities = structuredData[0].entities?.filter(this.isValidEntityForExtraction) || []
+      otorgantes = allEntities
     }
     
     if (otorgantes.length > 0 || beneficiarios.length > 0) {
@@ -988,6 +1029,103 @@ const PdfExtractorService = {
     }
     
     return acts
+  },
+
+  /**
+   * Extrae el tipo de acto real usando múltiples estrategias
+   */
+  extractRealActType(rawText) {
+    const text = rawText.toUpperCase()
+    
+    // Estrategia 1: Buscar después de "ACTO O CONTRATO:"
+    const actMatch = text.match(/ACTO\s+O\s+CONTRATO\s*[:\-]?\s*([^\n]+?)(?:\s+FECHA|\n|$)/i)
+    if (actMatch && actMatch[1]) {
+      const cleaned = this.cleanActType(actMatch[1])
+      if (cleaned && cleaned !== 'ESCRITURA' && !cleaned.includes('ESCRITURA N°')) {
+        return cleaned
+      }
+    }
+    
+    // Estrategia 2: Buscar patrones específicos de actos
+    const actPatterns = [
+      /PODER\s+GENERAL(?:\s+PERSONA\s+(?:NATURAL|JUR[IÍ]DICA))?/,
+      /PODER\s+ESPECIAL(?:\s+PERSONA\s+(?:NATURAL|JUR[IÍ]DICA))?/,
+      /PROCURACI[ÓO]N\s+JUDICIAL/,
+      /REVOCATORIA\s+DE\s+PODER/,
+      /COMPRAVENTA/,
+      /DONACI[ÓO]N/,
+      /TESTAMENTO/
+    ]
+    
+    for (const pattern of actPatterns) {
+      const match = text.match(pattern)
+      if (match) {
+        return match[0]
+      }
+    }
+    
+    // Estrategia 3: Inferir por contexto
+    if (text.includes('PERSONA NATURAL')) {
+      if (text.includes('PODER GENERAL')) return 'PODER GENERAL PERSONA NATURAL'
+      if (text.includes('PODER ESPECIAL')) return 'PODER ESPECIAL PERSONA NATURAL'
+      return 'PODER GENERAL PERSONA NATURAL'
+    } else if (text.includes('PERSONA JURÍDICA') || text.includes('PERSONA JURIDICA')) {
+      if (text.includes('PODER GENERAL')) return 'PODER GENERAL PERSONA JURÍDICA'
+      if (text.includes('PODER ESPECIAL')) return 'PODER ESPECIAL PERSONA JURÍDICA'
+      return 'PODER ESPECIAL PERSONA JURÍDICA'
+    }
+    
+    // Fallback final
+    return 'PODER ESPECIAL'
+  },
+
+  /**
+   * Valida si una entidad es válida (no es encabezado o metadata)
+   */
+  isValidEntityForExtraction(entity) {
+    if (!entity || !entity.nombre) return false
+    
+    const nombre = entity.nombre.trim()
+    
+    // Filtrar entidades muy cortas
+    if (nombre.length < 3) return false
+    
+    // Filtrar encabezados conocidos
+    const badPatterns = [
+      /^OTORGANTES?$/i,
+      /^BENEFICIARIOS?$/i,
+      /^A\s+FAVOR\s+DE$/i,
+      /^ESCRITURA\s+N[°º]/i,
+      /^FECHA\s+DE/i,
+      /^ACTO\s+O\s+CONTRATO/i,
+      /^PERSONA$/i,
+      /^NATURAL$/i,
+      /^JUR[IÍ]DICA$/i,
+      /^NOMBRES?\s*\/?\s*RAZ[ÓO]N/i,
+      /^TIPO\s+INTERVINIENTE/i,
+      /^DOCUMENTO/i,
+      /^NACIONALIDAD$/i,
+      /^CALIDAD$/i,
+      /^UBICACI[ÓO]N$/i,
+      /^PROVINCIA$/i,
+      /^CANT[ÓO]N$/i,
+      /^\d{1,2}\s+DE\s+\w+\s+DEL\s+\d{4}/i, // Fechas
+      /^\d{15,}[A-Z]\d+$/i // Números de escritura
+    ]
+    
+    if (badPatterns.some(pattern => pattern.test(nombre))) {
+      return false
+    }
+    
+    // Debe tener al menos 2 palabras o ser una empresa reconocible
+    const words = nombre.split(/\s+/).filter(Boolean)
+    if (words.length < 2) {
+      // Permitir si es empresa con tokens conocidos
+      const companyTokens = /(?:S\.A\.|LTDA|CIA|CORP|FUNDACI[ÓO]N|EMPRESA)/i
+      return companyTokens.test(nombre)
+    }
+    
+    return true
   },
 
   /**
