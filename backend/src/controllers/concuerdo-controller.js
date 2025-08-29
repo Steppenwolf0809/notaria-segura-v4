@@ -1,4 +1,5 @@
 import PdfExtractorService from '../services/pdf-extractor-service.js'
+import UniversalPdfParser from '../services/universal-pdf-parser.js'
 import { ExtractoTemplateEngine } from '../services/extractos/index.js'
 import { buildActPhrase } from '../services/extractos/phrase-builder.js'
 import DataQualityValidator from '../services/data-quality-validator.js'
@@ -105,7 +106,18 @@ async function extractData(req, res) {
     // Debug: mostrar preview del texto extraído
     console.log('📝 Preview texto extraído (primeros 500 chars):', text.substring(0, 500).replace(/\n/g, '\\n'))
     
-    let { acts } = await PdfExtractorService.parseAdvancedData(text, pdfBuffer)
+    // Usar el parser universal para detección automática
+    const universalParser = new UniversalPdfParser()
+    const universalResult = await universalParser.parseDocument(pdfBuffer, text)
+    
+    // Fallback al parser original si el universal falla
+    let acts = universalResult.acts || []
+    if (acts.length === 0) {
+      console.log('🔄 Fallback al parser original')
+      const fallbackResult = await PdfExtractorService.parseAdvancedData(text, pdfBuffer)
+      acts = fallbackResult.acts
+    }
+    
     let parsed = acts[0] || { tipoActo: '', otorgantes: [], beneficiarios: [] }
     const { notarioNombre, notariaNumero, notariaNumeroDigit, notarioSuplente } = PdfExtractorService.extractNotaryInfo(text)
     
@@ -707,7 +719,7 @@ async function generateDocuments(req, res) {
           }
           const connector = phrases.slice(1).map(p => `y de ${p}`).join('; ')
           const body = phrases.length > 1 ? `${phrases[0]}; ${connector}` : phrases[0]
-          combined = `\n\nSe otorgó ante mí, en fe de ello confiero esta **${rotuloPalabra} COPIA CERTIFICADA** de la escritura pública de ${body}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.\n\n\n\n                    ${footerNotario}\n                    ${footerNotaria}\n`
+          combined = `\n\n  Se otorgó ante mí, en fe de ello confiero esta **${rotuloPalabra} COPIA CERTIFICADA** de la escritura pública de ${body}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.\n\n\n\n                    ${footerNotario}\n                    ${footerNotaria}\n`
         } else {
           console.log('📋 [concuerdos] Modo clásico: render individual por acto')
           // Render clásico por acto y concatenado con separador
@@ -719,7 +731,7 @@ async function generateDocuments(req, res) {
             console.log(`✅ [concuerdos] Texto generado (primeros 200 chars):`, text?.substring(0, 200) + '...')
             rendered.push(text)
           }
-          combined = rendered.join('\n\n—\n\n')
+          combined = '  ' + rendered.join('\n\n—\n\n')
         }
         console.log(`✅ [concuerdos] Documento ${n} generado exitosamente (${combined?.length || 0} caracteres)`)
       } catch (templateError) {
@@ -759,15 +771,20 @@ async function generateDocuments(req, res) {
       }
 
       const toRtf = (text) => {
-        // Convertir **negritas** y saltos de línea a RTF básico con codificación ANSI
-        const escapeRtf = (s) => String(s || '')
-          .replace(/\\/g, '\\\\')
-          .replace(/[{}]/g, (m) => '\\' + m)
-        // Reemplazo de **texto** por formato RTF correcto
-        const withBold = text.replace(/\*\*(.+?)\*\*/g, (m, p1) => `\\b ${p1}\\b0 `)
-        const withParas = withBold.replace(/\r?\n/g, '\\par\n')
-        const payload = escapeRtf(withParas)
-        return `{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0 Times New Roman;}}\\fs24 ${payload}}`
+        // Generar RTF aplicando negritas y párrafos sin escapar controles RTF
+        const escapeRtfText = (s) => String(s || '')
+          .replace(/[\\{}]/g, (m) => `\\${m}`)
+          .replace(/[\u0080-\uFFFF]/g, (ch) => `\\u${ch.charCodeAt(0)}?`)
+        const parts = String(text || '').split(/(\*\*[^*]+\*\*)/)
+        let body = ''
+        for (const seg of parts) {
+          if (!seg) continue
+          const m = seg.match(/^\*\*(.+)\*\*$/)
+          if (m) body += `{\\b ${escapeRtfText(m[1])}}`
+          else body += escapeRtfText(seg)
+        }
+        body = body.split(/\r?\n/).map(line => `\\qj\\sl420\\slmult1 ${line}`).join('\\par\n')
+        return `{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0 Times New Roman;}}\\fs24 ${body}}`
       }
 
       let filename, mimeType, payload
@@ -842,17 +859,23 @@ ${body}
       }
 
       const toRtfBundle = (entries) => {
-        const escapeRtf = (s) => String(s || '')
-          .replace(/\\/g, '\\\\')
-          .replace(/[{}]/g, (m) => '\\' + m)
-        const toUnicode = (s) => s.replace(/[\u0080-\uFFFF]/g, (ch) => `\\u${ch.charCodeAt(0)}?`)
+        const escapeRtfText = (s) => String(s || '')
+          .replace(/[\\{}]/g, (m) => `\\${m}`)
+          .replace(/[\u0080-\uFFFF]/g, (ch) => `\\u${ch.charCodeAt(0)}?`)
+        const renderOne = (text) => {
+          const parts = String(text || '').split(/(\*\*[^*]+\*\*)/)
+          let body = ''
+          for (const seg of parts) {
+            if (!seg) continue
+            const m = seg.match(/^\*\*(.+)\*\*$/)
+            if (m) body += `{\\b ${escapeRtfText(m[1])}}`
+            else body += escapeRtfText(seg)
+          }
+          return body.split(/\r?\n/).map(line => `\\qj\\sl420\\slmult1 ${line}`).join('\\par\n')
+        }
         const sections = entries.map((e, idx) => {
-          const title = toUnicode(escapeRtf(e.title))
-          const bodyBold = e.text.replace(/\*\*(.+?)\*\*/g, (m, p1) => `\\b ${p1}\\b0 `)
-          const body = toUnicode(escapeRtf(bodyBold))
-          const paras = body.split(/\r?\n/).map(line => `\\qj\\sl420\\slmult1 ${line}`).join('\\par\n')
           const page = idx === 0 ? '' : '\\page\n'
-          return `${page}{\\b ${title}}\\par\n${paras}`
+          return `${page}${renderOne(e.text)}`
         }).join('\\par\n')
         return `{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Arial;}}\\f0\\fs28\n${sections}\n}`
       }
@@ -885,7 +908,7 @@ ${body}
       } else { // txt
         filename = 'CONCUERDO_COPIAS_UNIDAS.txt'
         mimeType = 'text/plain; charset=utf-8'
-        const payload = bundleEntries.map((e, idx) => (idx ? '\f\n' : '') + e.title + '\n\n' + e.text).join('\n\n')
+        const payload = bundleEntries.map((e, idx) => (idx ? '\f\n' : '') + e.text).join('\n\n')
         contentBase64 = Buffer.from(payload, 'utf8').toString('base64')
       }
       documents.length = 0
