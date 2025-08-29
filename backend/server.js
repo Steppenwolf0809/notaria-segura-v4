@@ -38,8 +38,13 @@ if (!isConfigurationComplete(config)) {
 const app = express()
 const PORT = config.PORT || 3001
 
-// Configurar trust proxy para Railway y otros proxies
-app.set('trust proxy', true)
+// Configurar trust proxy de forma segura (evita ERR_ERL_PERMISSIVE_TRUST_PROXY)
+// En Railway/producción confiamos solo en el primer proxy; en desarrollo no confiamos en proxies
+if (config.NODE_ENV === 'production' || config.NODE_ENV === 'staging') {
+  app.set('trust proxy', 1)
+} else {
+  app.set('trust proxy', false)
+}
 
 // Configuración CORS mejorada para desarrollo y producción
 const corsOptions = {
