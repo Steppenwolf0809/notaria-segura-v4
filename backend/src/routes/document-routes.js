@@ -179,6 +179,19 @@ router.put('/:id/notification-policy', authenticateToken, updateNotificationPoli
 // PUT /api/documents/group/:groupId/notification-policy - Actualizar política de notificación de grupo
 router.put('/group/:groupId/notification-policy', authenticateToken, updateGroupNotificationPolicy);
 
+// 🧪 Extracción avanzada (detrás de flag): actos y comparecientes desde texto
+router.post('/:id/extract-acts', authenticateToken, async (req, res, next) => {
+  // Cargar perezosamente para no impactar tiempo de arranque
+  const { extractDocumentActs } = await import('../controllers/document-controller.js');
+  return extractDocumentActs(req, res, next);
+});
+
+// Aplicar sugerencias del último snapshot al documento (no autocompleta)
+router.post('/:id/apply-extraction', authenticateToken, async (req, res, next) => {
+  const { applyExtractionSuggestions } = await import('../controllers/document-controller.js');
+  return applyExtractionSuggestions(req, res, next);
+});
+
 
 /**
  * Middleware de manejo de errores para multer

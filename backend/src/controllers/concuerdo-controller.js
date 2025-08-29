@@ -1,7 +1,6 @@
 import PdfExtractorService from '../services/pdf-extractor-service.js'
 import { ExtractoTemplateEngine } from '../services/extractos/index.js'
-import { buildActPhrase, normalizeActTypeForDisplay } from '../services/extractos/phrase-builder.js'
-import { generateDocxFromText } from '../services/docx-generator.js'
+import { buildActPhrase } from '../services/extractos/phrase-builder.js'
 import DataQualityValidator from '../services/data-quality-validator.js'
 import ocrService from '../services/ocr-service.js'
 
