@@ -194,9 +194,19 @@ async function previewConcuerdo(req, res) {
     })
     const { tipoActo, otorgantes, beneficiarios, acts, notario, notariaNumero, notarioSuplente, numeroCopias = 2 } = req.body || {}
 
-    const safeArray = (v) => Array.isArray(v)
-      ? v.map((x) => String(x || '').trim()).filter(Boolean)
-      : String(v || '').split(/\n|,|;/).map((x) => x.trim()).filter(Boolean)
+    const safeArray = (v) => {
+      if (Array.isArray(v)) {
+        return v.filter((x) => {
+          if (x === null || x === undefined) return false
+          if (typeof x === 'object' && !Array.isArray(x)) {
+            const nombre = x.nombre || x.fullname || x.text
+            return Boolean(String(nombre || '').trim())
+          }
+          return Boolean(String(x).trim())
+        })
+      }
+      return String(v || '').split(/\n|,|;/).map((x) => x.trim()).filter(Boolean)
+    }
 
     // Normaliza posibles bloques sucios (con encabezados de tabla) → lista de nombres
     const extractFromBlock = (block) => {
@@ -210,7 +220,11 @@ async function previewConcuerdo(req, res) {
     const expandComparecientes = (raw) => {
       const arr = safeArray(raw)
       if (arr.length === 0) return []
-      // Si llega un único bloque largo con encabezados conocidos, limpiarlo
+      // Si ya vienen objetos, normalizarlos y devolverlos
+      if (arr.some((it) => typeof it === 'object' && !Array.isArray(it))) {
+        return arr.map(normalizeCompareciente)
+      }
+      // Caso: llega un único bloque largo con encabezados conocidos → limpiar
       const joined = arr.join(' ')
       const hasHeaders = /RAZ[ÓO]N\s+SOCIAL|NOMBRES\s*\/|TIPO\s+INTERVINIENTE|NACIONALIDAD|CALIDAD/i.test(joined)
       if (arr.length === 1 && (arr[0].length > 40 || hasHeaders)) {
@@ -223,7 +237,8 @@ async function previewConcuerdo(req, res) {
         const names = PdfExtractorService.cleanPersonNames(s)
         return names.map(n => ({ nombre: n }))
       }
-      return arr.map(n => ({ nombre: n }))
+      // Caso: array de strings simples → mapear a objetos con nombre
+      return arr.map(n => ({ nombre: String(n) }))
     }
 
     const guessTipoPersona = (name) => {
