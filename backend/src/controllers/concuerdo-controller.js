@@ -33,14 +33,21 @@ async function uploadPdf(req, res) {
       return res.status(400).json({ success: false, message: 'El archivo PDF es demasiado grande (máximo 10MB)' })
     }
 
+    // Estrategia: permitir OCR-first por query (?ocrFirst=1) o por variable de entorno
+    const ocrFirst = (String(req.query?.ocrFirst || '').toLowerCase() === '1') || (process.env.CONCUERDOS_OCR_FIRST === 'true')
     let text = ''
-    try {
-      text = await PdfExtractorService.extractText(buffer)
-    } catch {}
-
-    // Si no hay texto o es demasiado corto, intentar OCR si está habilitado
     let ocrUsed = false
-    if ((!text || text.length < 50) && (process.env.OCR_ENABLED || 'false') !== 'false') {
+    if (ocrFirst && (process.env.OCR_ENABLED || 'false') !== 'false') {
+      const ocr = await ocrService.ocrPdf(buffer)
+      if (ocr && ocr.text && ocr.text.trim().length > 10) {
+        text = ocr.text
+        ocrUsed = true
+      }
+    }
+    if (!text) {
+      try { text = await PdfExtractorService.extractText(buffer) } catch {}
+    }
+    if ((!text || text.length < 50) && !ocrUsed && (process.env.OCR_ENABLED || 'false') !== 'false') {
       const ocr = await ocrService.ocrPdf(buffer)
       if (ocr && ocr.text && ocr.text.trim().length > 10) {
         text = ocr.text
@@ -671,7 +678,7 @@ async function generateDocuments(req, res) {
           }
           const connector = phrases.slice(1).map(p => `y de ${p}`).join('; ')
           const body = phrases.length > 1 ? `${phrases[0]}; ${connector}` : phrases[0]
-          combined = `Se otorgó ante mí, en fe de ello confiero esta **${rotuloPalabra} COPIA CERTIFICADA** de la escritura pública de ${body}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.\n\n${footerNotario}\n${footerNotaria}\n`
+          combined = `\n\nSe otorgó ante mí, en fe de ello confiero esta **${rotuloPalabra} COPIA CERTIFICADA** de la escritura pública de ${body}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.\n\n\n\n                    ${footerNotario}\n                    ${footerNotaria}\n`
         } else {
           console.log('📋 [concuerdos] Modo clásico: render individual por acto')
           // Render clásico por acto y concatenado con separador
@@ -721,8 +728,8 @@ async function generateDocuments(req, res) {
         const escapeRtf = (s) => String(s || '')
           .replace(/\\/g, '\\\\')
           .replace(/[{}]/g, (m) => '\\' + m)
-        // Reemplazo de **texto** por {\b texto}
-        const withBold = text.replace(/\*\*(.+?)\*\*/g, (m, p1) => `{\\b ${p1}}`)
+        // Reemplazo de **texto** por formato RTF correcto
+        const withBold = text.replace(/\*\*(.+?)\*\*/g, (m, p1) => `\\b ${p1}\\b0 `)
         const withParas = withBold.replace(/\r?\n/g, '\\par\n')
         const payload = escapeRtf(withParas)
         return `{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0 Times New Roman;}}\\fs24 ${payload}}`
@@ -768,11 +775,6 @@ async function generateDocuments(req, res) {
       const fmt = ['html', 'rtf', 'txt', 'docx'].includes(requestedFormat) ? requestedFormat : 'txt'
 
       const toHtmlBundle = (entries) => {
-        const headerTitle = [
-          (notariaNumero ? `Notaría: ${notariaNumero}` : ''),
-          (notario ? `Notario(a): ${notario}` : '')
-        ].filter(Boolean).join(' · ')
-        const footerText = `Fecha de impresión: ${new Date().toLocaleDateString('es-EC')}`
         const esc = (s) => String(s || '')
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
@@ -781,10 +783,8 @@ async function generateDocuments(req, res) {
           const bolded = esc(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
           const pb = first ? '' : 'page-break-before: always;'
           return `<section style=\"${pb}\">
-  <div class=\"hdr\">${esc(headerTitle)}</div>
   <h1>${esc(title)}</h1>
   <div class=\"doc\">${bolded}</div>
-  <div class=\"ftr\">${esc(footerText)}</div>
 </section>`
         }
         const body = entries.map((e, idx) => section(e.title, e.text, idx === 0)).join('\n')
@@ -794,8 +794,7 @@ async function generateDocuments(req, res) {
   body { font-family: Arial, sans-serif; line-height: 1.5; }
   .doc { white-space: pre-wrap; font-size: 14pt; text-align: justify; }
   h1 { font-size: 16pt; margin: 0 0 12px 0; font-family: Arial, sans-serif; }
-  .hdr { font-size: 10pt; color: #444; margin-bottom: 6px; }
-  .ftr { font-size: 10pt; color: #666; margin-top: 10px; }
+
 </style></head><body>
 ${body}
 </body></html>`
@@ -808,13 +807,11 @@ ${body}
         const toUnicode = (s) => s.replace(/[\u0080-\uFFFF]/g, (ch) => `\\u${ch.charCodeAt(0)}?`)
         const sections = entries.map((e, idx) => {
           const title = toUnicode(escapeRtf(e.title))
-          const bodyBold = e.text.replace(/\*\*(.+?)\*\*/g, (m, p1) => `{\\b ${p1}}`)
+          const bodyBold = e.text.replace(/\*\*(.+?)\*\*/g, (m, p1) => `\\b ${p1}\\b0 `)
           const body = toUnicode(escapeRtf(bodyBold))
           const paras = body.split(/\r?\n/).map(line => `\\qj\\sl420\\slmult1 ${line}`).join('\\par\n')
           const page = idx === 0 ? '' : '\\page\n'
-          const hdr = toUnicode(escapeRtf([notariaNumero ? `Notaría: ${notariaNumero}` : '', notario ? `Notario(a): ${notario}` : ''].filter(Boolean).join(' · ')))
-          const ftr = toUnicode(escapeRtf(`Fecha de impresión: ${new Date().toLocaleDateString('es-EC')}`))
-          return `${page}${hdr}\\par\n{\\b ${title}}\\par\n${paras}\\par\n${ftr}`
+          return `${page}{\\b ${title}}\\par\n${paras}`
         }).join('\\par\n')
         return `{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Arial;}}\\f0\\fs28\n${sections}\n}`
       }
@@ -833,12 +830,7 @@ ${body}
       } else if (fmt === 'docx') {
         try {
           const { generateDocxFromCopies } = await import('../services/docx-generator.js')
-          const headerTitle = [
-            (notariaNumero ? `Notaría: ${notariaNumero}` : ''),
-            (notario ? `Notario(a): ${notario}` : ''),
-          ].filter(Boolean).join(' · ')
-          const footerText = `Fecha de impresión: ${new Date().toLocaleDateString('es-EC')}`
-          const buf = await generateDocxFromCopies({ copies: bundleEntries, headerTitle, footerText })
+          const buf = await generateDocxFromCopies({ copies: bundleEntries })
           filename = 'CONCUERDO_COPIAS_UNIDAS.docx'
           mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
           contentBase64 = Buffer.from(buf).toString('base64')

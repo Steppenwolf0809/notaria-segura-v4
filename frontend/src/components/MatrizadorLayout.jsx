@@ -111,7 +111,8 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
       text: 'Generar Concuerdos',
       icon: <DocumentsIcon />,
       view: 'concuerdos',
-      active: currentView === 'concuerdos'
+      active: currentView === 'concuerdos',
+      beta: true
     }
   ];
 
@@ -220,16 +221,40 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
                     {item.icon}
                   </ListItemIcon>
                   {!sidebarCollapsed && (
-                    <ListItemText 
-                      primary={item.text}
-                      primaryTypographyProps={{
-                        variant: 'body2',
-                        fontWeight: item.active ? 'bold' : 'medium',
-                        color: item.active 
-                          ? 'white' 
-                          : (!isDarkMode ? '#ffffff' : 'inherit')
-                      }}
-                    />
+                    item.beta ? (
+                      <ListItemText
+                        primary={
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <span>{item.text}</span>
+                            <span style={{
+                              fontSize: '10px',
+                              padding: '2px 6px',
+                              borderRadius: '8px',
+                              backgroundColor: item.active ? 'rgba(255,255,255,0.2)' : (!isDarkMode ? 'rgba(255,255,255,0.15)' : 'rgba(25,118,210,0.15)'),
+                              color: item.active ? '#fff' : (!isDarkMode ? '#fff' : '#1976d2')
+                            }}>BETA</span>
+                          </Box>
+                        }
+                        primaryTypographyProps={{
+                          variant: 'body2',
+                          fontWeight: item.active ? 'bold' : 'medium',
+                          color: item.active 
+                            ? 'white' 
+                            : (!isDarkMode ? '#ffffff' : 'inherit')
+                        }}
+                      />
+                    ) : (
+                      <ListItemText 
+                        primary={item.text}
+                        primaryTypographyProps={{
+                          variant: 'body2',
+                          fontWeight: item.active ? 'bold' : 'medium',
+                          color: item.active 
+                            ? 'white' 
+                            : (!isDarkMode ? '#ffffff' : 'inherit')
+                        }}
+                      />
+                    )
                   )}
                 </ListItemButton>
               </Tooltip>

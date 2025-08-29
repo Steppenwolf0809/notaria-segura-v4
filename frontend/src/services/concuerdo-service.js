@@ -34,7 +34,7 @@ api.interceptors.request.use(
 );
 
 const concuerdoService = {
-  async uploadPDF(file) {
+  async uploadPDF(file, { ocrFirst = true } = {}) {
     try {
       if (!file || !file.name.toLowerCase().endsWith('.pdf')) {
         return { success: false, error: 'Seleccione un archivo PDF válido' };
@@ -45,7 +45,7 @@ const concuerdoService = {
       const formData = new FormData();
       formData.append('pdfFile', file);
 
-      const response = await api.post('/concuerdos/upload-pdf', formData, {
+      const response = await api.post(`/concuerdos/upload-pdf?ocrFirst=${ocrFirst ? '1' : '0'}`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 30000,
       });
