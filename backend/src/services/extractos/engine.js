@@ -290,11 +290,16 @@ function buildVariables({ data, reglasGenero }) {
   const NOTARIA = (() => {
     const raw = String(data?.notaria || data?.notariaNumero || '').trim()
     if (!raw) return ''
-    // Sin acentos por preferencia del cliente y sin prefijos automáticos
+    // Sin acentos por preferencia del cliente pero manteniendo "NOTARIA" al inicio
     const upNoAccents = raw
       .normalize('NFD')
       .replace(/\p{Diacritic}+/gu, '')
       .toUpperCase()
+    
+    // Asegurar que comience con "NOTARIA" si no lo tiene
+    if (!upNoAccents.startsWith('NOTARIA')) {
+      return `NOTARIA ${upNoAccents}`
+    }
     return upNoAccents
   })()
 

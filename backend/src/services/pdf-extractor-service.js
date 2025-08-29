@@ -360,7 +360,9 @@ const PdfExtractorService = {
     }
 
     // Patrón 4: Jurídica + Nombre en líneas consecutivas (mejorado)
-    const juridicaRe = /(?:PERSONA\s+)?JUR[IÍ]DICA\s*\n?\s*([A-ZÁÉÍÓÚÑ\s\.\-&]{3,80}?)\s*(?:REPRESENTADO|REPRESENTADA|TIPO|DOCUMENTO|RUC|\n|$)/gi
+    // Importante: NO cortar por salto de línea porque algunos nombres se parten (ej. QUITEÑA)
+    // Solo detenemos cuando aparece una etiqueta fuerte de tabla o campo
+    const juridicaRe = /(?:PERSONA\s+)?JUR[IÍ]DICA\s*\n?\s*([A-ZÁÉÍÓÚÑ\s\.\-&]{3,80}?)\s*(?:REPRESENTADO|REPRESENTADA|TIPO|DOCUMENTO|RUC|NOMBRES\s*\/\s*RAZ[ÓO]N|APELLIDOS?|A\s+FAVOR\s+DE|BENEFICIARIO|UBICACI[ÓO]N|$)/gi
     let jr
     while ((jr = juridicaRe.exec(upperBase)) !== null) {
       let name = jr[1].replace(/\s+/g, ' ').trim()
@@ -805,27 +807,69 @@ const PdfExtractorService = {
         beClean = filtered
       }
       
-      // Extraer representantes de formato tabla
+      // Extraer representantes: soportar tanto encabezado de tabla como "REPRESENTADO POR"
       const representantes = []
-      const reprMatch = section.match(/PERSONA\s+QUE\s+LE\s+REPRESENTA\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ\s\.]{3,50}?)(?:\s+A\s+FAVOR|\n|$)/gi)
-      if (reprMatch) {
-        for (const match of reprMatch) {
-          const nameMatch = match.match(/REPRESENTA\s*[:\-]?\s*(.+?)(?:\s+A\s+FAVOR|\n|$)/i)
-          if (nameMatch && nameMatch[1]) {
-            const name = nameMatch[1].trim()
-            // Solo agregar si no es la misma empresa (evitar loops)
-            if (name && !otClean.includes(name) && !/S\.A\.|LTDA|CIA/i.test(name)) {
-              representantes.push(name)
-            }
+      const repWindow = (() => {
+        // 1) Si existe columna/encabezado "PERSONA QUE LE REPRESENTA", tomar ventana desde allí hasta el bloque de beneficiarios
+        const idxCol = section.search(/PERSONA\s+QUE\s+LE\s+REPRESENTA/i)
+        if (idxCol !== -1) {
+          const after = section.slice(idxCol)
+          const stop = after.search(/A\s+FAVOR\s+DE|BENEFICIARIO|UBICACI[ÓO]N|ACTO\s+O\s+CON|EXTRACTO/i)
+          return stop === -1 ? after : after.slice(0, stop)
+        }
+        // 2) Buscar "REPRESENTADO POR" cerca del bloque de otorgantes
+        const idxRep = section.search(/REPRESENTAD[OA]\s+POR/i)
+        if (idxRep !== -1) {
+          const after = section.slice(idxRep)
+          const stop = after.search(/A\s+FAVOR\s+DE|BENEFICIARIO|UBICACI[ÓO]N|ACTO\s+O\s+CON|EXTRACTO/i)
+          return stop === -1 ? after : after.slice(0, stop)
+        }
+        return ''
+      })()
+      if (repWindow && repWindow.length) {
+        // Buscar nombres tipo persona natural dentro de la ventana, evitando tokens de empresa y encabezados
+        const candRe = /([A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,}){1,4})/g
+        const bad = new Set(['POR','SUS','PROPIOS','DERECHOS','JURIDICA','JURÍDICA','REPRESENTADO','REPRESENTADA','RUC','CEDULA','CÉDULA','MANDANTE','MANDATARIO','PERSONA','QUE','LE','REPRESENTA'])
+        const company = /(FUNDACI[ÓO]N|S\.?A\.?|\bSA\b|LTDA\.?|C[ÍI]A\.?|CORP\.?|CORPORACI[ÓO]N|EMPRESA|ASOCIACI[ÓO]N|COOPERATIVA|UNIVERSIDAD|MUNICIPIO|GAD|\bEP\b)/i
+        const repSet = new Set()
+
+        const cleanWindow = repWindow.toUpperCase()
+        // 1) Regla: combinar líneas de 2+2 tokens consecutivas ("NOMBRES" + "APELLIDOS")
+        const lines = cleanWindow.split(/\n+/).map(s => s.trim()).filter(Boolean)
+        const twoWords = (s) => /^([A-ZÁÉÍÓÚÑ]{2,})(\s+)([A-ZÁÉÍÓÚÑ]{2,})$/.test(s) && !company.test(s) && !/REPRESENTAD|RUC|CEDULA|CÉDULA/.test(s)
+        for (let i = 0; i < lines.length - 1; i++) {
+          if (twoWords(lines[i]) && twoWords(lines[i + 1])) {
+            const merged = `${lines[i]} ${lines[i + 1]}`.replace(/\s+/g, ' ').trim()
+            repSet.add(merged)
           }
+        }
+        // 2) Capturar secuencias largas en el bloque ignorando palabras malas
+        let m
+        while ((m = candRe.exec(cleanWindow)) !== null) {
+          const name = m[1].replace(/\s+/g, ' ').trim()
+          if (/REPRESENTAD|RUC/.test(name)) continue
+          const toks = name.split(' ')
+          if (toks.some(t => bad.has(t))) continue
+          if (company.test(name)) continue
+          repSet.add(name)
+        }
+        // Deduplicar: eliminar nombres que son subcadenas de uno más largo (p.ej., apellidos solos)
+        const repArr = Array.from(repSet)
+        for (const r of repArr) {
+          if (!r || otClean.includes(r)) continue
+          const isSub = repArr.some(other => other !== r && other.includes(r))
+          if (!isSub) representantes.push(r)
         }
       }
       
+        // Normalización de tipo/persona
+        const guessTipo = (name) => /FUNDACI[ÓO]N|S\.?A\.?|\bSA\b|LTDA\.?|C[ÍI]A\.?|CORP\.?|CORPORACI[ÓO]N|EMPRESA|ASOCIACI[ÓO]N|COOPERATIVA|UNIVERSIDAD|MUNICIPIO|GAD|\bEP\b/i.test(name) ? 'Jurídica' : 'Natural'
+
         for (const title of actsTitles) {
           const actData = {
             tipoActo: title || '',
-            otorgantes: otClean,
-            beneficiarios: beClean,
+            otorgantes: otClean.map(n => ({ nombre: n, tipo_persona: guessTipo(n) })),
+            beneficiarios: beClean.map(n => ({ nombre: n, tipo_persona: guessTipo(n) })),
             ...(notario ? { notario } : {})
           }
           
@@ -838,16 +882,13 @@ const PdfExtractorService = {
           }
 
           // Agregar representantes si hay otorgantes jurídicos
-          if (representantes.length > 0 && otClean.length > 0) {
+          if (representantes.length > 0 && actData.otorgantes.length > 0) {
             // Buscar el primer otorgante que parezca ser jurídico
-            const juridicoIdx = otClean.findIndex(ot => /S\.A\.|LTDA|CIA|CORP/i.test(ot))
+            const juridicoIdx = actData.otorgantes.findIndex(ot => /S\.A\.|LTDA|CIA|CORP|FUNDACI[ÓO]N|CORPORACI[ÓO]N/i.test(ot.nombre))
             if (juridicoIdx !== -1) {
-              // Convertir a formato objeto si es necesario
-              const otorgantesObj = otClean.map((nombre, idx) => ({
-                nombre,
-                ...(idx === juridicoIdx && representantes.length > 0 ? { representantes } : {})
-              }))
-              actData.otorgantes = otorgantesObj
+              actData.otorgantes = actData.otorgantes.map((o, idx) => (
+                idx === juridicoIdx ? { ...o, representantes } : o
+              ))
             }
           }
           

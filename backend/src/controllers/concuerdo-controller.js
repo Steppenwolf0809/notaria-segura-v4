@@ -705,21 +705,27 @@ async function generateDocuments(req, res) {
       const fmt = ['html', 'rtf', 'txt', 'docx'].includes(requestedFormat) ? requestedFormat : 'txt'
 
       const toHtml = (text) => {
-        // Convertir **negritas** a <strong>
+        // Convertir **negritas** a <strong> y centrar firma
         const esc = (s) => String(s || '')
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')
+        
         const bolded = esc(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"/><title>${rotuloPalabra} COPIA</title>
+        
+        // Detectar y centrar líneas de firma (que tienen muchos espacios al inicio)
+        const withCenteredSignature = bolded.replace(
+          /^(\s{15,})([A-ZÁÉÍÓÚÑ\s]+)$/gm, 
+          '<div style="text-align: center;">$2</div>'
+        )
+        
+        return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"/><title>Concuerdo</title>
 <style>
   @media print { body { margin: 2cm; } }
   body { font-family: 'Times New Roman', serif; line-height: 1.4; }
-  .doc { white-space: pre-wrap; font-size: 12pt; }
-  h1 { font-size: 14pt; margin: 0 0 12px 0; }
+  .doc { white-space: pre-wrap; font-size: 12pt; text-align: justify; }
 </style></head><body>
-<h1>${rotuloPalabra} COPIA</h1>
-<div class="doc">${bolded}</div>
+<div class="doc">${withCenteredSignature}</div>
 </body></html>`
       }
 
@@ -781,10 +787,16 @@ async function generateDocuments(req, res) {
           .replace(/>/g, '&gt;')
         const section = (title, text, first) => {
           const bolded = esc(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+          
+          // Detectar y centrar líneas de firma
+          const withCenteredSignature = bolded.replace(
+            /^(\s{15,})([A-ZÁÉÍÓÚÑ\s]+)$/gm, 
+            '<div style="text-align: center;">$2</div>'
+          )
+          
           const pb = first ? '' : 'page-break-before: always;'
           return `<section style=\"${pb}\">
-  <h1>${esc(title)}</h1>
-  <div class=\"doc\">${bolded}</div>
+  <div class=\"doc\">${withCenteredSignature}</div>
 </section>`
         }
         const body = entries.map((e, idx) => section(e.title, e.text, idx === 0)).join('\n')
