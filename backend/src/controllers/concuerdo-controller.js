@@ -538,9 +538,19 @@ async function generateDocuments(req, res) {
       numCopias
     })
 
-    const safeArray = (v) => Array.isArray(v)
-      ? v.map((x) => String(x || '').trim()).filter(Boolean)
-      : String(v || '').split(/\n|,|;/).map((x) => x.trim()).filter(Boolean)
+    const safeArray = (v) => {
+      if (Array.isArray(v)) {
+        return v.filter((x) => {
+          if (x === null || x === undefined) return false
+          if (typeof x === 'object' && !Array.isArray(x)) {
+            const nombre = x.nombre || x.fullname || x.text
+            return Boolean(String(nombre || '').trim())
+          }
+          return Boolean(String(x).trim())
+        })
+      }
+      return String(v || '').split(/\n|,|;/).map((x) => x.trim()).filter(Boolean)
+    }
 
     const extractFromBlock = (block) => {
       const s = String(block || '')
@@ -553,6 +563,10 @@ async function generateDocuments(req, res) {
     const expandComparecientes = (raw) => {
       const arr = safeArray(raw)
       if (arr.length === 0) return []
+      // Si ya vienen objetos, normalizarlos y devolverlos
+      if (arr.some((it) => typeof it === 'object' && !Array.isArray(it))) {
+        return arr.map(normalizeCompareciente)
+      }
       const joined = arr.join(' ')
       const hasHeaders = /RAZ[ÓO]N\s+SOCIAL|NOMBRES\s*\/|TIPO\s+INTERVINIENTE|NACIONALIDAD|CALIDAD/i.test(joined)
       if (arr.length === 1 && (arr[0].length > 40 || hasHeaders)) {
@@ -561,7 +575,7 @@ async function generateDocuments(req, res) {
         const names = PdfExtractorService.cleanPersonNames(arr[0])
         return names.map(n => ({ nombre: n }))
       }
-      return arr.map(n => ({ nombre: n }))
+      return arr.map(n => ({ nombre: String(n) }))
     }
 
     const guessTipoPersona = (name) => {
