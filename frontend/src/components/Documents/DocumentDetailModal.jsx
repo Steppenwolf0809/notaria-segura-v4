@@ -45,6 +45,7 @@ import {
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import DocumentTimeline from './DocumentTimeline';
+import ActosPanel from './ActosPanel.jsx';
 import useDocumentHistory from '../../hooks/useDocumentHistory';
 import useDocumentStore from '../../store/document-store';
 import useAuthStore from '../../store/auth-store';
@@ -457,6 +458,11 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
             label="Historial" 
             sx={{ fontWeight: 'bold' }}
           />
+          <Tab 
+            icon={<InfoIcon />} 
+            label="Actos" 
+            sx={{ fontWeight: 'bold' }}
+          />
         </Tabs>
       </Box>
 
@@ -626,6 +632,14 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
                 fallbackToSimulated: true
               }}
             />
+          </Box>
+        )}
+
+        {currentTab === 2 && (
+          <Box sx={{ p: 3 }}>
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <ActosPanel document={localDocument} />
+            </Paper>
           </Box>
         )}
 

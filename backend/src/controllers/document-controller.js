@@ -10,6 +10,8 @@ import {
   getEventIcon,
   getEventColor 
 } from '../utils/event-formatter.js';
+import AdvancedExtractionService from '../services/advanced-extraction-service.js';
+import ActosExtractorService from '../services/actos-extractor-service.js';
 // const WhatsAppService = require('../services/whatsapp-service.js'); // Descomentar cuando exista
 
 /**
@@ -135,6 +137,38 @@ async function uploadXmlDocument(req, res) {
       console.log(`⚠️ Documento creado sin asignación automática: ${assignmentResult.message}`);
     }
 
+    // 🧪 Extracción avanzada (snapshot) si está activo y hay texto para analizar
+    try {
+      const advEnabled = (process.env.ADVANCED_EXTRACTION || 'false') !== 'false';
+      const candidateText = `${parsedData.actoPrincipalDescripcion || ''}\n${Array.isArray(parsedData.itemsSecundarios) ? parsedData.itemsSecundarios.join('\n') : (parsedData.itemsSecundarios || '')}`;
+      if (advEnabled && candidateText && candidateText.trim().length > 10) {
+        const base = AdvancedExtractionService.extractFromText(candidateText);
+        const actos = ActosExtractorService.extract(candidateText);
+        const parties = actos.acts.flatMap(a => a.parties || []);
+
+        await prisma.documentEvent.create({
+          data: {
+            documentId: document.id,
+            userId: req.user.id,
+            eventType: 'EXTRACTION_SNAPSHOT',
+            description: `Snapshot extracción avanzada (auto) al crear desde XML` ,
+            details: {
+              acts: actos.acts,
+              parties,
+              signals: base.fields.filter(f => ['valor_operacion','forma_pago','articulo_29'].includes(f.fieldName)),
+              confidence: base.confidence,
+              meta: base.metadata,
+              extractor: 'advanced-actos-v1'
+            },
+            ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+            userAgent: req.get('User-Agent') || 'unknown'
+          }
+        });
+      }
+    } catch (snapErr) {
+      console.warn('No se pudo crear snapshot de extracción avanzada en uploadXmlDocument:', snapErr?.message || snapErr);
+    }
+
     res.status(201).json({
       success: true,
       message: assignmentResult.assigned 
@@ -170,6 +204,153 @@ async function uploadXmlDocument(req, res) {
       message: 'Error procesando archivo XML',
       error: error.message
     });
+  }
+}
+
+/**
+ * Extraer actos y comparecientes (experimental, detrás de flag)
+ */
+async function extractDocumentActs(req, res) {
+  try {
+    const enabled = (process.env.ADVANCED_EXTRACTION || 'false') !== 'false';
+    if (!enabled) {
+      return res.status(200).json({ success: true, data: { enabled: false, acts: [], parties: [], message: 'ADVANCED_EXTRACTION disabled' } });
+    }
+
+    const { id } = req.params;
+    const { text, saveSnapshot = false } = req.body || {};
+
+    const doc = await prisma.document.findUnique({ where: { id } });
+    if (!doc) {
+      return res.status(404).json({ success: false, message: 'Documento no encontrado' });
+    }
+
+    // Construir texto base: preferir payload, luego campos descriptivos del doc
+    const candidateText = `${text || ''}\n${doc.actoPrincipalDescripcion || ''}\n${doc.itemsSecundarios || ''}`;
+    if (!candidateText.trim()) {
+      return res.status(400).json({ success: false, message: 'No hay texto disponible para extraer actos' });
+    }
+
+    const base = AdvancedExtractionService.extractFromText(candidateText);
+    const actos = ActosExtractorService.extract(candidateText);
+
+    const parties = actos.acts.flatMap(a => a.parties || []);
+
+    // Persistir snapshot en historial si se solicita
+    if (saveSnapshot) {
+      try {
+        await prisma.documentEvent.create({
+          data: {
+            documentId: id,
+            userId: req.user.id,
+            eventType: 'EXTRACTION_SNAPSHOT',
+            description: `Snapshot de extracción avanzada guardado por ${req.user.firstName} ${req.user.lastName}`,
+            details: {
+              acts: actos.acts,
+              parties,
+              signals: base.fields.filter(f => ['valor_operacion','forma_pago','articulo_29'].includes(f.fieldName)),
+              confidence: base.confidence,
+              meta: base.metadata,
+              extractor: 'advanced-actos-v1'
+            },
+            ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+            userAgent: req.get('User-Agent') || 'unknown'
+          }
+        });
+      } catch (e) {
+        console.warn('No se pudo guardar snapshot de extracción:', e?.message || e);
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        enabled: true,
+        acts: actos.acts,
+        parties,
+        signals: base.fields.filter(f => ['valor_operacion','forma_pago','articulo_29'].includes(f.fieldName)),
+        confidence: base.confidence,
+        meta: base.metadata,
+        saved: !!saveSnapshot
+      }
+    });
+  } catch (error) {
+    console.error('Error en extractDocumentActs:', error);
+    res.status(500).json({ success: false, message: 'Error interno extrayendo actos', error: error.message });
+  }
+}
+
+/**
+ * Aplicar sugerencias del último snapshot de extracción al documento
+ * Reglas: solo completa campos vacíos y respeta umbral de confianza.
+ */
+async function applyExtractionSuggestions(req, res) {
+  try {
+    const { id } = req.params;
+    const minConfidence = parseFloat(process.env.DEFAULT_EXTRACTION_CONFIDENCE || '0.8');
+
+    const doc = await prisma.document.findUnique({ where: { id } });
+    if (!doc) return res.status(404).json({ success: false, message: 'Documento no encontrado' });
+
+    const snapshot = await prisma.documentEvent.findFirst({
+      where: { documentId: id, eventType: 'EXTRACTION_SNAPSHOT' },
+      orderBy: { createdAt: 'desc' }
+    });
+    if (!snapshot || !snapshot.details) {
+      return res.status(400).json({ success: false, message: 'No hay snapshot de extracción para aplicar' });
+    }
+
+    const details = snapshot.details;
+    const confidence = typeof details.confidence === 'number' ? details.confidence : 0;
+    if (confidence < minConfidence) {
+      return res.status(400).json({ success: false, message: `Confianza insuficiente (${Math.round(confidence*100)}%). Umbral: ${Math.round(minConfidence*100)}%` });
+    }
+
+    const acts = Array.isArray(details.acts) ? details.acts : [];
+    const firstActType = acts[0]?.actType ? String(acts[0].actType).trim() : '';
+    const joinedActs = acts.map(a => a.actType).filter(Boolean).join(' | ');
+
+    const updates = {};
+    const applied = {};
+    if ((!doc.actoPrincipalDescripcion || String(doc.actoPrincipalDescripcion).trim().length === 0) && firstActType) {
+      updates.actoPrincipalDescripcion = firstActType;
+      applied.actoPrincipalDescripcion = { from: doc.actoPrincipalDescripcion || null, to: firstActType };
+    }
+    if ((!doc.detalle_documento || String(doc.detalle_documento).trim().length === 0) && joinedActs) {
+      updates.detalle_documento = joinedActs;
+      applied.detalle_documento = { from: doc.detalle_documento || null, to: joinedActs };
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(200).json({ success: true, message: 'No hay cambios aplicables (campos ya tienen valor o no hay actos detectados)' });
+    }
+
+    const updated = await prisma.document.update({ where: { id }, data: updates });
+
+    // Auditar
+    try {
+      await prisma.documentEvent.create({
+        data: {
+          documentId: id,
+          userId: req.user.id,
+          eventType: 'EXTRACTION_APPLIED',
+          description: `Sugerencias de extracción aplicadas por ${req.user.firstName} ${req.user.lastName}`,
+          details: {
+            applied,
+            snapshotId: snapshot.id,
+            confidence,
+            threshold: minConfidence
+          },
+          ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown'
+        }
+      });
+    } catch {}
+
+    return res.json({ success: true, message: 'Sugerencias aplicadas', data: { document: updated, applied } });
+  } catch (error) {
+    console.error('Error en applyExtractionSuggestions:', error);
+    return res.status(500).json({ success: false, message: 'Error aplicando sugerencias', error: error.message });
   }
 }
 
@@ -3977,4 +4158,8 @@ export {
   // 🔔 Políticas de notificación
   updateNotificationPolicy,
   updateGroupNotificationPolicy
-}; 
+  ,
+  // 🧪 Extracción avanzada (flag)
+  extractDocumentActs,
+  applyExtractionSuggestions
+};

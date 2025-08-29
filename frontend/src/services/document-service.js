@@ -305,6 +305,39 @@ const documentService = {
   },
 
   /**
+   * Extracción avanzada (flag) de actos y comparecientes para un documento
+   * @param {string|number} documentId
+   * @param {string} [text] - Texto opcional para forzar análisis
+   */
+  async extractActs(documentId, text, options = {}) {
+    try {
+      const response = await api.post(`/documents/${documentId}/extract-acts`, { text, saveSnapshot: !!options.saveSnapshot });
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
+      };
+    } catch (error) {
+      console.error('Error extracting acts:', error);
+      const errorMessage = error.response?.data?.message || error.message || 'Error al extraer actos';
+      return { success: false, error: errorMessage };
+    }
+  },
+
+  /**
+   * Aplicar sugerencias del último snapshot al documento
+   */
+  async applyExtraction(documentId) {
+    try {
+      const response = await api.post(`/documents/${documentId}/apply-extraction`, {});
+      return { success: true, data: response.data.data, message: response.data.message };
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || error.message || 'Error aplicando sugerencias';
+      return { success: false, error: errorMessage };
+    }
+  },
+
+  /**
    * GET detalle de documento específico
    * @param {string} documentId - ID del documento
    * @returns {Promise<Object>} Detalle del documento
