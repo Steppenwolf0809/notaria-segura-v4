@@ -732,6 +732,23 @@ const PdfExtractorService = {
         }
       }
 
+      // 4) Fallback adicional robusto: si aún no hay otorgantes, usar ventana entre "FECHA DE OTORGAMIENTO" y "A FAVOR DE"
+      if (!otorgantesRaw || otorgantesRaw.trim().length < 3) {
+        const idxBen = secUpper.search(/A\s+FAVOR\s+DE|BENEFICIARIO(?:S)?/i)
+        const idxAfterFecha = (() => {
+          const m = secUpper.match(/FECHA\s+DE\s+OTORGAMIENTO[\s:]+/i)
+          if (!m) return -1
+          return secUpper.indexOf(m[0]) + m[0].length
+        })()
+        const idxStart = idxAfterFecha !== -1 ? idxAfterFecha : 0
+        if (idxBen !== -1) {
+          otorgantesRaw = section.slice(idxStart, idxBen)
+        } else {
+          // Como último recurso, tomar una ventana limitada después de FECHA
+          otorgantesRaw = section.slice(idxStart)
+        }
+      }
+
       let notario
       const notMatch = section.match(notarioRegex)
       if (notMatch && notMatch[1]) notario = notMatch[1].trim()
