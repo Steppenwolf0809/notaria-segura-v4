@@ -756,7 +756,20 @@ const PdfExtractorService = {
           otClean.push(...lastTry.filter(n => !otClean.includes(n)))
         }
       }
-      const beClean = this.cleanPersonNames(beneficiariosRaw)
+      let beClean = this.cleanPersonNames(beneficiariosRaw)
+      // Heurística anti-duplicación: si no existe etiqueta clara de beneficiarios
+      // o si la lista coincide con otorgantes, limpiar beneficiarios.
+      const hasBenefLabel = /A\s+FAVOR\s+DE|BENEFICIARIO(?:S)?/i.test(section)
+      if (!hasBenefLabel) {
+        beClean = []
+      }
+      // Si hay etiqueta pero las listas se solapan, excluir los que ya son otorgantes
+      if (hasBenefLabel && beClean.length) {
+        const otSet = new Set(otClean)
+        const filtered = beClean.filter(n => !otSet.has(n))
+        // Si después de filtrar quedan todos vacíos, mantener vacío para evitar espejar otorgantes
+        beClean = filtered
+      }
       
       // Extraer representantes de formato tabla
       const representantes = []
