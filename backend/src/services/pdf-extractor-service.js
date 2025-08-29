@@ -630,6 +630,23 @@ const PdfExtractorService = {
       .trim()
     const upper = text.toUpperCase()
 
+    // TABLE-FIRST: si detectamos cabeceras de tabla típicas y tenemos buffer del PDF,
+    // intentar el parser tabular antes del heurístico.
+    if (pdfBuffer && /NOMBRES\s*\/?\s*RAZ[ÓO]N\s+SOCIAL|TIPO\s+INTERVINIENTE|APELLIDOS?\s*(?:Y|E)\s*NOMBRES?/i.test(upper)) {
+      try {
+        const tableParser = new NotarialTableParser()
+        const structuredData = await tableParser.parseStructuredData(pdfBuffer)
+        if (structuredData && structuredData.length > 0) {
+          const tabularActs = this.convertStructuredDataToActs(structuredData, rawText)
+          if (tabularActs.length > 0) {
+            return { acts: tabularActs }
+          }
+        }
+      } catch (e) {
+        // continuar con heurística si falla
+      }
+    }
+
     // 1) Segmentar por “EXTRACTO Escritura N°:” para múltiples actos en un mismo PDF
     const segmentRe = /EXTRACTO\s*ESCRITURA\s*N[°ºO\.]?\s*:\s*/i
     const rawSegments = text.split(segmentRe).map(s => s.trim()).filter(Boolean)

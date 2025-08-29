@@ -33,16 +33,16 @@ export async function generateDocxFromText({ title = 'Documento', bodyText = '' 
 
   const lines = String(bodyText || '').split(/\r?\n/)
   const paragraphs = []
-  // Título discreto (no Heading), Arial 16 negrita
-  paragraphs.push(
-    new Paragraph({ children: [new TextRun({ text: String(title || ''), bold: true, font: 'Arial', size: 32 })] })
-  )
+  
   // Cuerpo Arial 14, justificado, 1.5
   lines.forEach((line) => {
+    // Detectar si es la línea de la firma del notario (contiene espacios de centrado)
+    const isSignatureLine = line.trim().length > 0 && line.startsWith('                    ')
+    
     paragraphs.push(
       new Paragraph({
         children: parseRuns(line),
-        alignment: AlignmentType.JUSTIFIED,
+        alignment: isSignatureLine ? AlignmentType.CENTER : AlignmentType.JUSTIFIED,
         spacing: { line: 360, lineRule: 'auto' },
       })
     )
@@ -54,7 +54,7 @@ export async function generateDocxFromText({ title = 'Documento', bodyText = '' 
   return buffer
 }
 
-export async function generateDocxFromCopies({ copies = [], headerTitle, footerText } = {}) {
+export async function generateDocxFromCopies({ copies = [] } = {}) {
   if (!Array.isArray(copies) || copies.length === 0) {
     return generateDocxFromText({ title: 'Documento', bodyText: '' })
   }
@@ -69,7 +69,7 @@ export async function generateDocxFromCopies({ copies = [], headerTitle, footerT
     throw err
   }
 
-  const { Document, Packer, Paragraph, TextRun, AlignmentType, PageBreak, Header, Footer } = lib
+  const { Document, Packer, Paragraph, TextRun, AlignmentType, PageBreak } = lib
 
   const parseRuns = (line) => {
     const segments = String(line || '').split(/(\*\*[^*]+\*\*)/)
@@ -89,21 +89,20 @@ export async function generateDocxFromCopies({ copies = [], headerTitle, footerT
   const paragraphs = []
   copies.forEach((entry, idx) => {
     const isFirst = idx === 0
-    // Título con salto de página antes (excepto la primera copia)
-    const titlePara = new Paragraph({
-      children: [
-        ...(isFirst ? [] : [new PageBreak()]),
-        new TextRun({ text: String(entry.title || ''), bold: true, font: 'Arial', size: 30 }),
-      ],
-      // Título discreto (sin estilo de encabezado)
-    })
-    paragraphs.push(titlePara)
+    // Agregar salto de página antes (excepto la primera copia)
+    if (!isFirst) {
+      paragraphs.push(new Paragraph({ children: [new PageBreak()] }))
+    }
+    
     const lines = String(entry.text || '').split(/\r?\n/)
-    lines.forEach((line) => {
+    lines.forEach((line, lineIdx) => {
+      // Detectar si es la línea de la firma del notario (contiene espacios de centrado)
+      const isSignatureLine = line.trim().length > 0 && line.startsWith('                    ')
+      
       paragraphs.push(
         new Paragraph({
           children: parseRuns(line),
-          alignment: AlignmentType.JUSTIFIED,
+          alignment: isSignatureLine ? AlignmentType.CENTER : AlignmentType.JUSTIFIED,
           spacing: { line: 360, lineRule: 'auto' },
         })
       )
@@ -112,8 +111,6 @@ export async function generateDocxFromCopies({ copies = [], headerTitle, footerT
 
   const doc = new Document({
     sections: [{
-      headers: headerTitle ? { default: new Header({ children: [ new Paragraph({ children: [ new TextRun({ text: String(headerTitle), font: 'Arial', size: 24 }) ] }) ] }) } : undefined,
-      footers: footerText ? { default: new Footer({ children: [ new Paragraph({ children: [ new TextRun({ text: String(footerText), font: 'Arial', size: 20 }) ] }) ] }) } : undefined,
       properties: {},
       children: paragraphs,
     }]

@@ -31,7 +31,8 @@ export default function useConcuerdoGenerator() {
     try {
       const res = await concuerdoService.uploadPDF(pdfFile)
       if (!res.success) throw new Error(res.error || 'Error subiendo PDF')
-      setExtractedText(res.data.text || '')
+      // Guardar objeto completo (texto + buffer base64) para permitir parser tabular en extractData
+      setExtractedText(res.data)
       // Extraer datos básicos automáticamente
       setExtracting(true)
       const parsed = await concuerdoService.extractData(res.data.text || '')
@@ -49,8 +50,8 @@ export default function useConcuerdoGenerator() {
     setExtracting(true)
     try {
       // Pasar el buffer del PDF si está disponible para el parser tabular
-      const buffer = extractedText.buffer || null
-      const parsed = await concuerdoService.extractData(extractedText.text || extractedText, buffer)
+      const buffer = extractedText?.buffer || null
+      const parsed = await concuerdoService.extractData(extractedText?.text || extractedText, buffer)
       if (!parsed.success) throw new Error(parsed.error || 'Error extrayendo datos')
       setExtractedData(parsed.data)
       setStep(1)
@@ -116,5 +117,4 @@ export default function useConcuerdoGenerator() {
 if (typeof window !== 'undefined') {
   // Monkey-patch setState to persist; en entorno real se podría usar useEffect
 }
-
 
