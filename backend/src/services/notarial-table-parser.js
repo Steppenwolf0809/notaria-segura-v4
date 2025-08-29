@@ -23,7 +23,9 @@ class NotarialTableParser {
         try { pdfjsLib.GlobalWorkerOptions.workerSrc = '' } catch {}
       }
 
-      const loadingTask = pdfjsLib.getDocument({ data: pdfBuffer })
+      // pdfjs-dist expects a plain Uint8Array (Node Buffer is not accepted here)
+      const data = new Uint8Array(pdfBuffer)
+      const loadingTask = pdfjsLib.getDocument({ data })
       const doc = await loadingTask.promise
       
       const allStructuredData = []

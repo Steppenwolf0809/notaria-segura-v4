@@ -1,5 +1,6 @@
-import React from 'react'
-import { Box, Stepper, Step, StepLabel, Paper, Typography, Divider, Button } from '@mui/material'
+import React, { useState } from 'react'
+import { Box, Stepper, Step, StepLabel, Paper, Typography, Divider, Button, TextField, IconButton, Tooltip } from '@mui/material'
+import { Edit as EditIcon, Save as SaveIcon, Cancel as CancelIcon } from '@mui/icons-material'
 import PDFUploader from './PDFUploader.jsx'
 import ExtractedDataForm from './ExtractedDataForm.jsx'
 import DataValidationPanel from './DataValidationPanel.jsx'
@@ -24,6 +25,38 @@ export default function ConcuerdoGenerator() {
     generating,
     reset
   } = useConcuerdoGenerator()
+
+  // Estado para edición de texto
+  const [editingDoc, setEditingDoc] = useState(null)
+  const [editedContent, setEditedContent] = useState('')
+
+  const handleStartEdit = (docIndex, content) => {
+    setEditingDoc(docIndex)
+    setEditedContent(content)
+  }
+
+  const handleSaveEdit = () => {
+    if (editingDoc !== null && extractedData?.previewDocs) {
+      // Actualizar el contenido del documento
+      const updatedDocs = [...extractedData.previewDocs]
+      const updatedContent = btoa(unescape(encodeURIComponent(editedContent)))
+      updatedDocs[editingDoc] = {
+        ...updatedDocs[editingDoc],
+        contentBase64: updatedContent
+      }
+      setExtractedData({
+        ...extractedData,
+        previewDocs: updatedDocs
+      })
+    }
+    setEditingDoc(null)
+    setEditedContent('')
+  }
+
+  const handleCancelEdit = () => {
+    setEditingDoc(null)
+    setEditedContent('')
+  }
 
   const buildPayload = () => {
     const data = extractedData || {}
@@ -197,7 +230,7 @@ export default function ConcuerdoGenerator() {
             {generating && 'Generando vista previa...'}
             {!generating && Array.isArray(extractedData?.previewDocs) && extractedData.previewDocs.length > 0 ? (
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr', gap: 2 }}>
-                {extractedData.previewDocs.map((doc) => {
+                {extractedData.previewDocs.map((doc, docIndex) => {
                   // Decodificar base64 como UTF-8
                   const decodeBase64Utf8 = (b64) => {
                     try {
@@ -212,15 +245,63 @@ export default function ConcuerdoGenerator() {
                   };
                   const content = decodeBase64Utf8(doc.contentBase64 || '');
                   const isPlain = String(doc.mimeType || '').startsWith('text/plain');
+                  const isEditing = editingDoc === docIndex;
+                  
                   return (
                     <Paper key={doc.index} variant="outlined" sx={{ p: 2 }}>
-                      <Typography variant="subtitle2" sx={{ mb: 1 }}>{doc.title}</Typography>
-                      {isPlain ? (
-                        <Typography component="pre" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', m: 0 }}>
-                          {content}
-                        </Typography>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                        <Typography variant="subtitle2">{doc.title}</Typography>
+                        <Box>
+                          {isEditing ? (
+                            <>
+                              <Tooltip title="Guardar cambios">
+                                <IconButton onClick={handleSaveEdit} color="primary" size="small">
+                                  <SaveIcon />
+                                </IconButton>
+                              </Tooltip>
+                              <Tooltip title="Cancelar edición">
+                                <IconButton onClick={handleCancelEdit} color="secondary" size="small">
+                                  <CancelIcon />
+                                </IconButton>
+                              </Tooltip>
+                            </>
+                          ) : (
+                            <Tooltip title="Editar texto">
+                              <IconButton onClick={() => handleStartEdit(docIndex, content)} size="small">
+                                <EditIcon />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                        </Box>
+                      </Box>
+                      
+                      {isEditing ? (
+                        <TextField
+                          multiline
+                          fullWidth
+                          rows={15}
+                          value={editedContent}
+                          onChange={(e) => setEditedContent(e.target.value)}
+                          variant="outlined"
+                          sx={{ 
+                            '& .MuiInputBase-input': { 
+                              fontFamily: 'monospace',
+                              fontSize: '0.9rem',
+                              lineHeight: 1.4
+                            }
+                          }}
+                          placeholder="Edite el texto del documento aquí..."
+                        />
                       ) : (
-                        <div dangerouslySetInnerHTML={{ __html: content }} />
+                        <>
+                          {isPlain ? (
+                            <Typography component="pre" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace', m: 0, fontSize: '0.9rem' }}>
+                              {content}
+                            </Typography>
+                          ) : (
+                            <div dangerouslySetInnerHTML={{ __html: content }} />
+                          )}
+                        </>
                       )}
                     </Paper>
                   );
