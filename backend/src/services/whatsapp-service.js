@@ -478,8 +478,14 @@ class WhatsAppService {
         if (!Array.isArray(documentos)) {
             // Documento individual
             const tipoDoc = documentos.documentType || documentos.tipo_documento || documentos.tipoDocumento || 'Documento';
-            const codigo = this.extraerCodigoEscritura(documentos);
-            return `📄 *${tipoDoc}*${codigo ? `\n📋 *Código:* ${codigo}` : ''}`;
+            const codigoEscritura = this.extraerCodigoEscritura(documentos);
+            const codigoRetiro = documentos.codigoRetiro || documentos.codigo_retiro || documentos.verificationCode || documentos.codigo;
+            const partes = [
+                `📄 *${tipoDoc}*`,
+                codigoEscritura ? `📋 *Código:* ${codigoEscritura}` : null,
+                codigoRetiro ? `🔢 *Código de retiro:* ${codigoRetiro}` : null
+            ].filter(Boolean);
+            return partes.join('\n');
         }
         
         if (documentos.length === 1) {
@@ -489,8 +495,14 @@ class WhatsAppService {
         // Múltiples documentos
         return documentos.map((doc, index) => {
             const tipoDoc = doc.documentType || doc.tipo_documento || doc.tipoDocumento || 'Documento';
-            const codigo = this.extraerCodigoEscritura(doc);
-            return `${index + 1}. 📄 *${tipoDoc}*${codigo ? ` - Código: ${codigo}` : ''}`;
+            const codigoEscritura = this.extraerCodigoEscritura(doc);
+            const codigoRetiro = doc.codigoRetiro || doc.codigo_retiro || doc.verificationCode;
+            const partes = [
+                `${index + 1}. 📄 *${tipoDoc}*`,
+                codigoEscritura ? `Código: ${codigoEscritura}` : null,
+                `Código de retiro: ${codigoRetiro || 'N/A'}`
+            ].filter(Boolean);
+            return partes.join(' • ');
         }).join('\n');
     }
 
@@ -542,8 +554,28 @@ class WhatsAppService {
             codigosEscritura: this.generarCodigosEscritura(variables.documentos || [variables]),
             cantidadDocumentos: variables.cantidadDocumentos || (variables.documentos ? variables.documentos.length : 1),
             listaDocumentosCompleta: variables.documentos ? 
-                variables.documentos.map((doc, i) => `• ${doc.documentType || doc.tipo_documento || 'Documento'} - Código: ${this.extraerCodigoEscritura(doc) || 'N/A'}`).join('\n') :
-                `• ${variables.documento || 'Documento'} - Código: ${this.extraerCodigoEscritura(variables) || 'N/A'}`,
+                variables.documentos.map((doc, i) => {
+                    const tipo = doc.documentType || doc.tipo_documento || 'Documento';
+                    const codEscritura = this.extraerCodigoEscritura(doc);
+                    const codRetiro = doc.codigoRetiro || doc.codigo_retiro || doc.verificationCode;
+                    const partes = [
+                        `• ${tipo}`,
+                        codEscritura ? `Código: ${codEscritura}` : null,
+                        `Código de retiro: ${codRetiro || 'N/A'}`
+                    ].filter(Boolean);
+                    return partes.join(' - ');
+                }).join('\n') :
+                (() => {
+                    const tipo = variables.documento || 'Documento';
+                    const codEscritura = this.extraerCodigoEscritura(variables);
+                    const codRetiro = variables.codigoRetiro || variables.codigo || '';
+                    const partes = [
+                        `• ${tipo}`,
+                        codEscritura ? `Código: ${codEscritura}` : null,
+                        codRetiro ? `Código de retiro: ${codRetiro}` : null
+                    ].filter(Boolean);
+                    return partes.join(' - ');
+                })(),
             
             // Variables condicionales
             nombreRetirador: variables.receptor_nombre || variables.nombreRetirador || variables.entregado_a || variables.deliveredTo || variables.cliente || 'Cliente',

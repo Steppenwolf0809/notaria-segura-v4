@@ -454,7 +454,6 @@ const DocumentOversight = () => {
                   <MenuItem value="">
                     <em>Todos los estados</em>
                   </MenuItem>
-                  <MenuItem value="PENDIENTE">Pendiente</MenuItem>
                   <MenuItem value="EN_PROCESO">En Proceso</MenuItem>
                   <MenuItem value="LISTO">Listo</MenuItem>
                   <MenuItem value="ENTREGADO">Entregado</MenuItem>

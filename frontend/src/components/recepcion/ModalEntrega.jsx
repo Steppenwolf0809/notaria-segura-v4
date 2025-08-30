@@ -21,6 +21,7 @@ import {
 } from '@mui/material';
 import receptionService from '../../services/reception-service';
 import archivoService from '../../services/archivo-service';
+import { toast } from 'react-toastify';
 
 /**
  * Modal para procesar entrega individual de documento, reconstruido con Material-UI
@@ -110,13 +111,25 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
         if (groupInfo?.wasGroupDelivery) {
           console.log(`✅ Entrega grupal exitosa: ${groupInfo.totalDocuments} documentos entregados`);
         }
+        // Notificación global según WhatsApp
+        const w = result.data?.whatsapp || {};
+        if (w.sent) {
+          toast.success('Documento entregado. Confirmación WhatsApp enviada.');
+        } else if (w.error) {
+          toast.error(`Documento entregado, pero WhatsApp falló: ${w.error}`);
+        } else {
+          toast.success(result.message || 'Documento entregado exitosamente');
+        }
         onEntregaExitosa();
       } else {
-        setError(result.error || 'Error procesando entrega');
+        const err = result.error || 'Error procesando entrega';
+        setError(err);
+        toast.error(err);
       }
     } catch (error) {
       console.error('Error:', error);
       setError('Error de conexión');
+      toast.error('Error de conexión');
     } finally {
       setLoading(false);
     }

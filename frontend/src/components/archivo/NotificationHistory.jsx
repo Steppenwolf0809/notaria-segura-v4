@@ -85,12 +85,13 @@ const NotificationHistory = () => {
   /**
    * Filtrar notificaciones por búsqueda
    */
-  const filteredNotifications = notifications.filter(notification =>
-    !searchTerm || 
-    (notification.clientName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (notification.clientPhone || '').includes(searchTerm) ||
-    (notification.protocolNumber || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredNotifications = notifications.filter(notification => {
+    const proto = notification.protocolNumber || notification.document?.protocolNumber || '';
+    const phone = notification.clientPhone || '';
+    const name = (notification.clientName || '').toLowerCase();
+    const term = (searchTerm || '').toLowerCase();
+    return !term || name.includes(term) || phone.includes(searchTerm) || proto.toLowerCase().includes(term);
+  });
 
   /**
    * Obtener notificaciones de la página actual
@@ -160,11 +161,12 @@ const NotificationHistory = () => {
    * Descargar mensaje como archivo de texto
    */
   const downloadMessage = (notification) => {
+    const protocol = notification.protocolNumber || notification.document?.protocolNumber || 'N/A';
     const content = `Notificación WhatsApp
 ========================
 Cliente: ${notification.clientName}
 Teléfono: ${notification.clientPhone}
-Protocolo: ${notification.protocolNumber || 'N/A'}
+Protocolo: ${protocol}
 Tipo: ${getMessageTypeText(notification.messageType)}
 Estado: ${getStatusText(notification.status)}
 Fecha: ${formatDate(notification.createdAt)}
@@ -178,7 +180,7 @@ ${notification.messageBody}`;
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `whatsapp-${notification.clientName}-${formatDate(notification.createdAt).replace(/[:/]/g, '-')}.txt`;
+    link.download = `whatsapp-${notification.clientName}-P${protocol}-${formatDate(notification.createdAt).replace(/[:/]/g, '-')}.txt`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -326,7 +328,7 @@ ${notification.messageBody}`;
                     
                     <TableCell>
                       <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        #{notification.protocolNumber || 'N/A'}
+                        #{notification.protocolNumber || notification.document?.protocolNumber || 'N/A'}
                       </Typography>
                     </TableCell>
                     

@@ -355,7 +355,6 @@ const DocumentsList = () => {
                 label="Estado"
               >
                 <MenuItem value="">Todos</MenuItem>
-                <MenuItem value="PENDIENTE">Pendiente</MenuItem>
                 <MenuItem value="EN_PROCESO">En Proceso</MenuItem>
                 <MenuItem value="LISTO">Listo</MenuItem>
                 <MenuItem value="ENTREGADO">Entregado</MenuItem>
