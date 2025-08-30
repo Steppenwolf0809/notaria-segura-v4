@@ -55,6 +55,7 @@ import notificationsService from '../../services/notifications-service';
 import NotificationPolicySelector from '../common/NotificationPolicySelector';
 import ImmediateDeliveryModal from '../common/ImmediateDeliveryModal';
 import { toast } from 'react-toastify';
+import archivoService from '../../services/archivo-service';
  
 
 /**
@@ -387,9 +388,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
           } else {
             toast.success(baseMessage);
           }
-          if (typeof onClose === 'function') {
-            onClose();
-          }
+          // Mantener el modal abierto para que el usuario decida cuándo cerrar
         } else {
           toast.success(baseMessage);
         }
@@ -766,6 +765,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
         onClose={() => setShowDeliveryModal(false)}
         document={localDocument}
         onDocumentDelivered={handleDocumentDelivered}
+        serviceType={user?.role === 'ARCHIVO' ? 'archivo' : 'default'}
       />
 
       {/* Modal de Entrega Simplificado para Matrizadores */}
@@ -811,7 +811,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
  * Modal de Entrega de Documentos
  * Permite registrar toda la información de entrega
  */
-const DeliveryModal = ({ open, onClose, document, onDocumentDelivered }) => {
+const DeliveryModal = ({ open, onClose, document, onDocumentDelivered, serviceType = 'default' }) => {
   const [formData, setFormData] = useState({
     entregadoA: '',
     cedulaReceptor: '',
@@ -869,7 +869,18 @@ const DeliveryModal = ({ open, onClose, document, onDocumentDelivered }) => {
     setErrors([]);
 
     try {
-      const result = await documentService.deliverDocument(document.id, formData);
+      // Usar endpoint específico de ARCHIVO cuando corresponda
+      const result = serviceType === 'archivo'
+        ? await archivoService.procesarEntrega(document.id, {
+            codigoVerificacion: formData.codigoVerificacion,
+            entregadoA: formData.entregadoA,
+            cedulaReceptor: formData.cedulaReceptor,
+            relacionTitular: formData.relacionTitular,
+            verificacionManual: formData.verificacionManual,
+            facturaPresenta: formData.facturaPresenta,
+            observaciones: formData.observacionesEntrega
+          })
+        : await documentService.deliverDocument(document.id, formData);
       
       if (result.success) {
         // Notificar al componente padre

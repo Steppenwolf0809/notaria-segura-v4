@@ -765,6 +765,11 @@ const useDocumentStore = create((set, get) => ({
   ungroupDocument: async (documentId) => {
     set({ loading: true, error: null });
     try {
+      // Optimistic update: quitar flags de grupo del documento mientras se llama al backend
+      const currentDocs = get().documents;
+      const optimisticDocs = currentDocs.map(doc => doc.id === documentId ? { ...doc, isGrouped: false, documentGroupId: null, groupCode: null } : doc);
+      set({ documents: optimisticDocs });
+
       const result = await documentService.ungroupDocument(documentId);
       if (result.success) {
         // Refrescar lista de documentos del usuario si aplica
@@ -777,10 +782,15 @@ const useDocumentStore = create((set, get) => ({
         set({ loading: false });
         return { success: true, message: result.message, data: result.data };
       }
+      // Rollback si falla
+      set({ documents: currentDocs });
       set({ loading: false, error: result.message || 'Error al desagrupar documento' });
       return { success: false, error: result.message };
     } catch (error) {
       console.error('Error en ungroupDocument:', error);
+      // Rollback
+      const originalDocs = get().documents;
+      set({ documents: originalDocs });
       set({ loading: false, error: 'Error inesperado al desagrupar documento' });
       return { success: false, error: 'Error inesperado al desagrupar documento' };
     }

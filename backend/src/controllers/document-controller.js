@@ -2737,11 +2737,11 @@ async function deliverDocument(req, res) {
       observacionesEntrega
     } = req.body;
 
-    // Verificar que el usuario sea RECEPCION, ADMIN, CAJA o MATRIZADOR
-    if (!['RECEPCION', 'ADMIN', 'CAJA', 'MATRIZADOR'].includes(req.user.role)) {
+    // Verificar que el usuario sea RECEPCION, ADMIN, CAJA, MATRIZADOR o ARCHIVO
+    if (!['RECEPCION', 'ADMIN', 'CAJA', 'MATRIZADOR', 'ARCHIVO'].includes(req.user.role)) {
       return res.status(403).json({
         success: false,
-        message: 'Solo RECEPCIÓN y MATRIZADORES pueden entregar documentos'
+        message: 'No tienes permisos para entregar documentos'
       });
     }
 
@@ -2783,7 +2783,7 @@ async function deliverDocument(req, res) {
     }
 
     // Validar permisos específicos por rol
-    if (req.user.role === 'MATRIZADOR') {
+    if (req.user.role === 'MATRIZADOR' || req.user.role === 'ARCHIVO') {
       // Los matrizadores solo pueden entregar sus propios documentos
       if (document.assignedToId !== req.user.id) {
         return res.status(403).json({
