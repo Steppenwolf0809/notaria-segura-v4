@@ -746,6 +746,11 @@ async function supervisionGeneral(req, res) {
     // Construir filtros
     const where = {};
 
+    // Umbrales de alertas basados en updatedAt (consistente en todas las ramas)
+    const now = new Date();
+    const fechaAmarilla = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+    const fechaRoja = new Date(now.getTime() - (15 * 24 * 60 * 60 * 1000));
+
     const searchTerm = (search || '').trim();
     if (searchTerm) {
       const supportsUnaccent = await supportsUnaccentFn();
@@ -756,6 +761,20 @@ async function supervisionGeneral(req, res) {
         if (estado && estado !== 'TODOS') filterClauses.push(Prisma.sql`d."status"::text = ${estado}`);
         if (fechaDesde) filterClauses.push(Prisma.sql`d."createdAt" >= ${new Date(fechaDesde)}`);
         if (fechaHasta) filterClauses.push(Prisma.sql`d."createdAt" <= ${new Date(fechaHasta)}`);
+        // Aplicar filtro de alerta por updatedAt en SQL si corresponde
+        if (alerta && alerta !== 'TODAS') {
+          if (alerta === 'ROJAS') {
+            // días >= 15  =>  updatedAt <= fechaRoja
+            filterClauses.push(Prisma.sql`d."updatedAt" <= ${fechaRoja}`);
+          } else if (alerta === 'AMARILLAS') {
+            // 7 <= días < 15  =>  fechaRoja < updatedAt <= fechaAmarilla
+            filterClauses.push(Prisma.sql`d."updatedAt" > ${fechaRoja}`);
+            filterClauses.push(Prisma.sql`d."updatedAt" <= ${fechaAmarilla}`);
+          } else if (alerta === 'NORMALES') {
+            // días < 7  =>  updatedAt > fechaAmarilla
+            filterClauses.push(Prisma.sql`d."updatedAt" > ${fechaAmarilla}`);
+          }
+        }
         const whereSql = Prisma.sql`${Prisma.join([
           Prisma.sql`(
             unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
@@ -834,6 +853,22 @@ async function supervisionGeneral(req, res) {
       if (fechaHasta) where.createdAt.lte = new Date(fechaHasta);
     }
 
+    // Aplicar filtro por estado de alerta usando updatedAt para que afecte paginación/total
+    if (alerta && alerta !== 'TODAS') {
+      where.updatedAt = where.updatedAt || {};
+      if (alerta === 'ROJAS') {
+        // días >= 15  => updatedAt <= fechaRoja
+        where.updatedAt.lte = fechaRoja;
+      } else if (alerta === 'AMARILLAS') {
+        // 7 <= días < 15  => fechaRoja < updatedAt <= fechaAmarilla
+        where.updatedAt.gt = fechaRoja;
+        where.updatedAt.lte = fechaAmarilla;
+      } else if (alerta === 'NORMALES') {
+        // días < 7 => updatedAt > fechaAmarilla
+        where.updatedAt.gt = fechaAmarilla;
+      }
+    }
+
     // Paginación
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
@@ -855,9 +890,9 @@ async function supervisionGeneral(req, res) {
       prisma.document.count({ where })
     ]);
 
-    // Calcular alertas de tiempo para cada documento (basado en fecha de creación para backlog)
+    // Calcular alertas de tiempo para cada documento (basado en updatedAt para consistencia)
     const documentosConAlertas = documentos.map(doc => {
-      const diasEnEstado = Math.floor((Date.now() - new Date(doc.createdAt).getTime()) / (1000 * 60 * 60 * 24));
+      const diasEnEstado = Math.floor((Date.now() - new Date(doc.updatedAt).getTime()) / (1000 * 60 * 60 * 24));
       
       let alerta = { nivel: 'normal', icono: '', dias: diasEnEstado };
       
@@ -873,7 +908,7 @@ async function supervisionGeneral(req, res) {
       };
     });
 
-    // Filtrar por alertas si se especifica
+    // Filtrar por alertas si se especifica (redundante si ya se aplicó en where, pero se mantiene por seguridad)
     let documentosFiltrados = documentosConAlertas;
     if (alerta && alerta !== 'TODAS') {
       documentosFiltrados = documentosConAlertas.filter(doc => {

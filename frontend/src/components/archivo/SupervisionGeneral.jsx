@@ -33,6 +33,7 @@ import {
   Warning as WarningIcon,
   Whatshot as FireIcon,
   Visibility as ViewIcon,
+  Sort as SortIcon,
   TrendingUp as TrendIcon,
   Assignment as DocumentIcon,
   Person as PersonIcon
@@ -58,13 +59,39 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
   const [totalDocuments, setTotalDocuments] = useState(0);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
+  const [sortByDaysDesc, setSortByDaysDesc] = useState(false);
   
-  const [filtros, setFiltros] = useState({
-    search: '',
-    matrizador: 'TODOS',
-    estado: 'TODOS',
-    alerta: 'TODAS'
+  const [filtros, setFiltros] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('archivo_supervision_filtros');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          search: parsed.search ?? '',
+          matrizador: parsed.matrizador ?? 'TODOS',
+          estado: parsed.estado ?? 'TODOS',
+          alerta: parsed.alerta ?? 'TODAS'
+        };
+      }
+    } catch (_) {
+      // Ignorar errores de parseo y usar valores por defecto
+    }
+    return {
+      search: '',
+      matrizador: 'TODOS',
+      estado: 'TODOS',
+      alerta: 'TODAS'
+    };
   });
+
+  // Persistir filtros durante la sesión
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('archivo_supervision_filtros', JSON.stringify(filtros));
+    } catch (_) {
+      // Ignorar almacenamiento fallido (modo privado, etc.)
+    }
+  }, [filtros]);
 
   // Debounce para la búsqueda (500ms)
   const debouncedSearch = useDebounce(filtros.search, 500);
@@ -203,6 +230,11 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
     });
     setPage(0);
   };
+
+  // Documentos a mostrar (aplicar orden por días si corresponde)
+  const displayedDocuments = sortByDaysDesc
+    ? [...documentos].sort((a, b) => (b.alerta?.dias || 0) - (a.alerta?.dias || 0))
+    : documentos;
 
   /**
    * Formatear fecha
@@ -448,6 +480,15 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
           >
             Limpiar
           </Button>
+
+          <Button
+            variant={sortByDaysDesc ? 'contained' : 'outlined'}
+            startIcon={<SortIcon />}
+            onClick={() => setSortByDaysDesc(prev => !prev)}
+            size="small"
+          >
+            {sortByDaysDesc ? 'Días: Mayor a menor' : 'Ordenar por días'}
+          </Button>
         </Box>
 
         {/* Resumen de filtros activos */}
@@ -503,7 +544,7 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {documentos.map((documento) => (
+              {displayedDocuments.map((documento) => (
                 <TableRow 
                   key={documento.id}
                   hover
