@@ -40,7 +40,7 @@ import documentService from '../../services/document-service';
  * Modal para mostrar información detallada de un grupo de documentos
  * Se activa al hacer click en "Parte de un grupo"
  */
-const GroupInfoModal = ({ open, onClose, document }) => {
+const GroupInfoModal = ({ open, onClose, document, onUngrouped }) => {
   const [groupDocuments, setGroupDocuments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [ungroupLoading, setUngroupLoading] = useState(false);
@@ -138,6 +138,7 @@ const GroupInfoModal = ({ open, onClose, document }) => {
       onClose?.();
       const result = await ungroupDocument(document.id);
       if (result.success) {
+        try { onUngrouped?.(result); } catch {}
         // Refrescar según rol (en siguiente tick)
         setTimeout(async () => {
           if (['MATRIZADOR', 'ARCHIVO'].includes(user?.role)) {

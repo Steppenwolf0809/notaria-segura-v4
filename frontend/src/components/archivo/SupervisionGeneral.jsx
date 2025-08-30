@@ -439,19 +439,22 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
           </FormControl>
 
           {/* Filtro Estado */}
-          <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel>Estado</InputLabel>
-            <Select
-              value={filtros.estado}
-              label="Estado"
-              onChange={(e) => handleFilterChange('estado', e.target.value)}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ pl: 0.5 }}>
+              Estado
+            </Typography>
+            <ToggleButtonGroup
+              size="small"
+              exclusive
+              value={filtros.estado === 'TODOS' ? '' : filtros.estado}
+              onChange={(e, value) => handleFilterChange('estado', value || 'TODOS')}
             >
-              <MenuItem value="TODOS">Todos</MenuItem>
-              <MenuItem value="EN_PROCESO">En Proceso</MenuItem>
-              <MenuItem value="LISTO">Listo</MenuItem>
-              <MenuItem value="ENTREGADO">Entregado</MenuItem>
-            </Select>
-          </FormControl>
+              <ToggleButton value="" sx={{ textTransform: 'none' }}>Todos</ToggleButton>
+              <ToggleButton value="EN_PROCESO" sx={{ textTransform: 'none' }}>En Proceso</ToggleButton>
+              <ToggleButton value="LISTO" sx={{ textTransform: 'none' }}>Listo</ToggleButton>
+              <ToggleButton value="ENTREGADO" sx={{ textTransform: 'none' }}>Entregado</ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
 
           {/* Filtro Alertas */}
           <FormControl size="small" sx={{ minWidth: 120 }}>

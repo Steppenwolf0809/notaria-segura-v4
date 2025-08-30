@@ -2837,7 +2837,7 @@ async function deliverDocument(req, res) {
 
     // Determinar método de verificación para auditoría enriquecida
     const computedVerificationMethod = verificacionManual
-      ? (metodoVerificacion || (cedulaReceptor ? 'cedula' : 'manual'))
+      ? ((req.body?.metodoVerificacion) || (cedulaReceptor ? 'cedula' : 'manual'))
       : 'codigo_whatsapp';
 
     // Si el documento está agrupado, entregar todos los documentos del grupo

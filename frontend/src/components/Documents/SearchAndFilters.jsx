@@ -9,7 +9,10 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Chip
+  Chip,
+  ToggleButtonGroup,
+  ToggleButton,
+  Typography
 } from '@mui/material';
 import {
   Search as SearchIcon
@@ -29,6 +32,12 @@ const SearchAndFilters = memo(({
   onTypeFilterChange,
   debouncedSearchTerm
 }) => {
+  const statusLabelMap = {
+    'EN_PROCESO': 'En Proceso',
+    'LISTO': 'Listo para Entrega',
+    'ENTREGADO': 'Entregado'
+  };
+
   return (
     <Card sx={{ mb: 1.5 }}>
       <CardContent sx={{ pb: 2 }}>
@@ -54,20 +63,23 @@ const SearchAndFilters = memo(({
             }}
           />
 
-          {/* Filtro por estado */}
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel>Estado</InputLabel>
-            <Select
-              value={statusFilter}
-              label="Estado"
-              onChange={onStatusFilterChange}
+          {/* Filtro por estado (botones) */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ pl: 0.5 }}>
+              Estado
+            </Typography>
+            <ToggleButtonGroup
+              size="small"
+              exclusive
+              value={statusFilter || ''}
+              onChange={(e, value) => onStatusFilterChange({ target: { value: value || '' } })}
             >
-              <MenuItem value="">Todos</MenuItem>
-              <MenuItem value="EN_PROCESO">En Proceso</MenuItem>
-              <MenuItem value="LISTO">Listo para Entrega</MenuItem>
-              <MenuItem value="ENTREGADO">Entregado</MenuItem>
-            </Select>
-          </FormControl>
+              <ToggleButton value="" sx={{ textTransform: 'none' }}>Todos</ToggleButton>
+              <ToggleButton value="EN_PROCESO" sx={{ textTransform: 'none' }}>En Proceso</ToggleButton>
+              <ToggleButton value="LISTO" sx={{ textTransform: 'none' }}>Listo</ToggleButton>
+              <ToggleButton value="ENTREGADO" sx={{ textTransform: 'none' }}>Entregado</ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
 
           {/* Filtro por tipo */}
           <FormControl size="small" sx={{ minWidth: 150 }}>
@@ -99,7 +111,7 @@ const SearchAndFilters = memo(({
             )}
             {statusFilter && (
               <Chip
-                label={`Estado: ${statusFilter}`}
+                label={`Estado: ${statusLabelMap[statusFilter] || statusFilter}`}
                 onDelete={() => onStatusFilterChange({ target: { value: '' } })}
                 size="small"
                 color="primary"

@@ -196,15 +196,11 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
       notificationPolicy: newPolicy,
       ...(updatedData || {})
     }));
-
-    // Notificar al componente padre si existe callback
-    if (onDocumentUpdated) {
-      onDocumentUpdated({
-        ...localDocument,
-        notificationPolicy: newPolicy,
-        ...(updatedData || {})
-      });
-    }
+    // Notificación sutil; no cerrar ni refrescar lista para evitar cerrar el modal
+    try {
+      const affected = (localDocument?.isGrouped || updatedData?.isGrouped) ? ' (aplica al grupo)' : '';
+      toast.success(`Política de notificación actualizada${affected}`);
+    } catch {}
   };
 
   /**
@@ -377,14 +373,13 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
             }
             return;
           }
-          if (w.sent) {
+          const sentLike = !!(w.sent || ['sent','queued','delivered'].includes(w.status) || w.sid || w.messageId);
+          if (sentLike) {
             toast.success('Documento marcado como LISTO. WhatsApp enviado.');
           } else if (w.skipped || localDocument?.notificationPolicy === 'no_notificar') {
             toast.info('Documento marcado como LISTO. No se envió WhatsApp (preferencia no notificar).');
           } else if (w.error) {
             toast.error(`Documento LISTO, pero WhatsApp falló: ${w.error}`);
-          } else if (!w.phone) {
-            toast.warning('Documento marcado como LISTO. No se envió WhatsApp: sin número de teléfono.');
           } else {
             toast.success(baseMessage);
           }
