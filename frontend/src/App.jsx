@@ -27,13 +27,14 @@ function App() {
         position="top-right"
         autoClose={5000}
         hideProgressBar={false}
-        newestOnTop={false}
+        newestOnTop={true}
         closeOnClick
         rtl={false}
         pauseOnFocusLoss
         draggable
         pauseOnHover
         theme="colored"
+        style={{ zIndex: 20000 }}
       />
       {isAuthenticated ? (
         <ProtectedRoute>

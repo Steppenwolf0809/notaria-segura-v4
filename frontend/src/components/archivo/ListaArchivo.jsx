@@ -59,6 +59,7 @@ import GroupingDetector from '../grouping/GroupingDetector';
 import useBulkActions from '../../hooks/useBulkActions';
 import BulkActionToolbar from '../bulk/BulkActionToolbar';
 import BulkStatusChangeModal from '../bulk/BulkStatusChangeModal';
+import { toast } from 'react-toastify';
 
 /**
  * Vista Lista para documentos de archivo
@@ -71,10 +72,19 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
   
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [filtros, setFiltros] = useState({
-    search: '',
-    estado: 'TODOS',
-    tipo: 'TODOS'
+  const [filtros, setFiltros] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('archivo_lista_filtros');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          search: parsed.search ?? '',
+          estado: parsed.estado ?? 'TODOS',
+          tipo: parsed.tipo ?? 'TODOS'
+        };
+      }
+    } catch (_) {}
+    return { search: '', estado: 'TODOS', tipo: 'TODOS' };
   });
   const [orderBy, setOrderBy] = useState('createdAt');
   const [order, setOrder] = useState('desc');
@@ -207,6 +217,13 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
     }));
     setPage(0); // Resetear a primera página
   };
+
+  // Persistir filtros de la lista de archivo durante la sesión
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('archivo_lista_filtros', JSON.stringify(filtros));
+    } catch (_) {}
+  }, [filtros]);
 
   /**
    * Verificar si hay más de un documento del mismo cliente disponible para agrupar
@@ -408,11 +425,24 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
       // Proceder directamente
       try {
         const response = await onEstadoChange(targetDoc.id, nuevoEstado);
-        if (response.success && onRefresh) {
-          onRefresh();
+        if (response?.success) {
+          const w = response.data?.whatsapp || {};
+          if (w.sent) {
+            toast.success('Documento marcado como LISTO. WhatsApp enviado.');
+          } else if (w.skipped) {
+            toast.info('Documento marcado como LISTO. No se envió WhatsApp (preferencia no notificar).');
+          } else if (w.error) {
+            toast.error(`Documento LISTO, pero WhatsApp falló: ${w.error}`);
+          } else if (w.phone === null || w.phone === undefined) {
+            toast.warning('Documento marcado como LISTO. No se envió WhatsApp: sin número de teléfono.');
+          } else {
+            toast.success(response.message || 'Documento marcado como LISTO');
+          }
+          if (onRefresh) onRefresh();
         }
       } catch (error) {
         console.error('Error al cambiar estado:', error);
+        toast.error(error.message || 'Error al cambiar estado');
       }
     }
     
@@ -440,13 +470,14 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
       if (result.success) {
         if (onRefresh) onRefresh();
         cerrarReversionModal();
+        toast.success(result.message || 'Documento revertido exitosamente');
       } else {
         console.error('Error en reversión (archivo):', result.error);
-        alert(result.error || 'Error al revertir el documento');
+        toast.error(result.error || 'Error al revertir el documento');
       }
     } catch (error) {
       console.error('Error en reversión (archivo):', error);
-      alert('Error inesperado al revertir el documento');
+      toast.error('Error inesperado al revertir el documento');
     } finally {
       setReversionLoading(false);
     }
@@ -478,17 +509,42 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
       if (response.success) {
         console.log('✅ Cambio de estado confirmado exitosamente');
         handleCloseConfirmation();
-        
+
         if (onRefresh) {
           onRefresh();
+        }
+        // Toast según WhatsApp
+        const w = response.data?.whatsapp || {};
+        if (data.newStatus === 'LISTO') {
+          if (w.sent) {
+            toast.success('Documento marcado como LISTO. WhatsApp enviado.');
+          } else if (w.skipped) {
+            toast.info('Documento marcado como LISTO. No se envió WhatsApp (preferencia no notificar).');
+          } else if (w.error) {
+            toast.error(`Documento LISTO, pero WhatsApp falló: ${w.error}`);
+          } else if (w.phone === null || w.phone === undefined) {
+            toast.warning('Documento marcado como LISTO. No se envió WhatsApp: sin número de teléfono.');
+          } else {
+            toast.success(response.message || 'Documento marcado como LISTO');
+          }
+        } else if (data.newStatus === 'ENTREGADO') {
+          if (w.sent) {
+            toast.success('Documento entregado. Confirmación WhatsApp enviada.');
+          } else if (w.error) {
+            toast.error(`Documento entregado, pero WhatsApp falló: ${w.error}`);
+          } else {
+            toast.success(response.message || 'Documento marcado como ENTREGADO');
+          }
         }
       } else {
         console.error('❌ Error al confirmar cambio:', response.message);
         setIsConfirmationLoading(false);
+        toast.error(response.message || 'Error al confirmar cambio de estado');
       }
     } catch (error) {
       console.error('❌ Error al confirmar cambio de estado:', error);
       setIsConfirmationLoading(false);
+      toast.error(error.message || 'Error al confirmar cambio de estado');
     }
   };
 
@@ -545,7 +601,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
    */
   const handleCreateGroup = async () => {
     if (bulkActions.selectedDocuments.size < 2) {
-      alert('Seleccione al menos 2 documentos para agrupar');
+      toast.info('Seleccione al menos 2 documentos para agrupar');
       return;
     }
 
@@ -566,6 +622,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
           whatsappError: result.whatsapp?.error || null,
           clientPhone: result.whatsapp?.phone || null
         });
+        toast.success(`Grupo creado (${documentIds.length}).`);
         
         // Limpiar selección
         bulkActions.clearSelection();
@@ -581,11 +638,11 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
         }, 5000);
       } else {
         console.error('❌ Error en resultado de agrupación:', result);
-        alert(`Error al crear el grupo: ${result?.error || result?.message || 'Error desconocido'}`);
+        toast.error(`Error al crear el grupo: ${result?.error || result?.message || 'Error desconocido'}`);
       }
     } catch (error) {
       console.error('❌ Error creando grupo:', error);
-      alert(`Error al crear el grupo: ${error.message}`);
+      toast.error(`Error al crear el grupo: ${error.message}`);
     } finally {
       setGroupingLoading(false);
     }
@@ -596,7 +653,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
    */
   const handleGroupDelivery = () => {
     if (bulkActions.selectedDocuments.size === 0) {
-      alert('Seleccione documentos para entrega grupal');
+      toast.info('Seleccione documentos para entrega grupal');
       return;
     }
     setShowGroupDeliveryModal(true);
@@ -632,7 +689,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
    */
   const handleUngroup = async () => {
     if (bulkActions.selectedDocuments.size === 0) {
-      alert('Seleccione documentos agrupados para desagrupar');
+      toast.info('Seleccione documentos agrupados para desagrupar');
       return;
     }
 
@@ -881,7 +938,6 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
               onChange={(e) => handleFilterChange('estado', e.target.value)}
             >
               <MenuItem value="TODOS">Todos</MenuItem>
-              <MenuItem value="PENDIENTE">Pendiente</MenuItem>
               <MenuItem value="EN_PROCESO">En Proceso</MenuItem>
               <MenuItem value="LISTO">Listo</MenuItem>
               <MenuItem value="ENTREGADO">Entregado</MenuItem>
