@@ -156,6 +156,21 @@ app.use(cors(corsOptions))
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
+// Performance logger: registra requests lentas (>500ms)
+app.use((req, res, next) => {
+  const start = process.hrtime.bigint();
+  res.on('finish', () => {
+    try {
+      const end = process.hrtime.bigint();
+      const ms = Number((end - start) / 1000000n);
+      if (ms > (parseInt(process.env.SLOW_REQUEST_MS || '500', 10))) {
+        console.log(`🐢 Slow ${req.method} ${req.originalUrl} → ${ms}ms`);
+      }
+    } catch {}
+  });
+  next();
+});
+
 // ============================================================================
 // RUTAS IMPLEMENTADAS - SISTEMA COMPLETO
 // ============================================================================

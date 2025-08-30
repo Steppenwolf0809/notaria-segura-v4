@@ -746,20 +746,20 @@ async function generateDocuments(req, res) {
       const fmt = ['html', 'rtf', 'txt', 'docx'].includes(requestedFormat) ? requestedFormat : 'txt'
 
       const toHtml = (text) => {
-        // Convertir **negritas** a <strong> y centrar firma
+        // Convertir **negritas** a <strong> y centrar/poner en negrita el pie de firma
         const esc = (s) => String(s || '')
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')
-        
+
         const bolded = esc(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        
-        // Detectar y centrar líneas de firma (que tienen muchos espacios al inicio)
+
+        // Detectar y centrar líneas del pie de firma (muchos espacios al inicio, texto en mayúsculas)
         const withCenteredSignature = bolded.replace(
-          /^(\s{15,})([A-ZÁÉÍÓÚÑ\s]+)$/gm, 
-          '<div style="text-align: center;">$2</div>'
+          /^(\s{15,})([A-ZÁÉÍÓÚÑ\s\.]+)$/gm,
+          '<div style="text-align:center; font-weight:700; white-space:nowrap;">$2</div>'
         )
-        
+
         return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"/><title>Concuerdo</title>
 <style>
   @media print { body { margin: 2cm; } }
@@ -771,20 +771,31 @@ async function generateDocuments(req, res) {
       }
 
       const toRtf = (text) => {
-        // Generar RTF aplicando negritas y párrafos sin escapar controles RTF
+        // Generar RTF aplicando negritas; centrar y poner en negrita el pie de firma
         const escapeRtfText = (s) => String(s || '')
           .replace(/[\\{}]/g, (m) => `\\${m}`)
           .replace(/[\u0080-\uFFFF]/g, (ch) => `\\u${ch.charCodeAt(0)}?`)
+
+        // Primero aplicar negritas por **texto**
         const parts = String(text || '').split(/(\*\*[^*]+\*\*)/)
-        let body = ''
+        let merged = ''
         for (const seg of parts) {
           if (!seg) continue
           const m = seg.match(/^\*\*(.+)\*\*$/)
-          if (m) body += `{\\b ${escapeRtfText(m[1])}}`
-          else body += escapeRtfText(seg)
+          if (m) merged += `{\\b ${escapeRtfText(m[1])}}`
+          else merged += escapeRtfText(seg)
         }
-        body = body.split(/\r?\n/).map(line => `\\qj\\sl420\\slmult1 ${line}`).join('\\par\n')
-        return `{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0 Times New Roman;}}\\fs24 ${body}}`
+
+        // Luego, formatear líneas individuales; detectar pie de firma
+        const lines = merged.split(/\r?\n/)
+        const formatted = lines.map((line) => {
+          if (/^\s{10,}[A-ZÁÉÍÓÚÑ\s\.]+$/.test(line)) {
+            const content = line.trim()
+            return `\\qc\\b ${content} \\b0`
+          }
+          return `\\qj\\sl420\\slmult1 ${line}`
+        })
+        return `{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0 Times New Roman;}}\\fs24 ${formatted.join('\\par\n')}}`
       }
 
       let filename, mimeType, payload
@@ -836,8 +847,8 @@ async function generateDocuments(req, res) {
           
           // Detectar y centrar líneas de firma
           const withCenteredSignature = bolded.replace(
-            /^(\s{15,})([A-ZÁÉÍÓÚÑ\s]+)$/gm, 
-            '<div style="text-align: center;">$2</div>'
+            /^(\s{15,})([A-ZÁÉÍÓÚÑ\s\.]+)$/gm,
+            '<div style="text-align:center; font-weight:700; white-space:nowrap;">$2</div>'
           )
           
           const pb = first ? '' : 'page-break-before: always;'

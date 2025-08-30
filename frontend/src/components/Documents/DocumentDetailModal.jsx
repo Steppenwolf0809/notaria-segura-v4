@@ -60,7 +60,7 @@ import ImmediateDeliveryModal from '../common/ImmediateDeliveryModal';
  * Componente DocumentDetailModal - Modal de detalle avanzado del documento
  * Incluye información completa, historial visual y acciones contextuales
  */
-const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => {
+const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readOnly = false }) => {
   const { updateDocumentStatus } = useDocumentStore();
   const { user } = useAuthStore();
   const { history, loading, error } = useDocumentHistory(document?.id);
@@ -391,7 +391,8 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
     }
   };
 
-  const actionConfig = getActionButton();
+  const isReadOnly = !!readOnly;
+  const actionConfig = isReadOnly ? null : getActionButton();
   const previousStatus = getPreviousStatus(localDocument?.status);
 
   return (
@@ -470,6 +471,11 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
         {/* Pestaña: Información General */}
         {currentTab === 0 && (
           <Box sx={{ p: 3 }}>
+            {isReadOnly && (
+              <Alert severity="info" sx={{ mb: 2 }}>
+                Vista en modo solo lectura. No puedes modificar este documento.
+              </Alert>
+            )}
             {/* Estado y tipo */}
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
               <Chip
@@ -647,7 +653,8 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
         <NotificationPolicySelector 
           document={localDocument}
           onPolicyChange={handleNotificationPolicyChange}
-          autoSave={true}
+          autoSave={!isReadOnly}
+          disabled={isReadOnly}
           sx={{ 
             borderTop: (theme) => theme.palette.mode === 'dark' 
               ? '1px solid rgba(255, 255, 255, 0.1)' 
@@ -676,20 +683,21 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
         >
           Cerrar
         </Button>
-        
-        
-        {/* Botón de Edición - NUEVA FUNCIONALIDAD */}
-        <Button
-          onClick={() => setShowEditModal(true)}
-          variant="outlined"
-          startIcon={<EditIcon />}
-          sx={{ mr: 1 }}
-        >
-          Editar Información
-        </Button>
+
+        {/* Botón de Edición - oculto en solo lectura */}
+        {!isReadOnly && (
+          <Button
+            onClick={() => setShowEditModal(true)}
+            variant="outlined"
+            startIcon={<EditIcon />}
+            sx={{ mr: 1 }}
+          >
+            Editar Información
+          </Button>
+        )}
         
         {/* Botón para regresar al estado anterior (solo ARCHIVO) */}
-        {user?.role === 'ARCHIVO' && previousStatus && (
+        {user?.role === 'ARCHIVO' && previousStatus && !isReadOnly && (
           <Button
             onClick={() => handleRevert(previousStatus)}
             variant="outlined"
@@ -702,7 +710,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated }) => 
           </Button>
         )}
 
-        {actionConfig && (
+        {!isReadOnly && actionConfig && (
           <Button
             onClick={handleAction}
             variant="contained"

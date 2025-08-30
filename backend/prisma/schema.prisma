@@ -132,6 +132,14 @@ model Document {
   updatedAt               DateTime       @updatedAt
   
   @@map("documents")
+  // Índices para acelerar listados y filtros comunes
+  @@index([status])
+  @@index([createdAt])
+  @@index([updatedAt])
+  @@index([assignedToId])
+  @@index([documentGroupId])
+  @@index([assignedToId, status])
+  @@index([documentGroupId, status])
 }
 
 // Modelo para gestionar grupos
@@ -191,6 +199,9 @@ model DocumentEvent {
   user            User      @relation(fields: [userId], references: [id])
   
   @@map("document_events")
+  // Índices para timelines por documento y auditoría por usuario
+  @@index([documentId, createdAt])
+  @@index([userId])
 }
 
 // Tipos de eventos para auditoría
@@ -227,6 +238,11 @@ model WhatsAppNotification {
   group         DocumentGroup? @relation(fields: [groupId], references: [id])
   
   @@map("whatsapp_notifications")
+  // Índices para métricas y búsquedas
+  @@index([status])
+  @@index([documentId])
+  @@index([groupId])
+  @@index([createdAt])
 }
 
 // Tipos de notificación

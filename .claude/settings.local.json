@@ -44,7 +44,8 @@
       "Bash(NODE_ENV=production npx prisma db push --accept-data-loss)",
       "Bash(npx vite build:*)",
       "Bash(sed:*)",
-      "Bash(pg_config:*)"
+      "Bash(pg_config:*)",
+      "Bash(npm test:*)"
     ],
     "deny": []
   }

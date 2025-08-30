@@ -192,6 +192,7 @@ const getSupervisionGeneral = async (token, params = {}) => {
     if (params.matrizador) queryParams.append('matrizador', params.matrizador);
     if (params.estado) queryParams.append('estado', params.estado);
     if (params.alerta) queryParams.append('alerta', params.alerta);
+    if (params.sortDias) queryParams.append('sortDias', params.sortDias);
     if (params.fechaDesde) queryParams.append('fechaDesde', params.fechaDesde);
     if (params.fechaHasta) queryParams.append('fechaHasta', params.fechaHasta);
     if (params.page) queryParams.append('page', params.page);

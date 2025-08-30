@@ -151,13 +151,22 @@ const documentService = {
    * CAJA: Ver todos los documentos para gestión
    * @returns {Promise<Object>} Lista de todos los documentos
    */
-  async getAllDocuments() {
+  async getAllDocuments({ page = 1, limit = 50 } = {}) {
     try {
-      const response = await api.get('/documents/all');
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+      const response = await api.get(`/documents/all?${params.toString()}`);
       
       return {
         success: true,
-        data: response.data.data
+        data: {
+          documents: response.data.data.documents,
+          total: response.data.data.total ?? (response.data.data.pagination?.totalCount || 0),
+          pagination: response.data.data.pagination || {
+            currentPage: page,
+            totalPages: Math.ceil((response.data.data.total || 0) / limit),
+            pageSize: limit
+          }
+        }
       };
     } catch (error) {
       console.error('Error fetching all documents:', error);

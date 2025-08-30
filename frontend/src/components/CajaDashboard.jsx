@@ -17,6 +17,7 @@ import {
   Paper,
   Chip,
   IconButton,
+  TablePagination,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -59,7 +60,8 @@ const CajaDashboard = () => {
     assignDocument,
     getDocumentStats,
     searchDocuments,
-    clearError
+    clearError,
+    totalDocuments
   } = useDocumentStore();
 
   // Estados locales
@@ -72,6 +74,9 @@ const CajaDashboard = () => {
 
   // DEBOUNCING: Solo buscar después de que el usuario pause por 400ms
   const debouncedSearchTerm = useDebounce(inputValue, 400);
+  // Paginación local (0-based para MUI)
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(50);
 
   /**
    * Cargar datos al montar el componente
@@ -85,10 +90,15 @@ const CajaDashboard = () => {
    */
   const loadInitialData = async () => {
     await Promise.all([
-      fetchAllDocuments(),
+      fetchAllDocuments(1, rowsPerPage),
       fetchMatrizadores()
     ]);
   };
+
+  // Refetch on page/size change
+  useEffect(() => {
+    fetchAllDocuments(page + 1, rowsPerPage);
+  }, [page, rowsPerPage]);
 
   /**
    * Configuración de dropzone para upload de XMLs
@@ -107,11 +117,12 @@ const CajaDashboard = () => {
     if (result.success) {
       toast.success(`XML procesado exitosamente: ${result.data.document.protocolNumber}`);
       // Recargar documentos para mostrar el nuevo
-      await fetchAllDocuments();
+      setPage(0);
+      await fetchAllDocuments(1, rowsPerPage);
     } else {
       toast.error(result.error || 'Ocurrió un error al procesar el XML');
     }
-  }, [uploadXmlDocument, fetchAllDocuments]);
+  }, [uploadXmlDocument, fetchAllDocuments, rowsPerPage]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -128,7 +139,9 @@ const CajaDashboard = () => {
    */
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadInitialData();
+    setPage(0);
+    await fetchAllDocuments(1, rowsPerPage);
+    await fetchMatrizadores();
     setRefreshing(false);
   };
 
@@ -406,7 +419,7 @@ const CajaDashboard = () => {
       <Card>
         <CardContent>
           <Typography variant="h6" gutterBottom sx={{ color: 'primary.main' }}>
-            Documentos Creados ({filteredDocuments.length})
+            Documentos Creados
           </Typography>
           
           <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
@@ -511,6 +524,19 @@ const CajaDashboard = () => {
               </TableBody>
             </Table>
           </TableContainer>
+
+          {/* Paginación */}
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <TablePagination
+              component="div"
+              count={Number.isFinite(totalDocuments) ? totalDocuments : 0}
+              page={page}
+              onPageChange={(e, newPage) => setPage(newPage)}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+              rowsPerPageOptions={[25, 50, 100, 200]}
+            />
+          </Box>
         </CardContent>
       </Card>
 
