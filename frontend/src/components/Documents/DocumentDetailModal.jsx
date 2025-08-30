@@ -54,6 +54,7 @@ import documentService from '../../services/document-service';
 import notificationsService from '../../services/notifications-service';
 import NotificationPolicySelector from '../common/NotificationPolicySelector';
 import ImmediateDeliveryModal from '../common/ImmediateDeliveryModal';
+import { toast } from 'react-toastify';
  
 
 /**
@@ -303,13 +304,13 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
       const result = await documentService.revertDocumentStatus(document.id, targetStatus, reason.trim());
       if (result.success) {
         setLocalDocument(prev => ({ ...prev, status: targetStatus }));
-        alert(result.message || `Documento revertido a ${targetStatus}`);
+        toast.success(result.message || `Documento revertido a ${targetStatus}`);
       } else {
         const errorMsg = result.error || result.message || 'No se pudo revertir el estado';
-        alert('Error: ' + errorMsg);
+        toast.error(errorMsg);
       }
     } catch (error) {
-      alert('Error al revertir estado: ' + error.message);
+      toast.error('Error al revertir estado: ' + error.message);
     } finally {
       setActionLoading(false);
     }
@@ -353,39 +354,55 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
           onDocumentUpdated(result.data);
         }
 
-        // Mostrar mensaje de éxito
-        const message = result.message || `Documento actualizado a: ${actionConfig.action}`;
-        
-        // Crear un alert temporal o notification
+        // Notificación global y cierre
+        const baseMessage = result.message || `Documento actualizado a: ${actionConfig.action}`;
         if (actionConfig.action === 'LISTO') {
-          const whatsappInfo = result.data?.whatsapp;
-          let alertMessage = message;
-          
-          if (whatsappInfo?.sent) {
-            alertMessage += '\n\n✅ Notificación WhatsApp enviada exitosamente';
-          } else if (whatsappInfo?.error) {
-            alertMessage += '\n\n⚠️ Error enviando WhatsApp: ' + whatsappInfo.error;
-          } else if (!whatsappInfo?.phone) {
-            alertMessage += '\n\nℹ️ Sin número de teléfono para WhatsApp';
+          const w = result.data?.whatsapp || {};
+          const esGrupo = result.data?.esGrupo || result.data?.documents?.length > 1;
+          // Feedback claro para operaciones en lote
+          if (esGrupo && Array.isArray(result.data?.documents) && result.data.documents.length > 1) {
+            const count = result.data.documents.length;
+            if (w.sent) {
+              toast.success(`Grupo marcado como LISTO (${count} documentos). WhatsApp enviado con todos los códigos.`);
+            } else if (w.error) {
+              toast.error(`Grupo marcado como LISTO (${count}). WhatsApp falló: ${w.error}`);
+            } else if (w.skipped || localDocument?.notificationPolicy === 'no_notificar') {
+              toast.info(`Grupo marcado como LISTO (${count}). Notificación omitida por política.`);
+            } else {
+              toast.success(baseMessage);
+            }
+            if (typeof onClose === 'function') {
+              onClose();
+            }
+            return;
           }
-          
-          alert(alertMessage);
+          if (w.sent) {
+            toast.success('Documento marcado como LISTO. WhatsApp enviado.');
+          } else if (w.skipped || localDocument?.notificationPolicy === 'no_notificar') {
+            toast.info('Documento marcado como LISTO. No se envió WhatsApp (preferencia no notificar).');
+          } else if (w.error) {
+            toast.error(`Documento LISTO, pero WhatsApp falló: ${w.error}`);
+          } else if (!w.phone) {
+            toast.warning('Documento marcado como LISTO. No se envió WhatsApp: sin número de teléfono.');
+          } else {
+            toast.success(baseMessage);
+          }
           if (typeof onClose === 'function') {
             onClose();
           }
         } else {
-          alert(message);
+          toast.success(baseMessage);
         }
         
         console.log(`✅ Documento actualizado a: ${actionConfig.action}`, result);
       } else {
         console.error('❌ Error en updateDocumentStatus:', result);
         const errorMsg = result.error || result.message || 'No se pudo actualizar el documento';
-        alert('Error: ' + errorMsg);
+        toast.error(errorMsg);
       }
     } catch (error) {
       console.error('Error al actualizar documento:', error);
-      alert('Error al actualizar documento: ' + error.message);
+      toast.error('Error al actualizar documento: ' + error.message);
     } finally {
       setActionLoading(false);
     }
@@ -871,10 +888,17 @@ const DeliveryModal = ({ open, onClose, document, onDocumentDelivered }) => {
           alertMessage += '\n\n⚠️ Error enviando WhatsApp: ' + whatsappInfo.error;
         }
         
-        alert(alertMessage);
+        if (whatsappInfo?.sent) {
+          toast.success('Documento entregado. Confirmación WhatsApp enviada.');
+        } else if (whatsappInfo?.error) {
+          toast.error(`Documento entregado, pero WhatsApp falló: ${whatsappInfo.error}`);
+        } else {
+          toast.success(message);
+        }
         onClose();
       } else {
         setErrors([result.message || 'Error al entregar documento']);
+        toast.error(result.message || 'Error al entregar documento');
       }
     } catch (error) {
       console.error('Error entregando documento:', error);

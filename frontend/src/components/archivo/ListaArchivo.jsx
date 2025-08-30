@@ -607,7 +607,8 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
    */
   const handleGroupStatusChange = async (newStatus) => {
     if (bulkActions.selectedDocuments.size === 0) {
-      alert('Seleccione documentos para cambiar estado');
+      // Notificación global: selección vacía
+      try { const { toast } = await import('react-toastify'); toast.info('Seleccione documentos para cambiar estado'); } catch {}
       return;
     }
 

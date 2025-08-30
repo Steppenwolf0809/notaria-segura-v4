@@ -58,6 +58,7 @@ import GroupingDetector from '../grouping/GroupingDetector';
 import receptionService from '../../services/reception-service';
 import documentService from '../../services/document-service';
 import useDocumentStore from '../../store/document-store';
+import { toast } from 'react-toastify';
 
 const StatusIndicator = ({ status }) => {
   const statusConfig = {
@@ -376,6 +377,20 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
       }
 
       if (result.success === true) {
+        // Notificación global según WhatsApp
+        const w = result.data?.whatsapp || {};
+        if (w.sent) {
+          toast.success('Documento(s) marcados como LISTO. WhatsApp enviado.');
+        } else if (w.skipped) {
+          toast.info('Documento(s) marcados como LISTO. No se envió WhatsApp (preferencia no notificar).');
+        } else if (w.error) {
+          toast.error(`Marcado como LISTO, pero WhatsApp falló: ${w.error}`);
+        } else if (w.phone === null || w.phone === undefined) {
+          toast.warning('Documento(s) marcados como LISTO. No se envió WhatsApp: sin número de teléfono.');
+        } else {
+          toast.success(result.message || 'Documento(s) marcado(s) como listo(s) exitosamente');
+        }
+        // Mantener snackbar local para compatibilidad visual existente
         setSnackbar({ open: true, message: result.message || 'Documento(s) marcado(s) como listo(s) exitosamente', severity: 'success' });
         console.log('🔄 Recargando documentos...');
         await cargarDocumentos();
@@ -405,7 +420,9 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
       }
     } catch (error) {
       console.error('Error marcando como listo:', error);
-      setSnackbar({ open: true, message: error.message || 'Error al marcar documento(s) como listo(s)', severity: 'error' });
+      const msg = error.message || 'Error al marcar documento(s) como listo(s)';
+      setSnackbar({ open: true, message: msg, severity: 'error' });
+      toast.error(msg);
     } finally {
       cerrarConfirmacion();
     }

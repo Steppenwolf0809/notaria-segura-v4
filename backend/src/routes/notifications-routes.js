@@ -21,6 +21,9 @@ router.get('/', authenticateToken, async (req, res) => {
     let documentFilter = {};
     if (userRole === 'MATRIZADOR') {
       documentFilter.assignedToId = userId;
+    } else if (userRole === 'ARCHIVO') {
+      // ARCHIVO debe ver solo notificaciones de sus documentos (mismo criterio que matrizador)
+      documentFilter.assignedToId = userId;
     } else if (userRole === 'CAJA') {
       documentFilter.createdById = userId;
     } else if (userRole === 'RECEPCION') {

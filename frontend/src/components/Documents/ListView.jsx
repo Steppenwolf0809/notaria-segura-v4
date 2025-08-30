@@ -42,6 +42,7 @@ import BulkActionToolbar from '../bulk/BulkActionToolbar';
 import BulkStatusChangeModal from '../bulk/BulkStatusChangeModal';
 import ReversionModal from '../recepcion/ReversionModal';
 import ModalEntregaMatrizador from '../matrizador/ModalEntregaMatrizador.jsx';
+import { toast } from 'react-toastify';
 
 /**
  * Vista Lista - EXACTA AL PROTOTIPO + SELECCIÓN MÚLTIPLE
@@ -198,15 +199,46 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
   // Confirmar marcar como LISTO
   const handleConfirmMarcarListo = async () => {
     if (!currentDocumento) return;
-    await updateDocumentStatus(currentDocumento.id, 'LISTO');
+    const result = await updateDocumentStatus(currentDocumento.id, 'LISTO');
     closeConfirmListo();
+    // Notificación global según resultado y política de notificación
+    if (!result) return;
+    if (result.success) {
+      const w = result.data?.whatsapp || {};
+      if (w.sent) {
+        toast.success('Documento marcado como LISTO. WhatsApp enviado.');
+      } else if (w.skipped || currentDocumento?.notificationPolicy === 'no_notificar') {
+        toast.info('Documento marcado como LISTO. No se envió WhatsApp (preferencia no notificar).');
+      } else if (w.error) {
+        toast.error(`Documento LISTO, pero WhatsApp falló: ${w.error}`);
+      } else if (!w.phone) {
+        toast.warning('Documento marcado como LISTO. No se envió WhatsApp: sin número de teléfono.');
+      } else {
+        toast.success('Documento marcado como LISTO.');
+      }
+    } else {
+      toast.error(result.error || 'Error al marcar como LISTO');
+    }
   };
 
   // Confirmar entrega (ENTREGADO) para matrizador
   const handleConfirmEntrega = async ({ deliveredTo }) => {
     if (!currentDocumento) return;
-    await updateDocumentStatus(currentDocumento.id, 'ENTREGADO', { deliveredTo });
+    const result = await updateDocumentStatus(currentDocumento.id, 'ENTREGADO', { deliveredTo });
     closeEntrega();
+    if (!result) return;
+    if (result.success) {
+      const w = result.data?.whatsapp || {};
+      if (w.sent) {
+        toast.success('Documento entregado. Confirmación WhatsApp enviada.');
+      } else if (w.error) {
+        toast.error(`Documento entregado, pero WhatsApp falló: ${w.error}`);
+      } else {
+        toast.success('Documento marcado como ENTREGADO.');
+      }
+    } else {
+      toast.error(result.error || 'Error al marcar como ENTREGADO');
+    }
   };
 
   /**

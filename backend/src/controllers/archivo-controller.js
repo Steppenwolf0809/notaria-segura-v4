@@ -286,33 +286,71 @@ async function cambiarEstadoDocumento(req, res) {
     if (documento.isGrouped && documento.documentGroupId) {
       console.log(`🔗 Documento ${id} es parte de un grupo, sincronizando cambio de estado...`);
       
-      // Sincronización grupal: si el código fue generado solo para este documento,
-      // no propagar codigoRetiro al resto del grupo, solo el estado.
-      const dataGroupSync = { ...updateData };
-      if (codigoGenerado) {
-        delete dataGroupSync.codigoRetiro;
-      }
+      if (nuevoEstado === 'LISTO') {
+        // Marcar como LISTO todos los documentos del grupo asignados al mismo usuario
+        // y garantizar código de retiro individual por documento
+        const groupDocs = await prisma.document.findMany({
+          where: {
+            documentGroupId: documento.documentGroupId,
+            isGrouped: true,
+            assignedToId: userId,
+            status: { not: 'ENTREGADO' }
+          }
+        });
 
-      // Actualizar todos los documentos del grupo
-      await prisma.document.updateMany({
-        where: {
-          documentGroupId: documento.documentGroupId,
-          isGrouped: true,
-          assignedToId: userId // Solo documentos asignados al mismo usuario
-        },
-        data: dataGroupSync
-      });
-      
-      // Obtener todos los documentos actualizados del grupo
-      documentosActualizados = await prisma.document.findMany({
-        where: {
-          documentGroupId: documento.documentGroupId,
-          isGrouped: true,
-          assignedToId: userId
+        const updatesPlan = [];
+        for (const doc of groupDocs) {
+          let codigoParaDoc = doc.codigoRetiro;
+          if (!codigoParaDoc) {
+            // Generar código único por documento
+            // Nota: usamos el mismo generador que para individuales
+            // para asegurar unicidad a nivel sistema
+            // (4 dígitos según lineamientos)
+            codigoParaDoc = await CodigoRetiroService.generarUnico();
+          }
+          updatesPlan.push({ id: doc.id, codigo: codigoParaDoc });
         }
-      });
-      
-      console.log(`✅ Sincronizados ${documentosActualizados.length} documentos del grupo`);
+
+        documentosActualizados = await prisma.$transaction(async (tx) => {
+          const result = [];
+          for (const up of updatesPlan) {
+            const updated = await tx.document.update({
+              where: { id: up.id },
+              data: {
+                status: 'LISTO',
+                codigoRetiro: up.codigo,
+                updatedAt: new Date()
+              }
+            });
+            result.push(updated);
+          }
+          return result;
+        });
+
+        console.log(`✅ ARCHIVO: ${documentosActualizados.length} documentos del grupo marcados como LISTO con códigos individuales`);
+      } else {
+        // Para otros estados (EN_PROCESO, ENTREGADO), propagar sin tocar códigos
+        const dataGroupSync = { ...updateData };
+        if (codigoGenerado) delete dataGroupSync.codigoRetiro;
+
+        await prisma.document.updateMany({
+          where: {
+            documentGroupId: documento.documentGroupId,
+            isGrouped: true,
+            assignedToId: userId
+          },
+          data: dataGroupSync
+        });
+
+        documentosActualizados = await prisma.document.findMany({
+          where: {
+            documentGroupId: documento.documentGroupId,
+            isGrouped: true,
+            assignedToId: userId
+          }
+        });
+        console.log(`✅ ARCHIVO: Sincronizados ${documentosActualizados.length} documentos del grupo para estado ${nuevoEstado}`);
+      }
     } else {
       // Actualizar solo el documento individual
       const documentoActualizado = await prisma.document.update({
@@ -329,36 +367,48 @@ async function cambiarEstadoDocumento(req, res) {
     let whatsappSent = false;
     let whatsappError = null;
     
-    if (nuevoEstado === 'LISTO' && (codigoGenerado || updateData.codigoRetiro)) {
+    if (nuevoEstado === 'LISTO') {
       // Respetar política de no notificar
       if (documento.notificationPolicy === 'no_notificar') {
         console.log('🔕 ARCHIVO: Política no_notificar activa, omitimos WhatsApp (LISTO)');
       } else {
-      try {
-        const clienteData = {
-          clientName: documento.clientName,
-          clientPhone: documento.clientPhone
-        };
-        
-        const documentoData = {
-          tipoDocumento: documento.documentType,
-          protocolNumber: documento.protocolNumber
-        };
-
-        const whatsappResult = await whatsappService.enviarDocumentoListo(
-          clienteData, 
-          documentoData, 
-          codigoGenerado || updateData.codigoRetiro
-        );
-
-        console.log('✅ Notificación WhatsApp enviada desde archivo:', whatsappResult.messageId || 'simulado');
-        whatsappSent = true;
-      } catch (error) {
-        // No fallar la operación principal si WhatsApp falla
-        console.error('⚠️ Error enviando WhatsApp desde archivo (operación continúa):', error.message);
-        whatsappError = error.message;
+        try {
+          const clienteData = {
+            clientName: documento.clientName,
+            clientPhone: documento.clientPhone
+          };
+          
+          if (documento.isGrouped && documento.documentGroupId) {
+            // Notificación grupal con TODOS los documentos del grupo y sus códigos individuales
+            const whatsappResult = await whatsappService.enviarGrupoDocumentosListo(
+              clienteData,
+              documentosActualizados,
+              documentosActualizados[0]?.codigoRetiro || null
+            );
+            console.log('✅ ARCHIVO: Notificación WhatsApp GRUPAL enviada:', whatsappResult.messageId || 'simulado');
+            whatsappSent = true;
+          } else if (codigoGenerado || updateData.codigoRetiro) {
+            // Notificación individual
+            const documentoData = {
+              tipoDocumento: documento.documentType,
+              protocolNumber: documento.protocolNumber
+            };
+            const whatsappResult = await whatsappService.enviarDocumentoListo(
+              clienteData, 
+              documentoData, 
+              codigoGenerado || updateData.codigoRetiro
+            );
+            console.log('✅ ARCHIVO: Notificación WhatsApp enviada:', whatsappResult.messageId || 'simulado');
+            whatsappSent = true;
+          } else {
+            console.log('ℹ️ ARCHIVO: LISTO sin código de retiro disponible para WhatsApp');
+          }
+        } catch (error) {
+          // No fallar la operación principal si WhatsApp falla
+          console.error('⚠️ Error enviando WhatsApp desde archivo (operación continúa):', error.message);
+          whatsappError = error.message;
+        }
       }
-    }
     }
     // 📱 ENVIAR NOTIFICACIÓN WHATSAPP si se marca como ENTREGADO
     if (nuevoEstado === 'ENTREGADO' && documento.clientPhone && documento.notificationPolicy !== 'no_notificar') {
@@ -412,10 +462,15 @@ async function cambiarEstadoDocumento(req, res) {
       success: true,
       data: { 
         documento: documentoActualizado,
+        documentos: documentosActualizados,
         documentosSincronizados: totalSincronizados,
         esGrupo: totalSincronizados > 1,
         codigoGenerado,
-        whatsappSent 
+        whatsapp: {
+          sent: whatsappSent,
+          error: whatsappError,
+          phone: documento.clientPhone
+        }
       },
       message: `${mensajeBase}${codigoGenerado ? ` - Código: ${codigoGenerado}` : ''}`
     });

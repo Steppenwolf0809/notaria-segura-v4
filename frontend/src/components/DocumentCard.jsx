@@ -36,6 +36,7 @@ import DocumentGroupingModal from './grouping/DocumentGroupingModal.jsx';
 import GroupingAlert from './grouping/GroupingAlert.jsx';
 import QuickGroupingModal from './grouping/QuickGroupingModal.jsx';
 import useDocumentStore from '../store/document-store.js';
+import { toast } from 'react-toastify';
 
 /**
  * Tarjeta de documento para dashboard del matrizador
@@ -96,16 +97,16 @@ const DocumentCard = ({ document, onStatusChange }) => {
         // Cerrar modal
         setShowQuickGroupingModal(false);
         
-        // Mostrar notificación de éxito
-        alert(`✅ Grupo creado con ${documentIds.length} documentos. Se envió notificación WhatsApp.`);
+        // Notificación global de éxito
+        toast.success(`Grupo creado (${documentIds.length}). WhatsApp enviado.`);
       } else {
         console.error('❌ Error creando grupo:', response.message);
-        alert(`❌ Error: ${response.message}`);
+        toast.error(response.message || 'Error creando el grupo');
         throw new Error(response.message);
       }
     } catch (error) {
       console.error('❌ Error creando grupo inteligente:', error);
-      alert('❌ Error creando grupo de documentos');
+      toast.error('Error creando grupo de documentos');
       throw error;
     } finally {
       setLoading(false);
