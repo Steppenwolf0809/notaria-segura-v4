@@ -26,7 +26,9 @@ import {
   Toolbar,
   Alert,
   Badge,
-  Tooltip
+  Tooltip,
+  ToggleButtonGroup,
+  ToggleButton
 } from '@mui/material';
 import {
   MoreVert as MoreIcon,
@@ -427,14 +429,13 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
         const response = await onEstadoChange(targetDoc.id, nuevoEstado);
         if (response?.success) {
           const w = response.data?.whatsapp || {};
-          if (w.sent) {
+          const sentLike = !!(w.sent || ['sent','queued','delivered'].includes(w.status) || w.sid || w.messageId);
+          if (sentLike) {
             toast.success('Documento marcado como LISTO. WhatsApp enviado.');
           } else if (w.skipped) {
             toast.info('Documento marcado como LISTO. No se envió WhatsApp (preferencia no notificar).');
           } else if (w.error) {
             toast.error(`Documento LISTO, pero WhatsApp falló: ${w.error}`);
-          } else if (w.phone === null || w.phone === undefined) {
-            toast.warning('Documento marcado como LISTO. No se envió WhatsApp: sin número de teléfono.');
           } else {
             toast.success(response.message || 'Documento marcado como LISTO');
           }
@@ -930,19 +931,22 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
           />
 
           {/* Filtro de Estado */}
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel>Estado</InputLabel>
-            <Select
-              value={filtros.estado}
-              label="Estado"
-              onChange={(e) => handleFilterChange('estado', e.target.value)}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ pl: 0.5 }}>
+              Estado
+            </Typography>
+            <ToggleButtonGroup
+              size="small"
+              exclusive
+              value={filtros.estado === 'TODOS' ? '' : filtros.estado}
+              onChange={(e, value) => handleFilterChange('estado', value || 'TODOS')}
             >
-              <MenuItem value="TODOS">Todos</MenuItem>
-              <MenuItem value="EN_PROCESO">En Proceso</MenuItem>
-              <MenuItem value="LISTO">Listo</MenuItem>
-              <MenuItem value="ENTREGADO">Entregado</MenuItem>
-            </Select>
-          </FormControl>
+              <ToggleButton value="" sx={{ textTransform: 'none' }}>Todos</ToggleButton>
+              <ToggleButton value="EN_PROCESO" sx={{ textTransform: 'none' }}>En Proceso</ToggleButton>
+              <ToggleButton value="LISTO" sx={{ textTransform: 'none' }}>Listo</ToggleButton>
+              <ToggleButton value="ENTREGADO" sx={{ textTransform: 'none' }}>Entregado</ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
 
           {/* Filtro de Tipo */}
           <FormControl size="small" sx={{ minWidth: 150 }}>
@@ -1514,6 +1518,10 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
         open={groupInfoModalOpen}
         onClose={handleCloseGroupInfo}
         document={selectedGroupDocument}
+        onUngrouped={() => {
+          // Refrescar de inmediato la lista al desagrupar
+          if (onRefresh) onRefresh();
+        }}
       />
 
       {/* 🎯 NUEVOS COMPONENTES: Selección múltiple */}

@@ -205,14 +205,13 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
     if (!result) return;
     if (result.success) {
       const w = result.data?.whatsapp || {};
-      if (w.sent) {
+      const sentLike = !!(w.sent || ['sent','queued','delivered'].includes(w.status) || w.sid || w.messageId);
+      if (sentLike) {
         toast.success('Documento marcado como LISTO. WhatsApp enviado.');
       } else if (w.skipped || currentDocumento?.notificationPolicy === 'no_notificar') {
         toast.info('Documento marcado como LISTO. No se envió WhatsApp (preferencia no notificar).');
       } else if (w.error) {
         toast.error(`Documento LISTO, pero WhatsApp falló: ${w.error}`);
-      } else if (!w.phone) {
-        toast.warning('Documento marcado como LISTO. No se envió WhatsApp: sin número de teléfono.');
       } else {
         toast.success('Documento marcado como LISTO.');
       }
