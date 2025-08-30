@@ -1358,6 +1358,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
           onClose={handleCloseDetailModal}
           document={selectedDocument}
           userRole="archivo"
+          /* Documentos en esta vista son propios del usuario ARCHIVO → edición permitida */
           onDocumentUpdated={(updated) => {
             // Sincronizar fila seleccionada en la tabla
             if (updated?.document) {

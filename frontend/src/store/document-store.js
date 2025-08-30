@@ -9,6 +9,8 @@ import useAuthStore from './auth-store.js';
 const useDocumentStore = create((set, get) => ({
   // Estado inicial
   documents: [],
+  totalDocuments: 0,
+  pagination: { currentPage: 1, pageSize: 50, totalPages: 1 },
   matrizadores: [],
   loading: false,
   error: null,
@@ -152,31 +154,26 @@ const useDocumentStore = create((set, get) => ({
    * CAJA: Cargar todos los documentos para gestión
    * @returns {Promise<boolean>} True si se cargaron exitosamente
    */
-  fetchAllDocuments: async () => {
+  fetchAllDocuments: async (page = 1, limit = 50) => {
     set({ loading: true, error: null });
-    
     try {
-      const result = await documentService.getAllDocuments();
-      
+      const result = await documentService.getAllDocuments({ page, limit });
       if (result.success) {
-        set({ 
+        const pagination = result.data.pagination || { currentPage: page, pageSize: limit, totalPages: 1 };
+        set({
           documents: result.data.documents || [],
-          loading: false 
+          totalDocuments: result.data.total || 0,
+          pagination,
+          loading: false
         });
         return true;
       } else {
-        set({ 
-          error: result.error, 
-          loading: false 
-        });
+        set({ error: result.error, loading: false });
         return false;
       }
     } catch (error) {
       console.error('Error in fetchAllDocuments:', error);
-      set({ 
-        error: 'Error inesperado al cargar documentos', 
-        loading: false 
-      });
+      set({ error: 'Error inesperado al cargar documentos', loading: false });
       return false;
     }
   },

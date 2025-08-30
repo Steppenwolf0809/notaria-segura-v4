@@ -738,7 +738,8 @@ async function supervisionGeneral(req, res) {
       fechaDesde, 
       fechaHasta,
       page = 1, 
-      limit = 20 
+      limit = 20,
+      sortDias
     } = req.query;
 
 
@@ -786,12 +787,18 @@ async function supervisionGeneral(req, res) {
           ...filterClauses
         ], Prisma.sql` AND `)}`;
 
+        const sortLower = String(sortDias || '').toLowerCase();
+        // Mapear: días desc => updatedAt ASC, días asc => updatedAt DESC
+        const orderSql = sortDias
+          ? (sortLower === 'desc' ? Prisma.sql`d."updatedAt" ASC` : Prisma.sql`d."updatedAt" DESC`)
+          : Prisma.sql`d."updatedAt" DESC`;
+
         const documentos = await prisma.$queryRaw`
           SELECT d.*, au.id as "_assignedToId", au."firstName" as "_assignedToFirstName", au."lastName" as "_assignedToLastName"
           FROM "documents" d
           LEFT JOIN "users" au ON au.id = d."assignedToId"
           WHERE ${whereSql}
-          ORDER BY d."updatedAt" DESC
+          ORDER BY ${orderSql}
           OFFSET ${(parseInt(page) - 1) * parseInt(limit)} LIMIT ${parseInt(limit)}
         `;
         const countRows = await prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${whereSql}`;
@@ -883,7 +890,8 @@ async function supervisionGeneral(req, res) {
             select: { firstName: true, lastName: true }
           }
         },
-        orderBy: { updatedAt: 'desc' },
+        // Mapear: días desc => updatedAt ASC, días asc => updatedAt DESC
+        orderBy: { updatedAt: String((sortDias || '')).toLowerCase() === 'desc' ? 'asc' : 'desc' },
         skip,
         take: parseInt(limit)
       }),

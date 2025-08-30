@@ -358,6 +358,9 @@ async function getDocumentosEnProceso(req, res) {
       status: 'EN_PROCESO'
     };
     
+    // PostgreSQL - Búsqueda case-insensitive y acento-insensitive (si hay extensión unaccent)
+    const searchTerm2 = (search || '').trim();
+
     // Clave de caché (incluye filtros)
     const cacheKey = cache.key({
       scope: 'reception:en_proceso',
@@ -370,9 +373,6 @@ async function getDocumentosEnProceso(req, res) {
     if (cached) {
       return res.json({ success: true, data: cached });
     }
-
-    // PostgreSQL - Búsqueda case-insensitive y acento-insensitive (si hay extensión unaccent)
-    const searchTerm2 = (search || '').trim();
     if (searchTerm2) {
       const supportsUnaccent = await supportsUnaccentFn();
       if (supportsUnaccent) {

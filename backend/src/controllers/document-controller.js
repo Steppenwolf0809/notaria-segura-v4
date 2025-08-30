@@ -361,7 +361,6 @@ async function applyExtractionSuggestions(req, res) {
  */
 async function getAllDocuments(req, res) {
   try {
-    // Verificar que el usuario sea CAJA o ADMIN
     if (!['CAJA', 'ADMIN'].includes(req.user.role)) {
       return res.status(403).json({
         success: false,
@@ -369,44 +368,51 @@ async function getAllDocuments(req, res) {
       });
     }
 
-    const documents = await prisma.document.findMany({
-      include: {
-        createdBy: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true
-          }
-        },
-        assignedTo: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true
-          }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      }
-    });
+    // Paginación y límite conservador por defecto para evitar cargas pesadas
+    const page = Math.max(1, parseInt(req.query.page || '1', 10));
+    const limitDefault = parseInt(process.env.CAJA_DOCS_LIMIT_DEFAULT || '200', 10);
+    const limit = Math.min(500, Math.max(10, parseInt(req.query.limit || String(limitDefault), 10)));
+    const skip = (page - 1) * limit;
 
-    res.json({
-      success: true,
-      data: {
-        documents,
-        total: documents.length
+    // Clave de caché simple (paginada)
+    const cacheKey = `caja:all:${page}:${limit}`;
+    const cached = await (await import('../services/cache-service.js')).default.get(cacheKey);
+    if (cached) {
+      return res.json({ success: true, data: cached });
+    }
+
+    const [documents, total] = await Promise.all([
+      prisma.document.findMany({
+        include: {
+          createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+          assignedTo: { select: { id: true, firstName: true, lastName: true, email: true } }
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit
+      }),
+      prisma.document.count()
+    ]);
+
+    const payload = {
+      documents,
+      total,
+      pagination: {
+        currentPage: page,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+        pageSize: limit
       }
-    });
+    };
+
+    // Guardar por 60s, invalidado por mutaciones (hook en db.js)
+    const cache = (await import('../services/cache-service.js')).default;
+    await cache.set(cacheKey, payload, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'caja:all'] });
+
+    res.json({ success: true, data: payload });
 
   } catch (error) {
     console.error('Error obteniendo documentos:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error interno del servidor'
-    });
+    res.status(500).json({ success: false, message: 'Error interno del servidor' });
   }
 }
 
@@ -690,8 +696,14 @@ async function updateDocumentStatus(req, res) {
         updateData.relacionTitular = 'directo';
       }
     } else if (req.user.role === 'ARCHIVO') {
-      // ARCHIVO puede gestionar cualquier documento (supervisión completa)
-      // Puede entregar documentos directamente como MATRIZADOR
+      // ARCHIVO: Solo puede modificar documentos asignados a él (propios). En supervisión es solo lectura.
+      if (document.assignedToId !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          message: 'Solo puedes modificar documentos asignados a ti'
+        });
+      }
+      // Puede entregar documentos directamente como MATRIZADOR sobre sus propios documentos
       if (status === 'ENTREGADO') {
         if (document.status !== 'LISTO') {
           return res.status(403).json({

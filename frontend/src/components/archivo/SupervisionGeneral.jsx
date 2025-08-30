@@ -24,7 +24,8 @@ import {
   Alert,
   CircularProgress,
   Tooltip,
-  IconButton
+  IconButton,
+  TableSortLabel
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -59,7 +60,6 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
   const [totalDocuments, setTotalDocuments] = useState(0);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
-  const [sortByDaysDesc, setSortByDaysDesc] = useState(false);
   
   const [filtros, setFiltros] = useState(() => {
     try {
@@ -70,7 +70,8 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
           search: parsed.search ?? '',
           matrizador: parsed.matrizador ?? 'TODOS',
           estado: parsed.estado ?? 'TODOS',
-          alerta: parsed.alerta ?? 'TODAS'
+          alerta: parsed.alerta ?? 'TODAS',
+          sortDias: parsed.sortDias ?? undefined
         };
       }
     } catch (_) {
@@ -80,7 +81,8 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
       search: '',
       matrizador: 'TODOS',
       estado: 'TODOS',
-      alerta: 'TODAS'
+      alerta: 'TODAS',
+      sortDias: undefined
     };
   });
 
@@ -110,7 +112,7 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
    */
   useEffect(() => {
     cargarDocumentos();
-  }, [filtros.matrizador, filtros.estado, filtros.alerta, debouncedSearch, page, rowsPerPage, token]);
+  }, [filtros.matrizador, filtros.estado, filtros.alerta, filtros.sortDias, debouncedSearch, page, rowsPerPage, token]);
 
   /**
    * Cargar datos iniciales
@@ -231,10 +233,14 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
     setPage(0);
   };
 
-  // Documentos a mostrar (aplicar orden por días si corresponde)
-  const displayedDocuments = sortByDaysDesc
-    ? [...documentos].sort((a, b) => (b.alerta?.dias || 0) - (a.alerta?.dias || 0))
-    : documentos;
+  // Toggle orden por días (backend aplica el orden para toda la paginación)
+  const toggleSortDias = () => {
+    setFiltros(prev => ({
+      ...prev,
+      sortDias: prev.sortDias === 'desc' ? 'asc' : 'desc'
+    }));
+    setPage(0);
+  };
 
   /**
    * Formatear fecha
@@ -482,12 +488,12 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
           </Button>
 
           <Button
-            variant={sortByDaysDesc ? 'contained' : 'outlined'}
+            variant={filtros.sortDias ? 'contained' : 'outlined'}
             startIcon={<SortIcon />}
-            onClick={() => setSortByDaysDesc(prev => !prev)}
+            onClick={toggleSortDias}
             size="small"
           >
-            {sortByDaysDesc ? 'Días: Mayor a menor' : 'Ordenar por días'}
+            {filtros.sortDias === 'desc' ? 'Días: Mayor a menor' : filtros.sortDias === 'asc' ? 'Días: Menor a mayor' : 'Ordenar por días'}
           </Button>
         </Box>
 
@@ -537,14 +543,23 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
                 <TableCell sx={{ fontWeight: 600 }}>Cliente</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Matrizador</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Estado</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Días</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    Días
+                    <TableSortLabel
+                      active={!!filtros.sortDias}
+                      direction={filtros.sortDias === 'desc' ? 'desc' : 'asc'}
+                      onClick={toggleSortDias}
+                    />
+                  </Box>
+                </TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Alerta</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Fecha</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Acciones</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {displayedDocuments.map((documento) => (
+              {documentos.map((documento) => (
                 <TableRow 
                   key={documento.id}
                   hover
@@ -649,6 +664,7 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
           open={detailModalOpen}
           onClose={handleCloseDetail}
           document={selectedDocument}
+          readOnly={true}
           onDocumentUpdated={() => {
             // Refrescar lista por si cambió algo relevante
             cargarDocumentos();
