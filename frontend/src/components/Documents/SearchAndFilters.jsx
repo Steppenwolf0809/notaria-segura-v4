@@ -73,11 +73,57 @@ const SearchAndFilters = memo(({
               exclusive
               value={statusFilter || ''}
               onChange={(e, value) => onStatusFilterChange({ target: { value: value || '' } })}
+              sx={{
+                bgcolor: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                borderRadius: 1,
+                p: 0.25,
+                '& .MuiToggleButton-root': {
+                  border: 0,
+                  textTransform: 'none',
+                  px: 1.5,
+                  height: 32,
+                }
+              }}
             >
-              <ToggleButton value="" sx={{ textTransform: 'none' }}>Todos</ToggleButton>
-              <ToggleButton value="EN_PROCESO" sx={{ textTransform: 'none' }}>En Proceso</ToggleButton>
-              <ToggleButton value="LISTO" sx={{ textTransform: 'none' }}>Listo</ToggleButton>
-              <ToggleButton value="ENTREGADO" sx={{ textTransform: 'none' }}>Entregado</ToggleButton>
+              <ToggleButton value="">Todos</ToggleButton>
+              <ToggleButton 
+                value="EN_PROCESO"
+                sx={{
+                  '&.Mui-selected': {
+                    bgcolor: 'info.main',
+                    color: 'common.white'
+                  },
+                  '&.Mui-selected:hover': { bgcolor: 'info.dark' }
+                }}
+              >
+                En Proceso
+              </ToggleButton>
+              <ToggleButton 
+                value="LISTO"
+                sx={{
+                  '&.Mui-selected': {
+                    bgcolor: 'success.main',
+                    color: 'common.white'
+                  },
+                  '&.Mui-selected:hover': { bgcolor: 'success.dark' }
+                }}
+              >
+                Listo
+              </ToggleButton>
+              <ToggleButton 
+                value="ENTREGADO"
+                sx={{
+                  '&.Mui-selected': {
+                    bgcolor: (t) => t.palette.mode === 'dark' ? t.palette.grey[700] : t.palette.grey[300],
+                    color: 'text.primary'
+                  },
+                  '&.Mui-selected:hover': {
+                    bgcolor: (t) => t.palette.mode === 'dark' ? t.palette.grey[600] : t.palette.grey[400]
+                  }
+                }}
+              >
+                Entregado
+              </ToggleButton>
             </ToggleButtonGroup>
           </Box>
 
