@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Box, Alert } from '@mui/material';
 import RecepcionLayout from './RecepcionLayout';
 import RecepcionDashboard from './RecepcionDashboard';
-import DocumentosUnificados from './recepcion/DocumentosUnificados';
+import DocumentosPage from '../pages/DocumentosPage.jsx';
 import NotificationHistory from './recepcion/NotificationHistory';
 import receptionService from '../services/reception-service';
 
@@ -94,13 +94,7 @@ const RecepcionCenter = () => {
         );
       
       case 'documentos':
-        return (
-          <DocumentosUnificados 
-            onEstadisticasChange={onEstadisticasChange}
-            documentoEspecifico={documentoEspecifico}
-            onDocumentoFound={() => setDocumentoEspecifico(null)} // Limpiar después de encontrarlo
-          />
-        );
+        return <DocumentosPage />;
 
       case 'notificaciones':
         return <NotificationHistory />;
