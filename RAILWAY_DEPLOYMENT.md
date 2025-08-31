@@ -54,6 +54,10 @@ ALLOWED_ORIGINS=https://your-app.railway.app
 # JWT
 JWT_SECRET=your-jwt-secret-here
 
+# Frontend API base
+# Recomendado: usar la misma app (backend sirve /api)
+VITE_API_URL=/api
+
 # Features (según UX v1.2)
 VITE_DOCS_MATRIZADOR_TABS=true
 VITE_DOCS_ARCHIVO_TABS=true
@@ -89,6 +93,43 @@ ls frontend/dist/
    - `npm run build` (instala deps + compila frontend + backend)
    - `npm start` (inicia server.js que sirve todo)
 
+### 2.1. Configurar variables por entorno (staging/producción) con CLI
+```bash
+# Instalar y autenticar
+npm i -g @railway/cli
+railway login
+railway link # seleccionar el proyecto
+
+# Ver entornos disponibles
+railway env list
+
+# STAGING
+railway env switch staging
+railway variables set \
+  NODE_ENV=staging \
+  VITE_API_URL=/api \
+  VITE_DOCS_MATRIZADOR_TABS=true \
+  VITE_DOCS_ARCHIVO_TABS=true \
+  VITE_DOCS_RECEPCION_GROUPED=true \
+  VITE_DOCS_LAZY_DELIVERED=true \
+  VITE_DOCS_WINDOWING=true \
+  VITE_DOCS_SEARCH_SMART_SCOPE=true \
+  VITE_DOCS_SEARCH_TOGGLE_RECEPCION=true
+
+# PRODUCCIÓN
+railway env switch production
+railway variables set \
+  NODE_ENV=production \
+  VITE_API_URL=/api \
+  VITE_DOCS_MATRIZADOR_TABS=true \
+  VITE_DOCS_ARCHIVO_TABS=true \
+  VITE_DOCS_RECEPCION_GROUPED=true \
+  VITE_DOCS_LAZY_DELIVERED=true \
+  VITE_DOCS_WINDOWING=true \
+  VITE_DOCS_SEARCH_SMART_SCOPE=true \
+  VITE_DOCS_SEARCH_TOGGLE_RECEPCION=true
+```
+
 ### 3. Verificación Post-Deploy
 - ✅ `https://your-app.railway.app/api/health` → API funcional
 - ✅ `https://your-app.railway.app/` → Frontend cargado
@@ -110,7 +151,17 @@ npm install -g @railway/cli
 # Login y deploy
 railway login
 railway link
-railway deploy
+# Seleccionar entorno (staging/production) y desplegar
+railway env switch staging   # o production
+railway deploy --service <nombre-del-servicio>
+```
+
+### Redeploy rápido de la rama preflight-railway-v1_2
+```bash
+git push origin preflight-railway-v1_2
+# Luego, desde Railway dashboard, Deploy latest / o via CLI:
+railway env switch staging   # o production
+railway deploy --service <nombre-del-servicio>
 ```
 
 ### Deploy Manual desde Dashboard:
