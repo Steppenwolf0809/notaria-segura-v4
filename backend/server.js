@@ -13,6 +13,7 @@ import cache from './src/services/cache-service.js'
 // Importar rutas implementadas
 import authRoutes from './src/routes/auth-routes.js'
 import documentRoutes from './src/routes/document-routes.js'
+import docsRoutes from './src/routes/docs-routes.js'
 import notificationsRoutes from './src/routes/notifications-routes.js'
 import adminRoutes from './src/routes/admin-routes.js'
 import archivoRoutes from './src/routes/archivo-routes.js'
@@ -199,6 +200,8 @@ app.use('/api/auth', authRoutes)
 
 // RUTAS DE DOCUMENTOS (/api/documents/*)  
 app.use('/api/documents', documentRoutes)
+// Alias compacta para UX v1.2
+app.use('/api/docs', docsRoutes)
 
 // RUTAS DE NOTIFICACIONES (/api/notifications/*)
 app.use('/api/notifications', notificationsRoutes)
