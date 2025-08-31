@@ -6,6 +6,7 @@ import SearchResults from '../documents/SearchResults';
 import DocRow from '../documents/DocRow';
 import DeliverModal from '../documents/DeliverModal';
 import docsService from '../../services/docs-service';
+import { FLAGS } from '../../utils/flags';
 
 const RecepcionGrouped = () => {
   const [query, setQuery] = useState('');
@@ -78,7 +79,14 @@ const RecepcionGrouped = () => {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <SearchBar value={query} onChange={setQuery} placeholder="Buscar (grupos visibles)" scope={scope} onScopeChange={setScope} showScopeToggle />
+      <SearchBar
+        value={query}
+        onChange={setQuery}
+        placeholder="Buscar (grupos visibles)"
+        scope={scope}
+        onScopeChange={setScope}
+        showScopeToggle={FLAGS.DOCS_SEARCH_TOGGLE_RECEPCION}
+      />
       <Box sx={{ mt: 1 }}>
         <Accordion expanded={expanded.proceso} onChange={() => setExpanded((e) => ({ ...e, proceso: !e.proceso }))}>
           <AccordionSummary expandIcon={<ExpandMoreIcon />}><Typography>En proceso</Typography></AccordionSummary>

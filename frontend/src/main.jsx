@@ -4,6 +4,7 @@ import App from './App.jsx'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
 import useThemeStore from './store/theme-store'
+import { FLAGS } from './utils/flags'
 
 /**
  * Componente que envuelve la aplicación con el tema dinámico
@@ -395,3 +396,11 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <AppWithTheme />
   </React.StrictMode>,
 )
+
+// Diagnóstico de flags en consola y exposición global
+try {
+  // eslint-disable-next-line no-console
+  console.table(FLAGS)
+  // @ts-ignore
+  window.FLAGS = FLAGS
+} catch {}

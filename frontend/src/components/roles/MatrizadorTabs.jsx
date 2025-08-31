@@ -7,6 +7,7 @@ import BulkBar from '../documents/BulkBar';
 import DeliverModal from '../documents/DeliverModal';
 import docsService from '../../services/docs-service';
 import { markAction } from '../../utils/telemetry';
+import { FLAGS } from '../../utils/flags';
 
 const TABS = [
   { key: 'trabajo', label: 'Trabajo' },
@@ -37,6 +38,11 @@ const MatrizadorTabs = ({ role }) => {
     let cancelled = false;
     const run = async () => {
       if (!query) {
+        if (stateForContext === 'entregado' && FLAGS.DOCS_LAZY_DELIVERED) {
+          setContextResults([]);
+          setGlobalPreview(null);
+          return;
+        }
         const states = stateForContext === 'trabajo' ? ['proceso', 'listo'] : [stateForContext];
         const results = [];
         for (const st of states) {
@@ -56,11 +62,12 @@ const MatrizadorTabs = ({ role }) => {
     let cancelled = false;
     const run = async () => {
       if (!query) return;
-      const ctxResp = await docsService.search({ query, scope: 'context', state: stateForContext === 'trabajo' ? 'proceso' : stateForContext });
+      const scope = FLAGS.DOCS_SEARCH_SMART_SCOPE ? 'context' : 'all';
+      const ctxResp = await docsService.search({ query, scope, state: stateForContext === 'trabajo' ? 'proceso' : stateForContext });
       if (cancelled) return;
       const ctxHits = ctxResp?.data?.context?.hits || [];
       setContextResults(ctxHits);
-      if (ctxHits.length <= 2) {
+      if (ctxHits.length <= 2 || !FLAGS.DOCS_SEARCH_SMART_SCOPE) {
         const glob = ctxResp?.data?.global?.groups || [];
         setGlobalPreview(glob);
       } else {
@@ -124,7 +131,7 @@ const MatrizadorTabs = ({ role }) => {
           <Tab key={t.key} value={t.key} label={t.label} />
         ))}
       </Tabs>
-      <SearchBar value={query} onChange={setQuery} placeholder={active === 'entregado' ? 'Buscar (Entregado lazy)' : 'Buscar (pestaña actual)'} />
+      <SearchBar value={query} onChange={setQuery} placeholder={active === 'entregado' && FLAGS.DOCS_LAZY_DELIVERED ? 'Buscar (Entregado lazy)' : 'Buscar (pestaña actual)'} />
       <Paper variant="outlined" sx={{ mt: 1, p: 1, flex: 1, overflow: 'auto' }}>
         {query ? (
           <SearchResults
