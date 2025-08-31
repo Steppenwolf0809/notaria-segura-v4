@@ -1,0 +1,89 @@
+{
+  "info": {
+    "name": "Notaría Segura - Docs v1.2",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "GET /api/docs (list by state)",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/docs?state=proceso&limit=25",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","docs"],
+          "query": [
+            {"key":"state","value":"proceso"},
+            {"key":"limit","value":"25"}
+          ]
+        },
+        "header": [{"key":"Authorization","value":"Bearer {{token}}"}]
+      }
+    },
+    {
+      "name": "PATCH /api/docs/:id/state (LISTO)",
+      "request": {
+        "method": "PATCH",
+        "url": {"raw": "{{baseUrl}}/api/docs/{{docId}}/state","host":["{{baseUrl}}"],"path":["api","docs","{{docId}}","state"]},
+        "header": [{"key":"Authorization","value":"Bearer {{token}}"}],
+        "body": {"mode":"raw","raw":"{\n  \"state\": \"LISTO\"\n}"}
+      }
+    },
+    {
+      "name": "PATCH /api/docs/:id/state (ENTREGADO - Recepción)",
+      "request": {
+        "method": "PATCH",
+        "url": {"raw": "{{baseUrl}}/api/docs/{{docId}}/state","host":["{{baseUrl}}"],"path":["api","docs","{{docId}}","state"]},
+        "header": [{"key":"Authorization","value":"Bearer {{token}}"}],
+        "body": {"mode":"raw","raw":"{\n  \"state\": \"ENTREGADO\",\n  \"payload\": {\n    \"verificationCode\": \"1234\",\n    \"receiverName\": \"MARIA G\",\n    \"receiverIdNumber\": \"1712345678\",\n    \"receiverRelation\": \"titular\",\n    \"deliveryNotes\": \"Observación de prueba\"\n  }\n}"}
+      }
+    },
+    {
+      "name": "PATCH /api/docs/bulk/state (LISTO)",
+      "request": {
+        "method": "PATCH",
+        "url": {"raw": "{{baseUrl}}/api/docs/bulk/state","host":["{{baseUrl}}"],"path":["api","docs","bulk","state"]},
+        "header": [{"key":"Authorization","value":"Bearer {{token}}"}],
+        "body": {"mode":"raw","raw":"{\n  \"ids\": [\"{{docId1}}\", \"{{docId2}}\"],\n  \"state\": \"LISTO\"\n}"}
+      }
+    },
+    {
+      "name": "GET /api/docs/search (context)",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/docs/search?query=MARIA&scope=context&state=proceso",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","docs","search"],
+          "query": [
+            {"key":"query","value":"MARIA"},
+            {"key":"scope","value":"context"},
+            {"key":"state","value":"proceso"}
+          ]
+        },
+        "header": [{"key":"Authorization","value":"Bearer {{token}}"}]
+      }
+    },
+    {
+      "name": "GET /api/docs/search (all)",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/api/docs/search?query=MARIA&scope=all",
+          "host": ["{{baseUrl}}"],
+          "path": ["api","docs","search"],
+          "query": [
+            {"key":"query","value":"MARIA"},
+            {"key":"scope","value":"all"}
+          ]
+        },
+        "header": [{"key":"Authorization","value":"Bearer {{token}}"}]
+      }
+    }
+  ],
+  "variable": [
+    {"key":"baseUrl","value":"http://localhost:3001"},
+    {"key":"token","value":""}
+  ]
+}
+
