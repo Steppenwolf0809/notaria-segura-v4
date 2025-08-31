@@ -79,7 +79,7 @@ class WhatsAppService {
         }
     }
 
-    // Envío con actualización de la notificación PENDING
+  // Envío con actualización de la notificación PENDING
     async _sendAndUpdate({ pendingId, numeroWhatsApp, mensaje }) {
         const result = await this.client.messages.create({
             from: this.fromNumber,
@@ -96,6 +96,18 @@ class WhatsAppService {
             message: mensaje,
             timestamp: new Date().toISOString()
         };
+    }
+
+    async _sendWithRetry({ pendingId, numeroWhatsApp, mensaje, retries = 1 }) {
+        try {
+            return await this._sendAndUpdate({ pendingId, numeroWhatsApp, mensaje });
+        } catch (err) {
+            if (retries > 0) {
+                await new Promise(r => setTimeout(r, 750));
+                return this._sendWithRetry({ pendingId, numeroWhatsApp, mensaje, retries: retries - 1 });
+            }
+            throw err;
+        }
     }
 
     /**
@@ -183,7 +195,7 @@ class WhatsAppService {
         if (this.asyncMode) {
             setImmediate(async () => {
                 try {
-                    await this._sendAndUpdate({ pendingId: pending?.id, numeroWhatsApp, mensaje });
+                    await this._sendWithRetry({ pendingId: pending?.id, numeroWhatsApp, mensaje, retries: 1 });
                 } catch (e) {
                     if (pending?.id) await this.updateNotification(pending.id, { status: 'FAILED', errorMessage: e.message });
                 }
@@ -192,7 +204,7 @@ class WhatsAppService {
         }
 
         try {
-            return await this._sendAndUpdate({ pendingId: pending?.id, numeroWhatsApp, mensaje });
+            return await this._sendWithRetry({ pendingId: pending?.id, numeroWhatsApp, mensaje, retries: 1 });
         } catch (error) {
             console.error('❌ Error enviando WhatsApp:', error);
             

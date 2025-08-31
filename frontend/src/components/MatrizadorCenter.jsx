@@ -3,7 +3,7 @@ import { Box, Alert } from '@mui/material';
 import MatrizadorLayout from './MatrizadorLayout';
 import MatrizadorDashboard from './MatrizadorDashboard';
 import ConcuerdoGenerator from './matrizador/concuerdos/ConcuerdoGenerator.jsx';
-import GestionDocumentos from './GestionDocumentos';
+import DocumentosPage from '../pages/DocumentosPage.jsx';
 import NotificationsHistory from './Documents/NotificationsHistory';
 import useDocumentStore from '../store/document-store';
 
@@ -71,12 +71,7 @@ const MatrizadorCenter = () => {
         return <MatrizadorDashboard onDocumentClick={handleDocumentClick} />;
       
       case 'documents':
-        return (
-          <GestionDocumentos 
-            documentoEspecifico={documentoEspecifico}
-            onDocumentoFound={() => setDocumentoEspecifico(null)}
-          />
-        );
+        return <DocumentosPage />;
       
       case 'history':
         return <NotificationsHistory />;
