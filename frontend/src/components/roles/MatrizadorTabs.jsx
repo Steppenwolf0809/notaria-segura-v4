@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Tabs, Tab, Paper, Divider, Checkbox } from '@mui/material';
-import SearchBar from '../documents/SearchBar';
-import SearchResults from '../documents/SearchResults';
-import DocRow from '../documents/DocRow';
-import BulkBar from '../documents/BulkBar';
-import DeliverModal from '../documents/DeliverModal';
+import SearchBar from '../Documents/SearchBar';
+import SearchResults from '../Documents/SearchResults';
+import DocRow from '../Documents/DocRow';
+import BulkBar from '../Documents/BulkBar';
+import DeliverModal from '../Documents/DeliverModal';
 import docsService from '../../services/docs-service';
 import { markAction } from '../../utils/telemetry';
 import { FLAGS } from '../../utils/flags';

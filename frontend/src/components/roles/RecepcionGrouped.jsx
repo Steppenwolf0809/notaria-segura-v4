@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Accordion, AccordionSummary, AccordionDetails, Typography, Paper } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import SearchBar from '../documents/SearchBar';
-import SearchResults from '../documents/SearchResults';
-import DocRow from '../documents/DocRow';
-import DeliverModal from '../documents/DeliverModal';
+import SearchBar from '../Documents/SearchBar';
+import SearchResults from '../Documents/SearchResults';
+import DocRow from '../Documents/DocRow';
+import DeliverModal from '../Documents/DeliverModal';
 import docsService from '../../services/docs-service';
 import { FLAGS } from '../../utils/flags';
 
