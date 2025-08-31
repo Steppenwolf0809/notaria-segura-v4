@@ -8,8 +8,8 @@
     "backend"
   ],
   "scripts": {
-    "start": "cd backend && npm start",
-    "build": "npm run build:frontend && cd backend && npm run build",
+    "start": "node backend/server.js",
+    "build": "npm --prefix frontend ci && npm --prefix frontend run build && npm --prefix backend ci",
     "build:frontend": "cd frontend && npm run build",
     "build:backend": "cd backend && npm run build",
     "install:all": "npm install && npm run install:frontend && npm run install:backend",
