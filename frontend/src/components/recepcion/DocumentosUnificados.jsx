@@ -136,7 +136,8 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
 
   const [searchQuery, setSearchQuery] = useState('');
   
-  const [page, setPage] = useState(0);
+  const [pagePendientes, setPagePendientes] = useState(0);
+  const [pageEntregados, setPageEntregados] = useState(0);
   // límite por página solicitado: 25, 50 y 100
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [totalPages, setTotalPages] = useState(1);
@@ -184,7 +185,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   const cargarDocumentos = useCallback(async () => {
     try {
       setLoading(true);
-      const currentPage = page + 1;
+      const currentPage = (activeTab === 'entregados' ? pageEntregados : pagePendientes) + 1;
 
       if (activeTab === 'entregados') {
         // Usar SIEMPRE /api/documents/my-documents con states=ENTREGADO (sin scroll infinito)
@@ -244,7 +245,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
     } finally {
       setLoading(false);
     }
-  }, [page, rowsPerPage, filters.search, filters.matrizador, filters.estado, filters.fechaDesde, filters.fechaHasta, sortBy, sortOrder, activeTab]);
+  }, [pagePendientes, pageEntregados, rowsPerPage, filters.search, filters.matrizador, filters.estado, filters.fechaDesde, filters.fechaHasta, sortBy, sortOrder, activeTab]);
 
   useEffect(() => {
     cargarDocumentos();
@@ -280,8 +281,9 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
       setHighlightedDocument(documentoEspecifico.id);
       setScrollToDocument(documentoEspecifico.id);
       
-      // Resetear página a 0 para asegurar que encuentre el documento
-      setPage(0);
+      // Resetear páginas para asegurar que encuentre el documento
+      setPagePendientes(0);
+      setPageEntregados(0);
     }
   }, [documentoEspecifico]);
 
@@ -319,7 +321,9 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   
   const handleFilterChange = (field, value) => {
     setFilters(prev => ({ ...prev, [field]: value }));
-    setPage(0);
+    // Resetear paginación en ambas pestañas al cambiar filtros/búsqueda
+    setPagePendientes(0);
+    setPageEntregados(0);
   };
 
   const handleClearSearch = () => {
@@ -830,7 +834,8 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
               // limpiamos el filtro estado para permitir ambos y filtramos en cliente
               setFilters(prev => ({ ...prev, estado: '' }));
             }
-            setPage(0);
+            // Resetear página del tab de destino
+            if (v === 'entregados') setPageEntregados(0); else setPagePendientes(0);
           }}
           textColor="primary"
           indicatorColor="primary"
@@ -1367,7 +1372,11 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
               labelId="rows-per-page-label"
               label="Filas"
               value={rowsPerPage}
-              onChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+              onChange={(e) => {
+                setRowsPerPage(parseInt(e.target.value, 10));
+                // Resetear página del tab actual
+                if (activeTab === 'entregados') setPageEntregados(0); else setPagePendientes(0);
+              }}
             >
               <MenuItem value={25}>25</MenuItem>
               <MenuItem value={50}>50</MenuItem>
@@ -1376,9 +1385,11 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
           </FormControl>
           <Pagination
             color="primary"
-            page={page + 1}
+            page={(activeTab === 'entregados' ? pageEntregados : pagePendientes) + 1}
             count={Math.max(1, totalPages)}
-            onChange={(_, value) => setPage(value - 1)}
+            onChange={(_, value) => {
+              if (activeTab === 'entregados') setPageEntregados(value - 1); else setPagePendientes(value - 1);
+            }}
             showFirstButton
             showLastButton
           />
