@@ -34,7 +34,9 @@ import {
   ListItemIcon,
   ListItemText,
   InputAdornment,
-  TableSortLabel
+  TableSortLabel,
+  Tabs,
+  Tab
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -115,6 +117,8 @@ function formatLocalDate(dateString) {
 function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDocumentoFound }) {
   const { createDocumentGroup, detectGroupableDocuments } = useDocumentStore();
   const [documentos, setDocumentos] = useState([]);
+  // pestañas: 'pendientes' (EN_PROCESO + LISTO) | 'entregados' (ENTREGADO)
+  const [activeTab, setActiveTab] = useState('pendientes');
   const [selectedDocuments, setSelectedDocuments] = useState([]); // Solo para visualización
   const [visualSelection, setVisualSelection] = useState(new Set()); // 🎯 NUEVA: Selección visual sin funcionalidad
   const [loading, setLoading] = useState(true);
@@ -132,7 +136,8 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   const [searchQuery, setSearchQuery] = useState('');
   
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  // límite por página solicitado: 25, 50 y 100
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [totalPages, setTotalPages] = useState(1);
   // Orden
   const [sortBy, setSortBy] = useState('createdAt');
@@ -177,12 +182,14 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   const cargarDocumentos = useCallback(async () => {
     try {
       setLoading(true);
+      // construir parámetros sin objetos inline inestables
       const params = {
         page: (page + 1).toString(),
         limit: rowsPerPage.toString(),
         ...(filters.search && { search: filters.search }),
         ...(filters.matrizador && { matrizador: filters.matrizador }),
-        ...(filters.estado && { estado: filters.estado }),
+        // cuando la pestaña es 'entregados', forzar estado ENTREGADO
+        ...((activeTab === 'entregados' ? 'ENTREGADO' : (filters.estado || '')) && { estado: activeTab === 'entregados' ? 'ENTREGADO' : filters.estado }),
         ...(filters.fechaDesde && { fechaDesde: filters.fechaDesde }),
         ...(filters.fechaHasta && { fechaHasta: filters.fechaHasta }),
         sortBy: sortBy,
@@ -203,7 +210,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
     } finally {
       setLoading(false);
     }
-  }, [page, rowsPerPage, filters, sortBy, sortOrder]);
+  }, [page, rowsPerPage, filters.search, filters.matrizador, filters.estado, filters.fechaDesde, filters.fechaHasta, sortBy, sortOrder, activeTab]);
 
   useEffect(() => {
     cargarDocumentos();
@@ -775,6 +782,29 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
 
   return (
     <Box sx={{ p: 3 }}>
+      {/* Tabs principales: Pendientes vs Entregados */}
+      <Box sx={{ mb: 2 }}>
+        <Tabs
+          value={activeTab}
+          onChange={(_, v) => {
+            setActiveTab(v);
+            // sincronizar filtro de estado para que la UI sea consistente
+            if (v === 'entregados') {
+              setFilters(prev => ({ ...prev, estado: 'ENTREGADO' }));
+            } else {
+              // pestaña principal: mostrar EN_PROCESO + LISTO (excluir ENTREGADO)
+              // limpiamos el filtro estado para permitir ambos y filtramos en cliente
+              setFilters(prev => ({ ...prev, estado: '' }));
+            }
+            setPage(0);
+          }}
+          textColor="primary"
+          indicatorColor="primary"
+        >
+          <Tab value="pendientes" label="Pendientes (En Proceso + Listos)" />
+          <Tab value="entregados" label="Entregados" />
+        </Tabs>
+      </Box>
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', mb: 1 }}>📋 Gestión de Documentos</Typography>
         <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>Vista unificada para marcar, entregar y consultar documentos.</Typography>
@@ -962,7 +992,11 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                   </TableCell>
                 </TableRow>
               ) : (
-                documentosOrdenados.map((documento) => (
+                // filtrar según pestaña activa: principales excluye ENTREGADO
+                (activeTab === 'pendientes'
+                  ? documentosOrdenados.filter(d => d.status === 'EN_PROCESO' || d.status === 'LISTO')
+                  : documentosOrdenados.filter(d => d.status === 'ENTREGADO')
+                ).map((documento) => (
                   <TableRow 
                     key={documento.id} 
                     selected={visualSelection.has(documento.id)} 
@@ -1011,7 +1045,19 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                     </TableCell>
                     <TableCell sx={{ py: 1.5 }}>
                       <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>{documento.clientName}</Typography>
+                        {/* Al hacer clic en el nombre, autocompletar buscador y filtrar */}
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 500, textDecoration: 'underline', cursor: 'pointer' }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const term = documento.clientName || '';
+                            setSearchQuery(term);
+                            handleFilterChange('search', term);
+                          }}
+                        >
+                          {documento.clientName}
+                        </Typography>
                         <Typography 
                           variant="caption" 
                           component="div" 
@@ -1280,8 +1326,15 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
             </TableBody>
           </Table>
         </TableContainer>
-        <TablePagination component="div" count={totalPages * rowsPerPage} page={page} onPageChange={handleChangePage}
-          rowsPerPage={rowsPerPage} onRowsPerPageChange={handleChangeRowsPerPage} rowsPerPageOptions={[5, 10, 25, 50]} labelRowsPerPage="Filas:"
+        <TablePagination
+          component="div"
+          count={totalPages * rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          rowsPerPageOptions={[25, 50, 100]}
+          labelRowsPerPage="Filas:"
         />
       </Card>
       
