@@ -188,25 +188,30 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
       const currentPage = (activeTab === 'entregados' ? pageEntregados : pagePendientes) + 1;
 
       if (activeTab === 'entregados') {
-        // Usar SIEMPRE /api/documents/my-documents con states=ENTREGADO (sin scroll infinito)
-        const paramsStable = {
-          states: 'ENTREGADO',
-          q: filters.search || '',
-          page: currentPage,
-          limit: rowsPerPage
+        // Usar endpoint de Recepción con filtro de estado para evitar 403 por rol
+        const baseParams = {
+          page: String(currentPage),
+          limit: String(rowsPerPage),
+          sortBy: sortBy,
+          sortOrder: sortOrder,
+          estado: 'ENTREGADO'
         };
-        const result = await documentService.getMyDocumentsPaged(paramsStable);
-        if (result.success) {
-          const docs = result.data.documents || [];
-          const pag = result.data.pagination || {};
-          setDocumentos(docs);
-          const total = Number(pag.total || 0);
-          setTotalCount(total);
-          setTotalPages(Number(pag.totalPages || Math.ceil(total / rowsPerPage)) || 1);
-          setError(null);
-        } else {
-          throw new Error(result.error);
-        }
+        if (filters.search) baseParams.search = filters.search;
+        if (filters.matrizador) baseParams.matrizador = filters.matrizador;
+        if (filters.fechaDesde) baseParams.fechaDesde = filters.fechaDesde;
+        if (filters.fechaHasta) baseParams.fechaHasta = filters.fechaHasta;
+
+        const result = await receptionService.getTodosDocumentos(baseParams);
+        if (!result.success) throw new Error(result.error);
+
+        const docs = result.data.documents || [];
+        setDocumentos(docs);
+
+        const pag = result.data.pagination || {};
+        const total = Number(pag.total || 0);
+        setTotalCount(total);
+        setTotalPages(Number(pag.totalPages || Math.ceil(total / rowsPerPage)) || 1);
+        setError(null);
       } else {
         // Pestaña principal: EN_PROCESO + LISTO (excluir ENTREGADO)
         const baseParams = {
