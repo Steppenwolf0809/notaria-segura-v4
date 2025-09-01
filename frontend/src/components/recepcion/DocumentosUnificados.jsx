@@ -556,10 +556,20 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
     cerrarModales();
   };
 
-  const handleChangePage = (event, newPage) => setPage(newPage);
+  const handleChangePage = (event, newPage) => {
+    if (activeTab === 'entregados') {
+      setPageEntregados(newPage);
+    } else {
+      setPagePendientes(newPage);
+    }
+  };
   const handleChangeRowsPerPage = (event) => {
     setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
+    if (activeTab === 'entregados') {
+      setPageEntregados(0);
+    } else {
+      setPagePendientes(0);
+    }
   };
   
   // Alternar orden por fecha
@@ -762,8 +772,9 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
    * Seleccionar/deseleccionar todos los documentos visibles
    */
   const handleToggleAllVisual = (selectAll) => {
+    const currentPageIndex = activeTab === 'entregados' ? pageEntregados : pagePendientes;
     if (selectAll) {
-      const visibleIds = documentos.slice(page * rowsPerPage, (page + 1) * rowsPerPage).map(doc => doc.id);
+      const visibleIds = documentos.slice(currentPageIndex * rowsPerPage, (currentPageIndex + 1) * rowsPerPage).map(doc => doc.id);
       setVisualSelection(new Set(visibleIds));
     } else {
       setVisualSelection(new Set());
@@ -771,7 +782,8 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   };
 
   // Calcular documentos paginados
-  const documentosPaginados = documentos.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+  const currentPageIndex = activeTab === 'entregados' ? pageEntregados : pagePendientes;
+  const documentosPaginados = documentos.slice(currentPageIndex * rowsPerPage, (currentPageIndex + 1) * rowsPerPage);
   
   // Prefetch de conteos por cliente para los documentos visibles
   useEffect(() => {
@@ -798,7 +810,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
       }
     };
     fetchCounts();
-  }, [documentosPaginados, page, rowsPerPage]);
+  }, [documentosPaginados, currentPageIndex, rowsPerPage]);
 
   // Verificar estado de selección para checkbox master
   const allVisualSelected = documentosPaginados.length > 0 && documentosPaginados.every(doc => visualSelection.has(doc.id));
