@@ -240,6 +240,40 @@ const documentService = {
   },
 
   /**
+   * Obtener mis documentos con filtros/paginación
+   * Soporta parámetros: states (comma), q (búsqueda), page (1-indexed), limit
+   */
+  async getMyDocumentsPaged({ states = '', q = '', page = 1, limit = 25 } = {}) {
+    try {
+      const params = new URLSearchParams();
+      params.set('page', String(page));
+      params.set('limit', String(limit));
+      if (states) params.set('states', states);
+      if (q) params.set('q', q);
+
+      const response = await api.get(`/documents/my-documents?${params.toString()}`);
+      const payload = response?.data?.data || {};
+
+      // Normalizar estructura de respuesta
+      const documents = payload.documents || payload.items || [];
+      const pagination = payload.pagination || {
+        page: payload.page || page,
+        limit: payload.limit || limit,
+        total: payload.total || 0,
+        totalPages: payload.totalPages || Math.ceil((payload.total || 0) / (payload.limit || limit || 1))
+      };
+
+      return {
+        success: true,
+        data: { documents, pagination }
+      };
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || error.message || 'Error al obtener mis documentos';
+      return { success: false, error: errorMessage };
+    }
+  },
+
+  /**
    * MATRIZADOR: PUT status
    * @param {string} documentId - ID del documento
    * @param {string} newStatus - Nuevo estado del documento

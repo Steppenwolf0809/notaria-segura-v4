@@ -36,7 +36,8 @@ import {
   InputAdornment,
   TableSortLabel,
   Tabs,
-  Tab
+  Tab,
+  Pagination
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -139,6 +140,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   // límite por página solicitado: 25, 50 y 100
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   // Orden
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState('desc');
@@ -182,27 +184,59 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   const cargarDocumentos = useCallback(async () => {
     try {
       setLoading(true);
-      // construir parámetros sin objetos inline inestables
-      const params = {
-        page: (page + 1).toString(),
-        limit: rowsPerPage.toString(),
-        ...(filters.search && { search: filters.search }),
-        ...(filters.matrizador && { matrizador: filters.matrizador }),
-        // cuando la pestaña es 'entregados', forzar estado ENTREGADO
-        ...((activeTab === 'entregados' ? 'ENTREGADO' : (filters.estado || '')) && { estado: activeTab === 'entregados' ? 'ENTREGADO' : filters.estado }),
-        ...(filters.fechaDesde && { fechaDesde: filters.fechaDesde }),
-        ...(filters.fechaHasta && { fechaHasta: filters.fechaHasta }),
-        sortBy: sortBy,
-        sortOrder: sortOrder
-      };
-      const result = await receptionService.getTodosDocumentos(params);
-      if (result.success) {
-        const docs = result.data.documents || [];
-        setDocumentos(docs);
-        setTotalPages(result.data.pagination?.totalPages || 1);
-        setError(null);
+      const currentPage = page + 1;
+
+      if (activeTab === 'entregados') {
+        // Usar SIEMPRE /api/documents/my-documents con states=ENTREGADO (sin scroll infinito)
+        const paramsStable = {
+          states: 'ENTREGADO',
+          q: filters.search || '',
+          page: currentPage,
+          limit: rowsPerPage
+        };
+        const result = await documentService.getMyDocumentsPaged(paramsStable);
+        if (result.success) {
+          const docs = result.data.documents || [];
+          const pag = result.data.pagination || {};
+          setDocumentos(docs);
+          const total = Number(pag.total || 0);
+          setTotalCount(total);
+          setTotalPages(Number(pag.totalPages || Math.ceil(total / rowsPerPage)) || 1);
+          setError(null);
+        } else {
+          throw new Error(result.error);
+        }
       } else {
-        throw new Error(result.error);
+        // Pestaña principal: EN_PROCESO + LISTO (excluir ENTREGADO)
+        const baseParams = {
+          page: String(currentPage),
+          limit: String(rowsPerPage),
+          sortBy: sortBy,
+          sortOrder: sortOrder
+        };
+        if (filters.search) baseParams.search = filters.search;
+        if (filters.matrizador) baseParams.matrizador = filters.matrizador;
+        if (filters.fechaDesde) baseParams.fechaDesde = filters.fechaDesde;
+        if (filters.fechaHasta) baseParams.fechaHasta = filters.fechaHasta;
+
+        const result = await receptionService.getTodosDocumentos(baseParams);
+        if (!result.success) throw new Error(result.error);
+
+        const docsAll = result.data.documents || [];
+        const docs = docsAll.filter(d => d.status === 'EN_PROCESO' || d.status === 'LISTO');
+        setDocumentos(docs);
+
+        // Calcular total exacto sumando conteos por estado
+        const [enProcesoCountRes, listoCountRes] = await Promise.all([
+          receptionService.getTodosDocumentos({ ...baseParams, page: '1', limit: '1', estado: 'EN_PROCESO' }),
+          receptionService.getTodosDocumentos({ ...baseParams, page: '1', limit: '1', estado: 'LISTO' })
+        ]);
+        const totalEnProceso = enProcesoCountRes.success ? (enProcesoCountRes.data.pagination?.total || 0) : 0;
+        const totalListo = listoCountRes.success ? (listoCountRes.data.pagination?.total || 0) : 0;
+        const total = totalEnProceso + totalListo;
+        setTotalCount(total);
+        setTotalPages(Math.max(1, Math.ceil(total / rowsPerPage)));
+        setError(null);
       }
     } catch (err) {
       console.error('Error:', err);
@@ -1326,16 +1360,29 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
             </TableBody>
           </Table>
         </TableContainer>
-        <TablePagination
-          component="div"
-          count={totalPages * rowsPerPage}
-          page={page}
-          onPageChange={handleChangePage}
-          rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
-          rowsPerPageOptions={[25, 50, 100]}
-          labelRowsPerPage="Filas:"
-        />
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 2 }}>
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel id="rows-per-page-label">Filas</InputLabel>
+            <Select
+              labelId="rows-per-page-label"
+              label="Filas"
+              value={rowsPerPage}
+              onChange={(e) => { setRowsPerPage(parseInt(e.target.value, 10)); setPage(0); }}
+            >
+              <MenuItem value={25}>25</MenuItem>
+              <MenuItem value={50}>50</MenuItem>
+              <MenuItem value={100}>100</MenuItem>
+            </Select>
+          </FormControl>
+          <Pagination
+            color="primary"
+            page={page + 1}
+            count={Math.max(1, totalPages)}
+            onChange={(_, value) => setPage(value - 1)}
+            showFirstButton
+            showLastButton
+          />
+        </Box>
       </Card>
       
       <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={handleMenuClose}>
