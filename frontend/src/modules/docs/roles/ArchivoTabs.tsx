@@ -93,94 +93,26 @@ export default function ArchivoTabs() {
   useEffect(() => {
     const load = async () => {
       if (activeTab === 'trabajo') {
-        const res = await fetchTrabajoArchivo({ page: pageTrabajo, limit: rowsPerPage, search });
-        let filtered = (res.documents || [])
+        const res = await fetchTrabajoArchivo({ page: pageTrabajo, limit: rowsPerPage, search, fechaDesde, fechaHasta, sortOrder });
+        const filtered = (res.documents || [])
           .filter((d: any) => ['EN_PROCESO','LISTO','proceso','listo'].includes((d.status || '').toString()))
           .filter((d: any) => matchesSearch(d, search || ''));
-        // Filtro por fechas (local)
-        filtered = filtered.filter((d: any) => {
-          const dateString = (d?.xmlDate || d?.fechaXml || d?.fechaXML || d?.fechaCreacion || d?.createdAt);
-          if (!dateString) return true;
-          const t = new Date(dateString).getTime();
-          if (fechaDesde) {
-            const from = new Date(fechaDesde);
-            from.setHours(0,0,0,0);
-            if (t < from.getTime()) return false;
-          }
-          if (fechaHasta) {
-            const to = new Date(fechaHasta);
-            to.setHours(23,59,59,999);
-            if (t > to.getTime()) return false;
-          }
-          return true;
-        });
-        // Orden por fecha (local)
-        filtered.sort((a: any, b: any) => {
-          const ta = new Date(a?.xmlDate || a?.fechaXml || a?.fechaXML || a?.fechaCreacion || a?.createdAt || 0).getTime();
-          const tb = new Date(b?.xmlDate || b?.fechaXml || b?.fechaXML || b?.fechaCreacion || b?.createdAt || 0).getTime();
-          return sortOrder === 'asc' ? ta - tb : tb - ta;
-        });
-        const start = (pageTrabajo - 1) * rowsPerPage;
-        setDocs(filtered.slice(start, start + rowsPerPage));
-        setTotalTrabajo(filtered.length);
+        setDocs(filtered);
+        setTotalTrabajo(res.total);
       } else if (activeTab === 'listo') {
-        const res = await fetchListoArchivo({ page: pageListo, limit: rowsPerPage, search });
-        let filtered = (res.documents || [])
+        const res = await fetchListoArchivo({ page: pageListo, limit: rowsPerPage, search, fechaDesde, fechaHasta, sortOrder });
+        const filtered = (res.documents || [])
           .filter((d: any) => ['LISTO','listo'].includes((d.status || '').toString()))
           .filter((d: any) => matchesSearch(d, search || ''));
-        filtered = filtered.filter((d: any) => {
-          const dateString = (d?.xmlDate || d?.fechaXml || d?.fechaXML || d?.fechaCreacion || d?.createdAt);
-          if (!dateString) return true;
-          const t = new Date(dateString).getTime();
-          if (fechaDesde) {
-            const from = new Date(fechaDesde);
-            from.setHours(0,0,0,0);
-            if (t < from.getTime()) return false;
-          }
-          if (fechaHasta) {
-            const to = new Date(fechaHasta);
-            to.setHours(23,59,59,999);
-            if (t > to.getTime()) return false;
-          }
-          return true;
-        });
-        filtered.sort((a: any, b: any) => {
-          const ta = new Date(a?.xmlDate || a?.fechaXml || a?.fechaXML || a?.fechaCreacion || a?.createdAt || 0).getTime();
-          const tb = new Date(b?.xmlDate || b?.fechaXml || b?.fechaXML || b?.fechaCreacion || b?.createdAt || 0).getTime();
-          return sortOrder === 'asc' ? ta - tb : tb - ta;
-        });
-        const start = (pageListo - 1) * rowsPerPage;
-        setDocs(filtered.slice(start, start + rowsPerPage));
-        setTotalListo(filtered.length);
+        setDocs(filtered);
+        setTotalListo(res.total);
       } else {
-        const res = await fetchEntregadoArchivo({ page: pageEntregado, limit: rowsPerPage, search });
-        let filtered = (res.documents || [])
+        const res = await fetchEntregadoArchivo({ page: pageEntregado, limit: rowsPerPage, search, fechaDesde, fechaHasta, sortOrder });
+        const filtered = (res.documents || [])
           .filter((d: any) => ['ENTREGADO','entregado'].includes((d.status || '').toString()))
           .filter((d: any) => matchesSearch(d, search || ''));
-        filtered = filtered.filter((d: any) => {
-          const dateString = (d?.xmlDate || d?.fechaXml || d?.fechaXML || d?.fechaCreacion || d?.createdAt);
-          if (!dateString) return true;
-          const t = new Date(dateString).getTime();
-          if (fechaDesde) {
-            const from = new Date(fechaDesde);
-            from.setHours(0,0,0,0);
-            if (t < from.getTime()) return false;
-          }
-          if (fechaHasta) {
-            const to = new Date(fechaHasta);
-            to.setHours(23,59,59,999);
-            if (t > to.getTime()) return false;
-          }
-          return true;
-        });
-        filtered.sort((a: any, b: any) => {
-          const ta = new Date(a?.xmlDate || a?.fechaXml || a?.fechaXML || a?.fechaCreacion || a?.createdAt || 0).getTime();
-          const tb = new Date(b?.xmlDate || b?.fechaXml || b?.fechaXML || b?.fechaCreacion || b?.createdAt || 0).getTime();
-          return sortOrder === 'asc' ? ta - tb : tb - ta;
-        });
-        const start = (pageEntregado - 1) * rowsPerPage;
-        setDocs(filtered.slice(start, start + rowsPerPage));
-        setTotalEntregado(filtered.length);
+        setDocs(filtered);
+        setTotalEntregado(res.total);
       }
     };
     if (!loadedTabs[activeTab]) {

@@ -220,6 +220,9 @@ export async function fetchTrabajoArchivo(params: ListParams): Promise<PagedResu
     limit: String(params.limit ?? PAGE_SIZE)
   };
   if (params.search) baseParams.search = params.search;
+  if (params.fechaDesde) baseParams.fechaDesde = params.fechaDesde;
+  if (params.fechaHasta) baseParams.fechaHasta = params.fechaHasta;
+  if (params.sortOrder) baseParams.sortOrder = params.sortOrder;
 
   // Cargar página general y filtrar estados (EN_PROCESO, LISTO)
   const res = await archivoService.getMisDocumentos(token, baseParams);
@@ -255,6 +258,9 @@ export async function fetchListoArchivo(params: ListParams): Promise<PagedResult
     estado: 'LISTO'
   };
   if (params.search) baseParams.search = params.search;
+  if (params.fechaDesde) baseParams.fechaDesde = params.fechaDesde;
+  if (params.fechaHasta) baseParams.fechaHasta = params.fechaHasta;
+  if (params.sortOrder) baseParams.sortOrder = params.sortOrder;
   const res = await archivoService.getMisDocumentos(token, baseParams);
   if (res?.success !== true) throw new Error(res?.message || 'Error cargando documentos');
   const docs = normalizeDocs(res?.data ?? res);
@@ -271,6 +277,9 @@ export async function fetchEntregadoArchivo(params: ListParams): Promise<PagedRe
     estado: 'ENTREGADO'
   };
   if (params.search) baseParams.search = params.search;
+  if (params.fechaDesde) baseParams.fechaDesde = params.fechaDesde;
+  if (params.fechaHasta) baseParams.fechaHasta = params.fechaHasta;
+  if (params.sortOrder) baseParams.sortOrder = params.sortOrder;
   const res = await archivoService.getMisDocumentos(token, baseParams);
   if (res?.success !== true) throw new Error(res?.message || 'Error cargando documentos');
   const docs = normalizeDocs(res?.data ?? res);
