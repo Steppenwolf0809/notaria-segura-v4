@@ -24,6 +24,7 @@ import {
   IconButton,
   Tooltip,
   Grid,
+  FormControlLabel,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -132,6 +133,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
     estado: '', // 🎯 ACTUALIZADO: Mostrar todos los estados por defecto (Recepción ahora se enfoca en marcar como listo)
     fechaDesde: '',
     fechaHasta: '',
+    globalSearchAllStates: true,
   });
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -188,12 +190,13 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
       const currentPage = (activeTab === 'entregados' ? pageEntregados : pagePendientes) + 1;
 
       const hasSearch = !!(filters.search && filters.search.trim());
+      const useGlobalSearch = hasSearch && !!filters.globalSearchAllStates;
 
-      // BÚSQUEDA GLOBAL: si hay término de búsqueda, ignorar pestaña y estado
-      if (hasSearch) {
+      // BÚSQUEDA GLOBAL: si hay término de búsqueda y flag activo, ignorar pestaña y estado
+      if (useGlobalSearch) {
         const baseParams = {
           page: String(currentPage),
-          limit: String(Math.max(rowsPerPage, 200)), // ampliar para filtro local si hace falta
+          limit: String(Math.max(rowsPerPage, 500)), // ampliar más para filtro local
           sortBy: sortBy,
           sortOrder: sortOrder,
           search: filters.search
@@ -345,6 +348,21 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
     setPagePendientes(0);
     setPageEntregados(0);
   }, [filters.search]);
+
+  // Persistir el flag de búsqueda global en localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('ns-recepcion-global-search');
+      if (saved !== null) {
+        setFilters(prev => ({ ...prev, globalSearchAllStates: saved === 'true' }));
+      }
+    } catch {}
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem('ns-recepcion-global-search', String(!!filters.globalSearchAllStates));
+    } catch {}
+  }, [filters.globalSearchAllStates]);
 
   useEffect(() => {
     const cargarMatrizadores = async () => {
@@ -1020,29 +1038,41 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
 
               {/* Fila 2 */}
               <Grid item xs={12} sm={6} md={3}>
-                 <FormControl fullWidth size="small">
-                   <Select
-                     value={filters.estado}
-                     onChange={(e) => handleFilterChange('estado', e.target.value)}
-                     displayEmpty
-                     renderValue={(selected) => {
-                       if (!selected) {
-                         return <em style={{ color: '#999' }}>Todos los estados</em>;
-                       }
-                       const estadoLabels = {
-                         'EN_PROCESO': 'En Proceso',
-                         'LISTO': 'Listo',
-                         'ENTREGADO': 'Entregado'
-                       };
-                       return estadoLabels[selected] || selected;
-                     }}
-                   >
-                     <MenuItem value="">Todos los estados</MenuItem>
-                     <MenuItem value="EN_PROCESO">En Proceso</MenuItem>
-                     <MenuItem value="LISTO">Listo</MenuItem>
-                     <MenuItem value="ENTREGADO">Entregado</MenuItem>
-                   </Select>
-                 </FormControl>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={!!filters.globalSearchAllStates}
+                      onChange={(e) => handleFilterChange('globalSearchAllStates', e.target.checked)}
+                      color="primary"
+                    />
+                  }
+                  label={<Typography variant="body2">Buscar en todos los estados</Typography>}
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={3}>
+                <FormControl fullWidth size="small">
+                  <Select
+                    value={filters.estado}
+                    onChange={(e) => handleFilterChange('estado', e.target.value)}
+                    displayEmpty
+                    renderValue={(selected) => {
+                      if (!selected) {
+                        return <em style={{ color: '#999' }}>Todos los estados</em>;
+                      }
+                      const estadoLabels = {
+                        'EN_PROCESO': 'En Proceso',
+                        'LISTO': 'Listo',
+                        'ENTREGADO': 'Entregado'
+                      };
+                      return estadoLabels[selected] || selected;
+                    }}
+                  >
+                    <MenuItem value="">Todos los estados</MenuItem>
+                    <MenuItem value="EN_PROCESO">En Proceso</MenuItem>
+                    <MenuItem value="LISTO">Listo</MenuItem>
+                    <MenuItem value="ENTREGADO">Entregado</MenuItem>
+                  </Select>
+                </FormControl>
               </Grid>
               <Grid item xs={12} sm={6} md={3}>
                   <TextField fullWidth size="small" type="date" label="Desde"
