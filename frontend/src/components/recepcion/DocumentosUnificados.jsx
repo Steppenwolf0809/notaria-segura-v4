@@ -201,17 +201,49 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
         if (filters.fechaDesde) baseParams.fechaDesde = filters.fechaDesde;
         if (filters.fechaHasta) baseParams.fechaHasta = filters.fechaHasta;
 
-        const result = await receptionService.getTodosDocumentos(baseParams);
-        if (!result.success) throw new Error(result.error);
+        try {
+          const result = await receptionService.getTodosDocumentos(baseParams);
+          if (!result.success) throw new Error(result.error);
 
-        const docs = result.data.documents || [];
-        setDocumentos(docs);
+          const docs = result.data.documents || [];
+          setDocumentos(docs);
 
-        const pag = result.data.pagination || {};
-        const total = Number(pag.total || 0);
-        setTotalCount(total);
-        setTotalPages(Number(pag.totalPages || Math.ceil(total / rowsPerPage)) || 1);
-        setError(null);
+          const pag = result.data.pagination || {};
+          const total = Number(pag.total || 0);
+          setTotalCount(total);
+          setTotalPages(Number(pag.totalPages || Math.ceil(total / rowsPerPage)) || 1);
+          setError(null);
+        } catch (fetchErr) {
+          console.warn('Fallo búsqueda en ENTREGADOS, usando fallback local:', fetchErr);
+          // Reintentar sin search y filtrar en frontend
+          const { search, ...restFilters } = filters;
+          const fallbackParams = { ...baseParams };
+          delete fallbackParams.search;
+
+          const fbRes = await receptionService.getTodosDocumentos(fallbackParams);
+          if (fbRes && fbRes.success) {
+            const allDocs = fbRes.data.documents || [];
+            const term = (filters.search || '').toString().toLowerCase();
+            const matches = (value) => (value || '').toString().toLowerCase().includes(term);
+            const filtered = term
+              ? allDocs.filter(d =>
+                  matches(d.clientName) ||
+                  matches(d.protocolNumber) ||
+                  matches(d.clientId) ||
+                  matches(d.actoPrincipalDescripcion) ||
+                  matches(d.detalle_documento)
+                )
+              : allDocs;
+
+            setDocumentos(filtered);
+            // Sin total exacto del backend para el término, usar conteo local
+            setTotalCount(filtered.length);
+            setTotalPages(1);
+            setError(null);
+          } else {
+            throw new Error(fbRes?.error || 'Error cargando documentos ENTREGADOS');
+          }
+        }
       } else {
         // Pestaña principal: EN_PROCESO + LISTO (excluir ENTREGADO)
         const baseParams = {
@@ -255,6 +287,12 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   useEffect(() => {
     cargarDocumentos();
   }, [cargarDocumentos]);
+
+  // Resetear paginación cuando cambia el término de búsqueda para que sea global
+  useEffect(() => {
+    setPagePendientes(0);
+    setPageEntregados(0);
+  }, [filters.search]);
 
   useEffect(() => {
     const cargarMatrizadores = async () => {
