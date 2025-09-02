@@ -3,6 +3,7 @@ import { Box, Alert } from '@mui/material';
 import ArchivoLayout from './ArchivoLayout';
 import ArchivoDashboard from './ArchivoDashboard';
 import GestionArchivo from './GestionArchivo';
+import DocumentosPage from '../pages/DocumentosPage';
 import SupervisionGeneral from './archivo/SupervisionGeneral';
 import NotificationHistory from './archivo/NotificationHistory';
 import archivoService from '../services/archivo-service';
@@ -11,7 +12,6 @@ import useAuth from '../hooks/use-auth';
 /**
  * Centro de Control Archivo
  * Funcionalidad dual:
- * - Dashboard para documentos propios
  * - Vista supervisión global de todos los documentos (solo lectura)
  */
 const ArchivoCenter = () => {
@@ -92,14 +92,18 @@ const ArchivoCenter = () => {
           />
         );
       
-      case 'documentos':
-        return (
+      case 'documentos': {
+        const useTabs = (import.meta.env.VITE_DOCS_ARCHIVO_TABS || 'false') === 'true';
+        return useTabs ? (
+          <DocumentosPage />
+        ) : (
           <GestionArchivo 
             dashboardData={dashboardData}
             loading={loading}
             onDataUpdate={handleDataUpdate}
           />
         );
+      }
       
       case 'notificaciones':
         return <NotificationHistory />;

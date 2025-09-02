@@ -4,6 +4,7 @@ import MatrizadorLayout from './MatrizadorLayout';
 import MatrizadorDashboard from './MatrizadorDashboard';
 import ConcuerdoGenerator from './matrizador/concuerdos/ConcuerdoGenerator.jsx';
 import GestionDocumentos from './GestionDocumentos';
+import DocumentosPage from '../pages/DocumentosPage';
 import NotificationsHistory from './Documents/NotificationsHistory';
 import useDocumentStore from '../store/document-store';
 
@@ -70,13 +71,17 @@ const MatrizadorCenter = () => {
       case 'dashboard':
         return <MatrizadorDashboard onDocumentClick={handleDocumentClick} />;
       
-      case 'documents':
-        return (
+      case 'documents': {
+        const useTabs = (import.meta.env.VITE_DOCS_MATRIZADOR_TABS || 'false') === 'true';
+        return useTabs ? (
+          <DocumentosPage />
+        ) : (
           <GestionDocumentos 
             documentoEspecifico={documentoEspecifico}
             onDocumentoFound={() => setDocumentoEspecifico(null)}
           />
         );
+      }
       
       case 'history':
         return <NotificationsHistory />;
