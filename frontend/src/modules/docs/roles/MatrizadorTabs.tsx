@@ -21,6 +21,24 @@ function formatLocalDateFromDoc(doc?: any) {
   return date.toLocaleDateString('es-EC', { year: 'numeric', month: '2-digit', day: '2-digit' });
 }
 
+function isGroupedDoc(doc: any) {
+  return !!(doc?.isGrouped || doc?.documentGroupId || doc?.groupId || doc?.groupCode);
+}
+
+function matchesSearch(doc: any, term: string) {
+  if (!term) return true;
+  const t = term.toLowerCase();
+  const fields = [
+    doc?.clientName,
+    doc?.protocolNumber,
+    doc?.clientId,
+    doc?.actoPrincipalDescripcion,
+    doc?.documentType,
+    doc?.groupCode
+  ];
+  return fields.some(v => (v || '').toString().toLowerCase().includes(t));
+}
+
 const getInitials = (name?: string) => {
   if (!name) return '?';
   const names = name.trim().split(' ').filter(n => n.length > 0);
@@ -71,18 +89,27 @@ export default function MatrizadorTabs() {
       try {
         if (activeTab === 'trabajo') {
           const res = await fetchTrabajoMatrizador({ page: pageTrabajo, limit: rowsPerPage, search });
-          const filtered = (res.documents || []).filter((d: any) => ['EN_PROCESO','LISTO','proceso','listo'].includes((d.status || '').toString()));
-          setDocs(filtered);
+          const filtered = (res.documents || [])
+            .filter((d: any) => ['EN_PROCESO','LISTO','proceso','listo'].includes((d.status || '').toString()))
+            .filter((d: any) => matchesSearch(d, search || ''));
+          const start = (pageTrabajo - 1) * rowsPerPage;
+          setDocs(filtered.slice(start, start + rowsPerPage));
           setTotalTrabajo(res.total);
         } else if (activeTab === 'listo') {
           const res = await fetchListoMatrizador({ page: pageListo, limit: rowsPerPage, search });
-          const filtered = (res.documents || []).filter((d: any) => ['LISTO','listo'].includes((d.status || '').toString()));
-          setDocs(filtered);
+          const filtered = (res.documents || [])
+            .filter((d: any) => ['LISTO','listo'].includes((d.status || '').toString()))
+            .filter((d: any) => matchesSearch(d, search || ''));
+          const start = (pageListo - 1) * rowsPerPage;
+          setDocs(filtered.slice(start, start + rowsPerPage));
           setTotalListo(res.total);
         } else {
           const res = await fetchEntregadoMatrizador({ page: pageEntregado, limit: rowsPerPage, search });
-          const filtered = (res.documents || []).filter((d: any) => ['ENTREGADO','entregado'].includes((d.status || '').toString()));
-          setDocs(filtered);
+          const filtered = (res.documents || [])
+            .filter((d: any) => ['ENTREGADO','entregado'].includes((d.status || '').toString()))
+            .filter((d: any) => matchesSearch(d, search || ''));
+          const start = (pageEntregado - 1) * rowsPerPage;
+          setDocs(filtered.slice(start, start + rowsPerPage));
           setTotalEntregado(res.total);
         }
       } finally {
@@ -309,10 +336,10 @@ export default function MatrizadorTabs() {
                     <TableCell>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                         <Typography variant="body2">{documento.status}</Typography>
-                        {(documento.isGrouped || !!documento.documentGroupId) && (
+                        {isGroupedDoc(documento) && (
                           <Chip label="🔗 Agrupado" size="small" variant="filled" color="primary" sx={{ fontSize: '0.65rem', height: '20px', '& .MuiChip-label': { px: 1 } }} />
                         )}
-                        {!(documento.isGrouped || !!documento.documentGroupId) && (documento.status === 'EN_PROCESO' || documento.status === 'LISTO') && (
+                        {!isGroupedDoc(documento) && (documento.status === 'EN_PROCESO' || documento.status === 'LISTO') && (
                           <Button
                             size="small"
                             variant="outlined"
