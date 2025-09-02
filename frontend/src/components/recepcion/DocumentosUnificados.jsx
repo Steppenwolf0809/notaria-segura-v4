@@ -212,27 +212,58 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
           if (!result.success) throw new Error(result.error);
           docs = result.data.documents || [];
         } catch (e) {
-          console.warn('Búsqueda backend 500, fallback a filtro local:', e);
-          // Fallback: traer sin search y filtrar local
-          const { search, ...rest } = baseParams;
-          const fbRes = await receptionService.getTodosDocumentos(rest);
-          if (fbRes && fbRes.success) {
-            const allDocs = fbRes.data.documents || [];
-            docs = allDocs;
-          } else {
-            throw new Error(fbRes?.error || 'Error cargando documentos');
+          console.warn('Búsqueda backend 500, fallback a filtro local (multipágina):', e);
+          // Fallback: descargar varias páginas sin search y filtrar local
+          const pageSize = 250;
+          let page = 1;
+          let totalPages = 5; // valor inicial hasta conocer real
+          const aggregated = [];
+
+          while (page <= totalPages && aggregated.length < 2000) {
+            const fbRes = await receptionService.getTodosDocumentos({
+              page: String(page),
+              limit: String(pageSize),
+              sortBy,
+              sortOrder
+            });
+            if (fbRes && fbRes.success) {
+              const payload = fbRes.data || {};
+              aggregated.push(...(payload.documents || []));
+              const pag = payload.pagination || {};
+              totalPages = Number(pag.totalPages || totalPages);
+              page += 1;
+            } else {
+              // Si una página falla, cortar para evitar bucles
+              console.warn('Fallo al cargar página para fallback local:', fbRes?.error);
+              break;
+            }
           }
+          docs = aggregated;
         }
 
-        // Filtro local por término (global, sin importar pestaña)
-        const term = filters.search.toString().toLowerCase();
-        const includes = (v) => (v || '').toString().toLowerCase().includes(term);
+        // Normalización e índice local por término (global, sin importar pestaña)
+        const termRaw = filters.search.toString().toLowerCase().trim();
+        const normalize = (v) => (v || '')
+          .toString()
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '') // quitar acentos
+          .replace(/\s+/g, '')
+          .replace(/[^a-z0-9]/g, '');
+        const term = normalize(termRaw);
+        const includes = (v) => {
+          const s = (v || '').toString().toLowerCase();
+          if (!term) return true;
+          return s.includes(termRaw) || normalize(v).includes(term);
+        };
         const filtered = docs.filter(d =>
           includes(d.clientName) ||
           includes(d.protocolNumber) ||
           includes(d.clientId) ||
           includes(d.actoPrincipalDescripcion) ||
-          includes(d.detalle_documento)
+          includes(d.detalle_documento) ||
+          includes(d.clientPhone) ||
+          includes(d.clientEmail)
         );
 
         setDocumentos(filtered);
