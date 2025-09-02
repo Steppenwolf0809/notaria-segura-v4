@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Tabs as MuiTabs, Tab, TextField, InputAdornment, IconButton, Tooltip, Select, MenuItem, FormControl, Pagination, Typography } from '@mui/material';
+import { Box, Tabs as MuiTabs, Tab, TextField, InputAdornment, IconButton, Tooltip, Select, MenuItem, FormControl, Pagination, Typography, InputLabel } from '@mui/material';
 import { Search as SearchIcon, Clear as ClearIcon } from '@mui/icons-material';
 
 interface TabsProps {
@@ -11,10 +11,16 @@ interface TabsProps {
   totalPages: number;
   onPageChange: (page: number) => void;
   inputId?: string;
+  rowsPerPage: number;
+  onRowsPerPageChange: (value: number) => void;
+  fechaDesde?: string;
+  fechaHasta?: string;
+  onFechaDesdeChange?: (value: string) => void;
+  onFechaHastaChange?: (value: string) => void;
 }
 
 export default function Tabs(props: TabsProps) {
-  const { activeTab, onTabChange, search, onSearchChange, page, totalPages, onPageChange, inputId } = props;
+  const { activeTab, onTabChange, search, onSearchChange, page, totalPages, onPageChange, inputId, rowsPerPage, onRowsPerPageChange, fechaDesde, fechaHasta, onFechaDesdeChange, onFechaHastaChange } = props;
   return (
     <Box sx={{ mb: 2 }}>
       <MuiTabs
@@ -53,6 +59,39 @@ export default function Tabs(props: TabsProps) {
             )
           }}
         />
+
+        <TextField
+          type="date"
+          size="small"
+          label="Desde"
+          value={fechaDesde || ''}
+          onChange={(e) => onFechaDesdeChange && onFechaDesdeChange(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          sx={{ minWidth: 160 }}
+        />
+        <TextField
+          type="date"
+          size="small"
+          label="Hasta"
+          value={fechaHasta || ''}
+          onChange={(e) => onFechaHastaChange && onFechaHastaChange(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          sx={{ minWidth: 160 }}
+        />
+
+        <FormControl size="small" sx={{ minWidth: 120 }}>
+          <InputLabel id="rows-per-page-label">Por página</InputLabel>
+          <Select
+            labelId="rows-per-page-label"
+            label="Por página"
+            value={rowsPerPage}
+            onChange={(e) => onRowsPerPageChange(Number(e.target.value))}
+          >
+            <MenuItem value={25}>25</MenuItem>
+            <MenuItem value={50}>50</MenuItem>
+            <MenuItem value={100}>100</MenuItem>
+          </Select>
+        </FormControl>
       </Box>
 
       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>

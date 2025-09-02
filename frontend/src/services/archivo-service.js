@@ -54,6 +54,9 @@ const getMisDocumentos = async (token, params = {}) => {
     if (params.estado) queryParams.append('estado', params.estado);
     if (params.page) queryParams.append('page', params.page);
     if (params.limit) queryParams.append('limit', params.limit);
+    if (params.fechaDesde) queryParams.append('fechaDesde', params.fechaDesde);
+    if (params.fechaHasta) queryParams.append('fechaHasta', params.fechaHasta);
+    if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder);
 
     const response = await axios.get(
       `${API_BASE_URL}/archivo/mis-documentos?${queryParams.toString()}`,

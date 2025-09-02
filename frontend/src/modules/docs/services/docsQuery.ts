@@ -150,12 +150,16 @@ function getToken(): string | null {
 
 // MATRIZADOR: usar /documents/my-documents (paginado y con estados)
 export async function fetchTrabajoMatrizador(params: ListParams): Promise<PagedResult<any>> {
-  const res = await documentService.getMyDocumentsPaged({
+  const options: any = {
     states: 'EN_PROCESO,LISTO',
     q: params.search || '',
     page: params.page,
     limit: params.limit ?? PAGE_SIZE
-  });
+  };
+  options.sortOrder = params.sortOrder || 'desc';
+  if (params.fechaDesde) options.fechaDesde = params.fechaDesde;
+  if (params.fechaHasta) options.fechaHasta = params.fechaHasta;
+  const res = await documentService.getMyDocumentsPaged(options as any);
   if (!res.success) throw new Error(res.error || 'Error cargando documentos');
   const docs = res.data?.documents || [];
   const pag = res.data?.pagination || {};
@@ -167,12 +171,16 @@ export async function fetchTrabajoMatrizador(params: ListParams): Promise<PagedR
 }
 
 export async function fetchListoMatrizador(params: ListParams): Promise<PagedResult<any>> {
-  const res = await documentService.getMyDocumentsPaged({
+  const options: any = {
     states: 'LISTO',
     q: params.search || '',
     page: params.page,
     limit: params.limit ?? PAGE_SIZE
-  });
+  };
+  options.sortOrder = params.sortOrder || 'desc';
+  if (params.fechaDesde) options.fechaDesde = params.fechaDesde;
+  if (params.fechaHasta) options.fechaHasta = params.fechaHasta;
+  const res = await documentService.getMyDocumentsPaged(options as any);
   if (!res.success) throw new Error(res.error || 'Error cargando documentos');
   const docs = res.data?.documents || [];
   const pag = res.data?.pagination || {};
@@ -184,12 +192,16 @@ export async function fetchListoMatrizador(params: ListParams): Promise<PagedRes
 }
 
 export async function fetchEntregadoMatrizador(params: ListParams): Promise<PagedResult<any>> {
-  const res = await documentService.getMyDocumentsPaged({
+  const options: any = {
     states: 'ENTREGADO',
     q: params.search || '',
     page: params.page,
     limit: params.limit ?? PAGE_SIZE
-  });
+  };
+  options.sortOrder = params.sortOrder || 'desc';
+  if (params.fechaDesde) options.fechaDesde = params.fechaDesde;
+  if (params.fechaHasta) options.fechaHasta = params.fechaHasta;
+  const res = await documentService.getMyDocumentsPaged(options as any);
   if (!res.success) throw new Error(res.error || 'Error cargando documentos');
   const docs = res.data?.documents || [];
   const pag = res.data?.pagination || {};
@@ -208,6 +220,9 @@ export async function fetchTrabajoArchivo(params: ListParams): Promise<PagedResu
     limit: String(params.limit ?? PAGE_SIZE)
   };
   if (params.search) baseParams.search = params.search;
+  if (params.fechaDesde) baseParams.fechaDesde = params.fechaDesde;
+  if (params.fechaHasta) baseParams.fechaHasta = params.fechaHasta;
+  if (params.sortOrder) baseParams.sortOrder = params.sortOrder;
 
   // Cargar página general y filtrar estados (EN_PROCESO, LISTO)
   const res = await archivoService.getMisDocumentos(token, baseParams);
@@ -243,6 +258,9 @@ export async function fetchListoArchivo(params: ListParams): Promise<PagedResult
     estado: 'LISTO'
   };
   if (params.search) baseParams.search = params.search;
+  if (params.fechaDesde) baseParams.fechaDesde = params.fechaDesde;
+  if (params.fechaHasta) baseParams.fechaHasta = params.fechaHasta;
+  if (params.sortOrder) baseParams.sortOrder = params.sortOrder;
   const res = await archivoService.getMisDocumentos(token, baseParams);
   if (res?.success !== true) throw new Error(res?.message || 'Error cargando documentos');
   const docs = normalizeDocs(res?.data ?? res);
@@ -259,6 +277,9 @@ export async function fetchEntregadoArchivo(params: ListParams): Promise<PagedRe
     estado: 'ENTREGADO'
   };
   if (params.search) baseParams.search = params.search;
+  if (params.fechaDesde) baseParams.fechaDesde = params.fechaDesde;
+  if (params.fechaHasta) baseParams.fechaHasta = params.fechaHasta;
+  if (params.sortOrder) baseParams.sortOrder = params.sortOrder;
   const res = await archivoService.getMisDocumentos(token, baseParams);
   if (res?.success !== true) throw new Error(res?.message || 'Error cargando documentos');
   const docs = normalizeDocs(res?.data ?? res);

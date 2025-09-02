@@ -241,15 +241,19 @@ const documentService = {
 
   /**
    * Obtener mis documentos con filtros/paginación
-   * Soporta parámetros: states (comma), q (búsqueda), page (1-indexed), limit
+   * Soporta parámetros: states (comma), q (búsqueda), page (1-indexed), limit, sortBy, sortOrder, fechaDesde, fechaHasta
    */
-  async getMyDocumentsPaged({ states = '', q = '', page = 1, limit = 25 } = {}) {
+  async getMyDocumentsPaged({ states = '', q = '', page = 1, limit = 25, sortBy, sortOrder, fechaDesde, fechaHasta } = {}) {
     try {
       const params = new URLSearchParams();
       params.set('page', String(page));
       params.set('limit', String(limit));
       if (states) params.set('states', states);
       if (q) params.set('q', q);
+      if (sortBy) params.set('sortBy', sortBy);
+      if (sortOrder) params.set('sortOrder', sortOrder);
+      if (fechaDesde) params.set('fechaDesde', fechaDesde);
+      if (fechaHasta) params.set('fechaHasta', fechaHasta);
 
       const response = await api.get(`/documents/my-documents?${params.toString()}`);
       const payload = response?.data?.data || {};

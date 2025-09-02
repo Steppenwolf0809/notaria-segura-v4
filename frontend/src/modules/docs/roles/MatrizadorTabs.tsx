@@ -7,6 +7,7 @@ import DocumentDetailModal from '../../../components/Documents/DocumentDetailMod
 import ReversionModal from '../../../components/recepcion/ReversionModal';
 import ModalEntregaMatrizador from '../../../components/matrizador/ModalEntregaMatrizador.jsx';
 import QuickGroupingModal from '../../../components/grouping/QuickGroupingModal.jsx';
+import StatusBadge from '../../../components/shared/StatusBadge';
 import useDocumentStore from '../../../store/document-store.js';
 import useDebounce from '../../../hooks/useDebounce';
 
@@ -59,6 +60,9 @@ export default function MatrizadorTabs() {
   const [pageListo, setPageListo] = useState<number>(1);
   const [pageEntregado, setPageEntregado] = useState<number>(1);
   const [rowsPerPage, setRowsPerPage] = useState<number>(PAGE_SIZE);
+  const [fechaDesde, setFechaDesde] = useState<string>('');
+  const [fechaHasta, setFechaHasta] = useState<string>('');
+  const [sortOrder, setSortOrder] = useState<'asc'|'desc'>('desc');
   const [totalTrabajo, setTotalTrabajo] = useState<number>(0);
   const [totalListo, setTotalListo] = useState<number>(0);
   const [totalEntregado, setTotalEntregado] = useState<number>(0);
@@ -75,6 +79,7 @@ export default function MatrizadorTabs() {
   const [showQuickGroupingModal, setShowQuickGroupingModal] = useState(false);
   const [pendingGroupData, setPendingGroupData] = useState<{ main: any|null; related: any[] }>({ main: null, related: [] });
   const [groupingLoading, setGroupingLoading] = useState(false);
+  const [autoSwitch, setAutoSwitch] = useState<{ term: string; did: boolean }>({ term: '', did: false });
 
   const currentPage = activeTab === 'trabajo' ? pageTrabajo : activeTab === 'listo' ? pageListo : pageEntregado;
   const totalPages = activeTab === 'trabajo'
@@ -88,7 +93,7 @@ export default function MatrizadorTabs() {
       setLoading(true);
       try {
         if (activeTab === 'trabajo') {
-          const res = await fetchTrabajoMatrizador({ page: pageTrabajo, limit: rowsPerPage, search });
+          const res = await fetchTrabajoMatrizador({ page: pageTrabajo, limit: rowsPerPage, search, fechaDesde, fechaHasta, sortOrder });
           const filtered = (res.documents || [])
             .filter((d: any) => ['EN_PROCESO','LISTO','proceso','listo'].includes((d.status || '').toString()))
             .filter((d: any) => matchesSearch(d, search || ''));
@@ -96,7 +101,7 @@ export default function MatrizadorTabs() {
           setDocs(filtered.slice(start, start + rowsPerPage));
           setTotalTrabajo(res.total);
         } else if (activeTab === 'listo') {
-          const res = await fetchListoMatrizador({ page: pageListo, limit: rowsPerPage, search });
+          const res = await fetchListoMatrizador({ page: pageListo, limit: rowsPerPage, search, fechaDesde, fechaHasta, sortOrder });
           const filtered = (res.documents || [])
             .filter((d: any) => ['LISTO','listo'].includes((d.status || '').toString()))
             .filter((d: any) => matchesSearch(d, search || ''));
@@ -104,7 +109,7 @@ export default function MatrizadorTabs() {
           setDocs(filtered.slice(start, start + rowsPerPage));
           setTotalListo(res.total);
         } else {
-          const res = await fetchEntregadoMatrizador({ page: pageEntregado, limit: rowsPerPage, search });
+          const res = await fetchEntregadoMatrizador({ page: pageEntregado, limit: rowsPerPage, search, fechaDesde, fechaHasta, sortOrder });
           const filtered = (res.documents || [])
             .filter((d: any) => ['ENTREGADO','entregado'].includes((d.status || '').toString()))
             .filter((d: any) => matchesSearch(d, search || ''));
@@ -121,7 +126,27 @@ export default function MatrizadorTabs() {
       setLoadedTabs(prev => ({ ...prev, [activeTab]: true }));
     }
     load();
-  }, [activeTab, pageTrabajo, pageListo, pageEntregado, rowsPerPage, search]);
+  }, [activeTab, pageTrabajo, pageListo, pageEntregado, rowsPerPage, search, fechaDesde, fechaHasta, sortOrder]);
+
+  // Auto-cambiar a Entregado si no hay resultados con un término de búsqueda en Trabajo/Listo
+  useEffect(() => {
+    const term = (search || '').trim();
+    if (term && !loading && docs.length === 0 && (activeTab === 'trabajo' || activeTab === 'listo')) {
+      if (!(autoSwitch.term === term && autoSwitch.did)) {
+        setAutoSwitch({ term, did: true });
+        setActiveTab('entregado');
+        setPageEntregado(1);
+      }
+    }
+  }, [search, docs.length, activeTab, loading]);
+
+  // Permitir nuevo auto-cambio cuando cambie el término
+  useEffect(() => {
+    const term = (search || '').trim();
+    if (term !== autoSwitch.term) {
+      setAutoSwitch({ term, did: false });
+    }
+  }, [search]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -239,6 +264,12 @@ export default function MatrizadorTabs() {
     }
   };
 
+  // Función para contar documentos del mismo cliente
+  const getClientDocumentCount = (clientName: string) => {
+    if (!clientName) return 0;
+    return docs.filter(d => d.clientName === clientName && !isGroupedDoc(d)).length;
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <TabsUI
@@ -261,6 +292,12 @@ export default function MatrizadorTabs() {
           else if (activeTab === 'listo') setPageListo(p);
           else setPageEntregado(p);
         }}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={(n) => { setRowsPerPage(n); setPageTrabajo(1); setPageListo(1); setPageEntregado(1); }}
+        fechaDesde={fechaDesde}
+        fechaHasta={fechaHasta}
+        onFechaDesdeChange={(v) => { setFechaDesde(v); setPageTrabajo(1); setPageListo(1); setPageEntregado(1); }}
+        onFechaHastaChange={(v) => { setFechaHasta(v); setPageTrabajo(1); setPageListo(1); setPageEntregado(1); }}
       />
 
       <Card>
@@ -269,7 +306,9 @@ export default function MatrizadorTabs() {
             <TableHead>
               <TableRow sx={{ bgcolor: 'grey.50' }}>
                 <TableCell sx={{ fontWeight: 'bold', py: 2 }}>Cliente / Documento</TableCell>
-                <TableCell sx={{ fontWeight: 'bold', py: 2 }}>Fecha Creación</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', py: 2, cursor: 'pointer' }} onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}>
+                  Fecha Creación {sortOrder === 'asc' ? '▲' : '▼'}
+                </TableCell>
                 <TableCell sx={{ fontWeight: 'bold', py: 2 }}>Estado / Agrupación</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', py: 2 }}>Acciones</TableCell>
               </TableRow>
@@ -335,11 +374,11 @@ export default function MatrizadorTabs() {
                     </TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                        <Typography variant="body2">{documento.status}</Typography>
+                        <StatusBadge status={documento.status} />
                         {isGroupedDoc(documento) && (
                           <Chip label="🔗 Agrupado" size="small" variant="filled" color="primary" sx={{ fontSize: '0.65rem', height: '20px', '& .MuiChip-label': { px: 1 } }} />
                         )}
-                        {!isGroupedDoc(documento) && (documento.status === 'EN_PROCESO' || documento.status === 'LISTO') && (
+                        {!isGroupedDoc(documento) && (documento.status === 'EN_PROCESO' || documento.status === 'LISTO') && getClientDocumentCount(documento.clientName) > 1 && (
                           <Button
                             size="small"
                             variant="outlined"
