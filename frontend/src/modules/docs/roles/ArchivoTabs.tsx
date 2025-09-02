@@ -12,7 +12,12 @@ import useDebounce from '../../../hooks/useDebounce';
 
 type TabKey = 'trabajo' | 'listo' | 'entregado';
 
-function formatLocalDate(dateString?: string) {
+function pickBestDate(doc: any) {
+  const candidate = doc?.xmlDate || doc?.fechaXml || doc?.fechaXML || doc?.fechaCreacion || doc?.createdAt;
+  return candidate;
+}
+function formatLocalDateFromDoc(doc?: any) {
+  const dateString = pickBestDate(doc || {});
   if (!dateString) return '-';
   const date = new Date(dateString);
   return date.toLocaleDateString('es-EC', { year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -63,15 +68,18 @@ export default function ArchivoTabs() {
     const load = async () => {
       if (activeTab === 'trabajo') {
         const res = await fetchTrabajoArchivo({ page: pageTrabajo, limit: rowsPerPage, search });
-        setDocs(res.documents);
+        const filtered = (res.documents || []).filter((d: any) => ['EN_PROCESO','LISTO','proceso','listo'].includes((d.status || '').toString()));
+        setDocs(filtered);
         setTotalTrabajo(res.total);
       } else if (activeTab === 'listo') {
         const res = await fetchListoArchivo({ page: pageListo, limit: rowsPerPage, search });
-        setDocs(res.documents);
+        const filtered = (res.documents || []).filter((d: any) => ['LISTO','listo'].includes((d.status || '').toString()));
+        setDocs(filtered);
         setTotalListo(res.total);
       } else {
         const res = await fetchEntregadoArchivo({ page: pageEntregado, limit: rowsPerPage, search });
-        setDocs(res.documents);
+        const filtered = (res.documents || []).filter((d: any) => ['ENTREGADO','entregado'].includes((d.status || '').toString()));
+        setDocs(filtered);
         setTotalEntregado(res.total);
       }
     };
@@ -164,6 +172,8 @@ export default function ArchivoTabs() {
       const res: any = await createDocumentGroup(ids);
       if (res?.success) {
         setSnackbar({ open: true, message: res.message || 'Grupo creado', severity: 'success' });
+        // Refrescar filas agrupadas locales
+        setDocs(prev => prev.map(d => ids.includes(d.id) ? { ...d, isGrouped: true } : d));
       } else {
         setSnackbar({ open: true, message: res?.error || 'Error al agrupar', severity: 'error' });
       }
@@ -262,16 +272,16 @@ export default function ArchivoTabs() {
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" sx={{ fontWeight: 500, color: (theme) => theme.palette.mode === 'dark' ? '#e2e8f0' : '#374151' }}>
-                        {formatLocalDate(documento.fechaCreacion)}
+                        {formatLocalDateFromDoc(documento)}
                       </Typography>
                     </TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                         <Typography variant="body2">{documento.status}</Typography>
-                        {documento.isGrouped && (
+                        {(documento.isGrouped || !!documento.documentGroupId) && (
                           <Chip label="🔗 Agrupado" size="small" variant="filled" color="primary" sx={{ fontSize: '0.65rem', height: '20px', '& .MuiChip-label': { px: 1 } }} />
                         )}
-                        {!documento.isGrouped && (documento.status === 'EN_PROCESO' || documento.status === 'LISTO') && (
+                        {!(documento.isGrouped || !!documento.documentGroupId) && (documento.status === 'EN_PROCESO' || documento.status === 'LISTO') && (
                           <Button
                             size="small"
                             variant="outlined"
@@ -327,7 +337,14 @@ export default function ArchivoTabs() {
           open={detailOpen}
           onClose={() => setDetailOpen(false)}
           document={detailDoc}
-          onDocumentUpdated={() => {}}
+          onDocumentUpdated={(payload) => {
+            try {
+              const updated = payload?.document || payload?.data?.document || payload;
+              if (updated?.id) {
+                setDocs(prev => prev.map(d => d.id === updated.id ? { ...d, ...updated } : d));
+              }
+            } catch {}
+          }}
         />
       )}
 

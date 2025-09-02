@@ -10,7 +10,12 @@ import QuickGroupingModal from '../../../components/grouping/QuickGroupingModal.
 import useDocumentStore from '../../../store/document-store.js';
 import useDebounce from '../../../hooks/useDebounce';
 
-function formatLocalDate(dateString?: string) {
+function pickBestDate(doc: any) {
+  const candidate = doc?.xmlDate || doc?.fechaXml || doc?.fechaXML || doc?.fechaCreacion || doc?.createdAt;
+  return candidate;
+}
+function formatLocalDateFromDoc(doc?: any) {
+  const dateString = pickBestDate(doc || {});
   if (!dateString) return '-';
   const date = new Date(dateString);
   return date.toLocaleDateString('es-EC', { year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -66,15 +71,18 @@ export default function MatrizadorTabs() {
       try {
         if (activeTab === 'trabajo') {
           const res = await fetchTrabajoMatrizador({ page: pageTrabajo, limit: rowsPerPage, search });
-          setDocs(res.documents);
+          const filtered = (res.documents || []).filter((d: any) => ['EN_PROCESO','LISTO','proceso','listo'].includes((d.status || '').toString()));
+          setDocs(filtered);
           setTotalTrabajo(res.total);
         } else if (activeTab === 'listo') {
           const res = await fetchListoMatrizador({ page: pageListo, limit: rowsPerPage, search });
-          setDocs(res.documents);
+          const filtered = (res.documents || []).filter((d: any) => ['LISTO','listo'].includes((d.status || '').toString()));
+          setDocs(filtered);
           setTotalListo(res.total);
         } else {
           const res = await fetchEntregadoMatrizador({ page: pageEntregado, limit: rowsPerPage, search });
-          setDocs(res.documents);
+          const filtered = (res.documents || []).filter((d: any) => ['ENTREGADO','entregado'].includes((d.status || '').toString()));
+          setDocs(filtered);
           setTotalEntregado(res.total);
         }
       } finally {
@@ -103,6 +111,14 @@ export default function MatrizadorTabs() {
   const handleOpenDetails = (doc: any) => {
     setDetailDoc(doc);
     setDetailOpen(true);
+  };
+
+  const handleRowUpdated = (updated: any) => {
+    try {
+      const updatedDoc = updated?.document || updated;
+      if (!updatedDoc?.id) return;
+      setDocs(prev => prev.map(d => d.id === updatedDoc.id ? { ...d, ...updatedDoc } : d));
+    } catch {}
   };
 
   const handleMarkListo = async (doc: any) => {
@@ -184,6 +200,8 @@ export default function MatrizadorTabs() {
       const res: any = await createDocumentGroup(ids);
       if (res?.success) {
         setSnackbar({ open: true, message: res.message || 'Grupo creado', severity: 'success' });
+        // Refrescar filas agrupadas locales
+        setDocs(prev => prev.map(d => ids.includes(d.id) ? { ...d, isGrouped: true } : d));
       } else {
         setSnackbar({ open: true, message: res?.error || 'Error al agrupar', severity: 'error' });
       }
@@ -285,16 +303,16 @@ export default function MatrizadorTabs() {
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" sx={{ fontWeight: 500, color: (theme) => theme.palette.mode === 'dark' ? '#e2e8f0' : '#374151' }}>
-                        {formatLocalDate(documento.fechaCreacion)}
+                        {formatLocalDateFromDoc(documento)}
                       </Typography>
                     </TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                         <Typography variant="body2">{documento.status}</Typography>
-                        {documento.isGrouped && (
+                        {(documento.isGrouped || !!documento.documentGroupId) && (
                           <Chip label="🔗 Agrupado" size="small" variant="filled" color="primary" sx={{ fontSize: '0.65rem', height: '20px', '& .MuiChip-label': { px: 1 } }} />
                         )}
-                        {!documento.isGrouped && (documento.status === 'EN_PROCESO' || documento.status === 'LISTO') && (
+                        {!(documento.isGrouped || !!documento.documentGroupId) && (documento.status === 'EN_PROCESO' || documento.status === 'LISTO') && (
                           <Button
                             size="small"
                             variant="outlined"
@@ -350,8 +368,13 @@ export default function MatrizadorTabs() {
           open={detailOpen}
           onClose={() => setDetailOpen(false)}
           document={detailDoc}
-          onDocumentUpdated={() => {
-            // mantener paginación/scroll sin reset
+          onDocumentUpdated={(payload) => {
+            try {
+              const updated = payload?.document || payload?.data?.document || payload;
+              if (updated?.id) {
+                setDocs(prev => prev.map(d => d.id === updated.id ? { ...d, ...updated } : d));
+              }
+            } catch {}
           }}
         />
       )}
