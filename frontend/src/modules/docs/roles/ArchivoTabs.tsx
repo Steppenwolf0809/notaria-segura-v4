@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Box, Card, CardContent, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Avatar, Typography, IconButton, Chip } from '@mui/material';
 import { Visibility as VisibilityIcon } from '@mui/icons-material';
 import TabsUI from '../ui/Tabs';
-import { fetchTrabajo, fetchListo, fetchEntregado, PAGE_SIZE } from '../services/docsQuery';
+import { fetchTrabajoArchivo, fetchListoArchivo, fetchEntregadoArchivo, PAGE_SIZE } from '../services/docsQuery';
 import DocumentDetailModal from '../../../components/Documents/DocumentDetailModal';
 import useDebounce from '../../../hooks/useDebounce';
 
@@ -48,15 +48,15 @@ export default function ArchivoTabs() {
   useEffect(() => {
     const load = async () => {
       if (activeTab === 'trabajo') {
-        const res = await fetchTrabajo({ page: pageTrabajo, limit: rowsPerPage, search });
+        const res = await fetchTrabajoArchivo({ page: pageTrabajo, limit: rowsPerPage, search });
         setDocs(res.documents);
         setTotalTrabajo(res.total);
       } else if (activeTab === 'listo') {
-        const res = await fetchListo({ page: pageListo, limit: rowsPerPage, search });
+        const res = await fetchListoArchivo({ page: pageListo, limit: rowsPerPage, search });
         setDocs(res.documents);
         setTotalListo(res.total);
       } else {
-        const res = await fetchEntregado({ page: pageEntregado, limit: rowsPerPage, search });
+        const res = await fetchEntregadoArchivo({ page: pageEntregado, limit: rowsPerPage, search });
         setDocs(res.documents);
         setTotalEntregado(res.total);
       }

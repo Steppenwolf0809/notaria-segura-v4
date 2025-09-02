@@ -1,5 +1,7 @@
 // Servicio fino que reutiliza receptionService para consultas con paginación fija y filtros por pestaña
 import receptionService from '../../../services/reception-service';
+import documentService from '../../../services/document-service';
+import archivoService from '../../../services/archivo-service';
 
 export type DocStatus = 'EN_PROCESO' | 'LISTO' | 'ENTREGADO';
 
@@ -117,6 +119,138 @@ export async function fetchEntregado(params: ListParams): Promise<PagedResult<an
     return { documents: filtered, total: filtered.length, totalPages: 1 };
   }
   throw new Error(fbRes?.error || 'Error cargando entregados');
+}
+
+// =========================
+// Endpoints por rol
+// =========================
+
+// Helper para leer token del storage (para archivo-service.getMisDocumentos)
+function getToken(): string | null {
+  const authData = localStorage.getItem('notaria-auth-storage');
+  if (authData) {
+    try {
+      const parsed = JSON.parse(authData);
+      return parsed.state?.token || null;
+    } catch {}
+  }
+  const token = localStorage.getItem('token');
+  return token;
+}
+
+// MATRIZADOR: usar /documents/my-documents (paginado y con estados)
+export async function fetchTrabajoMatrizador(params: ListParams): Promise<PagedResult<any>> {
+  const res = await documentService.getMyDocumentsPaged({
+    states: 'EN_PROCESO,LISTO',
+    q: params.search || '',
+    page: params.page,
+    limit: params.limit ?? PAGE_SIZE
+  });
+  if (!res.success) throw new Error(res.error || 'Error cargando documentos');
+  const docs = res.data?.documents || [];
+  const pag = res.data?.pagination || {};
+  return {
+    documents: docs,
+    total: Number(pag.total || 0),
+    totalPages: Number(pag.totalPages || Math.ceil((Number(pag.total || 0)) / (params.limit ?? PAGE_SIZE))) || 1
+  };
+}
+
+export async function fetchListoMatrizador(params: ListParams): Promise<PagedResult<any>> {
+  const res = await documentService.getMyDocumentsPaged({
+    states: 'LISTO',
+    q: params.search || '',
+    page: params.page,
+    limit: params.limit ?? PAGE_SIZE
+  });
+  if (!res.success) throw new Error(res.error || 'Error cargando documentos');
+  const docs = res.data?.documents || [];
+  const pag = res.data?.pagination || {};
+  return {
+    documents: docs,
+    total: Number(pag.total || 0),
+    totalPages: Number(pag.totalPages || Math.ceil((Number(pag.total || 0)) / (params.limit ?? PAGE_SIZE))) || 1
+  };
+}
+
+export async function fetchEntregadoMatrizador(params: ListParams): Promise<PagedResult<any>> {
+  const res = await documentService.getMyDocumentsPaged({
+    states: 'ENTREGADO',
+    q: params.search || '',
+    page: params.page,
+    limit: params.limit ?? PAGE_SIZE
+  });
+  if (!res.success) throw new Error(res.error || 'Error cargando documentos');
+  const docs = res.data?.documents || [];
+  const pag = res.data?.pagination || {};
+  return {
+    documents: docs,
+    total: Number(pag.total || 0),
+    totalPages: Number(pag.totalPages || Math.ceil((Number(pag.total || 0)) / (params.limit ?? PAGE_SIZE))) || 1
+  };
+}
+
+// ARCHIVO: usar /archivo/mis-documentos (token explícito)
+export async function fetchTrabajoArchivo(params: ListParams): Promise<PagedResult<any>> {
+  const token = getToken();
+  const baseParams: any = {
+    page: String(params.page),
+    limit: String(params.limit ?? PAGE_SIZE)
+  };
+  if (params.search) baseParams.search = params.search;
+
+  // Cargar página general y filtrar estados (EN_PROCESO, LISTO)
+  const res = await archivoService.getMisDocumentos(token, baseParams);
+  if (res?.success !== true) throw new Error(res?.message || 'Error cargando documentos');
+  const all = res.data?.documents || res.data?.items || res.data || [];
+  const documents = (all as any[]).filter(d => d.status === 'EN_PROCESO' || d.status === 'LISTO');
+
+  // Totales por estado
+  const [enProcesoRes, listoRes] = await Promise.all([
+    archivoService.getMisDocumentos(token, { ...baseParams, page: '1', limit: '1', estado: 'EN_PROCESO' }),
+    archivoService.getMisDocumentos(token, { ...baseParams, page: '1', limit: '1', estado: 'LISTO' })
+  ]);
+  const totalEnProceso = enProcesoRes?.success ? (enProcesoRes.data?.pagination?.total || enProcesoRes.data?.total || 0) : 0;
+  const totalListo = listoRes?.success ? (listoRes.data?.pagination?.total || listoRes.data?.total || 0) : 0;
+  const total = totalEnProceso + totalListo;
+
+  return {
+    documents,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / (params.limit ?? PAGE_SIZE)))
+  };
+}
+
+export async function fetchListoArchivo(params: ListParams): Promise<PagedResult<any>> {
+  const token = getToken();
+  const baseParams: any = {
+    page: String(params.page),
+    limit: String(params.limit ?? PAGE_SIZE),
+    estado: 'LISTO'
+  };
+  if (params.search) baseParams.search = params.search;
+  const res = await archivoService.getMisDocumentos(token, baseParams);
+  if (res?.success !== true) throw new Error(res?.message || 'Error cargando documentos');
+  const docs = res.data?.documents || res.data?.items || res.data || [];
+  const pag = res.data?.pagination || {};
+  const total = Number(pag.total || res.data?.total || docs.length || 0);
+  return { documents: docs, total, totalPages: Number(pag.totalPages || Math.ceil(total / (params.limit ?? PAGE_SIZE))) || 1 };
+}
+
+export async function fetchEntregadoArchivo(params: ListParams): Promise<PagedResult<any>> {
+  const token = getToken();
+  const baseParams: any = {
+    page: String(params.page),
+    limit: String(params.limit ?? PAGE_SIZE),
+    estado: 'ENTREGADO'
+  };
+  if (params.search) baseParams.search = params.search;
+  const res = await archivoService.getMisDocumentos(token, baseParams);
+  if (res?.success !== true) throw new Error(res?.message || 'Error cargando documentos');
+  const docs = res.data?.documents || res.data?.items || res.data || [];
+  const pag = res.data?.pagination || {};
+  const total = Number(pag.total || res.data?.total || docs.length || 0);
+  return { documents: docs, total, totalPages: Number(pag.totalPages || Math.ceil(total / (params.limit ?? PAGE_SIZE))) || 1 };
 }
 
 
