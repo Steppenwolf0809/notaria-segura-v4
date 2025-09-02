@@ -105,6 +105,20 @@ export default function MatrizadorTabs() {
     setDetailOpen(true);
   };
 
+  const handleMarkListo = async (doc: any) => {
+    try {
+      const res = await updateDocumentStatus(doc.id, 'LISTO');
+      if ((res as any)?.success) {
+        setSnackbar({ open: true, message: 'Marcado como LISTO', severity: 'success' });
+        if (activeTab === 'trabajo') setPageTrabajo(1); else if (activeTab === 'listo') setPageListo(1); else setPageEntregado(1);
+      } else {
+        setSnackbar({ open: true, message: (res as any)?.error || 'Error al marcar listo', severity: 'error' });
+      }
+    } catch (e) {
+      setSnackbar({ open: true, message: 'Error al marcar listo', severity: 'error' });
+    }
+  };
+
   const handleOpenEntrega = (doc: any) => {
     setCurrentDoc(doc);
     setEntregaOpen(true);
@@ -226,7 +240,7 @@ export default function MatrizadorTabs() {
                 </TableRow>
               ) : (
                 docs.map((documento) => (
-                  <TableRow key={documento.id} hover>
+                  <TableRow key={documento.id} hover onClick={() => handleOpenDetails(documento)} sx={{ cursor: 'pointer' }}>
                     <TableCell sx={{ py: 1.5 }}>
                       <Box>
                         <Typography
@@ -243,16 +257,12 @@ export default function MatrizadorTabs() {
                           {documento.clientName}
                         </Typography>
                         <Typography variant="caption" component="div" sx={{ fontWeight: 500, color: (theme) => theme.palette.mode === 'dark' ? '#cbd5e1' : '#4b5563' }}>
-                          Doc: <span
-                            style={{ textDecoration: 'underline', cursor: 'pointer' }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const term = documento.protocolNumber || '';
-                              setInputValue(term);
-                              const el = document.getElementById('matrizador-docs-search') as HTMLInputElement | null;
-                              el?.focus();
-                            }}
-                          >{documento.protocolNumber}</span> | {documento.documentType}
+                          Doc: <Tooltip title="Ver detalle">
+                            <span
+                              style={{ textDecoration: 'underline', cursor: 'pointer' }}
+                              onClick={(e) => { e.stopPropagation(); handleOpenDetails(documento); }}
+                            >{documento.protocolNumber}</span>
+                          </Tooltip> | {documento.documentType}
                         </Typography>
                         {documento.clientPhone && (
                           <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
@@ -300,6 +310,13 @@ export default function MatrizadorTabs() {
                     </TableCell>
                     <TableCell sx={{ textAlign: 'center' }}>
                       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'center' }}>
+                        {documento.status === 'EN_PROCESO' && (
+                          <Button size="small" variant="contained" color="primary"
+                            onClick={(e) => { e.stopPropagation(); handleMarkListo(documento); }}
+                          >
+                            Marcar Listo
+                          </Button>
+                        )}
                         {documento.status === 'LISTO' && (
                           <Button size="small" variant="contained" color="primary" startIcon={<SendIcon />}
                             onClick={(e) => { e.stopPropagation(); handleOpenEntrega(documento); }}
@@ -312,9 +329,11 @@ export default function MatrizadorTabs() {
                             <UndoIcon fontSize="small" />
                           </IconButton>
                         )}
-                        <IconButton size="small" aria-label="ver detalles" onClick={() => handleOpenDetails(documento)}>
-                          <VisibilityIcon fontSize="small" />
-                        </IconButton>
+                        <Tooltip title="Ver detalle">
+                          <IconButton size="small" aria-label="ver detalles" onClick={(e) => { e.stopPropagation(); handleOpenDetails(documento); }}>
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                       </Box>
                     </TableCell>
                   </TableRow>

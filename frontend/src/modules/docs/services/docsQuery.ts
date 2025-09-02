@@ -24,6 +24,16 @@ export interface PagedResult<T> {
 
 export const PAGE_SIZE = 25;
 
+// Normaliza distintas formas de respuesta a un array de documentos
+function normalizeDocs(res: any): any[] {
+  const base = res ?? {};
+  if (Array.isArray(base)) return base;
+  if (Array.isArray(base?.items)) return base.items;
+  if (Array.isArray(base?.data)) return base.data;
+  if (Array.isArray(base?.context?.hits)) return base.context.hits;
+  return [];
+}
+
 export async function fetchTrabajo(params: ListParams): Promise<PagedResult<any>> {
   const base = {
     page: String(params.page),
@@ -202,8 +212,12 @@ export async function fetchTrabajoArchivo(params: ListParams): Promise<PagedResu
   // Cargar página general y filtrar estados (EN_PROCESO, LISTO)
   const res = await archivoService.getMisDocumentos(token, baseParams);
   if (res?.success !== true) throw new Error(res?.message || 'Error cargando documentos');
-  const all = res.data?.documents || res.data?.items || res.data || [];
-  const documents = (all as any[]).filter(d => d.status === 'EN_PROCESO' || d.status === 'LISTO');
+  const all = normalizeDocs(res?.data ?? res);
+  const documents = all.filter((d: any) => d.status === 'EN_PROCESO' || d.status === 'LISTO');
+
+  // Captura de cursor para futuros usos (paginación por cursor si aplica)
+  const _cursor = (res as any)?.nextCursor || (res as any)?.cursor || (res as any)?.data?.nextCursor;
+  void _cursor;
 
   // Totales por estado
   const [enProcesoRes, listoRes] = await Promise.all([
@@ -231,7 +245,7 @@ export async function fetchListoArchivo(params: ListParams): Promise<PagedResult
   if (params.search) baseParams.search = params.search;
   const res = await archivoService.getMisDocumentos(token, baseParams);
   if (res?.success !== true) throw new Error(res?.message || 'Error cargando documentos');
-  const docs = res.data?.documents || res.data?.items || res.data || [];
+  const docs = normalizeDocs(res?.data ?? res);
   const pag = res.data?.pagination || {};
   const total = Number(pag.total || res.data?.total || docs.length || 0);
   return { documents: docs, total, totalPages: Number(pag.totalPages || Math.ceil(total / (params.limit ?? PAGE_SIZE))) || 1 };
@@ -247,7 +261,7 @@ export async function fetchEntregadoArchivo(params: ListParams): Promise<PagedRe
   if (params.search) baseParams.search = params.search;
   const res = await archivoService.getMisDocumentos(token, baseParams);
   if (res?.success !== true) throw new Error(res?.message || 'Error cargando documentos');
-  const docs = res.data?.documents || res.data?.items || res.data || [];
+  const docs = normalizeDocs(res?.data ?? res);
   const pag = res.data?.pagination || {};
   const total = Number(pag.total || res.data?.total || docs.length || 0);
   return { documents: docs, total, totalPages: Number(pag.totalPages || Math.ceil(total / (params.limit ?? PAGE_SIZE))) || 1 };
