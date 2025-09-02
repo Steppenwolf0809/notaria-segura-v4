@@ -72,6 +72,8 @@ async function uploadXmlDocument(req, res) {
         clientId: parsedData.clientId,
         clientPhone: parsedData.clientPhone,
         clientEmail: parsedData.clientEmail,
+        // Fecha del documento: usar exclusivamente la fecha del XML
+        createdAt: parsedData.xmlDate,
         documentType: parsedData.documentType,
         actoPrincipalDescripcion: parsedData.actoPrincipalDescripcion,
         actoPrincipalValor: parsedData.actoPrincipalValor,
@@ -1611,6 +1613,8 @@ async function uploadXmlDocumentsBatch(req, res) {
             clientId: parsedData.clientId,
             clientPhone: parsedData.clientPhone,
             clientEmail: parsedData.clientEmail,
+            // Fecha del documento: usar exclusivamente la fecha del XML
+            createdAt: parsedData.xmlDate,
             documentType: parsedData.documentType,
             actoPrincipalDescripcion: parsedData.actoPrincipalDescripcion,
             actoPrincipalValor: parsedData.actoPrincipalValor,

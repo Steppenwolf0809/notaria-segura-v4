@@ -59,6 +59,9 @@ async function parseXmlDocument(xmlContent) {
     // 3. Extraer información del cliente y matrizador
     const clientData = extractClientDataFromXml(factura);
     
+    // 3.b Extraer fecha del XML (obligatoria)
+    const xmlDate = extractXmlDate(factura);
+    
     // 4. Extraer información de la factura
     const totalFactura = parseFloat(factura.infoFactura[0].importeTotal[0]) || 0;
     
@@ -87,6 +90,7 @@ async function parseXmlDocument(xmlContent) {
       clientId: clientData.clientId,
       clientPhone: clientData.clientPhone,
       clientEmail: clientData.clientEmail,
+      xmlDate,
       documentType,
       actoPrincipalDescripcion: processedDetails.actoPrincipalDescripcion,
       actoPrincipalValor: totalFactura, // ⭐ CAMBIO: Usar valor total de factura en lugar del acto principal
@@ -100,6 +104,59 @@ async function parseXmlDocument(xmlContent) {
     console.error('Error procesando XML:', error);
     throw new Error(`Error al procesar XML: ${error.message}`);
   }
+}
+
+/**
+ * Extrae la fecha del XML (obligatoria) y la convierte a Date
+ * Prioriza infoFactura.fechaEmision (formato SRI dd/mm/yyyy). Si no existe,
+ * intenta infoFactura.fechaEmision en otros formatos o lanza error.
+ * @param {Object} factura - Objeto factura del XML parseado
+ * @returns {Date} Fecha derivada del XML (con hora fija 12:00)
+ */
+function extractXmlDate(factura) {
+  const infoFactura = factura.infoFactura?.[0] || {};
+  let fechaStr = null;
+
+  if (Array.isArray(infoFactura.fechaEmision) && infoFactura.fechaEmision[0]) {
+    fechaStr = String(infoFactura.fechaEmision[0]).trim();
+  } else if (typeof infoFactura.fechaEmision === 'string') {
+    fechaStr = infoFactura.fechaEmision.trim();
+  }
+
+  // Intentar extraer también desde infoAdicional si existiera
+  if (!fechaStr && Array.isArray(factura.infoAdicional?.[0]?.campoAdicional)) {
+    const campoFecha = factura.infoAdicional[0].campoAdicional.find(c => c?.$?.nombre?.toUpperCase?.() === 'FECHA');
+    if (campoFecha && campoFecha._) fechaStr = String(campoFecha._).trim();
+  }
+
+  if (!fechaStr) {
+    throw new Error('Fecha del XML no encontrada (infoFactura.fechaEmision)');
+  }
+
+  // Normalizar formatos comunes: dd/mm/yyyy (SRI) o yyyy-mm-dd
+  let year, month, day;
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(fechaStr)) {
+    const [dd, mm, yyyy] = fechaStr.split('/');
+    day = parseInt(dd, 10);
+    month = parseInt(mm, 10) - 1;
+    year = parseInt(yyyy, 10);
+  } else if (/^\d{4}-\d{2}-\d{2}$/.test(fechaStr)) {
+    const [yyyy, mm, dd] = fechaStr.split('-');
+    day = parseInt(dd, 10);
+    month = parseInt(mm, 10) - 1;
+    year = parseInt(yyyy, 10);
+  } else {
+    // Último intento: Date.parse
+    const d = new Date(fechaStr);
+    if (!isNaN(d.getTime())) {
+      return d;
+    }
+    throw new Error(`Formato de fecha XML no soportado: ${fechaStr}`);
+  }
+
+  // Crear Date con hora fija 12:00 para evitar desfases por timezone
+  const date = new Date(Date.UTC(year, month, day, 12, 0, 0));
+  return date;
 }
 
 /**

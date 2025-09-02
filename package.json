@@ -19,6 +19,7 @@
     "dev:backend": "cd backend && npm run dev",
     "dev:both": "start cmd /k \"npm run dev:backend\" && start cmd /k \"npm run dev:frontend\"",
     "start:backend": "cd backend && npm start",
+    "fix:xml-dates": "cd backend && npm run fix:xml-dates",
     "setup:dev": "npm run install:all && echo '✅ Dependencias instaladas' && echo '💡 Crea backend/.env basándote en backend/.env.example' && echo '🚀 Luego ejecuta: npm run dev'"
   },
   "keywords": [
