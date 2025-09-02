@@ -8,6 +8,7 @@ import ReversionModal from '../../../components/recepcion/ReversionModal';
 import ModalEntregaMatrizador from '../../../components/matrizador/ModalEntregaMatrizador.jsx';
 import QuickGroupingModal from '../../../components/grouping/QuickGroupingModal.jsx';
 import StatusBadge from '../../../components/shared/StatusBadge';
+import GroupInfoModal from '../../../components/shared/GroupInfoModal.jsx';
 import useDocumentStore from '../../../store/document-store.js';
 import useDebounce from '../../../hooks/useDebounce';
 
@@ -80,6 +81,8 @@ export default function MatrizadorTabs() {
   const [pendingGroupData, setPendingGroupData] = useState<{ main: any|null; related: any[] }>({ main: null, related: [] });
   const [groupingLoading, setGroupingLoading] = useState(false);
   const [autoSwitch, setAutoSwitch] = useState<{ term: string; did: boolean }>({ term: '', did: false });
+  const [showGroupInfoModal, setShowGroupInfoModal] = useState(false);
+  const [selectedGroupDocument, setSelectedGroupDocument] = useState<any>(null);
 
   const currentPage = activeTab === 'trabajo' ? pageTrabajo : activeTab === 'listo' ? pageListo : pageEntregado;
   const totalPages = activeTab === 'trabajo'
@@ -363,7 +366,28 @@ export default function MatrizadorTabs() {
                           </Typography>
                         )}
                         {documento.isGrouped && (
-                          <Chip label="⚡ Parte de un grupo" size="small" variant="outlined" color="primary" sx={{ cursor: 'default', fontSize: '0.65rem', height: '20px', '& .MuiChip-label': { px: 1 }, mt: 0.5 }} />
+                          <Chip 
+                            label="⚡ Parte de un grupo" 
+                            size="small" 
+                            variant="outlined" 
+                            color="primary" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedGroupDocument(documento);
+                              setShowGroupInfoModal(true);
+                            }}
+                            sx={{ 
+                              cursor: 'pointer', 
+                              fontSize: '0.65rem', 
+                              height: '20px', 
+                              '& .MuiChip-label': { px: 1 }, 
+                              mt: 0.5,
+                              '&:hover': {
+                                bgcolor: 'primary.light',
+                                color: 'white'
+                              }
+                            }} 
+                          />
                         )}
                       </Box>
                     </TableCell>
@@ -376,7 +400,26 @@ export default function MatrizadorTabs() {
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                         <StatusBadge status={documento.status} />
                         {isGroupedDoc(documento) && (
-                          <Chip label="🔗 Agrupado" size="small" variant="filled" color="primary" sx={{ fontSize: '0.65rem', height: '20px', '& .MuiChip-label': { px: 1 } }} />
+                          <Chip 
+                            label="🔗 Agrupado" 
+                            size="small" 
+                            variant="filled" 
+                            color="primary" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedGroupDocument(documento);
+                              setShowGroupInfoModal(true);
+                            }}
+                            sx={{ 
+                              fontSize: '0.65rem', 
+                              height: '20px', 
+                              '& .MuiChip-label': { px: 1 },
+                              cursor: 'pointer',
+                              '&:hover': {
+                                bgcolor: 'primary.dark'
+                              }
+                            }} 
+                          />
                         )}
                         {!isGroupedDoc(documento) && (documento.status === 'EN_PROCESO' || documento.status === 'LISTO') && getClientDocumentCount(documento.clientName) > 1 && (
                           <Button
@@ -472,6 +515,25 @@ export default function MatrizadorTabs() {
         loading={groupingLoading}
         onConfirm={handleCreateGroup}
         onDocumentUpdated={() => {}}
+      />
+
+      <GroupInfoModal
+        open={showGroupInfoModal}
+        onClose={() => {
+          setShowGroupInfoModal(false);
+          setSelectedGroupDocument(null);
+        }}
+        document={selectedGroupDocument}
+        onUngrouped={(result) => {
+          // Actualizar lista local después de desagrupar
+          if (result?.success && selectedGroupDocument) {
+            setDocs(prev => prev.map(d => 
+              d.id === selectedGroupDocument.id 
+                ? { ...d, isGrouped: false, documentGroupId: null }
+                : d
+            ));
+          }
+        }}
       />
 
       <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={() => setSnackbar({ ...snackbar, open: false })}>

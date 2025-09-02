@@ -8,6 +8,7 @@ import ReversionModal from '../../../components/recepcion/ReversionModal';
 import ModalEntregaMatrizador from '../../../components/matrizador/ModalEntregaMatrizador.jsx';
 import QuickGroupingModal from '../../../components/grouping/QuickGroupingModal.jsx';
 import StatusBadge from '../../../components/shared/StatusBadge';
+import GroupInfoModal from '../../../components/shared/GroupInfoModal.jsx';
 import useDocumentStore from '../../../store/document-store.js';
 import useDebounce from '../../../hooks/useDebounce';
 
@@ -79,6 +80,8 @@ export default function ArchivoTabs() {
   const [groupingLoading, setGroupingLoading] = useState(false);
   const [autoSwitch, setAutoSwitch] = useState<{ term: string; did: boolean }>({ term: '', did: false });
   const [loadedTabs, setLoadedTabs] = useState<Record<TabKey, boolean>>({ trabajo: true, listo: false, entregado: false });
+  const [showGroupInfoModal, setShowGroupInfoModal] = useState(false);
+  const [selectedGroupDocument, setSelectedGroupDocument] = useState<any>(null);
 
   const currentPage = activeTab === 'trabajo' ? pageTrabajo : activeTab === 'listo' ? pageListo : pageEntregado;
   const totalPages = activeTab === 'trabajo'
@@ -90,29 +93,94 @@ export default function ArchivoTabs() {
   useEffect(() => {
     const load = async () => {
       if (activeTab === 'trabajo') {
-        const res = await fetchTrabajoArchivo({ page: pageTrabajo, limit: rowsPerPage, search, fechaDesde, fechaHasta, sortOrder });
-        const filtered = (res.documents || [])
+        const res = await fetchTrabajoArchivo({ page: pageTrabajo, limit: rowsPerPage, search });
+        let filtered = (res.documents || [])
           .filter((d: any) => ['EN_PROCESO','LISTO','proceso','listo'].includes((d.status || '').toString()))
           .filter((d: any) => matchesSearch(d, search || ''));
+        // Filtro por fechas (local)
+        filtered = filtered.filter((d: any) => {
+          const dateString = (d?.xmlDate || d?.fechaXml || d?.fechaXML || d?.fechaCreacion || d?.createdAt);
+          if (!dateString) return true;
+          const t = new Date(dateString).getTime();
+          if (fechaDesde) {
+            const from = new Date(fechaDesde);
+            from.setHours(0,0,0,0);
+            if (t < from.getTime()) return false;
+          }
+          if (fechaHasta) {
+            const to = new Date(fechaHasta);
+            to.setHours(23,59,59,999);
+            if (t > to.getTime()) return false;
+          }
+          return true;
+        });
+        // Orden por fecha (local)
+        filtered.sort((a: any, b: any) => {
+          const ta = new Date(a?.xmlDate || a?.fechaXml || a?.fechaXML || a?.fechaCreacion || a?.createdAt || 0).getTime();
+          const tb = new Date(b?.xmlDate || b?.fechaXml || b?.fechaXML || b?.fechaCreacion || b?.createdAt || 0).getTime();
+          return sortOrder === 'asc' ? ta - tb : tb - ta;
+        });
         const start = (pageTrabajo - 1) * rowsPerPage;
         setDocs(filtered.slice(start, start + rowsPerPage));
-        setTotalTrabajo(res.total);
+        setTotalTrabajo(filtered.length);
       } else if (activeTab === 'listo') {
-        const res = await fetchListoArchivo({ page: pageListo, limit: rowsPerPage, search, fechaDesde, fechaHasta, sortOrder });
-        const filtered = (res.documents || [])
+        const res = await fetchListoArchivo({ page: pageListo, limit: rowsPerPage, search });
+        let filtered = (res.documents || [])
           .filter((d: any) => ['LISTO','listo'].includes((d.status || '').toString()))
           .filter((d: any) => matchesSearch(d, search || ''));
+        filtered = filtered.filter((d: any) => {
+          const dateString = (d?.xmlDate || d?.fechaXml || d?.fechaXML || d?.fechaCreacion || d?.createdAt);
+          if (!dateString) return true;
+          const t = new Date(dateString).getTime();
+          if (fechaDesde) {
+            const from = new Date(fechaDesde);
+            from.setHours(0,0,0,0);
+            if (t < from.getTime()) return false;
+          }
+          if (fechaHasta) {
+            const to = new Date(fechaHasta);
+            to.setHours(23,59,59,999);
+            if (t > to.getTime()) return false;
+          }
+          return true;
+        });
+        filtered.sort((a: any, b: any) => {
+          const ta = new Date(a?.xmlDate || a?.fechaXml || a?.fechaXML || a?.fechaCreacion || a?.createdAt || 0).getTime();
+          const tb = new Date(b?.xmlDate || b?.fechaXml || b?.fechaXML || b?.fechaCreacion || b?.createdAt || 0).getTime();
+          return sortOrder === 'asc' ? ta - tb : tb - ta;
+        });
         const start = (pageListo - 1) * rowsPerPage;
         setDocs(filtered.slice(start, start + rowsPerPage));
-        setTotalListo(res.total);
+        setTotalListo(filtered.length);
       } else {
-        const res = await fetchEntregadoArchivo({ page: pageEntregado, limit: rowsPerPage, search, fechaDesde, fechaHasta, sortOrder });
-        const filtered = (res.documents || [])
+        const res = await fetchEntregadoArchivo({ page: pageEntregado, limit: rowsPerPage, search });
+        let filtered = (res.documents || [])
           .filter((d: any) => ['ENTREGADO','entregado'].includes((d.status || '').toString()))
           .filter((d: any) => matchesSearch(d, search || ''));
+        filtered = filtered.filter((d: any) => {
+          const dateString = (d?.xmlDate || d?.fechaXml || d?.fechaXML || d?.fechaCreacion || d?.createdAt);
+          if (!dateString) return true;
+          const t = new Date(dateString).getTime();
+          if (fechaDesde) {
+            const from = new Date(fechaDesde);
+            from.setHours(0,0,0,0);
+            if (t < from.getTime()) return false;
+          }
+          if (fechaHasta) {
+            const to = new Date(fechaHasta);
+            to.setHours(23,59,59,999);
+            if (t > to.getTime()) return false;
+          }
+          return true;
+        });
+        filtered.sort((a: any, b: any) => {
+          const ta = new Date(a?.xmlDate || a?.fechaXml || a?.fechaXML || a?.fechaCreacion || a?.createdAt || 0).getTime();
+          const tb = new Date(b?.xmlDate || b?.fechaXml || b?.fechaXML || b?.fechaCreacion || b?.createdAt || 0).getTime();
+          return sortOrder === 'asc' ? ta - tb : tb - ta;
+        });
         const start = (pageEntregado - 1) * rowsPerPage;
         setDocs(filtered.slice(start, start + rowsPerPage));
-        setTotalEntregado(res.total);
+        setTotalEntregado(filtered.length);
       }
     };
     if (!loadedTabs[activeTab]) {
@@ -332,7 +400,28 @@ export default function ArchivoTabs() {
                           </Typography>
                         )}
                         {documento.isGrouped && (
-                          <Chip label="⚡ Parte de un grupo" size="small" variant="outlined" color="primary" sx={{ cursor: 'default', fontSize: '0.65rem', height: '20px', '& .MuiChip-label': { px: 1 }, mt: 0.5 }} />
+                          <Chip 
+                            label="⚡ Parte de un grupo" 
+                            size="small" 
+                            variant="outlined" 
+                            color="primary" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedGroupDocument(documento);
+                              setShowGroupInfoModal(true);
+                            }}
+                            sx={{ 
+                              cursor: 'pointer', 
+                              fontSize: '0.65rem', 
+                              height: '20px', 
+                              '& .MuiChip-label': { px: 1 }, 
+                              mt: 0.5,
+                              '&:hover': {
+                                bgcolor: 'primary.light',
+                                color: 'white'
+                              }
+                            }} 
+                          />
                         )}
                       </Box>
                     </TableCell>
@@ -345,7 +434,26 @@ export default function ArchivoTabs() {
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                         <StatusBadge status={documento.status} />
                         {isGroupedDoc(documento) && (
-                          <Chip label="🔗 Agrupado" size="small" variant="filled" color="primary" sx={{ fontSize: '0.65rem', height: '20px', '& .MuiChip-label': { px: 1 } }} />
+                          <Chip 
+                            label="🔗 Agrupado" 
+                            size="small" 
+                            variant="filled" 
+                            color="primary" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedGroupDocument(documento);
+                              setShowGroupInfoModal(true);
+                            }}
+                            sx={{ 
+                              fontSize: '0.65rem', 
+                              height: '20px', 
+                              '& .MuiChip-label': { px: 1 },
+                              cursor: 'pointer',
+                              '&:hover': {
+                                bgcolor: 'primary.dark'
+                              }
+                            }} 
+                          />
                         )}
                         {!isGroupedDoc(documento) && (documento.status === 'EN_PROCESO' || documento.status === 'LISTO') && getClientDocumentCount(documento.clientName) > 1 && (
                           <Button
@@ -441,6 +549,25 @@ export default function ArchivoTabs() {
         loading={groupingLoading}
         onConfirm={handleCreateGroup}
         onDocumentUpdated={() => {}}
+      />
+
+      <GroupInfoModal
+        open={showGroupInfoModal}
+        onClose={() => {
+          setShowGroupInfoModal(false);
+          setSelectedGroupDocument(null);
+        }}
+        document={selectedGroupDocument}
+        onUngrouped={(result) => {
+          // Actualizar lista local después de desagrupar
+          if (result?.success && selectedGroupDocument) {
+            setDocs(prev => prev.map(d => 
+              d.id === selectedGroupDocument.id 
+                ? { ...d, isGrouped: false, documentGroupId: null }
+                : d
+            ));
+          }
+        }}
       />
 
       <Snackbar open={snackbar.open} autoHideDuration={4000} onClose={() => setSnackbar({ ...snackbar, open: false })}>
