@@ -187,6 +187,58 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
       setLoading(true);
       const currentPage = (activeTab === 'entregados' ? pageEntregados : pagePendientes) + 1;
 
+      const hasSearch = !!(filters.search && filters.search.trim());
+
+      // BÚSQUEDA GLOBAL: si hay término de búsqueda, ignorar pestaña y estado
+      if (hasSearch) {
+        const baseParams = {
+          page: String(currentPage),
+          limit: String(Math.max(rowsPerPage, 200)), // ampliar para filtro local si hace falta
+          sortBy: sortBy,
+          sortOrder: sortOrder,
+          search: filters.search
+        };
+        if (filters.matrizador) baseParams.matrizador = filters.matrizador;
+        if (filters.fechaDesde) baseParams.fechaDesde = filters.fechaDesde;
+        if (filters.fechaHasta) baseParams.fechaHasta = filters.fechaHasta;
+
+        let docs = [];
+        try {
+          // Intentar búsqueda directa en backend
+          const result = await receptionService.getTodosDocumentos(baseParams);
+          if (!result.success) throw new Error(result.error);
+          docs = result.data.documents || [];
+        } catch (e) {
+          console.warn('Búsqueda backend 500, fallback a filtro local:', e);
+          // Fallback: traer sin search y filtrar local
+          const { search, ...rest } = baseParams;
+          const fbRes = await receptionService.getTodosDocumentos(rest);
+          if (fbRes && fbRes.success) {
+            const allDocs = fbRes.data.documents || [];
+            docs = allDocs;
+          } else {
+            throw new Error(fbRes?.error || 'Error cargando documentos');
+          }
+        }
+
+        // Filtro local por término (global, sin importar pestaña)
+        const term = filters.search.toString().toLowerCase();
+        const includes = (v) => (v || '').toString().toLowerCase().includes(term);
+        const filtered = docs.filter(d =>
+          includes(d.clientName) ||
+          includes(d.protocolNumber) ||
+          includes(d.clientId) ||
+          includes(d.actoPrincipalDescripcion) ||
+          includes(d.detalle_documento)
+        );
+
+        setDocumentos(filtered);
+        setTotalCount(filtered.length);
+        setTotalPages(1);
+        setError(null);
+        return; // evitar lógica por pestaña
+      }
+
       if (activeTab === 'entregados') {
         // Usar endpoint de Recepción con filtro de estado para evitar 403 por rol
         const baseParams = {
