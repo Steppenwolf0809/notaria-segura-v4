@@ -180,6 +180,9 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   // Cache de conteos de agrupables por cliente (clave: name|id)
   const [groupableCountCache, setGroupableCountCache] = useState(new Map());
 
+  // Flag para evitar auto-cambio repetido a "Entregados" con el mismo término
+  const [autoSwitch, setAutoSwitch] = useState({ term: '', did: false });
+
   // Estados para navegación específica desde alertas
   const [highlightedDocument, setHighlightedDocument] = useState(null);
   const [scrollToDocument, setScrollToDocument] = useState(null);
@@ -486,12 +489,24 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
 
   // Fallback: si en Pendientes con búsqueda no hay resultados, probar automáticamente Entregados
   useEffect(() => {
-    if (activeTab === 'pendientes' && filters.search && !loading && documentos.length === 0) {
-      // Evitar loop: solo cambiar si aún no estamos en entregados
-      setActiveTab('entregados');
-      setPageEntregados(0);
+    const term = (filters.search || '').trim();
+    if (activeTab === 'pendientes' && term && !loading && documentos.length === 0) {
+      // Evitar loop: no repetir para el mismo término
+      if (!(autoSwitch.term === term && autoSwitch.did)) {
+        setAutoSwitch({ term, did: true });
+        setActiveTab('entregados');
+        setPageEntregados(0);
+      }
     }
   }, [activeTab, filters.search, loading, documentos.length]);
+
+  // Al limpiar o cambiar el término, permitir un nuevo auto-cambio
+  useEffect(() => {
+    const term = (filters.search || '').trim();
+    if (term !== autoSwitch.term) {
+      setAutoSwitch({ term, did: false });
+    }
+  }, [filters.search]);
 
   const handleSelectDocument = (documentId) => {
     setSelectedDocuments(prev => prev.includes(documentId) ? prev.filter(id => id !== documentId) : [...prev, documentId]);
