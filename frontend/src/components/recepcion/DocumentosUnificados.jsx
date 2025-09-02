@@ -133,7 +133,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
     estado: '', // 🎯 ACTUALIZADO: Mostrar todos los estados por defecto (Recepción ahora se enfoca en marcar como listo)
     fechaDesde: '',
     fechaHasta: '',
-    globalSearchAllStates: true,
+    globalSearchAllStates: false,
   });
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -380,12 +380,14 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
     setPageEntregados(0);
   }, [filters.search]);
 
-  // Persistir el flag de búsqueda global en localStorage
+  // Persistir el flag de búsqueda global en localStorage (default OFF)
   useEffect(() => {
     try {
       const saved = localStorage.getItem('ns-recepcion-global-search');
       if (saved !== null) {
         setFilters(prev => ({ ...prev, globalSearchAllStates: saved === 'true' }));
+      } else {
+        localStorage.setItem('ns-recepcion-global-search', 'false');
       }
     } catch {}
   }, []);
@@ -481,6 +483,15 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
     }, 500);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  // Fallback: si en Pendientes con búsqueda no hay resultados, probar automáticamente Entregados
+  useEffect(() => {
+    if (activeTab === 'pendientes' && filters.search && !loading && documentos.length === 0) {
+      // Evitar loop: solo cambiar si aún no estamos en entregados
+      setActiveTab('entregados');
+      setPageEntregados(0);
+    }
+  }, [activeTab, filters.search, loading, documentos.length]);
 
   const handleSelectDocument = (documentId) => {
     setSelectedDocuments(prev => prev.includes(documentId) ? prev.filter(id => id !== documentId) : [...prev, documentId]);
