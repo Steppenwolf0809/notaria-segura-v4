@@ -4,6 +4,7 @@ import helmet from 'helmet'
 import compression from 'compression'
 import dotenv from 'dotenv'
 import path from 'path'
+import fs from 'fs'
 import { fileURLToPath } from 'url'
 import { closePrismaClient } from './src/db.js'
 import { getConfig, isConfigurationComplete, debugConfiguration } from './src/config/environment.js'
@@ -225,9 +226,22 @@ app.use('/api/concuerdos', concuerdoRoutes)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Servir archivos estáticos del frontend desde ../frontend/dist
-const frontendPath = path.join(__dirname, '..', 'frontend', 'dist');
-app.use(express.static(frontendPath));
+// Servir archivos estáticos del frontend. En Railway, el servicio "backend"
+// no siempre incluye ../frontend/dist. Intentamos múltiples ubicaciones.
+const frontendCandidates = [
+  path.join(__dirname, '..', 'frontend', 'dist'),
+  path.join(__dirname, 'frontend-dist'),
+  path.join(process.cwd(), 'frontend-dist')
+]
+const frontendPath = frontendCandidates.find((p) => {
+  try { return fs.existsSync(p) } catch { return false }
+})
+if (frontendPath) {
+  app.use(express.static(frontendPath))
+  console.log('🗂️  Sirviendo frontend estático desde:', frontendPath)
+} else {
+  console.warn('⚠️  Frontend dist no encontrado. Rutas web servirán 404 si no hay SPA.')
+}
 
 // ============================================================================
 // MIDDLEWARE DE MANEJO DE ERRORES
@@ -237,29 +251,33 @@ app.use(express.static(frontendPath));
 app.get('*', (req, res) => {
   // Solo para requests que no sean API
   if (!req.path.startsWith('/api')) {
-    res.sendFile(path.join(frontendPath, 'index.html'));
-  } else {
-    // Para rutas API no encontradas, devolver 404 JSON
-    res.status(404).json({ 
-      success: false,
-      error: 'Endpoint no encontrado',
-      availableEndpoints: [
-        'GET /api/health',
-        'POST /api/auth/login',
-        'GET /api/auth/verify',
-        'GET /api/documents/my-documents',
-        'POST /api/documents/upload-xml',
-        'POST /api/documents/upload-xml-batch',
-        'GET /api/admin/users (ADMIN only)',
-        'POST /api/admin/users (ADMIN only)',
-        'GET /api/archivo/dashboard (ARCHIVO only)',
-        'GET /api/archivo/mis-documentos (ARCHIVO only)',
-        'GET /api/reception/documentos/todos (RECEPCION only)',
-        'POST /api/reception/documentos/:id/marcar-listo (RECEPCION only)'
-      ]
-    });
+    if (frontendPath && fs.existsSync(path.join(frontendPath, 'index.html'))) {
+      return res.sendFile(path.join(frontendPath, 'index.html'))
+    }
+    // Sin SPA disponible: responder 404 amigable (evita enviar JSON a peticiones de CSS/JS)
+    res.status(404).type('text/plain').send('Frontend no disponible en este servicio. Verifique build de SPA.')
+    return
   }
-});
+  // Para rutas API no encontradas, devolver 404 JSON
+  res.status(404).json({ 
+    success: false,
+    error: 'Endpoint no encontrado',
+    availableEndpoints: [
+      'GET /api/health',
+      'POST /api/auth/login',
+      'GET /api/auth/verify', 
+      'GET /api/documents/my-documents',
+      'POST /api/documents/upload-xml',
+      'POST /api/documents/upload-xml-batch',
+      'GET /api/admin/users (ADMIN only)',
+      'POST /api/admin/users (ADMIN only)',
+      'GET /api/archivo/dashboard (ARCHIVO only)',
+      'GET /api/archivo/mis-documentos (ARCHIVO only)',
+      'GET /api/reception/documentos/todos (RECEPCION only)',
+      'POST /api/reception/documentos/:id/marcar-listo (RECEPCION only)'
+    ]
+  })
+})
 
 // Manejo de errores 404 para APIs (fallback)
 app.use('/api/*', (req, res) => {

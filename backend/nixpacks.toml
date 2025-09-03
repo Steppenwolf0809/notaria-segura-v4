@@ -10,7 +10,8 @@ cmds = [
 
 [phases.build]
 cmds = [
-    "npx prisma generate"
+    "npx prisma generate",
+    "bash -lc 'if [ -d ../frontend ]; then cd ../frontend && npm ci --omit=dev && npm run build && mkdir -p ../backend/frontend-dist && cp -r dist/* ../backend/frontend-dist/; else echo "No frontend dir"; fi'"
 ]
 
 [start]
