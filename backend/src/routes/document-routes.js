@@ -2,6 +2,8 @@ import express from 'express';
 import multer from 'multer';
 import { authenticateToken } from '../middleware/auth-middleware.js';
 import {
+  applyCreditNote,
+  revertCreditNote,
   uploadXmlDocument,
   uploadXmlDocumentsBatch,
   getAllDocuments,
@@ -110,6 +112,12 @@ router.put('/group/status', authenticateToken, updateDocumentGroupStatus);
 
 // PUT /api/documents/:id/status - MATRIZADOR: Actualizar estado
 router.put('/:id/status', authenticateToken, updateDocumentStatus);
+
+// 🧾 Nota de Crédito (Anulación)
+// POST /api/documents/:id/credit-note - Aplicar
+router.post('/:id/credit-note', authenticateToken, applyCreditNote);
+// POST /api/documents/:id/credit-note/revert - Revertir
+router.post('/:id/credit-note/revert', authenticateToken, revertCreditNote);
 
 // 🔄 POST /api/documents/:id/revert - Revertir estado de documento con razón
 router.post('/:id/revert', authenticateToken, revertDocumentStatus);

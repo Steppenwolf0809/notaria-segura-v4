@@ -137,7 +137,8 @@ function translateStatus(status) {
     'PENDIENTE': 'Pendiente',
     'EN_PROCESO': 'En Proceso',
     'LISTO': 'Listo',
-    'ENTREGADO': 'Entregado'
+    'ENTREGADO': 'Entregado',
+    'ANULADO_NOTA_CREDITO': 'Anulado (Nota de Crédito)'
   };
   return statusMap[status] || status;
 }

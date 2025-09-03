@@ -219,6 +219,14 @@ async function cambiarEstadoDocumento(req, res) {
       });
     }
 
+    // Bloquear cambios si está anulado por Nota de Crédito
+    if (documento.status === 'ANULADO_NOTA_CREDITO') {
+      return res.status(400).json({
+        success: false,
+        message: 'Documento anulado por Nota de Crédito. Use Revertir Nota de Crédito para continuar.'
+      });
+    }
+
     // Validar transición de estado
     const transicionesValidas = {
       'PENDIENTE': ['EN_PROCESO'],
@@ -546,6 +554,14 @@ async function procesarEntregaDocumento(req, res) {
       return res.status(404).json({
         success: false,
         message: 'Documento no encontrado o no asignado a usted'
+      });
+    }
+
+    // Bloquear entrega si está anulado por Nota de Crédito
+    if (documento.status === 'ANULADO_NOTA_CREDITO') {
+      return res.status(400).json({
+        success: false,
+        message: 'Documento anulado por Nota de Crédito. No se puede entregar hasta revertir la anulación.'
       });
     }
 

@@ -92,7 +92,8 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
       PENDIENTE: 'warning',
       EN_PROCESO: 'info',
       LISTO: 'success',
-      ENTREGADO: 'default'
+      ENTREGADO: 'default',
+      ANULADO_NOTA_CREDITO: 'error'
     };
     return colors[status] || 'default';
   };
@@ -106,7 +107,8 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
       PENDIENTE: 'Pendiente',
       EN_PROCESO: 'En Proceso',
       LISTO: 'Listo para Entrega',
-      ENTREGADO: 'Entregado'
+      ENTREGADO: 'Entregado',
+      ANULADO_NOTA_CREDITO: 'Anulado por Nota de Crédito'
     };
     return texts[status] || status;
   };
@@ -404,6 +406,47 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
   const isReadOnly = !!readOnly;
   const actionConfig = isReadOnly ? null : getActionButton();
   const previousStatus = getPreviousStatus(localDocument?.status);
+
+  const handleApplyCreditNote = async () => {
+    const reason = prompt('Motivo de la Nota de Crédito (obligatorio):');
+    if (!reason || !reason.trim()) return;
+    setActionLoading(true);
+    try {
+      const result = await documentService.applyCreditNote(localDocument.id, reason.trim());
+      if (result.success) {
+        setLocalDocument(prev => ({ ...prev, status: 'ANULADO_NOTA_CREDITO' }));
+        toast.success(result.message || 'Nota de Crédito aplicada');
+        if (onDocumentUpdated && result.data) onDocumentUpdated(result.data);
+      } else {
+        toast.error(result.message || 'No se pudo aplicar Nota de Crédito');
+      }
+    } catch (e) {
+      toast.error(e.message || 'Error al aplicar Nota de Crédito');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRevertCreditNote = async () => {
+    const reason = prompt('Motivo de la reversión de Nota de Crédito (obligatorio):');
+    if (!reason || !reason.trim()) return;
+    setActionLoading(true);
+    try {
+      const result = await documentService.revertCreditNote(localDocument.id, reason.trim());
+      if (result.success) {
+        const newDoc = result.data?.document;
+        setLocalDocument(prev => ({ ...prev, status: newDoc?.status || prev.status }));
+        toast.success(result.message || 'Nota de Crédito revertida');
+        if (onDocumentUpdated && result.data) onDocumentUpdated(result.data);
+      } else {
+        toast.error(result.message || 'No se pudo revertir la Nota de Crédito');
+      }
+    } catch (e) {
+      toast.error(e.message || 'Error al revertir Nota de Crédito');
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
   return (
     <Dialog
@@ -705,6 +748,30 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
             sx={{ mr: 1 }}
           >
             Regresar al estado anterior
+          </Button>
+        )}
+
+        {/* Nota de Crédito: Aplicar/Revertir (CAJA y ADMIN) */}
+        {['CAJA', 'ADMIN'].includes(user?.role) && !isReadOnly && localDocument?.status !== 'ANULADO_NOTA_CREDITO' && (
+          <Button
+            onClick={handleApplyCreditNote}
+            variant="outlined"
+            color="error"
+            disabled={actionLoading}
+            sx={{ mr: 1 }}
+          >
+            Aplicar Nota de Crédito
+          </Button>
+        )}
+        {['CAJA', 'ADMIN'].includes(user?.role) && !isReadOnly && localDocument?.status === 'ANULADO_NOTA_CREDITO' && (
+          <Button
+            onClick={handleRevertCreditNote}
+            variant="contained"
+            color="error"
+            disabled={actionLoading}
+            sx={{ mr: 1 }}
+          >
+            Revertir Nota de Crédito
           </Button>
         )}
 

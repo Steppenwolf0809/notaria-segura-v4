@@ -523,6 +523,11 @@ async function marcarComoListo(req, res) {
             console.log('❌ Documento no encontrado:', id);
             return res.status(404).json({ success: false, message: 'Documento no encontrado' });
         }
+
+        // Bloquear preparación para documentos anulados por Nota de Crédito
+        if (document.status === 'ANULADO_NOTA_CREDITO') {
+            return res.status(400).json({ success: false, message: 'Documento anulado por Nota de Crédito. No se puede preparar hasta revertir la anulación.' });
+        }
         
         console.log('📄 Documento encontrado:', {
             id: document.id,

@@ -15,6 +15,142 @@ import ActosExtractorService from '../services/actos-extractor-service.js';
 // const WhatsAppService = require('../services/whatsapp-service.js'); // Descomentar cuando exista
 
 /**
+ * Aplicar Nota de Crédito (Anulación) a un documento
+ * - Disponible para roles CAJA y ADMIN
+ * - Requiere motivo obligatorio
+ * - Aplica desde cualquier estado
+ * - Efectos: Cambia estado a ANULADO_NOTA_CREDITO, guarda estado previo y motivo, registra evento
+ */
+async function applyCreditNote(req, res) {
+  try {
+    const { id } = req.params;
+    const { motivo } = req.body || {};
+
+    if (!['CAJA', 'ADMIN'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Solo CAJA o ADMIN pueden aplicar Nota de Crédito' });
+    }
+
+    if (!motivo || String(motivo).trim().length < 3) {
+      return res.status(400).json({ success: false, message: 'Motivo de Nota de Crédito es obligatorio' });
+    }
+
+    const document = await prisma.document.findUnique({ where: { id } });
+    if (!document) {
+      return res.status(404).json({ success: false, message: 'Documento no encontrado' });
+    }
+
+    if (document.status === 'ANULADO_NOTA_CREDITO') {
+      return res.status(400).json({ success: false, message: 'El documento ya está anulado por Nota de Crédito' });
+    }
+
+    const updated = await prisma.document.update({
+      where: { id },
+      data: {
+        status: 'ANULADO_NOTA_CREDITO',
+        notaCreditoMotivo: String(motivo).trim(),
+        notaCreditoEstadoPrevio: document.status,
+        notaCreditoFecha: new Date(),
+        // Opcional: limpiar datos de entrega/códigos para evitar confusión
+        verificationCode: null,
+        codigoRetiro: null,
+        entregadoA: null,
+        fechaEntrega: null,
+        usuarioEntregaId: null,
+        relacionTitular: null
+      }
+    });
+
+    try {
+      await prisma.documentEvent.create({
+        data: {
+          documentId: id,
+          userId: req.user.id,
+          eventType: 'CREDIT_NOTE_APPLIED',
+          description: `Nota de Crédito aplicada por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
+          details: {
+            previousStatus: document.status,
+            newStatus: 'ANULADO_NOTA_CREDITO',
+            motivo: String(motivo).trim(),
+            timestamp: new Date().toISOString()
+          },
+          ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown'
+        }
+      });
+    } catch {}
+
+    return res.json({ success: true, message: 'Nota de Crédito aplicada', data: { document: updated } });
+  } catch (error) {
+    console.error('Error en applyCreditNote:', error);
+    return res.status(500).json({ success: false, message: 'Error interno del servidor' });
+  }
+}
+
+/**
+ * Revertir Nota de Crédito (volver al estado previo)
+ * - Disponible para roles CAJA y ADMIN
+ * - Requiere motivo obligatorio
+ */
+async function revertCreditNote(req, res) {
+  try {
+    const { id } = req.params;
+    const { motivo } = req.body || {};
+
+    if (!['CAJA', 'ADMIN'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Solo CAJA o ADMIN pueden revertir una Nota de Crédito' });
+    }
+
+    if (!motivo || String(motivo).trim().length < 3) {
+      return res.status(400).json({ success: false, message: 'Motivo de reversión es obligatorio' });
+    }
+
+    const document = await prisma.document.findUnique({ where: { id } });
+    if (!document) {
+      return res.status(404).json({ success: false, message: 'Documento no encontrado' });
+    }
+
+    if (document.status !== 'ANULADO_NOTA_CREDITO') {
+      return res.status(400).json({ success: false, message: 'El documento no está anulado por Nota de Crédito' });
+    }
+
+    const targetStatus = document.notaCreditoEstadoPrevio || 'PENDIENTE';
+    const updated = await prisma.document.update({
+      where: { id },
+      data: {
+        status: targetStatus,
+        notaCreditoMotivo: null,
+        notaCreditoEstadoPrevio: null,
+        notaCreditoFecha: null
+      }
+    });
+
+    try {
+      await prisma.documentEvent.create({
+        data: {
+          documentId: id,
+          userId: req.user.id,
+          eventType: 'CREDIT_NOTE_REVERTED',
+          description: `Reversión de Nota de Crédito por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
+          details: {
+            previousStatus: 'ANULADO_NOTA_CREDITO',
+            newStatus: targetStatus,
+            motivo: String(motivo).trim(),
+            timestamp: new Date().toISOString()
+          },
+          ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown'
+        }
+      });
+    } catch {}
+
+    return res.json({ success: true, message: `Documento revertido a ${targetStatus}`, data: { document: updated } });
+  } catch (error) {
+    console.error('Error en revertCreditNote:', error);
+    return res.status(500).json({ success: false, message: 'Error interno del servidor' });
+  }
+}
+
+/**
  * Obtener estadísticas globales de documentos por estado
  * Usado por CAJA para mostrar totales reales del sistema
  * @param {Object} req
@@ -533,6 +669,14 @@ async function assignDocument(req, res) {
       });
     }
 
+    // Bloquear flujo de entrega/preparación para documentos anulados por Nota de Crédito
+    if (document.status === 'ANULADO_NOTA_CREDITO') {
+      return res.status(400).json({
+        success: false,
+        message: 'Documento anulado por Nota de Crédito. No se puede entregar hasta revertir la anulación.'
+      });
+    }
+
     // Verificar que el matrizador existe y tiene el rol correcto
     const matrizador = await prisma.user.findUnique({
       where: { id: parseInt(matrizadorId) }
@@ -707,6 +851,14 @@ async function updateDocumentStatus(req, res) {
       });
     }
 
+    // Estado especial: ANULADO_NOTA_CREDITO solo se aplica vía endpoint específico
+    if (status === 'ANULADO_NOTA_CREDITO') {
+      return res.status(400).json({
+        success: false,
+        message: 'Use el endpoint de Nota de Crédito para anular documentos'
+      });
+    }
+
     // Buscar documento y verificar propiedad
     const document = await prisma.document.findUnique({
       where: { id }
@@ -725,6 +877,14 @@ async function updateDocumentStatus(req, res) {
       assignedTo: document.assignedToId,
       userId: req.user.id
     });
+
+    // Si el documento está anulado por Nota de Crédito, bloquear cambios de estado estándar
+    if (document.status === 'ANULADO_NOTA_CREDITO') {
+      return res.status(400).json({
+        success: false,
+        message: 'Documento anulado por Nota de Crédito. Use la opción Revertir Nota de Crédito.'
+      });
+    }
 
     // Detectar si es una reversión (estado "hacia atrás")
     const isReversion = isReversionFn(document.status, status);
@@ -4216,6 +4376,8 @@ async function updateGroupNotificationPolicy(req, res) {
 }
 
 export {
+  applyCreditNote,
+  revertCreditNote,
   uploadXmlDocument,
   uploadXmlDocumentsBatch,
   getAllDocuments,

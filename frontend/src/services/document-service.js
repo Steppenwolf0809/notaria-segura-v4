@@ -47,6 +47,31 @@ api.interceptors.request.use(
  */
 const documentService = {
   /**
+   * Aplicar Nota de Crédito (anular documento)
+   */
+  async applyCreditNote(documentId, motivo) {
+    try {
+      const response = await api.post(`/documents/${documentId}/credit-note`, { motivo });
+      return { success: true, data: response.data.data, message: response.data.message };
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || error.message || 'Error al aplicar Nota de Crédito';
+      return { success: false, error: errorMessage, message: errorMessage };
+    }
+  },
+
+  /**
+   * Revertir Nota de Crédito (volver al estado previo)
+   */
+  async revertCreditNote(documentId, motivo) {
+    try {
+      const response = await api.post(`/documents/${documentId}/credit-note/revert`, { motivo });
+      return { success: true, data: response.data.data, message: response.data.message };
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || error.message || 'Error al revertir Nota de Crédito';
+      return { success: false, error: errorMessage, message: errorMessage };
+    }
+  },
+  /**
    * 📊 Obtener estadísticas globales por estado
    * @returns {Promise<{success:boolean,data?:object,error?:string}>}
    */

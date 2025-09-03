@@ -50,6 +50,7 @@ import {
   Pending as PendingIcon,
   PlayArrow as InProgressIcon,
   LocalShipping as DeliveredIcon,
+  Cancel as CancelIcon,
   Edit as EditIcon,
   SwapHoriz as ReassignIcon,
   Timeline as TimelineIcon,
@@ -163,13 +164,13 @@ const DocumentOversight = () => {
 
       // Solicitudes en paralelo para ambos roles
       const [respMatrizadores, respArchivo] = await Promise.all([
-        fetch(`${API_BASE_URL}/admin/users?role=MATRIZADOR&limit=100`, {
+        fetch(`${API_BASE_URL}/admin/users?role=MATRIZADOR&status=true&limit=100`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
           }
         }),
-        fetch(`${API_BASE_URL}/admin/users?role=ARCHIVO&limit=100`, {
+        fetch(`${API_BASE_URL}/admin/users?role=ARCHIVO&status=true&limit=100`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -179,18 +180,24 @@ const DocumentOversight = () => {
 
       const users = [];
 
+      // Helper para extraer arreglo de usuarios soportando ambas formas de respuesta:
+      // 1) { success, data: [ ...usuarios ] }
+      // 2) { success, data: { users: [ ...usuarios ] } }
+      const extractUsers = (payload) => {
+        if (!payload?.success) return [];
+        if (Array.isArray(payload?.data)) return payload.data;
+        if (Array.isArray(payload?.data?.users)) return payload.data.users;
+        return [];
+      };
+
       if (respMatrizadores.ok) {
         const data = await respMatrizadores.json();
-        if (data?.success && Array.isArray(data?.data?.users)) {
-          users.push(...data.data.users);
-        }
+        users.push(...extractUsers(data));
       }
 
       if (respArchivo.ok) {
         const data = await respArchivo.json();
-        if (data?.success && Array.isArray(data?.data?.users)) {
-          users.push(...data.data.users);
-        }
+        users.push(...extractUsers(data));
       }
 
       // De-duplicar por id y ordenar por nombre
@@ -274,7 +281,8 @@ const DocumentOversight = () => {
       PENDIENTE: '#f59e0b',
       EN_PROCESO: '#3b82f6', 
       LISTO: '#22c55e',
-      ENTREGADO: '#6b7280'
+      ENTREGADO: '#6b7280',
+      ANULADO_NOTA_CREDITO: '#ef4444'
     };
     return colors[status] || '#6b7280';
   };
@@ -312,7 +320,8 @@ const DocumentOversight = () => {
       PENDIENTE: <PendingIcon />,
       EN_PROCESO: <InProgressIcon />,
       LISTO: <CompletedIcon />,
-      ENTREGADO: <DeliveredIcon />
+      ENTREGADO: <DeliveredIcon />,
+      ANULADO_NOTA_CREDITO: <CancelIcon />
     };
     return icons[status] || <PendingIcon />;
   };
@@ -507,9 +516,11 @@ const DocumentOversight = () => {
                   <MenuItem value="">
                     <em>Todos los estados</em>
                   </MenuItem>
+                  <MenuItem value="PENDIENTE">Pendiente</MenuItem>
                   <MenuItem value="EN_PROCESO">En Proceso</MenuItem>
                   <MenuItem value="LISTO">Listo</MenuItem>
                   <MenuItem value="ENTREGADO">Entregado</MenuItem>
+                  <MenuItem value="ANULADO_NOTA_CREDITO">Anulado (Nota de Crédito)</MenuItem>
                 </Select>
               </FormControl>
             </Grid>

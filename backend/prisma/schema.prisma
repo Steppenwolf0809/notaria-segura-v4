@@ -32,6 +32,7 @@ enum DocumentStatus {
   EN_PROCESO
   LISTO
   ENTREGADO
+  ANULADO_NOTA_CREDITO
 }
 
 // Modelo principal de usuarios
@@ -121,6 +122,11 @@ model Document {
   usuarioEntregaId     Int?       // ID del usuario de recepción que entregó
   usuarioEntrega       User?      @relation("DeliveredDocuments", fields: [usuarioEntregaId], references: [id])
   observacionesEntrega String?    // Observaciones adicionales de la entrega
+
+  // Nota de crédito (anulación)
+  notaCreditoMotivo       String?          // Motivo obligatorio al aplicar nota de crédito
+  notaCreditoEstadoPrevio DocumentStatus?  // Estado previo para permitir reversión
+  notaCreditoFecha        DateTime?        // Fecha en que se aplicó la nota de crédito
 
   documentGroup         DocumentGroup? @relation(fields: [documentGroupId], references: [id])
   
@@ -216,6 +222,8 @@ enum EventType {
   VERIFICATION_GENERATED // Código de verificación generado
   WHATSAPP_SENT        // Notificación WhatsApp enviada
   DOCUMENT_UNGROUPED   // Documento desagrupado
+  CREDIT_NOTE_APPLIED   // Nota de crédito aplicada (anulación)
+  CREDIT_NOTE_REVERTED  // Reversión de nota de crédito
 }
 
 // Modelo para historial de notificaciones WhatsApp
