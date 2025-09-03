@@ -5,6 +5,9 @@ import NotarialTableParser from './notarial-table-parser.js'
  * Sprint 1: Casos simples (un solo acto)
  * Incluye parser tabular avanzado como fallback
  */
+import createDebug from 'debug'
+const dlog = createDebug('concuerdos:extractor')
+
 const PdfExtractorService = {
   /**
    * Limpia el tipo de acto para eliminar metadata (PERSONA NATURAL, FECHA, etc.)
@@ -496,8 +499,10 @@ const PdfExtractorService = {
             .replace(/ +/g, ' ')
             .replace(/ *\n */g, '\n')
             .trim()
+          dlog('extractText via pdf-parse: %d chars', text.length)
           return text
         } catch (e) {
+          dlog('pdf-parse falló: %s', e?.message || e)
           return ''
         }
       })()
@@ -524,14 +529,17 @@ const PdfExtractorService = {
             const strings = content.items?.map(item => item.str).filter(Boolean) || []
             out += strings.join(' ') + '\n'
           }
-          return out
+          const cleaned = out
             .replace(/\u0000/g, ' ')
             .replace(/\r/g, '')
             .replace(/[\t\f]+/g, ' ')
             .replace(/ +/g, ' ')
             .replace(/ *\n */g, '\n')
             .trim()
+          dlog('extractText via pdfjs: %d chars', cleaned.length)
+          return cleaned
         } catch (e) {
+          dlog('pdfjs falló: %s', e?.message || e)
           return ''
         }
       })()
@@ -551,7 +559,10 @@ const PdfExtractorService = {
             child.on('error', reject)
             child.on('close', (code) => code === 0 ? resolve(stdout) : reject(new Error(stderr || `pdftotext exited ${code}`)))
           })
-          if (res && res.trim().length >= 20) return res.trim()
+          if (res && res.trim().length >= 20) {
+            dlog('extractText via pdftotext: %d chars', res.trim().length)
+            return res.trim()
+          }
         } catch (_) { /* ignore */ }
       }
 
@@ -655,10 +666,12 @@ const PdfExtractorService = {
         if (structuredData && structuredData.length > 0) {
           const tabularActs = this.convertStructuredDataToActs(structuredData, rawText)
           if (tabularActs.length > 0) {
+            dlog('parseAdvancedData: table-first strategy succeeded with %d acts', tabularActs.length)
             return { acts: tabularActs }
           }
         }
       } catch (e) {
+        dlog('parseAdvancedData table-first falló: %s', e?.message || e)
         // continuar con heurística si falla
       }
     }
@@ -820,7 +833,7 @@ const PdfExtractorService = {
       
       // Fallback mejorado para beneficiarios en formato tabular
       if ((!beClean || beClean.length === 0) && /A\s+FAVOR\s+DE/i.test(section)) {
-        console.log('🔍 Fallback: Buscando beneficiarios en formato tabular')
+        dlog('fallback beneficiarios: explorando región A FAVOR DE')
         
         // Buscar desde "A FAVOR DE" hasta el final de la sección o siguiente encabezado
         const aFavorIdx = section.search(/A\s+FAVOR\s+DE/i)
@@ -829,9 +842,9 @@ const PdfExtractorService = {
           const endIdx = afterAFavor.search(/NOTARIO|ACTO\s+O\s+CON|EXTRACTO|\n\s*ESCRITURA|$/)
           const benefRegion = endIdx === -1 ? afterAFavor : afterAFavor.slice(0, endIdx)
           
-          console.log('🔍 Región A FAVOR DE encontrada:', benefRegion.substring(0, 200))
+          dlog('region A FAVOR DE preview: %s', benefRegion.substring(0, 200))
           beClean = this.cleanPersonNames(benefRegion)
-          console.log('🔍 Beneficiarios extraídos del fallback:', beClean)
+          dlog('beneficiarios extraídos del fallback: %o', beClean)
         }
       }
       
@@ -919,7 +932,7 @@ const PdfExtractorService = {
           if (!actData.otorgantes || actData.otorgantes.length === 0) {
             try {
               const preview = (otorgantesRaw || section || '').toString().slice(0, 160).replace(/\s+/g, ' ').trim()
-              console.warn('[parseAdvancedData] Otorgantes no detectados. Título:', actData.tipoActo, '| Preview bloque:', preview)
+              dlog('otorgantes no detectados | título=%s | preview=%s', actData.tipoActo, preview)
             } catch (_) { /* noop */ }
           }
 
@@ -955,7 +968,7 @@ const PdfExtractorService = {
       
       // Último recurso: parser tabular si tenemos el buffer
       if (pdfBuffer) {
-        console.log('[PdfExtractorService] Fallback: usando parser tabular avanzado')
+        dlog('fallback final: usando parser tabular avanzado')
         try {
           const tableParser = new NotarialTableParser()
           const structuredData = await tableParser.parseStructuredData(pdfBuffer)
@@ -963,20 +976,20 @@ const PdfExtractorService = {
           if (structuredData.length > 0) {
             const tabularActs = this.convertStructuredDataToActs(structuredData, rawText)
             if (tabularActs.length > 0) {
-              console.log(`[PdfExtractorService] Parser tabular extrajo ${tabularActs.length} actos`)
+              dlog('parser tabular extrajo %d actos', tabularActs.length)
               return { acts: tabularActs }
             }
           }
         } catch (error) {
-          console.warn('[PdfExtractorService] Error en parser tabular:', error.message)
+          dlog('error en parser tabular: %s', error.message)
         }
       }
 
       // Fallback final: extracción agresiva por patrones cuando todo falla
-      console.log('[PdfExtractorService] Fallback final: extracción agresiva')
+      dlog('fallback final: extracción agresiva')
       const desperateAct = this.parseDesperatePatterns(rawText)
       if (desperateAct && (desperateAct.otorgantes.length > 0 || desperateAct.beneficiarios.length > 0)) {
-        console.log(`[PdfExtractorService] Extracción agresiva encontró ${desperateAct.otorgantes.length} otorgantes, ${desperateAct.beneficiarios.length} beneficiarios`)
+        dlog('extracción agresiva encontró %d otorgantes y %d beneficiarios', desperateAct.otorgantes.length, desperateAct.beneficiarios.length)
         return { acts: [desperateAct] }
       }
       

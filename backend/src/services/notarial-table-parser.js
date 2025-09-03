@@ -6,6 +6,7 @@
 class NotarialTableParser {
   constructor() {
     this.debug = process.env.NODE_ENV !== 'production'
+    this.dlog = (msg, ...args) => { if (this.debug) console.log('[NotarialTableParser]', msg, ...args) }
   }
 
   /**
@@ -13,7 +14,7 @@ class NotarialTableParser {
    * @param {Buffer} pdfBuffer 
    * @returns {Promise<Array>} Array de actos con otorgantes/beneficiarios estructurados
    */
-  async parseStructuredData(pdfBuffer) {
+  async parseStructuredData(pdfBuffer, options = {}) {
     try {
       // Usar pdfjs-dist para obtener coordenadas y texto posicionado
       const pdfjs = await import('pdfjs-dist/legacy/build/pdf.js')
@@ -49,7 +50,11 @@ class NotarialTableParser {
         for (const section of tableSections) {
           const parsedData = this.parseTableSection(section)
           if (parsedData) {
-            allStructuredData.push(parsedData)
+            if (options.returnDebug) {
+              allStructuredData.push({ ...parsedData, debug: { page: pageNum, itemsCount: items.length } })
+            } else {
+              allStructuredData.push(parsedData)
+            }
           }
         }
       }

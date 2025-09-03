@@ -187,3 +187,37 @@ Obtiene la lista de matrizadores para la supervisión. **Requiere rol de `ARCHIV
 ### `GET /archivo/documentos/:id`
 
 Obtiene los detalles de un documento. **Requiere rol de `ARCHIVO`**.
+
+---
+
+## Endpoints de Concuerdos (`/concuerdos`)
+
+### `POST /concuerdos/debug-extract` (solo debug)
+
+- multipart: campo `pdfFile`
+- query opcional: `ocrFirst=1`, `return=all`
+- respuesta: `{ success, data }` donde `data` incluye:
+  - `raw_text_primary`, `raw_text_ocr`
+  - `layout_detected` (`layout`, `hasTable`, `reasons`)
+  - `tables_rebuilt` (secciones con entidades y metadatos)
+  - `parser_simple_output`, `parser_tabular_output[]`, `parser_universal_output{ acts, source, classification, validation }`
+  - `quality{ score, confidence, issues[], warnings[], suggestions[] }`
+  - `notary_info`, `sections_found[]`, `traces{ strategy, heuristics }`
+  - `canonical` (schema canónico)
+
+---
+
+## Endpoints de Concuerdos (`/concuerdos`)
+
+### `POST /concuerdos/debug-extract` (solo debug)
+
+- multipart: campo `pdfFile`
+- query opcional: `ocrFirst=1`, `return=all`
+- respuesta: `{ success, data }` donde `data` incluye:
+  - `raw_text_primary`, `raw_text_ocr`
+  - `layout_detected` (`layout`, `hasTable`, `reasons`)
+  - `tables_rebuilt` (secciones con entidades y metadatos)
+  - `parser_simple_output`, `parser_tabular_output[]`, `parser_universal_output{ acts, source, classification, validation }`
+  - `quality{ score, confidence, issues[], warnings[], suggestions[] }`
+  - `notary_info`, `sections_found[]`, `traces{ strategy, heuristics }`
+  - `canonical` (schema canónico)

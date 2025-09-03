@@ -4,6 +4,9 @@ import { ExtractoTemplateEngine } from '../services/extractos/index.js'
 import { buildActPhrase } from '../services/extractos/phrase-builder.js'
 import DataQualityValidator from '../services/data-quality-validator.js'
 import ocrService from '../services/ocr-service.js'
+import createDebug from 'debug'
+
+const dlog = createDebug('concuerdos:controller')
 
 /**
  * Controlador de Generador de Concuerdos (Sprint 1)
@@ -523,6 +526,200 @@ async function applyAutoFixes(req, res) {
 }
 
 export { uploadPdf, extractData, previewConcuerdo, applyAutoFixes }
+
+/**
+ * Utilidad interna para ejecutar extracción y diagnóstico completo.
+ * Retorna un objeto con todas las etapas solicitadas para auditoría.
+ */
+export async function runDebugExtractInternal(pdfBuffer, query = {}) {
+  const flags = {
+    ocrFirst: String(query?.ocrFirst || '').toLowerCase() === '1' || String(query?.ocrFirst || '').toLowerCase() === 'true',
+    return: query?.return || 'all'
+  }
+
+  dlog('Iniciando runDebugExtractInternal con flags:', flags)
+
+  // 1. Extracción de texto primaria (pdf-parse/pdfjs)
+  let raw_text_primary = ''
+  let raw_text_ocr = null
+  let ocrUsed = false
+  let primaryError
+  try {
+    raw_text_primary = await PdfExtractorService.extractText(pdfBuffer)
+  } catch (e) {
+    primaryError = e?.message || String(e)
+    dlog('extractText falló, cause:', primaryError)
+  }
+
+  // 2. OCR (si se solicita o si la primaria es muy corta)
+  const ocrEnabled = (process.env.OCR_ENABLED || 'false') !== 'false'
+  if (ocrEnabled && (flags.ocrFirst || !raw_text_primary || raw_text_primary.length < 50)) {
+    try {
+      const ocr = await ocrService.ocrPdf(pdfBuffer)
+      if (ocr?.text?.trim()?.length > 10) {
+        raw_text_ocr = ocr.text
+        ocrUsed = true
+        if (!raw_text_primary) raw_text_primary = raw_text_ocr
+      }
+    } catch (e) {
+      dlog('OCR falló:', e?.message || e)
+    }
+  }
+
+  const text = String(raw_text_primary || '')
+
+  // 3. Análisis de estructura y layout
+  const universalParser = new UniversalPdfParser()
+  const structure = await universalParser.analyzeDocumentStructure(pdfBuffer, text)
+  const layout_detected = {
+    layout: structure.layout || 'linear',
+    hasTable: Boolean(structure.hasTable),
+    reasons: {
+      sectionsDetected: structure.sections?.map(s => s?.type) || [],
+      coordinatesCollected: Boolean(structure.coordinates && Array.isArray(structure.coordinates))
+    }
+  }
+
+  // 4. Reconstrucción de tablas por coordenadas (para diagnóstico)
+  // Reusar TableParser vía servicio avanzado con opción debug
+  let tables_rebuilt = null
+  try {
+    const { default: NotarialTableParser } = await import('../services/notarial-table-parser.js')
+    const tableParser = new NotarialTableParser()
+    const structured = await tableParser.parseStructuredData(pdfBuffer, { returnDebug: true })
+    tables_rebuilt = structured?.map(sec => ({
+      type: sec.type,
+      entities: sec.entities,
+      debug: sec.debug || null
+    })) || []
+  } catch (e) {
+    dlog('parseStructuredData(debug) falló:', e?.message || e)
+  }
+
+  // 5. Parsers
+  const parser_simple_output = PdfExtractorService.parseSimpleData(text)
+  let parser_tabular_output = []
+  try {
+    const { default: NotarialTableParser } = await import('../services/notarial-table-parser.js')
+    const tableParser = new NotarialTableParser()
+    const structured = await tableParser.parseStructuredData(pdfBuffer)
+    parser_tabular_output = PdfExtractorService.convertStructuredDataToActs(structured, text)
+  } catch {}
+
+  const parser_universal_output = await universalParser.parseDocument(pdfBuffer, text)
+
+  // 6. Validación de calidad
+  const candidateActs = (parser_universal_output?.acts?.length ? parser_universal_output.acts : parser_tabular_output) || []
+  const validator = new DataQualityValidator()
+  const quality = validator.validateMultipleActs(candidateActs)
+
+  // 7. Información notarial
+  const notary_info = PdfExtractorService.extractNotaryInfo(text)
+
+  // 8. Secciones con offsets
+  const sections_found = (() => {
+    const up = text.toUpperCase()
+    const find = (labelRe) => {
+      const m = up.match(labelRe)
+      if (!m) return -1
+      return up.indexOf(m[0])
+    }
+    return [
+      { name: 'ACTO O CONTRATO', offset: find(/ACTO\s+O\s+CON\s*-?\s*TRATO/) },
+      { name: 'OTORGANTES/OTORGADO POR', offset: find(/OTORGAD[OA]\s+POR|OTORGANTES?/) },
+      { name: 'A FAVOR DE', offset: find(/A\s+FAVOR\s+DE|BENEFICIARIOS?/) },
+      { name: 'UBICACIÓN', offset: find(/UBICACI[ÓO]N|PROVINCIA|CANT[ÓO]N|PARROQUIA/) },
+      { name: 'CUANTÍA', offset: find(/CUANT[ÍI]A/) }
+    ]
+  })()
+
+  // 9. Trazas de decisiones y heurísticas
+  const traces = {
+    strategy: {
+      ocrUsed,
+      primaryError,
+      universalSource: parser_universal_output?.source,
+      classification: parser_universal_output?.classification || null
+    },
+    heuristics: {
+      aFavorDeDetected: /A\s+FAVOR\s+DE|BENEFICIARIO/i.test(text),
+      naturalVsJuridicaHints: {
+        containsNatural: /PERSONA\s+NATURAL/i.test(text),
+        containsJuridica: /PERSONA\s+JUR[IÍ]DICA/i.test(text)
+      }
+    }
+  }
+
+  // 10. Esquema canónico (map básico sin tocar UI)
+  const canonical = (() => {
+    const acto = candidateActs?.[0]?.tipoActo || ''
+    const cuantiaTipo = /INDETERMINADA/i.test(text) ? 'INDETERMINADA' : undefined
+    const mapEntity = (e) => ({
+      nombre: e?.nombre || String(e || ''),
+      tipo_persona: e?.tipo_persona || 'Natural',
+      doc_identidad: e?.documento ? { tipo: e.documento?.length === 13 ? 'RUC' : 'CEDULA', numero: e.documento } : undefined,
+      calidad: undefined,
+      representado_por: Array.isArray(e?.representantes) ? e.representantes : undefined,
+      confidence: undefined
+    })
+    const firstAct = candidateActs?.[0] || {}
+    return {
+      acto,
+      fecha_iso: undefined,
+      escritura_numero: undefined,
+      notario: { nombre: notary_info?.notarioNombre },
+      notaria: { texto: notary_info?.notariaNumero, numero: notary_info?.notariaNumeroDigit },
+      otorgantes: (firstAct?.otorgantes || []).map(mapEntity),
+      a_favor_de: (firstAct?.beneficiarios || []).map(mapEntity),
+      ubicacion: { provincia: undefined, canton: undefined, parroquia: undefined },
+      cuantia: cuantiaTipo ? { tipo: cuantiaTipo, valor: undefined } : undefined,
+      confidence: quality?.overallScore || 0
+    }
+  })()
+
+  return {
+    raw_text_primary,
+    raw_text_ocr,
+    layout_detected,
+    tables_rebuilt,
+    parser_simple_output,
+    parser_tabular_output,
+    parser_universal_output,
+    quality: {
+      score: quality.overallScore,
+      confidence: quality.overallConfidence,
+      issues: quality.validations.flatMap(v => v.issues),
+      warnings: quality.validations.flatMap(v => v.warnings),
+      suggestions: quality.validations.flatMap(v => v.suggestions)
+    },
+    notary_info,
+    sections_found,
+    traces,
+    canonical
+  }
+}
+
+/**
+ * POST /api/concuerdos/debug-extract
+ * Endpoint de diagnóstico de extracción (solo debug)
+ * Recibe PDF (multipart) y query (?ocrFirst=1&return=all)
+ */
+async function debugExtract(req, res) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: 'Archivo PDF requerido' })
+    }
+    const { buffer } = req.file
+    const result = await runDebugExtractInternal(buffer, req.query || {})
+    res.set('Content-Type', 'application/json; charset=utf-8')
+    return res.json({ success: true, data: result })
+  } catch (error) {
+    console.error('Error en debugExtract:', error?.stack || error)
+    return res.status(500).json({ success: false, message: 'Error en diagnóstico de extracción', details: process.env.NODE_ENV !== 'production' ? (error?.message || String(error)) : undefined })
+  }
+}
+
+export { debugExtract }
 /**
  * Generar múltiples documentos (copias) numerados
  * POST /api/concuerdos/generate-documents

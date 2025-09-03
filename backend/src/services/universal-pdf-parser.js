@@ -5,6 +5,7 @@
 
 import PdfExtractorService from './pdf-extractor-service.js'
 import NotarialTableParser from './notarial-table-parser.js'
+import createDebug from 'debug'
 import fs from 'fs/promises'
 import path from 'path'
 import { fileURLToPath } from 'url'
@@ -15,6 +16,7 @@ const PATTERNS_DIR = path.join(__dirname, '..', 'data', 'extractos-referencia', 
 class UniversalPdfParser {
   constructor() {
     this.debug = process.env.NODE_ENV !== 'production'
+    this.dlog = createDebug('concuerdos:universal')
     this.patterns = new Map()
     this.confidence = {
       HIGH: 0.8,
@@ -41,7 +43,7 @@ class UniversalPdfParser {
 
   log(message, ...args) {
     if (this.debug) {
-      console.log(`[UniversalParser] ${message}`, ...args)
+      this.dlog(message, ...args)
     }
   }
 

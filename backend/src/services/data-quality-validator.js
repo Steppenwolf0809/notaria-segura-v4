@@ -6,6 +6,7 @@
 class DataQualityValidator {
   constructor() {
     this.debug = process.env.NODE_ENV !== 'production'
+    this._reasons = []
   }
 
   /**
@@ -59,6 +60,7 @@ class DataQualityValidator {
   validateTipoActo(tipoActo, validation) {
     if (!tipoActo || typeof tipoActo !== 'string') {
       validation.issues.push('Tipo de acto no detectado')
+      this._reasons.push('tipoActo:missing')
       validation.score -= 0.3
       validation.suggestions.push('Verificar que el PDF contenga la sección "ACTO O CONTRATO"')
       return
@@ -76,6 +78,7 @@ class DataQualityValidator {
     
     if (!tipoReconocido) {
       validation.warnings.push(`Tipo de acto "${tipo}" no es uno de los tipos comunes`)
+      this._reasons.push('tipoActo:unrecognized')
       validation.score -= 0.1
       validation.suggestions.push('Verificar que el tipo de acto esté correctamente extraído')
     }
@@ -83,6 +86,7 @@ class DataQualityValidator {
     // Verificar que no sea muy corto (posible extracción incompleta)
     if (tipo.length < 3) {
       validation.issues.push('Tipo de acto parece incompleto')
+      this._reasons.push('tipoActo:too_short')
       validation.score -= 0.2
       validation.suggestions.push('El tipo de acto parece estar cortado, revisar extracción')
     }
@@ -90,6 +94,7 @@ class DataQualityValidator {
     // Verificar que no contenga texto basura
     if (/\d{4,}|FECHA|PROVINCIA|CANTON/.test(tipo)) {
       validation.warnings.push('Tipo de acto contiene texto que parece ser metadata')
+      this._reasons.push('tipoActo:metadata_noise')
       validation.score -= 0.1
       validation.autoFixes.tipoActo = this.cleanActType(tipo)
     }
@@ -102,10 +107,12 @@ class DataQualityValidator {
     if (!entities || entities.length === 0) {
       if (tipo === 'otorgantes') {
         validation.issues.push('No se detectaron otorgantes')
+        this._reasons.push('otorgantes:none')
         validation.score -= 0.4
         validation.suggestions.push('Verificar que el PDF contenga la tabla de "OTORGANTES" o "OTORGADO POR"')
       } else {
         validation.warnings.push('No se detectaron beneficiarios')
+        this._reasons.push('beneficiarios:none')
         validation.score -= 0.1
         validation.suggestions.push('Los beneficiarios pueden estar implícitos o en sección "A FAVOR DE"')
       }
@@ -119,6 +126,7 @@ class DataQualityValidator {
     // Validar número típico de entidades
     if (tipo === 'otorgantes' && entities.length > 5) {
       validation.warnings.push(`Número inusualmente alto de otorgantes (${entities.length})`)
+      this._reasons.push('otorgantes:too_many')
       validation.suggestions.push('Verificar que no se hayan incluido representantes como otorgantes separados')
     }
   }
@@ -162,6 +170,7 @@ class DataQualityValidator {
   validateEntityName(nombre, context, validation) {
     if (!nombre || typeof nombre !== 'string') {
       validation.issues.push(`${context}: Nombre faltante`)
+      this._reasons.push(`${context}:name_missing`)
       validation.score -= 0.3
       return
     }
@@ -171,6 +180,7 @@ class DataQualityValidator {
     // Verificar longitud mínima
     if (nombreTrim.length < 3) {
       validation.issues.push(`${context}: Nombre demasiado corto ("${nombreTrim}")`)
+      this._reasons.push(`${context}:name_short`)
       validation.score -= 0.2
       validation.suggestions.push('Nombre parece incompleto, verificar extracción')
       return
@@ -179,6 +189,7 @@ class DataQualityValidator {
     // Verificar que no sean solo números o caracteres especiales
     if (/^[\d\s\-\.]+$/.test(nombreTrim)) {
       validation.issues.push(`${context}: Nombre contiene solo números/símbolos`)
+      this._reasons.push(`${context}:name_symbols_only`)
       validation.score -= 0.3
       validation.suggestions.push('Posible error en extracción, revisar tabla original')
       return
@@ -189,6 +200,7 @@ class DataQualityValidator {
     
     if (palabras.length === 1 && !this.isLikelyCompanyName(nombreTrim)) {
       validation.warnings.push(`${context}: Nombre con una sola palabra ("${nombreTrim}")`)
+      this._reasons.push(`${context}:name_single_word`)
       validation.score -= 0.1
       validation.suggestions.push('Verificar si el nombre completo fue extraído correctamente')
     }
@@ -197,6 +209,7 @@ class DataQualityValidator {
     const textBasura = ['PERSONA', 'NATURAL', 'JURIDICA', 'JURÍDICA', 'TIPO', 'INTERVINIENTE', 'DOCUMENTO', 'NACIONALIDAD']
     if (textBasura.some(basura => nombreTrim.toUpperCase().includes(basura))) {
       validation.warnings.push(`${context}: Nombre contiene texto de tabla ("${nombreTrim}")`)
+      this._reasons.push(`${context}:name_contains_headers`)
       validation.score -= 0.15
       validation.autoFixes[`${context}_nombre`] = this.cleanEntityName(nombreTrim)
     }
@@ -213,12 +226,14 @@ class DataQualityValidator {
   validateTipoPersona(tipoPersona, nombre, context, validation) {
     if (!tipoPersona) {
       validation.warnings.push(`${context}: Tipo de persona no especificado`)
+      this._reasons.push(`${context}:tipo_persona_missing`)
       validation.score -= 0.05
       return
     }
 
     if (!['Natural', 'Jurídica'].includes(tipoPersona)) {
       validation.issues.push(`${context}: Tipo de persona inválido ("${tipoPersona}")`)
+      this._reasons.push(`${context}:tipo_persona_invalid`)
       validation.score -= 0.1
       validation.suggestions.push('Tipo de persona debe ser "Natural" o "Jurídica"')
       return
@@ -231,11 +246,13 @@ class DataQualityValidator {
       
       if (shouldBeJuridica && !isJuridica) {
         validation.warnings.push(`${context}: "${nombre}" parece ser jurídica pero está marcada como Natural`)
+        this._reasons.push(`${context}:tipo_mismatch_should_be_juridica`)
         validation.score -= 0.1
         validation.autoFixes[`${context}_tipo_persona`] = 'Jurídica'
         validation.suggestions.push('Revisar clasificación de tipo de persona')
       } else if (!shouldBeJuridica && isJuridica) {
         validation.warnings.push(`${context}: "${nombre}" parece ser natural pero está marcada como Jurídica`)
+        this._reasons.push(`${context}:tipo_mismatch_should_be_natural`)
         validation.score -= 0.1
         validation.autoFixes[`${context}_tipo_persona`] = 'Natural'
         validation.suggestions.push('Revisar clasificación de tipo de persona')
@@ -249,6 +266,7 @@ class DataQualityValidator {
   validateRepresentantes(representantes, context, validation) {
     if (!Array.isArray(representantes)) {
       validation.warnings.push(`${context}: Lista de representantes inválida`)
+      this._reasons.push(`${context}:representantes_invalid_list`)
       validation.score -= 0.05
       return
     }
@@ -260,6 +278,7 @@ class DataQualityValidator {
         this.validateEntityName(rep.nombre, `${context}.representante[${index}]`, validation)
       } else {
         validation.warnings.push(`${context}.representante[${index}]: Representante inválido`)
+        this._reasons.push(`${context}.representante[${index}]:invalid`)
         validation.score -= 0.05
       }
     })
@@ -275,10 +294,12 @@ class DataQualityValidator {
     if (tipoActo && tipoActo.toUpperCase().includes('PODER')) {
       if (!otorgantes || otorgantes.length === 0) {
         validation.issues.push('Poder sin otorgantes detectados')
+        this._reasons.push('consistency:poder_sin_otorgantes')
         validation.score -= 0.3
       }
       if (!beneficiarios || beneficiarios.length === 0) {
         validation.warnings.push('Poder sin beneficiarios explícitos')
+        this._reasons.push('consistency:poder_sin_beneficiarios')
         validation.score -= 0.1
         validation.suggestions.push('En poderes generales, el beneficiario puede ser implícito')
       }
@@ -292,6 +313,7 @@ class DataQualityValidator {
       const duplicados = nombresOtorgantes.filter(nombre => nombresBeneficiarios.includes(nombre))
       if (duplicados.length > 0) {
         validation.warnings.push(`Personas aparecen como otorgantes y beneficiarios: ${duplicados.join(', ')}`)
+        this._reasons.push('consistency:otorgante_beneficiario_dup')
         validation.score -= 0.05
         validation.suggestions.push('Verificar si es correcto que la misma persona sea otorgante y beneficiario')
       }
