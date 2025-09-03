@@ -21,22 +21,6 @@ function formatEventDescription(event) {
 
   switch (eventType) {
     case 'CREDIT_NOTE_APPLIED': {
-      const motivo = details?.motivo || details?.reason || '-';
-      const prev = details?.previousStatus ? translateStatus(details.previousStatus) : null;
-      if (prev) contextInfo.push(`Estado previo: ${prev}`);
-      if (motivo) contextInfo.push(`Motivo: ${motivo}`);
-      if (event?.createdAt) contextInfo.push(`Fecha: ${formatLongDateTime(event.createdAt)}`);
-      break;
-    }
-    case 'CREDIT_NOTE_REVERTED': {
-      const motivo = details?.motivo || details?.reason || '-';
-      const to = details?.newStatus ? translateStatus(details.newStatus) : null;
-      if (to) contextInfo.push(`Estado destino: ${to}`);
-      if (motivo) contextInfo.push(`Motivo: ${motivo}`);
-      if (event?.createdAt) contextInfo.push(`Fecha: ${formatLongDateTime(event.createdAt)}`);
-      break;
-    }
-    case 'CREDIT_NOTE_APPLIED': {
       const by = userName;
       return `Nota de Crédito aplicada por ${by}`;
     }
@@ -194,6 +178,22 @@ function getEventContextInfo(event) {
   const contextInfo = [];
 
   switch (eventType) {
+    case 'CREDIT_NOTE_APPLIED': {
+      const prev = details?.previousStatus ? translateStatus(details.previousStatus) : null;
+      const motivo = details?.motivo || details?.reason || null;
+      if (prev) contextInfo.push(`Estado previo: ${prev}`);
+      if (motivo) contextInfo.push(`Motivo: ${motivo}`);
+      if (event?.createdAt) contextInfo.push(`Fecha: ${formatLongDateTime(event.createdAt)}`);
+      break;
+    }
+    case 'CREDIT_NOTE_REVERTED': {
+      const to = details?.newStatus ? translateStatus(details.newStatus) : null;
+      const motivo = details?.motivo || details?.reason || null;
+      if (to) contextInfo.push(`Estado destino: ${to}`);
+      if (motivo) contextInfo.push(`Motivo: ${motivo}`);
+      if (event?.createdAt) contextInfo.push(`Fecha: ${formatLongDateTime(event.createdAt)}`);
+      break;
+    }
     case 'STATUS_UNDO': {
       const from = details?.revertedFrom || details?.fromStatus;
       const to = details?.revertedTo || details?.toStatus;
