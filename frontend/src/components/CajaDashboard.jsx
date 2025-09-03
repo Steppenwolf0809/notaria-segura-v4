@@ -43,6 +43,9 @@ import useDocumentStore from '../store/document-store';
 import useDebounce from '../hooks/useDebounce';
 import { toast } from 'react-toastify';
 import BatchUpload from './BatchUpload';
+import DocumentDetailModal from './Documents/DocumentDetailModal';
+import documentService from '../services/document-service';
+import { Cancel as CancelIcon, History as HistoryIcon } from '@mui/icons-material';
 
 /**
  * Dashboard donde CAJA sube XMLs, crea documentos y asigna matrizadores
@@ -73,6 +76,8 @@ const CajaDashboard = () => {
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [selectedMatrizador, setSelectedMatrizador] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [detailDocument, setDetailDocument] = useState(null);
 
   // DEBOUNCING: Solo buscar después de que el usuario pause por 400ms
   const debouncedSearchTerm = useDebounce(inputValue, 400);
@@ -210,9 +215,44 @@ const CajaDashboard = () => {
       PENDIENTE: 'warning',
       EN_PROCESO: 'info',
       LISTO: 'success',
-      ENTREGADO: 'default'
+      ENTREGADO: 'default',
+      ANULADO_NOTA_CREDITO: 'error'
     };
     return colors[status] || 'default';
+  };
+
+  const openDetail = (doc) => {
+    setDetailDocument(doc);
+    setDetailModalOpen(true);
+  };
+
+  const closeDetail = () => {
+    setDetailModalOpen(false);
+    setDetailDocument(null);
+  };
+
+  const handleApplyCreditNote = async (doc) => {
+    const reason = prompt('Motivo de la Nota de Crédito (obligatorio):');
+    if (!reason || !reason.trim()) return;
+    const res = await documentService.applyCreditNote(doc.id, reason.trim());
+    if (res.success) {
+      toast.success(res.message || 'Nota de Crédito aplicada');
+      await fetchAllDocuments(page + 1, rowsPerPage);
+    } else {
+      toast.error(res.message || 'No se pudo aplicar Nota de Crédito');
+    }
+  };
+
+  const handleRevertCreditNote = async (doc) => {
+    const reason = prompt('Motivo de la reversión (obligatorio):');
+    if (!reason || !reason.trim()) return;
+    const res = await documentService.revertCreditNote(doc.id, reason.trim());
+    if (res.success) {
+      toast.success(res.message || 'Nota de Crédito revertida');
+      await fetchAllDocuments(page + 1, rowsPerPage);
+    } else {
+      toast.error(res.message || 'No se pudo revertir la Nota de Crédito');
+    }
   };
 
   /**
@@ -514,6 +554,38 @@ const CajaDashboard = () => {
                           Asignar
                         </Button>
                       )}
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => openDetail(document)}
+                        sx={{ ml: 1 }}
+                      >
+                        Ver Detalle
+                      </Button>
+                      {/* Nota de Crédito para CAJA */}
+                      {document.status !== 'ANULADO_NOTA_CREDITO' ? (
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="error"
+                          onClick={() => handleApplyCreditNote(document)}
+                          startIcon={<CancelIcon />}
+                          sx={{ ml: 1 }}
+                        >
+                          Nota de Crédito
+                        </Button>
+                      ) : (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="error"
+                          onClick={() => handleRevertCreditNote(document)}
+                          startIcon={<HistoryIcon />}
+                          sx={{ ml: 1 }}
+                        >
+                          Revertir Nota
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -544,6 +616,18 @@ const CajaDashboard = () => {
           </Box>
         </CardContent>
       </Card>
+
+      {/* Modal de Detalle */}
+      <DocumentDetailModal
+        open={detailModalOpen}
+        onClose={closeDetail}
+        document={detailDocument}
+        onDocumentUpdated={async () => {
+          // Refrescar lista al guardar/accionar desde el detalle
+          await fetchAllDocuments(page + 1, rowsPerPage);
+        }}
+        readOnly={false}
+      />
 
       {/* Diálogo de asignación */}
       <Dialog open={assignDialogOpen} onClose={handleCloseAssignDialog} maxWidth="sm" fullWidth>

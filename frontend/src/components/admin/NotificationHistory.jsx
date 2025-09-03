@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Card,
@@ -20,7 +20,14 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Button
+  Button,
+  Grid,
+  TextField,
+  FormControl,
+  Select,
+  MenuItem,
+  InputLabel,
+  InputAdornment
 } from '@mui/material';
 import {
   History as HistoryIcon,
@@ -29,7 +36,8 @@ import {
   Schedule as PendingIcon,
   Refresh as RefreshIcon,
   WhatsApp as WhatsAppIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  Search as SearchIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import useAuthStore from '../../store/auth-store';
@@ -45,6 +53,13 @@ const NotificationHistory = () => {
   const [error, setError] = useState(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewNotification, setPreviewNotification] = useState(null);
+
+  // Filtros locales
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
 
   const loadNotifications = async () => {
     try {
@@ -82,6 +97,48 @@ const NotificationHistory = () => {
   useEffect(() => {
     loadNotifications();
   }, [token]);
+
+  const clearFilters = () => {
+    setSearch('');
+    setStatusFilter('');
+    setTypeFilter('');
+    setDateFrom('');
+    setDateTo('');
+  };
+
+  const filteredNotifications = useMemo(() => {
+    return notifications.filter((n) => {
+      const matchesSearch = (() => {
+        if (!search) return true;
+        const q = search.toLowerCase();
+        return (
+          (n.cliente || '').toLowerCase().includes(q) ||
+          (n.telefono || '').toLowerCase().includes(q) ||
+          (n.mensaje || '').toLowerCase().includes(q)
+        );
+      })();
+
+      const matchesStatus = statusFilter ? n.estado === statusFilter : true;
+      const matchesType = typeFilter ? n.tipo === typeFilter : true;
+
+      const matchesDate = (() => {
+        if (!dateFrom && !dateTo) return true;
+        const ts = new Date(n.fecha).getTime();
+        if (Number.isNaN(ts)) return false;
+        if (dateFrom) {
+          const fromTs = new Date(dateFrom + 'T00:00:00').getTime();
+          if (ts < fromTs) return false;
+        }
+        if (dateTo) {
+          const toTs = new Date(dateTo + 'T23:59:59').getTime();
+          if (ts > toTs) return false;
+        }
+        return true;
+      })();
+
+      return matchesSearch && matchesStatus && matchesType && matchesDate;
+    });
+  }, [notifications, search, statusFilter, typeFilter, dateFrom, dateTo]);
 
   const getStatusIcon = (status) => {
     switch (status) {
@@ -172,6 +229,101 @@ const NotificationHistory = () => {
         </Alert>
       )}
 
+      {/* Filtros */}
+      <Card sx={{ mb: 2 }}>
+        <CardContent>
+          <Grid container spacing={2} alignItems="center">
+            <Grid item xs={12} md={4}>
+              <TextField
+                fullWidth
+                size="small"
+                placeholder="Buscar por cliente, teléfono o texto"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon color="action" />
+                    </InputAdornment>
+                  )
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={2}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Estado</InputLabel>
+                <Select
+                  label="Estado"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                >
+                  <MenuItem value=""><em>Todos</em></MenuItem>
+                  <MenuItem value="SENT">Enviado</MenuItem>
+                  <MenuItem value="FAILED">Fallido</MenuItem>
+                  <MenuItem value="PENDING">Pendiente</MenuItem>
+                  <MenuItem value="SIMULATED">Simulado</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6} md={2}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Tipo</InputLabel>
+                <Select
+                  label="Tipo"
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                >
+                  <MenuItem value=""><em>Todos</em></MenuItem>
+                  <MenuItem value="DOCUMENT_READY">Documento Listo</MenuItem>
+                  <MenuItem value="GROUP_READY">Grupo Listo</MenuItem>
+                  <MenuItem value="DOCUMENT_DELIVERED">Documento Entregado</MenuItem>
+                  <MenuItem value="REMINDER">Recordatorio</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={6} md={2}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Desde"
+                type="date"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={6} md={2}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Hasta"
+                type="date"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Grid>
+            <Grid item xs={12} md={2}>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button size="small" onClick={clearFilters}>Limpiar</Button>
+                <Tooltip title="Recargar desde servidor">
+                  <span>
+                    <Button 
+                      size="small" 
+                      onClick={loadNotifications} 
+                      disabled={loading}
+                      startIcon={<RefreshIcon />}
+                    >
+                      Actualizar
+                    </Button>
+                  </span>
+                </Tooltip>
+              </Box>
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
       {/* Tabla */}
       <Card>
         <CardContent>
@@ -194,7 +346,7 @@ const NotificationHistory = () => {
                       <CircularProgress />
                     </TableCell>
                   </TableRow>
-                ) : notifications.length === 0 ? (
+                ) : filteredNotifications.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={6} align="center">
                       <Typography variant="body2" color="text.secondary">
@@ -203,7 +355,7 @@ const NotificationHistory = () => {
                     </TableCell>
                   </TableRow>
                 ) : (
-                  notifications.map((notification) => (
+                  filteredNotifications.map((notification) => (
                     <TableRow key={notification.id} hover>
                       <TableCell align="center">
                         <Tooltip title={notification.estado}>

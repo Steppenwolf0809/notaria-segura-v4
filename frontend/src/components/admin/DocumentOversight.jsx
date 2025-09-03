@@ -61,7 +61,9 @@ import { toast } from 'react-toastify';
 import { useDebounce } from '../../hooks/useDebounce';
 import useAuthStore from '../../store/auth-store';
 import DocumentStatusTimeline from './DocumentStatusTimeline';
-import BulkOperationsDialog from './BulkOperationsDialog';
+import DocumentDetailModal from '../Documents/DocumentDetailModal';
+import documentService from '../../services/document-service';
+import { History as HistoryIcon } from '@mui/icons-material';
 
 /**
  * Componente de supervisión integral de documentos para administradores
@@ -89,11 +91,10 @@ const DocumentOversight = () => {
   const [sortOrder, setSortOrder] = useState('desc');
 
   // Estados de UI
-  const [selectedDocuments, setSelectedDocuments] = useState([]);
-  const [anchorEl, setAnchorEl] = useState(null);
   const [showTimeline, setShowTimeline] = useState(false);
   const [selectedDocumentForTimeline, setSelectedDocumentForTimeline] = useState(null);
-  const [showBulkOperations, setShowBulkOperations] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedDocumentForDetail, setSelectedDocumentForDetail] = useState(null);
   const [matrizadores, setMatrizadores] = useState([]);
 
   // Debounce para búsqueda
@@ -251,27 +252,7 @@ const DocumentOversight = () => {
     setPage(0);
   };
 
-  /**
-   * Seleccionar/deseleccionar documento
-   */
-  const toggleDocumentSelection = (documentId) => {
-    setSelectedDocuments(prev => 
-      prev.includes(documentId)
-        ? prev.filter(id => id !== documentId)
-        : [...prev, documentId]
-    );
-  };
-
-  /**
-   * Seleccionar/deseleccionar todos los documentos
-   */
-  const toggleSelectAll = () => {
-    if (selectedDocuments.length === documents.length) {
-      setSelectedDocuments([]);
-    } else {
-      setSelectedDocuments(documents.map(doc => doc.id));
-    }
-  };
+  // Sin selección múltiple: checkboxes y acciones en lote eliminados
 
   /**
    * Obtener color del estado
@@ -359,6 +340,38 @@ const DocumentOversight = () => {
   const showDocumentTimeline = (document) => {
     setSelectedDocumentForTimeline(document);
     setShowTimeline(true);
+  };
+
+  /**
+   * Mostrar detalle del documento
+   */
+  const showDocumentDetail = (document) => {
+    setSelectedDocumentForDetail(document);
+    setShowDetailModal(true);
+  };
+
+  const handleApplyCreditNote = async (doc) => {
+    const reason = prompt('Motivo de la Nota de Crédito (obligatorio):');
+    if (!reason || !reason.trim()) return;
+    const res = await documentService.applyCreditNote(doc.id, reason.trim());
+    if (res.success) {
+      toast.success(res.message || 'Nota de Crédito aplicada');
+      loadDocuments();
+    } else {
+      toast.error(res.message || 'No se pudo aplicar Nota de Crédito');
+    }
+  };
+
+  const handleRevertCreditNote = async (doc) => {
+    const reason = prompt('Motivo de la reversión (obligatorio):');
+    if (!reason || !reason.trim()) return;
+    const res = await documentService.revertCreditNote(doc.id, reason.trim());
+    if (res.success) {
+      toast.success(res.message || 'Nota de Crédito revertida');
+      loadDocuments();
+    } else {
+      toast.error(res.message || 'No se pudo revertir la Nota de Crédito');
+    }
   };
 
   /**
@@ -613,23 +626,7 @@ const DocumentOversight = () => {
         </CardContent>
       </Card>
 
-      {/* Operaciones en lote */}
-      {selectedDocuments.length > 0 && (
-        <Alert 
-          severity="info" 
-          sx={{ mb: 2 }}
-          action={
-            <Button
-              size="small"
-              onClick={() => setShowBulkOperations(true)}
-            >
-              Acciones en Lote
-            </Button>
-          }
-        >
-          {selectedDocuments.length} documento(s) seleccionado(s)
-        </Alert>
-      )}
+      
 
       {/* Error */}
       {error && (
@@ -644,13 +641,6 @@ const DocumentOversight = () => {
           <Table>
             <TableHead>
               <TableRow>
-                <TableCell padding="checkbox">
-                  <Checkbox
-                    indeterminate={selectedDocuments.length > 0 && selectedDocuments.length < documents.length}
-                    checked={documents.length > 0 && selectedDocuments.length === documents.length}
-                    onChange={toggleSelectAll}
-                  />
-                </TableCell>
                 <TableCell>Documento</TableCell>
                 <TableCell>Cliente</TableCell>
                 <TableCell>Tipo</TableCell>
@@ -666,7 +656,6 @@ const DocumentOversight = () => {
                 // Skeleton loading
                 Array.from(new Array(rowsPerPage)).map((_, index) => (
                   <TableRow key={index}>
-                    <TableCell><Skeleton variant="rectangular" width={24} height={24} /></TableCell>
                     <TableCell><Skeleton variant="text" width={120} /></TableCell>
                     <TableCell><Skeleton variant="text" width={150} /></TableCell>
                     <TableCell><Skeleton variant="text" width={100} /></TableCell>
@@ -679,7 +668,7 @@ const DocumentOversight = () => {
                 ))
               ) : documents.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
                     <Typography variant="body2" color="text.secondary">
                       No se encontraron documentos
                     </Typography>
@@ -699,13 +688,7 @@ const DocumentOversight = () => {
                         opacity: isOverdue ? 0.9 : 1
                       }}
                     >
-                      <TableCell padding="checkbox">
-                        <Checkbox
-                          checked={selectedDocuments.includes(document.id)}
-                          onChange={() => toggleDocumentSelection(document.id)}
-                        />
-                      </TableCell>
-                      <TableCell>
+                      <TableCell onClick={() => showDocumentDetail(document)} sx={{ cursor: 'pointer' }}>
                         <Box>
                           <Typography variant="body2" fontWeight="medium">
                             {document.protocolNumber}
@@ -717,7 +700,11 @@ const DocumentOversight = () => {
                       </TableCell>
                       <TableCell>
                         <Box>
-                          <Typography variant="body2">
+                          <Typography 
+                            variant="body2"
+                            sx={{ cursor: 'pointer', textDecoration: 'underline' }}
+                            onClick={() => { setSearch(document.clientName || ''); setPage(0); }}
+                          >
                             {document.clientName}
                           </Typography>
                           {document.clientPhone && (
@@ -808,6 +795,29 @@ const DocumentOversight = () => {
                             <TimelineIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          onClick={() => showDocumentDetail(document)}
+                          sx={{ ml: 1 }}
+                        >
+                          Ver Detalle
+                        </Button>
+                        {['ADMIN','CAJA'].includes(currentUser?.role) && (
+                          document.status !== 'ANULADO_NOTA_CREDITO' ? (
+                            <Tooltip title="Aplicar Nota de Crédito">
+                              <IconButton size="small" onClick={() => handleApplyCreditNote(document)}>
+                                <CancelIcon fontSize="small" color="error" />
+                              </IconButton>
+                            </Tooltip>
+                          ) : (
+                            <Tooltip title="Revertir Nota de Crédito">
+                              <IconButton size="small" onClick={() => handleRevertCreditNote(document)}>
+                                <HistoryIcon fontSize="small" color="error" />
+                              </IconButton>
+                            </Tooltip>
+                          )
+                        )}
                       </TableCell>
                     </TableRow>
                   );
@@ -839,13 +849,12 @@ const DocumentOversight = () => {
         document={selectedDocumentForTimeline}
       />
 
-      {/* Modal de operaciones en lote */}
-      <BulkOperationsDialog
-        open={showBulkOperations}
-        onClose={() => setShowBulkOperations(false)}
-        selectedDocuments={selectedDocuments}
-        onOperationComplete={() => {
-          setSelectedDocuments([]);
+      {/* Modal de detalle de documento */}
+      <DocumentDetailModal
+        open={showDetailModal}
+        onClose={() => setShowDetailModal(false)}
+        document={selectedDocumentForDetail}
+        onDocumentUpdated={() => {
           loadDocuments();
         }}
       />
