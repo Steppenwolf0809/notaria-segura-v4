@@ -32,6 +32,7 @@ function normalizeDocs(res: any): any[] {
   if (Array.isArray(base?.items)) return base.items;
   // Soportar distintas claves usadas por el backend
   if (Array.isArray(base?.documents)) return base.documents;
+  if (Array.isArray(base?.documentos)) return base.documentos;
   if (Array.isArray(data?.documents)) return data.documents;
   if (Array.isArray(data?.documentos)) return data.documentos;
   if (Array.isArray(base?.data)) return base.data;
