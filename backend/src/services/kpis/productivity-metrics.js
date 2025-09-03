@@ -1,22 +1,28 @@
 import { startOfDayLocal, endOfDayLocal } from '../../utils/timezone.js';
 
 export async function buildProductivityMetrics(prisma, from, to, opts = {}) {
-  const limit = opts.limit || 10;
+  const limit = Math.max(1, Math.min(opts.limit || 10, 50));
   const start = startOfDayLocal(from);
   const end = endOfDayLocal(to);
 
   // Ranking por matrizadores: documentos en LISTO en ventana (aprox.)
-  const rankingRaw = await prisma.document.groupBy({
-    by: ['assignedToId'],
-    where: {
-      status: 'LISTO',
-      updatedAt: { gte: start, lte: end },
-      assignedToId: { not: null },
-    },
-    _count: { _all: true },
-    orderBy: { _count: { _all: 'desc' } },
-    take: limit,
-  });
+  let rankingRaw = [];
+  try {
+    rankingRaw = await prisma.document.groupBy({
+      by: ['assignedToId'],
+      where: {
+        status: 'LISTO',
+        updatedAt: { gte: start, lte: end },
+        assignedToId: { not: null },
+      },
+      _count: { _all: true },
+      orderBy: [{ _count: { _all: 'desc' } }],
+      take: limit,
+    });
+  } catch (err) {
+    console.error('KPIs productivity groupBy error:', err?.message || err);
+    rankingRaw = [];
+  }
 
   const userIds = rankingRaw.map((r) => r.assignedToId).filter(Boolean);
   const users = userIds.length ? await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, firstName: true, lastName: true } }) : [];
@@ -44,10 +50,23 @@ export async function buildProductivityMetrics(prisma, from, to, opts = {}) {
   }));
 
   // Comparativas por área: estimación simple usando estados
+  let recepcionCount = 0;
+  let archivoCount = 0;
+  try {
+    [recepcionCount, archivoCount] = await Promise.all([
+      prisma.document.count({ where: { fechaEntrega: { gte: start, lte: end } } }),
+      prisma.document.count({ where: { status: 'ENTREGADO', updatedAt: { gte: start, lte: end } } }),
+    ]);
+  } catch (err) {
+    console.error('KPIs productivity counts error:', err?.message || err);
+    recepcionCount = 0;
+    archivoCount = 0;
+  }
+
   const comparativas_area = [
     { area: 'MATRIZACION', valor: ranking_matrizadores.reduce((a, b) => a + (b.docs_procesados || 0), 0) },
-    { area: 'RECEPCION', valor: await prisma.document.count({ where: { fechaEntrega: { gte: start, lte: end } } }) },
-    { area: 'ARCHIVO', valor: await prisma.document.count({ where: { status: 'ENTREGADO', updatedAt: { gte: start, lte: end } } }) },
+    { area: 'RECEPCION', valor: recepcionCount },
+    { area: 'ARCHIVO', valor: archivoCount },
   ];
 
   return { ranking_matrizadores, comparativas_area };
