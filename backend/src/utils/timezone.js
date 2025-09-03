@@ -56,12 +56,41 @@ export function formatLongDateTime(dateInput, locale = DEFAULT_LOCALE) {
   return `${day} de ${month} de ${year}, ${time}`;
 }
 
+// Retorna inicio del día en TZ local
+export function startOfDayLocal(dateInput) {
+  const d = new Date(dateInput);
+  const y = new Intl.DateTimeFormat(DEFAULT_LOCALE, { year: 'numeric', timeZone: getAppTimeZone() }).format(d);
+  const m = new Intl.DateTimeFormat(DEFAULT_LOCALE, { month: '2-digit', timeZone: getAppTimeZone() }).format(d);
+  const day = new Intl.DateTimeFormat(DEFAULT_LOCALE, { day: '2-digit', timeZone: getAppTimeZone() }).format(d);
+  return new Date(`${y}-${m}-${day}T00:00:00`);
+}
+
+// Retorna fin del día en TZ local
+export function endOfDayLocal(dateInput) {
+  const d = startOfDayLocal(dateInput);
+  d.setDate(d.getDate() + 1);
+  d.setMilliseconds(-1);
+  return d;
+}
+
+// YYYY-MM-DD en TZ local
+export function formatDateLocal(dateInput) {
+  const d = new Date(dateInput);
+  const y = new Intl.DateTimeFormat(DEFAULT_LOCALE, { year: 'numeric', timeZone: getAppTimeZone() }).format(d);
+  const m = new Intl.DateTimeFormat(DEFAULT_LOCALE, { month: '2-digit', timeZone: getAppTimeZone() }).format(d);
+  const day = new Intl.DateTimeFormat(DEFAULT_LOCALE, { day: '2-digit', timeZone: getAppTimeZone() }).format(d);
+  return `${y}-${m}-${day}`;
+}
+
 export default {
   getAppTimeZone,
   formatDateTime,
   formatDateOnly,
   formatTimeOnly,
-  formatLongDateTime
+  formatLongDateTime,
+  startOfDayLocal,
+  endOfDayLocal,
+  formatDateLocal
 };
 
 

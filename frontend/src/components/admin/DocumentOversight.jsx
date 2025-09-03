@@ -100,6 +100,26 @@ const DocumentOversight = () => {
   // Debounce para búsqueda
   const debouncedSearch = useDebounce(search, 500);
 
+  // Aplicar filtros iniciales desde querystring para soportar drill-down del dashboard
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search || '');
+      const s = params.get('state');
+      const tipo = params.get('tipo_documento');
+      const asg = params.get('assigned_to');
+      const fecha = params.get('fecha');
+      if (s) setStatusFilter(s);
+      if (tipo) setTypeFilter(tipo);
+      if (asg) setMatrizadorFilter(asg);
+      if (fecha) {
+        // Mostrar más recientes primero y buscar por fecha aproximada en search
+        setSearch(fecha);
+      }
+    } catch {}
+    // Aplicar solo una vez al montar
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Configuración de umbrales para documentos vencidos (en días)
   const OVERDUE_THRESHOLDS = {
     PENDIENTE: 2,    // Pendiente más de 2 días

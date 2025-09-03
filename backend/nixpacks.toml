@@ -18,3 +18,6 @@ cmd = "npm start"
 
 [variables]
 NODE_ENV = "production"
+APP_TIMEZONE = "America/Guayaquil"
+TZ = "America/Guayaquil"
+# CACHE_ENABLED=true por defecto. Si se adjunta Redis en Railway, exporta REDIS_URL.

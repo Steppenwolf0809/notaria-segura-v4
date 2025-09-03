@@ -52,6 +52,7 @@ import {
   addRateLimitHeaders
 } from '../middleware/rate-limiter.js';
 import cache from '../services/cache-service.js';
+import kpisRoutes from './kpis-routes.js';
 
 const router = express.Router();
 
@@ -64,6 +65,9 @@ router.use(requireAdmin);
 
 // Aplicar rate limiting a todas las rutas administrativas
 router.use(adminRateLimit);
+
+// Subrutas de KPIs para admin
+router.use('/kpis', kpisRoutes);
 
 /**
  * @route GET /api/admin/users
