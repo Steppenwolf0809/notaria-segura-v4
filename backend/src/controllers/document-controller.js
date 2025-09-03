@@ -3805,6 +3805,34 @@ async function getDocumentHistory(req, res) {
       createdAt: document.createdAt
     };
 
+    // Construir forma simplificada adicional (compatibilidad con clientes que esperan items planos)
+    const toAlias = (status) => {
+      if (!status) return status;
+      const s = String(status).toUpperCase();
+      return s === 'ANULADO_NOTA_CREDITO' ? 'NOTA_CREDITO' : s;
+    };
+    const flatItems = events.map(ev => {
+      const det = ev.details || {};
+      let fromState = det.previousStatus || det.fromStatus || null;
+      let toState = det.newStatus || det.toStatus || null;
+      if (ev.eventType === 'CREDIT_NOTE_APPLIED') {
+        fromState = document.status; // mejor esfuerzo
+        toState = 'ANULADO_NOTA_CREDITO';
+      } else if (ev.eventType === 'CREDIT_NOTE_REVERTED') {
+        fromState = 'ANULADO_NOTA_CREDITO';
+        toState = det.newStatus || document.status;
+      }
+      return {
+        id: ev.id,
+        timestamp: ev.createdAt,
+        fromState: toAlias(fromState),
+        toState: toAlias(toState),
+        action: ev.eventType,
+        reason: det.motivo || det.reason || det.reversionReason || null,
+        user: ev.user ? { id: ev.user.id, name: `${ev.user.firstName} ${ev.user.lastName}` } : null
+      };
+    });
+
     res.json({
       success: true,
       data: {
@@ -3818,6 +3846,7 @@ async function getDocumentHistory(req, res) {
             hasMore: (parseInt(offset) + parseInt(limit)) < totalEvents
           }
         },
+        items: flatItems,
         permissions: {
           role: userRole,
           canViewAll: ['ADMIN', 'RECEPCION', 'CAJA', 'ARCHIVO'].includes(userRole),
@@ -3828,9 +3857,15 @@ async function getDocumentHistory(req, res) {
 
   } catch (error) {
     console.error('Error obteniendo historial del documento:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error interno del servidor'
+    // No devolver 500 por problemas de consulta simple; retornar estructura vacía
+    res.status(200).json({
+      success: true,
+      data: {
+        document: { id: req.params.id },
+        history: { events: [], pagination: { total: 0, limit: parseInt(req.query.limit || 50), offset: parseInt(req.query.offset || 0), hasMore: false } },
+        items: [],
+        permissions: { role: req.user?.role || 'UNKNOWN' }
+      }
     });
   }
 }

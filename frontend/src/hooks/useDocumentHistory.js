@@ -98,6 +98,8 @@ const useDocumentHistory = (documentId, options = {}) => {
           error: err.message || 'Error al cargar el historial del documento'
         }));
       }
+    } finally {
+      setState(prev => ({ ...prev, loading: false }));
     }
   }, [documentId, limit, eventType, enabled, fallbackToSimulated]);
 

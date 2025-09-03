@@ -863,11 +863,14 @@ const documentService = {
       const response = await api.get(url);
       console.log('📥 SERVICE: Respuesta del historial recibida:', response.data);
       
-      return {
-        success: true,
-        data: response.data.data,
-        message: response.data.message
-      };
+      const data = response?.data?.data || {};
+      // Normalizar estructura defensivamente
+      return { success: true, data: {
+        document: data.document || { id: documentId },
+        history: data.history || { events: [], pagination: { total: 0, limit: params.limit || 50, offset: params.offset || 0, hasMore: false } },
+        items: Array.isArray(data.items) ? data.items : [],
+        permissions: data.permissions || {}
+      }, message: response?.data?.message };
     } catch (error) {
       console.error('💥 SERVICE: Error obteniendo historial del documento:', error);
       console.error('📊 SERVICE: Error details:', {
@@ -877,15 +880,13 @@ const documentService = {
         message: error.message
       });
       
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          'Error al obtener historial del documento';
-      
-      return {
-        success: false,
-        error: errorMessage,
-        message: errorMessage
-      };
+      // Retornar vacío (no bloquear UI)
+      return { success: true, data: {
+        document: { id: documentId },
+        history: { events: [], pagination: { total: 0, limit: params.limit || 50, offset: params.offset || 0, hasMore: false } },
+        items: [],
+        permissions: {}
+      }, message: 'Sin historial disponible' };
     }
   },
 

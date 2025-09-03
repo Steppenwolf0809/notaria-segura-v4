@@ -64,18 +64,24 @@ const QuickGroupingModal = ({
 
 
   // Debug del modal
+  const loggedRef = React.useRef(false);
   React.useEffect(() => {
     if (open) {
-      console.log('🔗 QuickGroupingModal abierto con datos:', {
-        open,
-        mainDocument: mainDocument?.protocolNumber,
-        relatedDocuments: relatedDocuments.map(d => d.protocolNumber),
-        totalDocuments: relatedDocuments.length + 1
-      });
+      if (!loggedRef.current) {
+        console.log('🔗 QuickGroupingModal abierto con datos:', {
+          open,
+          mainDocument: mainDocument?.protocolNumber,
+          relatedDocuments: relatedDocuments.map(d => d.protocolNumber),
+          totalDocuments: (relatedDocuments?.length || 0) + (mainDocument ? 1 : 0)
+        });
+        loggedRef.current = true;
+      }
       // Reset selección y documento actualizado cuando se abre
-      setSelectedDocuments(new Set(relatedDocuments.map(doc => doc.id)));
+      setSelectedDocuments(new Set((relatedDocuments || []).map(doc => doc.id)));
       setUpdatedMainDocument(null);
       setDocumentUpdates(new Map());
+    } else {
+      loggedRef.current = false;
     }
   }, [open, mainDocument, relatedDocuments]);
 
@@ -153,12 +159,9 @@ const QuickGroupingModal = ({
   const totalSelected = 1 + selectedDocuments.size;
 
   // Usar documento principal actualizado si existe, sino el original
-  const currentMainDocument = updatedMainDocument || mainDocument;
+  const currentMainDocument = updatedMainDocument || mainDocument || {};
 
-  if (!open || !mainDocument) {
-    console.log('🔗 QuickGroupingModal NO mostrado - open:', open, 'mainDocument:', !!mainDocument);
-    return null;
-  }
+  if (!open) return null;
 
   return (
     <Dialog 

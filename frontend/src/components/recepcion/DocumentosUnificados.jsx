@@ -332,7 +332,12 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
             setTotalPages(1);
             setError(null);
           } else {
-            throw new Error(fbRes?.error || 'Error cargando documentos ENTREGADOS');
+            console.warn('Sin resultados en fallback ENTREGADOS; mostrando vacío.');
+            setDocumentos([]);
+            setTotalCount(0);
+            setTotalPages(1);
+            setError(null);
+            return;
           }
         }
       } else if (activeTab === 'anulados') {

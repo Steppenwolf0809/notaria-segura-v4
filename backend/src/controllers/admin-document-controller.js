@@ -37,7 +37,8 @@ async function getAllDocumentsOversight(req, res) {
 
     // Filtro por estado
     if (status) {
-      where.status = status;
+      const normalized = String(status).toUpperCase();
+      where.status = normalized === 'NOTA_CREDITO' || normalized === 'NOTA-CREDITO' ? 'ANULADO_NOTA_CREDITO' : status;
     }
 
     // Filtro por tipo

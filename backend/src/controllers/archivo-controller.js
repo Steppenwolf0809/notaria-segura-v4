@@ -149,7 +149,8 @@ async function listarMisDocumentos(req, res) {
     }
 
     if (estado && estado !== 'TODOS') {
-      where.status = estado;
+      const norm = String(estado).toUpperCase();
+      where.status = (norm === 'NOTA_CREDITO' || norm === 'NOTA-CREDITO') ? 'ANULADO_NOTA_CREDITO' : estado;
     }
 
     // Paginación
