@@ -137,6 +137,49 @@ async function uploadXmlDocument(req, res) {
       console.log(`✅ Documento asignado automáticamente a: ${assignmentResult.matrizador.firstName} ${assignmentResult.matrizador.lastName}`);
     } else {
       console.log(`⚠️ Documento creado sin asignación automática: ${assignmentResult.message}`);
+
+      // ⭐ Fallback específico para ARCHIVO: asignar CERTIFICACION/OTROS al rol ARCHIVO
+      try {
+        if (['CERTIFICACION', 'OTROS'].includes(parsedData.documentType)) {
+          const archivoUser = await prisma.user.findFirst({
+            where: { role: 'ARCHIVO', isActive: true },
+            select: { id: true, firstName: true, lastName: true }
+          });
+
+          if (archivoUser) {
+            finalDocument = await prisma.document.update({
+              where: { id: document.id },
+              data: { assignedToId: archivoUser.id, status: 'EN_PROCESO' },
+              include: { assignedTo: { select: { id: true, firstName: true, lastName: true, role: true } } }
+            });
+
+            // Registrar evento de asignación por fallback ARCHIVO
+            await prisma.documentEvent.create({
+              data: {
+                documentId: document.id,
+                userId: req.user.id,
+                eventType: 'DOCUMENT_ASSIGNED',
+                description: `Asignación por defecto a ARCHIVO: ${archivoUser.firstName} ${archivoUser.lastName}`,
+                details: {
+                  assignmentType: 'FALLBACK_ARCHIVO',
+                  reason: 'CERTIFICACION/OTROS sin matrizador coincidente',
+                  assignedTo: archivoUser.id,
+                  previousStatus: 'PENDIENTE',
+                  newStatus: 'EN_PROCESO'
+                },
+                ipAddress: req.ip || req.connection?.remoteAddress || 'system',
+                userAgent: req.get('User-Agent') || 'uploadXmlDocument-fallback'
+              }
+            });
+
+            console.log(`📎 Fallback: Documento asignado a usuario ARCHIVO ${archivoUser.firstName} ${archivoUser.lastName}`);
+          } else {
+            console.warn('📎 Fallback ARCHIVO: No se encontró usuario activo con rol ARCHIVO');
+          }
+        }
+      } catch (fallbackErr) {
+        console.error('Error en fallback de asignación a ARCHIVO:', fallbackErr);
+      }
     }
 
     // 🧪 Extracción avanzada (snapshot) si está activo y hay texto para analizar
