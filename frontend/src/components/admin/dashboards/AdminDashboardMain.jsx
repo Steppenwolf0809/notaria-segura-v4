@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Button, Spinner } from 'react-bootstrap';
-import { Box, Grid, Card, CardContent, Typography, Skeleton, Alert, Chip, IconButton } from '@mui/material';
+import { Box, Grid, Card, CardContent, Typography, Skeleton, Alert, Chip, IconButton, Button } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import KPISection from './KPISection.jsx';
 import FlowCharts from './FlowCharts.jsx';
@@ -27,7 +26,7 @@ const AdminDashboardMain = ({ onDrillDown }) => {
         <RealtimeStats lastUpdated={lastUpdated} onRefresh={refresh} loading={loading} />
         <Box>
           <Chip label={`${days} días`} color="info" variant="outlined" sx={{ mr: 1 }} />
-          <Button size="sm" onClick={() => setDays(days === 7 ? 30 : 7)}>
+          <Button size="small" onClick={() => setDays(days === 7 ? 30 : 7)}>
             {days === 7 ? 'Ver 30 días' : 'Ver 7 días'}
           </Button>
         </Box>
