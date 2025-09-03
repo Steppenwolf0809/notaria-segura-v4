@@ -56,12 +56,14 @@ const CajaDashboard = () => {
     uploadProgress,
     fetchAllDocuments,
     fetchMatrizadores,
+    fetchGlobalStats,
     uploadXmlDocument,
     assignDocument,
     getDocumentStats,
     searchDocuments,
     clearError,
-    totalDocuments
+    totalDocuments,
+    globalStats
   } = useDocumentStore();
 
   // Estados locales
@@ -91,7 +93,8 @@ const CajaDashboard = () => {
   const loadInitialData = async () => {
     await Promise.all([
       fetchAllDocuments(1, rowsPerPage),
-      fetchMatrizadores()
+      fetchMatrizadores(),
+      fetchGlobalStats()
     ]);
   };
 
@@ -232,7 +235,9 @@ const CajaDashboard = () => {
   /**
    * Estadísticas de documentos
    */
-  const stats = getDocumentStats();
+  // 📊 Mostrar estadísticas globales del sistema (fallback a locales si aún no cargan)
+  const localStats = getDocumentStats();
+  const stats = globalStats?.total ? globalStats : localStats;
 
   return (
     <Box sx={{ p: 3 }}>

@@ -15,6 +15,40 @@ import ActosExtractorService from '../services/actos-extractor-service.js';
 // const WhatsAppService = require('../services/whatsapp-service.js'); // Descomentar cuando exista
 
 /**
+ * Obtener estadísticas globales de documentos por estado
+ * Usado por CAJA para mostrar totales reales del sistema
+ * @param {Object} req
+ * @param {Object} res
+ */
+async function getGlobalStats(req, res) {
+  try {
+    // Conteos por estado en paralelo
+    const [pendiente, enProceso, listo, entregado, total] = await Promise.all([
+      prisma.document.count({ where: { status: 'PENDIENTE' } }),
+      prisma.document.count({ where: { status: 'EN_PROCESO' } }),
+      prisma.document.count({ where: { status: 'LISTO' } }),
+      prisma.document.count({ where: { status: 'ENTREGADO' } }),
+      prisma.document.count()
+    ]);
+
+    return res.json({
+      success: true,
+      data: {
+        total,
+        PENDIENTE: pendiente,
+        EN_PROCESO: enProceso,
+        LISTO: listo,
+        ENTREGADO: entregado
+      },
+      message: 'Estadísticas de documentos obtenidas correctamente'
+    });
+  } catch (error) {
+    console.error('Error obteniendo estadísticas globales:', error);
+    return res.status(500).json({ success: false, message: 'Error interno del servidor' });
+  }
+}
+
+/**
  * Procesar XML y crear documento automáticamente
  * Función para CAJA: Upload XML, procesar y crear documento
  * @param {Object} req - Request object con archivo XML
@@ -4220,5 +4254,7 @@ export {
   ,
   // 🧪 Extracción avanzada (flag)
   extractDocumentActs,
-  applyExtractionSuggestions
+  applyExtractionSuggestions,
+  // 📊 Estadísticas globales
+  getGlobalStats
 };

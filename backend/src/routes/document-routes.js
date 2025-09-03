@@ -95,6 +95,10 @@ router.post('/upload-xml-batch', authenticateToken, uploadBatch.array('xmlFiles'
 // GET /api/documents/all - CAJA/ADMIN: Ver todos los documentos
 router.get('/all', authenticateToken, getAllDocuments);
 
+// 📊 GET /api/documents/stats - Totales globales por estado
+import { getGlobalStats } from '../controllers/document-controller.js';
+router.get('/stats', authenticateToken, getGlobalStats);
+
 // PUT /api/documents/:id/assign - CAJA: Asignar documento a matrizador
 router.put('/:id/assign', authenticateToken, assignDocument);
 

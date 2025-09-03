@@ -155,26 +155,54 @@ const DocumentOversight = () => {
   }, [page, rowsPerPage, debouncedSearch, statusFilter, typeFilter, matrizadorFilter, overdueOnly, sortBy, sortOrder, token]);
 
   /**
-   * Cargar lista de matrizadores para filtro
+   * Cargar lista de responsables (MATRIZADOR y ARCHIVO) para el filtro
    */
   const loadMatrizadores = useCallback(async () => {
     try {
       const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
-      const response = await fetch(`${API_BASE_URL}/admin/users?role=MATRIZADOR&limit=100`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setMatrizadores(data.data.users);
+      // Solicitudes en paralelo para ambos roles
+      const [respMatrizadores, respArchivo] = await Promise.all([
+        fetch(`${API_BASE_URL}/admin/users?role=MATRIZADOR&limit=100`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }),
+        fetch(`${API_BASE_URL}/admin/users?role=ARCHIVO&limit=100`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+      ]);
+
+      const users = [];
+
+      if (respMatrizadores.ok) {
+        const data = await respMatrizadores.json();
+        if (data?.success && Array.isArray(data?.data?.users)) {
+          users.push(...data.data.users);
         }
       }
+
+      if (respArchivo.ok) {
+        const data = await respArchivo.json();
+        if (data?.success && Array.isArray(data?.data?.users)) {
+          users.push(...data.data.users);
+        }
+      }
+
+      // De-duplicar por id y ordenar por nombre
+      const uniqueById = Object.values(
+        users.reduce((acc, u) => {
+          acc[u.id] = u; return acc;
+        }, {})
+      ).sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`, 'es')); 
+
+      setMatrizadores(uniqueById);
     } catch (error) {
-      console.error('Error cargando matrizadores:', error);
+      console.error('Error cargando responsables (Matrizadores/Archivo):', error);
     }
   }, [token]);
 
@@ -249,6 +277,31 @@ const DocumentOversight = () => {
       ENTREGADO: '#6b7280'
     };
     return colors[status] || '#6b7280';
+  };
+
+  /**
+   * Obtener rol del usuario asignado (desde API o lista local)
+   */
+  const getAssignedRole = (doc) => {
+    const roleFromDoc = doc?.assignedTo?.role;
+    if (roleFromDoc) return roleFromDoc;
+    if (!doc?.assignedTo?.id) return null;
+    const match = matrizadores.find(u => u.id === doc.assignedTo.id);
+    return match?.role || null;
+  };
+
+  /**
+   * Color del chip por rol
+   */
+  const getRoleChipColor = (role) => {
+    switch (role) {
+      case 'MATRIZADOR':
+        return 'info';
+      case 'ARCHIVO':
+        return 'secondary';
+      default:
+        return 'default';
+    }
   };
 
   /**
@@ -490,14 +543,26 @@ const DocumentOversight = () => {
                   displayEmpty
                 >
                   <MenuItem value="">
-                    <em>Todos los matrizadores</em>
+                    <em>Todos (Matrizadores y Archivo)</em>
                   </MenuItem>
                   <MenuItem value="unassigned">
                     <em>Sin asignar</em>
                   </MenuItem>
                   {matrizadores?.map((matrizador) => (
                     <MenuItem key={matrizador.id} value={matrizador.id}>
-                      {matrizador.firstName} {matrizador.lastName}
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="body2">
+                          {matrizador.firstName} {matrizador.lastName}
+                        </Typography>
+                        {matrizador.role && (
+                          <Chip 
+                            label={matrizador.role}
+                            size="small"
+                            color={getRoleChipColor(matrizador.role)}
+                            variant="outlined"
+                          />
+                        )}
+                      </Box>
                     </MenuItem>
                   ))}
                 </Select>
@@ -677,13 +742,24 @@ const DocumentOversight = () => {
                         </Box>
                       </TableCell>
                       <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                           {document.assignedTo ? (
                             <>
                               <PersonIcon fontSize="small" color="action" />
                               <Typography variant="body2">
                                 {document.assignedTo.firstName} {document.assignedTo.lastName}
                               </Typography>
+                              {(() => {
+                                const role = getAssignedRole(document);
+                                return role ? (
+                                  <Chip 
+                                    label={role}
+                                    size="small"
+                                    color={getRoleChipColor(role)}
+                                    variant="outlined"
+                                  />
+                                ) : null;
+                              })()}
                             </>
                           ) : (
                             <Chip 

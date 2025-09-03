@@ -27,10 +27,17 @@ export const PAGE_SIZE = 25;
 // Normaliza distintas formas de respuesta a un array de documentos
 function normalizeDocs(res: any): any[] {
   const base = res ?? {};
+  const data = base?.data ?? {};
   if (Array.isArray(base)) return base;
   if (Array.isArray(base?.items)) return base.items;
+  // Soportar distintas claves usadas por el backend
+  if (Array.isArray(base?.documents)) return base.documents;
+  if (Array.isArray(data?.documents)) return data.documents;
+  if (Array.isArray(data?.documentos)) return data.documentos;
   if (Array.isArray(base?.data)) return base.data;
   if (Array.isArray(base?.context?.hits)) return base.context.hits;
+  const docs = data?.documents || data?.documentos;
+  if (Array.isArray(docs)) return docs;
   return [];
 }
 
@@ -239,8 +246,8 @@ export async function fetchTrabajoArchivo(params: ListParams): Promise<PagedResu
     archivoService.getMisDocumentos(token, { ...baseParams, page: '1', limit: '1', estado: 'EN_PROCESO' }),
     archivoService.getMisDocumentos(token, { ...baseParams, page: '1', limit: '1', estado: 'LISTO' })
   ]);
-  const totalEnProceso = enProcesoRes?.success ? (enProcesoRes.data?.pagination?.total || enProcesoRes.data?.total || 0) : 0;
-  const totalListo = listoRes?.success ? (listoRes.data?.pagination?.total || listoRes.data?.total || 0) : 0;
+  const totalEnProceso = enProcesoRes?.success ? (enProcesoRes.data?.pagination?.totalDocuments || enProcesoRes.data?.pagination?.total || enProcesoRes.data?.total || 0) : 0;
+  const totalListo = listoRes?.success ? (listoRes.data?.pagination?.totalDocuments || listoRes.data?.pagination?.total || listoRes.data?.total || 0) : 0;
   const total = totalEnProceso + totalListo;
 
   return {
@@ -265,7 +272,7 @@ export async function fetchListoArchivo(params: ListParams): Promise<PagedResult
   if (res?.success !== true) throw new Error(res?.message || 'Error cargando documentos');
   const docs = normalizeDocs(res?.data ?? res);
   const pag = res.data?.pagination || {};
-  const total = Number(pag.total || res.data?.total || docs.length || 0);
+  const total = Number(pag.totalDocuments || pag.total || res.data?.total || docs.length || 0);
   return { documents: docs, total, totalPages: Number(pag.totalPages || Math.ceil(total / (params.limit ?? PAGE_SIZE))) || 1 };
 }
 
@@ -284,7 +291,7 @@ export async function fetchEntregadoArchivo(params: ListParams): Promise<PagedRe
   if (res?.success !== true) throw new Error(res?.message || 'Error cargando documentos');
   const docs = normalizeDocs(res?.data ?? res);
   const pag = res.data?.pagination || {};
-  const total = Number(pag.total || res.data?.total || docs.length || 0);
+  const total = Number(pag.totalDocuments || pag.total || res.data?.total || docs.length || 0);
   return { documents: docs, total, totalPages: Number(pag.totalPages || Math.ceil(total / (params.limit ?? PAGE_SIZE))) || 1 };
 }
 

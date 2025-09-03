@@ -15,6 +15,8 @@ const useDocumentStore = create((set, get) => ({
   loading: false,
   error: null,
   uploadProgress: null,
+  // 📊 Totales globales (para dashboards)
+  globalStats: { total: 0, PENDIENTE: 0, EN_PROCESO: 0, LISTO: 0, ENTREGADO: 0 },
 
   /**
    * Función para establecer estado de carga
@@ -174,6 +176,25 @@ const useDocumentStore = create((set, get) => ({
     } catch (error) {
       console.error('Error in fetchAllDocuments:', error);
       set({ error: 'Error inesperado al cargar documentos', loading: false });
+      return false;
+    }
+  },
+
+  /**
+   * 📊 Cargar estadísticas globales desde el backend
+   */
+  fetchGlobalStats: async () => {
+    try {
+      const result = await documentService.getGlobalStats();
+      if (result.success) {
+        set({ globalStats: result.data });
+        return true;
+      } else {
+        console.error('Error obteniendo estadísticas globales:', result.error);
+        return false;
+      }
+    } catch (error) {
+      console.error('Error en fetchGlobalStats:', error);
       return false;
     }
   },
