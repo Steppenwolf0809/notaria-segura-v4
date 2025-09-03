@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Box, Card, CardContent, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Avatar, Typography, IconButton, Chip, Button, Snackbar, Alert } from '@mui/material';
 import { Visibility as VisibilityIcon, Undo as UndoIcon, Send as SendIcon, GroupWork as GroupWorkIcon, Phone as PhoneIcon } from '@mui/icons-material';
 import TabsUI from '../ui/Tabs';
-import { fetchTrabajoMatrizador, fetchListoMatrizador, fetchEntregadoMatrizador, PAGE_SIZE } from '../services/docsQuery';
+import { fetchTrabajoMatrizador, fetchListoMatrizador, fetchEntregadoMatrizador, fetchAnuladoMatrizador, PAGE_SIZE } from '../services/docsQuery';
 import DocumentDetailModal from '../../../components/Documents/DocumentDetailModal';
 import ReversionModal from '../../../components/recepcion/ReversionModal';
 import ModalEntregaMatrizador from '../../../components/matrizador/ModalEntregaMatrizador.jsx';
@@ -50,7 +50,7 @@ const getInitials = (name?: string) => {
   return `${firstInitial}${secondInitial}`.toUpperCase();
 };
 
-type TabKey = 'trabajo' | 'listo' | 'entregado';
+type TabKey = 'trabajo' | 'listo' | 'entregado' | 'anulados';
 
 export default function MatrizadorTabs() {
   const { updateDocumentStatus, detectGroupableDocuments, createDocumentGroup } = useDocumentStore();
@@ -60,6 +60,7 @@ export default function MatrizadorTabs() {
   const [pageTrabajo, setPageTrabajo] = useState<number>(1);
   const [pageListo, setPageListo] = useState<number>(1);
   const [pageEntregado, setPageEntregado] = useState<number>(1);
+  const [pageAnulados, setPageAnulados] = useState<number>(1);
   const [rowsPerPage, setRowsPerPage] = useState<number>(PAGE_SIZE);
   const [fechaDesde, setFechaDesde] = useState<string>('');
   const [fechaHasta, setFechaHasta] = useState<string>('');
@@ -67,6 +68,7 @@ export default function MatrizadorTabs() {
   const [totalTrabajo, setTotalTrabajo] = useState<number>(0);
   const [totalListo, setTotalListo] = useState<number>(0);
   const [totalEntregado, setTotalEntregado] = useState<number>(0);
+  const [totalAnulados, setTotalAnulados] = useState<number>(0);
   const [docs, setDocs] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [detailOpen, setDetailOpen] = useState<boolean>(false);
@@ -84,12 +86,14 @@ export default function MatrizadorTabs() {
   const [showGroupInfoModal, setShowGroupInfoModal] = useState(false);
   const [selectedGroupDocument, setSelectedGroupDocument] = useState<any>(null);
 
-  const currentPage = activeTab === 'trabajo' ? pageTrabajo : activeTab === 'listo' ? pageListo : pageEntregado;
+  const currentPage = activeTab === 'trabajo' ? pageTrabajo : activeTab === 'listo' ? pageListo : activeTab === 'entregado' ? pageEntregado : pageAnulados;
   const totalPages = activeTab === 'trabajo'
     ? Math.max(1, Math.ceil(totalTrabajo / rowsPerPage))
     : activeTab === 'listo'
     ? Math.max(1, Math.ceil(totalListo / rowsPerPage))
-    : Math.max(1, Math.ceil(totalEntregado / rowsPerPage));
+    : activeTab === 'entregado'
+    ? Math.max(1, Math.ceil(totalEntregado / rowsPerPage))
+    : Math.max(1, Math.ceil(totalAnulados / rowsPerPage));
 
   useEffect(() => {
     const load = async () => {
@@ -98,7 +102,7 @@ export default function MatrizadorTabs() {
         if (activeTab === 'trabajo') {
           const res = await fetchTrabajoMatrizador({ page: pageTrabajo, limit: rowsPerPage, search, fechaDesde, fechaHasta, sortOrder });
           const filtered = (res.documents || [])
-            .filter((d: any) => ['EN_PROCESO','LISTO','proceso','listo'].includes((d.status || '').toString()))
+            .filter((d: any) => ['EN_PROCESO','LISTO','ANULADO_NOTA_CREDITO','proceso','listo','anulado'].includes((d.status || '').toString()))
             .filter((d: any) => matchesSearch(d, search || ''));
           const start = (pageTrabajo - 1) * rowsPerPage;
           setDocs(filtered.slice(start, start + rowsPerPage));
@@ -111,7 +115,7 @@ export default function MatrizadorTabs() {
           const start = (pageListo - 1) * rowsPerPage;
           setDocs(filtered.slice(start, start + rowsPerPage));
           setTotalListo(res.total);
-        } else {
+        } else if (activeTab === 'entregado') {
           const res = await fetchEntregadoMatrizador({ page: pageEntregado, limit: rowsPerPage, search, fechaDesde, fechaHasta, sortOrder });
           const filtered = (res.documents || [])
             .filter((d: any) => ['ENTREGADO','entregado'].includes((d.status || '').toString()))
@@ -119,6 +123,14 @@ export default function MatrizadorTabs() {
           const start = (pageEntregado - 1) * rowsPerPage;
           setDocs(filtered.slice(start, start + rowsPerPage));
           setTotalEntregado(res.total);
+        } else {
+          const res = await fetchAnuladoMatrizador({ page: pageAnulados, limit: rowsPerPage, search, fechaDesde, fechaHasta, sortOrder });
+          const filtered = (res.documents || [])
+            .filter((d: any) => ['ANULADO_NOTA_CREDITO','anulado'].includes((d.status || '').toString()))
+            .filter((d: any) => matchesSearch(d, search || ''));
+          const start = (pageAnulados - 1) * rowsPerPage;
+          setDocs(filtered.slice(start, start + rowsPerPage));
+          setTotalAnulados(res.total);
         }
       } finally {
         setLoading(false);
@@ -293,14 +305,15 @@ export default function MatrizadorTabs() {
         onPageChange={(p) => {
           if (activeTab === 'trabajo') setPageTrabajo(p);
           else if (activeTab === 'listo') setPageListo(p);
-          else setPageEntregado(p);
+          else if (activeTab === 'entregado') setPageEntregado(p);
+          else setPageAnulados(p);
         }}
         rowsPerPage={rowsPerPage}
-        onRowsPerPageChange={(n) => { setRowsPerPage(n); setPageTrabajo(1); setPageListo(1); setPageEntregado(1); }}
+        onRowsPerPageChange={(n) => { setRowsPerPage(n); setPageTrabajo(1); setPageListo(1); setPageEntregado(1); setPageAnulados(1); }}
         fechaDesde={fechaDesde}
         fechaHasta={fechaHasta}
-        onFechaDesdeChange={(v) => { setFechaDesde(v); setPageTrabajo(1); setPageListo(1); setPageEntregado(1); }}
-        onFechaHastaChange={(v) => { setFechaHasta(v); setPageTrabajo(1); setPageListo(1); setPageEntregado(1); }}
+        onFechaDesdeChange={(v) => { setFechaDesde(v); setPageTrabajo(1); setPageListo(1); setPageEntregado(1); setPageAnulados(1); }}
+        onFechaHastaChange={(v) => { setFechaHasta(v); setPageTrabajo(1); setPageListo(1); setPageEntregado(1); setPageAnulados(1); }}
       />
 
       <Card>

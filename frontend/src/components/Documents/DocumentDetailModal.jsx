@@ -519,6 +519,22 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
         {/* Pestaña: Información General */}
         {currentTab === 0 && (
           <Box sx={{ p: 3 }}>
+            {localDocument?.status === 'ANULADO_NOTA_CREDITO' && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Documento anulado por Nota de Crédito</Typography>
+                <Typography variant="body2">
+                  Motivo: {localDocument?.notaCreditoMotivo || 'No especificado'}
+                </Typography>
+                {localDocument?.notaCreditoFecha && (
+                  <Typography variant="body2">
+                    Fecha: {formatDate(localDocument.notaCreditoFecha)}
+                  </Typography>
+                )}
+                <Typography variant="caption" color="text.secondary">
+                  Para revertir la anulación, contacte a Caja o Administrador.
+                </Typography>
+              </Alert>
+            )}
             {isReadOnly && (
               <Alert severity="info" sx={{ mb: 2 }}>
                 Vista en modo solo lectura. No puedes modificar este documento.

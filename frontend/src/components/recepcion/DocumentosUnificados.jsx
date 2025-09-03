@@ -70,6 +70,7 @@ const StatusIndicator = ({ status }) => {
     LISTO: { label: '✅ Listo', color: '#2e7d32' },
     ENTREGADO: { label: '📦 Entregado', color: '#616161' },
     PENDIENTE: { label: '⏳ Pendiente', color: '#f57c00' },
+    ANULADO_NOTA_CREDITO: { label: '🚫 Anulado (Nota de Crédito)', color: '#dc2626' },
   };
   const config = statusConfig[status] || { label: `📎 ${status}`, color: '#616161' };
   return (
@@ -119,7 +120,7 @@ function formatLocalDate(dateString) {
 function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDocumentoFound }) {
   const { createDocumentGroup, detectGroupableDocuments } = useDocumentStore();
   const [documentos, setDocumentos] = useState([]);
-  // pestañas: 'pendientes' (EN_PROCESO + LISTO) | 'entregados' (ENTREGADO)
+  // pestañas: 'pendientes' (EN_PROCESO + LISTO) | 'entregados' (ENTREGADO) | 'anulados' (ANULADO_NOTA_CREDITO)
   const [activeTab, setActiveTab] = useState('pendientes');
   const [selectedDocuments, setSelectedDocuments] = useState([]); // Solo para visualización
   const [visualSelection, setVisualSelection] = useState(new Set()); // 🎯 NUEVA: Selección visual sin funcionalidad
@@ -140,6 +141,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   
   const [pagePendientes, setPagePendientes] = useState(0);
   const [pageEntregados, setPageEntregados] = useState(0);
+  const [pageAnulados, setPageAnulados] = useState(0);
   // límite por página solicitado: 25, 50 y 100
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [totalPages, setTotalPages] = useState(1);
@@ -190,7 +192,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   const cargarDocumentos = useCallback(async () => {
     try {
       setLoading(true);
-      const currentPage = (activeTab === 'entregados' ? pageEntregados : pagePendientes) + 1;
+      const currentPage = (activeTab === 'entregados' ? pageEntregados : (activeTab === 'anulados' ? pageAnulados : pagePendientes)) + 1;
 
       const hasSearch = !!(filters.search && filters.search.trim());
       const useGlobalSearch = hasSearch && !!filters.globalSearchAllStates;
@@ -333,6 +335,31 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
             throw new Error(fbRes?.error || 'Error cargando documentos ENTREGADOS');
           }
         }
+      } else if (activeTab === 'anulados') {
+        // Mostrar sólo ANULADO_NOTA_CREDITO
+        const baseParams = {
+          page: String(currentPage),
+          limit: String(rowsPerPage),
+          sortBy: sortBy,
+          sortOrder: sortOrder,
+          estado: 'ANULADO_NOTA_CREDITO'
+        };
+        if (filters.search) baseParams.search = filters.search;
+        if (filters.matrizador) baseParams.matrizador = filters.matrizador;
+        if (filters.fechaDesde) baseParams.fechaDesde = filters.fechaDesde;
+        if (filters.fechaHasta) baseParams.fechaHasta = filters.fechaHasta;
+
+        const result = await receptionService.getTodosDocumentos(baseParams);
+        if (!result.success) throw new Error(result.error);
+
+        const docs = result.data.documents || [];
+        setDocumentos(docs);
+
+        const pag = result.data.pagination || {};
+        const total = Number(pag.total || 0);
+        setTotalCount(total);
+        setTotalPages(Number(pag.totalPages || Math.ceil(total / rowsPerPage)) || 1);
+        setError(null);
       } else {
         // Pestaña principal: EN_PROCESO + LISTO (excluir ENTREGADO)
         const baseParams = {
@@ -371,7 +398,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
     } finally {
       setLoading(false);
     }
-  }, [pagePendientes, pageEntregados, rowsPerPage, filters.search, filters.matrizador, filters.estado, filters.fechaDesde, filters.fechaHasta, sortBy, sortOrder, activeTab]);
+  }, [pagePendientes, pageEntregados, pageAnulados, rowsPerPage, filters.search, filters.matrizador, filters.estado, filters.fechaDesde, filters.fechaHasta, sortBy, sortOrder, activeTab]);
 
   useEffect(() => {
     cargarDocumentos();
@@ -1002,7 +1029,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
 
   return (
     <Box sx={{ p: 3 }}>
-      {/* Tabs principales: Pendientes vs Entregados */}
+      {/* Tabs principales: Pendientes vs Entregados vs Anulados */}
       <Box sx={{ mb: 2 }}>
         <Tabs
           value={activeTab}
@@ -1011,19 +1038,22 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
             // sincronizar filtro de estado para que la UI sea consistente
             if (v === 'entregados') {
               setFilters(prev => ({ ...prev, estado: 'ENTREGADO' }));
+            } else if (v === 'anulados') {
+              setFilters(prev => ({ ...prev, estado: 'ANULADO_NOTA_CREDITO' }));
             } else {
               // pestaña principal: mostrar EN_PROCESO + LISTO (excluir ENTREGADO)
               // limpiamos el filtro estado para permitir ambos y filtramos en cliente
               setFilters(prev => ({ ...prev, estado: '' }));
             }
             // Resetear página del tab de destino
-            if (v === 'entregados') setPageEntregados(0); else setPagePendientes(0);
+            if (v === 'entregados') setPageEntregados(0); else if (v === 'anulados') setPageAnulados(0); else setPagePendientes(0);
           }}
           textColor="primary"
           indicatorColor="primary"
         >
           <Tab value="pendientes" label="Pendientes (En Proceso + Listos)" />
           <Tab value="entregados" label="Entregados" />
+          <Tab value="anulados" label="Notas de Crédito" />
         </Tabs>
       </Box>
       <Box sx={{ mb: 4 }}>
@@ -1569,7 +1599,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
               onChange={(e) => {
                 setRowsPerPage(parseInt(e.target.value, 10));
                 // Resetear página del tab actual
-                if (activeTab === 'entregados') setPageEntregados(0); else setPagePendientes(0);
+                if (activeTab === 'entregados') setPageEntregados(0); else if (activeTab === 'anulados') setPageAnulados(0); else setPagePendientes(0);
               }}
             >
               <MenuItem value={25}>25</MenuItem>
@@ -1579,10 +1609,10 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
           </FormControl>
           <Pagination
             color="primary"
-            page={(activeTab === 'entregados' ? pageEntregados : pagePendientes) + 1}
+            page={(activeTab === 'entregados' ? pageEntregados : (activeTab === 'anulados' ? pageAnulados : pagePendientes)) + 1}
             count={Math.max(1, totalPages)}
             onChange={(_, value) => {
-              if (activeTab === 'entregados') setPageEntregados(value - 1); else setPagePendientes(value - 1);
+              if (activeTab === 'entregados') setPageEntregados(value - 1); else if (activeTab === 'anulados') setPageAnulados(value - 1); else setPagePendientes(value - 1);
             }}
             showFirstButton
             showLastButton

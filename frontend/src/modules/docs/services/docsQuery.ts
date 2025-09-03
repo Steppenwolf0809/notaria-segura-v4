@@ -220,6 +220,27 @@ export async function fetchEntregadoMatrizador(params: ListParams): Promise<Page
   };
 }
 
+export async function fetchAnuladoMatrizador(params: ListParams): Promise<PagedResult<any>> {
+  const options: any = {
+    states: 'ANULADO_NOTA_CREDITO',
+    q: params.search || '',
+    page: params.page,
+    limit: params.limit ?? PAGE_SIZE
+  };
+  options.sortOrder = params.sortOrder || 'desc';
+  if (params.fechaDesde) options.fechaDesde = params.fechaDesde;
+  if (params.fechaHasta) options.fechaHasta = params.fechaHasta;
+  const res = await documentService.getMyDocumentsPaged(options as any);
+  if (!res.success) throw new Error(res.error || 'Error cargando documentos');
+  const docs = res.data?.documents || [];
+  const pag = res.data?.pagination || {};
+  return {
+    documents: docs,
+    total: Number(pag.total || 0),
+    totalPages: Number(pag.totalPages || Math.ceil((Number(pag.total || 0)) / (params.limit ?? PAGE_SIZE))) || 1
+  };
+}
+
 // ARCHIVO: usar /archivo/mis-documentos (token explícito)
 export async function fetchTrabajoArchivo(params: ListParams): Promise<PagedResult<any>> {
   const token = getToken();
@@ -236,7 +257,7 @@ export async function fetchTrabajoArchivo(params: ListParams): Promise<PagedResu
   const res = await archivoService.getMisDocumentos(token, baseParams);
   if (res?.success !== true) throw new Error(res?.message || 'Error cargando documentos');
   const all = normalizeDocs(res?.data ?? res);
-  const documents = all.filter((d: any) => d.status === 'EN_PROCESO' || d.status === 'LISTO');
+  const documents = all.filter((d: any) => d.status === 'EN_PROCESO' || d.status === 'LISTO' || d.status === 'ANULADO_NOTA_CREDITO');
 
   // Captura de cursor para futuros usos (paginación por cursor si aplica)
   const _cursor = (res as any)?.nextCursor || (res as any)?.cursor || (res as any)?.data?.nextCursor;
@@ -283,6 +304,25 @@ export async function fetchEntregadoArchivo(params: ListParams): Promise<PagedRe
     page: String(params.page),
     limit: String(params.limit ?? PAGE_SIZE),
     estado: 'ENTREGADO'
+  };
+  if (params.search) baseParams.search = params.search;
+  if (params.fechaDesde) baseParams.fechaDesde = params.fechaDesde;
+  if (params.fechaHasta) baseParams.fechaHasta = params.fechaHasta;
+  if (params.sortOrder) baseParams.sortOrder = params.sortOrder;
+  const res = await archivoService.getMisDocumentos(token, baseParams);
+  if (res?.success !== true) throw new Error(res?.message || 'Error cargando documentos');
+  const docs = normalizeDocs(res?.data ?? res);
+  const pag = res.data?.pagination || {};
+  const total = Number(pag.totalDocuments || pag.total || res.data?.total || docs.length || 0);
+  return { documents: docs, total, totalPages: Number(pag.totalPages || Math.ceil(total / (params.limit ?? PAGE_SIZE))) || 1 };
+}
+
+export async function fetchAnuladoArchivo(params: ListParams): Promise<PagedResult<any>> {
+  const token = getToken();
+  const baseParams: any = {
+    page: String(params.page),
+    limit: String(params.limit ?? PAGE_SIZE),
+    estado: 'ANULADO_NOTA_CREDITO'
   };
   if (params.search) baseParams.search = params.search;
   if (params.fechaDesde) baseParams.fechaDesde = params.fechaDesde;

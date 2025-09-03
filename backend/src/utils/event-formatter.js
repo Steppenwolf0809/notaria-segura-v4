@@ -20,6 +20,30 @@ function formatEventDescription(event) {
   const userRole = user?.role || 'SISTEMA';
 
   switch (eventType) {
+    case 'CREDIT_NOTE_APPLIED': {
+      const motivo = details?.motivo || details?.reason || '-';
+      const prev = details?.previousStatus ? translateStatus(details.previousStatus) : null;
+      if (prev) contextInfo.push(`Estado previo: ${prev}`);
+      if (motivo) contextInfo.push(`Motivo: ${motivo}`);
+      if (event?.createdAt) contextInfo.push(`Fecha: ${formatLongDateTime(event.createdAt)}`);
+      break;
+    }
+    case 'CREDIT_NOTE_REVERTED': {
+      const motivo = details?.motivo || details?.reason || '-';
+      const to = details?.newStatus ? translateStatus(details.newStatus) : null;
+      if (to) contextInfo.push(`Estado destino: ${to}`);
+      if (motivo) contextInfo.push(`Motivo: ${motivo}`);
+      if (event?.createdAt) contextInfo.push(`Fecha: ${formatLongDateTime(event.createdAt)}`);
+      break;
+    }
+    case 'CREDIT_NOTE_APPLIED': {
+      const by = userName;
+      return `Nota de Crédito aplicada por ${by}`;
+    }
+    case 'CREDIT_NOTE_REVERTED': {
+      const by = userName;
+      return `Reversión de Nota de Crédito realizada por ${by}`;
+    }
     case 'STATUS_UNDO': {
       const from = details?.revertedFrom || details?.reverted_to || details?.fromStatus || 'desconocido';
       const to = details?.revertedTo || details?.reverted_to || details?.toStatus || 'desconocido';

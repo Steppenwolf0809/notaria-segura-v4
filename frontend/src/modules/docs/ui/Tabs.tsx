@@ -3,8 +3,8 @@ import { Box, Tabs as MuiTabs, Tab, TextField, InputAdornment, IconButton, Toolt
 import { Search as SearchIcon, Clear as ClearIcon } from '@mui/icons-material';
 
 interface TabsProps {
-  activeTab: 'trabajo' | 'listo' | 'entregado';
-  onTabChange: (tab: 'trabajo' | 'listo' | 'entregado') => void;
+  activeTab: 'trabajo' | 'listo' | 'entregado' | 'anulados';
+  onTabChange: (tab: 'trabajo' | 'listo' | 'entregado' | 'anulados') => void;
   search: string;
   onSearchChange: (value: string) => void;
   page: number; // 1-based
@@ -32,6 +32,7 @@ export default function Tabs(props: TabsProps) {
         <Tab value="trabajo" label="Trabajo (En Proceso + Listo)" />
         <Tab value="listo" label="Listo" />
         <Tab value="entregado" label="Entregado" />
+        <Tab value="anulados" label="Notas de Crédito" />
       </MuiTabs>
 
       <Box sx={{ mt: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
