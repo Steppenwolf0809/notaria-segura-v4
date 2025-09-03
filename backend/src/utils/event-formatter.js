@@ -22,11 +22,11 @@ function formatEventDescription(event) {
   switch (eventType) {
     case 'CREDIT_NOTE_APPLIED': {
       const by = userName;
-      return `Nota de Crédito aplicada por ${by}`;
+      return `Nota de crédito aplicada por ${by}`;
     }
     case 'CREDIT_NOTE_REVERTED': {
       const by = userName;
-      return `Reversión de Nota de Crédito realizada por ${by}`;
+      return `Reversión de nota de crédito realizada por ${by}`;
     }
     case 'STATUS_UNDO': {
       const from = details?.revertedFrom || details?.reverted_to || details?.fromStatus || 'desconocido';
@@ -364,7 +364,9 @@ function getEventTitle(eventType, details = {}) {
     'GROUP_CREATED': 'Grupo Creado',
     'GROUP_DELIVERED': 'Grupo Entregado',
     'VERIFICATION_GENERATED': 'Código Generado',
-    'WHATSAPP_SENT': 'Notificación Enviada'
+    'WHATSAPP_SENT': 'Notificación Enviada',
+    'CREDIT_NOTE_APPLIED': 'Nota de crédito aplicada',
+    'CREDIT_NOTE_REVERTED': 'Reversión de nota de crédito'
   };
   return titleMap[eventType] || eventType;
 }
@@ -386,7 +388,9 @@ function getEventIcon(eventType, details = {}) {
     'GROUP_CREATED': 'group',
     'GROUP_DELIVERED': 'delivery',
     'VERIFICATION_GENERATED': 'check_circle',
-    'WHATSAPP_SENT': 'notification'
+    'WHATSAPP_SENT': 'notification',
+    'CREDIT_NOTE_APPLIED': 'error',
+    'CREDIT_NOTE_REVERTED': 'warning'
   };
   return iconMap[eventType] || 'default';
 }
@@ -415,6 +419,10 @@ function getEventColor(eventType, details = {}) {
       return 'success';
     case 'WHATSAPP_SENT':
       return details.whatsappSent || details.status === 'SENT' ? 'info' : 'error';
+    case 'CREDIT_NOTE_APPLIED':
+      return 'error';
+    case 'CREDIT_NOTE_REVERTED':
+      return 'warning';
     default:
       return 'grey';
   }

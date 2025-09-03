@@ -185,7 +185,9 @@ const useDocumentHistory = (documentId, options = {}) => {
       GROUP_CREATED: 'Grupo Creado',
       GROUP_DELIVERED: 'Grupo Entregado',
       VERIFICATION_GENERATED: 'Código Generado',
-      notification_sent: 'Notificación Enviada'
+      notification_sent: 'Notificación Enviada',
+      CREDIT_NOTE_APPLIED: 'Nota de crédito aplicada',
+      CREDIT_NOTE_REVERTED: 'Reversión de nota de crédito'
     };
     return titleMap[eventType] || eventType;
   };
@@ -203,7 +205,9 @@ const useDocumentHistory = (documentId, options = {}) => {
       GROUP_CREATED: 'group',
       GROUP_DELIVERED: 'delivery',
       VERIFICATION_GENERATED: 'check_circle',
-      notification_sent: 'notification'
+      notification_sent: 'notification',
+      CREDIT_NOTE_APPLIED: 'error',
+      CREDIT_NOTE_REVERTED: 'warning'
     };
     return iconMap[eventType] || 'default';
   };
@@ -221,7 +225,9 @@ const useDocumentHistory = (documentId, options = {}) => {
       GROUP_CREATED: 'success',
       GROUP_DELIVERED: 'success',
       VERIFICATION_GENERATED: 'success',
-      notification_sent: 'info'
+      notification_sent: 'info',
+      CREDIT_NOTE_APPLIED: 'error',
+      CREDIT_NOTE_REVERTED: 'warning'
     };
     return colorMap[eventType] || 'grey';
   };

@@ -1260,10 +1260,12 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                   </TableCell>
                 </TableRow>
               ) : (
-                // filtrar según pestaña activa: principales excluye ENTREGADO
+                // filtrar según pestaña activa
                 (activeTab === 'pendientes'
                   ? documentosOrdenados.filter(d => d.status === 'EN_PROCESO' || d.status === 'LISTO')
-                  : documentosOrdenados.filter(d => d.status === 'ENTREGADO')
+                  : activeTab === 'entregados'
+                    ? documentosOrdenados.filter(d => d.status === 'ENTREGADO')
+                    : documentosOrdenados.filter(d => d.status === 'ANULADO_NOTA_CREDITO')
                 ).map((documento) => (
                   <TableRow 
                     key={documento.id} 
