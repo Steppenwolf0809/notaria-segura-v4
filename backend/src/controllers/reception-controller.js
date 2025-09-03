@@ -139,7 +139,7 @@ async function listarTodosDocumentos(req, res) {
     
     if (estado) {
       const norm = String(estado).toUpperCase();
-      where.status = (norm === 'NOTA_CREDITO' || norm === 'NOTA-CREDITO') ? 'ANULADO_NOTA_CREDITO' : estado;
+      where.status = (norm === 'NOTA_CREDITO' || norm === 'NOTA-CREDITO') ? 'ANULADO_NOTA_CREDITO' : norm;
     }
 
     if (fechaDesde || fechaHasta) {
@@ -176,95 +176,109 @@ async function listarTodosDocumentos(req, res) {
     if (searchTerm) {
       const supportsUnaccent = await supportsUnaccentFn();
       if (supportsUnaccent) {
-        const pattern = `%${searchTerm}%`;
-        // Construir cláusulas adicionales según filtros
-        const filterClauses = [];
-        if (estado) filterClauses.push(Prisma.sql`d."status"::text = ${estado}`);
-        if (matrizador) filterClauses.push(Prisma.sql`d."assignedToId" = ${parseInt(matrizador)}`);
-        if (fechaDesde) filterClauses.push(Prisma.sql`d."createdAt" >= ${new Date(fechaDesde)}`);
-        if (fechaHasta) {
-          const hasta = new Date(fechaHasta); hasta.setDate(hasta.getDate() + 1);
-          filterClauses.push(Prisma.sql`d."createdAt" < ${hasta}`);
+        try {
+          const pattern = `%${searchTerm}%`;
+          // Construir cláusulas adicionales según filtros (usar estado normalizado)
+          const filterClauses = [];
+          if (where.status) filterClauses.push(Prisma.sql`d."status"::text = ${where.status}`);
+          if (matrizador) filterClauses.push(Prisma.sql`d."assignedToId" = ${parseInt(matrizador)}`);
+          if (fechaDesde) filterClauses.push(Prisma.sql`d."createdAt" >= ${new Date(fechaDesde)}`);
+          if (fechaHasta) {
+            const hasta = new Date(fechaHasta); hasta.setDate(hasta.getDate() + 1);
+            filterClauses.push(Prisma.sql`d."createdAt" < ${hasta}`);
+          }
+
+          const whereSql = Prisma.sql`${Prisma.join([
+            Prisma.sql`(
+              unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
+              unaccent(d."clientEmail") ILIKE unaccent(${pattern}) OR
+              unaccent(d."clientId") ILIKE unaccent(${pattern}) OR
+              unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
+              unaccent(d."actoPrincipalDescripcion") ILIKE unaccent(${pattern}) OR
+              unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
+              d."clientPhone" ILIKE ${pattern}
+            )`,
+            ...filterClauses
+          ], Prisma.sql` AND `)}`;
+
+          // Preparar ORDER BY seguro (solo campos permitidos)
+          const fieldSql = (() => {
+            switch (mappedSortField) {
+              case 'createdAt': return Prisma.sql`d."createdAt"`;
+              case 'updatedAt': return Prisma.sql`d."updatedAt"`;
+              case 'clientName': return Prisma.sql`d."clientName"`;
+              case 'protocolNumber': return Prisma.sql`d."protocolNumber"`;
+              case 'documentType': return Prisma.sql`d."documentType"`;
+              case 'status': return Prisma.sql`d."status"`;
+              case 'fechaEntrega': return Prisma.sql`d."fechaEntrega"`;
+              default: return Prisma.sql`d."createdAt"`;
+            }
+          })();
+          const directionSql = mappedSortOrder === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+
+          const documents = await prisma.$queryRaw`
+            SELECT d.*, u.id as "_assignedToId", u."firstName" as "_assignedToFirstName", u."lastName" as "_assignedToLastName"
+            FROM "documents" d
+            LEFT JOIN "users" u ON u.id = d."assignedToId"
+            WHERE ${whereSql}
+            ORDER BY ${fieldSql} ${directionSql}
+            OFFSET ${skip} LIMIT ${take}
+          `;
+          const countRows = await prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${whereSql}`;
+          const total = Array.isArray(countRows) ? (countRows[0]?.count || 0) : (countRows?.count || 0);
+
+          const formattedDocuments = documents.map(doc => ({
+            id: doc.id,
+            protocolNumber: doc.protocolNumber,
+            clientName: doc.clientName,
+            clientPhone: doc.clientPhone,
+            clientEmail: doc.clientEmail,
+            clientId: doc.clientId,
+            documentType: doc.documentType,
+            status: doc.status,
+            isGrouped: doc.isGrouped,
+            documentGroupId: doc.documentGroupId,
+            groupVerificationCode: doc.groupVerificationCode,
+            matrizador: doc._assignedToFirstName ? `${doc._assignedToFirstName} ${doc._assignedToLastName}` : 'No asignado',
+            matrizadorId: doc.assignedToId,
+            codigoRetiro: doc.codigoRetiro,
+            verificationCode: doc.verificationCode,
+            fechaCreacion: doc.createdAt,
+            fechaEntrega: doc.fechaEntrega,
+            actoPrincipalDescripcion: doc.actoPrincipalDescripcion,
+            actoPrincipalValor: doc.totalFactura,
+            totalFactura: doc.totalFactura,
+            matrizadorName: doc.matrizadorName,
+            detalle_documento: doc.detalle_documento,
+            comentarios_recepcion: doc.comentarios_recepcion
+          }));
+
+          const totalPages = Math.ceil(total / take);
+
+          const payload = {
+            documents: formattedDocuments,
+            pagination: {
+              page: parseInt(page),
+              limit: take,
+              total,
+              totalPages
+            }
+          };
+          await cache.set(cacheKey, payload, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'search:reception:todos'] });
+          return res.json({ success: true, data: payload });
+        } catch (err) {
+          console.warn('Fallo búsqueda con unaccent en recepción, aplicando fallback simple:', err?.message || err);
+          // Fallback: usar filtros compatibles (sin unaccent)
+          where.OR = [
+            { clientName: { contains: searchTerm } },
+            { clientPhone: { contains: searchTerm } },
+            { clientEmail: { contains: searchTerm } },
+            { clientId: { contains: searchTerm } },
+            { protocolNumber: { contains: searchTerm } },
+            { actoPrincipalDescripcion: { contains: searchTerm } },
+            { detalle_documento: { contains: searchTerm } }
+          ];
         }
-
-        const whereSql = Prisma.sql`${Prisma.join([
-          Prisma.sql`(
-            unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
-            unaccent(d."clientEmail") ILIKE unaccent(${pattern}) OR
-            unaccent(d."clientId") ILIKE unaccent(${pattern}) OR
-            unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
-            unaccent(d."actoPrincipalDescripcion") ILIKE unaccent(${pattern}) OR
-            unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
-            d."clientPhone" ILIKE ${pattern}
-          )`,
-          ...filterClauses
-        ], Prisma.sql` AND `)}`;
-
-        // Preparar ORDER BY seguro (solo campos permitidos)
-        const fieldSql = (() => {
-          switch (mappedSortField) {
-            case 'createdAt': return Prisma.sql`d."createdAt"`;
-            case 'updatedAt': return Prisma.sql`d."updatedAt"`;
-            case 'clientName': return Prisma.sql`d."clientName"`;
-            case 'protocolNumber': return Prisma.sql`d."protocolNumber"`;
-            case 'documentType': return Prisma.sql`d."documentType"`;
-            case 'status': return Prisma.sql`d."status"`;
-            case 'fechaEntrega': return Prisma.sql`d."fechaEntrega"`;
-            default: return Prisma.sql`d."createdAt"`;
-          }
-        })();
-        const directionSql = mappedSortOrder === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
-
-        const documents = await prisma.$queryRaw`
-          SELECT d.*, u.id as "_assignedToId", u."firstName" as "_assignedToFirstName", u."lastName" as "_assignedToLastName"
-          FROM "documents" d
-          LEFT JOIN "users" u ON u.id = d."assignedToId"
-          WHERE ${whereSql}
-          ORDER BY ${fieldSql} ${directionSql}
-          OFFSET ${skip} LIMIT ${take}
-        `;
-        const countRows = await prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${whereSql}`;
-        const total = Array.isArray(countRows) ? (countRows[0]?.count || 0) : (countRows?.count || 0);
-
-        const formattedDocuments = documents.map(doc => ({
-          id: doc.id,
-          protocolNumber: doc.protocolNumber,
-          clientName: doc.clientName,
-          clientPhone: doc.clientPhone,
-          clientEmail: doc.clientEmail,
-          clientId: doc.clientId,
-          documentType: doc.documentType,
-          status: doc.status,
-          isGrouped: doc.isGrouped,
-          documentGroupId: doc.documentGroupId,
-          groupVerificationCode: doc.groupVerificationCode,
-          matrizador: doc._assignedToFirstName ? `${doc._assignedToFirstName} ${doc._assignedToLastName}` : 'No asignado',
-          matrizadorId: doc.assignedToId,
-          codigoRetiro: doc.codigoRetiro,
-          verificationCode: doc.verificationCode,
-          fechaCreacion: doc.createdAt,
-          fechaEntrega: doc.fechaEntrega,
-          actoPrincipalDescripcion: doc.actoPrincipalDescripcion,
-          actoPrincipalValor: doc.totalFactura,
-          totalFactura: doc.totalFactura,
-          matrizadorName: doc.matrizadorName,
-          detalle_documento: doc.detalle_documento,
-          comentarios_recepcion: doc.comentarios_recepcion
-        }));
-
-        const totalPages = Math.ceil(total / take);
-
-        const payload = {
-          documents: formattedDocuments,
-          pagination: {
-            page: parseInt(page),
-            limit: take,
-            total,
-            totalPages
-          }
-        };
-        await cache.set(cacheKey, payload, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'search:reception:todos'] });
-        return res.json({ success: true, data: payload });
       } else {
         // Si no hay unaccent, usar filtros compatibles con todos los proveedores (sin 'mode')
         // Nota: Esto puede ser sensible a mayúsculas/minúsculas en algunos motores (p.ej. SQLite)
