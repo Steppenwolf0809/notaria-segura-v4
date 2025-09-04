@@ -216,6 +216,8 @@ enum EventType {
   VERIFICATION_GENERATED // Código de verificación generado
   WHATSAPP_SENT        // Notificación WhatsApp enviada
   DOCUMENT_UNGROUPED   // Documento desagrupado
+  CREDIT_NOTE_APPLIED   // Nota de crédito aplicada (compatibilidad con producción)
+  CREDIT_NOTE_REVERTED  // Nota de crédito revertida (compatibilidad con producción)
 }
 
 // Modelo para historial de notificaciones WhatsApp
