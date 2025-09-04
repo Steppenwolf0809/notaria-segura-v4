@@ -32,6 +32,7 @@ enum DocumentStatus {
   EN_PROCESO
   LISTO
   ENTREGADO
+  AGRUPADO
 }
 
 // Modelo principal de usuarios
@@ -121,6 +122,9 @@ model Document {
   usuarioEntregaId     Int?       // ID del usuario de recepción que entregó
   usuarioEntrega       User?      @relation("DeliveredDocuments", fields: [usuarioEntregaId], references: [id])
   observacionesEntrega String?    // Observaciones adicionales de la entrega
+
+  // Compatibilidad con ramas que usan nota de crédito
+  notaCreditoEstadoPrevio String?
 
   documentGroup         DocumentGroup? @relation(fields: [documentGroupId], references: [id])
   
