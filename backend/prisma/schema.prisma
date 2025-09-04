@@ -32,6 +32,8 @@ enum DocumentStatus {
   EN_PROCESO
   LISTO
   ENTREGADO
+  AGRUPADO
+  ANULADO_NOTA_CREDITO
 }
 
 // Modelo principal de usuarios
