@@ -33,6 +33,7 @@ enum DocumentStatus {
   LISTO
   ENTREGADO
   ANULADO_NOTA_CREDITO
+  AGRUPADO
 }
 
 // Modelo principal de usuarios

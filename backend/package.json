@@ -29,7 +29,9 @@
     "fix:grouped-force": "node scripts/fix-grouped-documents-status.js force EN_PROCESO",
     "db:sync": "npx prisma db push --accept-data-loss",
     "fix:xml-dates": "node scripts/backfill-xml-dates.js",
-    "fix:assign-archivo": "node scripts/reassign-archivo-documents.js apply"
+    "fix:assign-archivo": "node scripts/reassign-archivo-documents.js apply",
+    "reconcile": "node scripts/reconcile-schema.js",
+    "schema:inspect": "node scripts/inspect-schema.js"
   },
   "dependencies": {
     "@prisma/client": "^5.7.0",
