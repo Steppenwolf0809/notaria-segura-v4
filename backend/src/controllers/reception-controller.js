@@ -576,13 +576,16 @@ async function marcarComoListo(req, res) {
                 // Generar códigos únicos para cada documento si no los tienen
                 const documentsToUpdate = [];
                 for (const doc of groupDocuments) {
-                    let codigoRetiro;
+                    // OTP generation removed - no longer generate verification codes
+                    let codigoRetiro = null;
+                    /*
                     if (doc.verificationCode) {
                         codigoRetiro = doc.verificationCode;
                     } else {
                         codigoRetiro = await CodigoRetiroService.generarUnico();
                         console.log(`🎯 Código generado para ${doc.protocolNumber}: ${codigoRetiro}`);
                     }
+                    */
                     
                     documentsToUpdate.push({
                         docId: doc.id,
@@ -656,10 +659,13 @@ async function marcarComoListo(req, res) {
                 });
             }
         } else {
-            // Documento individual - comportamiento original
-            console.log('🔐 Generando código de retiro...');
+            // Individual document - OTP generation removed
+            console.log('📱 OTP generation skipped - using approved template');
+            const nuevoCodigo = null; // No longer generate OTP codes
+            /*
             const nuevoCodigo = await CodigoRetiroService.generarUnico();
             console.log('✅ Código generado:', nuevoCodigo);
+            */
 
             console.log('💾 Actualizando documento en base de datos...');
             // Usar transacción para evitar condiciones de carrera
@@ -673,7 +679,7 @@ async function marcarComoListo(req, res) {
                 
                 return await tx.document.update({
                     where: { id },
-                    data: { status: 'LISTO', codigoRetiro: nuevoCodigo, updatedAt: new Date() }
+                    data: { status: 'LISTO', /* codigoRetiro: nuevoCodigo, */ updatedAt: new Date() }
                 });
             });
             
@@ -786,8 +792,11 @@ async function marcarGrupoListo(req, res) {
             return res.status(400).json({ success: false, message: 'Los documentos deben tener la misma identificación del cliente.' });
         }
 
-        // Generar código único para grupo usando el servicio mejorado
+        // Group OTP generation removed - use approved template instead
+        const nuevoCodigo = null; // No longer generate group OTP codes
+        /*
         const nuevoCodigo = await CodigoRetiroService.generarUnicoGrupo();
+        */
         
         const updatedDocuments = await prisma.$transaction(async (tx) => {
             // Verificar nuevamente que todos los documentos estén EN_PROCESO
@@ -803,7 +812,7 @@ async function marcarGrupoListo(req, res) {
             return await Promise.all(
                 documentIds.map(id => tx.document.update({
                     where: { id },
-                    data: { status: 'LISTO', codigoRetiro: nuevoCodigo, isGrouped: true, groupVerificationCode: nuevoCodigo, updatedAt: new Date() }
+                    data: { status: 'LISTO', isGrouped: true, updatedAt: new Date() }
                 }))
             );
         });
@@ -890,10 +899,13 @@ async function desagruparDocumentos(req, res) {
             return res.status(400).json({ success: false, message: 'No se encontraron documentos agrupados para desagrupar.' });
         }
 
-        // Generar códigos individuales para cada documento
+        // Individual code generation removed for ungrouping - use approved template
+        const codigosIndividuales = documents.map(() => null); // No longer generate individual codes
+        /*
         const codigosIndividuales = await Promise.all(
             documents.map(() => CodigoRetiroService.generarUnico())
         );
+        */
 
         // Desagrupar documentos - asignar códigos individuales
         const updatedDocuments = await prisma.$transaction(
@@ -903,7 +915,6 @@ async function desagruparDocumentos(req, res) {
                     isGrouped: false,
                     documentGroupId: null,
                     groupVerificationCode: null,
-                    codigoRetiro: codigosIndividuales[index],
                     updatedAt: new Date()
                 }
             }))

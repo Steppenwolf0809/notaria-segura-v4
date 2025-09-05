@@ -156,13 +156,14 @@ class WhatsAppService {
     }
 
     /**
-     * Enviar mensaje de documento listo para retiro
+     * Enviar mensaje de documento listo para retiro usando plantilla aprobada de Twilio
      */
-    async enviarDocumentoListo(cliente, documento, codigo) {
+    async enviarDocumentoListo(cliente, documento, codigo = null) {
         const clientName = cliente.clientName || cliente.nombre;
         const clientPhone = cliente.clientPhone || cliente.telefono;
-        // Usar template de BD o fallback a hardcodeado
-        const mensaje = await this.generarMensajeDocumentoListoFromTemplate(cliente, documento, codigo);
+        
+        // Use approved Twilio template instead of database templates
+        return this.enviarPlantillaAprobada(cliente, documento);
 
         // Preparar notificación PENDING para trazar sin bloquear
         const notificationData = {
@@ -932,6 +933,63 @@ Para consultas: ${process.env.NOTARIA_CONTACTO || 'Tel: (02) 2234-567'}
             environment: process.env.NODE_ENV,
             fromNumber: this.fromNumber
         };
+    }
+
+    /**
+     * Enviar mensaje usando plantilla aprobada de Twilio sin OTP
+     * Variables: {{1}}=client name, {{2}}=document type, {{3}}=document number  
+     */
+    async enviarPlantillaAprobada(cliente, documento) {
+        const clientName = cliente.clientName || cliente.nombre;
+        const clientPhone = cliente.clientPhone || cliente.telefono;
+        
+        if (!this.isEnabled || !this.client) {
+            console.log('📱 WhatsApp simulation mode - template:', this.templates.listo_entrega_single_v5.sid);
+            return {
+                success: true,
+                simulated: true,
+                messageId: 'SIMULATED_' + Date.now(),
+                to: clientPhone,
+                template: 'listo_entrega_single_v5'
+            };
+        }
+
+        const numeroWhatsApp = this.formatPhoneNumber(clientPhone);
+        if (!numeroWhatsApp) {
+            throw new Error(`Número de teléfono inválido: ${clientPhone}`);
+        }
+
+        try {
+            const templateSid = this.templates.listo_entrega_single_v5.sid;
+            const variables = [
+                clientName,                                           // {{1}}
+                documento.documentType || documento.tipoDocumento || 'Documento', // {{2}}  
+                documento.protocolNumber || documento.id || 'N/A'    // {{3}}
+            ];
+
+            const result = await this.client.messages.create({
+                contentSid: templateSid,
+                contentVariables: JSON.stringify(variables.reduce((obj, val, idx) => {
+                    obj[(idx + 1).toString()] = val;
+                    return obj;
+                }, {})),
+                from: this.fromNumber,
+                to: numeroWhatsApp
+            });
+
+            console.log(`✅ WhatsApp approved template sent: ${result.sid}`);
+            return {
+                success: true,
+                messageId: result.sid,
+                to: numeroWhatsApp,
+                template: 'listo_entrega_single_v5',
+                variables
+            };
+
+        } catch (error) {
+            console.error('❌ Error sending WhatsApp approved template:', error);
+            throw error;
+        }
     }
 }
 

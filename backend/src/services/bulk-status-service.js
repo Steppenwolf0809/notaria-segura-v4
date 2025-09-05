@@ -95,14 +95,18 @@ export async function bulkMarkReady({ documentIds, actor, sendNotifications = tr
   const perClientGroupCode = new Map();
 
   for (const [key, docs] of byClient.entries()) {
+    // OTP generation removed - use approved template instead
+    /* Original OTP code generation:
     if (docs.length > 1) {
-      // Código grupal compartido
+      // Group shared code
       const code = await CodigoRetiroService.generarUnicoGrupo();
       perClientGroupCode.set(key, code);
     } else {
       const code = await CodigoRetiroService.generarUnico();
       perDocCode.set(docs[0].id, code);
     }
+    */
+    // Skip code generation - codes will be null
   }
 
   // Ejecutar actualización en transacción
@@ -111,14 +115,15 @@ export async function bulkMarkReady({ documentIds, actor, sendNotifications = tr
     for (const d of documents) {
       const key = groupKey(d);
       const isGroup = byClient.get(key).length > 1;
-      const code = isGroup ? perClientGroupCode.get(key) : perDocCode.get(d.id);
+      // const code = isGroup ? perClientGroupCode.get(key) : perDocCode.get(d.id);
+      const code = null; // OTP generation removed
 
       const data = {
         status: 'LISTO',
-        codigoRetiro: code,
+        // codigoRetiro: code, // OTP field removed
         updatedAt: new Date(),
-        // Si es grupo por cliente, marcar agrupado y setear el mismo código grupal.
-        ...(isGroup ? { isGrouped: true, groupVerificationCode: code } : {})
+        // If group by client, mark as grouped without verification code
+        ...(isGroup ? { isGrouped: true /* , groupVerificationCode: code */ } : {})
       };
 
       const ud = await tx.document.update({ where: { id: d.id }, data });
@@ -135,8 +140,7 @@ export async function bulkMarkReady({ documentIds, actor, sendNotifications = tr
             fromStatus: 'EN_PROCESO',
             toStatus: 'LISTO',
             bulk: true,
-            groupByClient: byClient.get(key).length,
-            codigoRetiro: code
+            groupByClient: byClient.get(key).length
           },
           createdAt: new Date()
         }
@@ -162,29 +166,28 @@ export async function bulkMarkReady({ documentIds, actor, sendNotifications = tr
 
       try {
         if (docs.length > 1) {
-          // Envío grupal
-          const code = perClientGroupCode.get(key);
-          const result = await whatsappService.enviarGrupoDocumentosListo(
-            clienteData,
-            docs,
-            code
+          // Envío grupal usando plantilla aprobada
+          const result = await whatsappService.enviarPlantillaAprobada(
+            clienteData.clientPhone,
+            'listo_entrega_single_v5',
+            {
+              '1': clienteData.clientName,
+              '2': `${docs.length} documentos`,
+              '3': docs.map(d => d.protocolNumber).join(', ')
+            }
           );
           notifications.push({ status: 'fulfilled', value: result });
         } else {
-          // Envío individual
+          // Envío individual usando plantilla aprobada
           const only = docs[0];
-          const code = perDocCode.get(only.id);
-          const documentoData = {
-            id: only.id,
-            tipoDocumento: only.documentType,
-            protocolNumber: only.protocolNumber,
-            actoPrincipalDescripcion: only.actoPrincipalDescripcion,
-            actoPrincipalValor: only.actoPrincipalValor
-          };
-          const result = await whatsappService.enviarDocumentoListo(
-            clienteData,
-            documentoData,
-            code
+          const result = await whatsappService.enviarPlantillaAprobada(
+            clienteData.clientPhone,
+            'listo_entrega_single_v5',
+            {
+              '1': clienteData.clientName,
+              '2': only.documentType,
+              '3': only.protocolNumber
+            }
           );
           notifications.push({ status: 'fulfilled', value: result });
         }

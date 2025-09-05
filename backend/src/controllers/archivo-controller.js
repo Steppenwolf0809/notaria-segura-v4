@@ -245,17 +245,19 @@ async function cambiarEstadoDocumento(req, res) {
     // Preparar datos de actualización
     const updateData = { status: nuevoEstado };
 
-    // Si se marca como LISTO, generar código de retiro
+    // OTP generation removed - no longer generate verification codes
     let codigoGenerado = null;
+    // Skip code generation for LISTO state
+    /*
     if (nuevoEstado === 'LISTO' && !documento.codigoRetiro) {
-      // Para documentos agrupados, usar el código del grupo si existe
+      // For grouped documents, use group code if exists
       if (documento.isGrouped && documento.documentGroup?.verificationCode) {
         updateData.codigoRetiro = documento.documentGroup.verificationCode;
       } else {
         codigoGenerado = await CodigoRetiroService.generarUnico();
         updateData.codigoRetiro = codigoGenerado;
         
-        // 📈 Registrar evento de generación de código de retiro
+        // Event registration for code generation
         try {
           await prisma.documentEvent.create({
             data: {
@@ -280,6 +282,7 @@ async function cambiarEstadoDocumento(req, res) {
         }
       }
     }
+    */
 
     // Si se marca como ENTREGADO, registrar datos de entrega simplificada
     if (nuevoEstado === 'ENTREGADO') {
@@ -309,15 +312,16 @@ async function cambiarEstadoDocumento(req, res) {
 
         const updatesPlan = [];
         for (const doc of groupDocs) {
+          /* OTP generation removed - no longer generate codes for group documents
           let codigoParaDoc = doc.codigoRetiro;
           if (!codigoParaDoc) {
-            // Generar código único por documento
-            // Nota: usamos el mismo generador que para individuales
-            // para asegurar unicidad a nivel sistema
-            // (4 dígitos según lineamientos)
+            // Generate unique code per document
             codigoParaDoc = await CodigoRetiroService.generarUnico();
           }
           updatesPlan.push({ id: doc.id, codigo: codigoParaDoc });
+          */
+          // Skip code generation - just add document to update plan
+          updatesPlan.push({ id: doc.id, codigo: null });
         }
 
         documentosActualizados = await prisma.$transaction(async (tx) => {
@@ -327,7 +331,7 @@ async function cambiarEstadoDocumento(req, res) {
               where: { id: up.id },
               data: {
                 status: 'LISTO',
-                codigoRetiro: up.codigo,
+                // codigoRetiro: up.codigo, // OTP generation removed
                 updatedAt: new Date()
               }
             });
@@ -396,21 +400,26 @@ async function cambiarEstadoDocumento(req, res) {
             );
             console.log('✅ ARCHIVO: Notificación WhatsApp GRUPAL enviada:', whatsappResult.messageId || 'simulado');
             whatsappSent = true;
-          } else if (codigoGenerado || updateData.codigoRetiro) {
-            // Notificación individual
+          } else {
+            // Individual notification without OTP - use approved template
             const documentoData = {
               tipoDocumento: documento.documentType,
               protocolNumber: documento.protocolNumber
             };
+            /* OTP-based notification removed
             const whatsappResult = await whatsappService.enviarDocumentoListo(
               clienteData, 
               documentoData, 
               codigoGenerado || updateData.codigoRetiro
             );
-            console.log('✅ ARCHIVO: Notificación WhatsApp enviada:', whatsappResult.messageId || 'simulado');
+            */
+            // Individual notification using approved template (no OTP)
+            const whatsappResult = await whatsappService.enviarPlantillaAprobada(
+              clienteData, 
+              documentoData
+            );
+            console.log('✅ ARCHIVO: WhatsApp approved template sent:', whatsappResult.messageId || 'simulated');
             whatsappSent = true;
-          } else {
-            console.log('ℹ️ ARCHIVO: LISTO sin código de retiro disponible para WhatsApp');
           }
         } catch (error) {
           // No fallar la operación principal si WhatsApp falla
@@ -481,7 +490,7 @@ async function cambiarEstadoDocumento(req, res) {
           phone: documento.clientPhone
         }
       },
-      message: `${mensajeBase}${codigoGenerado ? ` - Código: ${codigoGenerado}` : ''}`
+      message: `${mensajeBase} - OTP eliminado, usar plantilla aprobada`
     });
 
   } catch (error) {
