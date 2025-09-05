@@ -29,11 +29,10 @@ import { toast } from 'react-toastify';
  */
 function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'reception' }) {
   const [formData, setFormData] = useState({
-    codigoVerificacion: '',
-    entregadoA: '',
-    cedulaReceptor: '',
-    relacionTitular: '',
-    verificacionManual: false,
+    retiradoPorNombre: '',
+    retiradoPorDocumento: '',
+    relacionConTitular: '',
+    esTitular: false,
     facturaPresenta: false,
     observaciones: ''
   });
@@ -72,28 +71,43 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
+    
+    // Handle "Es titular" checkbox with autofill
+    if (name === 'esTitular' && type === 'checkbox') {
+      if (checked) {
+        setFormData(prev => ({
+          ...prev,
+          [name]: checked,
+          retiradoPorNombre: documento.clientName || '',
+          relacionConTitular: 'titular'
+        }));
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          [name]: checked,
+          retiradoPorNombre: '',
+          relacionConTitular: ''
+        }));
+      }
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
+      }));
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     // Validaciones
-    if (!formData.entregadoA.trim()) {
+    if (!formData.retiradoPorNombre.trim()) {
       setError('Nombre de quien retira es obligatorio');
       return;
     }
 
-    if (!formData.relacionTitular) {
+    if (!formData.relacionConTitular) {
       setError('Relación con titular es obligatoria');
-      return;
-    }
-
-    if (!formData.verificacionManual && !formData.codigoVerificacion.trim()) {
-      setError('Código de verificación es obligatorio (o marcar verificación manual)');
       return;
     }
 
@@ -175,12 +189,12 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
             </Grid>
             <Grid item xs={12} sm={4}>
               <Typography variant="body2">
-                <strong>Código:</strong> 
+                <strong>Estado:</strong> 
                 <Chip 
-                  label={documento.codigoRetiro || documento.verificationCode || 'N/A'} 
+                  label={documento.status || 'LISTO'} 
                   size="small" 
                   color="success"
-                  sx={{ ml: 1, fontFamily: 'monospace', fontWeight: 'bold' }}
+                  sx={{ ml: 1 }}
                 />
               </Typography>
             </Grid>
@@ -190,27 +204,19 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
         <form onSubmit={handleSubmit}>
           <Grid container spacing={3}>
             <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Código de Verificación"
-                name="codigoVerificacion"
-                value={formData.codigoVerificacion}
-                onChange={handleChange}
-                disabled={formData.verificacionManual}
-                helperText="Código de 4 dígitos enviado al cliente"
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
               <FormControlLabel
                 control={
                   <Checkbox
-                    name="verificacionManual"
-                    checked={formData.verificacionManual}
+                    name="esTitular"
+                    checked={formData.esTitular}
                     onChange={handleChange}
                   />
                 }
-                label="Verificación Manual (cliente no tiene código)"
+                label="Es titular (autocompletar datos)"
               />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              {/* Empty grid for spacing */}
             </Grid>
 
             <Grid item xs={12} sm={6}>
@@ -218,17 +224,18 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
                 fullWidth
                 required
                 label="Nombre de quien retira"
-                name="entregadoA"
-                value={formData.entregadoA}
+                name="retiradoPorNombre"
+                value={formData.retiradoPorNombre}
                 onChange={handleChange}
+                disabled={formData.esTitular}
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
                 label="Cédula/ID de quien retira (opcional)"
-                name="cedulaReceptor"
-                value={formData.cedulaReceptor}
+                name="retiradoPorDocumento"
+                value={formData.retiradoPorDocumento}
                 onChange={handleChange}
               />
             </Grid>
@@ -237,10 +244,11 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
               <FormControl fullWidth required sx={{ minWidth: 220 }}>
                 <InputLabel>Relación con el Titular</InputLabel>
                 <Select
-                  name="relacionTitular"
-                  value={formData.relacionTitular}
+                  name="relacionConTitular"
+                  value={formData.relacionConTitular}
                   onChange={handleChange}
                   label="Relación con el Titular"
+                  disabled={formData.esTitular}
                 >
                   {relacionesOptions.map(option => (
                     <MenuItem key={option.value} value={option.value}>

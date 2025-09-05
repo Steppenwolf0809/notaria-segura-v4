@@ -2969,13 +2969,16 @@ async function deliverDocument(req, res) {
   try {
     const { id } = req.params;
     const {
-      entregadoA,
-      cedulaReceptor,
-      relacionTitular,
-      codigoVerificacion,
-      verificacionManual,
+      retiradoPorNombre,
+      retiradoPorDocumento,
+      relacionConTitular,
       facturaPresenta,
-      observacionesEntrega
+      observaciones,
+      // Legacy support for old field names
+      entregadoA = retiradoPorNombre,
+      cedulaReceptor = retiradoPorDocumento,
+      relacionTitular = relacionConTitular,
+      observacionesEntrega = observaciones
     } = req.body;
 
     // Verificar que el usuario sea RECEPCION, ADMIN, CAJA, MATRIZADOR o ARCHIVO
@@ -2987,14 +2990,17 @@ async function deliverDocument(req, res) {
     }
 
     // Validar datos requeridos
-    if (!entregadoA) {
+    const nombreRetirador = retiradoPorNombre || entregadoA;
+    const relacion = relacionConTitular || relacionTitular;
+
+    if (!nombreRetirador) {
       return res.status(400).json({
         success: false,
         message: 'Nombre de quien retira es obligatorio'
       });
     }
 
-    if (!relacionTitular) {
+    if (!relacion) {
       return res.status(400).json({
         success: false,
         message: 'Relación con titular es obligatoria'
@@ -3056,30 +3062,9 @@ async function deliverDocument(req, res) {
       console.log(`⚡ Entrega inmediata solicitada para documento ${document.protocolNumber} (estado actual: ${document.status})`);
     }
 
-    // Verificar código de verificación si no es manual (aceptar individual o grupal)
-    if (!verificacionManual) {
-      if (!codigoVerificacion) {
-        return res.status(400).json({
-          success: false,
-          message: 'Código de verificación es obligatorio'
-        });
-      }
-
-      // Preferir el código que ve recepción en el frontend: codigoRetiro
-      // Fallback a verificationCode (flujo antiguo) y groupVerificationCode
-      const expectedCode = document.codigoRetiro || document.verificationCode || document.groupVerificationCode;
-      if (!expectedCode || expectedCode !== codigoVerificacion) {
-        return res.status(400).json({
-          success: false,
-          message: 'Código de verificación incorrecto'
-        });
-      }
-    }
-
-    // Determinar método de verificación para auditoría enriquecida
-    const computedVerificationMethod = verificacionManual
-      ? ((req.body?.metodoVerificacion) || (cedulaReceptor ? 'cedula' : 'manual'))
-      : 'codigo_whatsapp';
+    // OTP validation removed - delivery now based on identity verification only
+    const cedulaReceptorFinal = retiradoPorDocumento || cedulaReceptor;
+    const computedVerificationMethod = cedulaReceptorFinal ? 'cedula' : 'manual';
 
     // Si el documento está agrupado, entregar todos los documentos del grupo
     let groupDocuments = [];
@@ -3151,14 +3136,14 @@ async function deliverDocument(req, res) {
       where: { id },
       data: {
         status: 'ENTREGADO',
-        entregadoA,
-        cedulaReceptor,
-        relacionTitular,
-        verificacionManual: verificacionManual || false,
+        entregadoA: nombreRetirador,
+        cedulaReceptor: cedulaReceptorFinal,
+        relacionTitular: relacion,
+        verificacionManual: true, // Always manual verification now (no OTP)
         facturaPresenta: facturaPresenta || false,
         fechaEntrega: new Date(),
         usuarioEntregaId: req.user.id,
-        observacionesEntrega
+        observacionesEntrega: observaciones || observacionesEntrega
       },
       include: {
         assignedTo: {
@@ -3181,28 +3166,28 @@ async function deliverDocument(req, res) {
         const fechaEntrega = new Date();
         const datosEntrega = {
           // Variables básicas (compatibilidad)
-          entregado_a: entregadoA,
-          deliveredTo: entregadoA,
+          entregado_a: nombreRetirador,
+          deliveredTo: nombreRetirador,
           fecha: fechaEntrega,
           usuario_entrega: `${req.user.firstName} ${req.user.lastName}`,
           
           // Claves adicionales que esperan los templates del servicio
-          entregadoA,
-          cedulaReceptor,
-          relacionTitular,
+          entregadoA: nombreRetirador,
+          cedulaReceptor: cedulaReceptorFinal,
+          relacionTitular: relacion,
           
           // Variables mejoradas para template
           fechaEntrega: fechaEntrega,
-          nombreRetirador: entregadoA,
-          cedulaReceptor: cedulaReceptor,
-          cedula_receptor: cedulaReceptor,
-          relacionTitular: relacionTitular,
-          relacion_titular: relacionTitular,
+          nombreRetirador: nombreRetirador,
+          cedulaReceptor: cedulaReceptorFinal,
+          cedula_receptor: cedulaReceptorFinal,
+          relacionTitular: relacion,
+          relacion_titular: relacion,
           
           // Variables adicionales
-          verificacionManual: verificacionManual || false,
+          verificacionManual: true, // Always manual now
           facturaPresenta: facturaPresenta || false,
-          observacionesEntrega: observacionesEntrega || '',
+          observacionesEntrega: observaciones || observacionesEntrega || '',
           usuarioEntrega: `${req.user.firstName} ${req.user.lastName}`,
           roleEntrega: req.user.role
         };

@@ -25,6 +25,14 @@ class WhatsAppService {
             horario: process.env.NOTARIA_HORARIO || "Lunes a Viernes 8:00-17:00"
         };
 
+        // Configuración de templates WhatsApp
+        this.templates = {
+            listo_entrega_single_v5: {
+                sid: 'HX4c13498aa30e141130c4a9866da18b11',
+                variables: ['1', '2', '3'] // {{1}}=client name, {{2}}=document type, {{3}}=document number
+            }
+        };
+
         if (this.isEnabled && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
             try {
                 this.client = twilio(

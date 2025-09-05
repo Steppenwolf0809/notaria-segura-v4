@@ -501,36 +501,40 @@ async function procesarEntregaDocumento(req, res) {
   try {
     const { id } = req.params;
     const {
-      entregadoA,
-      cedulaReceptor,
-      relacionTitular,
-      codigoVerificacion,
-      verificacionManual,
+      retiradoPorNombre,
+      retiradoPorDocumento,
+      relacionConTitular,
       facturaPresenta,
-      observaciones
+      observaciones,
+      // Legacy support for old field names
+      entregadoA = retiradoPorNombre,
+      cedulaReceptor = retiradoPorDocumento,
+      relacionTitular = relacionConTitular
     } = req.body;
 
     const userId = req.user.id;
 
     // Validaciones
-    if (!entregadoA) {
+    const nombreRetirador = retiradoPorNombre || entregadoA;
+    const relacion = relacionConTitular || relacionTitular;
+
+    if (!nombreRetirador) {
       return res.status(400).json({
         success: false,
         message: 'Nombre de quien retira es obligatorio'
       });
     }
 
-    if (!relacionTitular) {
+    if (!relacion) {
       return res.status(400).json({
         success: false,
         message: 'Relación con titular es obligatoria'
       });
     }
 
-    // Determinar método de verificación para auditoría enriquecida
-    const computedVerificationMethod = verificacionManual
-      ? (req.body.metodoVerificacion || (cedulaReceptor ? 'cedula' : 'manual'))
-      : 'codigo_whatsapp';
+    // Método de verificación simplificado (sin OTP)
+    const cedulaReceptorFinal = retiradoPorDocumento || cedulaReceptor;
+    const computedVerificationMethod = cedulaReceptorFinal ? 'cedula' : 'manual';
 
     // Buscar documento y verificar que pertenece al archivo (con información de grupo)
     const documento = await prisma.document.findFirst({
@@ -574,23 +578,7 @@ async function procesarEntregaDocumento(req, res) {
       });
     }
 
-    // Validar código de verificación (si no es manual)
-    if (!verificacionManual) {
-      if (!codigoVerificacion) {
-        return res.status(400).json({
-          success: false,
-          message: 'Código de verificación es obligatorio'
-        });
-      }
-      
-      const expectedCode = documento.codigoRetiro || documento.verificationCode || documento.groupVerificationCode;
-      if (!expectedCode || expectedCode !== codigoVerificacion) {
-        return res.status(400).json({
-          success: false,
-          message: 'Código de verificación incorrecto'
-        });
-      }
-    }
+    // OTP validation removed - delivery now based on identity verification only
 
     // 🔗 NUEVA FUNCIONALIDAD: Si el documento está agrupado, entregar todos los documentos del grupo
     let groupDocuments = [];
@@ -617,10 +605,10 @@ async function procesarEntregaDocumento(req, res) {
           },
           data: {
             status: 'ENTREGADO',
-            entregadoA,
-            cedulaReceptor,
-            relacionTitular,
-            verificacionManual: verificacionManual || false,
+            entregadoA: nombreRetirador,
+            cedulaReceptor: cedulaReceptorFinal,
+            relacionTitular: relacion,
+            verificacionManual: true, // Always manual verification now (no OTP)
             facturaPresenta: facturaPresenta || false,
             fechaEntrega: new Date(),
             usuarioEntregaId: userId,
@@ -635,19 +623,19 @@ async function procesarEntregaDocumento(req, res) {
               documentId: doc.id,
               userId: userId,
               eventType: 'STATUS_CHANGED',
-              description: `Documento entregado grupalmente por ARCHIVO a ${entregadoA}`,
+              description: `Documento entregado grupalmente por ARCHIVO a ${nombreRetirador}`,
               details: {
-                entregadoA,
-                cedulaReceptor,
-                relacionTitular,
-                verificacionManual: verificacionManual || false,
+                entregadoA: nombreRetirador,
+                cedulaReceptor: cedulaReceptorFinal,
+                relacionTitular: relacion,
+                verificacionManual: true, // Always manual verification now
                 facturaPresenta: facturaPresenta || false,
                 deliveredWith: documento.protocolNumber,
                 groupDelivery: true,
                 deliveredBy: 'ARCHIVO'
               },
-              personaRetiro: entregadoA,
-              cedulaRetiro: cedulaReceptor || undefined,
+              personaRetiro: nombreRetirador,
+              cedulaRetiro: cedulaReceptorFinal || undefined,
               metodoVerificacion: computedVerificationMethod,
               observacionesRetiro: (observaciones || `Entregado grupalmente junto con ${documento.protocolNumber} por ARCHIVO`)
             }
@@ -663,10 +651,10 @@ async function procesarEntregaDocumento(req, res) {
       where: { id },
       data: {
         status: 'ENTREGADO',
-        entregadoA,
-        cedulaReceptor,
-        relacionTitular,
-        verificacionManual: verificacionManual || false,
+        entregadoA: nombreRetirador,
+        cedulaReceptor: cedulaReceptorFinal,
+        relacionTitular: relacion,
+        verificacionManual: true, // Always manual verification now (no OTP)
         facturaPresenta: facturaPresenta || false,
         fechaEntrega: new Date(),
         usuarioEntregaId: userId,
@@ -694,15 +682,15 @@ async function procesarEntregaDocumento(req, res) {
           : [documentoActualizado];
 
         const datosEntrega = {
-          entregado_a: entregadoA,
-          deliveredTo: entregadoA,
+          entregado_a: nombreRetirador,
+          deliveredTo: nombreRetirador,
           fecha: new Date(),
           usuario_entrega: `${req.user.firstName} ${req.user.lastName} (ARCHIVO)`,
           // Campos opcionales y condicionales
-          cedulaReceptor,
-          cedula_receptor: cedulaReceptor,
-          relacionTitular,
-          relacion_titular: relacionTitular,
+          cedulaReceptor: cedulaReceptorFinal,
+          cedula_receptor: cedulaReceptorFinal,
+          relacionTitular: relacion,
+          relacion_titular: relacion,
           documentos: documentosParaMensaje,
           cantidadDocumentos: documentosParaMensaje.length
         };
