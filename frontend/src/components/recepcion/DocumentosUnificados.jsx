@@ -644,6 +644,9 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
         onEstadisticasChange?.();
         setSelectedDocuments([]);
         console.log('✅ Proceso completado exitosamente');
+        
+        // 🔧 CORRECCIÓN: Cerrar modal automáticamente después de operación exitosa
+        cerrarConfirmacion();
       } else {
         console.error('❌ Error en resultado del servicio:', {
           success: result?.success,
@@ -669,7 +672,8 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
       const msg = error.message || 'Error al marcar documento(s) como listo(s)';
       setSnackbar({ open: true, message: msg, severity: 'error' });
       toast.error(msg);
-    } finally {
+      
+      // 🔧 CORRECCIÓN: Cerrar modal también en caso de error
       cerrarConfirmacion();
     }
   };
