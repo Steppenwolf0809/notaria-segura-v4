@@ -3077,10 +3077,12 @@ async function deliverDocument(req, res) {
     if (document.documentGroup && Array.isArray(document.documentGroup.documents)) {
       const allGroupDocuments = document.documentGroup.documents;
 
-      // Entregar todos los documentos del grupo que estén LISTO (excepto el actual)
-      const documentsToDeliver = allGroupDocuments.filter(doc => 
-        doc.status === 'LISTO' && doc.id !== id
-      );
+      // Entrega inmediata: entregar todos los no ENTREGADOS del grupo (excepto el actual)
+      // Entrega normal: entregar solo los LISTO (excepto el actual)
+      const documentsToDeliver = allGroupDocuments.filter(doc => {
+        if (doc.id === id) return false;
+        return immediateDelivery ? (doc.status !== 'ENTREGADO') : (doc.status === 'LISTO');
+      });
 
       if (documentsToDeliver.length > 0) {
         console.log(`🚚 Entregando ${documentsToDeliver.length + 1} documentos del grupo automáticamente`);
@@ -3112,7 +3114,7 @@ async function deliverDocument(req, res) {
               eventType: 'STATUS_CHANGED',
               description: `Documento entregado grupalmente a ${entregadoA}`,
               details: {
-                previousStatus: 'LISTO',
+                previousStatus: doc.status,
                 newStatus: 'ENTREGADO',
                 entregadoA,
                 cedulaReceptor,

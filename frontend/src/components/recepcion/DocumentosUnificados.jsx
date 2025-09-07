@@ -378,27 +378,23 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
         if (filters.fechaDesde) baseParams.fechaDesde = filters.fechaDesde;
         if (filters.fechaHasta) baseParams.fechaHasta = filters.fechaHasta;
 
-        const result = await receptionService.getTodosDocumentos(baseParams);
+        // Excluir ENTREGADO para tab pendientes y permitir EN_PROCESO+LISTO correctamente paginados
+        const result = await receptionService.getTodosDocumentos({ ...baseParams, excludeEstado: 'ENTREGADO' });
         if (!result.success) throw new Error(result.error);
 
         const docsAll = result.data.documents || [];
-        // Respetar filtro de estado si está seleccionado en la pestaña principal
+        // Ya viene sin ENTREGADO desde backend; aplicar filtro adicional opcional en cliente
         const allowed = (() => {
           if (filters.estado === 'EN_PROCESO') return new Set(['EN_PROCESO']);
           if (filters.estado === 'LISTO') return new Set(['LISTO']);
-          return new Set(['EN_PROCESO', 'LISTO']);
+          return null; // ambos
         })();
-        const docs = docsAll.filter(d => allowed.has(d.status));
+        const docs = allowed ? docsAll.filter(d => allowed.has(d.status)) : docsAll;
         setDocumentos(docs);
 
         // Calcular total exacto sumando conteos por estado
-        const [enProcesoCountRes, listoCountRes] = await Promise.all([
-          receptionService.getTodosDocumentos({ ...baseParams, page: '1', limit: '1', estado: 'EN_PROCESO' }),
-          receptionService.getTodosDocumentos({ ...baseParams, page: '1', limit: '1', estado: 'LISTO' })
-        ]);
-        const totalEnProceso = enProcesoCountRes.success ? (enProcesoCountRes.data.pagination?.total || 0) : 0;
-        const totalListo = listoCountRes.success ? (listoCountRes.data.pagination?.total || 0) : 0;
-        const total = totalEnProceso + totalListo;
+        // Backend ya devuelve paginación con excludeEstado aplicado
+        const total = Number(result.data.pagination?.total || docs.length);
         setTotalCount(total);
         setTotalPages(Math.max(1, Math.ceil(total / rowsPerPage)));
         setError(null);

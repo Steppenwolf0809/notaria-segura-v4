@@ -25,11 +25,16 @@ class WhatsAppService {
             horario: process.env.NOTARIA_HORARIO || "Lunes a Viernes 8:00-17:00"
         };
 
-        // Configuración de templates WhatsApp
+        // Configuración de templates WhatsApp (usar plantilla aprobada por Twilio)
+        // Variables esperadas por la plantilla aprobada (solo 3):
+        //  {{1}} = Nombre del compareciente
+        //  {{2}} = Acto principal (ej: "RECONOCIMIENTO DE FIRMAS")
+        //  {{3}} = Código/Número del documento (protocolo)
+        // Nota: Dirección y horario deben quedar como texto estático en la plantilla aprobada por Twilio
         this.templates = {
             listo_entrega_single_v5: {
-                sid: 'HX4c13498aa30e141130c4a9866da18b11',
-                variables: ['1', '2', '3'] // {{1}}=client name, {{2}}=document type, {{3}}=document number
+                sid: process.env.TWILIO_READY_TEMPLATE_SID || 'HX4c13498aa30e141130c4a9866da18b11',
+                variables: ['1', '2', '3']
             }
         };
 
@@ -958,7 +963,12 @@ Para consultas: ${process.env.NOTARIA_CONTACTO || 'Tel: (02) 2234-567'}
                 simulated: true,
                 messageId: 'SIMULATED_' + Date.now(),
                 to: clientPhone,
-                template: 'listo_entrega_single_v5'
+                template: 'listo_entrega_single_v5',
+                variables: [
+                    clientName,
+                    documento.actoPrincipalDescripcion || documento.documentType || documento.tipoDocumento || 'Documento',
+                    documento.protocolNumber || documento.id || 'N/A'
+                ]
             };
             await this.saveNotification({ ...notificationBase, status: 'SIMULATED', messageBody: '[TEMPLATE listo_entrega_single_v5]', messageId: simulation.messageId });
             return simulation;
@@ -971,10 +981,23 @@ Para consultas: ${process.env.NOTARIA_CONTACTO || 'Tel: (02) 2234-567'}
 
         try {
             const templateSid = this.templates.listo_entrega_single_v5.sid;
+            if (!templateSid || !templateSid.startsWith('H')) {
+                console.warn('⚠️ TWILIO_READY_TEMPLATE_SID no configurado correctamente. Evitando envío real.');
+                const simulation = {
+                    success: true,
+                    simulated: true,
+                    messageId: 'SIMULATED_MISSING_SID_' + Date.now(),
+                    to: numeroWhatsApp,
+                    template: 'listo_entrega_single_v5'
+                };
+                await this.saveNotification({ ...notificationBase, status: 'SIMULATED', messageBody: '[TEMPLATE listo_entrega_single_v5 - MISSING SID]', messageId: simulation.messageId });
+                return simulation;
+            }
+
             const variables = [
                 clientName,                                           // {{1}}
                 documento.actoPrincipalDescripcion || documento.documentType || documento.tipoDocumento || 'Documento', // {{2}}
-                documento.protocolNumber || documento.id || 'N/A'    // {{3}}
+                documento.protocolNumber || documento.id || 'N/A'     // {{3}}
             ];
 
             // Guardar como PENDING

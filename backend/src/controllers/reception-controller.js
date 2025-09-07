@@ -99,7 +99,7 @@ async function getMatrizadores(req, res) {
 
 async function listarTodosDocumentos(req, res) {
   try {
-    const { search, matrizador, estado, fechaDesde, fechaHasta, page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
+    const { search, matrizador, estado, fechaDesde, fechaHasta, page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc', excludeEstado } = req.query;
     // Normalizar y mapear campo de ordenamiento permitido
     const mapSortField = (field) => {
       switch ((field || '').toString()) {
@@ -141,6 +141,12 @@ async function listarTodosDocumentos(req, res) {
       const norm = String(estado).toUpperCase();
       where.status = (norm === 'NOTA_CREDITO' || norm === 'NOTA-CREDITO') ? 'ANULADO_NOTA_CREDITO' : estado;
     }
+    // Soporte opcional para excluir un estado (p. ej. ENTREGADO) y arreglar paginación con filtros
+    const excludeStatus = excludeEstado ? String(excludeEstado).toUpperCase() : '';
+    if (!estado && excludeStatus) {
+      // Solo aplicar exclusión si no se está usando un estado específico
+      where.status = { not: excludeStatus };
+    }
 
     if (fechaDesde || fechaHasta) {
       where.createdAt = {};
@@ -180,6 +186,7 @@ async function listarTodosDocumentos(req, res) {
         // Construir cláusulas adicionales según filtros
         const filterClauses = [];
         if (estado) filterClauses.push(Prisma.sql`d."status"::text = ${estado}`);
+        if (!estado && excludeStatus) filterClauses.push(Prisma.sql`d."status"::text <> ${excludeStatus}`);
         if (matrizador) filterClauses.push(Prisma.sql`d."assignedToId" = ${parseInt(matrizador)}`);
         if (fechaDesde) filterClauses.push(Prisma.sql`d."createdAt" >= ${new Date(fechaDesde)}`);
         if (fechaHasta) {
