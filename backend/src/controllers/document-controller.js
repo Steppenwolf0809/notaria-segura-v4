@@ -2981,6 +2981,12 @@ async function deliverDocument(req, res) {
       observacionesEntrega = observaciones
     } = req.body;
 
+    // Variables legacy utilizadas en eventos/plantillas (evitar ReferenceError)
+    const {
+      verificacionManual = true,
+      codigoVerificacion
+    } = req.body;
+
     // Verificar que el usuario sea RECEPCION, ADMIN, CAJA, MATRIZADOR o ARCHIVO
     if (!['RECEPCION', 'ADMIN', 'CAJA', 'MATRIZADOR', 'ARCHIVO'].includes(req.user.role)) {
       return res.status(403).json({

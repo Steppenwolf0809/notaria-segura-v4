@@ -43,6 +43,25 @@ api.interceptors.request.use(
   }
 );
 
+// Interceptor de respuesta para manejar 401 globalmente
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    if (status === 401) {
+      try {
+        localStorage.removeItem('notaria-auth-storage');
+        localStorage.removeItem('token');
+      } catch {}
+      // Redirigir a login de manera no bloqueante
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 /**
  * Servicio de recepción
  * Maneja todas las peticiones relacionadas con entrega de documentos
@@ -216,13 +235,8 @@ const receptionService = {
    */
   async procesarEntrega(documentId, entregaData) {
     try {
-      // 🔄 CONSERVADOR: Usar endpoint principal de documentos que ya existe
-      const response = await axios.post(`${API_BASE_URL}/documents/${documentId}/deliver`, entregaData, {
-        headers: {
-          'Authorization': `Bearer ${this.getToken()}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      // Usar instancia 'api' para heredar interceptores (401)
+      const response = await api.post(`/documents/${documentId}/deliver`, entregaData);
       return {
         success: true,
         data: response.data.data,

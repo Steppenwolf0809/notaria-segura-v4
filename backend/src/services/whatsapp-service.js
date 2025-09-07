@@ -620,7 +620,7 @@ class WhatsAppService {
             const variables = {
                 // Variables básicas
                 cliente: cliente.nombre || cliente.clientName || 'Cliente',
-                documento: documento.tipo_documento || documento.tipoDocumento || documento.documentType || 'Documento',
+                documento: documento.actoPrincipalDescripcion || documento.tipo_documento || documento.tipoDocumento || documento.documentType || 'Documento',
                 codigo: codigo,
                 
                 // Variables mejoradas
@@ -943,15 +943,25 @@ Para consultas: ${process.env.NOTARIA_CONTACTO || 'Tel: (02) 2234-567'}
         const clientName = cliente.clientName || cliente.nombre;
         const clientPhone = cliente.clientPhone || cliente.telefono;
         
+        // Preparar datos de notificación para historial
+        const notificationBase = {
+            documentId: documento.id || null,
+            clientName: clientName,
+            clientPhone: clientPhone,
+            messageType: 'DOCUMENT_READY'
+        };
+
         if (!this.isEnabled || !this.client) {
             console.log('📱 WhatsApp simulation mode - template:', this.templates.listo_entrega_single_v5.sid);
-            return {
+            const simulation = {
                 success: true,
                 simulated: true,
                 messageId: 'SIMULATED_' + Date.now(),
                 to: clientPhone,
                 template: 'listo_entrega_single_v5'
             };
+            await this.saveNotification({ ...notificationBase, status: 'SIMULATED', messageBody: '[TEMPLATE listo_entrega_single_v5]', messageId: simulation.messageId });
+            return simulation;
         }
 
         const numeroWhatsApp = this.formatPhoneNumber(clientPhone);
@@ -963,9 +973,12 @@ Para consultas: ${process.env.NOTARIA_CONTACTO || 'Tel: (02) 2234-567'}
             const templateSid = this.templates.listo_entrega_single_v5.sid;
             const variables = [
                 clientName,                                           // {{1}}
-                documento.documentType || documento.tipoDocumento || 'Documento', // {{2}}  
+                documento.actoPrincipalDescripcion || documento.documentType || documento.tipoDocumento || 'Documento', // {{2}}
                 documento.protocolNumber || documento.id || 'N/A'    // {{3}}
             ];
+
+            // Guardar como PENDING
+            const pending = await this.saveNotification({ ...notificationBase, status: 'PENDING', messageBody: `[TEMPLATE ${templateSid}]` });
 
             const result = await this.client.messages.create({
                 contentSid: templateSid,
@@ -978,6 +991,7 @@ Para consultas: ${process.env.NOTARIA_CONTACTO || 'Tel: (02) 2234-567'}
             });
 
             console.log(`✅ WhatsApp approved template sent: ${result.sid}`);
+            if (pending?.id) await this.updateNotification(pending.id, { status: 'SENT', messageId: result.sid, sentAt: new Date() });
             return {
                 success: true,
                 messageId: result.sid,
@@ -988,6 +1002,10 @@ Para consultas: ${process.env.NOTARIA_CONTACTO || 'Tel: (02) 2234-567'}
 
         } catch (error) {
             console.error('❌ Error sending WhatsApp approved template:', error);
+            // Guardar como FAILED
+            try {
+                await this.saveNotification({ ...notificationBase, status: 'FAILED', messageBody: '[TEMPLATE listo_entrega_single_v5]', errorMessage: error.message });
+            } catch {}
             throw error;
         }
     }

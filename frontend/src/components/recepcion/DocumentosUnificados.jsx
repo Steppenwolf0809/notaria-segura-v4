@@ -382,7 +382,13 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
         if (!result.success) throw new Error(result.error);
 
         const docsAll = result.data.documents || [];
-        const docs = docsAll.filter(d => d.status === 'EN_PROCESO' || d.status === 'LISTO');
+        // Respetar filtro de estado si está seleccionado en la pestaña principal
+        const allowed = (() => {
+          if (filters.estado === 'EN_PROCESO') return new Set(['EN_PROCESO']);
+          if (filters.estado === 'LISTO') return new Set(['LISTO']);
+          return new Set(['EN_PROCESO', 'LISTO']);
+        })();
+        const docs = docsAll.filter(d => allowed.has(d.status));
         setDocumentos(docs);
 
         // Calcular total exacto sumando conteos por estado
@@ -644,7 +650,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
         onEstadisticasChange?.();
         setSelectedDocuments([]);
         console.log('✅ Proceso completado exitosamente');
-        
+
         // 🔧 CORRECCIÓN: Cerrar modal automáticamente después de operación exitosa
         cerrarConfirmacion();
       } else {
