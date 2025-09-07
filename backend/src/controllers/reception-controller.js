@@ -99,7 +99,7 @@ async function getMatrizadores(req, res) {
 
 async function listarTodosDocumentos(req, res) {
   try {
-    const { search, matrizador, estado, fechaDesde, fechaHasta, page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc', excludeEstado } = req.query;
+    const { search, matrizador, estado, estadoIn, fechaDesde, fechaHasta, page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc', excludeEstado } = req.query;
     // Normalizar y mapear campo de ordenamiento permitido
     const mapSortField = (field) => {
       switch ((field || '').toString()) {
@@ -129,6 +129,7 @@ async function listarTodosDocumentos(req, res) {
     const take = parseInt(limit);
 
     const where = {};
+    const VALID_STATUSES = ['PENDIENTE','EN_PROCESO','LISTO','ENTREGADO','ANULADO_NOTA_CREDITO'];
     
     // PostgreSQL - Búsqueda case-insensitive y acento-insensitive (si hay extensión unaccent)
     const searchTerm = (search || '').trim();
@@ -141,9 +142,19 @@ async function listarTodosDocumentos(req, res) {
       const norm = String(estado).toUpperCase();
       where.status = (norm === 'NOTA_CREDITO' || norm === 'NOTA-CREDITO') ? 'ANULADO_NOTA_CREDITO' : estado;
     }
+    // Soporte para múltiples estados (p. ej. EN_PROCESO,LISTO)
+    let estadosIn = [];
+    if (!estado && estadoIn) {
+      const raw = Array.isArray(estadoIn) ? estadoIn : String(estadoIn).split(',');
+      estadosIn = raw.map(s => String(s).trim().toUpperCase()).filter(s => VALID_STATUSES.includes(s));
+      if (estadosIn.length > 0) {
+        where.status = { in: estadosIn };
+      }
+    }
     // Soporte opcional para excluir un estado (p. ej. ENTREGADO) y arreglar paginación con filtros
-    const excludeStatus = excludeEstado ? String(excludeEstado).toUpperCase() : '';
-    if (!estado && excludeStatus) {
+    const excludeStatus = excludeEstado ? String(excludeEstado).toUpperCase().trim() : '';
+    const excludeIsValid = VALID_STATUSES.includes(excludeStatus);
+    if (!estado && excludeIsValid) {
       // Solo aplicar exclusión si no se está usando un estado específico
       where.status = { not: excludeStatus };
     }
@@ -169,6 +180,8 @@ async function listarTodosDocumentos(req, res) {
       estado,
       fechaDesde: fechaDesde || null,
       fechaHasta: fechaHasta || null,
+      estadoIn: estadosIn.length > 0 ? estadosIn.join(',') : null,
+      excludeEstado: excludeIsValid ? excludeStatus : null,
       sortBy: mappedSortField,
       sortOrder: mappedSortOrder
     });
@@ -186,7 +199,8 @@ async function listarTodosDocumentos(req, res) {
         // Construir cláusulas adicionales según filtros
         const filterClauses = [];
         if (estado) filterClauses.push(Prisma.sql`d."status"::text = ${estado}`);
-        if (!estado && excludeStatus) filterClauses.push(Prisma.sql`d."status"::text <> ${excludeStatus}`);
+        if (!estado && estadosIn.length > 0) filterClauses.push(Prisma.sql`d."status"::text IN (${Prisma.join(estadosIn)})`);
+        if (!estado && excludeIsValid) filterClauses.push(Prisma.sql`d."status"::text <> ${excludeStatus}`);
         if (matrizador) filterClauses.push(Prisma.sql`d."assignedToId" = ${parseInt(matrizador)}`);
         if (fechaDesde) filterClauses.push(Prisma.sql`d."createdAt" >= ${new Date(fechaDesde)}`);
         if (fechaHasta) {
