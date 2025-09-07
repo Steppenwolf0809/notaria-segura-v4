@@ -297,3 +297,15 @@ model TestConnection {
   
   @@map("test_connection")
 }
+
+// Configuración del sistema (clave-valor) para toggles administrables
+model SystemSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@map("system_settings")
+  @@index([key])
+}

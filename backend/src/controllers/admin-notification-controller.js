@@ -1,4 +1,5 @@
 import prisma from '../db.js';
+import settingsService from '../services/settings-service.js';
 import { logAuditEvent } from '../utils/audit-logger.js';
 import jwt from 'jsonwebtoken';
 
@@ -670,45 +671,7 @@ const getNotificationSettings = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // Por ahora devolver configuración por defecto
-    // TODO: Implementar almacenamiento real de configuración
-    const defaultSettings = {
-      whatsapp: {
-        enabled: true,
-        apiUrl: '',
-        authToken: '',
-        phoneNumber: '',
-        businessAccount: '',
-        webhookUrl: ''
-      },
-      scheduling: {
-        enableScheduling: true,
-        workingHours: {
-          start: '08:00',
-          end: '18:00'
-        },
-        workingDays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
-        timezone: 'America/Guayaquil'
-      },
-      rateLimiting: {
-        enabled: true,
-        messagesPerMinute: 10,
-        messagesPerHour: 300,
-        messagesPerDay: 1000
-      },
-      retryPolicy: {
-        enabled: true,
-        maxRetries: 3,
-        retryDelay: 300,
-        backoffMultiplier: 2
-      },
-      notifications: {
-        enableEmailAlerts: true,
-        alertEmail: '',
-        failureThreshold: 5,
-        enableSystemNotifications: true
-      }
-    };
+    const simple = await settingsService.getAllSettings();
 
     // Auditoría
     await auditLogger.log({
@@ -720,7 +683,7 @@ const getNotificationSettings = async (req, res) => {
 
     res.json({
       success: true,
-      data: { settings: defaultSettings }
+      data: { settings: simple }
     });
   } catch (error) {
     console.error('Error getting notification settings:', error);
@@ -739,8 +702,7 @@ const updateNotificationSettings = async (req, res) => {
     const userId = req.user.id;
     const settings = req.body;
 
-    // TODO: Implementar almacenamiento real de configuración
-    // Por ahora solo simular el guardado
+    const updated = await settingsService.updateSettings(settings);
 
     // Auditoría
     await auditLogger.log({
@@ -755,6 +717,7 @@ const updateNotificationSettings = async (req, res) => {
 
     res.json({
       success: true,
+      data: { settings: updated },
       message: 'Configuración actualizada exitosamente'
     });
   } catch (error) {

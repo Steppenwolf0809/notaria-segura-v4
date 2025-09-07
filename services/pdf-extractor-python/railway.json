@@ -1,0 +1,9 @@
+{
+  "build": {
+    "builder": "NIXPACKS"
+  },
+  "env": {
+    "PYTHONUNBUFFERED": "1"
+  },
+  "start": "python -m uvicorn app:app --host 0.0.0.0 --port $PORT"
+}

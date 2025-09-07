@@ -1,6 +1,7 @@
 import twilio from 'twilio';
 import { parsePhoneNumber } from 'libphonenumber-js';
 import prisma from '../db.js';
+import settingsService from './settings-service.js';
 import { getActiveTemplateByType } from '../controllers/admin-whatsapp-templates-controller.js';
 import { formatDateTime, formatTimeOnly, formatLongDateTime } from '../utils/timezone.js';
 
@@ -51,6 +52,15 @@ class WhatsAppService {
             }
         } else {
             console.log('⚠️ WhatsApp deshabilitado o credenciales faltantes');
+        }
+    }
+
+    async isWhatsAppEnabled() {
+        try {
+            const dyn = await settingsService.getSetting('whatsappEnabled');
+            return Boolean(dyn);
+        } catch {
+            return this.isEnabled;
         }
     }
 
@@ -181,7 +191,8 @@ class WhatsAppService {
         };
         const pending = await this.saveNotification(notificationData);
 
-        if (!this.isEnabled || !this.client) {
+        const enabled = await this.isWhatsAppEnabled();
+        if (!enabled || !this.client) {
             const simulationResult = this.simularEnvio(cliente, documento, codigo, 'documento_listo');
             if (pending?.id) await this.updateNotification(pending.id, { status: 'SIMULATED', messageId: simulationResult.messageId, sentAt: new Date() });
             return simulationResult;
@@ -246,7 +257,8 @@ class WhatsAppService {
         };
         const pending = await this.saveNotification(notificationData);
 
-        if (!this.isEnabled || !this.client) {
+        const enabled = await this.isWhatsAppEnabled();
+        if (!enabled || !this.client) {
             const simulationResult = this.simularEnvio(documento, datosEntrega, 'documento_entregado');
             if (pending?.id) await this.updateNotification(pending.id, { status: 'SIMULATED', messageId: simulationResult.messageId, sentAt: new Date() });
             return simulationResult;
@@ -352,7 +364,8 @@ class WhatsAppService {
             documentCount: Array.isArray(documentos) ? documentos.length : documentos
         };
 
-        if (!this.isEnabled || !this.client) {
+        const enabled = await this.isWhatsAppEnabled();
+        if (!enabled || !this.client) {
             // Modo simulación - crear resultado simulado
             const simulationResult = {
                 success: true,
@@ -861,7 +874,8 @@ Para consultas: ${process.env.NOTARIA_CONTACTO || 'Tel: (02) 2234-567'}
      * Verificar configuración del servicio
      */
     async verificarConfiguracion() {
-        if (!this.isEnabled) {
+        const enabled = await this.isWhatsAppEnabled();
+        if (!enabled) {
             return { 
                 status: 'disabled', 
                 message: 'WhatsApp deshabilitado en configuración',
@@ -956,7 +970,8 @@ Para consultas: ${process.env.NOTARIA_CONTACTO || 'Tel: (02) 2234-567'}
             messageType: 'DOCUMENT_READY'
         };
 
-        if (!this.isEnabled || !this.client) {
+        const enabled = await this.isWhatsAppEnabled();
+        if (!enabled || !this.client) {
             console.log('📱 WhatsApp simulation mode - template:', this.templates.listo_entrega_single_v5.sid);
             const simulation = {
                 success: true,
