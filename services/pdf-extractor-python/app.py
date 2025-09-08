@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from extractors.pdf_reader import PdfReader
 from extractors.text_normalizer import normalize_text
-from extractors.simple_extractor import extract_entities as simple_extract_entities, guess_act_type
+from extractors.simple_extractor import extract_entities as simple_extract_entities, extract_entities_with_sections, extract_notary, guess_act_type
 from extractors.spacy_extractor import extract_entities as spacy_extract_entities
 from extractors.semantic_analyzer import analyze_semantics, normalize_person_name, detectar_tipo_persona
 from extractors.simple_extractor import find_names as simple_find_names
@@ -37,7 +37,9 @@ class ExtractResponse(BaseModel):
     success: bool
     processing_time: float
     actos: list
+    confidence_score: float | None = None
     debug: dict | None = None
+    debug_info: dict | None = None
 
 
 app = FastAPI(title="PDF Extractor Notarial (Python)", version="0.1.0")
@@ -83,7 +85,7 @@ async def extract(
 
     # Lectura PDF
     reader = PdfReader(max_pages=MAX_PAGES)
-    text, pages_read = reader.extract_text(data)
+    text, pages_read, method = reader.extract_text(data)
     if not text or len(text) < 5:
         raise HTTPException(status_code=400, detail="No se pudo extraer texto legible del PDF")
 
@@ -99,8 +101,12 @@ async def extract(
     except Exception:
         spa = {"sections": {}}
 
-    # Extracción básica por regex como base
-    otorgantes, beneficiarios, reps = simple_extract_entities(text_upper)
+    # Extracción usando secciones si están disponibles; fallback a básica
+    sections = (spa or {}).get("sections") or {}
+    otorgantes, beneficiarios, reps, raw_sections = extract_entities_with_sections(text_upper, sections)
+    if not (otorgantes or beneficiarios):
+        ot2, be2, reps2 = simple_extract_entities(text_upper)
+        otorgantes, beneficiarios, reps = ot2, be2, reps2
     logger.info(f"Otorgantes antes procesamiento: {[o.get('nombre') for o in otorgantes]}")
     logger.info(f"Beneficiarios antes procesamiento: {[b.get('nombre') for b in beneficiarios]}")
     tipo_acto = guess_act_type(text_upper)
@@ -109,6 +115,20 @@ async def extract(
     sem = analyze_semantics(text_upper, spa)
 
     # Enriquecer entidades con normalización y tipo robusto
+    def _compute_entity_confidence(nombre: str, norm: dict, tipo: str) -> float:
+        try:
+            tokens = [t for t in (nombre or "").split() if t]
+            base = 0.4 + 0.08 * max(0, len(tokens) - 1)
+            if len(tokens) >= 2:
+                base += 0.1
+            if norm.get("apellidos") and norm.get("nombres"):
+                base += 0.1
+            if tipo == "JURIDICA":
+                base += 0.05
+            return round(max(0.2, min(0.95, base)), 2)
+        except Exception:
+            return 0.5
+
     def _enrich_list(items: list) -> list:
         out = []
         for e in items or []:
@@ -121,6 +141,7 @@ async def extract(
             enriched["nombres"] = norm.get("nombres")
             enriched["orden_detectada"] = norm.get("orden_detectada")
             enriched["nombre_normalizado"] = norm.get("nombre_normalizado")
+            enriched["confidence"] = _compute_entity_confidence(nombre, norm, tipo_robusto)
             out.append(enriched)
         return out
 
@@ -129,13 +150,21 @@ async def extract(
     logger.info(f"Otorgantes después procesamiento: {[o.get('nombre_normalizado') for o in otorgantes]}")
     logger.info(f"Tipo detectado para cada persona: {[o.get('tipo') for o in otorgantes + beneficiarios]}")
 
+    # Extraer notario si se detectó ventana
+    notario_info = extract_notary(text_upper, sections)
+
+    # Elegir tipo_acto más robusto si disponible
+    tipo_acto_sem = (sem.get("perfil_acto") or {}).get("tipo_detectado") if isinstance(sem, dict) else None
+    tipo_acto_final = tipo_acto_sem or tipo_acto
+
     acto = {
-        "tipo_acto": tipo_acto,
+        "tipo_acto": tipo_acto_final,
         "otorgantes": otorgantes,
         "beneficiarios": beneficiarios,
-        "autoridad_notarial": None,
+        "autoridad_notarial": {"nombre": notario_info.get("nombre"), "notaria_texto": notario_info.get("notaria")} if notario_info else None,
         "fecha_otorgamiento": None,
         "perfil_acto": sem.get("perfil_acto"),
+        "tiene_beneficiarios": bool(beneficiarios),
     }
 
     # Scoring y validación
@@ -175,14 +204,22 @@ async def extract(
         except Exception:
             pass
 
-    result_debug = {"pages_read": pages_read, "text_preview": text_norm[:500], "spacy": spa_debug}
+    result_debug = {"pages_read": pages_read, "text_preview": text_norm[:500], "spacy": spa_debug, "sections_detected": list((sections or {}).keys()), "raw_sections": raw_sections, "text_extraction_method": method}
 
     processing_time = round(time.perf_counter() - start, 3)
+    # confidence_score a nivel respuesta (promedio de actos)
+    try:
+        confs = [a.get("validacion", {}).get("score", 0.0) for a in actos]
+        top_conf = round(sum(confs) / max(1, len(confs)), 2)
+    except Exception:
+        top_conf = None
     return ExtractResponse(
         success=True,
         processing_time=processing_time,
         actos=actos,
+        confidence_score=top_conf,
         debug=result_debug if debug else None,
+        debug_info=result_debug if debug else None,
     )
 
 
@@ -201,7 +238,7 @@ async def debug_extract(
         raise HTTPException(status_code=400, detail=f"El archivo PDF es demasiado grande (máximo {int(MAX_PDF_MB)}MB)")
 
     reader = PdfReader(max_pages=MAX_PAGES)
-    text, pages_read = reader.extract_text(data)
+    text, pages_read, method = reader.extract_text(data)
     if not text or len(text) < 5:
         raise HTTPException(status_code=400, detail="No se pudo extraer texto legible del PDF")
 
@@ -265,6 +302,7 @@ async def debug_extract(
         "success": True,
         "processing_time": processing_time,
         "pages_read": pages_read,
+        "text_extraction_method": method,
         "text_raw_preview": text[:800],
         "text_normalized_preview": text_norm[:800],
         "spacy": {

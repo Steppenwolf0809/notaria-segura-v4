@@ -8,7 +8,9 @@ def normalize_text(text: str) -> str:
     t = t.replace("\u0000", " ")
     t = t.replace("\r", "")
     t = re.sub(r"[\t\f]+", " ", t)
-    # Compactar espacios sin perder saltos de línea
+    # Unir líneas quebradas de nombres: si una línea termina en palabra y la siguiente inicia en mayúscula, unir
+    t = re.sub(r"(\S)\n([A-ZÁÉÍÓÚÑ]{2,})", r"\1 \2", t)
+    # Compactar espacios sin perder saltos de línea remanentes
     t = re.sub(r" +", " ", t)
     t = re.sub(r" *\n *", "\n", t)
     return t.strip()

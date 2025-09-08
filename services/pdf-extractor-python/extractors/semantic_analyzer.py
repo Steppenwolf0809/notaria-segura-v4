@@ -181,12 +181,17 @@ def analyze_semantics(text_upper: str, tokens_info: Dict[str, Any]) -> Dict[str,
 
     es_generico = tipo_detectado == "ACTO_GENERICO" or ("PODER" in text_upper and not any(k in text_upper for k in ["COMPRAVENTA", "REVOCATORIA", "DONACION", "DONACIÓN", "TESTAMENTO"]))
 
+    # Señales de múltiples actos (se repite ancla de secciones)
+    anchors = [k for k in sections.keys() if k in {"otorgantes", "beneficiarios"}]
+    multi_act_hint = len(anchors) >= 2 and "OTORGANTES" in text_upper and "A FAVOR DE" in text_upper
+
     return {
         "perfil_acto": {
             "requiere_beneficiario": requiere_benef,
             "confidence_beneficiario": conf_benef,
             "es_acto_generico": es_generico,
             "tipo_detectado": tipo_detectado,
+            "posible_multiple_actos": multi_act_hint,
         }
     }
 

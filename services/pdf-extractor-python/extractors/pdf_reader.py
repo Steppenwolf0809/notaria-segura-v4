@@ -16,13 +16,14 @@ class PdfReader:
     def __init__(self, max_pages: int = 8):
         self.max_pages = max_pages
 
-    def extract_text(self, data: bytes) -> Tuple[str, int]:
+    def extract_text(self, data: bytes) -> Tuple[str, int, str]:
         """
         Devuelve (texto, paginas_leidas).
         Intenta pdfplumber y, si falla o devuelve muy poco texto, usa pdfminer.six.
         """
         text = ""
         pages_read = 0
+        method = ""
 
         # Primer intento: pdfplumber
         try:
@@ -33,6 +34,7 @@ class PdfReader:
                     page_text = page.extract_text() or ""
                     text += (page_text.strip() + "\n")
                 pages_read = num
+                method = "pdfplumber"
         except Exception:
             text = ""
 
@@ -43,6 +45,7 @@ class PdfReader:
                 text = (pdfminer_extract_text(io.BytesIO(data)) or "").strip()
                 if text:
                     pages_read = max(pages_read, 1)
+                    method = "pdfminer"
             except Exception:
                 pass
 
@@ -52,6 +55,8 @@ class PdfReader:
             .replace("\r", "")
             .replace("\t", " ")
         )
-        return text, pages_read
+        if not method:
+            method = "pdfminer" if text and pages_read and len(text.strip()) >= 20 else "unknown"
+        return text, pages_read, method
 
 

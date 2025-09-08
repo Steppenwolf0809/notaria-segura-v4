@@ -14,6 +14,7 @@
 {
   "success": true,
   "processing_time": 0.45,
+  "confidence_score": 0.68,
   "actos": [
     {
       "tipo_acto": "PODER ESPECIAL",
@@ -26,7 +27,12 @@
       }
     }
   ],
-  "debug": { "pages_read": 2 }
+  "debug": { "pages_read": 2 },
+  "debug_info": {
+    "text_extraction_method": "pdfplumber",
+    "sections_detected": ["otorgantes","beneficiarios"],
+    "raw_sections": {"otorgantes_raw":"...","beneficiarios_raw":"..."}
+  }
 }
 ```
 
