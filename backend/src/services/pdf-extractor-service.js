@@ -973,9 +973,16 @@ const PdfExtractorService = {
       }
 
       // Fallback final: extracción agresiva por patrones cuando todo falla
+      console.log('📊 EJECUTANDO MÉTODO ANTERIOR NODE.JS')
+      console.log('- Razón: Fallback por fallo del microservicio Python o sin detecciones suficientes')
+      console.log('- Método: UniversalPdfParser + regex heurísticas')
       console.log('[PdfExtractorService] Fallback final: extracción agresiva')
       const desperateAct = this.parseDesperatePatterns(rawText)
       if (desperateAct && (desperateAct.otorgantes.length > 0 || desperateAct.beneficiarios.length > 0)) {
+        console.log('📊 RESULTADO MÉTODO NODE.JS:')
+        console.log(`- Otorgantes detectados: ${desperateAct.otorgantes.length}`)
+        console.log(`- Beneficiarios detectados: ${desperateAct.beneficiarios.length}`)
+        console.log('📊 USANDO DATOS DEL MÉTODO NODE.JS ANTERIOR')
         console.log(`[PdfExtractorService] Extracción agresiva encontró ${desperateAct.otorgantes.length} otorgantes, ${desperateAct.beneficiarios.length} beneficiarios`)
         return { acts: [desperateAct] }
       }

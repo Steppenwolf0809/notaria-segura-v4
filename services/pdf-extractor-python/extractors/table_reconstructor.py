@@ -121,5 +121,19 @@ def _extract_name_candidates(upper_text: str) -> List[str]:
 
 def _guess_tipo_persona(name: str) -> str:
     import re
-    return 'Jurídica' if re.search(r"FUNDACI[ÓO]N|S\.?A\.?|\bSA\b|LTDA\.?|C[ÍI]A\.?|CORP\.?|CORPORACI[ÓO]N|EMPRESA|UNIVERSIDAD|MUNICIPIO|COOPERATIVA|GAD|\bEP\b", name, re.I) else 'Natural'
+    # Patrones con límites de palabra para evitar falsos positivos (p.ej., 'PATRICIA' no matchea 'CIA')
+    patrones = [
+        r"\bFUNDACI[ÓO]N\b",
+        r"\bS\.?A\.?\b|\bSA\b|\bSAS\b|S\.A\.S\b",
+        r"\bLTDA\.?\b",
+        r"\bC[ÍI]A\.?\b|\bCOMPAÑ[ÍI]A\b",
+        r"\bCORP\.?\b|\bCORPORACI[ÓO]N\b",
+        r"\bEMPRESA\b",
+        r"\bUNIVERSIDAD\b|\bMUNICIPIO\b|\bCOOPERATIVA\b|\bGAD\b|\bEP\b",
+    ]
+    up = (name or "").upper()
+    for p in patrones:
+        if re.search(p, up, re.I):
+            return 'Jurídica'
+    return 'Natural'
 

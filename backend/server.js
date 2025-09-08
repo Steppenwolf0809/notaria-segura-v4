@@ -7,6 +7,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { closePrismaClient } from './src/db.js'
 import { getConfig, isConfigurationComplete, debugConfiguration } from './src/config/environment.js'
+import PythonPdfClient from './src/services/python-pdf-client.js'
 import xmlWatcherService from './src/services/xml-watcher-service.js'
 import cache from './src/services/cache-service.js'
 
@@ -113,7 +114,10 @@ const corsOptions = {
     'X-Security-Info',
     'X-RateLimit-Limit',
     'X-RateLimit-Remaining',
-    'X-RateLimit-Reset'
+    'X-RateLimit-Reset',
+    'X-Extraction-Method',
+    'X-Processing-Time',
+    'X-Python-Available'
   ]
 };
 
@@ -355,6 +359,27 @@ const server = app.listen(PORT, () => {
       }
     })
     .catch(() => console.log('⚠️ Caché: uso de memoria por defecto'))
+  
+  // Health check del microservicio Python al inicio (no bloqueante)
+  ;(async () => {
+    try {
+      const cfg = getConfig()
+      if (cfg?.pdfExtractor?.baseUrl) {
+        console.log('🏥 VERIFICANDO SALUD MICROSERVICIO PYTHON')
+        const client = new PythonPdfClient()
+        const health = await client.healthCheck()
+        if (health.ok) {
+          console.log('✅ MICROSERVICIO PYTHON DISPONIBLE')
+        } else {
+          console.log(`❌ MICROSERVICIO PYTHON NO SALUDABLE: ${health.status}`)
+        }
+      } else {
+        console.log('ℹ️ Microservicio Python no configurado (PDF_EXTRACTOR_BASE_URL ausente)')
+      }
+    } catch (e) {
+      console.log(`❌ MICROSERVICIO PYTHON NO ACCESIBLE: ${e?.message || e}`)
+    }
+  })()
 })
 
 // ============================================================================

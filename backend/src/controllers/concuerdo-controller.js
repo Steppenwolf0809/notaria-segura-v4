@@ -5,6 +5,7 @@ import { ExtractoTemplateEngine } from '../services/extractos/index.js'
 import { buildActPhrase } from '../services/extractos/phrase-builder.js'
 import DataQualityValidator from '../services/data-quality-validator.js'
 import ocrService from '../services/ocr-service.js'
+import { getConfig } from '../config/environment.js'
 
 /**
  * Controlador de Generador de Concuerdos (Sprint 1)
@@ -89,6 +90,8 @@ async function uploadPdf(req, res) {
  */
 async function extractData(req, res) {
   try {
+    const tStart = Date.now()
+    console.log('🚀 INICIANDO EXTRACCIÓN PDF - Concuerdo Controller')
     const { text, buffer } = req.body || {}
     if (!text || typeof text !== 'string' || text.trim().length < 5) {
       return res.status(400).json({ success: false, message: 'Texto del PDF inválido o vacío' })
@@ -104,17 +107,42 @@ async function extractData(req, res) {
       }
     }
 
+    const filename = req.body?.filename || 'upload.pdf'
+    const fileSizeKb = pdfBuffer ? Math.round(pdfBuffer.length / 1024) : 'N/A'
+    console.log(`📄 Archivo: ${filename}, Tamaño: ${fileSizeKb}KB`)
+
     // Debug: mostrar preview del texto extraído
     console.log('📝 Preview texto extraído (primeros 500 chars):', text.substring(0, 500).replace(/\n/g, '\\n'))
+    const tAfterPrep = Date.now()
+    const tiempoPrep = tAfterPrep - tStart
+
+    // Decisión de procesamiento
+    const config = getConfig()
+    const pythonAvailable = Boolean(config?.pdfExtractor?.baseUrl) && Boolean(config?.pdfExtractor?.token)
+    console.log('🔄 DECISIÓN DE PROCESAMIENTO:')
+    console.log(`- PDF_EXTRACTOR_BASE_URL configurado: ${config?.pdfExtractor?.baseUrl ? 'SÍ' : 'NO'}`)
+    console.log(`- PDF_EXTRACTOR_TOKEN configurado: ${config?.pdfExtractor?.token ? 'SÍ' : 'NO'}`)
     
     // Intentar microservicio Python si hay buffer disponible
     let acts = []
     let pythonTried = false
+    let metodoUtilizado = 'NODE.JS'
+    let tiempoPython = 0
     try {
       if (pdfBuffer) {
         const py = new PythonPdfClient()
         pythonTried = true
+        if (pythonAvailable) {
+          console.log('🐍 USANDO MICROSERVICIO PYTHON')
+          console.log(`- URL: ${config.pdfExtractor.baseUrl}`)
+          console.log(`- Token configurado: ${config.pdfExtractor.token ? 'SÍ' : 'NO'}`)
+        } else {
+          console.log('📊 USANDO MÉTODO NODE.JS ANTERIOR')
+          console.log('- Razón: Microservicio no disponible o configuración faltante')
+        }
+        const tPyStart = Date.now()
         const pyResp = await py.extractFromPdf(pdfBuffer, 'upload.pdf', { debug: 0 })
+        tiempoPython = Date.now() - tPyStart
         if (pyResp && (pyResp.success === true || pyResp.actos)) {
           const mapTipo = (t) => {
             if (!t) return undefined
@@ -127,6 +155,7 @@ async function extractData(req, res) {
             otorgantes: (a?.otorgantes || []).map(o => ({ nombre: o?.nombre || '', tipo_persona: mapTipo(o?.tipo) })),
             beneficiarios: (a?.beneficiarios || []).map(b => ({ nombre: b?.nombre || '', tipo_persona: mapTipo(b?.tipo) }))
           }))
+          if (acts.length > 0) metodoUtilizado = 'PYTHON'
         }
       }
     } catch (pyErr) {
@@ -136,6 +165,8 @@ async function extractData(req, res) {
     // Si Python no produjo actos, usar parser universal y fallbacks existentes
     if (!acts || acts.length === 0) {
       // Usar el parser universal para detección automática
+      console.log('📊 USANDO MÉTODO NODE.JS ANTERIOR')
+      console.log('- Razón: Microservicio no disponible o sin datos útiles')
       const universalParser = new UniversalPdfParser()
       const universalResult = await universalParser.parseDocument(pdfBuffer, text)
       acts = universalResult.acts || []
@@ -191,6 +222,30 @@ async function extractData(req, res) {
       console.log(`✅ Extracción validada con calidad ${validation.overallConfidence} (${Math.round(validation.overallScore * 100)}%)`)
     }
 
+    const tEnd = Date.now()
+    const tiempoTotal = tEnd - tStart
+    const tiempoPost = Math.max(0, tiempoTotal - tiempoPrep - tiempoPython)
+
+    // Logs de comparación de resultados
+    const tipoActo = parsed.tipoActo
+    const otsNames = (parsed.otorgantes || []).map(o => o?.nombre).filter(Boolean)
+    const besNames = (parsed.beneficiarios || []).map(b => b?.nombre).filter(Boolean)
+    console.log('📋 RESULTADO FINAL PROCESAMIENTO:')
+    console.log(`- Método utilizado: ${metodoUtilizado}`)
+    console.log(`- Tipo acto detectado: ${tipoActo}`)
+    console.log(`- Otorgantes: ${otsNames.join(', ')}`)
+    console.log(`- Beneficiarios: ${besNames.join(', ')}`)
+    console.log(`- Tiempo total: ${tiempoTotal}ms`)
+    if (metodoUtilizado === 'PYTHON') {
+      console.log('✅ DATOS FINALES PROVIENEN DEL MICROSERVICIO PYTHON')
+    } else {
+      console.log('✅ DATOS FINALES PROVIENEN DEL MÉTODO NODE.JS ANTERIOR')
+    }
+
+    // Headers de response para debugging
+    res.set('X-Extraction-Method', metodoUtilizado)
+    res.set('X-Processing-Time', String(tiempoTotal))
+    res.set('X-Python-Available', pythonAvailable ? 'true' : 'false')
     res.set('Content-Type', 'application/json; charset=utf-8')
     return res.json({
       success: true,
@@ -212,7 +267,14 @@ async function extractData(req, res) {
           suggestions: validation.validations.flatMap(v => v.suggestions),
           autoFixes: validation.validations.reduce((acc, v) => ({ ...acc, ...v.autoFixes }), {})
         },
-        ocr: { tried: ocrTried, enabled: allowOcr }
+        ocr: { tried: ocrTried, enabled: allowOcr },
+        performance: {
+          tiempoPrep,
+          tiempoPython,
+          tiempoPost,
+          tiempoTotal
+        },
+        method: metodoUtilizado
       }
     })
   } catch (error) {
