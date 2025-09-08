@@ -119,9 +119,29 @@ function validateEnvironment() {
     
     if (!result.success) {
       console.error('❌ Error en validación de variables de entorno:');
-      result.error.errors.forEach(error => {
-        console.error(`   • ${error.path.join('.')}: ${error.message}`);
-      });
+
+      // Debug defensivo para evitar crash si la estructura del error cambia
+      const zodError = result.error;
+      const issues = zodError && Array.isArray(zodError.issues) ? zodError.issues : [];
+
+      console.log('🔍 Debugging Zod error before iteración:');
+      console.log('   • Tipo de error:', zodError ? zodError.name || typeof zodError : 'undefined');
+      console.log('   • issues es array:', Array.isArray(issues));
+      console.log('   • issues length:', Array.isArray(issues) ? issues.length : 'N/A');
+
+      if (issues.length > 0) {
+        issues.forEach(issue => {
+          const path = Array.isArray(issue.path) ? issue.path.join('.') : '(sin ruta)';
+          console.error(`   • ${path}: ${issue.message}`);
+        });
+      } else {
+        // Fallback: loguear el error completo serializado
+        try {
+          console.error('   • Detalle del error:', JSON.stringify(zodError, Object.getOwnPropertyNames(zodError), 2));
+        } catch {
+          console.error('   • Detalle del error no serializable');
+        }
+      }
       
       // En producción, fallar inmediatamente
       if (process.env.NODE_ENV === 'production') {
