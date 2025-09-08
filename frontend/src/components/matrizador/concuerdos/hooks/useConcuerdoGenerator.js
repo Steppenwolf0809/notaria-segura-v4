@@ -35,7 +35,9 @@ export default function useConcuerdoGenerator() {
       setExtractedText(res.data)
       // Extraer datos básicos automáticamente
       setExtracting(true)
-      const parsed = await concuerdoService.extractData(res.data.text || '')
+      // Pasar también el buffer base64 para habilitar extracción Python inmediata
+      const buffer = res.data?.buffer || null
+      const parsed = await concuerdoService.extractData(res.data.text || '', buffer)
       if (!parsed.success) throw new Error(parsed.error || 'Error extrayendo datos')
       setExtractedData(parsed.data)
       setStep(1)
