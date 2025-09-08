@@ -14,8 +14,8 @@ from validators.confidence_scorer import score_act
 from validators.quality_validator import validate_act
 
 
-API_TOKEN = os.getenv("API_TOKEN", "changeme")
-MAX_PDF_MB = float(os.getenv("MAX_PDF_MB", "10"))
+API_TOKEN = os.getenv("PDF_EXTRACTOR_TOKEN") or os.getenv("API_TOKEN", "changeme")
+MAX_PDF_MB = float(os.getenv("MAX_PDF_SIZE_MB") or os.getenv("MAX_PDF_MB", "10"))
 MAX_PAGES = int(os.getenv("MAX_PAGES", "8"))
 MAX_ACTS = int(os.getenv("MAX_ACTS", "10"))
 TIMEOUT_SECONDS = int(os.getenv("TIMEOUT_SECONDS", "30"))

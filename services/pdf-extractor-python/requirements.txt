@@ -6,3 +6,4 @@ spacy>=3.7.0
 python-multipart>=0.0.6
 pydantic>=2.5.0
 es-core-news-md @ https://github.com/explosion/spacy-models/releases/download/es_core_news_md-3.7.0/es_core_news_md-3.7.0-py3-none-any.whl
+requests>=2.31.0

@@ -24,10 +24,12 @@ def score_act(act: Dict[str, Any]) -> Dict[str, Any]:
     bes = act.get("beneficiarios") or []
     conf["beneficiarios"] = min(0.9, 0.3 + 0.1 * len(bes)) if bes else 0.1
 
-    if act.get("autoridad_notarial", {}).get("nombre"):
+    autoridad = act.get("autoridad_notarial") or {}
+    if isinstance(autoridad, dict) and autoridad.get("nombre"):
         conf["notario"] = 0.9
 
-    if act.get("fecha_otorgamiento", {}).get("fecha_texto"):
+    fecha = act.get("fecha_otorgamiento") or {}
+    if isinstance(fecha, dict) and fecha.get("fecha_texto"):
         conf["fecha"] = 0.88
 
     score = round((conf["tipo_acto"] + conf["otorgantes"] + conf["beneficiarios"] + conf["notario"] + conf["fecha"]) / 5, 2)

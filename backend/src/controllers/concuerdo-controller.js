@@ -1,4 +1,5 @@
 import PdfExtractorService from '../services/pdf-extractor-service.js'
+import PythonPdfClient from '../services/python-pdf-client.js'
 import UniversalPdfParser from '../services/universal-pdf-parser.js'
 import { ExtractoTemplateEngine } from '../services/extractos/index.js'
 import { buildActPhrase } from '../services/extractos/phrase-builder.js'
@@ -106,16 +107,43 @@ async function extractData(req, res) {
     // Debug: mostrar preview del texto extraído
     console.log('📝 Preview texto extraído (primeros 500 chars):', text.substring(0, 500).replace(/\n/g, '\\n'))
     
-    // Usar el parser universal para detección automática
-    const universalParser = new UniversalPdfParser()
-    const universalResult = await universalParser.parseDocument(pdfBuffer, text)
-    
-    // Fallback al parser original si el universal falla
-    let acts = universalResult.acts || []
-    if (acts.length === 0) {
-      console.log('🔄 Fallback al parser original')
-      const fallbackResult = await PdfExtractorService.parseAdvancedData(text, pdfBuffer)
-      acts = fallbackResult.acts
+    // Intentar microservicio Python si hay buffer disponible
+    let acts = []
+    let pythonTried = false
+    try {
+      if (pdfBuffer) {
+        const py = new PythonPdfClient()
+        pythonTried = true
+        const pyResp = await py.extractFromPdf(pdfBuffer, 'upload.pdf', { debug: 0 })
+        if (pyResp && (pyResp.success === true || pyResp.actos)) {
+          const mapTipo = (t) => {
+            if (!t) return undefined
+            const up = String(t).toUpperCase()
+            return /JURIDICA|JURÍDICA/.test(up) ? 'Jurídica' : 'Natural'
+          }
+          const pyActs = Array.isArray(pyResp.actos) ? pyResp.actos : []
+          acts = pyActs.map(a => ({
+            tipoActo: a?.tipo_acto || a?.tipo || '',
+            otorgantes: (a?.otorgantes || []).map(o => ({ nombre: o?.nombre || '', tipo_persona: mapTipo(o?.tipo) })),
+            beneficiarios: (a?.beneficiarios || []).map(b => ({ nombre: b?.nombre || '', tipo_persona: mapTipo(b?.tipo) }))
+          }))
+        }
+      }
+    } catch (pyErr) {
+      console.error('Python PDF extractor failed:', pyErr?.message || pyErr)
+    }
+
+    // Si Python no produjo actos, usar parser universal y fallbacks existentes
+    if (!acts || acts.length === 0) {
+      // Usar el parser universal para detección automática
+      const universalParser = new UniversalPdfParser()
+      const universalResult = await universalParser.parseDocument(pdfBuffer, text)
+      acts = universalResult.acts || []
+      if (acts.length === 0) {
+        console.log('🔄 Fallback al parser original')
+        const fallbackResult = await PdfExtractorService.parseAdvancedData(text, pdfBuffer)
+        acts = fallbackResult.acts
+      }
     }
     
     let parsed = acts[0] || { tipoActo: '', otorgantes: [], beneficiarios: [] }

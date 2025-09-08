@@ -91,6 +91,20 @@ const environmentSchema = z.object({
     .string()
     .url('BASE_URL debe ser una URL válida')
     .optional()
+,
+
+  // Integración Microservicio Python PDF Extractor (opcionales)
+  PDF_EXTRACTOR_BASE_URL: z
+    .string()
+    .url('PDF_EXTRACTOR_BASE_URL debe ser una URL válida')
+    .optional(),
+  PDF_EXTRACTOR_TOKEN: z
+    .string()
+    .optional(),
+  PDF_EXTRACTOR_TIMEOUT: z
+    .string()
+    .optional()
+    .default('30000')
 });
 
 /**
@@ -158,10 +172,25 @@ function getConfig() {
       JWT_SECRET: process.env.JWT_SECRET || '',
       WHATSAPP_ENABLED: false,
       // Otros valores por defecto...
+      pdfExtractor: {
+        baseUrl: process.env.PDF_EXTRACTOR_BASE_URL || 'http://localhost:8001',
+        token: process.env.PDF_EXTRACTOR_TOKEN || '',
+        timeout: parseInt(process.env.PDF_EXTRACTOR_TIMEOUT || '30000', 10)
+      }
     };
   }
   
-  return validatedEnv;
+  // Construir configuración extendida
+  const cfg = {
+    ...validatedEnv,
+    pdfExtractor: {
+      baseUrl: validatedEnv.PDF_EXTRACTOR_BASE_URL || 'http://localhost:8001',
+      token: validatedEnv.PDF_EXTRACTOR_TOKEN || '',
+      timeout: parseInt(validatedEnv.PDF_EXTRACTOR_TIMEOUT || '30000', 10)
+    }
+  };
+  
+  return cfg;
 }
 
 /**
@@ -194,6 +223,11 @@ function debugConfiguration(config) {
     console.log('   JWT_SECRET:', config.JWT_SECRET ? '[CONFIGURADO]' : '[FALTANTE]');
     console.log('   WHATSAPP_ENABLED:', config.WHATSAPP_ENABLED);
     console.log('   FRONTEND_URL:', config.FRONTEND_URL || '[NO CONFIGURADA]');
+    if (config.pdfExtractor) {
+      console.log('   PDF_EXTRACTOR_BASE_URL:', config.pdfExtractor.baseUrl || '[NO CONFIGURADA]');
+      console.log('   PDF_EXTRACTOR_TIMEOUT:', config.pdfExtractor.timeout);
+      console.log('   PDF_EXTRACTOR_TOKEN:', config.pdfExtractor.token ? '[CONFIGURADO]' : '[FALTANTE]');
+    }
   }
 }
 
