@@ -23,6 +23,7 @@ const upload = multer({
 router.post('/upload-pdf', authenticateToken, requireMatrizador, upload.single('pdfFile'), uploadPdf)
 
 // POST /api/concuerdos/extract-data
+// Query opcional: ?hybrid=true para usar agregador Node+Python
 router.post('/extract-data', authenticateToken, requireMatrizador, extractData)
 
 // POST /api/concuerdos/preview (opcional Sprint 1)

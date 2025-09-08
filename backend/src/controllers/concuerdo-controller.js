@@ -1,9 +1,11 @@
 import PdfExtractorService from '../services/pdf-extractor-service.js'
 import PythonPdfClient from '../services/python-pdf-client.js'
 import UniversalPdfParser from '../services/universal-pdf-parser.js'
+import ExtractionAggregator from '../services/extraction-aggregator.js'
 import { ExtractoTemplateEngine } from '../services/extractos/index.js'
 import { buildActPhrase } from '../services/extractos/phrase-builder.js'
 import DataQualityValidator from '../services/data-quality-validator.js'
+import { getConfig as _getConfig } from '../config/environment.js'
 import ocrService from '../services/ocr-service.js'
 import { getConfig } from '../config/environment.js'
 
@@ -307,6 +309,21 @@ async function extractData(req, res) {
       })
     } else {
       console.log(`✅ Extracción validada con calidad ${validation.overallConfidence} (${Math.round(validation.overallScore * 100)}%)`)
+    }
+
+    // Modo híbrido: combinar Node + Python cuando se solicite
+    const enableHybrid = String(req.query?.hybrid || process.env.EXTRACT_HYBRID || 'false') === 'true'
+    if (enableHybrid) {
+      try {
+        const hyb = await ExtractionAggregator.hybridExtract({ pdfBuffer, rawText: text, filename })
+        if (hyb?.acts?.length) {
+          acts = hyb.acts
+          metodoUtilizado = 'HYBRID'
+          console.log(`✅ EXTRACCIÓN HÍBRIDA EXITOSA (conf=${hyb.confidence})`)
+        }
+      } catch (e) {
+        console.log('⚠️ Error en extracción híbrida:', e?.message || e)
+      }
     }
 
     const tEnd = Date.now()

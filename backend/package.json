@@ -5,9 +5,9 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest --detectOpenHandles --forceExit",
-    "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch",
-    "test:ci": "NODE_OPTIONS=--experimental-vm-modules jest --ci --coverage --watchAll=false",
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --detectOpenHandles --forceExit",
+    "test:watch": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --watch",
+    "test:ci": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --ci --coverage --watchAll=false",
     "prebuild": "npm run test:ci",
     "start": "npx prisma db push --accept-data-loss && node server.js",
     "build": "npx prisma generate",
@@ -61,7 +61,8 @@
     "nodemon": "^3.0.0",
     "prisma": "^5.7.0",
     "sqlite3": "^5.1.7",
-    "supertest": "^7.1.4"
+    "supertest": "^7.1.4",
+    "cross-env": "^7.0.3"
   },
   "keywords": [
     "api",
