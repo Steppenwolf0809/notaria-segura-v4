@@ -10,6 +10,27 @@ function normalizeName(name) {
     .trim()
 }
 
+// Tokens de ruido comunes en extractos (alineados con Python/Node)
+const STOP_TOKENS = new Set([
+  'PERSONA','PERSONAS','NATURAL','JURIDICA','JURÍDICA','DOCUMENTO','IDENTIDAD','NACIONALIDAD','CALIDAD','RUC','CÉDULA','CEDULA','NUMERO','NÚMERO',
+  'NOMBRES','RAZON','RAZÓN','SOCIAL','TIPO','INTERVINIENTE','BENEFICIARIO','BENEFICIARIOS','OTORGANTE','OTORGANTES','OTORGADO','BENEFICIARIOS',
+  'OBJETO','OBSERVACIONES','DESCRIPCIÓN','DESCRIPCION','CUANTÍA','CUANTIA','ACTO','CONTRATO','INDETERMINADA','UBICACION','UBICACIÓN','PROVINCIA','CANTON','CANTÓN','PARROQUIA',
+  'QUITO','PICHINCHA','IÑAQUITO','NA','A','FAVOR','DE','POR','SUS','PROPIOS','DERECHOS'
+])
+
+function isValidPersonName(name) {
+  const n = normalizeName(name)
+  if (!n || n.length < 4) return false
+  const tokens = n.split(' ').filter(Boolean)
+  // Al menos 2 tokens no-ruido
+  const clean = tokens.filter(t => !STOP_TOKENS.has(t))
+  if (clean.length < 2) return false
+  // Evitar nombres que están compuestos mayoritariamente de tokens de parada
+  const noiseRatio = 1 - (clean.length / tokens.length)
+  if (noiseRatio > 0.4) return false
+  return true
+}
+
 function jaccardSimilarity(a, b) {
   const as = new Set(normalizeName(a).split(' ').filter(Boolean))
   const bs = new Set(normalizeName(b).split(' ').filter(Boolean))
@@ -45,6 +66,7 @@ function dedupeEntities(entities, threshold = 0.6) {
   const out = []
   for (const e of entities || []) {
     const n = normalizeName(ensureNamesFirst(e?.nombre))
+    if (!isValidPersonName(n)) continue
     if (!n || n.length < 3) continue
     const found = out.find(o => jaccardSimilarity(o.nombre, n) >= threshold)
     if (!found) {
