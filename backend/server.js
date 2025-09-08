@@ -198,6 +198,26 @@ app.get('/api/health', (req, res) => {
   })
 })
 
+// Endpoint de debug: test de salud del microservicio Python
+app.get('/api/debug/test-python-health', async (req, res) => {
+  try {
+    const client = new PythonPdfClient()
+    const health = await client.healthCheck()
+
+    res.json({
+      healthy: Boolean(health?.ok),
+      status: health?.status,
+      baseUrl: client.baseUrl,
+      tokenConfigured: Boolean(client.token)
+    })
+  } catch (error) {
+    res.status(500).json({
+      healthy: false,
+      error: error?.message || String(error)
+    })
+  }
+})
+
 // RUTAS DE AUTENTICACIÓN (/api/auth/*)
 app.use('/api/auth', authRoutes)
 

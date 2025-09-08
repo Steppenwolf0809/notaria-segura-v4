@@ -180,22 +180,45 @@ async function extractData(req, res) {
           console.log('📊 USANDO MÉTODO NODE.JS ANTERIOR')
           console.log('- Razón: Microservicio no disponible o configuración faltante')
         }
-        const tPyStart = Date.now()
-        const pyResp = await py.extractFromPdf(pdfBuffer, 'upload.pdf', { debug: 0 })
-        tiempoPython = Date.now() - tPyStart
-        if (pyResp && (pyResp.success === true || pyResp.actos)) {
-          const mapTipo = (t) => {
-            if (!t) return undefined
-            const up = String(t).toUpperCase()
-            return /JURIDICA|JURÍDICA/.test(up) ? 'Jurídica' : 'Natural'
+
+        // Health check previo
+        console.log('🔍 VERIFICANDO SALUD ANTES DE EXTRACT...')
+        const health = await py.healthCheck()
+        if (!health.ok) {
+          console.log('⚠️ HEALTH CHECK FALLÓ - SALTANDO A FALLBACK')
+        } else {
+          console.log('✅ HEALTH CHECK OK - PROCEDIENDO CON EXTRACT')
+          const tPyStart = Date.now()
+          try {
+            const pyResp = await py.extractFromPdf(pdfBuffer, 'upload.pdf', { debug: 0 })
+            tiempoPython = Date.now() - tPyStart
+
+            console.log('📊 RESULTADO PYTHON CLIENT:')
+            console.log(`- Success: ${pyResp?.success}`)
+            console.log(`- Source: ${pyResp?.source || 'N/A'}`)
+
+            if (pyResp && (pyResp.success === true || pyResp.actos)) {
+              const mapTipo = (t) => {
+                if (!t) return undefined
+                const up = String(t).toUpperCase()
+                return /JURIDICA|JURÍDICA/.test(up) ? 'Jurídica' : 'Natural'
+              }
+              const pyActs = Array.isArray(pyResp.actos) ? pyResp.actos : []
+              acts = pyActs.map(a => ({
+                tipoActo: a?.tipo_acto || a?.tipo || '',
+                otorgantes: (a?.otorgantes || []).map(o => ({ nombre: o?.nombre || '', tipo_persona: mapTipo(o?.tipo) })),
+                beneficiarios: (a?.beneficiarios || []).map(b => ({ nombre: b?.nombre || '', tipo_persona: mapTipo(b?.tipo) }))
+              }))
+              if (acts.length > 0) metodoUtilizado = 'PYTHON'
+            } else {
+              console.log(`⚠️ PYTHON CLIENT FALLÓ - Razón: ${pyResp?.error || 'respuesta sin datos'}`)
+              console.log('🔄 EJECUTANDO FALLBACK A MÉTODO NODE.JS')
+            }
+          } catch (error) {
+            tiempoPython = Date.now() - tPyStart
+            console.log(`💥 PYTHON CLIENT EXCEPTION: ${error?.message || error}`)
+            console.log('🔄 EJECUTANDO FALLBACK A MÉTODO NODE.JS')
           }
-          const pyActs = Array.isArray(pyResp.actos) ? pyResp.actos : []
-          acts = pyActs.map(a => ({
-            tipoActo: a?.tipo_acto || a?.tipo || '',
-            otorgantes: (a?.otorgantes || []).map(o => ({ nombre: o?.nombre || '', tipo_persona: mapTipo(o?.tipo) })),
-            beneficiarios: (a?.beneficiarios || []).map(b => ({ nombre: b?.nombre || '', tipo_persona: mapTipo(b?.tipo) }))
-          }))
-          if (acts.length > 0) metodoUtilizado = 'PYTHON'
         }
       }
     } catch (pyErr) {
