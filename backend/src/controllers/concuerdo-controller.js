@@ -163,53 +163,71 @@ async function extractData(req, res) {
     console.log(`- PDF_EXTRACTOR_BASE_URL configurado: ${config?.pdfExtractor?.baseUrl ? 'SÍ' : 'NO'}`)
     console.log(`- PDF_EXTRACTOR_TOKEN configurado: ${config?.pdfExtractor?.token ? 'SÍ' : 'NO'}`)
     
-    // Intentar microservicio Python si hay buffer disponible
+    // Intentar microservicio Python si hay buffer disponible y configuración válida
     let acts = []
     let pythonTried = false
     let metodoUtilizado = 'NODE.JS'
     let tiempoPython = 0
-    try {
-      if (pdfBuffer) {
+    
+    const shouldUsePython = (deberiaUsarPython || FORCE_PYTHON) && pdfBuffer
+    if (shouldUsePython) {
+      try {
+        console.log('🐍 INICIANDO EXTRACCIÓN CON MICROSERVICIO PYTHON')
+        console.log(`- URL: ${config.pdfExtractor.baseUrl}`)
+        console.log(`- Token configurado: ${config.pdfExtractor.token ? 'SÍ' : 'NO'}`)
+        
         const py = new PythonPdfClient()
         pythonTried = true
-        if (pythonAvailable) {
-          console.log('🐍 USANDO MICROSERVICIO PYTHON')
-          console.log(`- URL: ${config.pdfExtractor.baseUrl}`)
-          console.log(`- Token configurado: ${config.pdfExtractor.token ? 'SÍ' : 'NO'}`)
-        } else {
-          console.log('📊 USANDO MÉTODO NODE.JS ANTERIOR')
-          console.log('- Razón: Microservicio no disponible o configuración faltante')
-        }
 
         // Health check previo
         console.log('🔍 VERIFICANDO SALUD ANTES DE EXTRACT...')
         const health = await py.healthCheck()
         if (!health.ok) {
           console.log('⚠️ HEALTH CHECK FALLÓ - SALTANDO A FALLBACK')
+          console.log(`- Razón: Status ${health.status}`)
         } else {
           console.log('✅ HEALTH CHECK OK - PROCEDIENDO CON EXTRACT')
+          
           const tPyStart = Date.now()
           try {
-            const pyResp = await py.extractFromPdf(pdfBuffer, 'upload.pdf', { debug: 0 })
+            console.log('🚀 INICIANDO EXTRACCIÓN CON PYTHON')
+            const pyResp = await py.extractFromPdf(pdfBuffer, filename, { debug: 0 })
             tiempoPython = Date.now() - tPyStart
 
             console.log('📊 RESULTADO PYTHON CLIENT:')
             console.log(`- Success: ${pyResp?.success}`)
-            console.log(`- Source: ${pyResp?.source || 'N/A'}`)
+            console.log(`- Source: ${pyResp?.source || 'PYTHON'}`)
+            console.log(`- Actos detectados: ${Array.isArray(pyResp?.actos) ? pyResp.actos.length : 0}`)
 
             if (pyResp && (pyResp.success === true || pyResp.actos)) {
+              console.log('✅ USANDO DATOS DEL MICROSERVICIO PYTHON')
+              
               const mapTipo = (t) => {
                 if (!t) return undefined
                 const up = String(t).toUpperCase()
                 return /JURIDICA|JURÍDICA/.test(up) ? 'Jurídica' : 'Natural'
               }
+              
               const pyActs = Array.isArray(pyResp.actos) ? pyResp.actos : []
               acts = pyActs.map(a => ({
                 tipoActo: a?.tipo_acto || a?.tipo || '',
-                otorgantes: (a?.otorgantes || []).map(o => ({ nombre: o?.nombre || '', tipo_persona: mapTipo(o?.tipo) })),
-                beneficiarios: (a?.beneficiarios || []).map(b => ({ nombre: b?.nombre || '', tipo_persona: mapTipo(b?.tipo) }))
+                otorgantes: (a?.otorgantes || []).map(o => ({ 
+                  nombre: o?.nombre || '', 
+                  tipo_persona: mapTipo(o?.tipo) 
+                })),
+                beneficiarios: (a?.beneficiarios || []).map(b => ({ 
+                  nombre: b?.nombre || '', 
+                  tipo_persona: mapTipo(b?.tipo) 
+                }))
               }))
-              if (acts.length > 0) metodoUtilizado = 'PYTHON'
+              
+              if (acts.length > 0) {
+                metodoUtilizado = 'PYTHON'
+                console.log(`✅ EXTRACCIÓN PYTHON EXITOSA: ${acts.length} actos procesados`)
+              } else {
+                console.log('⚠️ PYTHON CLIENT RETORNÓ DATOS VACÍOS')
+                console.log('🔄 EJECUTANDO FALLBACK A MÉTODO NODE.JS')
+              }
             } else {
               console.log(`⚠️ PYTHON CLIENT FALLÓ - Razón: ${pyResp?.error || 'respuesta sin datos'}`)
               console.log('🔄 EJECUTANDO FALLBACK A MÉTODO NODE.JS')
@@ -220,16 +238,22 @@ async function extractData(req, res) {
             console.log('🔄 EJECUTANDO FALLBACK A MÉTODO NODE.JS')
           }
         }
+      } catch (pyErr) {
+        console.error('💥 ERROR INICIALIZANDO PYTHON CLIENT:', pyErr?.message || pyErr)
+        console.log('🔄 EJECUTANDO FALLBACK A MÉTODO NODE.JS')
       }
-    } catch (pyErr) {
-      console.error('Python PDF extractor failed:', pyErr?.message || pyErr)
     }
 
     // Si Python no produjo actos, usar parser universal y fallbacks existentes
     if (!acts || acts.length === 0) {
       // Usar el parser universal para detección automática
-      console.log('📊 USANDO MÉTODO NODE.JS ANTERIOR')
-      console.log('- Razón: Microservicio no disponible o sin datos útiles')
+      if (pythonTried) {
+        console.log('📊 EJECUTANDO MÉTODO NODE.JS ANTERIOR')
+        console.log('- Razón: Fallback por fallo del microservicio Python o sin detecciones suficientes')
+      } else {
+        console.log('📊 USANDO MÉTODO NODE.JS ANTERIOR')
+        console.log('- Razón: Microservicio no disponible o sin datos útiles')
+      }
       const universalParser = new UniversalPdfParser()
       const universalResult = await universalParser.parseDocument(pdfBuffer, text)
       acts = universalResult.acts || []
