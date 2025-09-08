@@ -117,6 +117,45 @@ function coverageInBlock(name, block) {
   return present / tokens.length
 }
 
+function tokenizeName(name) {
+  return normalizeName(name)
+    .split(' ')
+    .filter(t => t && !CONNECTORS.has(t) && !STOP_TOKENS.has(t))
+}
+
+function isSubsetTokens(aTokens, bTokens) {
+  if (aTokens.length === 0) return true
+  const bSet = new Set(bTokens)
+  for (const t of aTokens) {
+    if (!bSet.has(t)) return false
+  }
+  return true
+}
+
+function compressEntities(entities) {
+  const items = (entities || []).map(e => ({ ...e, _tokens: tokenizeName(e.nombre) }))
+  const keep = new Array(items.length).fill(true)
+  for (let i = 0; i < items.length; i++) {
+    if (!keep[i]) continue
+    for (let j = 0; j < items.length; j++) {
+      if (i === j || !keep[j]) continue
+      const a = items[i]
+      const b = items[j]
+      // Si a es subconjunto de b y b aporta al menos un token extra, descartar a
+      if (isSubsetTokens(a._tokens, b._tokens) && b._tokens.length >= a._tokens.length + 1) {
+        keep[i] = false
+        break
+      }
+      // Si muy similares pero b es más largo, descartar a
+      if (jaccardSimilarity(a.nombre, b.nombre) > 0.9 && b._tokens.length > a._tokens.length) {
+        keep[i] = false
+        break
+      }
+    }
+  }
+  return items.filter((_, idx) => keep[idx]).map(({ _tokens, ...rest }) => rest)
+}
+
 function disambiguateSections(rawText, otorgantes, beneficiarios) {
   const { otBlock, beBlock } = buildSectionBlocks(rawText || '')
   const mapName = new Map()
@@ -164,8 +203,8 @@ function mergeActs(nodeActs = [], pythonActs = []) {
   const pyO = mark((pyAct?.otorgantes || []).map(o => ({ nombre: bestPythonName(o), tipo_persona: mapTipoPersona(o?.tipo) })), 'python')
   const pyB = mark((pyAct?.beneficiarios || []).map(b => ({ nombre: bestPythonName(b), tipo_persona: mapTipoPersona(b?.tipo) })), 'python')
 
-  let otorgantes = dedupeEntities([...nodeO, ...pyO])
-  let beneficiarios = dedupeEntities([...nodeB, ...pyB])
+  let otorgantes = compressEntities(dedupeEntities([...nodeO, ...pyO]))
+  let beneficiarios = compressEntities(dedupeEntities([...nodeB, ...pyB]))
 
   // Resolver duplicados cruzados usando el texto original (si está disponible luego en la llamada de alto nivel)
   // Esta función será aplicada en hybridExtract donde sí tenemos rawText
@@ -220,8 +259,8 @@ const ExtractionAggregator = {
     // Reasignación cruzada usando ventanas del texto
     if (merged?.[0] && rawText) {
       const fix = disambiguateSections(rawText, merged[0].otorgantes, merged[0].beneficiarios)
-      merged[0].otorgantes = fix.otorgantes
-      merged[0].beneficiarios = fix.beneficiarios
+      merged[0].otorgantes = compressEntities(fix.otorgantes)
+      merged[0].beneficiarios = compressEntities(fix.beneficiarios)
     }
     debug.merged = merged
     debug.durationMs = Date.now() - debug.startedAt
