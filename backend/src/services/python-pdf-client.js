@@ -7,6 +7,10 @@ class PythonPdfClient {
     this.baseUrl = config?.pdfExtractor?.baseUrl || 'http://localhost:8001'
     this.token = config?.pdfExtractor?.token || ''
     this.timeout = config?.pdfExtractor?.timeout || 30000
+    console.log('🐍 PYTHON CLIENT - Configuración inicial:')
+    console.log(`- baseUrl: ${this.baseUrl || '[NO CONFIGURADA]'}`)
+    console.log(`- token: ${this.token ? '[CONFIGURADO]' : '[FALTANTE]'}`)
+    console.log(`- timeout: ${this.timeout}ms`)
   }
 
   async extractFromPdf(pdfBuffer, filename = 'document.pdf', options = {}) {

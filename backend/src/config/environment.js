@@ -114,6 +114,11 @@ const environmentSchema = z.object({
 function validateEnvironment() {
   try {
     console.log('🔍 Validando variables de entorno...');
+    // Logs de variables crudas para PDF Extractor
+    console.log('⚙️ CARGANDO CONFIGURACIÓN PDF EXTRACTOR:');
+    console.log(`- NODE_ENV: ${process.env.NODE_ENV}`);
+    console.log(`- PDF_EXTRACTOR_BASE_URL raw: '${process.env.PDF_EXTRACTOR_BASE_URL}'`);
+    console.log(`- PDF_EXTRACTOR_TOKEN raw: '${process.env.PDF_EXTRACTOR_TOKEN ? 'SET' : 'NOT SET'}'`);
     
     const result = environmentSchema.safeParse(process.env);
     
@@ -210,6 +215,12 @@ function getConfig() {
     }
   };
   
+  try {
+    console.log('⚙️ CONFIGURACIÓN PROCESADA:');
+    console.log(`- baseUrl final: '${cfg.pdfExtractor.baseUrl}'`);
+    console.log(`- token final: '${cfg.pdfExtractor.token ? 'SET' : 'NOT SET'}'`);
+  } catch {}
+
   return cfg;
 }
 

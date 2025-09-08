@@ -118,6 +118,46 @@ async function extractData(req, res) {
 
     // Decisión de procesamiento
     const config = getConfig()
+    // Logs de diagnóstico inmediatos de configuración y conectividad Python
+    console.log('🔍 DIAGNÓSTICO CONFIGURACIÓN PYTHON:')
+    console.log(`- PDF_EXTRACTOR_BASE_URL: ${process.env.PDF_EXTRACTOR_BASE_URL || 'NO CONFIGURADA'}`)
+    console.log(`- PDF_EXTRACTOR_TOKEN: ${process.env.PDF_EXTRACTOR_TOKEN ? 'CONFIGURADO' : 'NO CONFIGURADO'}`)
+    try {
+      console.log(`- Config objeto: ${JSON.stringify(config.pdfExtractor, null, 2)}`)
+    } catch {}
+
+    console.log('🔗 PROBANDO CONECTIVIDAD PYTHON:')
+    try {
+      const client = new PythonPdfClient()
+      const health = await client.healthCheck()
+      console.log(`- Health check response: ${health.status}`)
+      console.log(`- Python service disponible: ${health.ok ? 'SÍ' : 'NO'}`)
+    } catch (error) {
+      console.log(`- Health check FALLÓ: ${error?.message || error}`)
+      console.log(`- Python service disponible: NO`)
+      console.log(`- RAZÓN FALLBACK: ${error?.message || error}`)
+    }
+
+    // Evaluación de condiciones para usar Python (solo logging)
+    const tieneUrl = Boolean(config?.pdfExtractor?.baseUrl)
+    const tieneToken = Boolean(config?.pdfExtractor?.token)
+    const urlValida = typeof config?.pdfExtractor?.baseUrl === 'string' && config.pdfExtractor.baseUrl.startsWith('https://')
+    const FORCE_PYTHON = process.env.FORCE_PYTHON_EXTRACTOR === 'true'
+
+    console.log('🎯 EVALUANDO CONDICIONES PARA USAR PYTHON:')
+    console.log(`- Tiene URL: ${tieneUrl}`)
+    console.log(`- Tiene Token: ${tieneToken}`)
+    console.log(`- URL válida (https): ${urlValida}`)
+    console.log(`- FORCE_PYTHON_EXTRACTOR: ${FORCE_PYTHON ? 'ACTIVO' : 'INACTIVO'}`)
+    const deberiaUsarPython = tieneUrl && tieneToken && urlValida
+    console.log(`- DECISIÓN: ${(deberiaUsarPython || FORCE_PYTHON) ? 'USAR PYTHON' : 'USAR NODE.JS'}`)
+    if (!(deberiaUsarPython || FORCE_PYTHON)) {
+      console.log('❌ RAZONES PARA NO USAR PYTHON:')
+      if (!tieneUrl) console.log('  - URL no configurada')
+      if (!tieneToken) console.log('  - Token no configurado')
+      if (!urlValida) console.log('  - URL no es HTTPS válida')
+    }
+
     const pythonAvailable = Boolean(config?.pdfExtractor?.baseUrl) && Boolean(config?.pdfExtractor?.token)
     console.log('🔄 DECISIÓN DE PROCESAMIENTO:')
     console.log(`- PDF_EXTRACTOR_BASE_URL configurado: ${config?.pdfExtractor?.baseUrl ? 'SÍ' : 'NO'}`)
@@ -1051,3 +1091,54 @@ async function getOcrHealth(req, res) {
 }
 
 export { getOcrHealth }
+
+/**
+ * POST /api/concuerdos/test-python
+ * Endpoint explícito de debugging de conexión al microservicio Python
+ */
+async function testPython(req, res) {
+  console.log('🧪 TEST EXPLÍCITO CONEXIÓN PYTHON')
+  const config = getConfig()
+  try {
+    const client = new PythonPdfClient()
+
+    // Test 1: Health check
+    const health = await client.healthCheck()
+    console.log(`1. Health check status: ${health.status}`)
+    console.log(`   ok: ${health.ok}`)
+
+    // Test 2: Extract con PDF dummy
+    console.log('2. Test extract endpoint con dummy PDF')
+    let extractStatus = null
+    let extractPreview = ''
+    try {
+      const dummy = Buffer.from('%PDF-1.4\n% Notaria Segura connectivity test\n', 'utf8')
+      const resp = await client.extractFromPdf(dummy, 'test.pdf', { debug: 1, timeout: 10000 })
+      extractStatus = 200
+      extractPreview = JSON.stringify(resp).substring(0, 200)
+    } catch (e) {
+      extractStatus = e?.status || 500
+      const body = e?.response ? (typeof e.response === 'string' ? e.response : JSON.stringify(e.response)) : e?.message
+      extractPreview = String(body || '').substring(0, 200)
+      console.log(`   Extract error status: ${extractStatus}`)
+    }
+
+    return res.json({
+      success: true,
+      health: health.status,
+      extract: extractStatus,
+      message: health.ok ? 'Conexión Python funcionando (health ok)' : 'Health check falló',
+      details: {
+        baseUrl: config?.pdfExtractor?.baseUrl || null,
+        token: config?.pdfExtractor?.token ? 'SET' : 'NOT SET',
+        extractPreview
+      }
+    })
+  } catch (error) {
+    console.log(`❌ ERROR TEST PYTHON: ${error?.message || error}`)
+    console.log(`   Stack: ${error?.stack || 'n/a'}`)
+    return res.json({ success: false, error: error?.message || String(error), message: 'Conexión Python FALLÓ' })
+  }
+}
+
+export { testPython }
