@@ -84,6 +84,70 @@ function dedupeEntities(entities, threshold = 0.6) {
   return out.map(x => ({ nombre: x.nombre, tipo_persona: x.tipo_persona, sources: [...x.sources] }))
 }
 
+function toAsciiUpper(s) {
+  return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase()
+}
+
+function buildSectionBlocks(rawText) {
+  const text = toAsciiUpper(rawText)
+  const startOt = /(OTORGAD[OA]\s+POR|OTORGANTES?|COMPARECIENTE[S]?|NOMBRES\s*\/??\s*RAZON\s+SOCIAL)/i
+  const startBe = /(A\s+FAVOR\s+DE|BENEFICIARIOS?)/i
+  const endCommon = /(A\s+FAVOR\s+DE|BENEFICIARIOS?|NOTARIO|ACTO\s+O\s+CON|EXTRACTO|ESCRITURA)\b/i
+  const findBetween = (reStart, reEnd) => {
+    const m = text.match(reStart)
+    if (!m) return ''
+    const from = m.index + m[0].length
+    const rest = text.slice(from)
+    const e = rest.match(reEnd)
+    return e ? rest.slice(0, e.index) : rest
+  }
+  const ot = findBetween(startOt, endCommon)
+  const be = findBetween(startBe, /(NOTARIO|ACTO\s+O\s+CON|EXTRACTO|ESCRITURA)\b/i)
+  return { otBlock: ot || '', beBlock: be || '' }
+}
+
+const CONNECTORS = new Set(['DE','DEL','DELA','DELOS','DELAS','LA','LOS','LAS','Y'])
+
+function coverageInBlock(name, block) {
+  if (!name || !block) return 0
+  const tokens = normalizeName(name).split(' ').filter(t => t && !CONNECTORS.has(t) && !STOP_TOKENS.has(t))
+  if (tokens.length === 0) return 0
+  const b = toAsciiUpper(block)
+  const present = tokens.filter(t => b.includes(toAsciiUpper(t))).length
+  return present / tokens.length
+}
+
+function disambiguateSections(rawText, otorgantes, beneficiarios) {
+  const { otBlock, beBlock } = buildSectionBlocks(rawText || '')
+  const mapName = new Map()
+  for (const o of otorgantes || []) mapName.set(o.nombre, { where: new Set(['o']), item: o })
+  for (const b of beneficiarios || []) {
+    const key = b.nombre
+    if (!mapName.has(key)) mapName.set(key, { where: new Set(['b']), item: b })
+    else mapName.get(key).where.add('b')
+  }
+
+  const outO = []
+  const outB = []
+  for (const [name, meta] of mapName.entries()) {
+    const cO = coverageInBlock(name, otBlock)
+    const cB = coverageInBlock(name, beBlock)
+    if (cO === 0 && cB === 0) {
+      // Mantener donde ya estaba, pero si estaba en ambos, preferir otorgantes
+      if (meta.where.has('o')) outO.push(meta.item)
+      else outB.push(meta.item)
+      continue
+    }
+    if (cO >= cB + 0.2) { outO.push(meta.item); continue }
+    if (cB >= cO + 0.2) { outB.push(meta.item); continue }
+    // Empate: si aparece en ambos, mantén la primera ocurrencia (otorgantes)
+    if (meta.where.has('o') && !meta.where.has('b')) outO.push(meta.item)
+    else if (meta.where.has('b') && !meta.where.has('o')) outB.push(meta.item)
+    else outO.push(meta.item)
+  }
+  return { otorgantes: outO, beneficiarios: outB }
+}
+
 function mergeActs(nodeActs = [], pythonActs = []) {
   // Por ahora considerar un solo acto predominante; elegir el más confiable
   const nodeAct = Array.isArray(nodeActs) && nodeActs.length > 0 ? nodeActs[0] : null
@@ -100,8 +164,11 @@ function mergeActs(nodeActs = [], pythonActs = []) {
   const pyO = mark((pyAct?.otorgantes || []).map(o => ({ nombre: bestPythonName(o), tipo_persona: mapTipoPersona(o?.tipo) })), 'python')
   const pyB = mark((pyAct?.beneficiarios || []).map(b => ({ nombre: bestPythonName(b), tipo_persona: mapTipoPersona(b?.tipo) })), 'python')
 
-  const otorgantes = dedupeEntities([...nodeO, ...pyO])
-  const beneficiarios = dedupeEntities([...nodeB, ...pyB])
+  let otorgantes = dedupeEntities([...nodeO, ...pyO])
+  let beneficiarios = dedupeEntities([...nodeB, ...pyB])
+
+  // Resolver duplicados cruzados usando el texto original (si está disponible luego en la llamada de alto nivel)
+  // Esta función será aplicada en hybridExtract donde sí tenemos rawText
 
   // Heurística simple de confianza
   const overlapO = otorgantes.filter(o => (nodeO.some(n => jaccardSimilarity(n.nombre, o.nombre) >= 0.7) && pyO.some(p => jaccardSimilarity(p.nombre, o.nombre) >= 0.7))).length
@@ -149,7 +216,13 @@ const ExtractionAggregator = {
     const nodeActs = nodeRes?.ok ? (nodeRes.data?.acts || []) : []
     const pythonActs = pythonRes?.ok ? (Array.isArray(pythonRes.data?.actos) ? pythonRes.data.actos : []) : []
 
-    const merged = mergeActs(nodeActs, pythonActs)
+    let merged = mergeActs(nodeActs, pythonActs)
+    // Reasignación cruzada usando ventanas del texto
+    if (merged?.[0] && rawText) {
+      const fix = disambiguateSections(rawText, merged[0].otorgantes, merged[0].beneficiarios)
+      merged[0].otorgantes = fix.otorgantes
+      merged[0].beneficiarios = fix.beneficiarios
+    }
     debug.merged = merged
     debug.durationMs = Date.now() - debug.startedAt
 
