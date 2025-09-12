@@ -771,6 +771,11 @@ async function marcarComoListo(req, res) {
             console.error('⚠️ Error enviando WhatsApp (operación continúa):', whatsappError.message);
         }
 
+        // Invalidar caché de listados antes de responder para evitar datos obsoletos
+        try {
+            await cache.invalidateByTag('documents');
+        } catch {}
+
         const mainDocument = updatedDocuments.find(doc => doc.id === id) || updatedDocuments[0];
         const responseMessage = groupAffected 
             ? `${updatedDocuments.length} documentos del grupo marcados como listos exitosamente`
@@ -854,6 +859,11 @@ async function marcarGrupoListo(req, res) {
                 }))
             );
         });
+
+        // Invalidar caché de listados antes de responder para evitar datos obsoletos
+        try {
+            await cache.invalidateByTag('documents');
+        } catch {}
 
         // 📱 ENVIAR NOTIFICACIÓN WHATSAPP GRUPAL
         try {
