@@ -3,6 +3,7 @@ import { Box, Alert } from '@mui/material';
 import MatrizadorLayout from './MatrizadorLayout';
 import MatrizadorDashboard from './MatrizadorDashboard';
 import ConcuerdoGenerator from './matrizador/concuerdos/ConcuerdoGenerator.jsx';
+import useAuthStore from '../store/auth-store';
 import GestionDocumentos from './GestionDocumentos';
 import DocumentosPage from '../pages/DocumentosPage';
 import NotificationsHistory from './Documents/NotificationsHistory';
@@ -16,6 +17,7 @@ import useDocumentStore from '../store/document-store';
  */
 const MatrizadorCenter = () => {
   const [currentView, setCurrentView] = useState('documents'); // Iniciar en documentos por defecto
+  const userId = useAuthStore(s => s.user?.id)
   const [documentoEspecifico, setDocumentoEspecifico] = useState(null);
   const { 
     documents, 
@@ -31,6 +33,12 @@ const MatrizadorCenter = () => {
   useEffect(() => {
     fetchMyDocuments();
   }, [fetchMyDocuments]);
+
+  // Al cambiar de usuario, volver a la vista por defecto y limpiar navegación interna
+  useEffect(() => {
+    setCurrentView('documents')
+    setDocumentoEspecifico(null)
+  }, [userId])
 
   /**
    * Manejar cambios de vista

@@ -212,8 +212,9 @@ const PdfExtractorService = {
     }
 
     const particles = new Set(['DE','DEL','DELA','DELOS','DELAS','LA','LOS','LAS','SAN','SANTA','VON','VAN','DA','DI'])
-    const female = new Set(['MARIA','ANA','ROSA','ELENA','FERNANDA','LUISA','VALERIA','CAMILA','GABRIELA','SOFIA','ISABEL','PATRICIA','VERONICA','CARMEN','LUZ'])
-    const male = new Set(['JOSE','JUAN','CARLOS','DANIEL','MIGUEL','DIEGO','ANDRES','LUIS','PEDRO','PABLO','FRANCISCO','JAVIER','FERNANDO','ROBERTO','ANTONIO','MANUEL'])
+    // Listas de nombres más amplias para Ecuador (comunes en PDFs de notarías)
+    const female = new Set(['MARIA','ANA','ROSA','ELENA','FERNANDA','LUISA','VALERIA','CAMILA','GABRIELA','SOFIA','ISABEL','PATRICIA','VERONICA','CARMEN','LUZ','ANDREA','KARINA','NATALIA','PAOLA'])
+    const male = new Set(['JOSE','JUAN','CARLOS','DANIEL','MIGUEL','DIEGO','ANDRES','LUIS','PEDRO','PABLO','FRANCISCO','JAVIER','FERNANDO','ROBERTO','ANTONIO','MANUEL','JULIO','PATRICIO','EDUARDO'])
     
     const isParticle = (t) => particles.has(t)
     const isProbableName = (t) => female.has(t) || male.has(t)
@@ -257,9 +258,16 @@ const PdfExtractorService = {
       const last = tokens[n-1], prev = tokens[n-2]
       nameCount = (isProbableName(last) && isProbableName(prev)) ? 2 : 1
     } else if (n === 4) {
-      // Para 4 tokens, usualmente 2 nombres + 2 apellidos
+      // Para 4 tokens, priorizar 2 nombres + 2 apellidos si los dos últimos son probables nombres
       const last = tokens[n-1], prev = tokens[n-2]
-      nameCount = (isProbableName(last) && isProbableName(prev)) ? 2 : 1
+      if (isProbableName(last) && isProbableName(prev)) {
+        nameCount = 2
+      } else if (!isProbableName(tokens[0]) && !isProbableName(tokens[1]) && (isProbableName(prev) || isProbableName(last))) {
+        // Caso típico APELLIDOS NOMBRES: ej. "MATA CARRILLO ANDREA PATRICIA"
+        nameCount = 2
+      } else {
+        nameCount = 1
+      }
     } else {
       // Para 5+ tokens, detectar por partículas
       const prev = tokens[n-2]

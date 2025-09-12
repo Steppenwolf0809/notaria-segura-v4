@@ -1,14 +1,18 @@
 import { useState, useCallback, useEffect } from 'react'
 import concuerdoService from '../../../../services/concuerdo-service.js'
+import useAuthStore from '../../../../store/auth-store.js'
 
 export default function useConcuerdoGenerator() {
-  const loadDraft = () => {
+  const userId = useAuthStore(s => s.user?.id)
+  const getKey = (uid) => `concuerdo-draft:${uid || 'anon'}`
+
+  const loadDraft = (uid) => {
     try {
-      const raw = localStorage.getItem('concuerdo-draft')
+      const raw = localStorage.getItem(getKey(uid))
       return raw ? JSON.parse(raw) : null
     } catch { return null }
   }
-  const draft = loadDraft()
+  const draft = loadDraft(userId)
   const [step, setStep] = useState(draft?.step || 0)
   const [pdfFile, setPdfFile] = useState(null)
   const [uploading, setUploading] = useState(false)
@@ -21,9 +25,22 @@ export default function useConcuerdoGenerator() {
   useEffect(() => {
     try {
       const payload = { step, extractedText, extractedData }
-      localStorage.setItem('concuerdo-draft', JSON.stringify(payload))
+      localStorage.setItem(getKey(userId), JSON.stringify(payload))
     } catch {}
-  }, [step, extractedText, extractedData])
+  }, [step, extractedText, extractedData, userId])
+
+  // Limpiar automáticamente cuando cambia de usuario (o al pasar de anon → usuario)
+  useEffect(() => {
+    // Resetear estado para evitar ver datos de otro usuario
+    try { localStorage.removeItem('concuerdo-draft') } catch {}
+    try { localStorage.removeItem(getKey(userId)) } catch {}
+    // Estado limpio
+    setStep(0)
+    setPdfFile(null)
+    setExtractedText('')
+    setExtractedData({ tipoActo: '', otorgantes: [], beneficiarios: [], notario: '' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId])
 
   const handleUpload = useCallback(async () => {
     if (!pdfFile) return
@@ -89,12 +106,13 @@ export default function useConcuerdoGenerator() {
   }, [])
 
   const reset = useCallback(() => {
+    try { localStorage.removeItem(getKey(userId)) } catch {}
     try { localStorage.removeItem('concuerdo-draft') } catch {}
     setStep(0)
     setPdfFile(null)
     setExtractedText('')
     setExtractedData({ tipoActo: '', otorgantes: [], beneficiarios: [], notario: '' })
-  }, [])
+  }, [userId])
 
   return {
     step,
