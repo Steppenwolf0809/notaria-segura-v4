@@ -8,6 +8,7 @@ import DataQualityValidator from '../services/data-quality-validator.js'
 import { getConfig as _getConfig } from '../config/environment.js'
 import ocrService from '../services/ocr-service.js'
 import { getConfig } from '../config/environment.js'
+import { extractDataWithGemini } from '../services/gemini-service.js'
 
 /**
  * Controlador de Generador de Concuerdos (Sprint 1)
@@ -165,13 +166,38 @@ async function extractData(req, res) {
     console.log(`- PDF_EXTRACTOR_BASE_URL configurado: ${config?.pdfExtractor?.baseUrl ? 'SÍ' : 'NO'}`)
     console.log(`- PDF_EXTRACTOR_TOKEN configurado: ${config?.pdfExtractor?.token ? 'SÍ' : 'NO'}`)
     
-    // Intentar microservicio Python si hay buffer disponible y configuración válida
+    // Intentar Gemini primero si está habilitado
     let acts = []
     let pythonTried = false
     let metodoUtilizado = 'NODE.JS'
     let tiempoPython = 0
-    
-    const shouldUsePython = (deberiaUsarPython || FORCE_PYTHON) && pdfBuffer
+
+    if ((process.env.GEMINI_ENABLED || '').toLowerCase() === 'true') {
+      try {
+        const tGeminiStart = Date.now()
+        const gemini = await extractDataWithGemini(text)
+        const tiempoGemini = Date.now() - tGeminiStart
+        if (gemini && (gemini.acto_o_contrato || gemini.otorgantes || gemini.beneficiarios)) {
+          // Adaptar a estructura interna
+          const tipoActo = gemini.acto_o_contrato || ''
+          const mapEntity = (e) => ({ nombre: e?.nombre || '', tipo_persona: 'Natural' })
+          acts = [{
+            tipoActo,
+            otorgantes: Array.isArray(gemini.otorgantes) ? gemini.otorgantes.map(mapEntity) : [],
+            beneficiarios: Array.isArray(gemini.beneficiarios) ? gemini.beneficiarios.map(mapEntity) : []
+          }]
+          metodoUtilizado = 'GEMINI'
+          console.log(`✅ EXTRACCIÓN GEMINI EXITOSA en ${tiempoGemini}ms`)
+        } else {
+          console.log('⚠️ GEMINI no retornó datos útiles. Fallback al flujo existente')
+        }
+      } catch (e) {
+        console.log('⚠️ Error ejecutando Gemini, se usa fallback:', e?.message || e)
+      }
+    }
+
+    // Intentar microservicio Python si hay buffer disponible y configuración válida
+    const shouldUsePython = (deberiaUsarPython || FORCE_PYTHON) && pdfBuffer && (!acts || acts.length === 0)
     if (shouldUsePython) {
       try {
         console.log('🐍 INICIANDO EXTRACCIÓN CON MICROSERVICIO PYTHON')
@@ -342,6 +368,8 @@ async function extractData(req, res) {
     console.log(`- Tiempo total: ${tiempoTotal}ms`)
     if (metodoUtilizado === 'PYTHON') {
       console.log('✅ DATOS FINALES PROVIENEN DEL MICROSERVICIO PYTHON')
+    } else if (metodoUtilizado === 'GEMINI') {
+      console.log('✅ DATOS FINALES PROVIENEN DE GEMINI')
     } else {
       console.log('✅ DATOS FINALES PROVIENEN DEL MÉTODO NODE.JS ANTERIOR')
     }
