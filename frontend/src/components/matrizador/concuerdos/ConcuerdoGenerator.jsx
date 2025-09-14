@@ -69,13 +69,25 @@ export default function ConcuerdoGenerator() {
       numCopias,
     }
     if (Array.isArray(data?.acts) && data.acts.length > 0) {
-      return { ...base, acts: data.acts }
+      // Limpieza de entidades antes de enviar
+      const norm = (arr) => (Array.isArray(arr) ? arr : []).map(e => {
+        if (!e) return null
+        if (typeof e === 'string') return { nombre: e.trim() }
+        if (typeof e === 'object') return { ...e, nombre: String(e.nombre || e.fullname || e.text || '').trim() }
+        return null
+      }).filter(Boolean)
+      const actsClean = data.acts.map(a => ({
+        ...a,
+        otorgantes: norm(a?.otorgantes),
+        beneficiarios: norm(a?.beneficiarios)
+      }))
+      return { ...base, acts: actsClean }
     }
     return {
       ...base,
       tipoActo: data?.tipoActo,
-      otorgantes: data?.otorgantes,
-      beneficiarios: data?.beneficiarios,
+      otorgantes: (Array.isArray(data?.otorgantes) ? data.otorgantes : []).map(e => (typeof e === 'string' ? { nombre: e.trim() } : { ...e, nombre: String(e?.nombre || '').trim() })),
+      beneficiarios: (Array.isArray(data?.beneficiarios) ? data.beneficiarios : []).map(e => (typeof e === 'string' ? { nombre: e.trim() } : { ...e, nombre: String(e?.nombre || '').trim() })),
     }
   }
 

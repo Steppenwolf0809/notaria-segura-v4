@@ -19,6 +19,46 @@ export default function ExtractedDataForm({ data, setData, loading, onBack, onPr
     setData({ ...data, acts: newActs })
   }
 
+  // Limpieza ligera y helpers de UI para personas
+  const normalizeEntities = (arr) => {
+    const list = Array.isArray(arr) ? arr : []
+    const mapped = list.map((e) => {
+      if (!e) return null
+      if (typeof e === 'string') return { nombre: e.trim() }
+      if (typeof e === 'object') return { ...e, nombre: String(e.nombre || e.fullname || e.text || '').trim() }
+      return null
+    }).filter(Boolean)
+    // Deduplicar por nombre (case-insensitive)
+    const seen = new Set()
+    const out = []
+    for (const p of mapped) {
+      const key = (p.nombre || '').toUpperCase()
+      if (p.nombre && !seen.has(key)) { seen.add(key); out.push(p) }
+    }
+    return out
+  }
+
+  const ots = normalizeEntities(currentAct?.otorgantes)
+  const bes = normalizeEntities(currentAct?.beneficiarios)
+
+  const changeEntity = (type, index, value) => {
+    const arr = type === 'otorgantes' ? [...ots] : [...bes]
+    arr[index] = { ...(arr[index] || {}), nombre: value }
+    updateAct({ [type]: arr })
+  }
+
+  const addEntity = (type) => () => {
+    const arr = type === 'otorgantes' ? [...ots] : [...bes]
+    arr.push({ nombre: '' })
+    updateAct({ [type]: arr })
+  }
+
+  const removeEntity = (type, index) => () => {
+    const arr = type === 'otorgantes' ? [...ots] : [...bes]
+    arr.splice(index, 1)
+    updateAct({ [type]: arr })
+  }
+
   // Inicializar selección por acto (por defecto todos incluidos)
   const selectedActs = Array.isArray(data?.selectedActs) && data.selectedActs.length === acts.length
     ? data.selectedActs
@@ -100,36 +140,38 @@ export default function ExtractedDataForm({ data, setData, loading, onBack, onPr
           />
         </Grid>
         <Grid item xs={12} md={6}>
-          <TextField
-            fullWidth
-            label="Otorgantes (uno por línea)"
-            value={Array.isArray(currentAct?.otorgantes) 
-              ? currentAct.otorgantes.map(o => 
-                  typeof o === 'object' && o !== null ? o.nombre : String(o)
-                ).join('\n') 
-              : ''}
-            onChange={(e) => updateAct({ 
-              otorgantes: e.target.value.split('\n').filter(Boolean).map(nombre => ({ nombre }))
-            })}
-            multiline
-            minRows={4}
-          />
+          <Stack spacing={1}>
+            <Typography variant="subtitle2">Otorgantes</Typography>
+            {ots.map((p, idx) => (
+              <Stack key={`ot-${idx}`} direction="row" spacing={1} alignItems="center">
+                <TextField
+                  fullWidth
+                  label={`Otorgante ${idx + 1}`}
+                  value={p?.nombre || ''}
+                  onChange={(e) => changeEntity('otorgantes', idx, e.target.value)}
+                />
+                <Button variant="outlined" color="error" onClick={removeEntity('otorgantes', idx)}>Eliminar</Button>
+              </Stack>
+            ))}
+            <Button variant="text" onClick={addEntity('otorgantes')}>Agregar otorgante</Button>
+          </Stack>
         </Grid>
         <Grid item xs={12} md={6}>
-          <TextField
-            fullWidth
-            label="Beneficiarios (uno por línea)"
-            value={Array.isArray(currentAct?.beneficiarios) 
-              ? currentAct.beneficiarios.map(b => 
-                  typeof b === 'object' && b !== null ? b.nombre : String(b)
-                ).join('\n') 
-              : ''}
-            onChange={(e) => updateAct({ 
-              beneficiarios: e.target.value.split('\n').filter(Boolean).map(nombre => ({ nombre }))
-            })}
-            multiline
-            minRows={4}
-          />
+          <Stack spacing={1}>
+            <Typography variant="subtitle2">Beneficiarios</Typography>
+            {bes.map((p, idx) => (
+              <Stack key={`be-${idx}`} direction="row" spacing={1} alignItems="center">
+                <TextField
+                  fullWidth
+                  label={`Beneficiario ${idx + 1}`}
+                  value={p?.nombre || ''}
+                  onChange={(e) => changeEntity('beneficiarios', idx, e.target.value)}
+                />
+                <Button variant="outlined" color="error" onClick={removeEntity('beneficiarios', idx)}>Eliminar</Button>
+              </Stack>
+            ))}
+            <Button variant="text" onClick={addEntity('beneficiarios')}>Agregar beneficiario</Button>
+          </Stack>
         </Grid>
         <Grid item xs={12}>
           <TextField

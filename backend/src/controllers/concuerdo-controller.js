@@ -721,7 +721,7 @@ async function previewConcuerdo(req, res) {
         }
         const connector = phrases.slice(1).map(p => `y de ${p}`).join('; ')
         const body = phrases.length > 1 ? `${phrases[0]}; ${connector}` : phrases[0]
-        const combined = `Se otorgó ante mí, en fe de ello confiero esta **${ordinalWord(n)} COPIA CERTIFICADA** de la escritura pública de ${body}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.\n\n${footerNotario}\n${footerNotaria}\n`
+        const combined = `\n\nSe otorgó ante mí, en fe de ello confiero esta **${ordinalWord(n)} COPIA CERTIFICADA** de la escritura pública de ${body}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.\n\n${footerNotario}\n${footerNotaria}\n`
         previews.push({ index: n, title: rot, text: `${rot}:\n\n${combined}` })
       } else {
         // Modo clásico: render individual por acto y concatenado con separador
@@ -731,7 +731,10 @@ async function previewConcuerdo(req, res) {
           const { text: t } = await ExtractoTemplateEngine.render('poder-universal.txt', engineData, override)
           rendered.push(t)
         }
-        const combined = rendered.join('\n\n—\n\n')
+        // Asegurar que cada bloque individual respete el doble salto de línea antes de "Se otorgó"
+        const ensureDoubleNL = (txt) => txt.replace(/\n?\n?Se otorgó/, '\n\nSe otorgó')
+        const renderedFixed = rendered.map(ensureDoubleNL)
+        const combined = renderedFixed.join('\n\n—\n\n')
         previews.push({ index: n, title: rot, text: `${rot}:\n\n${combined}` })
       }
     }
@@ -1107,7 +1110,7 @@ async function generateDocuments(req, res) {
           }
           const connector = phrases.slice(1).map(p => `y de ${p}`).join('; ')
           const body = phrases.length > 1 ? `${phrases[0]}; ${connector}` : phrases[0]
-          combined = `\n\n  Se otorgó ante mí, en fe de ello confiero esta **${rotuloPalabra} COPIA CERTIFICADA** de la escritura pública de ${body}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.\n\n\n\n                    ${footerNotario}\n                    ${footerNotaria}\n`
+          combined = `\n\nSe otorgó ante mí, en fe de ello confiero esta **${rotuloPalabra} COPIA CERTIFICADA** de la escritura pública de ${body}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.\n\n${footerNotario}\n${footerNotaria}\n`
         } else {
           console.log('📋 [concuerdos] Modo clásico: render individual por acto')
           // Render clásico por acto y concatenado con separador
@@ -1119,7 +1122,7 @@ async function generateDocuments(req, res) {
             console.log(`✅ [concuerdos] Texto generado (primeros 200 chars):`, text?.substring(0, 200) + '...')
             rendered.push(text)
           }
-          combined = '  ' + rendered.join('\n\n—\n\n')
+          combined = rendered.join('\n\n—\n\n')
         }
         console.log(`✅ [concuerdos] Documento ${n} generado exitosamente (${combined?.length || 0} caracteres)`)
       } catch (templateError) {
@@ -1142,10 +1145,21 @@ async function generateDocuments(req, res) {
 
         const bolded = esc(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
 
-        // Detectar y centrar líneas del pie de firma (muchos espacios al inicio, texto en mayúsculas)
-        const withCenteredSignature = bolded.replace(
+        // Detectar y centrar líneas del pie de firma
+        // 1) Mantener compatibilidad con firmas con muchos espacios iniciales
+        let withCenteredSignature = bolded.replace(
           /^(\s{15,})([A-ZÁÉÍÓÚÑ\s\.]+)$/gm,
           '<div style="text-align:center; font-weight:700; white-space:nowrap;">$2</div>'
+        )
+        // 2) Centrar líneas que contengan NOTARIA (aunque no tengan espacios)
+        withCenteredSignature = withCenteredSignature.replace(
+          /^\s*(<strong>)?([A-ZÁÉÍÓÚÑ\s\.,\-]*NOTAR[ÍI]A[ A-ZÁÉÍÓÚÑ\s\.,\-]*)(<\/strong>)?\s*$/gm,
+          '<div style="text-align:center; font-weight:700; white-space:nowrap;">$1$2$3</div>'
+        )
+        // 3) Centrar línea anterior si está justo antes de NOTARIA (nombre del notario)
+        withCenteredSignature = withCenteredSignature.replace(
+          /(^(?:<strong>)?[A-ZÁÉÍÓÚÑ\s\.,\-]{6,}(?:<\/strong>)?\s*$)\n(?=\s*(?:<strong>)?[A-ZÁÉÍÓÚÑ\s\.,\-]*NOTAR[ÍI]A)/gm,
+          '<div style="text-align:center; font-weight:700; white-space:nowrap;">$1</div>\n'
         )
 
         return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"/><title>Concuerdo</title>
@@ -1176,10 +1190,13 @@ async function generateDocuments(req, res) {
 
         // Luego, formatear líneas individuales; detectar pie de firma
         const lines = merged.split(/\r?\n/)
-        const formatted = lines.map((line) => {
-          if (/^\s{10,}[A-ZÁÉÍÓÚÑ\s\.]+$/.test(line)) {
-            const content = line.trim()
-            return `\\qc\\b ${content} \\b0`
+        const formatted = lines.map((line, idx) => {
+          const trimmed = line.trim()
+          const isFooter = /^([A-ZÁÉÍÓÚÑ\s\.,\-]*NOTAR[ÍI]A[ A-ZÁÉÍÓÚÑ\s\.,\-]*)$/.test(trimmed)
+            || (/^[A-ZÁÉÍÓÚÑ\s\.,\-]{6,}$/.test(trimmed) && idx + 1 < lines.length && /NOTAR[ÍI]A/.test(lines[idx + 1]))
+            || /^\s{10,}[A-ZÁÉÍÓÚÑ\s\.]+$/.test(line)
+          if (isFooter) {
+            return `\\qc\\b ${trimmed} \\b0`
           }
           return `\\qj\\sl420\\slmult1 ${line}`
         })
@@ -1233,10 +1250,18 @@ async function generateDocuments(req, res) {
         const section = (title, text, first) => {
           const bolded = esc(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
           
-          // Detectar y centrar líneas de firma
-          const withCenteredSignature = bolded.replace(
+          // Detectar y centrar líneas de firma (mismas reglas que toHtml)
+          let withCenteredSignature = bolded.replace(
             /^(\s{15,})([A-ZÁÉÍÓÚÑ\s\.]+)$/gm,
             '<div style="text-align:center; font-weight:700; white-space:nowrap;">$2</div>'
+          )
+          withCenteredSignature = withCenteredSignature.replace(
+            /^\s*(<strong>)?([A-ZÁÉÍÓÚÑ\s\.,\-]*NOTAR[ÍI]A[ A-ZÁÉÍÓÚÑ\s\.,\-]*)(<\/strong>)?\s*$/gm,
+            '<div style="text-align:center; font-weight:700; white-space:nowrap;">$1$2$3</div>'
+          )
+          withCenteredSignature = withCenteredSignature.replace(
+            /(^(?:<strong>)?[A-ZÁÉÍÓÚÑ\s\.,\-]{6,}(?:<\/strong>)?\s*$)\n(?=\s*(?:<strong>)?[A-ZÁÉÍÓÚÑ\s\.,\-]*NOTAR[ÍI]A)/gm,
+            '<div style="text-align:center; font-weight:700; white-space:nowrap;">$1</div>\n'
           )
           
           const pb = first ? '' : 'page-break-before: always;'
