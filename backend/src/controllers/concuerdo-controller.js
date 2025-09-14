@@ -291,6 +291,17 @@ async function extractData(req, res) {
         acts = fallbackResult.acts
       }
     }
+
+    // Fallback manual: si no hay actos después de todos los intentos
+    if (!acts || acts.length === 0) {
+      console.log('⚠️ Sin actos detectados tras todos los métodos. Enviando fallback manual.')
+      res.set('Content-Type', 'application/json; charset=utf-8')
+      return res.json({ 
+        success: true, 
+        data: null,
+        message: 'Complete manualmente mientras se ajusta la extracción automática'
+      })
+    }
     
     let parsed = acts[0] || { tipoActo: '', otorgantes: [], beneficiarios: [] }
     const { notarioNombre, notariaNumero, notariaNumeroDigit, notarioSuplente } = PdfExtractorService.extractNotaryInfo(text)

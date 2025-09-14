@@ -64,16 +64,13 @@ export async function extractDataWithGemini(pdfText) {
   const client = getClient()
   if (!client) return null
 
-  const timeoutMs = parseInt(process.env.GEMINI_TIMEOUT || '10000', 10)
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-
   try {
     const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-flash'
     const model = client.getGenerativeModel({ model: modelName })
 
     const prompt = `${PROMPT_TEMPLATE}\n\n${pdfText}`
-    const result = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }], signal: controller.signal })
+    // Llamada mínima sin parámetros extra (evita campo "signal" no soportado)
+    const result = await model.generateContent(prompt)
     const response = await result.response
     const text = response.text()
 
@@ -85,11 +82,30 @@ export async function extractDataWithGemini(pdfText) {
   } catch (error) {
     console.error('Error en extracción Gemini:', error?.message || error)
     return null
-  } finally {
-    clearTimeout(timer)
   }
 }
 
 export default { extractDataWithGemini }
+
+// Prueba de conectividad simple con Gemini
+export async function testGeminiConnection() {
+  try {
+    const keyPresent = Boolean(process.env.GOOGLE_API_KEY)
+    console.log('API Key configurada:', keyPresent)
+    if (!keyPresent) return false
+
+    const client = getClient()
+    if (!client) return false
+    const model = client.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-1.5-flash' })
+    const result = await model.generateContent('Responde solo: "OK"')
+    const response = await result.response
+    const text = response.text()
+    console.log('Prueba Gemini respuesta:', text)
+    return typeof text === 'string' && text.toUpperCase().includes('OK')
+  } catch (error) {
+    console.error('Prueba Gemini falló:', error?.message || error)
+    return false
+  }
+}
 
 

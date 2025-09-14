@@ -20,6 +20,7 @@ import archivoRoutes from './src/routes/archivo-routes.js'
 import receptionRoutes from './src/routes/reception-routes.js'
 import alertasRoutes from './src/routes/alertas-routes.js'
 import concuerdoRoutes from './src/routes/concuerdo-routes.js'
+import { testGeminiConnection } from './src/services/gemini-service.js'
 
 // Cargar variables de entorno
 dotenv.config({ path: './.env' })
@@ -215,6 +216,17 @@ app.get('/api/debug/test-python-health', async (req, res) => {
       healthy: false,
       error: error?.message || String(error)
     })
+  }
+})
+
+// Endpoint de prueba para Google Gemini
+app.get('/api/test-gemini', async (req, res) => {
+  try {
+    console.log('Probando conexión Gemini...')
+    const ok = await testGeminiConnection()
+    res.json({ success: ok, message: ok ? 'Gemini funcionando' : 'Gemini falló' })
+  } catch (error) {
+    res.json({ success: false, error: error?.message || String(error) })
   }
 })
 
