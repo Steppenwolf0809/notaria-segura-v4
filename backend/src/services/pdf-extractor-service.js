@@ -818,7 +818,8 @@ const PdfExtractorService = {
 
       const otClean = this.cleanPersonNames(otorgantesRaw)
       // Si seguimos sin detectar, hacer una última búsqueda global de patrones de tabla dentro de la sección
-      if ((!otClean || otClean.length === 0) && /NATURAL|RAZ[ÓO]N\s+SOCIAL|APELLIDOS?/i.test(secUpper)) {
+      // Ampliado: incluir "JURÍDICA" como señal fuerte para extraer razón social
+      if ((!otClean || otClean.length === 0) && /NATURAL|RAZ[ÓO]N\s+SOCIAL|APELLIDOS?|JUR[IÍ]DICA/i.test(secUpper)) {
         const lastTry = this.cleanPersonNames(section)
         if (lastTry && lastTry.length) {
           otClean.push(...lastTry.filter(n => !otClean.includes(n)))
@@ -858,6 +859,9 @@ const PdfExtractorService = {
       }
       
       // Extraer representantes: soportar tanto encabezado de tabla como "REPRESENTADO POR"
+      // Mejora: si hay persona jurídica detectada como otorgante y aparece un nombre natural seguido de
+      // "PERSONA QUE LE REPRESENTA" o "REPRESENTADO POR", asociarlo como representante aunque
+      // no esté en array de otorgantes.
       const representantes = []
       const repWindow = (() => {
         // 1) Si existe columna/encabezado "PERSONA QUE LE REPRESENTA", tomar ventana desde allí hasta el bloque de beneficiarios
