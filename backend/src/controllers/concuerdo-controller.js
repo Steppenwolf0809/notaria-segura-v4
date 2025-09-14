@@ -122,6 +122,22 @@ async function extractData(req, res) {
     // Decisión de procesamiento
     const config = getConfig()
     // Logs de diagnóstico inmediatos de configuración y conectividad Python
+    // Logs de configuración globales (Gemini / Python / Node.js)
+    const debugExtraction = String(process.env.DEBUG_EXTRACTION_METHOD || '').toLowerCase() === 'true'
+    const geminiEnabled = String(process.env.GEMINI_ENABLED || '').toLowerCase() === 'true'
+    const useGeminiFirst = geminiEnabled || String(process.env.CONCUERDOS_USE_GEMINI_FIRST || '').toLowerCase() === 'true' || String(process.env.GEMINI_PRIORITY || '').toLowerCase() === 'high'
+    const forcePythonFlag = String(process.env.FORCE_PYTHON_EXTRACTOR || '').toLowerCase()
+    const pythonGloballyEnabled = String(process.env.PDF_EXTRACTOR_ENABLED || 'true').toLowerCase() !== 'false'
+    console.log('🎯 CONFIGURACIÓN DE EXTRACCIÓN:', {
+      gemini_enabled: geminiEnabled,
+      gemini_model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
+      use_gemini_first: useGeminiFirst,
+      python_url: process.env.PDF_EXTRACTOR_BASE_URL ? 'CONFIGURADO' : 'NO',
+      python_token: process.env.PDF_EXTRACTOR_TOKEN ? 'CONFIGURADO' : 'NO',
+      python_enabled_flag: pythonGloballyEnabled,
+      force_python_flag: forcePythonFlag || 'no',
+    })
+
     console.log('🔍 DIAGNÓSTICO CONFIGURACIÓN PYTHON:')
     console.log(`- PDF_EXTRACTOR_BASE_URL: ${process.env.PDF_EXTRACTOR_BASE_URL || 'NO CONFIGURADA'}`)
     console.log(`- PDF_EXTRACTOR_TOKEN: ${process.env.PDF_EXTRACTOR_TOKEN ? 'CONFIGURADO' : 'NO CONFIGURADO'}`)
@@ -146,19 +162,23 @@ async function extractData(req, res) {
     const tieneToken = Boolean(config?.pdfExtractor?.token)
     const urlValida = typeof config?.pdfExtractor?.baseUrl === 'string' && config.pdfExtractor.baseUrl.startsWith('https://')
     const FORCE_PYTHON = process.env.FORCE_PYTHON_EXTRACTOR === 'true'
+    const FORCE_PYTHON_DISABLED = process.env.FORCE_PYTHON_EXTRACTOR === 'false'
 
     console.log('🎯 EVALUANDO CONDICIONES PARA USAR PYTHON:')
     console.log(`- Tiene URL: ${tieneUrl}`)
     console.log(`- Tiene Token: ${tieneToken}`)
     console.log(`- URL válida (https): ${urlValida}`)
-    console.log(`- FORCE_PYTHON_EXTRACTOR: ${FORCE_PYTHON ? 'ACTIVO' : 'INACTIVO'}`)
-    const deberiaUsarPython = tieneUrl && tieneToken && urlValida
+    console.log(`- PDF_EXTRACTOR_ENABLED flag: ${pythonGloballyEnabled ? 'true' : 'false'}`)
+    console.log(`- FORCE_PYTHON_EXTRACTOR: ${FORCE_PYTHON ? 'ACTIVO' : (FORCE_PYTHON_DISABLED ? 'DESACTIVADO' : 'INACTIVO')}`)
+    const deberiaUsarPython = tieneUrl && tieneToken && urlValida && pythonGloballyEnabled && !FORCE_PYTHON_DISABLED
     console.log(`- DECISIÓN: ${(deberiaUsarPython || FORCE_PYTHON) ? 'USAR PYTHON' : 'USAR NODE.JS'}`)
     if (!(deberiaUsarPython || FORCE_PYTHON)) {
       console.log('❌ RAZONES PARA NO USAR PYTHON:')
       if (!tieneUrl) console.log('  - URL no configurada')
       if (!tieneToken) console.log('  - Token no configurado')
       if (!urlValida) console.log('  - URL no es HTTPS válida')
+      if (!pythonGloballyEnabled) console.log('  - PDF_EXTRACTOR_ENABLED=false')
+      if (FORCE_PYTHON_DISABLED) console.log('  - FORCE_PYTHON_EXTRACTOR=false (forzado deshabilitado)')
     }
 
     const pythonAvailable = Boolean(config?.pdfExtractor?.baseUrl) && Boolean(config?.pdfExtractor?.token)
@@ -172,11 +192,15 @@ async function extractData(req, res) {
     let metodoUtilizado = 'NODE.JS'
     let tiempoPython = 0
 
-    if ((process.env.GEMINI_ENABLED || '').toLowerCase() === 'true') {
+    if (useGeminiFirst) {
       try {
         const tGeminiStart = Date.now()
         const gemini = await extractDataWithGemini(text)
         const tiempoGemini = Date.now() - tGeminiStart
+        if (debugExtraction) {
+          console.log('🔄 INTENTANDO MÉTODO: GEMINI')
+          console.log(`⏱️  TIEMPO RESPUESTA GEMINI: ${tiempoGemini}ms`)
+        }
         if (gemini && (gemini.acto_o_contrato || gemini.otorgantes || gemini.beneficiarios)) {
           // Adaptar a estructura interna
           const tipoActo = gemini.acto_o_contrato || ''
@@ -188,6 +212,14 @@ async function extractData(req, res) {
           }]
           metodoUtilizado = 'GEMINI'
           console.log(`✅ EXTRACCIÓN GEMINI EXITOSA en ${tiempoGemini}ms`)
+          if (debugExtraction) {
+            const data = acts[0] || {}
+            console.log('📊 DATOS EXTRAÍDOS (GEMINI):', {
+              acto: data.tipoActo || 'NO_ENCONTRADO',
+              otorgantes: data.otorgantes?.length || 0,
+              beneficiarios: data.beneficiarios?.length || 0
+            })
+          }
         } else {
           console.log('⚠️ GEMINI no retornó datos útiles. Fallback al flujo existente')
         }
@@ -221,6 +253,7 @@ async function extractData(req, res) {
             console.log('🚀 INICIANDO EXTRACCIÓN CON PYTHON')
             const pyResp = await py.extractFromPdf(pdfBuffer, filename, { debug: 0 })
             tiempoPython = Date.now() - tPyStart
+            if (debugExtraction) console.log(`⏱️  TIEMPO RESPUESTA PYTHON: ${tiempoPython}ms`)
 
             console.log('📊 RESULTADO PYTHON CLIENT:')
             console.log(`- Success: ${pyResp?.success}`)
@@ -252,6 +285,14 @@ async function extractData(req, res) {
               if (acts.length > 0) {
                 metodoUtilizado = 'PYTHON'
                 console.log(`✅ EXTRACCIÓN PYTHON EXITOSA: ${acts.length} actos procesados`)
+                if (debugExtraction) {
+                  const data = acts[0]
+                  console.log('📊 DATOS EXTRAÍDOS (PYTHON):', {
+                    acto: data?.tipoActo || 'NO_ENCONTRADO',
+                    otorgantes: data?.otorgantes?.length || 0,
+                    beneficiarios: data?.beneficiarios?.length || 0
+                  })
+                }
               } else {
                 console.log('⚠️ PYTHON CLIENT RETORNÓ DATOS VACÍOS')
                 console.log('🔄 EJECUTANDO FALLBACK A MÉTODO NODE.JS')
@@ -289,6 +330,14 @@ async function extractData(req, res) {
         console.log('🔄 Fallback al parser original')
         const fallbackResult = await PdfExtractorService.parseAdvancedData(text, pdfBuffer)
         acts = fallbackResult.acts
+        if (debugExtraction) {
+          const data = acts?.[0] || {}
+          console.log('📊 DATOS EXTRAÍDOS (NODEJS):', {
+            acto: data?.tipoActo || 'NO_ENCONTRADO',
+            otorgantes: Array.isArray(data?.otorgantes) ? data.otorgantes.length : 0,
+            beneficiarios: Array.isArray(data?.beneficiarios) ? data.beneficiarios.length : 0
+          })
+        }
       }
     }
 
@@ -756,6 +805,65 @@ async function applyAutoFixes(req, res) {
 }
 
 export { uploadPdf, extractData, previewConcuerdo, applyAutoFixes }
+
+/**
+ * GET /api/concuerdos/debug-config
+ * Devuelve configuración y prioridades de métodos de extracción
+ */
+async function getExtractionDebugConfig(req, res) {
+  try {
+    const cfg = getConfig()
+    const issues = []
+    const geminiEnabled = String(process.env.GEMINI_ENABLED || '').toLowerCase() === 'true'
+    const googleKey = Boolean(process.env.GOOGLE_API_KEY)
+    const pythonEnabled = Boolean(process.env.PDF_EXTRACTOR_BASE_URL)
+    const forcePythonDisabled = String(process.env.FORCE_PYTHON_EXTRACTOR || '').toLowerCase() === 'false'
+    const pythonGloballyEnabled = String(process.env.PDF_EXTRACTOR_ENABLED || 'true').toLowerCase() !== 'false'
+
+    if (!process.env.GEMINI_ENABLED) issues.push('GEMINI_ENABLED no configurado')
+    if (!googleKey) issues.push('GOOGLE_API_KEY faltante')
+    if (pythonEnabled && !forcePythonDisabled) issues.push('Python aún habilitado - puede interferir con Gemini')
+    if (!pythonGloballyEnabled) issues.push('PDF_EXTRACTOR_ENABLED=false (Python deshabilitado globalmente)')
+
+    return res.json({
+      extraction_methods: {
+        gemini: {
+          enabled: geminiEnabled,
+          api_key_configured: googleKey,
+          model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
+        },
+        python: {
+          enabled: Boolean(cfg?.pdfExtractor?.baseUrl),
+          url: cfg?.pdfExtractor?.baseUrl || null,
+          force_disabled: forcePythonDisabled,
+          token_configured: Boolean(cfg?.pdfExtractor?.token),
+          globally_enabled: pythonGloballyEnabled,
+        },
+        nodejs: {
+          enabled: true,
+          fallback: true,
+        },
+      },
+      priority_order: [
+        'GEMINI (primary)',
+        'PYTHON (fallback)',
+        'NODEJS (last resort)'
+      ],
+      current_config_issues: issues,
+      flags: {
+        GEMINI_PRIORITY: process.env.GEMINI_PRIORITY || null,
+        CONCUERDOS_USE_GEMINI_FIRST: process.env.CONCUERDOS_USE_GEMINI_FIRST || null,
+        FORCE_PYTHON_EXTRACTOR: process.env.FORCE_PYTHON_EXTRACTOR || null,
+        PDF_EXTRACTOR_ENABLED: process.env.PDF_EXTRACTOR_ENABLED || null,
+        DEBUG_EXTRACTION_METHOD: process.env.DEBUG_EXTRACTION_METHOD || null,
+      }
+    })
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Error obteniendo debug de configuración', details: error?.message })
+  }
+}
+
+export { getExtractionDebugConfig }
 /**
  * Generar múltiples documentos (copias) numerados
  * POST /api/concuerdos/generate-documents

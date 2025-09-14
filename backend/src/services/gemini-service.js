@@ -66,16 +66,37 @@ export async function extractDataWithGemini(pdfText) {
 
   try {
     const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-flash'
+    const timeoutMs = parseInt(process.env.GEMINI_TIMEOUT || '10000', 10)
+    const debugExtraction = String(process.env.DEBUG_EXTRACTION_METHOD || '').toLowerCase() === 'true'
     const model = client.getGenerativeModel({ model: modelName })
 
     const prompt = `${PROMPT_TEMPLATE}\n\n${pdfText}`
-    // Llamada mínima sin parámetros extra (evita campo "signal" no soportado)
-    const result = await model.generateContent(prompt)
-    const response = await result.response
-    const text = response.text()
+    const exec = async () => {
+      const t0 = Date.now()
+      const result = await model.generateContent(prompt)
+      const response = await result.response
+      const text = response.text()
+      const elapsed = Date.now() - t0
+      if (debugExtraction) {
+        console.log(`⏱️  GEMINI tiempo total: ${elapsed}ms (modelo=${modelName}, timeout=${timeoutMs}ms)`) 
+      }
+      return text
+    }
+
+    const text = await Promise.race([
+      exec(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('GEMINI_TIMEOUT_EXCEEDED')), timeoutMs))
+    ])
 
     const parsed = safeParseJsonFromText(text)
     if (parsed && typeof parsed === 'object') {
+      if (debugExtraction) {
+        console.log('🔎 GEMINI parse OK:', {
+          acto: parsed.acto_o_contrato || null,
+          otorgantes: Array.isArray(parsed.otorgantes) ? parsed.otorgantes.length : 0,
+          beneficiarios: Array.isArray(parsed.beneficiarios) ? parsed.beneficiarios.length : 0
+        })
+      }
       return parsed
     }
     return null
