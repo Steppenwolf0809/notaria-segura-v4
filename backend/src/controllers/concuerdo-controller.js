@@ -191,6 +191,7 @@ async function extractData(req, res) {
     let pythonTried = false
     let metodoUtilizado = 'NODE.JS'
     let tiempoPython = 0
+    let geminiSplitNames = null
 
     if (useGeminiFirst) {
       try {
@@ -202,21 +203,27 @@ async function extractData(req, res) {
           console.log(`⏱️  TIEMPO RESPUESTA GEMINI: ${tiempoGemini}ms`)
         }
         if (gemini && (gemini.acto_o_contrato || gemini.otorgantes || gemini.beneficiarios)) {
-          // Adaptar a estructura interna con nombres separados
+          // Adaptar a estructura interna: en acts solo 'nombre' para evitar redundancia,
+          // y exponer apellidos/nombres separados en splitNames
           const tipoActo = gemini.acto_o_contrato || ''
-          const mapPersonaNatural = (e) => {
-            const apellidos = String(e?.apellidos || '').trim()
-            const nombres = String(e?.nombres || '').trim()
-            const nombre = `${apellidos} ${nombres}`.trim()
-            const genero = e?.genero || null
-            const calidad = e?.calidad || undefined
-            const tipo_persona = e?.tipo_persona || 'Natural'
-            return { nombre, apellidos, nombres, genero, calidad, tipo_persona }
-          }
+          const mapSplit = (e) => ({
+            apellidos: String(e?.apellidos || '').trim(),
+            nombres: String(e?.nombres || '').trim(),
+            genero: e?.genero || null,
+            calidad: e?.calidad || undefined,
+            tipo_persona: e?.tipo_persona || 'Natural'
+          })
+          const toNombre = (s) => String(s || '').trim()
+          const toFullName = (e) => toNombre(`${e.apellidos || ''} ${e.nombres || ''}`)
+
+          const otorgantesSplit = Array.isArray(gemini.otorgantes) ? gemini.otorgantes.map(mapSplit) : []
+          const beneficiariosSplit = Array.isArray(gemini.beneficiarios) ? gemini.beneficiarios.map(mapSplit) : []
+          geminiSplitNames = { otorgantes: otorgantesSplit, beneficiarios: beneficiariosSplit }
+
           acts = [{
             tipoActo,
-            otorgantes: Array.isArray(gemini.otorgantes) ? gemini.otorgantes.map(mapPersonaNatural) : [],
-            beneficiarios: Array.isArray(gemini.beneficiarios) ? gemini.beneficiarios.map(mapPersonaNatural) : []
+            otorgantes: otorgantesSplit.map(p => ({ nombre: toFullName(p), tipo_persona: p.tipo_persona })),
+            beneficiarios: beneficiariosSplit.map(p => ({ nombre: toFullName(p), tipo_persona: p.tipo_persona }))
           }]
           metodoUtilizado = 'GEMINI'
           console.log(`✅ EXTRACCIÓN GEMINI EXITOSA en ${tiempoGemini}ms`)
@@ -363,13 +370,13 @@ async function extractData(req, res) {
     let parsed = acts[0] || { tipoActo: '', otorgantes: [], beneficiarios: [] }
     const { notarioNombre, notariaNumero, notariaNumeroDigit, notarioSuplente } = PdfExtractorService.extractNotaryInfo(text)
     
-    // Debug: mostrar datos extraídos antes de validación
+    // Debug: mostrar datos extraídos antes de validación (solo nombres completos para evitar ruido)
     console.log('🔍 Datos extraídos antes de validación:', {
       tipoActo: parsed.tipoActo,
       otorgantes: parsed.otorgantes?.length || 0,
       beneficiarios: parsed.beneficiarios?.length || 0,
-      otorgantesPreview: parsed.otorgantes?.slice(0, 2),
-      beneficiariosPreview: parsed.beneficiarios?.slice(0, 2)
+      otorgantesPreview: (parsed.otorgantes || []).slice(0, 2).map(o => o?.nombre).filter(Boolean),
+      beneficiariosPreview: (parsed.beneficiarios || []).slice(0, 2).map(b => b?.nombre).filter(Boolean)
     })
 
     // Validar calidad de los datos extraídos
@@ -450,6 +457,7 @@ async function extractData(req, res) {
         notarioSuplente, 
         notariaNumero, 
         notariaNumeroDigit,
+        splitNames: geminiSplitNames || undefined,
         // Incluir información de validación
         validation: {
           score: validation.overallScore,
