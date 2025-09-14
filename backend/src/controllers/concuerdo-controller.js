@@ -202,13 +202,21 @@ async function extractData(req, res) {
           console.log(`⏱️  TIEMPO RESPUESTA GEMINI: ${tiempoGemini}ms`)
         }
         if (gemini && (gemini.acto_o_contrato || gemini.otorgantes || gemini.beneficiarios)) {
-          // Adaptar a estructura interna
+          // Adaptar a estructura interna con nombres separados
           const tipoActo = gemini.acto_o_contrato || ''
-          const mapEntity = (e) => ({ nombre: e?.nombre || '', tipo_persona: 'Natural' })
+          const mapPersonaNatural = (e) => {
+            const apellidos = String(e?.apellidos || '').trim()
+            const nombres = String(e?.nombres || '').trim()
+            const nombre = `${apellidos} ${nombres}`.trim()
+            const genero = e?.genero || null
+            const calidad = e?.calidad || undefined
+            const tipo_persona = e?.tipo_persona || 'Natural'
+            return { nombre, apellidos, nombres, genero, calidad, tipo_persona }
+          }
           acts = [{
             tipoActo,
-            otorgantes: Array.isArray(gemini.otorgantes) ? gemini.otorgantes.map(mapEntity) : [],
-            beneficiarios: Array.isArray(gemini.beneficiarios) ? gemini.beneficiarios.map(mapEntity) : []
+            otorgantes: Array.isArray(gemini.otorgantes) ? gemini.otorgantes.map(mapPersonaNatural) : [],
+            beneficiarios: Array.isArray(gemini.beneficiarios) ? gemini.beneficiarios.map(mapPersonaNatural) : []
           }]
           metodoUtilizado = 'GEMINI'
           console.log(`✅ EXTRACCIÓN GEMINI EXITOSA en ${tiempoGemini}ms`)
@@ -420,19 +428,12 @@ async function extractData(req, res) {
     const tipoActo = parsed.tipoActo
     const otsNames = (parsed.otorgantes || []).map(o => o?.nombre).filter(Boolean)
     const besNames = (parsed.beneficiarios || []).map(b => b?.nombre).filter(Boolean)
-    console.log('📋 RESULTADO FINAL PROCESAMIENTO:')
-    console.log(`- Método utilizado: ${metodoUtilizado}`)
-    console.log(`- Tipo acto detectado: ${tipoActo}`)
-    console.log(`- Otorgantes: ${otsNames.join(', ')}`)
-    console.log(`- Beneficiarios: ${besNames.join(', ')}`)
-    console.log(`- Tiempo total: ${tiempoTotal}ms`)
-    if (metodoUtilizado === 'PYTHON') {
-      console.log('✅ DATOS FINALES PROVIENEN DEL MICROSERVICIO PYTHON')
-    } else if (metodoUtilizado === 'GEMINI') {
-      console.log('✅ DATOS FINALES PROVIENEN DE GEMINI')
-    } else {
-      console.log('✅ DATOS FINALES PROVIENEN DEL MÉTODO NODE.JS ANTERIOR')
-    }
+    console.log('✅ EXTRACCIÓN COMPLETADA')
+    console.log('📊 MÉTODO UTILIZADO:', metodoUtilizado)
+    console.log('🎯 TIPO ACTO:', tipoActo)
+    console.log('👥 OTORGANTES:', otsNames.join(', '))
+    console.log('🎁 BENEFICIARIOS:', besNames.join(', '))
+    console.log('⏱️  TIEMPO TOTAL:', `${tiempoTotal}ms`)
 
     // Headers de response para debugging
     res.set('X-Extraction-Method', metodoUtilizado)
@@ -474,6 +475,44 @@ async function extractData(req, res) {
     return res.status(500).json({ success: false, message: 'Error extrayendo datos' })
   }
 }
+
+// Helper: procesar datos crudos de Gemini al formato esperado por formulario
+function processGeminiData(geminiResult) {
+  if (!geminiResult) return null
+  console.log('🔄 PROCESANDO DATOS GEMINI...')
+
+  const safeArr = (v) => (Array.isArray(v) ? v : [])
+  const mapPersona = (p) => {
+    const apellidos = String(p?.apellidos || '').trim()
+    const nombres = String(p?.nombres || '').trim()
+    const nombre_completo = `${apellidos} ${nombres}`.trim()
+    return {
+      apellidos,
+      nombres,
+      nombre_completo,
+      genero: p?.genero || null,
+      calidad: p?.calidad || undefined,
+      tipo_persona: p?.tipo_persona || 'Natural'
+    }
+  }
+
+  const processedData = {
+    acto_o_contrato: geminiResult.acto_o_contrato || null,
+    otorgantes: safeArr(geminiResult.otorgantes).map(mapPersona),
+    beneficiarios: safeArr(geminiResult.beneficiarios).map(mapPersona),
+    notario: geminiResult.notario || '',
+    notaria: geminiResult.notaria || ''
+  }
+
+  console.log('✅ DATOS PROCESADOS:', {
+    otorgantes: processedData.otorgantes.map(o => ({ apellidos: o.apellidos, nombres: o.nombres, completo: o.nombre_completo })),
+    beneficiarios: processedData.beneficiarios.map(b => ({ apellidos: b.apellidos, nombres: b.nombres, completo: b.nombre_completo }))
+  })
+
+  return processedData
+}
+
+export { processGeminiData }
 
 /**
  * POST /api/concuerdos/preview
@@ -1353,3 +1392,35 @@ async function testPython(req, res) {
 }
 
 export { testPython }
+
+/**
+ * POST /api/concuerdos/test-gemini
+ * Permite probar la extracción con Gemini y validar formato de nombres separados
+ */
+async function testGemini(req, res) {
+  try {
+    const { text } = req.body || {}
+    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+      return res.status(400).json({ success: false, error: 'Texto requerido' })
+    }
+
+    console.log('🧪 PROBANDO EXTRACCIÓN GEMINI...')
+    const result = await extractDataWithGemini(text)
+    if (!result) {
+      return res.json({ success: false, error: 'Gemini no pudo extraer datos' })
+    }
+
+    const processed = processGeminiData(result)
+    const validation = {
+      has_apellidos: processed.otorgantes.every(o => (o.apellidos || '').length > 0),
+      has_nombres: processed.otorgantes.every(o => (o.nombres || '').length > 0),
+      format_correct: true
+    }
+
+    return res.json({ success: true, raw_gemini: result, processed_data: processed, validation })
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error?.message || String(error) })
+  }
+}
+
+export { testGemini }

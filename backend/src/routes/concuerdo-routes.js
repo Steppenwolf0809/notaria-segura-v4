@@ -1,7 +1,7 @@
 import express from 'express'
 import multer from 'multer'
 import { authenticateToken, requireRoles } from '../middleware/auth-middleware.js'
-import { uploadPdf, extractData, previewConcuerdo, generateDocuments, applyAutoFixes, getOcrHealth, testPython, getExtractionDebugConfig } from '../controllers/concuerdo-controller.js'
+import { uploadPdf, extractData, previewConcuerdo, generateDocuments, applyAutoFixes, getOcrHealth, testPython, getExtractionDebugConfig, testGemini } from '../controllers/concuerdo-controller.js'
 
 const router = express.Router()
 
@@ -43,6 +43,9 @@ router.get('/debug-config', authenticateToken, requireMatrizador, getExtractionD
 
 // POST /api/concuerdos/test-python (debugging explícito)
 router.post('/test-python', authenticateToken, requireMatrizador, testPython)
+
+// POST /api/concuerdos/test-gemini (debug de formato nombres separados)
+router.post('/test-gemini', authenticateToken, requireMatrizador, testGemini)
 
 // Manejo de errores de multer
 router.use((error, req, res, next) => {

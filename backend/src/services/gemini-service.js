@@ -1,37 +1,46 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
-// Template de prompt optimizado para extractos notariales ecuatorianos
+// Template de prompt optimizado para nombres separados (Ecuador)
 const PROMPT_TEMPLATE = `Eres un experto en documentos notariales ecuatorianos.
 
-TAREA: Extraer información estructurada del extracto notarial.
+TAREA: Extraer información del extracto notarial y devolver JSON con formato específico para nombres.
 
-FORMATO DE SALIDA REQUERIDO (SOLO JSON, SIN TEXTO EXTRA):
+FORMATO EXACTO REQUERIDO (SOLO JSON):
 {
-  "acto_o_contrato": "PODER GENERAL",
+  "acto_o_contrato": "PODER ESPECIAL",
   "otorgantes": [
     {
-      "nombre": "APELLIDOS NOMBRES COMPLETOS",
+      "apellidos": "APELLIDO1 APELLIDO2",
+      "nombres": "NOMBRE1 NOMBRE2", 
       "genero": "M",
-      "calidad": "MANDANTE"
+      "calidad": "MANDANTE",
+      "tipo_persona": "Natural"
     }
   ],
   "beneficiarios": [
     {
-      "nombre": "APELLIDOS NOMBRES COMPLETOS", 
-      "genero": "F",
-      "calidad": "MANDATARIO"
+      "apellidos": "APELLIDO1 APELLIDO2",
+      "nombres": "NOMBRE1 NOMBRE2",
+      "genero": "F", 
+      "calidad": "MANDATARIO",
+      "tipo_persona": "Natural"
     }
   ],
-  "notario": "NOMBRES APELLIDOS DEL NOTARIO"
+  "notario": "NOMBRES APELLIDOS NOTARIO",
+  "notaria": "NOTARÍA COMPLETA"
 }
 
-REGLAS ESPECÍFICAS:
-- Mantén nombres EXACTOS como aparecen en el documento
-- Infiere género por nombres ecuatorianos típicos (MARÍA=F, CARLOS=M)
-- Para calidades usa términos del documento: MANDANTE, MANDATARIO, VENDEDOR, COMPRADOR, etc.
-- Si no encuentras información específica, usa null
+REGLAS NOMBRES ECUATORIANOS:
+- Formato típico: APELLIDO1 APELLIDO2 NOMBRE1 NOMBRE2
+- Ejemplo: "BELLO GONZALEZ VICTOR HUGO" → apellidos: "BELLO GONZALEZ", nombres: "VICTOR HUGO"
+- Si dudas en la separación, coloca todo en "apellidos" y deja "nombres" como ""
+- Infiere género por nombres típicos (ej: VICTOR=M, MARIA=F). Si no hay certeza, usa null
+- Mantén mayúsculas como aparecen en el documento
+
+REGLAS GENERALES:
+- Responde SOLO el JSON, sin texto extra
+- Si no encuentras algo, usa null
 - NO inventes datos que no estén en el texto
-- Responde ÚNICAMENTE el JSON, sin explicaciones
 
 EXTRACTO A PROCESAR:
 {texto_del_pdf}`
@@ -65,9 +74,10 @@ export async function extractDataWithGemini(pdfText) {
   if (!client) return null
 
   try {
+    const debugExtraction = String(process.env.DEBUG_EXTRACTION_METHOD || '').toLowerCase() === 'true'
+    if (debugExtraction) console.log('🔮 INICIANDO EXTRACCIÓN GEMINI...')
     const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-flash'
     const timeoutMs = parseInt(process.env.GEMINI_TIMEOUT || '10000', 10)
-    const debugExtraction = String(process.env.DEBUG_EXTRACTION_METHOD || '').toLowerCase() === 'true'
     const model = client.getGenerativeModel({ model: modelName })
 
     const prompt = `${PROMPT_TEMPLATE}\n\n${pdfText}`
@@ -96,12 +106,19 @@ export async function extractDataWithGemini(pdfText) {
           otorgantes: Array.isArray(parsed.otorgantes) ? parsed.otorgantes.length : 0,
           beneficiarios: Array.isArray(parsed.beneficiarios) ? parsed.beneficiarios.length : 0
         })
+        try {
+          const nombresExtract = {
+            otorgantes: (parsed.otorgantes || []).map(o => `${o?.apellidos || ''} ${o?.nombres || ''}`.trim()),
+            beneficiarios: (parsed.beneficiarios || []).map(b => `${b?.apellidos || ''} ${b?.nombres || ''}`.trim())
+          }
+          console.log('👥 NOMBRES EXTRAÍDOS:', nombresExtract)
+        } catch {}
       }
       return parsed
     }
     return null
   } catch (error) {
-    console.error('Error en extracción Gemini:', error?.message || error)
+    console.error('❌ Error en extracción Gemini:', error?.message || error)
     return null
   }
 }
