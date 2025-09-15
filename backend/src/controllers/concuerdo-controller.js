@@ -225,6 +225,27 @@ async function extractData(req, res) {
             otorgantes: otorgantesSplit.map(p => ({ nombre: toFullName(p), tipo_persona: p.tipo_persona })),
             beneficiarios: beneficiariosSplit.map(p => ({ nombre: toFullName(p), tipo_persona: p.tipo_persona }))
           }]
+          // Reconciliar: si Gemini devolvió solo un natural como otorgante pero el texto tiene una razón social
+          try {
+            const names = PdfExtractorService.cleanPersonNames(text)
+            const isJuridicaToken = (n) => /S\.A\.|\bSA\b|LTDA|C[ÍI]A\.?|CORP\.?|FUNDACI[ÓO]N|EMPRESA|ASOCIACI[ÓO]N|COOPERATIVA|UNIVERSIDAD|MUNICIPIO|\bEP\b/i.test(String(n || ''))
+            const juridicas = Array.isArray(names) ? names.filter(isJuridicaToken) : []
+            const act0 = acts[0]
+            const hasOneNatural = Array.isArray(act0?.otorgantes) && act0.otorgantes.length === 1 && !/JUR[IÍ]DICA/i.test(String(act0.otorgantes[0]?.tipo_persona || ''))
+            if (juridicas.length > 0 && hasOneNatural) {
+              const representante = act0.otorgantes[0]?.nombre
+              const company = juridicas[0]
+              acts = [{
+                tipoActo,
+                otorgantes: [{ nombre: company, tipo_persona: 'Jurídica', representantes: representante ? [representante] : undefined }],
+                beneficiarios: act0.beneficiarios || []
+              }]
+              metodoUtilizado = 'GEMINI+RECONCILIATION'
+              console.log('🔧 RECONCILIACIÓN: Detectada razón social en texto. Ajuste aplicado:', { company, representante })
+            }
+          } catch (reconErr) {
+            console.log('⚠️ Error en reconciliación post-Gemini:', reconErr?.message || reconErr)
+          }
           metodoUtilizado = 'GEMINI'
           console.log(`✅ EXTRACCIÓN GEMINI EXITOSA en ${tiempoGemini}ms`)
           if (debugExtraction) {
