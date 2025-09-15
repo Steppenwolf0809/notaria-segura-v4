@@ -342,7 +342,7 @@ const PdfExtractorService = {
 
     // Patrón 2: Extracción específica de tablas estructuradas (formato moderno)
     // Buscar líneas "Nombres/Razón social: NOMBRE" directamente
-    const razSocialRe = /NOMBRES?\s*\/?\s*RAZ[ÓO]N\s+SOCIAL\s*[:\-]\s*([A-ZÁÉÍÓÚÑ\s\.]{3,80}?)(?:\s+TIPO|\s+REPRESENTADO|\s+DOCUMENTO|\s+NACIONALIDAD|\n|$)/gi
+    const razSocialRe = /NOMBRES?\s*\/?\s*RAZ[ÓO]N\s+SOCIAL\s*[:\-]\s*([A-ZÁÉÍÓÚÑ\s\.]{3,80}?)(?:\s+TIPO|\s+REPRESENTAD[OA]|\s+DOCUMENTO|\s+NACIONALIDAD|\n|$)/gi
     let rs
     while ((rs = razSocialRe.exec(upperBase)) !== null) {
       let name = rs[1].replace(/\s+/g, ' ').trim()
@@ -354,6 +354,16 @@ const PdfExtractorService = {
           const reordered = this.reorderName(name)
           if (reordered && !tableNames.includes(reordered)) tableNames.push(reordered)
         }
+      }
+    }
+
+    // Patrón 2b: Capturar RAZÓN SOCIAL inmediatamente antes de "REPRESENTADO/A POR" o "RUC"
+    const razBeforeRep = /RAZ[ÓO]N\s+SOCIAL\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ0-9\s\.,\-\&]{3,120}?)\s+(?:REPRESENTAD[OA]\s+POR|RUC)/gi
+    let rbr
+    while ((rbr = razBeforeRep.exec(upperBase)) !== null) {
+      const cname = rbr[1].replace(/\s+/g, ' ').trim()
+      if (cname && cname.length > 2 && !tableNames.includes(cname)) {
+        tableNames.push(cname)
       }
     }
 
@@ -460,10 +470,22 @@ const PdfExtractorService = {
       const finalName = hasCompanyToken ? cleaned : this.reorderName(cleaned)
       if (!names.includes(finalName)) names.push(finalName)
     }
+    try {
+      if (process.env.NODE_ENV !== 'production') {
+        const j = names.filter(n => /S\.A\.|LTDA|CIA|CORP|FUNDACI[ÓO]N|EMPRESA|ASOCIACI[ÓO]N/i.test(n))
+        if (j.length) console.log('[PdfExtractorService.cleanPersonNames] Jurídicas detectadas (heurístico):', j)
+      }
+    } catch {}
     // Si se detectaron por patrón de tabla, priorizarlos
     if (tableNames.length > 0) {
       const out = []
       for (const t of tableNames) if (!out.includes(t)) out.push(t)
+      try {
+        if (process.env.NODE_ENV !== 'production') {
+          const j = out.filter(n => /S\.A\.|LTDA|CIA|CORP|FUNDACI[ÓO]N|EMPRESA|ASOCIACI[ÓO]N/i.test(n))
+          if (j.length) console.log('[PdfExtractorService.cleanPersonNames] Jurídicas detectadas (tabla):', j)
+        }
+      } catch {}
       return out
     }
     return names

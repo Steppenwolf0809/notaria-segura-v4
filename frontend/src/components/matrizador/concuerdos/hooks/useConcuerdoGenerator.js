@@ -56,6 +56,16 @@ export default function useConcuerdoGenerator() {
       const buffer = res.data?.buffer || null
       const parsed = await concuerdoService.extractData(res.data.text || '', buffer)
       if (!parsed.success) throw new Error(parsed.error || 'Error extrayendo datos')
+      try {
+        const act0 = Array.isArray(parsed.data?.acts) ? parsed.data.acts[0] : parsed.data
+        const ots = (act0?.otorgantes || []).map(o => o?.nombre).filter(Boolean)
+        const bes = (act0?.beneficiarios || []).map(b => b?.nombre).filter(Boolean)
+        console.log('[Concuerdo] Datos extraídos:', {
+          tipoActo: act0?.tipoActo || act0?.tipo,
+          otorgantes: ots,
+          beneficiarios: bes
+        })
+      } catch {}
       setExtractedData(parsed.data)
       setStep(1)
     } finally {
@@ -72,6 +82,16 @@ export default function useConcuerdoGenerator() {
       const buffer = extractedText?.buffer || null
       const parsed = await concuerdoService.extractData(extractedText?.text || extractedText, buffer)
       if (!parsed.success) throw new Error(parsed.error || 'Error extrayendo datos')
+      try {
+        const act0 = Array.isArray(parsed.data?.acts) ? parsed.data.acts[0] : parsed.data
+        const ots = (act0?.otorgantes || []).map(o => o?.nombre).filter(Boolean)
+        const bes = (act0?.beneficiarios || []).map(b => b?.nombre).filter(Boolean)
+        console.log('[Concuerdo] Datos extraídos:', {
+          tipoActo: act0?.tipoActo || act0?.tipo,
+          otorgantes: ots,
+          beneficiarios: bes
+        })
+      } catch {}
       setExtractedData(parsed.data)
       setStep(1)
     } finally {
