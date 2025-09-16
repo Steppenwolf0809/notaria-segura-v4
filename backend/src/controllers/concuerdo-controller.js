@@ -5,12 +5,10 @@ import ExtractionAggregator from '../services/extraction-aggregator.js'
 import { ExtractoTemplateEngine } from '../services/extractos/index.js'
 import { buildActPhrase } from '../services/extractos/phrase-builder.js'
 import DataQualityValidator from '../services/data-quality-validator.js'
-import { getConfig as _getConfig } from '../config/environment.js'
-import ocrService from '../services/ocr-service.js'
 import { getConfig } from '../config/environment.js'
+import ocrService from '../services/ocr-service.js'
 import { extractDataWithGemini, processDocumentWithConcuerdos } from '../services/gemini-service.js'
 import { generarConcuerdos, metrics } from '../services/concuerdo-service.js'
-import { getConfig } from '../config/environment.js'
 
 /**
  * Controlador de Generador de Concuerdos (Sprint 1)

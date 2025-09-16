@@ -122,6 +122,24 @@ const environmentSchema = z.object({
     .optional()
     .default('hibrido'),
 
+  // Flags legacy opcionales (para compatibilidad)
+  GEMINI_ENABLED: z
+    .enum(['true','false'])
+    .optional()
+    .transform(v => v ? v === 'true' : undefined),
+  EXTRACT_HYBRID: z
+    .enum(['true','false'])
+    .optional()
+    .transform(v => v ? v === 'true' : undefined),
+  FORCE_PYTHON_EXTRACTOR: z
+    .enum(['true','false'])
+    .optional()
+    .transform(v => v ? v === 'true' : undefined),
+  GEMINI_PRIORITY: z
+    .enum(['true','false'])
+    .optional()
+    .transform(v => v ? v === 'true' : undefined),
+
   // PROMPT_FORCE_TEMPLATE: fuerza el template estructural base
   //  - "auto" | "A" | "B" | "C"
   PROMPT_FORCE_TEMPLATE: z
@@ -148,20 +166,21 @@ const environmentSchema = z.object({
     .optional()
     .default('true')
     .transform(val => val === 'true')
+  ,
+
+  // Google API (requerido en producción; opcional en otros entornos)
+  GOOGLE_API_KEY: z.string().optional()
 });
 
 /**
  * Valida las variables de entorno al inicio de la aplicación
  * @returns {Object} Variables validadas y parseadas
  */
+let printedOnce = false;
+
 function validateEnvironment() {
   try {
     console.log('🔍 Validando variables de entorno...');
-    // Logs de variables crudas para PDF Extractor
-    console.log('⚙️ CARGANDO CONFIGURACIÓN PDF EXTRACTOR:');
-    console.log(`- NODE_ENV: ${process.env.NODE_ENV}`);
-    console.log(`- PDF_EXTRACTOR_BASE_URL raw: '${process.env.PDF_EXTRACTOR_BASE_URL}'`);
-    console.log(`- PDF_EXTRACTOR_TOKEN raw: '${process.env.PDF_EXTRACTOR_TOKEN ? 'SET' : 'NOT SET'}'`);
     
     const result = environmentSchema.safeParse(process.env);
     
@@ -172,9 +191,8 @@ function validateEnvironment() {
       const zodError = result.error;
       const issues = zodError && Array.isArray(zodError.issues) ? zodError.issues : [];
 
-      console.log('🔍 Debugging Zod error before iteración:');
-      console.log('   • Tipo de error:', zodError ? zodError.name || typeof zodError : 'undefined');
-      console.log('   • issues es array:', Array.isArray(issues));
+      // Debug mínimo y seguro
+      console.log('🔍 Detalle de validación (seguro):');
       console.log('   • issues length:', Array.isArray(issues) ? issues.length : 'N/A');
 
       if (issues.length > 0) {
@@ -184,11 +202,7 @@ function validateEnvironment() {
         });
       } else {
         // Fallback: loguear el error completo serializado
-        try {
-          console.error('   • Detalle del error:', JSON.stringify(zodError, Object.getOwnPropertyNames(zodError), 2));
-        } catch {
-          console.error('   • Detalle del error no serializable');
-        }
+        console.error('   • Error de validación no desglosado');
       }
       
       // En producción, fallar inmediatamente
@@ -203,12 +217,6 @@ function validateEnvironment() {
     }
     
     console.log('✅ Variables de entorno validadas correctamente');
-    console.log(`   • Entorno: ${result.data.NODE_ENV}`);
-    console.log(`   • Puerto: ${result.data.PORT}`);
-    console.log(`   • Base de datos: ${result.data.DATABASE_URL ? '✓ Configurada' : '✗ No configurada'}`);
-    console.log(`   • JWT: ${result.data.JWT_SECRET ? '✓ Configurado' : '✗ No configurado'}`);
-    console.log(`   • Twilio: ${result.data.TWILIO_ACCOUNT_SID ? '✓ Configurado' : '✗ No configurado'}`);
-    console.log(`   • WhatsApp: ${result.data.WHATSAPP_ENABLED ? '✓ Habilitado' : '✗ Deshabilitado'}`);
     
     return result.data;
     
@@ -264,6 +272,29 @@ function getConfig() {
   }
   
   // Construir configuración extendida
+  // Resolver estrategia efectiva y compatibilidad con flags legacy (sin imprimir valores)
+  const resolveStrategy = (env) => {
+    let strategy = env.LLM_STRATEGY || 'hibrido';
+    // Si no se definió estrategia, inferir desde flags legacy si existen
+    if (!process.env.LLM_STRATEGY) {
+      const legacyGeminiEnabled = typeof env.GEMINI_ENABLED === 'boolean' ? env.GEMINI_ENABLED : undefined;
+      const legacyHybrid = typeof env.EXTRACT_HYBRID === 'boolean' ? env.EXTRACT_HYBRID : undefined;
+      if (legacyGeminiEnabled === false) strategy = 'solo_node';
+      else if (legacyHybrid === true) strategy = 'hibrido';
+      else if (legacyHybrid === false) strategy = 'solo_gemini';
+      // FORCE_PYTHON_EXTRACTOR no mapea inequívocamente; no altera strategy si solo aparece este flag
+    }
+    return strategy;
+  };
+
+  const effectiveStrategy = resolveStrategy(validatedEnv);
+
+  // Derivar flags legacy desde la estrategia para compatibilidad:
+  const derivedLegacy = {
+    geminiEnabled: effectiveStrategy !== 'solo_node',
+    extractHybrid: effectiveStrategy === 'hibrido'
+  };
+
   const cfg = {
     ...validatedEnv,
     pdfExtractor: {
@@ -274,19 +305,60 @@ function getConfig() {
     concuerdos: {
       // Flags agrupados para el sistema de concuerdos
       llmRouterEnabled: validatedEnv.LLM_ROUTER_ENABLED,
-      llmStrategy: validatedEnv.LLM_STRATEGY,
+      llmStrategy: effectiveStrategy,
       promptForceTemplate: validatedEnv.PROMPT_FORCE_TEMPLATE,
       structureRouterEnabled: validatedEnv.STRUCTURE_ROUTER_ENABLED,
       templateMode: validatedEnv.TEMPLATE_MODE,
-      geminiJsonMode: validatedEnv.GEMINI_JSON_MODE
+      geminiJsonMode: validatedEnv.GEMINI_JSON_MODE,
+      // Compatibilidad legacy derivada
+      derived: {
+        GEMINI_ENABLED: derivedLegacy.geminiEnabled,
+        EXTRACT_HYBRID: derivedLegacy.extractHybrid
+      }
     }
   };
   
-  try {
-    console.log('⚙️ CONFIGURACIÓN PROCESADA:');
-    console.log(`- baseUrl final: '${cfg.pdfExtractor.baseUrl}'`);
-    console.log(`- token final: '${cfg.pdfExtractor.token ? 'SET' : 'NOT SET'}'`);
-  } catch {}
+  // Impresión única de advertencias y tabla de configuración efectiva
+  if (!printedOnce) {
+    printedOnce = true;
+    try {
+      // Warnings por flags deprecados presentes
+      const deprecated = ['CONCUERDOS_USE_GEMINI_FIRST','EXTRACT_HYBRID','FORCE_PYTHON_EXTRACTOR','GEMINI_PRIORITY'];
+      const present = deprecated.filter(k => typeof process.env[k] !== 'undefined');
+      if (present.length) {
+        console.warn('⚠️ Flags deprecados detectados. Usa LLM_STRATEGY en su lugar:');
+        present.forEach(k => console.warn(`   • ${k} (usar LLM_STRATEGY)`));
+      }
+
+      // Fail fast adicional en producción por claves críticas
+      if (cfg.NODE_ENV === 'production') {
+        const criticalMissing = [];
+        if (!cfg.DATABASE_URL) criticalMissing.push('DATABASE_URL');
+        if (!cfg.JWT_SECRET) criticalMissing.push('JWT_SECRET');
+        if (!process.env.GOOGLE_API_KEY) criticalMissing.push('GOOGLE_API_KEY');
+        if (criticalMissing.length) {
+          console.error('❌ Variables críticas faltantes en producción:', criticalMissing.join(', '));
+          process.exit(1);
+        }
+      }
+
+      // Tabla segura de configuración efectiva (solo nombres/estado, sin valores)
+      const names = [
+        'NODE_ENV','DATABASE_URL','JWT_SECRET','GOOGLE_API_KEY','LLM_STRATEGY','GEMINI_ENABLED(derived)','EXTRACT_HYBRID(derived)','STRUCTURE_ROUTER_ENABLED','PROMPT_FORCE_TEMPLATE','TEMPLATE_MODE','GEMINI_JSON_MODE','WHATSAPP_ENABLED','PDF_EXTRACTOR_BASE_URL','TWILIO_ACCOUNT_SID','TWILIO_AUTH_TOKEN','TWILIO_WHATSAPP_FROM'
+      ];
+      console.log('📋 Effective settings (nombres, sin valores):');
+      console.log('| Setting | Status |');
+      console.log('|---|---|');
+      const statusOf = (k) => {
+        switch (k) {
+          case 'GEMINI_ENABLED(derived)': return cfg.concuerdos.derived.GEMINI_ENABLED ? 'SET' : 'UNSET';
+          case 'EXTRACT_HYBRID(derived)': return cfg.concuerdos.derived.EXTRACT_HYBRID ? 'SET' : 'UNSET';
+          default: return process.env[k.replace(/\(derived\)/,'')] ? 'SET' : 'UNSET';
+        }
+      };
+      names.forEach(n => console.log(`| ${n} | ${statusOf(n)} |`));
+    } catch {}
+  }
 
   return cfg;
 }
