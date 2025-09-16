@@ -1,0 +1,22 @@
+{{!--
+  Mod: Poderes
+  Variables esperadas del viewModel:
+  - otorgantes_render: string con lista de otorgantes formateada
+  - beneficiarios_render: string con lista de beneficiarios formateada
+  - acto: string del tipo de acto (PODER GENERAL, PODER ESPECIAL, etc.)
+
+  Fragmentos que agrega:
+  - Mapeo mandante/mandatario con roles específicos
+  - Referencia a facultades otorgadas
+  - Duración del poder (si está presente en datos)
+--}}
+
+{{!-- Bloque específico para poderes --}}
+{{#if beneficiarios_render}}
+**MANDANTE{{#if (gt otorgantes.length 1)}}S{{/if}}:** {{otorgantes_render}}
+
+**MANDATARIO{{#if (gt beneficiarios.length 1)}}S{{/if}}:** {{beneficiarios_render}}
+
+**FACULTADES:** Las necesarias para {{acto}} conforme a la legislación ecuatoriana.
+
+{{/if}}

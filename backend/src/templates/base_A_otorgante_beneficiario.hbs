@@ -1,0 +1,32 @@
+{{!-- Template Base A: Otorgante → Beneficiario --}}
+{{!--
+  Propósito:
+  - Estructura estándar cuando existe al menos un otorgante y al menos un beneficiario.
+  - Usado por el router de estructura cuando `tipo === 'A'`.
+
+  Variables esperadas (a nivel de contexto/engine):
+  - acto: string  → nombre del acto/contrato
+  - otorgantes: Array<{ nombre, tipo_persona, representantes? }>
+  - beneficiarios: Array<{ nombre, tipo_persona }>
+  - notarioNombre: string
+  - notariaNumero: string|number
+  - numeroCopia: string (PRIMERA, SEGUNDA, ...), opcional
+
+  Notas:
+  - Este archivo es un esqueleto (T1). No implementa el contenido final.
+  - Los modificadores (mods) ajustarán fraseo, conectores y estilos en T2/T3.
+--}}
+
+{{!-- Encabezado de copia (placeholder) --}}
+{{#if numeroCopia}}
+{{numeroCopia}} COPIA
+{{/if}}
+
+{{!-- Cuerpo base (placeholder) --}}
+{{!-- Ejemplo orientativo: "De la escritura pública de {{acto}} otorgada por {{otorgantes}} a favor de {{beneficiarios}}" --}}
+
+{{!-- Pie de firma (placeholder) --}}
+{{notarioNombre}}
+NOTARÍA {{notariaNumero}}
+
+

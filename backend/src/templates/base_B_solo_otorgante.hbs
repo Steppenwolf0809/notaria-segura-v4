@@ -1,0 +1,27 @@
+{{!-- Template Base B: Solo Otorgante --}}
+{{!--
+  Propósito:
+  - Estructura para casos sin beneficiarios explícitos (solo comparecientes otorgantes).
+  - Usado por el router de estructura cuando `tipo === 'B'`.
+
+  Variables esperadas:
+  - acto: string
+  - otorgantes: Array<{ nombre, tipo_persona, representantes? }>
+  - notarioNombre: string
+  - notariaNumero: string|number
+  - numeroCopia: string (PRIMERA, SEGUNDA, ...), opcional
+
+  Notas:
+  - Esqueleto T1 para integración con engine de templates.
+--}}
+
+{{#if numeroCopia}}
+{{numeroCopia}} COPIA
+{{/if}}
+
+{{!-- Cuerpo base (placeholder) --}}
+
+{{notarioNombre}}
+NOTARÍA {{notariaNumero}}
+
+

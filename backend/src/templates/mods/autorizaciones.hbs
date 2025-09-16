@@ -1,0 +1,23 @@
+{{!--
+  Mod: Autorizaciones
+  Variables esperadas del viewModel:
+  - otorgantes_render: string con lista de otorgantes formateada
+  - beneficiarios_render: string con lista de beneficiarios formateada
+  - acto: string del tipo de acto (AUTORIZACIÓN DE SALIDA, etc.)
+  - genero: string género del menor ('M' o 'F')
+
+  Fragmentos que agrega:
+  - Roles parentales (padre/madre/representante)
+  - Referencia a menor de edad
+  - Género específico (hijo/hija)
+--}}
+
+{{!-- Bloque específico para autorizaciones --}}
+{{#if beneficiarios_render}}
+**PADRE/MADRE/REPRESENTANTE:** {{otorgantes_render}}
+
+**AUTORIZADO{{#if (gt beneficiarios.length 1)}}S{{/if}}:** {{beneficiarios_render}}
+
+**AUTORIZACIÓN:** Para {{acto}} conforme a la legislación aplicable.
+
+{{/if}}

@@ -1,7 +1,8 @@
 import express from 'express'
 import multer from 'multer'
 import { authenticateToken, requireRoles } from '../middleware/auth-middleware.js'
-import { uploadPdf, extractData, previewConcuerdo, generateDocuments, applyAutoFixes, getOcrHealth } from '../controllers/concuerdo-controller.js'
+import { adminRateLimit } from '../middleware/rate-limiter.js'
+import { uploadPdf, extractData, previewConcuerdo, generateDocuments, applyAutoFixes, getOcrHealth, testPython, getExtractionDebugConfig, testGemini, processConcuerdos, getMetrics } from '../controllers/concuerdo-controller.js'
 
 const router = express.Router()
 
@@ -23,10 +24,25 @@ const upload = multer({
 router.post('/upload-pdf', authenticateToken, requireMatrizador, upload.single('pdfFile'), uploadPdf)
 
 // POST /api/concuerdos/extract-data
+// Query opcional: ?hybrid=true para usar agregador Node+Python
 router.post('/extract-data', authenticateToken, requireMatrizador, extractData)
 
 // POST /api/concuerdos/preview (opcional Sprint 1)
 router.post('/preview', authenticateToken, requireMatrizador, previewConcuerdo)
+
+// POST /api/concuerdos/process (nuevo: extracción + concuerdos integrados)
+// Rate limiting adicional para operaciones intensivas
+router.post('/process', authenticateToken, requireMatrizador, adminRateLimit, processConcuerdos)
+
+// GET /api/concuerdos/metrics (solo desarrollo)
+if (process.env.NODE_ENV !== 'production') {
+  router.get('/metrics', authenticateToken, requireMatrizador, getMetrics)
+} else {
+  // En producción, endpoint no disponible
+  router.get('/metrics', (req, res) => {
+    res.status(404).json({ success: false, message: 'Endpoint no disponible en producción' })
+  })
+}
 
 // POST /api/concuerdos/generate-documents
 router.post('/generate-documents', authenticateToken, requireMatrizador, generateDocuments)
@@ -36,6 +52,15 @@ router.post('/apply-fixes', authenticateToken, requireMatrizador, applyAutoFixes
 
 // GET /api/concuerdos/ocr-health
 router.get('/ocr-health', authenticateToken, requireMatrizador, getOcrHealth)
+
+// GET /api/concuerdos/debug-config
+router.get('/debug-config', authenticateToken, requireMatrizador, getExtractionDebugConfig)
+
+// POST /api/concuerdos/test-python (debugging explícito)
+router.post('/test-python', authenticateToken, requireMatrizador, testPython)
+
+// POST /api/concuerdos/test-gemini (debug de formato nombres separados)
+router.post('/test-gemini', authenticateToken, requireMatrizador, testGemini)
 
 // Manejo de errores de multer
 router.use((error, req, res, next) => {

@@ -1,0 +1,27 @@
+{{!--
+  Mod: Hipotecas
+  Variables esperadas del viewModel:
+  - otorgantes_render: string con lista de otorgantes formateada
+  - beneficiarios_render: string con lista de beneficiarios formateada
+  - acto: string del tipo de acto (HIPOTECA, etc.)
+  - bien: string descripción del bien hipotecado (opcional)
+
+  Fragmentos que agrega:
+  - Acreedor hipotecario
+  - Bien objeto de hipoteca
+  - Referencia a gravamen constituido
+--}}
+
+{{!-- Bloque específico para hipotecas --}}
+{{#if beneficiarios_render}}
+**DEUDOR{{#if (gt otorgantes.length 1)}}ES{{/if}}:** {{otorgantes_render}}
+
+**ACREEDOR{{#if (gt beneficiarios.length 1)}}ES{{/if}}:** {{beneficiarios_render}}
+
+{{#if bien}}
+**BIEN HIPOTECADO:** {{bien}}
+{{/if}}
+
+**GRAVAMEN:** Hipoteca constituida conforme a {{acto}}.
+
+{{/if}}

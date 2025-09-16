@@ -1,9 +1,16 @@
 import PdfExtractorService from '../services/pdf-extractor-service.js'
+import PythonPdfClient from '../services/python-pdf-client.js'
 import UniversalPdfParser from '../services/universal-pdf-parser.js'
+import ExtractionAggregator from '../services/extraction-aggregator.js'
 import { ExtractoTemplateEngine } from '../services/extractos/index.js'
 import { buildActPhrase } from '../services/extractos/phrase-builder.js'
 import DataQualityValidator from '../services/data-quality-validator.js'
+import { getConfig as _getConfig } from '../config/environment.js'
 import ocrService from '../services/ocr-service.js'
+import { getConfig } from '../config/environment.js'
+import { extractDataWithGemini, processDocumentWithConcuerdos } from '../services/gemini-service.js'
+import { generarConcuerdos, metrics } from '../services/concuerdo-service.js'
+import { getConfig } from '../config/environment.js'
 
 /**
  * Controlador de Generador de Concuerdos (Sprint 1)
@@ -88,6 +95,8 @@ async function uploadPdf(req, res) {
  */
 async function extractData(req, res) {
   try {
+    const tStart = Date.now()
+    console.log('🚀 INICIANDO EXTRACCIÓN PDF - Concuerdo Controller')
     const { text, buffer } = req.body || {}
     if (!text || typeof text !== 'string' || text.trim().length < 5) {
       return res.status(400).json({ success: false, message: 'Texto del PDF inválido o vacío' })
@@ -103,31 +112,294 @@ async function extractData(req, res) {
       }
     }
 
+    const filename = req.body?.filename || 'upload.pdf'
+    const fileSizeKb = pdfBuffer ? Math.round(pdfBuffer.length / 1024) : 'N/A'
+    console.log(`📄 Archivo: ${filename}, Tamaño: ${fileSizeKb}KB`)
+
     // Debug: mostrar preview del texto extraído
     console.log('📝 Preview texto extraído (primeros 500 chars):', text.substring(0, 500).replace(/\n/g, '\\n'))
+    const tAfterPrep = Date.now()
+    const tiempoPrep = tAfterPrep - tStart
+
+    // Decisión de procesamiento
+    const config = getConfig()
+    // Logs de diagnóstico inmediatos de configuración y conectividad Python
+    // Logs de configuración globales (Gemini / Python / Node.js)
+    const debugExtraction = String(process.env.DEBUG_EXTRACTION_METHOD || '').toLowerCase() === 'true'
+    const geminiEnabled = String(process.env.GEMINI_ENABLED || '').toLowerCase() === 'true'
+    const useGeminiFirst = geminiEnabled || String(process.env.CONCUERDOS_USE_GEMINI_FIRST || '').toLowerCase() === 'true' || String(process.env.GEMINI_PRIORITY || '').toLowerCase() === 'high'
+    const forcePythonFlag = String(process.env.FORCE_PYTHON_EXTRACTOR || '').toLowerCase()
+    const pythonGloballyEnabled = String(process.env.PDF_EXTRACTOR_ENABLED || 'true').toLowerCase() !== 'false'
+    console.log('🎯 CONFIGURACIÓN DE EXTRACCIÓN:', {
+      gemini_enabled: geminiEnabled,
+      gemini_model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
+      use_gemini_first: useGeminiFirst,
+      python_url: process.env.PDF_EXTRACTOR_BASE_URL ? 'CONFIGURADO' : 'NO',
+      python_token: process.env.PDF_EXTRACTOR_TOKEN ? 'CONFIGURADO' : 'NO',
+      python_enabled_flag: pythonGloballyEnabled,
+      force_python_flag: forcePythonFlag || 'no',
+    })
+
+    console.log('🔍 DIAGNÓSTICO CONFIGURACIÓN PYTHON:')
+    console.log(`- PDF_EXTRACTOR_BASE_URL: ${process.env.PDF_EXTRACTOR_BASE_URL || 'NO CONFIGURADA'}`)
+    console.log(`- PDF_EXTRACTOR_TOKEN: ${process.env.PDF_EXTRACTOR_TOKEN ? 'CONFIGURADO' : 'NO CONFIGURADO'}`)
+    try {
+      console.log(`- Config objeto: ${JSON.stringify(config.pdfExtractor, null, 2)}`)
+    } catch {}
+
+    console.log('🔗 PROBANDO CONECTIVIDAD PYTHON:')
+    try {
+      const client = new PythonPdfClient()
+      const health = await client.healthCheck()
+      console.log(`- Health check response: ${health.status}`)
+      console.log(`- Python service disponible: ${health.ok ? 'SÍ' : 'NO'}`)
+    } catch (error) {
+      console.log(`- Health check FALLÓ: ${error?.message || error}`)
+      console.log(`- Python service disponible: NO`)
+      console.log(`- RAZÓN FALLBACK: ${error?.message || error}`)
+    }
+
+    // Evaluación de condiciones para usar Python (solo logging)
+    const tieneUrl = Boolean(config?.pdfExtractor?.baseUrl)
+    const tieneToken = Boolean(config?.pdfExtractor?.token)
+    const urlValida = typeof config?.pdfExtractor?.baseUrl === 'string' && config.pdfExtractor.baseUrl.startsWith('https://')
+    const FORCE_PYTHON = process.env.FORCE_PYTHON_EXTRACTOR === 'true'
+    const FORCE_PYTHON_DISABLED = process.env.FORCE_PYTHON_EXTRACTOR === 'false'
+
+    console.log('🎯 EVALUANDO CONDICIONES PARA USAR PYTHON:')
+    console.log(`- Tiene URL: ${tieneUrl}`)
+    console.log(`- Tiene Token: ${tieneToken}`)
+    console.log(`- URL válida (https): ${urlValida}`)
+    console.log(`- PDF_EXTRACTOR_ENABLED flag: ${pythonGloballyEnabled ? 'true' : 'false'}`)
+    console.log(`- FORCE_PYTHON_EXTRACTOR: ${FORCE_PYTHON ? 'ACTIVO' : (FORCE_PYTHON_DISABLED ? 'DESACTIVADO' : 'INACTIVO')}`)
+    const deberiaUsarPython = tieneUrl && tieneToken && urlValida && pythonGloballyEnabled && !FORCE_PYTHON_DISABLED
+    console.log(`- DECISIÓN: ${(deberiaUsarPython || FORCE_PYTHON) ? 'USAR PYTHON' : 'USAR NODE.JS'}`)
+    if (!(deberiaUsarPython || FORCE_PYTHON)) {
+      console.log('❌ RAZONES PARA NO USAR PYTHON:')
+      if (!tieneUrl) console.log('  - URL no configurada')
+      if (!tieneToken) console.log('  - Token no configurado')
+      if (!urlValida) console.log('  - URL no es HTTPS válida')
+      if (!pythonGloballyEnabled) console.log('  - PDF_EXTRACTOR_ENABLED=false')
+      if (FORCE_PYTHON_DISABLED) console.log('  - FORCE_PYTHON_EXTRACTOR=false (forzado deshabilitado)')
+    }
+
+    const pythonAvailable = Boolean(config?.pdfExtractor?.baseUrl) && Boolean(config?.pdfExtractor?.token)
+    console.log('🔄 DECISIÓN DE PROCESAMIENTO:')
+    console.log(`- PDF_EXTRACTOR_BASE_URL configurado: ${config?.pdfExtractor?.baseUrl ? 'SÍ' : 'NO'}`)
+    console.log(`- PDF_EXTRACTOR_TOKEN configurado: ${config?.pdfExtractor?.token ? 'SÍ' : 'NO'}`)
     
-    // Usar el parser universal para detección automática
-    const universalParser = new UniversalPdfParser()
-    const universalResult = await universalParser.parseDocument(pdfBuffer, text)
-    
-    // Fallback al parser original si el universal falla
-    let acts = universalResult.acts || []
-    if (acts.length === 0) {
-      console.log('🔄 Fallback al parser original')
-      const fallbackResult = await PdfExtractorService.parseAdvancedData(text, pdfBuffer)
-      acts = fallbackResult.acts
+    // Intentar Gemini primero si está habilitado
+    let acts = []
+    let pythonTried = false
+    let metodoUtilizado = 'NODE.JS'
+    let tiempoPython = 0
+    let geminiSplitNames = null
+
+    if (useGeminiFirst) {
+      try {
+        const tGeminiStart = Date.now()
+        const gemini = await extractDataWithGemini(text)
+        const tiempoGemini = Date.now() - tGeminiStart
+        if (debugExtraction) {
+          console.log('🔄 INTENTANDO MÉTODO: GEMINI')
+          console.log(`⏱️  TIEMPO RESPUESTA GEMINI: ${tiempoGemini}ms`)
+        }
+        if (gemini && (gemini.acto_o_contrato || gemini.otorgantes || gemini.beneficiarios)) {
+          // Adaptar a estructura interna: en acts solo 'nombre' para evitar redundancia,
+          // y exponer apellidos/nombres separados en splitNames
+          const tipoActo = gemini.acto_o_contrato || ''
+          const mapSplit = (e) => ({
+            apellidos: String(e?.apellidos || '').trim(),
+            nombres: String(e?.nombres || '').trim(),
+            genero: e?.genero || null,
+            calidad: e?.calidad || undefined,
+            tipo_persona: e?.tipo_persona || 'Natural'
+          })
+          const toNombre = (s) => String(s || '').trim()
+          const toFullName = (e) => toNombre(`${e.apellidos || ''} ${e.nombres || ''}`)
+
+          const otorgantesSplit = Array.isArray(gemini.otorgantes) ? gemini.otorgantes.map(mapSplit) : []
+          const beneficiariosSplit = Array.isArray(gemini.beneficiarios) ? gemini.beneficiarios.map(mapSplit) : []
+          geminiSplitNames = { otorgantes: otorgantesSplit, beneficiarios: beneficiariosSplit }
+
+          acts = [{
+            tipoActo,
+            otorgantes: otorgantesSplit.map(p => ({ nombre: toFullName(p), tipo_persona: p.tipo_persona })),
+            beneficiarios: beneficiariosSplit.map(p => ({ nombre: toFullName(p), tipo_persona: p.tipo_persona }))
+          }]
+          // Reconciliar: si Gemini devolvió solo un natural como otorgante pero el texto tiene una razón social
+          try {
+            const names = PdfExtractorService.cleanPersonNames(text)
+            const isJuridicaToken = (n) => /S\.A\.|\bSA\b|LTDA|C[ÍI]A\.?|CORP\.?|FUNDACI[ÓO]N|EMPRESA|ASOCIACI[ÓO]N|COOPERATIVA|UNIVERSIDAD|MUNICIPIO|\bEP\b/i.test(String(n || ''))
+            const juridicas = Array.isArray(names) ? names.filter(isJuridicaToken) : []
+            const act0 = acts[0]
+            const hasOneNatural = Array.isArray(act0?.otorgantes) && act0.otorgantes.length === 1 && !/JUR[IÍ]DICA/i.test(String(act0.otorgantes[0]?.tipo_persona || ''))
+            if (juridicas.length > 0 && hasOneNatural) {
+              const representante = act0.otorgantes[0]?.nombre
+              const company = juridicas[0]
+              acts = [{
+                tipoActo,
+                otorgantes: [{ nombre: company, tipo_persona: 'Jurídica', representantes: representante ? [representante] : undefined }],
+                beneficiarios: act0.beneficiarios || []
+              }]
+              metodoUtilizado = 'GEMINI+RECONCILIATION'
+              console.log('🔧 RECONCILIACIÓN: Detectada razón social en texto. Ajuste aplicado:', { company, representante })
+            }
+          } catch (reconErr) {
+            console.log('⚠️ Error en reconciliación post-Gemini:', reconErr?.message || reconErr)
+          }
+          metodoUtilizado = 'GEMINI'
+          console.log(`✅ EXTRACCIÓN GEMINI EXITOSA en ${tiempoGemini}ms`)
+          if (debugExtraction) {
+            const data = acts[0] || {}
+            console.log('📊 DATOS EXTRAÍDOS (GEMINI):', {
+              acto: data.tipoActo || 'NO_ENCONTRADO',
+              otorgantes: data.otorgantes?.length || 0,
+              beneficiarios: data.beneficiarios?.length || 0
+            })
+          }
+        } else {
+          console.log('⚠️ GEMINI no retornó datos útiles. Fallback al flujo existente')
+        }
+      } catch (e) {
+        console.log('⚠️ Error ejecutando Gemini, se usa fallback:', e?.message || e)
+      }
+    }
+
+    // Intentar microservicio Python si hay buffer disponible y configuración válida
+    const shouldUsePython = (deberiaUsarPython || FORCE_PYTHON) && pdfBuffer && (!acts || acts.length === 0)
+    if (shouldUsePython) {
+      try {
+        console.log('🐍 INICIANDO EXTRACCIÓN CON MICROSERVICIO PYTHON')
+        console.log(`- URL: ${config.pdfExtractor.baseUrl}`)
+        console.log(`- Token configurado: ${config.pdfExtractor.token ? 'SÍ' : 'NO'}`)
+        
+        const py = new PythonPdfClient()
+        pythonTried = true
+
+        // Health check previo
+        console.log('🔍 VERIFICANDO SALUD ANTES DE EXTRACT...')
+        const health = await py.healthCheck()
+        if (!health.ok) {
+          console.log('⚠️ HEALTH CHECK FALLÓ - SALTANDO A FALLBACK')
+          console.log(`- Razón: Status ${health.status}`)
+        } else {
+          console.log('✅ HEALTH CHECK OK - PROCEDIENDO CON EXTRACT')
+          
+          const tPyStart = Date.now()
+          try {
+            console.log('🚀 INICIANDO EXTRACCIÓN CON PYTHON')
+            const pyResp = await py.extractFromPdf(pdfBuffer, filename, { debug: 0 })
+            tiempoPython = Date.now() - tPyStart
+            if (debugExtraction) console.log(`⏱️  TIEMPO RESPUESTA PYTHON: ${tiempoPython}ms`)
+
+            console.log('📊 RESULTADO PYTHON CLIENT:')
+            console.log(`- Success: ${pyResp?.success}`)
+            console.log(`- Source: ${pyResp?.source || 'PYTHON'}`)
+            console.log(`- Actos detectados: ${Array.isArray(pyResp?.actos) ? pyResp.actos.length : 0}`)
+
+            if (pyResp && (pyResp.success === true || pyResp.actos)) {
+              console.log('✅ USANDO DATOS DEL MICROSERVICIO PYTHON')
+              
+              const mapTipo = (t) => {
+                if (!t) return undefined
+                const up = String(t).toUpperCase()
+                return /JURIDICA|JURÍDICA/.test(up) ? 'Jurídica' : 'Natural'
+              }
+              
+              const pyActs = Array.isArray(pyResp.actos) ? pyResp.actos : []
+              acts = pyActs.map(a => ({
+                tipoActo: a?.tipo_acto || a?.tipo || '',
+                otorgantes: (a?.otorgantes || []).map(o => ({ 
+                  nombre: o?.nombre || '', 
+                  tipo_persona: mapTipo(o?.tipo) 
+                })),
+                beneficiarios: (a?.beneficiarios || []).map(b => ({ 
+                  nombre: b?.nombre || '', 
+                  tipo_persona: mapTipo(b?.tipo) 
+                }))
+              }))
+              
+              if (acts.length > 0) {
+                metodoUtilizado = 'PYTHON'
+                console.log(`✅ EXTRACCIÓN PYTHON EXITOSA: ${acts.length} actos procesados`)
+                if (debugExtraction) {
+                  const data = acts[0]
+                  console.log('📊 DATOS EXTRAÍDOS (PYTHON):', {
+                    acto: data?.tipoActo || 'NO_ENCONTRADO',
+                    otorgantes: data?.otorgantes?.length || 0,
+                    beneficiarios: data?.beneficiarios?.length || 0
+                  })
+                }
+              } else {
+                console.log('⚠️ PYTHON CLIENT RETORNÓ DATOS VACÍOS')
+                console.log('🔄 EJECUTANDO FALLBACK A MÉTODO NODE.JS')
+              }
+            } else {
+              console.log(`⚠️ PYTHON CLIENT FALLÓ - Razón: ${pyResp?.error || 'respuesta sin datos'}`)
+              console.log('🔄 EJECUTANDO FALLBACK A MÉTODO NODE.JS')
+            }
+          } catch (error) {
+            tiempoPython = Date.now() - tPyStart
+            console.log(`💥 PYTHON CLIENT EXCEPTION: ${error?.message || error}`)
+            console.log('🔄 EJECUTANDO FALLBACK A MÉTODO NODE.JS')
+          }
+        }
+      } catch (pyErr) {
+        console.error('💥 ERROR INICIALIZANDO PYTHON CLIENT:', pyErr?.message || pyErr)
+        console.log('🔄 EJECUTANDO FALLBACK A MÉTODO NODE.JS')
+      }
+    }
+
+    // Si Python no produjo actos, usar parser universal y fallbacks existentes
+    if (!acts || acts.length === 0) {
+      // Usar el parser universal para detección automática
+      if (pythonTried) {
+        console.log('📊 EJECUTANDO MÉTODO NODE.JS ANTERIOR')
+        console.log('- Razón: Fallback por fallo del microservicio Python o sin detecciones suficientes')
+      } else {
+        console.log('📊 USANDO MÉTODO NODE.JS ANTERIOR')
+        console.log('- Razón: Microservicio no disponible o sin datos útiles')
+      }
+      const universalParser = new UniversalPdfParser()
+      const universalResult = await universalParser.parseDocument(pdfBuffer, text)
+      acts = universalResult.acts || []
+      if (acts.length === 0) {
+        console.log('🔄 Fallback al parser original')
+        const fallbackResult = await PdfExtractorService.parseAdvancedData(text, pdfBuffer)
+        acts = fallbackResult.acts
+        if (debugExtraction) {
+          const data = acts?.[0] || {}
+          console.log('📊 DATOS EXTRAÍDOS (NODEJS):', {
+            acto: data?.tipoActo || 'NO_ENCONTRADO',
+            otorgantes: Array.isArray(data?.otorgantes) ? data.otorgantes.length : 0,
+            beneficiarios: Array.isArray(data?.beneficiarios) ? data.beneficiarios.length : 0
+          })
+        }
+      }
+    }
+
+    // Fallback manual: si no hay actos después de todos los intentos
+    if (!acts || acts.length === 0) {
+      console.log('⚠️ Sin actos detectados tras todos los métodos. Enviando fallback manual.')
+      res.set('Content-Type', 'application/json; charset=utf-8')
+      return res.json({ 
+        success: true, 
+        data: null,
+        message: 'Complete manualmente mientras se ajusta la extracción automática'
+      })
     }
     
     let parsed = acts[0] || { tipoActo: '', otorgantes: [], beneficiarios: [] }
     const { notarioNombre, notariaNumero, notariaNumeroDigit, notarioSuplente } = PdfExtractorService.extractNotaryInfo(text)
     
-    // Debug: mostrar datos extraídos antes de validación
+    // Debug: mostrar datos extraídos antes de validación (solo nombres completos para evitar ruido)
     console.log('🔍 Datos extraídos antes de validación:', {
       tipoActo: parsed.tipoActo,
       otorgantes: parsed.otorgantes?.length || 0,
       beneficiarios: parsed.beneficiarios?.length || 0,
-      otorgantesPreview: parsed.otorgantes?.slice(0, 2),
-      beneficiariosPreview: parsed.beneficiarios?.slice(0, 2)
+      otorgantesPreview: (parsed.otorgantes || []).slice(0, 2).map(o => o?.nombre).filter(Boolean),
+      beneficiariosPreview: (parsed.beneficiarios || []).slice(0, 2).map(b => b?.nombre).filter(Boolean)
     })
 
     // Validar calidad de los datos extraídos
@@ -163,6 +435,40 @@ async function extractData(req, res) {
       console.log(`✅ Extracción validada con calidad ${validation.overallConfidence} (${Math.round(validation.overallScore * 100)}%)`)
     }
 
+    // Modo híbrido: combinar Node + Python cuando se solicite
+    const enableHybrid = String(req.query?.hybrid || process.env.EXTRACT_HYBRID || 'false') === 'true'
+    if (enableHybrid) {
+      try {
+        const hyb = await ExtractionAggregator.hybridExtract({ pdfBuffer, rawText: text, filename })
+        if (hyb?.acts?.length) {
+          acts = hyb.acts
+          metodoUtilizado = 'HYBRID'
+          console.log(`✅ EXTRACCIÓN HÍBRIDA EXITOSA (conf=${hyb.confidence})`)
+        }
+      } catch (e) {
+        console.log('⚠️ Error en extracción híbrida:', e?.message || e)
+      }
+    }
+
+    const tEnd = Date.now()
+    const tiempoTotal = tEnd - tStart
+    const tiempoPost = Math.max(0, tiempoTotal - tiempoPrep - tiempoPython)
+
+    // Logs de comparación de resultados
+    const tipoActo = parsed.tipoActo
+    const otsNames = (parsed.otorgantes || []).map(o => o?.nombre).filter(Boolean)
+    const besNames = (parsed.beneficiarios || []).map(b => b?.nombre).filter(Boolean)
+    console.log('✅ EXTRACCIÓN COMPLETADA')
+    console.log('📊 MÉTODO UTILIZADO:', metodoUtilizado)
+    console.log('🎯 TIPO ACTO:', tipoActo)
+    console.log('👥 OTORGANTES:', otsNames.join(', '))
+    console.log('🎁 BENEFICIARIOS:', besNames.join(', '))
+    console.log('⏱️  TIEMPO TOTAL:', `${tiempoTotal}ms`)
+
+    // Headers de response para debugging
+    res.set('X-Extraction-Method', metodoUtilizado)
+    res.set('X-Processing-Time', String(tiempoTotal))
+    res.set('X-Python-Available', pythonAvailable ? 'true' : 'false')
     res.set('Content-Type', 'application/json; charset=utf-8')
     return res.json({
       success: true,
@@ -174,6 +480,7 @@ async function extractData(req, res) {
         notarioSuplente, 
         notariaNumero, 
         notariaNumeroDigit,
+        splitNames: geminiSplitNames || undefined,
         // Incluir información de validación
         validation: {
           score: validation.overallScore,
@@ -184,7 +491,14 @@ async function extractData(req, res) {
           suggestions: validation.validations.flatMap(v => v.suggestions),
           autoFixes: validation.validations.reduce((acc, v) => ({ ...acc, ...v.autoFixes }), {})
         },
-        ocr: { tried: ocrTried, enabled: allowOcr }
+        ocr: { tried: ocrTried, enabled: allowOcr },
+        performance: {
+          tiempoPrep,
+          tiempoPython,
+          tiempoPost,
+          tiempoTotal
+        },
+        method: metodoUtilizado
       }
     })
   } catch (error) {
@@ -192,6 +506,44 @@ async function extractData(req, res) {
     return res.status(500).json({ success: false, message: 'Error extrayendo datos' })
   }
 }
+
+// Helper: procesar datos crudos de Gemini al formato esperado por formulario
+function processGeminiData(geminiResult) {
+  if (!geminiResult) return null
+  console.log('🔄 PROCESANDO DATOS GEMINI...')
+
+  const safeArr = (v) => (Array.isArray(v) ? v : [])
+  const mapPersona = (p) => {
+    const apellidos = String(p?.apellidos || '').trim()
+    const nombres = String(p?.nombres || '').trim()
+    const nombre_completo = `${apellidos} ${nombres}`.trim()
+    return {
+      apellidos,
+      nombres,
+      nombre_completo,
+      genero: p?.genero || null,
+      calidad: p?.calidad || undefined,
+      tipo_persona: p?.tipo_persona || 'Natural'
+    }
+  }
+
+  const processedData = {
+    acto_o_contrato: geminiResult.acto_o_contrato || null,
+    otorgantes: safeArr(geminiResult.otorgantes).map(mapPersona),
+    beneficiarios: safeArr(geminiResult.beneficiarios).map(mapPersona),
+    notario: geminiResult.notario || '',
+    notaria: geminiResult.notaria || ''
+  }
+
+  console.log('✅ DATOS PROCESADOS:', {
+    otorgantes: processedData.otorgantes.map(o => ({ apellidos: o.apellidos, nombres: o.nombres, completo: o.nombre_completo })),
+    beneficiarios: processedData.beneficiarios.map(b => ({ apellidos: b.apellidos, nombres: b.nombres, completo: b.nombre_completo }))
+  })
+
+  return processedData
+}
+
+export { processGeminiData }
 
 /**
  * POST /api/concuerdos/preview
@@ -392,7 +744,7 @@ async function previewConcuerdo(req, res) {
         }
         const connector = phrases.slice(1).map(p => `y de ${p}`).join('; ')
         const body = phrases.length > 1 ? `${phrases[0]}; ${connector}` : phrases[0]
-        const combined = `Se otorgó ante mí, en fe de ello confiero esta **${ordinalWord(n)} COPIA CERTIFICADA** de la escritura pública de ${body}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.\n\n${footerNotario}\n${footerNotaria}\n`
+        const combined = `\n\nSe otorgó ante mí, en fe de ello confiero esta **${ordinalWord(n)} COPIA CERTIFICADA** de la escritura pública de ${body}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.\n\n${footerNotario}\n${footerNotaria}\n`
         previews.push({ index: n, title: rot, text: `${rot}:\n\n${combined}` })
       } else {
         // Modo clásico: render individual por acto y concatenado con separador
@@ -402,7 +754,10 @@ async function previewConcuerdo(req, res) {
           const { text: t } = await ExtractoTemplateEngine.render('poder-universal.txt', engineData, override)
           rendered.push(t)
         }
-        const combined = rendered.join('\n\n—\n\n')
+        // Asegurar que cada bloque individual respete el doble salto de línea antes de "Se otorgó"
+        const ensureDoubleNL = (txt) => txt.replace(/\n?\n?Se otorgó/, '\n\nSe otorgó')
+        const renderedFixed = rendered.map(ensureDoubleNL)
+        const combined = renderedFixed.join('\n\n—\n\n')
         previews.push({ index: n, title: rot, text: `${rot}:\n\n${combined}` })
       }
     }
@@ -523,6 +878,65 @@ async function applyAutoFixes(req, res) {
 }
 
 export { uploadPdf, extractData, previewConcuerdo, applyAutoFixes }
+
+/**
+ * GET /api/concuerdos/debug-config
+ * Devuelve configuración y prioridades de métodos de extracción
+ */
+async function getExtractionDebugConfig(req, res) {
+  try {
+    const cfg = getConfig()
+    const issues = []
+    const geminiEnabled = String(process.env.GEMINI_ENABLED || '').toLowerCase() === 'true'
+    const googleKey = Boolean(process.env.GOOGLE_API_KEY)
+    const pythonEnabled = Boolean(process.env.PDF_EXTRACTOR_BASE_URL)
+    const forcePythonDisabled = String(process.env.FORCE_PYTHON_EXTRACTOR || '').toLowerCase() === 'false'
+    const pythonGloballyEnabled = String(process.env.PDF_EXTRACTOR_ENABLED || 'true').toLowerCase() !== 'false'
+
+    if (!process.env.GEMINI_ENABLED) issues.push('GEMINI_ENABLED no configurado')
+    if (!googleKey) issues.push('GOOGLE_API_KEY faltante')
+    if (pythonEnabled && !forcePythonDisabled) issues.push('Python aún habilitado - puede interferir con Gemini')
+    if (!pythonGloballyEnabled) issues.push('PDF_EXTRACTOR_ENABLED=false (Python deshabilitado globalmente)')
+
+    return res.json({
+      extraction_methods: {
+        gemini: {
+          enabled: geminiEnabled,
+          api_key_configured: googleKey,
+          model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',
+        },
+        python: {
+          enabled: Boolean(cfg?.pdfExtractor?.baseUrl),
+          url: cfg?.pdfExtractor?.baseUrl || null,
+          force_disabled: forcePythonDisabled,
+          token_configured: Boolean(cfg?.pdfExtractor?.token),
+          globally_enabled: pythonGloballyEnabled,
+        },
+        nodejs: {
+          enabled: true,
+          fallback: true,
+        },
+      },
+      priority_order: [
+        'GEMINI (primary)',
+        'PYTHON (fallback)',
+        'NODEJS (last resort)'
+      ],
+      current_config_issues: issues,
+      flags: {
+        GEMINI_PRIORITY: process.env.GEMINI_PRIORITY || null,
+        CONCUERDOS_USE_GEMINI_FIRST: process.env.CONCUERDOS_USE_GEMINI_FIRST || null,
+        FORCE_PYTHON_EXTRACTOR: process.env.FORCE_PYTHON_EXTRACTOR || null,
+        PDF_EXTRACTOR_ENABLED: process.env.PDF_EXTRACTOR_ENABLED || null,
+        DEBUG_EXTRACTION_METHOD: process.env.DEBUG_EXTRACTION_METHOD || null,
+      }
+    })
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Error obteniendo debug de configuración', details: error?.message })
+  }
+}
+
+export { getExtractionDebugConfig }
 /**
  * Generar múltiples documentos (copias) numerados
  * POST /api/concuerdos/generate-documents
@@ -719,7 +1133,7 @@ async function generateDocuments(req, res) {
           }
           const connector = phrases.slice(1).map(p => `y de ${p}`).join('; ')
           const body = phrases.length > 1 ? `${phrases[0]}; ${connector}` : phrases[0]
-          combined = `\n\n  Se otorgó ante mí, en fe de ello confiero esta **${rotuloPalabra} COPIA CERTIFICADA** de la escritura pública de ${body}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.\n\n\n\n                    ${footerNotario}\n                    ${footerNotaria}\n`
+          combined = `\n\nSe otorgó ante mí, en fe de ello confiero esta **${rotuloPalabra} COPIA CERTIFICADA** de la escritura pública de ${body}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.\n\n${footerNotario}\n${footerNotaria}\n`
         } else {
           console.log('📋 [concuerdos] Modo clásico: render individual por acto')
           // Render clásico por acto y concatenado con separador
@@ -731,7 +1145,7 @@ async function generateDocuments(req, res) {
             console.log(`✅ [concuerdos] Texto generado (primeros 200 chars):`, text?.substring(0, 200) + '...')
             rendered.push(text)
           }
-          combined = '  ' + rendered.join('\n\n—\n\n')
+          combined = rendered.join('\n\n—\n\n')
         }
         console.log(`✅ [concuerdos] Documento ${n} generado exitosamente (${combined?.length || 0} caracteres)`)
       } catch (templateError) {
@@ -754,10 +1168,21 @@ async function generateDocuments(req, res) {
 
         const bolded = esc(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
 
-        // Detectar y centrar líneas del pie de firma (muchos espacios al inicio, texto en mayúsculas)
-        const withCenteredSignature = bolded.replace(
+        // Detectar y centrar líneas del pie de firma
+        // 1) Mantener compatibilidad con firmas con muchos espacios iniciales
+        let withCenteredSignature = bolded.replace(
           /^(\s{15,})([A-ZÁÉÍÓÚÑ\s\.]+)$/gm,
           '<div style="text-align:center; font-weight:700; white-space:nowrap;">$2</div>'
+        )
+        // 2) Centrar líneas que contengan NOTARIA (aunque no tengan espacios)
+        withCenteredSignature = withCenteredSignature.replace(
+          /^\s*(<strong>)?([A-ZÁÉÍÓÚÑ\s\.,\-]*NOTAR[ÍI]A[ A-ZÁÉÍÓÚÑ\s\.,\-]*)(<\/strong>)?\s*$/gm,
+          '<div style="text-align:center; font-weight:700; white-space:nowrap;">$1$2$3</div>'
+        )
+        // 3) Centrar línea anterior si está justo antes de NOTARIA (nombre del notario)
+        withCenteredSignature = withCenteredSignature.replace(
+          /(^(?:<strong>)?[A-ZÁÉÍÓÚÑ\s\.,\-]{6,}(?:<\/strong>)?\s*$)\n(?=\s*(?:<strong>)?[A-ZÁÉÍÓÚÑ\s\.,\-]*NOTAR[ÍI]A)/gm,
+          '<div style="text-align:center; font-weight:700; white-space:nowrap;">$1</div>\n'
         )
 
         return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"/><title>Concuerdo</title>
@@ -788,10 +1213,13 @@ async function generateDocuments(req, res) {
 
         // Luego, formatear líneas individuales; detectar pie de firma
         const lines = merged.split(/\r?\n/)
-        const formatted = lines.map((line) => {
-          if (/^\s{10,}[A-ZÁÉÍÓÚÑ\s\.]+$/.test(line)) {
-            const content = line.trim()
-            return `\\qc\\b ${content} \\b0`
+        const formatted = lines.map((line, idx) => {
+          const trimmed = line.trim()
+          const isFooter = /^([A-ZÁÉÍÓÚÑ\s\.,\-]*NOTAR[ÍI]A[ A-ZÁÉÍÓÚÑ\s\.,\-]*)$/.test(trimmed)
+            || (/^[A-ZÁÉÍÓÚÑ\s\.,\-]{6,}$/.test(trimmed) && idx + 1 < lines.length && /NOTAR[ÍI]A/.test(lines[idx + 1]))
+            || /^\s{10,}[A-ZÁÉÍÓÚÑ\s\.]+$/.test(line)
+          if (isFooter) {
+            return `\\qc\\b ${trimmed} \\b0`
           }
           return `\\qj\\sl420\\slmult1 ${line}`
         })
@@ -845,10 +1273,18 @@ async function generateDocuments(req, res) {
         const section = (title, text, first) => {
           const bolded = esc(text).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
           
-          // Detectar y centrar líneas de firma
-          const withCenteredSignature = bolded.replace(
+          // Detectar y centrar líneas de firma (mismas reglas que toHtml)
+          let withCenteredSignature = bolded.replace(
             /^(\s{15,})([A-ZÁÉÍÓÚÑ\s\.]+)$/gm,
             '<div style="text-align:center; font-weight:700; white-space:nowrap;">$2</div>'
+          )
+          withCenteredSignature = withCenteredSignature.replace(
+            /^\s*(<strong>)?([A-ZÁÉÍÓÚÑ\s\.,\-]*NOTAR[ÍI]A[ A-ZÁÉÍÓÚÑ\s\.,\-]*)(<\/strong>)?\s*$/gm,
+            '<div style="text-align:center; font-weight:700; white-space:nowrap;">$1$2$3</div>'
+          )
+          withCenteredSignature = withCenteredSignature.replace(
+            /(^(?:<strong>)?[A-ZÁÉÍÓÚÑ\s\.,\-]{6,}(?:<\/strong>)?\s*$)\n(?=\s*(?:<strong>)?[A-ZÁÉÍÓÚÑ\s\.,\-]*NOTAR[ÍI]A)/gm,
+            '<div style="text-align:center; font-weight:700; white-space:nowrap;">$1</div>\n'
           )
           
           const pb = first ? '' : 'page-break-before: always;'
@@ -961,3 +1397,175 @@ async function getOcrHealth(req, res) {
 }
 
 export { getOcrHealth }
+
+/**
+ * POST /api/concuerdos/test-python
+ * Endpoint explícito de debugging de conexión al microservicio Python
+ */
+async function testPython(req, res) {
+  console.log('🧪 TEST EXPLÍCITO CONEXIÓN PYTHON')
+  const config = getConfig()
+  try {
+    const client = new PythonPdfClient()
+
+    // Test 1: Health check
+    const health = await client.healthCheck()
+    console.log(`1. Health check status: ${health.status}`)
+    console.log(`   ok: ${health.ok}`)
+
+    // Test 2: Extract con PDF dummy
+    console.log('2. Test extract endpoint con dummy PDF')
+    let extractStatus = null
+    let extractPreview = ''
+    try {
+      const dummy = Buffer.from('%PDF-1.4\n% Notaria Segura connectivity test\n', 'utf8')
+      const resp = await client.extractFromPdf(dummy, 'test.pdf', { debug: 1, timeout: 10000 })
+      extractStatus = 200
+      extractPreview = JSON.stringify(resp).substring(0, 200)
+    } catch (e) {
+      extractStatus = e?.status || 500
+      const body = e?.response ? (typeof e.response === 'string' ? e.response : JSON.stringify(e.response)) : e?.message
+      extractPreview = String(body || '').substring(0, 200)
+      console.log(`   Extract error status: ${extractStatus}`)
+    }
+
+    return res.json({
+      success: true,
+      health: health.status,
+      extract: extractStatus,
+      message: health.ok ? 'Conexión Python funcionando (health ok)' : 'Health check falló',
+      details: {
+        baseUrl: config?.pdfExtractor?.baseUrl || null,
+        token: config?.pdfExtractor?.token ? 'SET' : 'NOT SET',
+        extractPreview
+      }
+    })
+  } catch (error) {
+    console.log(`❌ ERROR TEST PYTHON: ${error?.message || error}`)
+    console.log(`   Stack: ${error?.stack || 'n/a'}`)
+    return res.json({ success: false, error: error?.message || String(error), message: 'Conexión Python FALLÓ' })
+  }
+}
+
+export { testPython }
+
+/**
+ * POST /api/concuerdos/test-gemini
+ * Permite probar la extracción con Gemini y validar formato de nombres separados
+ */
+async function testGemini(req, res) {
+  try {
+    const { text } = req.body || {}
+    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+      return res.status(400).json({ success: false, error: 'Texto requerido' })
+    }
+
+    console.log('🧪 PROBANDO EXTRACCIÓN GEMINI...')
+    const result = await extractDataWithGemini(text)
+    if (!result) {
+      return res.json({ success: false, error: 'Gemini no pudo extraer datos' })
+    }
+
+    const processed = processGeminiData(result)
+    const validation = {
+      has_apellidos: processed.otorgantes.every(o => (o.apellidos || '').length > 0),
+      has_nombres: processed.otorgantes.every(o => (o.nombres || '').length > 0),
+      format_correct: true
+    }
+
+    return res.json({ success: true, raw_gemini: result, processed_data: processed, validation })
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error?.message || String(error) })
+  }
+}
+
+export { testGemini }
+
+/**
+ * POST /api/concuerdos/process
+ * Endpoint integrado: extrae datos del PDF y genera concuerdos completos
+ */
+async function processConcuerdos(req, res) {
+  try {
+    const { text } = req.body || {}
+    if (!text || typeof text !== 'string' || text.trim().length < 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'Texto del documento inválido o vacío'
+      })
+    }
+
+    console.log('🚀 INICIANDO PROCESAMIENTO INTEGRADO DE CONCUERDOS')
+
+    // Procesar documento completo con extracción + concuerdos
+    const result = await processDocumentWithConcuerdos(text, {
+      userId: req.user?.id,
+      docId: `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    })
+
+    if (!result.success) {
+      return res.status(400).json({
+        success: false,
+        message: result.error || 'Error procesando documento'
+      })
+    }
+
+    console.log('✅ PROCESAMIENTO COMPLETADO EXITOSAMENTE')
+    console.log(`📊 Estructura detectada: ${result.concuerdos?.estructura || 'N/A'}`)
+    console.log(`📝 Primera copia: ${result.concuerdos?.primera?.length || 0} caracteres`)
+    console.log(`📝 Segunda copia: ${result.concuerdos?.segunda?.length || 0} caracteres`)
+
+    res.set('Content-Type', 'application/json; charset=utf-8')
+    return res.json({
+      success: true,
+      message: 'Documento procesado y concuerdos generados exitosamente',
+      data: result
+    })
+
+  } catch (error) {
+    console.error('💥 Error en processConcuerdos:', error?.stack || error)
+    return res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      details: process.env.NODE_ENV !== 'production' ? (error?.message || String(error)) : undefined
+    })
+  }
+}
+
+export { processConcuerdos }
+
+/**
+ * GET /api/concuerdos/metrics
+ * Devuelve métricas de observabilidad (solo en desarrollo)
+ */
+async function getMetrics(req, res) {
+  try {
+    // Solo permitir en desarrollo
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(403).json({
+        success: false,
+        message: 'Endpoint no disponible en producción'
+      });
+    }
+
+    res.set('Content-Type', 'application/json; charset=utf-8');
+    return res.json({
+      success: true,
+      message: 'Métricas de concuerdos',
+      data: {
+        ...metrics,
+        uptime: process.uptime(),
+        memory: process.memoryUsage()
+      }
+    });
+
+  } catch (error) {
+    console.error('Error obteniendo métricas:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+}
+
+export { getMetrics }

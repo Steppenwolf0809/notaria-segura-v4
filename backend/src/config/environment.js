@@ -91,6 +91,63 @@ const environmentSchema = z.object({
     .string()
     .url('BASE_URL debe ser una URL válida')
     .optional()
+,
+
+  // Integración Microservicio Python PDF Extractor (opcionales)
+  PDF_EXTRACTOR_BASE_URL: z
+    .string()
+    .url('PDF_EXTRACTOR_BASE_URL debe ser una URL válida')
+    .optional(),
+  PDF_EXTRACTOR_TOKEN: z
+    .string()
+    .optional(),
+  PDF_EXTRACTOR_TIMEOUT: z
+    .string()
+    .optional()
+    .default('30000')
+,
+
+  // Flags Concuerdos / LLM (opcionales con defaults)
+  // LLM_ROUTER_ENABLED: habilita un router que decide estrategias LLM/Node
+  LLM_ROUTER_ENABLED: z
+    .enum(['true', 'false'])
+    .optional()
+    .default('false')
+    .transform(val => val === 'true'),
+
+  // LLM_STRATEGY: selecciona la estrategia de extracción
+  //  - "hibrido" | "solo_gemini" | "solo_node"
+  LLM_STRATEGY: z
+    .enum(['hibrido', 'solo_gemini', 'solo_node'])
+    .optional()
+    .default('hibrido'),
+
+  // PROMPT_FORCE_TEMPLATE: fuerza el template estructural base
+  //  - "auto" | "A" | "B" | "C"
+  PROMPT_FORCE_TEMPLATE: z
+    .enum(['auto', 'A', 'B', 'C'])
+    .optional()
+    .default('auto'),
+
+  // STRUCTURE_ROUTER_ENABLED: activa el enrutador de estructura (A/B/C)
+  STRUCTURE_ROUTER_ENABLED: z
+    .enum(['true', 'false'])
+    .optional()
+    .default('true')
+    .transform(val => val === 'true'),
+
+  // TEMPLATE_MODE: modo de plantillas (structural/family)
+  TEMPLATE_MODE: z
+    .enum(['structural', 'family'])
+    .optional()
+    .default('structural'),
+
+  // GEMINI_JSON_MODE: obliga a respuesta JSON strict en Gemini
+  GEMINI_JSON_MODE: z
+    .enum(['true', 'false'])
+    .optional()
+    .default('true')
+    .transform(val => val === 'true')
 });
 
 /**
@@ -100,14 +157,39 @@ const environmentSchema = z.object({
 function validateEnvironment() {
   try {
     console.log('🔍 Validando variables de entorno...');
+    // Logs de variables crudas para PDF Extractor
+    console.log('⚙️ CARGANDO CONFIGURACIÓN PDF EXTRACTOR:');
+    console.log(`- NODE_ENV: ${process.env.NODE_ENV}`);
+    console.log(`- PDF_EXTRACTOR_BASE_URL raw: '${process.env.PDF_EXTRACTOR_BASE_URL}'`);
+    console.log(`- PDF_EXTRACTOR_TOKEN raw: '${process.env.PDF_EXTRACTOR_TOKEN ? 'SET' : 'NOT SET'}'`);
     
     const result = environmentSchema.safeParse(process.env);
     
     if (!result.success) {
       console.error('❌ Error en validación de variables de entorno:');
-      result.error.errors.forEach(error => {
-        console.error(`   • ${error.path.join('.')}: ${error.message}`);
-      });
+
+      // Debug defensivo para evitar crash si la estructura del error cambia
+      const zodError = result.error;
+      const issues = zodError && Array.isArray(zodError.issues) ? zodError.issues : [];
+
+      console.log('🔍 Debugging Zod error before iteración:');
+      console.log('   • Tipo de error:', zodError ? zodError.name || typeof zodError : 'undefined');
+      console.log('   • issues es array:', Array.isArray(issues));
+      console.log('   • issues length:', Array.isArray(issues) ? issues.length : 'N/A');
+
+      if (issues.length > 0) {
+        issues.forEach(issue => {
+          const path = Array.isArray(issue.path) ? issue.path.join('.') : '(sin ruta)';
+          console.error(`   • ${path}: ${issue.message}`);
+        });
+      } else {
+        // Fallback: loguear el error completo serializado
+        try {
+          console.error('   • Detalle del error:', JSON.stringify(zodError, Object.getOwnPropertyNames(zodError), 2));
+        } catch {
+          console.error('   • Detalle del error no serializable');
+        }
+      }
       
       // En producción, fallar inmediatamente
       if (process.env.NODE_ENV === 'production') {
@@ -158,10 +240,55 @@ function getConfig() {
       JWT_SECRET: process.env.JWT_SECRET || '',
       WHATSAPP_ENABLED: false,
       // Otros valores por defecto...
+      pdfExtractor: {
+        baseUrl: process.env.PDF_EXTRACTOR_BASE_URL || 'http://localhost:8001',
+        token: process.env.PDF_EXTRACTOR_TOKEN || '',
+        timeout: parseInt(process.env.PDF_EXTRACTOR_TIMEOUT || '30000', 10)
+      },
+      concuerdos: {
+        // Defaults seguros para flags nuevos
+        llmRouterEnabled: String(process.env.LLM_ROUTER_ENABLED || 'false') === 'true',
+        llmStrategy: ['hibrido', 'solo_gemini', 'solo_node'].includes(String(process.env.LLM_STRATEGY))
+          ? String(process.env.LLM_STRATEGY)
+          : 'hibrido',
+        promptForceTemplate: ['auto', 'A', 'B', 'C'].includes(String(process.env.PROMPT_FORCE_TEMPLATE))
+          ? String(process.env.PROMPT_FORCE_TEMPLATE)
+          : 'auto',
+        structureRouterEnabled: String(process.env.STRUCTURE_ROUTER_ENABLED || 'true') === 'true',
+        templateMode: ['structural', 'family'].includes(String(process.env.TEMPLATE_MODE))
+          ? String(process.env.TEMPLATE_MODE)
+          : 'structural',
+        geminiJsonMode: String(process.env.GEMINI_JSON_MODE || 'true') === 'true'
+      }
     };
   }
   
-  return validatedEnv;
+  // Construir configuración extendida
+  const cfg = {
+    ...validatedEnv,
+    pdfExtractor: {
+      baseUrl: validatedEnv.PDF_EXTRACTOR_BASE_URL || 'http://localhost:8001',
+      token: validatedEnv.PDF_EXTRACTOR_TOKEN || '',
+      timeout: parseInt(validatedEnv.PDF_EXTRACTOR_TIMEOUT || '30000', 10)
+    },
+    concuerdos: {
+      // Flags agrupados para el sistema de concuerdos
+      llmRouterEnabled: validatedEnv.LLM_ROUTER_ENABLED,
+      llmStrategy: validatedEnv.LLM_STRATEGY,
+      promptForceTemplate: validatedEnv.PROMPT_FORCE_TEMPLATE,
+      structureRouterEnabled: validatedEnv.STRUCTURE_ROUTER_ENABLED,
+      templateMode: validatedEnv.TEMPLATE_MODE,
+      geminiJsonMode: validatedEnv.GEMINI_JSON_MODE
+    }
+  };
+  
+  try {
+    console.log('⚙️ CONFIGURACIÓN PROCESADA:');
+    console.log(`- baseUrl final: '${cfg.pdfExtractor.baseUrl}'`);
+    console.log(`- token final: '${cfg.pdfExtractor.token ? 'SET' : 'NOT SET'}'`);
+  } catch {}
+
+  return cfg;
 }
 
 /**
@@ -194,6 +321,11 @@ function debugConfiguration(config) {
     console.log('   JWT_SECRET:', config.JWT_SECRET ? '[CONFIGURADO]' : '[FALTANTE]');
     console.log('   WHATSAPP_ENABLED:', config.WHATSAPP_ENABLED);
     console.log('   FRONTEND_URL:', config.FRONTEND_URL || '[NO CONFIGURADA]');
+    if (config.pdfExtractor) {
+      console.log('   PDF_EXTRACTOR_BASE_URL:', config.pdfExtractor.baseUrl || '[NO CONFIGURADA]');
+      console.log('   PDF_EXTRACTOR_TIMEOUT:', config.pdfExtractor.timeout);
+      console.log('   PDF_EXTRACTOR_TOKEN:', config.pdfExtractor.token ? '[CONFIGURADO]' : '[FALTANTE]');
+    }
   }
 }
 

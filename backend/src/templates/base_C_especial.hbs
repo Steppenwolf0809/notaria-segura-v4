@@ -1,0 +1,30 @@
+{{!-- Template Base C: Especial --}}
+{{!--
+  Propósito:
+  - Estructura para casos mixtos, múltiples actos, representantes complejos
+    o reglas específicas de negocio que requieran tratamiento particular.
+  - Usado por el router de estructura cuando `tipo === 'C'`.
+
+  Variables esperadas (flexibles):
+  - acto?: string
+  - actos?: Array<{ tipo, otorgantes, beneficiarios }>
+  - otorgantes?: Array<{ nombre, tipo_persona, representantes? }>
+  - beneficiarios?: Array<{ nombre, tipo_persona }>
+  - notarioNombre: string
+  - notariaNumero: string|number
+  - numeroCopia?: string
+
+  Notas:
+  - Esqueleto T1. El contenido final dependerá de reglas y mods.
+--}}
+
+{{#if numeroCopia}}
+{{numeroCopia}} COPIA
+{{/if}}
+
+{{!-- Cuerpo base (placeholder) --}}
+
+{{notarioNombre}}
+NOTARÍA {{notariaNumero}}
+
+
