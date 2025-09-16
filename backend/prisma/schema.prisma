@@ -4,37 +4,15 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
-// Enumeración de roles de usuario
-enum UserRole {
-  ADMIN        // Control total del sistema
-  CAJA         // Gestión financiera y documentos
-  MATRIZADOR   // Creación y gestión de documentos
-  RECEPCION    // Entrega de documentos
-  ARCHIVO      // Gestión de archivo y documentos históricos
-}
+// Enumeración de roles de usuario (SQLite compatible)
 
-// Enumeración de tipos de documento
-enum DocumentType {
-  PROTOCOLO
-  DILIGENCIA
-  CERTIFICACION
-  ARRENDAMIENTO
-  OTROS
-}
+// Enumeración de tipos de documento (SQLite compatible)
 
-// Enumeración de estados de documento
-enum DocumentStatus {
-  PENDIENTE
-  EN_PROCESO
-  LISTO
-  ENTREGADO
-  AGRUPADO
-  ANULADO_NOTA_CREDITO
-}
+// Enumeración de estados de documento (SQLite compatible)
 
 // Modelo principal de usuarios
 model User {
@@ -43,7 +21,7 @@ model User {
   password    String
   firstName   String
   lastName    String
-  role        UserRole
+  role        String
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -74,8 +52,8 @@ model Document {
   detalle_documento       String?                  // Descripción específica del trámite
   comentarios_recepcion   String?                  // Notas especiales para recepción
   
-  documentType            DocumentType             // Tipo de documento detectado
-  status                  DocumentStatus @default(PENDIENTE)
+  documentType            String             // Tipo de documento detectado
+  status                  String @default("PENDIENTE")
   verificationCode        String?                  // Código de 4 dígitos para entrega
   
   // Relaciones
@@ -89,7 +67,7 @@ model Document {
   actoPrincipalValor       Float                   // Valor del acto principal
   totalFactura             Float                   // Total de la factura XML
   matrizadorName           String                  // Nombre del matrizador del XML
-  itemsSecundarios         Json?                   // Array de items ignorados para auditoría
+  itemsSecundarios         String?                   // Array de items ignorados para auditoría (JSON string)
   xmlOriginal              String?                 // XML completo opcional
 
   // Agrupación de documentos
@@ -127,7 +105,7 @@ model Document {
 
   // Nota de crédito (anulación)
   notaCreditoMotivo       String?          // Motivo obligatorio al aplicar nota de crédito
-  notaCreditoEstadoPrevio DocumentStatus?  // Estado previo para permitir reversión
+  notaCreditoEstadoPrevio String?  // Estado previo para permitir reversión
   notaCreditoFecha        DateTime?        // Fecha en que se aplicó la nota de crédito
 
   documentGroup         DocumentGroup? @relation(fields: [documentGroupId], references: [id])
@@ -163,7 +141,7 @@ model DocumentGroup {
   clientEmail         String?
   
   // Estados del grupo
-  status              GroupStatus @default(IN_PROCESS) // IN_PROCESS, READY, DELIVERED
+  status              String @default("IN_PROCESS") // IN_PROCESS, READY, DELIVERED
   documentsCount      Int
   
   // Control de notificaciones
@@ -180,20 +158,16 @@ model DocumentGroup {
   notifications      WhatsAppNotification[]
 }
 
-enum GroupStatus {
-  IN_PROCESS
-  READY  
-  DELIVERED
-}
+// enum GroupStatus (SQLite compatible)
 
 // MODELO DE AUDITORÍA - Registro de eventos de documentos
 model DocumentEvent {
   id              String    @id @default(uuid())
   documentId      String                          // FK al documento
   userId          Int                             // FK al usuario que realizó la acción
-  eventType       EventType                      // Tipo de evento
+  eventType       String                      // Tipo de evento
   description     String                         // Descripción del evento
-  details         Json?                          // Detalles adicionales del evento (campo anterior, nuevo valor, etc.)
+  details         String?                          // Detalles adicionales del evento (JSON string)
   // Detalles enriquecidos de entrega (compatibles hacia atrás)
   personaRetiro        String?    // Nombre completo de quien retira
   cedulaRetiro         String?    // Cédula/identificación de quien retira
@@ -213,21 +187,7 @@ model DocumentEvent {
   @@index([userId])
 }
 
-// Tipos de eventos para auditoría
-enum EventType {
-  DOCUMENT_CREATED      // Documento creado desde XML
-  DOCUMENT_ASSIGNED     // Documento asignado a matrizador
-  STATUS_CHANGED        // Estado del documento cambiado
-  STATUS_UNDO           // Cambio deshecho por error humano/sistema
-  INFO_EDITED          // Información del documento editada (NUEVA FUNCIONALIDAD)
-  GROUP_CREATED        // Documento agrupado
-  GROUP_DELIVERED      // Grupo de documentos entregado
-  VERIFICATION_GENERATED // Código de verificación generado
-  WHATSAPP_SENT        // Notificación WhatsApp enviada
-  DOCUMENT_UNGROUPED   // Documento desagrupado
-  CREDIT_NOTE_APPLIED   // Nota de crédito aplicada (anulación)
-  CREDIT_NOTE_REVERTED  // Reversión de nota de crédito
-}
+// Tipos de eventos para auditoría (SQLite compatible)
 
 // Modelo para historial de notificaciones WhatsApp
 model WhatsAppNotification {
@@ -236,9 +196,9 @@ model WhatsAppNotification {
   groupId       String?                                 // FK al grupo (opcional)
   clientName    String                                  // Nombre del cliente
   clientPhone   String                                  // Número de teléfono
-  messageType   NotificationType                       // Tipo de notificación
+  messageType   String                       // Tipo de notificación
   messageBody   String                                  // Contenido del mensaje
-  status        NotificationStatus  @default(PENDING)  // Estado de la notificación
+  status        String  @default("PENDING")  // Estado de la notificación
   messageId     String?                                 // ID del mensaje de Twilio (si se envió)
   errorMessage  String?                                 // Error si falló
   sentAt        DateTime?                               // Fecha de envío exitoso
@@ -256,26 +216,13 @@ model WhatsAppNotification {
   @@index([createdAt])
 }
 
-// Tipos de notificación
-enum NotificationType {
-  DOCUMENT_READY       // Documento individual listo
-  GROUP_READY         // Grupo de documentos listo
-  DOCUMENT_DELIVERED  // Documento entregado
-  REMINDER           // Recordatorio
-}
-
-// Estados de notificación
-enum NotificationStatus {
-  PENDING    // Pendiente de envío
-  SENT       // Enviado exitosamente
-  FAILED     // Falló el envío
-  SIMULATED  // Simulado (desarrollo)
-}
+// Tipos de notificación (SQLite compatible)
+// Estados de notificación (SQLite compatible)
 
 // Modelo para templates WhatsApp personalizables por admin
 model WhatsAppTemplate {
   id        String              @id @default(uuid())
-  tipo      TemplateType        // Tipo de template
+  tipo      String        // Tipo de template
   titulo    String              // Título descriptivo para el admin
   mensaje   String              // Contenido del mensaje con variables {cliente}, {documento}, etc.
   activo    Boolean             @default(true)
@@ -285,11 +232,7 @@ model WhatsAppTemplate {
   @@map("whatsapp_templates")
 }
 
-// Tipos de templates disponibles
-enum TemplateType {
-  DOCUMENTO_LISTO     // Notificación cuando documento está listo
-  DOCUMENTO_ENTREGADO // Confirmación de entrega
-}
+// Tipos de templates disponibles (SQLite compatible)
 
 // Modelo básico para verificar conexión
 model TestConnection {
@@ -322,7 +265,7 @@ model ConcuerdoAuditLog {
   hashConcuerdo   String   // SHA-256 de PRIMERA+SEGUNDA
   createdBy       Int      // FK al usuario que generó
   createdAt       DateTime @default(now())
-  meta            Json?    // JSON con métricas, warnings, versión plantilla, timings
+  meta            String?    // JSON con métricas, warnings, versión plantilla, timings
 
   // Relaciones
   user            User     @relation(fields: [createdBy], references: [id])

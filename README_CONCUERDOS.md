@@ -277,10 +277,22 @@ DATABASE_URL
 ### Checklist Pre-Despliegue
 
 - [ ] `npm run qa:gate` pasa con score ≥ 70
-- [ ] Variables de entorno configuradas
-- [ ] Base de datos migrada
+- [ ] Variables de entorno configuradas (incluyendo `RUN_MIGRATIONS_ON_START=true` en Railway)
+- [ ] Base de datos migrada (automático via prestart hook)
 - [ ] Templates validados
 - [ ] Circuit breaker en estado CLOSED
+
+### Sistema de Migraciones Automáticas
+
+El sistema incluye un hook `prestart` que ejecuta migraciones automáticamente en despliegue:
+
+- **Script**: `scripts/run-migrations.js` verifica condiciones antes de ejecutar `npx prisma migrate deploy`
+- **Condiciones**: `RUN_MIGRATIONS_ON_START=true` AND `DATABASE_URL` presente AND `NODE_ENV=production`
+- **Seguridad**: Nunca loguea `DATABASE_URL` u otra información sensible
+- **Logs**: Solo mensajes cortos: "migrate deploy: start/success/fail"
+- **Configuración en Railway**: Establecer `RUN_MIGRATIONS_ON_START=true` y `NODE_ENV=production`
+
+**Advertencia**: No loguear `DATABASE_URL` en ningún output del despliegue.
 
 ### Comandos de Despliegue
 

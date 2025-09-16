@@ -107,6 +107,27 @@ notaria-segura/
 
 La aplicación frontend estará disponible en `http://localhost:5173` y el backend en `http://localhost:3001`.
 
+### Migraciones automáticas en prestart (staging/producción)
+
+El workspace incluye un script de preinicio que aplica migraciones de Prisma de forma segura antes de levantar el backend en entornos gestionados:
+
+- Script: `scripts/run-migrations.js`
+- Comando ejecutado: `npx prisma migrate deploy` (dentro de `backend/`)
+- Condiciones para ejecutarse:
+  - `RUN_MIGRATIONS_ON_START === 'true'`
+  - `NODE_ENV === 'production'`
+  - `DATABASE_URL` definido
+
+Para habilitarlo en staging/producción, define en el entorno:
+
+```
+NODE_ENV=production
+RUN_MIGRATIONS_ON_START=true
+DATABASE_URL=postgresql://USER:PASS@HOST:PORT/DBNAME?schema=public
+```
+
+El script produce logs mínimos y no imprime valores de secretos. Si alguna condición no se cumple, omite la ejecución y continúa con el arranque normal.
+
 ### Usuarios de Prueba
 
 Para empezar a probar la aplicación, puedes usar los siguientes usuarios:

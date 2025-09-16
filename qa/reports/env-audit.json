@@ -1,0 +1,1893 @@
+{
+  "generated_at": "2025-09-16T22:48:11.101Z",
+  "repo_root": "/mnt/c/notaria-segura",
+  "totals": {
+    "vars": 86,
+    "occurrences": 212
+  },
+  "warnings": [],
+  "declared_set": [
+    "CONCUERDOS_USE_GEMINI_FIRST",
+    "DATABASE_PUBLIC_URL",
+    "DATABASE_URL",
+    "DEBUG_EXTRACTION_METHOD",
+    "EXTRACT_HYBRID",
+    "FORCE_PYTHON_EXTRACTOR",
+    "FRONTEND_URL",
+    "GEMINI_ENABLED",
+    "GEMINI_JSON_MODE",
+    "GEMINI_MODEL",
+    "GEMINI_PRIORITY",
+    "GEMINI_TIMEOUT",
+    "GOOGLE_API_KEY",
+    "JWT_SECRET",
+    "LLM_STRATEGY",
+    "NEXT_PUBLIC_DOCS_ARCHIVO_TABS",
+    "NEXT_PUBLIC_DOCS_LAZY_DELIVERED",
+    "NEXT_PUBLIC_DOCS_MATRIZADOR_TABS",
+    "NEXT_PUBLIC_DOCS_RECEPCION_GROUPED",
+    "NEXT_PUBLIC_DOCS_SEARCH_SMART_SCOPE",
+    "NEXT_PUBLIC_DOCS_SEARCH_TOGGLE_RECEPCION",
+    "NEXT_PUBLIC_DOCS_WINDOWING",
+    "NODE_ENV",
+    "RAILWAY_START_COMMAND",
+    "REDIS_URL",
+    "STRUCTURE_ROUTER_ENABLED",
+    "TEMPLATE_MODE",
+    "TWILIO_ACCOUNT_SID",
+    "TWILIO_AUTH_TOKEN",
+    "TWILIO_PHONE_NUMBER",
+    "TWILIO_WHATSAPP_FROM",
+    "VITE_API_URL",
+    "VITE_DOCS_ARCHIVO_TABS",
+    "VITE_DOCS_LAZY_DELIVERED",
+    "VITE_DOCS_MATRIZADOR_TABS",
+    "VITE_DOCS_RECEPCION_GROUPED",
+    "VITE_DOCS_SEARCH_SMART_SCOPE",
+    "VITE_DOCS_SEARCH_TOGGLE_RECEPCION",
+    "VITE_DOCS_WINDOWING",
+    "WHATSAPP_ENABLED",
+    "RUN_MIGRATIONS_ON_START",
+    "TEMPLATE_CACHE_TTL_MS",
+    "RATE_LIMIT_MAX",
+    "RATE_LIMIT_WINDOW_MS",
+    "CIRCUIT_BREAKER_THRESHOLD",
+    "RETRY_MAX_ATTEMPTS"
+  ],
+  "unused_declared": [
+    "DATABASE_PUBLIC_URL",
+    "RAILWAY_START_COMMAND",
+    "RUN_MIGRATIONS_ON_START",
+    "TEMPLATE_CACHE_TTL_MS",
+    "RATE_LIMIT_MAX",
+    "RATE_LIMIT_WINDOW_MS",
+    "CIRCUIT_BREAKER_THRESHOLD",
+    "RETRY_MAX_ATTEMPTS"
+  ],
+  "missing_declared": [
+    "ADVANCED_EXTRACTION",
+    "ALLOWED_ORIGINS",
+    "ALLOWED_ORIGINS_DEV",
+    "API_SECRET_KEY",
+    "API_URL",
+    "APP_TIMEZONE",
+    "BACKEND_URL",
+    "CACHE_ENABLED",
+    "CACHE_TTL_MS",
+    "CAJA_DOCS_LIMIT_DEFAULT",
+    "CONCUERDOS_OCR_FIRST",
+    "DEFAULT_EXTRACTION_CONFIDENCE",
+    "DEV",
+    "GEMINI_CIRCUIT_THRESHOLD",
+    "GEMINI_CIRCUIT_TIMEOUT",
+    "GEMINI_MAX_RETRIES",
+    "GEMINI_MAX_RETRY_DELAY",
+    "GEMINI_RETRY_DELAY",
+    "JWT_EXPIRES_IN",
+    "LLM_ROUTER_ENABLED",
+    "NOTARIA_CONTACTO",
+    "NOTARIA_DIRECCION",
+    "NOTARIA_HORARIO",
+    "NOTARIA_NOMBRE",
+    "OCR_CACHE_TTL_MS",
+    "OCR_ENABLED",
+    "OCR_LANGS",
+    "OCR_MAX_PAGES",
+    "OCR_PSM",
+    "PDF_EXTRACTOR_BASE_URL",
+    "PDF_EXTRACTOR_ENABLED",
+    "PDF_EXTRACTOR_TIMEOUT",
+    "PDF_EXTRACTOR_TOKEN",
+    "PDF_OCR_DPI",
+    "PDF_USE_PDFTOTEXT",
+    "PORT",
+    "PROMPT_FORCE_TEMPLATE",
+    "RAILWAY_PUBLIC_DOMAIN",
+    "REDIS_HOST",
+    "REDIS_PASSWORD",
+    "REDIS_PORT",
+    "SERVICE_EMAIL",
+    "SERVICE_PASSWORD",
+    "SLOW_REQUEST_MS",
+    "TZ",
+    "VITE_API_BASE_URL",
+    "WHATSAPP_ASYNC",
+    "XML_WATCHER_ENABLED"
+  ],
+  "deprecated_candidates": [
+    {
+      "name": "CONCUERDOS_USE_GEMINI_FIRST",
+      "references": 2,
+      "superseded_by": "LLM_STRATEGY",
+      "deprecate": true
+    },
+    {
+      "name": "EXTRACT_HYBRID",
+      "references": 1,
+      "superseded_by": "LLM_STRATEGY",
+      "deprecate": true
+    },
+    {
+      "name": "FORCE_PYTHON_EXTRACTOR",
+      "references": 5,
+      "superseded_by": "LLM_STRATEGY",
+      "deprecate": true
+    },
+    {
+      "name": "GEMINI_PRIORITY",
+      "references": 2,
+      "superseded_by": "LLM_STRATEGY",
+      "deprecate": true
+    }
+  ],
+  "vars": [
+    {
+      "name": "ADVANCED_EXTRACTION",
+      "occurrences": [
+        {
+          "file": "backend/src/controllers/document-controller.js",
+          "line": 142,
+          "snippet": "const advEnabled = (process.env.ADVANCED_EXTRACTION || 'false') !== 'false';"
+        },
+        {
+          "file": "backend/src/controllers/document-controller.js",
+          "line": 215,
+          "snippet": "const enabled = (process.env.ADVANCED_EXTRACTION || 'false') !== 'false';"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "ALLOWED_ORIGINS",
+      "occurrences": [
+        {
+          "file": "backend/server.js",
+          "line": 54,
+          "snippet": "const productionOrigins = process.env.ALLOWED_ORIGINS"
+        },
+        {
+          "file": "backend/server.js",
+          "line": 55,
+          "snippet": "? process.env.ALLOWED_ORIGINS.split(',').map(url => url.trim())"
+        }
+      ],
+      "usage_kind": "branch",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "ALLOWED_ORIGINS_DEV",
+      "occurrences": [
+        {
+          "file": "backend/server.js",
+          "line": 76,
+          "snippet": "const developmentOrigins = process.env.ALLOWED_ORIGINS_DEV"
+        },
+        {
+          "file": "backend/server.js",
+          "line": 77,
+          "snippet": "? process.env.ALLOWED_ORIGINS_DEV.split(',').map(url => url.trim())"
+        }
+      ],
+      "usage_kind": "branch",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "API_SECRET_KEY",
+      "occurrences": [
+        {
+          "file": "backend/src/middleware/api-key-middleware.js",
+          "line": 8,
+          "snippet": "const expected = process.env.API_SECRET_KEY || '';"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": true
+    },
+    {
+      "name": "API_URL",
+      "occurrences": [
+        {
+          "file": "xml-watcher-service/src/config.js",
+          "line": 42,
+          "snippet": "apiUrl: process.env.API_URL,"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "backend",
+      "sensitive": true
+    },
+    {
+      "name": "APP_TIMEZONE",
+      "occurrences": [
+        {
+          "file": "backend/src/utils/timezone.js",
+          "line": 7,
+          "snippet": "return process.env.APP_TIMEZONE || process.env.TZ || DEFAULT_TIMEZONE;"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "BACKEND_URL",
+      "occurrences": [
+        {
+          "file": "scripts/verify-production.js",
+          "line": 8,
+          "snippet": "const API_BASE_URL = process.env.BACKEND_URL || process.argv[2];"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "CACHE_ENABLED",
+      "occurrences": [
+        {
+          "file": "backend/src/services/cache-service.js",
+          "line": 10,
+          "snippet": "this.enabled = process.env.CACHE_ENABLED !== 'false';"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "CACHE_TTL_MS",
+      "occurrences": [
+        {
+          "file": "backend/src/controllers/admin-document-controller.js",
+          "line": 180,
+          "snippet": "await cache.set(cacheKey, { documents, totalCount }, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'search:admin:oversight'] });"
+        },
+        {
+          "file": "backend/src/controllers/archivo-controller.js",
+          "line": 139,
+          "snippet": "await cache.set(cacheKey, payload, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'search:archivo:mis-documentos', `user:${userId}`] });"
+        },
+        {
+          "file": "backend/src/controllers/archivo-controller.js",
+          "line": 182,
+          "snippet": "await cache.set(cacheKey, payload, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'search:archivo:mis-documentos', `user:${userId}`] });"
+        },
+        {
+          "file": "backend/src/controllers/document-controller.js",
+          "line": 409,
+          "snippet": "await cache.set(cacheKey, payload, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'caja:all'] });"
+        },
+        {
+          "file": "backend/src/controllers/reception-controller.js",
+          "line": 265,
+          "snippet": "await cache.set(cacheKey, payload, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'search:reception:todos'] });"
+        },
+        {
+          "file": "backend/src/controllers/reception-controller.js",
+          "line": 341,
+          "snippet": "await cache.set(cacheKey, payload, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'search:reception:todos'] });"
+        },
+        {
+          "file": "backend/src/controllers/reception-controller.js",
+          "line": 429,
+          "snippet": "await cache.set(cacheKey, payload, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'search:reception:en_proceso'] });"
+        },
+        {
+          "file": "backend/src/controllers/reception-controller.js",
+          "line": 493,
+          "snippet": "await cache.set(cacheKey, payload, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'search:reception:en_proceso'] });"
+        },
+        {
+          "file": "backend/src/services/cache-service.js",
+          "line": 11,
+          "snippet": "this.defaultTtlMs = parseInt(process.env.CACHE_TTL_MS || '60000', 10); // 60s"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "CAJA_DOCS_LIMIT_DEFAULT",
+      "occurrences": [
+        {
+          "file": "backend/src/controllers/document-controller.js",
+          "line": 373,
+          "snippet": "const limitDefault = parseInt(process.env.CAJA_DOCS_LIMIT_DEFAULT || '200', 10);"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "CONCUERDOS_OCR_FIRST",
+      "occurrences": [
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 45,
+          "snippet": "const ocrFirst = (String(req.query?.ocrFirst || '').toLowerCase() === '1') || (process.env.CONCUERDOS_OCR_FIRST === 'true')"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "CONCUERDOS_USE_GEMINI_FIRST",
+      "occurrences": [
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 130,
+          "snippet": "const useGeminiFirst = geminiEnabled || String(process.env.CONCUERDOS_USE_GEMINI_FIRST || '').toLowerCase() === 'true' || String(process.env.GEMINI_PRIORITY || '').toLowerCase() === 'high'"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 928,
+          "snippet": "CONCUERDOS_USE_GEMINI_FIRST: process.env.CONCUERDOS_USE_GEMINI_FIRST || null,"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "DATABASE_URL",
+      "occurrences": [
+        {
+          "file": "backend/scripts/setup-production-data.js",
+          "line": 67,
+          "snippet": "databaseUrl: process.env.DATABASE_URL ? 'CONFIGURADO' : 'NO CONFIGURADO',"
+        },
+        {
+          "file": "backend/src/config/environment.js",
+          "line": 239,
+          "snippet": "DATABASE_URL: process.env.DATABASE_URL || '',"
+        },
+        {
+          "file": "backend/tests/setup.js",
+          "line": 7,
+          "snippet": "if (!process.env.DATABASE_URL) {"
+        },
+        {
+          "file": "backend/tests/setup.js",
+          "line": 8,
+          "snippet": "process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://user:password@localhost:5432/notaria_test';"
+        },
+        {
+          "file": "backend/tests/setup.js",
+          "line": 8,
+          "snippet": "process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://user:password@localhost:5432/notaria_test';"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": true
+    },
+    {
+      "name": "DEBUG_EXTRACTION_METHOD",
+      "occurrences": [
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 128,
+          "snippet": "const debugExtraction = String(process.env.DEBUG_EXTRACTION_METHOD || '').toLowerCase() === 'true'"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 931,
+          "snippet": "DEBUG_EXTRACTION_METHOD: process.env.DEBUG_EXTRACTION_METHOD || null,"
+        },
+        {
+          "file": "backend/src/services/gemini-service.js",
+          "line": 159,
+          "snippet": "const debugExtraction = String(process.env.DEBUG_EXTRACTION_METHOD || '').toLowerCase() === 'true'"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "DEFAULT_EXTRACTION_CONFIDENCE",
+      "occurrences": [
+        {
+          "file": "backend/src/controllers/document-controller.js",
+          "line": 290,
+          "snippet": "const minConfidence = parseFloat(process.env.DEFAULT_EXTRACTION_CONFIDENCE || '0.8');"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "DEV",
+      "occurrences": [
+        {
+          "file": "frontend/src/utils/apiConfig.js",
+          "line": 18,
+          "snippet": "if (import.meta.env.DEV) {"
+        }
+      ],
+      "usage_kind": "branch",
+      "layer": "frontend-build",
+      "sensitive": false
+    },
+    {
+      "name": "EXTRACT_HYBRID",
+      "occurrences": [
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 439,
+          "snippet": "const enableHybrid = String(req.query?.hybrid || process.env.EXTRACT_HYBRID || 'false') === 'true'"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "FORCE_PYTHON_EXTRACTOR",
+      "occurrences": [
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 131,
+          "snippet": "const forcePythonFlag = String(process.env.FORCE_PYTHON_EXTRACTOR || '').toLowerCase()"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 166,
+          "snippet": "const FORCE_PYTHON = process.env.FORCE_PYTHON_EXTRACTOR === 'true'"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 167,
+          "snippet": "const FORCE_PYTHON_DISABLED = process.env.FORCE_PYTHON_EXTRACTOR === 'false'"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 893,
+          "snippet": "const forcePythonDisabled = String(process.env.FORCE_PYTHON_EXTRACTOR || '').toLowerCase() === 'false'"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 929,
+          "snippet": "FORCE_PYTHON_EXTRACTOR: process.env.FORCE_PYTHON_EXTRACTOR || null,"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "FRONTEND_URL",
+      "occurrences": [
+        {
+          "file": "backend/server.js",
+          "line": 56,
+          "snippet": ": [process.env.FRONTEND_URL || 'https://notaria-segura.com'];"
+        },
+        {
+          "file": "backend/server.js",
+          "line": 86,
+          "snippet": "if (process.env.FRONTEND_URL && !developmentOrigins.includes(process.env.FRONTEND_URL)) {"
+        },
+        {
+          "file": "backend/server.js",
+          "line": 86,
+          "snippet": "if (process.env.FRONTEND_URL && !developmentOrigins.includes(process.env.FRONTEND_URL)) {"
+        },
+        {
+          "file": "backend/server.js",
+          "line": 87,
+          "snippet": "developmentOrigins.push(process.env.FRONTEND_URL);"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "GEMINI_CIRCUIT_THRESHOLD",
+      "occurrences": [
+        {
+          "file": "backend/src/services/gemini-service.js",
+          "line": 60,
+          "snippet": "circuitBreakerThreshold: parseInt(process.env.GEMINI_CIRCUIT_THRESHOLD || '5'),"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "GEMINI_CIRCUIT_TIMEOUT",
+      "occurrences": [
+        {
+          "file": "backend/src/services/gemini-service.js",
+          "line": 61,
+          "snippet": "circuitBreakerTimeout: parseInt(process.env.GEMINI_CIRCUIT_TIMEOUT || '60000') // ms"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "GEMINI_ENABLED",
+      "occurrences": [
+        {
+          "file": "backend/scripts/qa-gate.js",
+          "line": 209,
+          "snippet": "gemini_enabled: process.env.GEMINI_ENABLED === 'true'"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 129,
+          "snippet": "const geminiEnabled = String(process.env.GEMINI_ENABLED || '').toLowerCase() === 'true'"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 890,
+          "snippet": "const geminiEnabled = String(process.env.GEMINI_ENABLED || '').toLowerCase() === 'true'"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 896,
+          "snippet": "if (!process.env.GEMINI_ENABLED) issues.push('GEMINI_ENABLED no configurado')"
+        },
+        {
+          "file": "backend/src/services/gemini-service.js",
+          "line": 52,
+          "snippet": "const enabled = () => String(process.env.GEMINI_ENABLED || '').toLowerCase() === 'true'"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "GEMINI_JSON_MODE",
+      "occurrences": [
+        {
+          "file": "backend/src/config/environment.js",
+          "line": 261,
+          "snippet": "geminiJsonMode: String(process.env.GEMINI_JSON_MODE || 'true') === 'true'"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "GEMINI_MAX_RETRIES",
+      "occurrences": [
+        {
+          "file": "backend/src/services/gemini-service.js",
+          "line": 56,
+          "snippet": "maxRetries: parseInt(process.env.GEMINI_MAX_RETRIES || '3'),"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "GEMINI_MAX_RETRY_DELAY",
+      "occurrences": [
+        {
+          "file": "backend/src/services/gemini-service.js",
+          "line": 58,
+          "snippet": "maxDelay: parseInt(process.env.GEMINI_MAX_RETRY_DELAY || '10000'), // ms"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "GEMINI_MODEL",
+      "occurrences": [
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 135,
+          "snippet": "gemini_model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 906,
+          "snippet": "model: process.env.GEMINI_MODEL || 'gemini-1.5-flash',"
+        },
+        {
+          "file": "backend/src/services/gemini-service.js",
+          "line": 160,
+          "snippet": "const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-flash'"
+        },
+        {
+          "file": "backend/src/services/gemini-service.js",
+          "line": 332,
+          "snippet": "const model = client.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-1.5-flash' })"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "GEMINI_PRIORITY",
+      "occurrences": [
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 130,
+          "snippet": "const useGeminiFirst = geminiEnabled || String(process.env.CONCUERDOS_USE_GEMINI_FIRST || '').toLowerCase() === 'true' || String(process.env.GEMINI_PRIORITY || '').toLowerCase() === 'high'"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 927,
+          "snippet": "GEMINI_PRIORITY: process.env.GEMINI_PRIORITY || null,"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "GEMINI_RETRY_DELAY",
+      "occurrences": [
+        {
+          "file": "backend/src/services/gemini-service.js",
+          "line": 57,
+          "snippet": "baseDelay: parseInt(process.env.GEMINI_RETRY_DELAY || '1000'), // ms"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "GEMINI_TIMEOUT",
+      "occurrences": [
+        {
+          "file": "backend/src/services/gemini-service.js",
+          "line": 59,
+          "snippet": "timeout: parseInt(process.env.GEMINI_TIMEOUT || '30000'), // ms"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "GOOGLE_API_KEY",
+      "occurrences": [
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 891,
+          "snippet": "const googleKey = Boolean(process.env.GOOGLE_API_KEY)"
+        },
+        {
+          "file": "backend/src/services/gemini-service.js",
+          "line": 129,
+          "snippet": "const key = process.env.GOOGLE_API_KEY"
+        },
+        {
+          "file": "backend/src/services/gemini-service.js",
+          "line": 326,
+          "snippet": "const keyPresent = Boolean(process.env.GOOGLE_API_KEY)"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "backend",
+      "sensitive": true
+    },
+    {
+      "name": "JWT_EXPIRES_IN",
+      "occurrences": [
+        {
+          "file": "backend/src/controllers/auth-controller.js",
+          "line": 42,
+          "snippet": "{ expiresIn: process.env.JWT_EXPIRES_IN || '24h' }"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": true
+    },
+    {
+      "name": "JWT_SECRET",
+      "occurrences": [
+        {
+          "file": "backend/scripts/setup-production-data.js",
+          "line": 68,
+          "snippet": "jwtSecret: process.env.JWT_SECRET ? 'CONFIGURADO' : 'NO CONFIGURADO',"
+        },
+        {
+          "file": "backend/src/config/environment.js",
+          "line": 240,
+          "snippet": "JWT_SECRET: process.env.JWT_SECRET || '',"
+        },
+        {
+          "file": "backend/src/controllers/auth-controller.js",
+          "line": 41,
+          "snippet": "process.env.JWT_SECRET,"
+        },
+        {
+          "file": "backend/src/middleware/auth-middleware.js",
+          "line": 23,
+          "snippet": "const decoded = jwt.verify(token, process.env.JWT_SECRET);"
+        },
+        {
+          "file": "backend/tests/role-security.test.js",
+          "line": 45,
+          "snippet": "tokens[role] = jwt.sign({ id: user.id }, process.env.JWT_SECRET);"
+        },
+        {
+          "file": "backend/tests/role-security.test.js",
+          "line": 97,
+          "snippet": "process.env.JWT_SECRET,"
+        },
+        {
+          "file": "backend/tests/role-security.test.js",
+          "line": 110,
+          "snippet": "const fakeToken = jwt.sign({ id: 99999 }, process.env.JWT_SECRET);"
+        },
+        {
+          "file": "backend/tests/role-security.test.js",
+          "line": 302,
+          "snippet": "{ lastName: '${process.env.JWT_SECRET}' }"
+        },
+        {
+          "file": "backend/tests/role-security.test.js",
+          "line": 377,
+          "snippet": "const token1 = jwt.sign({ id: users.MATRIZADOR.id }, process.env.JWT_SECRET);"
+        },
+        {
+          "file": "backend/tests/role-security.test.js",
+          "line": 378,
+          "snippet": "const token2 = jwt.sign({ id: users.MATRIZADOR.id }, process.env.JWT_SECRET);"
+        },
+        {
+          "file": "backend/tests/role-system.test.js",
+          "line": 84,
+          "snippet": "adminToken = jwt.sign({ id: adminUser.id }, process.env.JWT_SECRET);"
+        },
+        {
+          "file": "backend/tests/role-system.test.js",
+          "line": 85,
+          "snippet": "cajaToken = jwt.sign({ id: cajaUser.id }, process.env.JWT_SECRET);"
+        },
+        {
+          "file": "backend/tests/role-system.test.js",
+          "line": 86,
+          "snippet": "matrizadorToken = jwt.sign({ id: matrizadorUser.id }, process.env.JWT_SECRET);"
+        },
+        {
+          "file": "backend/tests/role-system.test.js",
+          "line": 87,
+          "snippet": "recepcionToken = jwt.sign({ id: recepcionUser.id }, process.env.JWT_SECRET);"
+        },
+        {
+          "file": "backend/tests/role-system.test.js",
+          "line": 88,
+          "snippet": "archivoToken = jwt.sign({ id: archivoUser.id }, process.env.JWT_SECRET);"
+        },
+        {
+          "file": "backend/tests/setup.js",
+          "line": 11,
+          "snippet": "if (!process.env.JWT_SECRET) {"
+        },
+        {
+          "file": "backend/tests/setup.js",
+          "line": 12,
+          "snippet": "process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing-only';"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": true
+    },
+    {
+      "name": "LLM_ROUTER_ENABLED",
+      "occurrences": [
+        {
+          "file": "backend/src/config/environment.js",
+          "line": 250,
+          "snippet": "llmRouterEnabled: String(process.env.LLM_ROUTER_ENABLED || 'false') === 'true',"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "LLM_STRATEGY",
+      "occurrences": [
+        {
+          "file": "backend/src/config/environment.js",
+          "line": 251,
+          "snippet": "llmStrategy: ['hibrido', 'solo_gemini', 'solo_node'].includes(String(process.env.LLM_STRATEGY))"
+        },
+        {
+          "file": "backend/src/config/environment.js",
+          "line": 252,
+          "snippet": "? String(process.env.LLM_STRATEGY)"
+        }
+      ],
+      "usage_kind": "branch",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "NEXT_PUBLIC_DOCS_ARCHIVO_TABS",
+      "occurrences": [
+        {
+          "file": "scripts/env-audit.mjs",
+          "line": 16,
+          "snippet": "\"CONCUERDOS_USE_GEMINI_FIRST\",\"DATABASE_PUBLIC_URL\",\"DATABASE_URL\",\"DEBUG_EXTRACTION_METHOD\",\"EXTRACT_HYBRID\",\"FORCE_PYTHON_EXTRACTOR\",\"FRONTEND_URL\",\"GEMINI_ENABLED\",\"GEMINI_JSON_MODE\",\"GEMINI_MODEL\",\"GEMINI_PRIORITY\",\"GEMINI_TIMEOUT\",\"GOO…"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "shared",
+      "sensitive": false
+    },
+    {
+      "name": "NEXT_PUBLIC_DOCS_LAZY_DELIVERED",
+      "occurrences": [
+        {
+          "file": "scripts/env-audit.mjs",
+          "line": 16,
+          "snippet": "\"CONCUERDOS_USE_GEMINI_FIRST\",\"DATABASE_PUBLIC_URL\",\"DATABASE_URL\",\"DEBUG_EXTRACTION_METHOD\",\"EXTRACT_HYBRID\",\"FORCE_PYTHON_EXTRACTOR\",\"FRONTEND_URL\",\"GEMINI_ENABLED\",\"GEMINI_JSON_MODE\",\"GEMINI_MODEL\",\"GEMINI_PRIORITY\",\"GEMINI_TIMEOUT\",\"GOO…"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "shared",
+      "sensitive": false
+    },
+    {
+      "name": "NEXT_PUBLIC_DOCS_MATRIZADOR_TABS",
+      "occurrences": [
+        {
+          "file": "scripts/env-audit.mjs",
+          "line": 16,
+          "snippet": "\"CONCUERDOS_USE_GEMINI_FIRST\",\"DATABASE_PUBLIC_URL\",\"DATABASE_URL\",\"DEBUG_EXTRACTION_METHOD\",\"EXTRACT_HYBRID\",\"FORCE_PYTHON_EXTRACTOR\",\"FRONTEND_URL\",\"GEMINI_ENABLED\",\"GEMINI_JSON_MODE\",\"GEMINI_MODEL\",\"GEMINI_PRIORITY\",\"GEMINI_TIMEOUT\",\"GOO…"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "shared",
+      "sensitive": false
+    },
+    {
+      "name": "NEXT_PUBLIC_DOCS_RECEPCION_GROUPED",
+      "occurrences": [
+        {
+          "file": "scripts/env-audit.mjs",
+          "line": 16,
+          "snippet": "\"CONCUERDOS_USE_GEMINI_FIRST\",\"DATABASE_PUBLIC_URL\",\"DATABASE_URL\",\"DEBUG_EXTRACTION_METHOD\",\"EXTRACT_HYBRID\",\"FORCE_PYTHON_EXTRACTOR\",\"FRONTEND_URL\",\"GEMINI_ENABLED\",\"GEMINI_JSON_MODE\",\"GEMINI_MODEL\",\"GEMINI_PRIORITY\",\"GEMINI_TIMEOUT\",\"GOO…"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "shared",
+      "sensitive": false
+    },
+    {
+      "name": "NEXT_PUBLIC_DOCS_SEARCH_SMART_SCOPE",
+      "occurrences": [
+        {
+          "file": "scripts/env-audit.mjs",
+          "line": 16,
+          "snippet": "\"CONCUERDOS_USE_GEMINI_FIRST\",\"DATABASE_PUBLIC_URL\",\"DATABASE_URL\",\"DEBUG_EXTRACTION_METHOD\",\"EXTRACT_HYBRID\",\"FORCE_PYTHON_EXTRACTOR\",\"FRONTEND_URL\",\"GEMINI_ENABLED\",\"GEMINI_JSON_MODE\",\"GEMINI_MODEL\",\"GEMINI_PRIORITY\",\"GEMINI_TIMEOUT\",\"GOO…"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "shared",
+      "sensitive": false
+    },
+    {
+      "name": "NEXT_PUBLIC_DOCS_SEARCH_TOGGLE_RECEPCION",
+      "occurrences": [
+        {
+          "file": "scripts/env-audit.mjs",
+          "line": 16,
+          "snippet": "\"CONCUERDOS_USE_GEMINI_FIRST\",\"DATABASE_PUBLIC_URL\",\"DATABASE_URL\",\"DEBUG_EXTRACTION_METHOD\",\"EXTRACT_HYBRID\",\"FORCE_PYTHON_EXTRACTOR\",\"FRONTEND_URL\",\"GEMINI_ENABLED\",\"GEMINI_JSON_MODE\",\"GEMINI_MODEL\",\"GEMINI_PRIORITY\",\"GEMINI_TIMEOUT\",\"GOO…"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "shared",
+      "sensitive": false
+    },
+    {
+      "name": "NEXT_PUBLIC_DOCS_WINDOWING",
+      "occurrences": [
+        {
+          "file": "scripts/env-audit.mjs",
+          "line": 16,
+          "snippet": "\"CONCUERDOS_USE_GEMINI_FIRST\",\"DATABASE_PUBLIC_URL\",\"DATABASE_URL\",\"DEBUG_EXTRACTION_METHOD\",\"EXTRACT_HYBRID\",\"FORCE_PYTHON_EXTRACTOR\",\"FRONTEND_URL\",\"GEMINI_ENABLED\",\"GEMINI_JSON_MODE\",\"GEMINI_MODEL\",\"GEMINI_PRIORITY\",\"GEMINI_TIMEOUT\",\"GOO…"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "shared",
+      "sensitive": false
+    },
+    {
+      "name": "NODE_ENV",
+      "occurrences": [
+        {
+          "file": "backend/scripts/qa-gate.js",
+          "line": 207,
+          "snippet": "node_env: process.env.NODE_ENV,"
+        },
+        {
+          "file": "backend/scripts/setup-production-data.js",
+          "line": 65,
+          "snippet": "nodeEnv: process.env.NODE_ENV,"
+        },
+        {
+          "file": "backend/server.js",
+          "line": 53,
+          "snippet": "if (process.env.NODE_ENV === 'production') {"
+        },
+        {
+          "file": "backend/server.js",
+          "line": 183,
+          "snippet": "environment: process.env.NODE_ENV,"
+        },
+        {
+          "file": "backend/server.js",
+          "line": 310,
+          "snippet": "message: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'"
+        },
+        {
+          "file": "backend/server.js",
+          "line": 327,
+          "snippet": "console.log(`🏷️ Environment: ${process.env.NODE_ENV || 'development'}`)"
+        },
+        {
+          "file": "backend/server.js",
+          "line": 331,
+          "snippet": "if (process.env.NODE_ENV !== 'production') {"
+        },
+        {
+          "file": "backend/src/config/environment.js",
+          "line": 162,
+          "snippet": "console.log(`- NODE_ENV: ${process.env.NODE_ENV}`);"
+        },
+        {
+          "file": "backend/src/config/environment.js",
+          "line": 195,
+          "snippet": "if (process.env.NODE_ENV === 'production') {"
+        },
+        {
+          "file": "backend/src/config/environment.js",
+          "line": 218,
+          "snippet": "if (process.env.NODE_ENV === 'production') {"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 87,
+          "snippet": "details: process.env.NODE_ENV !== 'production' ? (error?.cause?.message || error?.message) : undefined"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 769,
+          "snippet": "return res.status(500).json({ success: false, message: 'Error generando vista previa', details: process.env.NODE_ENV !== 'production' ? (error?.stack || error?.message) : undefined })"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 1379,
+          "snippet": "details: process.env.NODE_ENV !== 'production' ? (error?.stack || error?.message || String(error)) : undefined"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 1530,
+          "snippet": "details: process.env.NODE_ENV !== 'production' ? (error?.message || String(error)) : undefined"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 1544,
+          "snippet": "if (process.env.NODE_ENV === 'production') {"
+        },
+        {
+          "file": "backend/src/controllers/document-controller.js",
+          "line": 2480,
+          "snippet": "error: process.env.NODE_ENV === 'development' ? error.message : 'Error interno del servidor'"
+        },
+        {
+          "file": "backend/src/db.js",
+          "line": 18,
+          "snippet": "if (process.env.NODE_ENV === 'development') {"
+        },
+        {
+          "file": "backend/src/db.js",
+          "line": 26,
+          "snippet": "log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],"
+        },
+        {
+          "file": "backend/src/middleware/rate-limiter.js",
+          "line": 18,
+          "snippet": "trustProxy: process.env.NODE_ENV === 'production', // Solo confiar en proxy en producción"
+        },
+        {
+          "file": "backend/src/middleware/rate-limiter.js",
+          "line": 59,
+          "snippet": "trustProxy: process.env.NODE_ENV === 'production', // Solo confiar en proxy en producción"
+        },
+        {
+          "file": "backend/src/middleware/rate-limiter.js",
+          "line": 153,
+          "snippet": "trustProxy: process.env.NODE_ENV === 'production', // Solo confiar en proxy en producción"
+        },
+        {
+          "file": "backend/src/routes/concuerdo-routes.js",
+          "line": 38,
+          "snippet": "if (process.env.NODE_ENV !== 'production') {"
+        },
+        {
+          "file": "backend/src/services/data-quality-validator.js",
+          "line": 8,
+          "snippet": "this.debug = process.env.NODE_ENV !== 'production'"
+        },
+        {
+          "file": "backend/src/services/notarial-table-parser.js",
+          "line": 8,
+          "snippet": "this.debug = process.env.NODE_ENV !== 'production'"
+        },
+        {
+          "file": "backend/src/services/pdf-extractor-service.js",
+          "line": 718,
+          "snippet": "if (process.env.NODE_ENV !== 'production') {"
+        },
+        {
+          "file": "backend/src/services/universal-pdf-parser.js",
+          "line": 17,
+          "snippet": "this.debug = process.env.NODE_ENV !== 'production'"
+        },
+        {
+          "file": "backend/src/services/whatsapp-service.js",
+          "line": 19,
+          "snippet": "this.isDevelopment = process.env.NODE_ENV === 'development';"
+        },
+        {
+          "file": "backend/src/services/whatsapp-service.js",
+          "line": 857,
+          "snippet": "environment: process.env.NODE_ENV"
+        },
+        {
+          "file": "backend/src/services/whatsapp-service.js",
+          "line": 869,
+          "snippet": "environment: process.env.NODE_ENV"
+        },
+        {
+          "file": "backend/src/services/whatsapp-service.js",
+          "line": 882,
+          "snippet": "environment: process.env.NODE_ENV"
+        },
+        {
+          "file": "backend/src/services/whatsapp-service.js",
+          "line": 898,
+          "snippet": "environment: process.env.NODE_ENV,"
+        },
+        {
+          "file": "backend/src/services/whatsapp-service.js",
+          "line": 911,
+          "snippet": "environment: process.env.NODE_ENV"
+        },
+        {
+          "file": "backend/src/services/whatsapp-service.js",
+          "line": 924,
+          "snippet": "environment: process.env.NODE_ENV,"
+        },
+        {
+          "file": "backend/src/utils/http.js",
+          "line": 71,
+          "snippet": "if (process.env.NODE_ENV === 'development') {"
+        },
+        {
+          "file": "backend/src/utils/http.js",
+          "line": 77,
+          "snippet": "if (process.env.NODE_ENV === 'production' && status === 500) {"
+        },
+        {
+          "file": "backend/tests/setup.js",
+          "line": 15,
+          "snippet": "if (!process.env.NODE_ENV) {"
+        },
+        {
+          "file": "backend/tests/setup.js",
+          "line": 16,
+          "snippet": "process.env.NODE_ENV = 'test';"
+        }
+      ],
+      "usage_kind": "log",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "NOTARIA_CONTACTO",
+      "occurrences": [
+        {
+          "file": "backend/src/services/whatsapp-service.js",
+          "line": 549,
+          "snippet": "contactoConsultas: process.env.NOTARIA_CONTACTO || 'Tel: (02) 2234-567',"
+        },
+        {
+          "file": "backend/src/services/whatsapp-service.js",
+          "line": 800,
+          "snippet": "Para consultas: ${process.env.NOTARIA_CONTACTO || 'Tel: (02) 2234-567'}"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "NOTARIA_DIRECCION",
+      "occurrences": [
+        {
+          "file": "backend/src/services/whatsapp-service.js",
+          "line": 24,
+          "snippet": "direccion: process.env.NOTARIA_DIRECCION || \"Azuay E2-231 y Av Amazonas, Quito\","
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "NOTARIA_HORARIO",
+      "occurrences": [
+        {
+          "file": "backend/src/services/whatsapp-service.js",
+          "line": 25,
+          "snippet": "horario: process.env.NOTARIA_HORARIO || \"Lunes a Viernes 8:00-17:00\""
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "NOTARIA_NOMBRE",
+      "occurrences": [
+        {
+          "file": "backend/src/services/whatsapp-service.js",
+          "line": 23,
+          "snippet": "nombre: process.env.NOTARIA_NOMBRE || \"NOTARÍA DECIMO OCTAVA DEL CANTÓN QUITO\","
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "OCR_CACHE_TTL_MS",
+      "occurrences": [
+        {
+          "file": "backend/src/services/ocr-service.js",
+          "line": 20,
+          "snippet": "this.cacheTtlMs = parseInt(process.env.OCR_CACHE_TTL_MS || String(6 * 60 * 60 * 1000), 10); // 6h por defecto"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "OCR_ENABLED",
+      "occurrences": [
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 48,
+          "snippet": "if (ocrFirst && (process.env.OCR_ENABLED || 'false') !== 'false') {"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 58,
+          "snippet": "if ((!text || text.length < 50) && !ocrUsed && (process.env.OCR_ENABLED || 'false') !== 'false') {"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 410,
+          "snippet": "const allowOcr = (process.env.OCR_ENABLED || 'false') !== 'false'"
+        },
+        {
+          "file": "backend/src/services/ocr-service.js",
+          "line": 15,
+          "snippet": "this.enabled = (process.env.OCR_ENABLED || 'false') !== 'false';"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "OCR_LANGS",
+      "occurrences": [
+        {
+          "file": "backend/src/services/ocr-service.js",
+          "line": 16,
+          "snippet": "this.lang = process.env.OCR_LANGS || 'spa';"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "OCR_MAX_PAGES",
+      "occurrences": [
+        {
+          "file": "backend/src/services/ocr-service.js",
+          "line": 19,
+          "snippet": "this.maxPages = parseInt(process.env.OCR_MAX_PAGES || '5', 10);"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "OCR_PSM",
+      "occurrences": [
+        {
+          "file": "backend/src/services/ocr-service.js",
+          "line": 17,
+          "snippet": "this.psm = process.env.OCR_PSM || '6';"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "PDF_EXTRACTOR_BASE_URL",
+      "occurrences": [
+        {
+          "file": "backend/src/config/environment.js",
+          "line": 163,
+          "snippet": "console.log(`- PDF_EXTRACTOR_BASE_URL raw: '${process.env.PDF_EXTRACTOR_BASE_URL}'`);"
+        },
+        {
+          "file": "backend/src/config/environment.js",
+          "line": 244,
+          "snippet": "baseUrl: process.env.PDF_EXTRACTOR_BASE_URL || 'http://localhost:8001',"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 137,
+          "snippet": "python_url: process.env.PDF_EXTRACTOR_BASE_URL ? 'CONFIGURADO' : 'NO',"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 144,
+          "snippet": "console.log(`- PDF_EXTRACTOR_BASE_URL: ${process.env.PDF_EXTRACTOR_BASE_URL || 'NO CONFIGURADA'}`)"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 892,
+          "snippet": "const pythonEnabled = Boolean(process.env.PDF_EXTRACTOR_BASE_URL)"
+        }
+      ],
+      "usage_kind": "log",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "PDF_EXTRACTOR_ENABLED",
+      "occurrences": [
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 132,
+          "snippet": "const pythonGloballyEnabled = String(process.env.PDF_EXTRACTOR_ENABLED || 'true').toLowerCase() !== 'false'"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 894,
+          "snippet": "const pythonGloballyEnabled = String(process.env.PDF_EXTRACTOR_ENABLED || 'true').toLowerCase() !== 'false'"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 930,
+          "snippet": "PDF_EXTRACTOR_ENABLED: process.env.PDF_EXTRACTOR_ENABLED || null,"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "PDF_EXTRACTOR_TIMEOUT",
+      "occurrences": [
+        {
+          "file": "backend/src/config/environment.js",
+          "line": 246,
+          "snippet": "timeout: parseInt(process.env.PDF_EXTRACTOR_TIMEOUT || '30000', 10)"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "PDF_EXTRACTOR_TOKEN",
+      "occurrences": [
+        {
+          "file": "backend/src/config/environment.js",
+          "line": 164,
+          "snippet": "console.log(`- PDF_EXTRACTOR_TOKEN raw: '${process.env.PDF_EXTRACTOR_TOKEN ? 'SET' : 'NOT SET'}'`);"
+        },
+        {
+          "file": "backend/src/config/environment.js",
+          "line": 245,
+          "snippet": "token: process.env.PDF_EXTRACTOR_TOKEN || '',"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 138,
+          "snippet": "python_token: process.env.PDF_EXTRACTOR_TOKEN ? 'CONFIGURADO' : 'NO',"
+        },
+        {
+          "file": "backend/src/controllers/concuerdo-controller.js",
+          "line": 145,
+          "snippet": "console.log(`- PDF_EXTRACTOR_TOKEN: ${process.env.PDF_EXTRACTOR_TOKEN ? 'CONFIGURADO' : 'NO CONFIGURADO'}`)"
+        }
+      ],
+      "usage_kind": "log",
+      "layer": "backend",
+      "sensitive": true
+    },
+    {
+      "name": "PDF_OCR_DPI",
+      "occurrences": [
+        {
+          "file": "backend/src/services/ocr-service.js",
+          "line": 18,
+          "snippet": "this.dpi = parseInt(process.env.PDF_OCR_DPI || '300', 10);"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "PDF_USE_PDFTOTEXT",
+      "occurrences": [
+        {
+          "file": "backend/src/services/pdf-extractor-service.js",
+          "line": 542,
+          "snippet": "if (process.env.PDF_USE_PDFTOTEXT === 'true') {"
+        }
+      ],
+      "usage_kind": "branch",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "PORT",
+      "occurrences": [
+        {
+          "file": "backend/debug-port.js",
+          "line": 1,
+          "snippet": "console.log('PORT from env:', process.env.PORT);"
+        },
+        {
+          "file": "backend/debug-server.js",
+          "line": 1,
+          "snippet": "import dotenv from 'dotenv'; dotenv.config({path: './.env'}); console.log('DEBUG - process.env.PORT:', process.env.PORT); console.log('DEBUG - Final PORT:', process.env.PORT || 3002);"
+        },
+        {
+          "file": "backend/debug-server.js",
+          "line": 1,
+          "snippet": "import dotenv from 'dotenv'; dotenv.config({path: './.env'}); console.log('DEBUG - process.env.PORT:', process.env.PORT); console.log('DEBUG - Final PORT:', process.env.PORT || 3002);"
+        },
+        {
+          "file": "backend/debug-server.js",
+          "line": 1,
+          "snippet": "import dotenv from 'dotenv'; dotenv.config({path: './.env'}); console.log('DEBUG - process.env.PORT:', process.env.PORT); console.log('DEBUG - Final PORT:', process.env.PORT || 3002);"
+        },
+        {
+          "file": "backend/scripts/setup-production-data.js",
+          "line": 66,
+          "snippet": "port: process.env.PORT,"
+        },
+        {
+          "file": "scripts/env-audit.mjs",
+          "line": 191,
+          "snippet": "warnings.push({ missing: 'PORT', severity: 'high', message: 'Server should bind process.env.PORT; not found in codebase.'});"
+        }
+      ],
+      "usage_kind": "log",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "PROMPT_FORCE_TEMPLATE",
+      "occurrences": [
+        {
+          "file": "backend/src/config/environment.js",
+          "line": 254,
+          "snippet": "promptForceTemplate: ['auto', 'A', 'B', 'C'].includes(String(process.env.PROMPT_FORCE_TEMPLATE))"
+        },
+        {
+          "file": "backend/src/config/environment.js",
+          "line": 255,
+          "snippet": "? String(process.env.PROMPT_FORCE_TEMPLATE)"
+        }
+      ],
+      "usage_kind": "branch",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "RAILWAY_PUBLIC_DOMAIN",
+      "occurrences": [
+        {
+          "file": "backend/server.js",
+          "line": 59,
+          "snippet": "if (process.env.RAILWAY_PUBLIC_DOMAIN) {"
+        },
+        {
+          "file": "backend/server.js",
+          "line": 60,
+          "snippet": "const railwayUrl = `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;"
+        }
+      ],
+      "usage_kind": "branch",
+      "layer": "backend",
+      "sensitive": true
+    },
+    {
+      "name": "REDIS_HOST",
+      "occurrences": [
+        {
+          "file": "backend/src/services/cache-service.js",
+          "line": 34,
+          "snippet": "const host = process.env.REDIS_HOST;"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "REDIS_PASSWORD",
+      "occurrences": [
+        {
+          "file": "backend/src/services/cache-service.js",
+          "line": 36,
+          "snippet": "const password = process.env.REDIS_PASSWORD;"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "backend",
+      "sensitive": true
+    },
+    {
+      "name": "REDIS_PORT",
+      "occurrences": [
+        {
+          "file": "backend/src/services/cache-service.js",
+          "line": 35,
+          "snippet": "const port = process.env.REDIS_PORT;"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "REDIS_URL",
+      "occurrences": [
+        {
+          "file": "backend/src/services/cache-service.js",
+          "line": 33,
+          "snippet": "const url = process.env.REDIS_URL;"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "backend",
+      "sensitive": true
+    },
+    {
+      "name": "SERVICE_EMAIL",
+      "occurrences": [
+        {
+          "file": "xml-watcher-service/src/config.js",
+          "line": 43,
+          "snippet": "email: process.env.SERVICE_EMAIL,"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "SERVICE_PASSWORD",
+      "occurrences": [
+        {
+          "file": "xml-watcher-service/src/config.js",
+          "line": 44,
+          "snippet": "password: process.env.SERVICE_PASSWORD"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "backend",
+      "sensitive": true
+    },
+    {
+      "name": "SLOW_REQUEST_MS",
+      "occurrences": [
+        {
+          "file": "backend/server.js",
+          "line": 166,
+          "snippet": "if (ms > (parseInt(process.env.SLOW_REQUEST_MS || '500', 10))) {"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "STRUCTURE_ROUTER_ENABLED",
+      "occurrences": [
+        {
+          "file": "backend/src/config/environment.js",
+          "line": 257,
+          "snippet": "structureRouterEnabled: String(process.env.STRUCTURE_ROUTER_ENABLED || 'true') === 'true',"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "TEMPLATE_MODE",
+      "occurrences": [
+        {
+          "file": "backend/scripts/qa-gate.js",
+          "line": 167,
+          "snippet": "if (process.env.TEMPLATE_MODE !== 'family' && process.env.TEMPLATE_MODE !== 'structural') {"
+        },
+        {
+          "file": "backend/scripts/qa-gate.js",
+          "line": 167,
+          "snippet": "if (process.env.TEMPLATE_MODE !== 'family' && process.env.TEMPLATE_MODE !== 'structural') {"
+        },
+        {
+          "file": "backend/scripts/qa-gate.js",
+          "line": 208,
+          "snippet": "template_mode: process.env.TEMPLATE_MODE,"
+        },
+        {
+          "file": "backend/src/config/environment.js",
+          "line": 258,
+          "snippet": "templateMode: ['structural', 'family'].includes(String(process.env.TEMPLATE_MODE))"
+        },
+        {
+          "file": "backend/src/config/environment.js",
+          "line": 259,
+          "snippet": "? String(process.env.TEMPLATE_MODE)"
+        }
+      ],
+      "usage_kind": "branch",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "TWILIO_ACCOUNT_SID",
+      "occurrences": [
+        {
+          "file": "backend/scripts/setup-production-data.js",
+          "line": 70,
+          "snippet": "twilioConfigured: process.env.TWILIO_ACCOUNT_SID ? 'SÍ' : 'NO'"
+        },
+        {
+          "file": "backend/src/services/whatsapp-service.js",
+          "line": 28,
+          "snippet": "if (this.isEnabled && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {"
+        },
+        {
+          "file": "backend/src/services/whatsapp-service.js",
+          "line": 31,
+          "snippet": "process.env.TWILIO_ACCOUNT_SID,"
+        },
+        {
+          "file": "backend/src/services/whatsapp-service.js",
+          "line": 862,
+          "snippet": "if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {"
+        },
+        {
+          "file": "backend/src/services/whatsapp-service.js",
+          "line": 889,
+          "snippet": "const account = await this.client.api.accounts(process.env.TWILIO_ACCOUNT_SID).fetch();"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": true
+    },
+    {
+      "name": "TWILIO_AUTH_TOKEN",
+      "occurrences": [
+        {
+          "file": "backend/src/services/whatsapp-service.js",
+          "line": 28,
+          "snippet": "if (this.isEnabled && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {"
+        },
+        {
+          "file": "backend/src/services/whatsapp-service.js",
+          "line": 32,
+          "snippet": "process.env.TWILIO_AUTH_TOKEN"
+        },
+        {
+          "file": "backend/src/services/whatsapp-service.js",
+          "line": 862,
+          "snippet": "if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": true
+    },
+    {
+      "name": "TWILIO_PHONE_NUMBER",
+      "occurrences": [
+        {
+          "file": "backend/src/services/whatsapp-service.js",
+          "line": 18,
+          "snippet": "this.fromNumber = process.env.TWILIO_WHATSAPP_FROM || process.env.TWILIO_PHONE_NUMBER;"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": true
+    },
+    {
+      "name": "TWILIO_WHATSAPP_FROM",
+      "occurrences": [
+        {
+          "file": "backend/src/services/whatsapp-service.js",
+          "line": 18,
+          "snippet": "this.fromNumber = process.env.TWILIO_WHATSAPP_FROM || process.env.TWILIO_PHONE_NUMBER;"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": true
+    },
+    {
+      "name": "TZ",
+      "occurrences": [
+        {
+          "file": "backend/src/utils/timezone.js",
+          "line": 7,
+          "snippet": "return process.env.APP_TIMEZONE || process.env.TZ || DEFAULT_TIMEZONE;"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": false
+    },
+    {
+      "name": "VITE_API_BASE_URL",
+      "occurrences": [
+        {
+          "file": "frontend/src/components/alertas/AlertasModal.jsx",
+          "line": 30,
+          "snippet": "const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';"
+        },
+        {
+          "file": "frontend/src/components/alertas/ContadorAlertas.jsx",
+          "line": 14,
+          "snippet": "const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001';"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "frontend-build",
+      "sensitive": true
+    },
+    {
+      "name": "VITE_API_URL",
+      "occurrences": [
+        {
+          "file": "README.md",
+          "line": 90,
+          "snippet": "- `VITE_API_URL`: La URL de tu backend (p. ej., `http://localhost:3001/api`)."
+        },
+        {
+          "file": "frontend/src/services/admin-notifications.js",
+          "line": 8,
+          "snippet": "? import.meta.env.VITE_API_URL"
+        },
+        {
+          "file": "frontend/src/services/admin-service.js",
+          "line": 4,
+          "snippet": "const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';"
+        },
+        {
+          "file": "frontend/src/services/auth-service.js",
+          "line": 10,
+          "snippet": "return import.meta.env.VITE_API_URL || 'http://localhost:3001/api';"
+        },
+        {
+          "file": "frontend/src/utils/apiConfig.js",
+          "line": 12,
+          "snippet": "return import.meta.env.VITE_API_URL || 'http://localhost:3001/api';"
+        },
+        {
+          "file": "frontend/vite.config.js",
+          "line": 22,
+          "snippet": "'import.meta.env.VITE_API_URL': JSON.stringify('/api')"
+        },
+        {
+          "file": "scripts/env-audit.mjs",
+          "line": 16,
+          "snippet": "\"CONCUERDOS_USE_GEMINI_FIRST\",\"DATABASE_PUBLIC_URL\",\"DATABASE_URL\",\"DEBUG_EXTRACTION_METHOD\",\"EXTRACT_HYBRID\",\"FORCE_PYTHON_EXTRACTOR\",\"FRONTEND_URL\",\"GEMINI_ENABLED\",\"GEMINI_JSON_MODE\",\"GEMINI_MODEL\",\"GEMINI_PRIORITY\",\"GEMINI_TIMEOUT\",\"GOO…"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "frontend-build",
+      "sensitive": true
+    },
+    {
+      "name": "VITE_DOCS_ARCHIVO_TABS",
+      "occurrences": [
+        {
+          "file": "scripts/env-audit.mjs",
+          "line": 16,
+          "snippet": "\"CONCUERDOS_USE_GEMINI_FIRST\",\"DATABASE_PUBLIC_URL\",\"DATABASE_URL\",\"DEBUG_EXTRACTION_METHOD\",\"EXTRACT_HYBRID\",\"FORCE_PYTHON_EXTRACTOR\",\"FRONTEND_URL\",\"GEMINI_ENABLED\",\"GEMINI_JSON_MODE\",\"GEMINI_MODEL\",\"GEMINI_PRIORITY\",\"GEMINI_TIMEOUT\",\"GOO…"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "shared",
+      "sensitive": false
+    },
+    {
+      "name": "VITE_DOCS_LAZY_DELIVERED",
+      "occurrences": [
+        {
+          "file": "scripts/env-audit.mjs",
+          "line": 16,
+          "snippet": "\"CONCUERDOS_USE_GEMINI_FIRST\",\"DATABASE_PUBLIC_URL\",\"DATABASE_URL\",\"DEBUG_EXTRACTION_METHOD\",\"EXTRACT_HYBRID\",\"FORCE_PYTHON_EXTRACTOR\",\"FRONTEND_URL\",\"GEMINI_ENABLED\",\"GEMINI_JSON_MODE\",\"GEMINI_MODEL\",\"GEMINI_PRIORITY\",\"GEMINI_TIMEOUT\",\"GOO…"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "shared",
+      "sensitive": false
+    },
+    {
+      "name": "VITE_DOCS_MATRIZADOR_TABS",
+      "occurrences": [
+        {
+          "file": "scripts/env-audit.mjs",
+          "line": 16,
+          "snippet": "\"CONCUERDOS_USE_GEMINI_FIRST\",\"DATABASE_PUBLIC_URL\",\"DATABASE_URL\",\"DEBUG_EXTRACTION_METHOD\",\"EXTRACT_HYBRID\",\"FORCE_PYTHON_EXTRACTOR\",\"FRONTEND_URL\",\"GEMINI_ENABLED\",\"GEMINI_JSON_MODE\",\"GEMINI_MODEL\",\"GEMINI_PRIORITY\",\"GEMINI_TIMEOUT\",\"GOO…"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "shared",
+      "sensitive": false
+    },
+    {
+      "name": "VITE_DOCS_RECEPCION_GROUPED",
+      "occurrences": [
+        {
+          "file": "scripts/env-audit.mjs",
+          "line": 16,
+          "snippet": "\"CONCUERDOS_USE_GEMINI_FIRST\",\"DATABASE_PUBLIC_URL\",\"DATABASE_URL\",\"DEBUG_EXTRACTION_METHOD\",\"EXTRACT_HYBRID\",\"FORCE_PYTHON_EXTRACTOR\",\"FRONTEND_URL\",\"GEMINI_ENABLED\",\"GEMINI_JSON_MODE\",\"GEMINI_MODEL\",\"GEMINI_PRIORITY\",\"GEMINI_TIMEOUT\",\"GOO…"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "shared",
+      "sensitive": false
+    },
+    {
+      "name": "VITE_DOCS_SEARCH_SMART_SCOPE",
+      "occurrences": [
+        {
+          "file": "scripts/env-audit.mjs",
+          "line": 16,
+          "snippet": "\"CONCUERDOS_USE_GEMINI_FIRST\",\"DATABASE_PUBLIC_URL\",\"DATABASE_URL\",\"DEBUG_EXTRACTION_METHOD\",\"EXTRACT_HYBRID\",\"FORCE_PYTHON_EXTRACTOR\",\"FRONTEND_URL\",\"GEMINI_ENABLED\",\"GEMINI_JSON_MODE\",\"GEMINI_MODEL\",\"GEMINI_PRIORITY\",\"GEMINI_TIMEOUT\",\"GOO…"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "shared",
+      "sensitive": false
+    },
+    {
+      "name": "VITE_DOCS_SEARCH_TOGGLE_RECEPCION",
+      "occurrences": [
+        {
+          "file": "scripts/env-audit.mjs",
+          "line": 16,
+          "snippet": "\"CONCUERDOS_USE_GEMINI_FIRST\",\"DATABASE_PUBLIC_URL\",\"DATABASE_URL\",\"DEBUG_EXTRACTION_METHOD\",\"EXTRACT_HYBRID\",\"FORCE_PYTHON_EXTRACTOR\",\"FRONTEND_URL\",\"GEMINI_ENABLED\",\"GEMINI_JSON_MODE\",\"GEMINI_MODEL\",\"GEMINI_PRIORITY\",\"GEMINI_TIMEOUT\",\"GOO…"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "shared",
+      "sensitive": false
+    },
+    {
+      "name": "VITE_DOCS_WINDOWING",
+      "occurrences": [
+        {
+          "file": "scripts/env-audit.mjs",
+          "line": 16,
+          "snippet": "\"CONCUERDOS_USE_GEMINI_FIRST\",\"DATABASE_PUBLIC_URL\",\"DATABASE_URL\",\"DEBUG_EXTRACTION_METHOD\",\"EXTRACT_HYBRID\",\"FORCE_PYTHON_EXTRACTOR\",\"FRONTEND_URL\",\"GEMINI_ENABLED\",\"GEMINI_JSON_MODE\",\"GEMINI_MODEL\",\"GEMINI_PRIORITY\",\"GEMINI_TIMEOUT\",\"GOO…"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "shared",
+      "sensitive": false
+    },
+    {
+      "name": "WHATSAPP_ASYNC",
+      "occurrences": [
+        {
+          "file": "backend/src/services/whatsapp-service.js",
+          "line": 16,
+          "snippet": "this.asyncMode = (process.env.WHATSAPP_ASYNC || 'true') !== 'false';"
+        }
+      ],
+      "usage_kind": "default",
+      "layer": "backend",
+      "sensitive": true
+    },
+    {
+      "name": "WHATSAPP_ENABLED",
+      "occurrences": [
+        {
+          "file": "backend/scripts/setup-production-data.js",
+          "line": 69,
+          "snippet": "whatsappEnabled: process.env.WHATSAPP_ENABLED,"
+        },
+        {
+          "file": "backend/src/services/whatsapp-service.js",
+          "line": 15,
+          "snippet": "this.isEnabled = process.env.WHATSAPP_ENABLED === 'true';"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "backend",
+      "sensitive": true
+    },
+    {
+      "name": "XML_WATCHER_ENABLED",
+      "occurrences": [
+        {
+          "file": "backend/src/services/xml-watcher-service.js",
+          "line": 8,
+          "snippet": "const enabled = process.env.XML_WATCHER_ENABLED === 'true';"
+        }
+      ],
+      "usage_kind": "read",
+      "layer": "backend",
+      "sensitive": false
+    }
+  ]
+}
