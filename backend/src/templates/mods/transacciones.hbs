@@ -1,0 +1,23 @@
+{{!--
+  Mod: Transacciones
+  Variables esperadas del viewModel:
+  - otorgantes_render: string con lista de otorgantes formateada
+  - beneficiarios_render: string con lista de beneficiarios formateada
+  - acto: string del tipo de acto (COMPRAVENTA, DONACIÓN, etc.)
+  - cuantia: string con cuantía (determinada/indeterminada)
+
+  Fragmentos que agrega:
+  - Verbos específicos según tipo de transacción (vende/dona/cede)
+  - Bloque de cuantía determinada/indeterminada
+  - Referencias a bienes transmitidos
+--}}
+
+{{!-- Bloque específico para transacciones --}}
+{{#if beneficiarios_render}}
+**VENDEDOR{{#if (gt otorgantes.length 1)}}ES{{/if}}:** {{otorgantes_render}}
+
+**COMPRADOR{{#if (gt beneficiarios.length 1)}}ES{{/if}}:** {{beneficiarios_render}}
+
+**CUANTÍA:** {{#if cuantia}}{{cuantia}}{{else}}INDETERMINADA{{/if}}
+
+{{/if}}

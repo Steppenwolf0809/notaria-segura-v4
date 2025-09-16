@@ -33,6 +33,7 @@ enum DocumentStatus {
   LISTO
   ENTREGADO
   AGRUPADO
+  ANULADO_NOTA_CREDITO
 }
 
 // Modelo principal de usuarios
@@ -55,7 +56,8 @@ model User {
   
   // Relación de auditoría - NUEVA FUNCIONALIDAD
   documentEvents    DocumentEvent[]                            // Eventos de auditoría realizados por el usuario
-  
+  concuerdoAudits   ConcuerdoAuditLog[]                        // Auditoría de generación de concuerdos
+
   @@map("users")
 }
 
@@ -123,15 +125,18 @@ model Document {
   usuarioEntrega       User?      @relation("DeliveredDocuments", fields: [usuarioEntregaId], references: [id])
   observacionesEntrega String?    // Observaciones adicionales de la entrega
 
-  // Compatibilidad con ramas que usan nota de crédito
-  notaCreditoEstadoPrevio String?
+  // Nota de crédito (anulación)
+  notaCreditoMotivo       String?          // Motivo obligatorio al aplicar nota de crédito
+  notaCreditoEstadoPrevio DocumentStatus?  // Estado previo para permitir reversión
+  notaCreditoFecha        DateTime?        // Fecha en que se aplicó la nota de crédito
 
   documentGroup         DocumentGroup? @relation(fields: [documentGroupId], references: [id])
   
   // Relación de auditoría - NUEVA FUNCIONALIDAD
   events                DocumentEvent[]        // Historial de eventos del documento
   notifications         WhatsAppNotification[] // Notificaciones enviadas para este documento
-  
+  concuerdoAudits       ConcuerdoAuditLog[]    // Auditoría de generación de concuerdos
+
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt
   
@@ -220,6 +225,8 @@ enum EventType {
   VERIFICATION_GENERATED // Código de verificación generado
   WHATSAPP_SENT        // Notificación WhatsApp enviada
   DOCUMENT_UNGROUPED   // Documento desagrupado
+  CREDIT_NOTE_APPLIED   // Nota de crédito aplicada (anulación)
+  CREDIT_NOTE_REVERTED  // Reversión de nota de crédito
 }
 
 // Modelo para historial de notificaciones WhatsApp
@@ -291,4 +298,39 @@ model TestConnection {
   createdAt DateTime @default(now())
   
   @@map("test_connection")
+}
+
+// Configuración del sistema (clave-valor) para toggles administrables
+model SystemSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@map("system_settings")
+  @@index([key])
+}
+
+// MODELO DE AUDITORÍA PARA CONCUERDOS - T10 Hardening
+model ConcuerdoAuditLog {
+  id              String   @id @default(uuid())
+  docId           String?  // FK opcional al documento fuente
+  estructura      String   // "A"|"B"|"C"
+  templateMode    String   // "structural"|"family"
+  force           String   // "auto"|"A"|"B"|"C"
+  hashConcuerdo   String   // SHA-256 de PRIMERA+SEGUNDA
+  createdBy       Int      // FK al usuario que generó
+  createdAt       DateTime @default(now())
+  meta            Json?    // JSON con métricas, warnings, versión plantilla, timings
+
+  // Relaciones
+  user            User     @relation(fields: [createdBy], references: [id])
+  document        Document? @relation(fields: [docId], references: [id])
+
+  @@map("concuerdo_audit_logs")
+  @@index([docId])
+  @@index([createdBy])
+  @@index([createdAt])
+  @@index([estructura])
 }
