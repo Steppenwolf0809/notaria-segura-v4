@@ -9,6 +9,13 @@ datasource db {
 }
 
 // Enumeración de roles de usuario (SQLite compatible)
+enum UserRole {
+  ADMIN
+  CAJA
+  MATRIZADOR
+  RECEPCION
+  ARCHIVO
+}
 
 // Enumeración de tipos de documento (SQLite compatible)
 
