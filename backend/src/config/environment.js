@@ -5,6 +5,28 @@ import dotenv from 'dotenv';
 dotenv.config({ path: './.env' });
 
 /**
+ * Parsea un valor string a boolean aceptando múltiples formatos
+ * @param {string|undefined} value - Valor a parsear
+ * @param {boolean} defaultValue - Valor por defecto si inválido o undefined
+ * @returns {boolean} Valor boolean parseado
+ */
+function parseBoolean(value, defaultValue = false) {
+  if (value === undefined || value === null) return defaultValue;
+
+  const str = String(value).toLowerCase().trim();
+
+  // Valores truthy
+  if (['true', '1', 'yes', 'on'].includes(str)) return true;
+
+  // Valores falsy
+  if (['false', '0', 'no', 'off'].includes(str)) return false;
+
+  // Valor inválido: warning y usar default
+  console.warn(`⚠️  Valor inválido para boolean: "${value}". Usando default: ${defaultValue}`);
+  return defaultValue;
+}
+
+/**
  * Schema de validación para variables de entorno críticas
  * Usando Zod para validación robusta y type safety
  */
@@ -25,27 +47,18 @@ const environmentSchema = z.object({
     })
     .min(32, 'JWT_SECRET debe tener al menos 32 caracteres para seguridad'),
 
-  // Twilio - Obligatorios para WhatsApp
+  // Twilio - Opcionales, requeridos solo si WhatsApp habilitado
   TWILIO_ACCOUNT_SID: z
-    .string({
-      required_error: 'TWILIO_ACCOUNT_SID es obligatorio',
-      invalid_type_error: 'TWILIO_ACCOUNT_SID debe ser una string'
-    })
-    .min(10, 'TWILIO_ACCOUNT_SID debe tener al menos 10 caracteres'),
+    .string()
+    .optional(),
 
   TWILIO_AUTH_TOKEN: z
-    .string({
-      required_error: 'TWILIO_AUTH_TOKEN es obligatorio',
-      invalid_type_error: 'TWILIO_AUTH_TOKEN debe ser una string'
-    })
-    .min(10, 'TWILIO_AUTH_TOKEN debe tener al menos 10 caracteres'),
+    .string()
+    .optional(),
 
   TWILIO_WHATSAPP_FROM: z
-    .string({
-      required_error: 'TWILIO_WHATSAPP_FROM es obligatorio',
-      invalid_type_error: 'TWILIO_WHATSAPP_FROM debe ser una string'
-    })
-    .min(10, 'TWILIO_WHATSAPP_FROM debe tener formato válido'),
+    .string()
+    .optional(),
 
   // Entorno - Con valores válidos específicos
   NODE_ENV: z
@@ -136,9 +149,9 @@ const environmentSchema = z.object({
     .optional()
     .transform(v => v ? v === 'true' : undefined),
   GEMINI_PRIORITY: z
-    .enum(['true','false'])
+    .string()
     .optional()
-    .transform(v => v ? v === 'true' : undefined),
+    .transform(v => parseBoolean(v, false)),
 
   // PROMPT_FORCE_TEMPLATE: fuerza el template estructural base
   //  - "auto" | "A" | "B" | "C"
@@ -317,6 +330,12 @@ function getConfig() {
       }
     }
   };
+
+  // Verificar Twilio si WhatsApp habilitado
+  if (cfg.WHATSAPP_ENABLED && (!cfg.TWILIO_ACCOUNT_SID || !cfg.TWILIO_AUTH_TOKEN || !cfg.TWILIO_WHATSAPP_FROM)) {
+    console.warn('⚠️  WhatsApp habilitado pero credenciales Twilio faltantes. Desactivando WhatsApp.');
+    cfg.WHATSAPP_ENABLED = false;
+  }
   
   // Impresión única de advertencias y tabla de configuración efectiva
   if (!printedOnce) {
@@ -344,7 +363,7 @@ function getConfig() {
 
       // Tabla segura de configuración efectiva (solo nombres/estado, sin valores)
       const names = [
-        'NODE_ENV','DATABASE_URL','JWT_SECRET','GOOGLE_API_KEY','LLM_STRATEGY','GEMINI_ENABLED(derived)','EXTRACT_HYBRID(derived)','STRUCTURE_ROUTER_ENABLED','PROMPT_FORCE_TEMPLATE','TEMPLATE_MODE','GEMINI_JSON_MODE','WHATSAPP_ENABLED','PDF_EXTRACTOR_BASE_URL','TWILIO_ACCOUNT_SID','TWILIO_AUTH_TOKEN','TWILIO_WHATSAPP_FROM'
+        'NODE_ENV','DATABASE_URL','JWT_SECRET','GOOGLE_API_KEY','LLM_STRATEGY','GEMINI_ENABLED(derived)','EXTRACT_HYBRID(derived)','STRUCTURE_ROUTER_ENABLED','PROMPT_FORCE_TEMPLATE','TEMPLATE_MODE','GEMINI_JSON_MODE','GEMINI_PRIORITY','WHATSAPP_ENABLED','PDF_EXTRACTOR_BASE_URL','TWILIO_ACCOUNT_SID','TWILIO_AUTH_TOKEN','TWILIO_WHATSAPP_FROM'
       ];
       console.log('📋 Effective settings (nombres, sin valores):');
       console.log('| Setting | Status |');
@@ -353,6 +372,7 @@ function getConfig() {
         switch (k) {
           case 'GEMINI_ENABLED(derived)': return cfg.concuerdos.derived.GEMINI_ENABLED ? 'SET' : 'UNSET';
           case 'EXTRACT_HYBRID(derived)': return cfg.concuerdos.derived.EXTRACT_HYBRID ? 'SET' : 'UNSET';
+          case 'GEMINI_PRIORITY': return cfg.GEMINI_PRIORITY ? 'SET' : 'UNSET';
           default: return process.env[k.replace(/\(derived\)/,'')] ? 'SET' : 'UNSET';
         }
       };
