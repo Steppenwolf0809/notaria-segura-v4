@@ -1,0 +1,12 @@
+
+TEST: Autorización de Salida
+CONFIG: {"TEMPLATE_MODE":"structural","PROMPT_FORCE_TEMPLATE":"A"}
+ESTRUCTURA: A
+CALIDAD: REQUIERE EDICIÓN
+
+=== PRIMERA COPIA ===
+Contenido generado
+
+=== SEGUNDA COPIA ===
+Contenido generado
+    

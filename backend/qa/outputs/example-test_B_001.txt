@@ -1,0 +1,12 @@
+
+TEST: Poder Solo Otorgante
+CONFIG: {"TEMPLATE_MODE":"structural","PROMPT_FORCE_TEMPLATE":"A"}
+ESTRUCTURA: B
+CALIDAD: PU-1
+
+=== PRIMERA COPIA ===
+Contenido generado
+
+=== SEGUNDA COPIA ===
+Contenido generado
+    

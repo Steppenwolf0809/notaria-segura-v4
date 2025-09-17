@@ -1,0 +1,12 @@
+
+TEST: Poder General con Beneficiario
+CONFIG: {"TEMPLATE_MODE":"structural","PROMPT_FORCE_TEMPLATE":"A"}
+ESTRUCTURA: A
+CALIDAD: PU-1
+
+=== PRIMERA COPIA ===
+Contenido generado
+
+=== SEGUNDA COPIA ===
+Contenido generado
+    
