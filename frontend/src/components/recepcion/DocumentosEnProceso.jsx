@@ -174,23 +174,44 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
       console.log('🚫 Solicitud ya en proceso, ignorando...');
       return;
     }
-    
+
+    // OPTIMISTIC UPDATE: Preparar estado anterior para rollback
+    const documentosAnteriores = [...documentos];
+    const selectedAnteriores = [...selectedDocuments];
+
     try {
       setProcessingRequest(true);
       let result;
-      
+
       console.log('🎯 Iniciando marcar como listo:', {
         actionType,
         documentoIndividual: documentoIndividual?.id,
         selectedDocuments: selectedDocuments.length,
         timestamp: new Date().toISOString()
       });
-      
+
+      // OPTIMISTIC UPDATE: Actualizar estado local inmediatamente
       if (actionType === 'individual' && documentoIndividual) {
         console.log('📄 Marcando documento individual:', documentoIndividual.id);
+
+        // Actualizar estado local optimistamente
+        setDocumentos(prev => prev.map(doc =>
+          doc.id === documentoIndividual.id
+            ? { ...doc, status: 'LISTO', updatedAt: new Date().toISOString() }
+            : doc
+        ));
+
         result = await receptionService.marcarComoListo(documentoIndividual.id);
       } else if (actionType === 'grupal' && selectedDocuments.length > 0) {
         console.log('📁 Marcando grupo de documentos:', selectedDocuments);
+
+        // Actualizar estado local optimistamente para todos los documentos seleccionados
+        setDocumentos(prev => prev.map(doc =>
+          selectedDocuments.includes(doc.id)
+            ? { ...doc, status: 'LISTO', updatedAt: new Date().toISOString() }
+            : doc
+        ));
+
         result = await receptionService.marcarGrupoListo(selectedDocuments);
       }
 
@@ -202,13 +223,20 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
           message: result.message,
           severity: 'success'
         });
-        
-        console.log('🔄 Recargando documentos...');
-        // Recargar documentos y actualizar estadísticas
-        await cargarDocumentos();
-        console.log('📊 Actualizando estadísticas...');
-        onEstadisticasChange?.();
+
+        // Limpiar selección y cerrar modal inmediatamente
         setSelectedDocuments([]);
+        cerrarConfirmacion();
+
+        // Recargar documentos en background para asegurar consistencia
+        console.log('🔄 Recargando documentos en background...');
+        cargarDocumentos().then(() => {
+          console.log('📊 Actualizando estadísticas...');
+          onEstadisticasChange?.();
+        }).catch(error => {
+          console.error('⚠️ Error recargando documentos:', error);
+        });
+
         console.log('✅ Proceso completado exitosamente');
       } else {
         console.error('❌ Error en resultado del servidor:', result);
@@ -216,6 +244,11 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
       }
     } catch (error) {
       console.error('💥 Error marcando como listo:', error);
+
+      // ROLLBACK: Revertir cambios optimistas en caso de error
+      setDocumentos(documentosAnteriores);
+      setSelectedDocuments(selectedAnteriores);
+
       setSnackbar({
         open: true,
         message: error.message || 'Error al marcar documento(s) como listo(s)',
@@ -223,7 +256,6 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
       });
     } finally {
       setProcessingRequest(false);
-      cerrarConfirmacion();
     }
   };
 
