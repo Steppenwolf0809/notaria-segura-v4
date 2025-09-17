@@ -735,17 +735,24 @@ async function marcarComoListo(req, res) {
             documentsUpdated: updatedDocuments.length
         });
 
-        res.json({ 
-            success: true, 
-            message: responseMessage, 
-            data: { 
+        // Headers para evitar cache del navegador
+        res.set({
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        });
+
+        res.json({
+            success: true,
+            message: responseMessage,
+            data: {
                 document: mainDocument,
                 documents: updatedDocuments,
                 codigoRetiro: mainDocument.codigoRetiro,
                 groupAffected: groupAffected,
                 documentsUpdated: updatedDocuments.length,
                 whatsappSent: true // Siempre true para no exponer errores al frontend
-            } 
+            }
         });
     } catch (error) {
         console.error('Error marcando como listo:', error);
@@ -827,14 +834,21 @@ async function marcarGrupoListo(req, res) {
             console.error('⚠️ Error enviando WhatsApp grupal (operación continúa):', whatsappError.message);
         }
 
-        res.json({ 
-            success: true, 
-            message: `${updatedDocuments.length} documentos marcados como listos`, 
-            data: { 
+        // Headers para evitar cache del navegador
+        res.set({
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        });
+
+        res.json({
+            success: true,
+            message: `${updatedDocuments.length} documentos marcados como listos`,
+            data: {
                 codigoRetiro: nuevoCodigo,
                 documentsCount: updatedDocuments.length,
                 whatsappSent: true // Siempre true para no exponer errores al frontend
-            } 
+            }
         });
     } catch (error) {
         console.error('Error marcando grupo como listo:', error);
