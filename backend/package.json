@@ -12,7 +12,6 @@
     "start": "npx prisma db push --accept-data-loss && node server.js",
     "build": "npx prisma generate",
     "start:prod": "npx prisma generate && (npx prisma migrate deploy || npx prisma db push --accept-data-loss) && node server.js",
-    "start:railway": "npx prisma generate && npm run db:baseline && npx prisma migrate deploy --schema=./prisma/schema.prisma && node server.js",
     "dev": "nodemon server.js",
     "db:generate": "npx prisma generate",
     "db:migrate": "npx prisma migrate dev",
@@ -34,7 +33,15 @@
     "reconcile": "node scripts/reconcile-schema.js",
     "schema:inspect": "node scripts/inspect-schema.js",
     "qa:concuerdos": "node scripts/qa-concuerdos.js",
-    "qa:gate": "node scripts/qa-gate.js"
+    "qa:gate": "node scripts/qa-gate.js",
+    "railway:deploy": "node scripts/railway-deploy.js",
+    "railway:health": "node scripts/health-check.js",
+    "railway:backup": "node scripts/backup.js",
+    "railway:recovery": "node scripts/recovery.js --strategy=in-place",
+    "diagnose:p3009": "node scripts/diagnose-p3009.js",
+    "recovery:in-place": "node scripts/recovery.js --strategy=in-place",
+    "recovery:reset": "node scripts/recovery.js --strategy=reset --confirm",
+    "recovery:hybrid": "node scripts/recovery.js --strategy=hybrid"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
