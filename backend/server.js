@@ -6,7 +6,7 @@ import dotenv from 'dotenv'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import { closePrismaClient } from './src/db.js'
-import { getConfig, isConfigurationComplete, debugConfiguration } from './src/config/environment.js'
+import { getConfig, isConfigurationComplete, validateConfigurationComplete, debugConfiguration } from './src/config/environment.js'
 import xmlWatcherService from './src/services/xml-watcher-service.js'
 import cache from './src/services/cache-service.js'
 
@@ -27,12 +27,38 @@ dotenv.config({ path: './.env' })
 const config = getConfig()
 debugConfiguration(config)
 
-// Verificar configuración crítica
-if (!isConfigurationComplete(config)) {
-  console.error('💥 Configuración incompleta - la aplicación puede no funcionar correctamente')
-  if (config.NODE_ENV === 'production') {
-    process.exit(1)
+// Verificar configuración completa
+const validationResult = validateConfigurationComplete(config)
+
+if (!validationResult.isComplete) {
+  console.error('💥 CONFIGURACIÓN INCOMPLETA DETECTADA')
+
+  if (!validationResult.critical.complete) {
+    console.error('❌ VARIABLES CRÍTICAS FALTANTES:');
+    validationResult.critical.missing.forEach(v => console.error(`   • ${v}`));
   }
+
+  if (!validationResult.optional.complete) {
+    console.warn('⚠️ SERVICIOS OPCIONALES NO CONFIGURADOS:');
+    validationResult.optional.warnings.forEach(w => console.warn(`   • ${w}`));
+  }
+
+  if (validationResult.recommendations.length > 0) {
+    console.log('💡 RECOMENDACIONES:');
+    validationResult.recommendations.forEach(r => console.log(`   • ${r}`));
+  }
+
+  // En producción, solo fallar por variables críticas
+  if (config.NODE_ENV === 'production' && !validationResult.critical.complete) {
+    console.error('💥 La aplicación no puede iniciar en producción con configuración crítica faltante');
+    process.exit(1);
+  }
+
+  if (config.NODE_ENV !== 'production') {
+    console.warn('⚠️ La aplicación continuará en modo desarrollo, pero algunas funciones pueden no estar disponibles');
+  }
+} else {
+  console.log('✅ CONFIGURACIÓN COMPLETA - Todos los servicios están listos');
 }
 
 const app = express()

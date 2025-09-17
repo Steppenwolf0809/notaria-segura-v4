@@ -194,9 +194,9 @@ let printedOnce = false;
 function validateEnvironment() {
   try {
     console.log('🔍 Validando variables de entorno...');
-    
+
     const result = environmentSchema.safeParse(process.env);
-    
+
     if (!result.success) {
       console.error('❌ Error en validación de variables de entorno:');
 
@@ -217,71 +217,76 @@ function validateEnvironment() {
         // Fallback: loguear el error completo serializado
         console.error('   • Error de validación no desglosado');
       }
-      
-      // En producción, fallar inmediatamente
+
+      // En producción, fallar inmediatamente con código de error específico
       if (process.env.NODE_ENV === 'production') {
         console.error('💥 La aplicación no puede iniciar en producción con configuración inválida');
+        console.error('💡 Verifique las variables de entorno requeridas: DATABASE_URL, JWT_SECRET');
         process.exit(1);
       }
-      
+
       // En desarrollo, mostrar advertencia pero continuar
       console.warn('⚠️  La aplicación continuará en modo desarrollo, pero algunas funciones pueden fallar');
+      console.warn('💡 Configure las variables faltantes para funcionalidad completa');
       return null;
     }
-    
+
     console.log('✅ Variables de entorno validadas correctamente');
-    
+
     return result.data;
-    
+
   } catch (error) {
-    console.error('💥 Error crítico validando environment:', error);
-    
+    console.error('💥 Error crítico validando environment:', error?.message || error);
+
     if (process.env.NODE_ENV === 'production') {
+      console.error('💥 Error fatal en validación de configuración');
       process.exit(1);
     }
-    
+
     return null;
   }
 }
 
 /**
- * Obtiene configuración validada
+ * Obtiene configuración validada con validación robusta
  * @returns {Object} Configuración de la aplicación
  */
 function getConfig() {
   const validatedEnv = validateEnvironment();
-  
+
   // Si la validación falló, usar valores por defecto seguros
   if (!validatedEnv) {
-    console.warn('⚠️  Usando configuración de fallback');
-    return {
+    console.warn('⚠️  Usando configuración de fallback - algunas funciones pueden no estar disponibles');
+    const fallbackConfig = {
       NODE_ENV: 'development',
       PORT: 3001,
       DATABASE_URL: process.env.DATABASE_URL || '',
       JWT_SECRET: process.env.JWT_SECRET || '',
       WHATSAPP_ENABLED: false,
-      // Otros valores por defecto...
+      // Valores por defecto seguros para servicios opcionales
       pdfExtractor: {
-        baseUrl: process.env.PDF_EXTRACTOR_BASE_URL || 'http://localhost:8001',
-        token: process.env.PDF_EXTRACTOR_TOKEN || '',
+        baseUrl: process.env.PDF_EXTRACTOR_BASE_URL || null,
+        token: process.env.PDF_EXTRACTOR_TOKEN || null,
         timeout: parseInt(process.env.PDF_EXTRACTOR_TIMEOUT || '30000', 10)
       },
       concuerdos: {
         // Defaults seguros para flags nuevos
-        llmRouterEnabled: String(process.env.LLM_ROUTER_ENABLED || 'false') === 'true',
-        llmStrategy: ['hibrido', 'solo_gemini', 'solo_node'].includes(String(process.env.LLM_STRATEGY))
-          ? String(process.env.LLM_STRATEGY)
-          : 'hibrido',
-        promptForceTemplate: ['auto', 'A', 'B', 'C'].includes(String(process.env.PROMPT_FORCE_TEMPLATE))
-          ? String(process.env.PROMPT_FORCE_TEMPLATE)
-          : 'auto',
-        structureRouterEnabled: String(process.env.STRUCTURE_ROUTER_ENABLED || 'true') === 'true',
-        templateMode: ['structural', 'family'].includes(String(process.env.TEMPLATE_MODE))
-          ? String(process.env.TEMPLATE_MODE)
-          : 'structural',
-        geminiJsonMode: String(process.env.GEMINI_JSON_MODE || 'true') === 'true'
+        llmRouterEnabled: false,
+        llmStrategy: 'hibrido',
+        promptForceTemplate: 'auto',
+        structureRouterEnabled: true,
+        templateMode: 'structural',
+        geminiJsonMode: true
       }
     };
+
+    console.log('🔧 Configuración fallback aplicada:', {
+      database: fallbackConfig.DATABASE_URL ? 'CONFIGURADA' : 'NO CONFIGURADA',
+      whatsapp: fallbackConfig.WHATSAPP_ENABLED ? 'HABILITADO' : 'DESHABILITADO',
+      pdfExtractor: fallbackConfig.pdfExtractor.baseUrl ? 'CONFIGURADO' : 'NO CONFIGURADO'
+    });
+
+    return fallbackConfig;
   }
   
   // Construir configuración extendida
@@ -341,43 +346,66 @@ function getConfig() {
   if (!printedOnce) {
     printedOnce = true;
     try {
+      console.log('🔧 CONFIGURACIÓN CARGADA EXITOSAMENTE');
+      console.log('=' .repeat(50));
+
       // Warnings por flags deprecados presentes
       const deprecated = ['CONCUERDOS_USE_GEMINI_FIRST','EXTRACT_HYBRID','FORCE_PYTHON_EXTRACTOR','GEMINI_PRIORITY'];
       const present = deprecated.filter(k => typeof process.env[k] !== 'undefined');
       if (present.length) {
-        console.warn('⚠️ Flags deprecados detectados. Usa LLM_STRATEGY en su lugar:');
-        present.forEach(k => console.warn(`   • ${k} (usar LLM_STRATEGY)`));
+        console.warn('⚠️ FLAGS DEPRECADOS DETECTADOS:');
+        console.warn('   Usa LLM_STRATEGY en su lugar para mejor control:');
+        present.forEach(k => console.warn(`   • ${k} → reemplazar con LLM_STRATEGY`));
+        console.log('');
       }
 
-      // Fail fast adicional en producción por claves críticas
+      // Validación crítica en producción
       if (cfg.NODE_ENV === 'production') {
         const criticalMissing = [];
         if (!cfg.DATABASE_URL) criticalMissing.push('DATABASE_URL');
         if (!cfg.JWT_SECRET) criticalMissing.push('JWT_SECRET');
         if (!process.env.GOOGLE_API_KEY) criticalMissing.push('GOOGLE_API_KEY');
         if (criticalMissing.length) {
-          console.error('❌ Variables críticas faltantes en producción:', criticalMissing.join(', '));
+          console.error('❌ VARIABLES CRÍTICAS FALTANTES EN PRODUCCIÓN:');
+          criticalMissing.forEach(v => console.error(`   • ${v}`));
+          console.error('💥 La aplicación no puede continuar sin estas variables');
           process.exit(1);
         }
       }
 
-      // Tabla segura de configuración efectiva (solo nombres/estado, sin valores)
-      const names = [
-        'NODE_ENV','DATABASE_URL','JWT_SECRET','GOOGLE_API_KEY','LLM_STRATEGY','GEMINI_ENABLED(derived)','EXTRACT_HYBRID(derived)','STRUCTURE_ROUTER_ENABLED','PROMPT_FORCE_TEMPLATE','TEMPLATE_MODE','GEMINI_JSON_MODE','GEMINI_PRIORITY','WHATSAPP_ENABLED','PDF_EXTRACTOR_BASE_URL','TWILIO_ACCOUNT_SID','TWILIO_AUTH_TOKEN','TWILIO_WHATSAPP_FROM'
+      // Estado de servicios críticos
+      console.log('📊 ESTADO DE SERVICIOS:');
+      console.log(`   • Base de datos: ${cfg.DATABASE_URL ? '✅ CONECTADA' : '❌ NO CONFIGURADA'}`);
+      console.log(`   • Autenticación JWT: ${cfg.JWT_SECRET ? '✅ CONFIGURADA' : '❌ NO CONFIGURADA'}`);
+      console.log(`   • WhatsApp: ${cfg.WHATSAPP_ENABLED ? '✅ HABILITADO' : '⚪ DESHABILITADO'}`);
+      console.log(`   • PDF Extractor: ${cfg.pdfExtractor?.baseUrl ? '✅ CONFIGURADO' : '⚪ NO CONFIGURADO'}`);
+      console.log(`   • Gemini AI: ${process.env.GOOGLE_API_KEY ? '✅ CONFIGURADO' : '⚪ NO CONFIGURADO'}`);
+      console.log('');
+
+      // Tabla de configuración efectiva (solo nombres/estado, sin valores sensibles)
+      const configItems = [
+        ['NODE_ENV', cfg.NODE_ENV],
+        ['DATABASE_URL', cfg.DATABASE_URL ? 'SET' : 'UNSET'],
+        ['JWT_SECRET', cfg.JWT_SECRET ? 'SET' : 'UNSET'],
+        ['GOOGLE_API_KEY', process.env.GOOGLE_API_KEY ? 'SET' : 'UNSET'],
+        ['LLM_STRATEGY', cfg.concuerdos.llmStrategy],
+        ['WHATSAPP_ENABLED', cfg.WHATSAPP_ENABLED ? 'TRUE' : 'FALSE'],
+        ['PDF_EXTRACTOR_BASE_URL', cfg.pdfExtractor?.baseUrl ? 'SET' : 'UNSET'],
+        ['STRUCTURE_ROUTER_ENABLED', cfg.concuerdos.structureRouterEnabled ? 'TRUE' : 'FALSE']
       ];
-      console.log('📋 Effective settings (nombres, sin valores):');
-      console.log('| Setting | Status |');
-      console.log('|---|---|');
-      const statusOf = (k) => {
-        switch (k) {
-          case 'GEMINI_ENABLED(derived)': return cfg.concuerdos.derived.GEMINI_ENABLED ? 'SET' : 'UNSET';
-          case 'EXTRACT_HYBRID(derived)': return cfg.concuerdos.derived.EXTRACT_HYBRID ? 'SET' : 'UNSET';
-          case 'GEMINI_PRIORITY': return cfg.GEMINI_PRIORITY ? 'SET' : 'UNSET';
-          default: return process.env[k.replace(/\(derived\)/,'')] ? 'SET' : 'UNSET';
-        }
-      };
-      names.forEach(n => console.log(`| ${n} | ${statusOf(n)} |`));
-    } catch {}
+
+      console.log('📋 CONFIGURACIÓN EFECTIVA:');
+      console.log('| Variable | Valor |');
+      console.log('|----------|-------|');
+      configItems.forEach(([key, value]) => {
+        console.log(`| ${key} | ${value} |`);
+      });
+
+      console.log('=' .repeat(50));
+      console.log('✅ Configuración validada y lista para usar');
+    } catch (logError) {
+      console.warn('⚠️ Error en logging de configuración:', logError?.message || logError);
+    }
   }
 
   return cfg;
@@ -390,7 +418,7 @@ function getConfig() {
  */
 function isConfigurationComplete(config) {
   const criticalVars = ['DATABASE_URL', 'JWT_SECRET'];
-  
+
   return criticalVars.every(varName => {
     const hasValue = config[varName] && config[varName].length > 0;
     if (!hasValue) {
@@ -398,6 +426,71 @@ function isConfigurationComplete(config) {
     }
     return hasValue;
   });
+}
+
+/**
+ * Valida configuración completa incluyendo servicios opcionales
+ * @param {Object} config - Configuración de la aplicación
+ * @returns {Object} Resultado de validación con detalles
+ */
+function validateConfigurationComplete(config) {
+  const result = {
+    isComplete: true,
+    critical: { complete: true, missing: [] },
+    optional: { complete: true, missing: [], warnings: [] },
+    recommendations: []
+  };
+
+  // Validación de variables críticas
+  const criticalVars = ['DATABASE_URL', 'JWT_SECRET'];
+  criticalVars.forEach(varName => {
+    const hasValue = config[varName] && config[varName].length > 0;
+    if (!hasValue) {
+      result.critical.complete = false;
+      result.critical.missing.push(varName);
+      result.isComplete = false;
+    }
+  });
+
+  // Validación de servicios opcionales
+  const optionalServices = [
+    {
+      name: 'Google API Key',
+      check: () => process.env.GOOGLE_API_KEY,
+      message: 'Sin GOOGLE_API_KEY, Gemini AI no funcionará'
+    },
+    {
+      name: 'PDF Extractor',
+      check: () => config.pdfExtractor?.baseUrl && config.pdfExtractor?.token,
+      message: 'Sin configuración de PDF Extractor, se usará solo procesamiento local'
+    },
+    {
+      name: 'WhatsApp',
+      check: () => config.WHATSAPP_ENABLED && config.TWILIO_ACCOUNT_SID && config.TWILIO_AUTH_TOKEN,
+      message: 'WhatsApp habilitado pero credenciales Twilio faltantes'
+    }
+  ];
+
+  optionalServices.forEach(service => {
+    if (!service.check()) {
+      result.optional.missing.push(service.name);
+      result.optional.warnings.push(service.message);
+      result.optional.complete = false;
+    }
+  });
+
+  // Recomendaciones
+  if (!config.pdfExtractor?.baseUrl) {
+    result.recommendations.push('Configure PDF_EXTRACTOR_BASE_URL para mejor rendimiento de extracción');
+  }
+  if (!process.env.GOOGLE_API_KEY) {
+    result.recommendations.push('Configure GOOGLE_API_KEY para usar IA en procesamiento de documentos');
+  }
+  if (config.WHATSAPP_ENABLED && (!config.TWILIO_ACCOUNT_SID || !config.TWILIO_AUTH_TOKEN)) {
+    result.recommendations.push('Complete credenciales Twilio para funcionalidad WhatsApp completa');
+  }
+
+  return result;
 }
 
 /**
@@ -426,5 +519,6 @@ export {
   validateEnvironment,
   getConfig,
   isConfigurationComplete,
+  validateConfigurationComplete,
   debugConfiguration
 };
