@@ -29,7 +29,6 @@
     "fix:grouped": "node scripts/fix-grouped-documents-status.js smart",
     "fix:grouped-force": "node scripts/fix-grouped-documents-status.js force EN_PROCESO",
     "db:sync": "npx prisma db push --accept-data-loss",
-    "db:mark-baseline": "node scripts/mark-baseline-migration.js",
     "db:baseline": "node scripts/db-baseline.js",
     "prestart": "node scripts/run-migrations.js",
     "reconcile": "node scripts/reconcile-schema.js",
