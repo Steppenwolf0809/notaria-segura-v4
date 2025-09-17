@@ -2,37 +2,35 @@
 
 /**
  * Baseline de Prisma para DB ya existente (evita error P3005)
+ * Implementación compatible con Prisma 5.22 (sin `migrate status --json`).
  *
- * ¿Qué es un baseline?
- * - Es una migración especial que representa el estado actual del esquema en la base de datos
- *   pero NO se ejecuta. Solo se marca como "aplicada" para que Prisma no intente recrear
- *   tablas ya existentes cuando aún no hay historial de migraciones.
- *
- * ¿Por qué correrlo ANTES de `prisma migrate deploy`?
- * - En Railway a veces la DB PostgreSQL ya tiene tablas (pre-cargadas o por `db push`).
- *   Si no existe historial en `_prisma_migrations`, `migrate deploy` falla con P3005
- *   ("Database is not empty"). Al marcar un baseline primero, Prisma puede continuar
- *   con `migrate deploy` sin intentar recrear lo existente.
- *
- * Idempotencia:
- * - Si ya hay migraciones aplicadas o ya existe un baseline aplicado, el script no hace nada.
- * - Si no hay migraciones aplicadas PERO la base está vacía, no hace nada.
+ * Estrategia:
+ * - Detecta por SQL vía `pg` si hay tablas en `public`.
+ * - Verifica si existe `public.prisma_migrations` y si ya hay una fila *_baseline.
+ * - Si hay tablas y no hay baseline aplicada:
+ *   - Usa `prisma migrate diff --from-empty --to-schema-datamodel --script` para generar baseline
+ *   - Guarda en ./prisma/migrations/<timestamp>_baseline/migration.sql
+ *   - Registra con `prisma migrate resolve --applied <timestamp>_baseline`.
+ * - Idempotente: si la baseline ya está marcada, no hace nada y sale con 0.
  */
 
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, writeFileSync, readdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import path, { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import process from 'node:process';
-
-// Usamos `pg` para detectar si la DB tiene tablas reales.
-// Está en dependencies del backend, por lo que está disponible en producción.
 import pg from 'pg';
 
-const rootDir = resolve(new URL('.', import.meta.url).pathname, '..');
-const backendDir = resolve(rootDir, '..');
+function log(msg) {
+  console.log(`[db:baseline] ${msg}`);
+}
+
+// Rutas y constantes
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const backendDir = resolve(__dirname, '..');
 const prismaDir = join(backendDir, 'prisma');
 const migrationsDir = join(prismaDir, 'migrations');
-const schemaPath = './prisma/schema.prisma';
+const SCHEMA = path.resolve(__dirname, '../prisma/schema.prisma');
 
 function run(cmd, args, opts = {}) {
   const res = spawnSync(cmd, args, {
@@ -45,85 +43,87 @@ function run(cmd, args, opts = {}) {
 }
 
 function npxPrisma(args) {
-  return run('npx', ['prisma', ...args]);
-}
-
-function log(msg) {
-  // Prefijo claro para logs en Railway
-  console.log(`[db:baseline] ${msg}`);
-}
-
-async function databaseHasTables() {
-  // Primero, si no hay DATABASE_URL, devolvemos false (no podemos comprobar)
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    log('VARIABLE DATABASE_URL no definida; no se puede verificar tablas. Asumiendo DB vacía.');
-    return false;
-  }
-
-  try {
-    const client = new pg.Client({ connectionString: url, ssl: getSSLConfig(url) });
-    await client.connect();
-    const q = `
-      SELECT COUNT(*)::int AS cnt
-      FROM information_schema.tables
-      WHERE table_schema NOT IN ('pg_catalog','information_schema')
-        AND table_type = 'BASE TABLE';
-    `;
-    const { rows } = await client.query(q);
-    await client.end();
-    const count = rows?.[0]?.cnt ?? 0;
-    log(`Tablas existentes detectadas: ${count}`);
-    return Number(count) > 0;
-  } catch (err) {
-    log(`No se pudo consultar tablas vía pg: ${err.message}`);
-  }
-
-  // Fallback: leer salida de `prisma migrate status` en texto y buscar pista
-  try {
-    const res = npxPrisma(['migrate', 'status', `--schema=${schemaPath}`]);
-    const txt = `${res.stdout}\n${res.stderr}`;
-    if (/not empty/i.test(txt)) {
-      log('Prisma indica que la base NO está vacía.');
-      return true;
-    }
-  } catch (e) {
-    // Ignorar
-  }
-  return false;
+  // Siempre pasar ruta absoluta de schema
+  return run('npx', ['prisma', ...args, `--schema=${SCHEMA}`]);
 }
 
 function getSSLConfig(url) {
-  // Railway suele requerir SSL en Postgres administrados
-  // Si es un file: (SQLite) o localhost, no aplicar SSL.
   if (url.startsWith('postgres://') || url.startsWith('postgresql://')) {
     return { rejectUnauthorized: false };
   }
   return undefined;
 }
 
-function getMigrateStatusJSON() {
-  const res = npxPrisma(['migrate', 'status', `--schema=${schemaPath}`, '--json']);
-  if (res.status !== 0) {
-    throw new Error(`Fallo al ejecutar prisma migrate status: ${res.stderr || res.stdout}`);
-  }
+async function pgQuery(sql, params = []) {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error('DATABASE_URL no definida');
+  const client = new pg.Client({ connectionString: url, ssl: getSSLConfig(url) });
+  await client.connect();
   try {
-    return JSON.parse(res.stdout);
-  } catch (e) {
-    throw new Error(`No se pudo parsear JSON de migrate status: ${e.message}\n${res.stdout}`);
+    const res = await client.query(sql, params);
+    return res;
+  } finally {
+    await client.end();
   }
 }
 
-function findExistingBaselineId() {
+async function getDbState() {
+  const url = process.env.DATABASE_URL || '';
+  if (!url) {
+    log('DATABASE_URL no definida. Asumiendo entorno local sin Postgres. No hacer nada.');
+    return { engine: 'unknown', hasTables: false, hasPrismaMigrations: false, baselineName: null };
+  }
+
+  if (!url.startsWith('postgres://') && !url.startsWith('postgresql://')) {
+    log(`DATABASE_URL no es Postgres (${url.split(':')[0]}). Omitiendo baseline.`);
+    return { engine: 'other', hasTables: false, hasPrismaMigrations: false, baselineName: null };
+  }
+
+  // 1) Contar tablas en esquema public
+  const tablesRes = await pgQuery(
+    `SELECT COUNT(*)::int AS cnt
+     FROM information_schema.tables
+     WHERE table_schema = 'public' AND table_type = 'BASE TABLE'`
+  );
+  const hasTables = Number(tablesRes.rows?.[0]?.cnt ?? 0) > 0;
+  log(`Tablas en public: ${tablesRes.rows?.[0]?.cnt ?? 0}`);
+
+  // 2) Ver si existe tabla prisma_migrations
+  const existsRes = await pgQuery(
+    `SELECT EXISTS (
+       SELECT 1 FROM information_schema.tables
+       WHERE table_schema='public' AND table_name='prisma_migrations'
+     ) AS exists`);
+  const hasPrismaMigrations = !!existsRes.rows?.[0]?.exists;
+  log(`Tabla prisma_migrations existe: ${hasPrismaMigrations}`);
+
+  // 3) Si existe, buscar *_baseline aplicado
+  let baselineName = null;
+  if (hasPrismaMigrations) {
+    const baseRes = await pgQuery(
+      `SELECT migration_name
+       FROM public.prisma_migrations
+       WHERE migration_name LIKE '%_baseline'
+       ORDER BY finished_at DESC NULLS LAST, started_at DESC NULLS LAST
+       LIMIT 1`
+    );
+    baselineName = baseRes.rows?.[0]?.migration_name || null;
+    if (baselineName) log(`Baseline ya aplicada en DB: ${baselineName}`);
+  }
+
+  return { engine: 'postgres', hasTables, hasPrismaMigrations, baselineName };
+}
+
+function findExistingBaselineIdOnDisk() {
   if (!existsSync(migrationsDir)) return null;
-  const entries = readdirSync(migrationsDir, { withFileTypes: true })
+  const dirs = readdirSync(migrationsDir, { withFileTypes: true })
     .filter((d) => d.isDirectory() && d.name.endsWith('_baseline'))
     .map((d) => d.name)
-    .sort(); // escoger la más reciente por nombre (timestamp prefijo)
-  return entries.length ? entries[entries.length - 1] : null;
+    .sort();
+  return dirs.length ? dirs[dirs.length - 1] : null;
 }
 
-function createBaselineMigration() {
+function createBaselineMigrationOnDisk() {
   const ts = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14); // YYYYMMDDHHMMSS
   const baselineId = `${ts}_baseline`;
   const dir = join(migrationsDir, baselineId);
@@ -131,14 +131,7 @@ function createBaselineMigration() {
   if (!existsSync(dir)) mkdirSync(dir);
 
   log(`Generando baseline con prisma migrate diff → ${baselineId}`);
-  const diff = npxPrisma([
-    'migrate',
-    'diff',
-    '--from-empty',
-    '--to-schema-datamodel',
-    'backend/prisma/schema.prisma',
-    '--script',
-  ]);
+  const diff = run('npx', ['prisma', 'migrate', 'diff', '--from-empty', '--to-schema-datamodel', SCHEMA, '--script']);
   if (diff.status !== 0) {
     throw new Error(`Fallo al generar baseline (migrate diff): ${diff.stderr || diff.stdout}`);
   }
@@ -146,85 +139,50 @@ function createBaselineMigration() {
   return baselineId;
 }
 
-function markBaselineApplied(baselineId) {
+function resolveBaselineApplied(baselineId) {
   log(`Marcando baseline como aplicada: ${baselineId}`);
-  const res = npxPrisma([
-    'migrate',
-    'resolve',
-    `--schema=${schemaPath}`,
-    '--applied',
-    baselineId,
-  ]);
+  const res = npxPrisma(['migrate', 'resolve', '--applied', baselineId]);
   if (res.status !== 0) {
     throw new Error(`Fallo al marcar baseline como aplicada: ${res.stderr || res.stdout}`);
   }
 }
 
 async function main() {
-  log('Inicio baseline idempotente (P3005 guard)');
+  log('Inicio baseline idempotente (modo Prisma 5.22)');
 
-  // 1) Estado de migraciones Prisma (JSON)
-  let statusJSON;
-  try {
-    statusJSON = getMigrateStatusJSON();
-  } catch (err) {
-    // Si falla status, continuamos con heurísticas; pero usualmente debería estar disponible
-    log(`Aviso: no se pudo obtener migrate status en JSON: ${err.message}`);
-  }
+  const state = await getDbState();
 
-  const applied = statusJSON?.appliedMigrationNames ?? [];
-  const hasApplied = applied.length > 0;
-  const appliedBaseline = applied.find((n) => n.endsWith('_baseline'));
-
-  if (appliedBaseline) {
-    log(`Baseline ya aplicada (${appliedBaseline}). Nada que hacer.`);
+  // Si no es Postgres o no hay tablas, no hacer nada
+  if (state.engine !== 'postgres') {
+    log('Entorno no-Postgres o sin DATABASE_URL. Nada que hacer.');
     process.exit(0);
   }
 
-  if (hasApplied) {
-    log('Ya existen migraciones aplicadas. No se requiere baseline.');
+  if (!state.hasTables) {
+    log('Base de datos sin tablas en public. No se requiere baseline.');
     process.exit(0);
   }
 
-  // 2) Si no hay migraciones aplicadas, verificar si la DB tiene tablas
-  const hasTables = await databaseHasTables();
-  if (!hasTables) {
-    log('Base de datos vacía. No se requiere baseline.');
+  if (state.baselineName) {
+    log(`Baseline ya aplicada en la DB (${state.baselineName}). Nada que hacer.`);
     process.exit(0);
   }
 
-  // 3) Buscar baseline existente en carpeta
-  let baselineId = findExistingBaselineId();
+  // Si hay tablas y no hay baseline registrada, crear/usar baseline local y resolverla como aplicada
+  let baselineId = findExistingBaselineIdOnDisk();
   if (baselineId) {
-    log(`Baseline encontrado en filesystem: ${baselineId}`);
+    log(`Baseline encontrada en filesystem: ${baselineId}`);
   } else {
-    // 4) Crear baseline por diff si no existe
-    baselineId = createBaselineMigration();
+    baselineId = createBaselineMigrationOnDisk();
   }
 
-  // 5) Marcar baseline como aplicada (idempotente si ya lo está)
-  try {
-    markBaselineApplied(baselineId);
-  } catch (e) {
-    // Si ya fue aplicada, Prisma devolverá error; intentamos detectar ese caso con un segundo status
-    log(`Aviso al marcar baseline: ${e.message}`);
-    try {
-      const st = getMigrateStatusJSON();
-      const ap = st?.appliedMigrationNames ?? [];
-      if (ap.includes(baselineId)) {
-        log('Confimado: baseline ya constaba como aplicada.');
-        process.exit(0);
-      }
-    } catch (_) {}
-    // Error real
-    process.exit(1);
-  }
+  // Registrar baseline como aplicada (crea prisma_migrations si no existe)
+  resolveBaselineApplied(baselineId);
 
-  log('Baseline aplicado/registrado correctamente.');
+  log('Baseline registrado correctamente.');
 }
 
 main().catch((err) => {
-  console.error('[db:baseline] Error no controlado:', err);
+  console.error('[db:baseline] Error:', err?.message || err);
   process.exit(1);
 });
-
