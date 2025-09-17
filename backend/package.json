@@ -38,6 +38,8 @@
     "railway:health": "node scripts/health-check.js",
     "railway:backup": "node scripts/backup.js",
     "railway:recovery": "node scripts/recovery.js --strategy=in-place",
+    "railway:fix-p3009": "node scripts/railway-recovery.js in-place",
+    "railway:emergency-reset": "node scripts/railway-recovery.js reset",
     "diagnose:p3009": "node scripts/diagnose-p3009.js",
     "recovery:in-place": "node scripts/recovery.js --strategy=in-place",
     "recovery:reset": "node scripts/recovery.js --strategy=reset --confirm",
