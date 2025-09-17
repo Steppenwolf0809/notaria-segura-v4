@@ -143,7 +143,13 @@ function resolveBaselineApplied(baselineId) {
   log(`Marcando baseline como aplicada: ${baselineId}`);
   const res = npxPrisma(['migrate', 'resolve', '--applied', baselineId]);
   if (res.status !== 0) {
-    throw new Error(`Fallo al marcar baseline como aplicada: ${res.stderr || res.stdout}`);
+    const errorMsg = res.stderr || res.stdout;
+    if (errorMsg.includes('P3008')) {
+      log('Baseline ya registrada (P3008). Tratando como éxito.');
+      return;
+    } else {
+      throw new Error(`Fallo al marcar baseline como aplicada: ${errorMsg}`);
+    }
   }
 }
 
