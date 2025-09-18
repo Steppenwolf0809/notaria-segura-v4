@@ -35,6 +35,20 @@ enum DocumentStatus {
   ANULADO_NOTA_CREDITO
 }
 
+// Enumeración de tipos de eventos de auditoría (SQLite compatible)
+enum DocumentEventType {
+  DOCUMENT_CREATED
+  DOCUMENT_ASSIGNED
+  STATUS_CHANGED
+  VERIFICATION_GENERATED
+  WHATSAPP_SENT
+  EXTRACTION_SNAPSHOT
+  EXTRACTION_APPLIED
+  STATUS_UNDO
+  NOTE_ADDED
+  UNKNOWN
+}
+
 // Modelo principal de usuarios
 model User {
   id          Int      @id @default(autoincrement())
@@ -183,10 +197,10 @@ model DocumentGroup {
 
 // MODELO DE AUDITORÍA - Registro de eventos de documentos
 model DocumentEvent {
-  id              String    @id @default(uuid())
+  id              String            @id @default(uuid())
   documentId      String                          // FK al documento
   userId          Int                             // FK al usuario que realizó la acción
-  eventType       String                      // Tipo de evento
+  eventType       DocumentEventType @default(UNKNOWN) // Tipo de evento (enum)
   description     String                         // Descripción del evento
   details         String?                          // Detalles adicionales del evento (JSON string)
   // Detalles enriquecidos de entrega (compatibles hacia atrás)
@@ -197,15 +211,16 @@ model DocumentEvent {
   ipAddress       String?                        // IP desde donde se realizó la acción
   userAgent       String?                        // User agent del navegador
   createdAt       DateTime  @default(now())
-  
+
   // Relaciones
   document        Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
   user            User      @relation(fields: [userId], references: [id])
-  
+
   @@map("document_events")
   // Índices para timelines por documento y auditoría por usuario
   @@index([documentId, createdAt])
   @@index([userId])
+  @@index([eventType])
 }
 
 // Tipos de eventos para auditoría (SQLite compatible)
