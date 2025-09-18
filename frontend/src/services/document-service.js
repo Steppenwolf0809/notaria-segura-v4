@@ -28,7 +28,13 @@ api.interceptors.request.use(
       try {
         const parsed = JSON.parse(authData);
         if (parsed.state && parsed.state.token) {
-          config.headers.Authorization = `Bearer ${parsed.state.token}`;
+          // Validar que el token tenga un formato básico válido
+          const token = parsed.state.token;
+          if (token && typeof token === 'string' && token.split('.').length === 3) {
+            config.headers.Authorization = `Bearer ${token}`;
+          } else {
+            console.warn('Token JWT malformado detectado, omitiendo header Authorization');
+          }
         }
       } catch (error) {
         console.error('Error parsing auth token:', error);
@@ -37,6 +43,63 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Interceptor para manejar respuestas y errores de autenticación
+api.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  async (error) => {
+    const originalRequest = error.config;
+
+    // Si es error 401 y no hemos reintentado ya
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      console.warn('🔐 Error 401 detectado, intentando refrescar token...');
+
+      try {
+        // Intentar refrescar el token usando authService
+        const authService = (await import('./auth-service.js')).default;
+        const refreshResult = await authService.refreshToken(localStorage.getItem('notaria-auth-storage'));
+
+        if (refreshResult.success && refreshResult.data?.token) {
+          console.log('✅ Token refrescado exitosamente');
+
+          // Actualizar el token en localStorage
+          const authData = JSON.parse(localStorage.getItem('notaria-auth-storage') || '{}');
+          if (authData.state) {
+            authData.state.token = refreshResult.data.token;
+            localStorage.setItem('notaria-auth-storage', JSON.stringify(authData));
+          }
+
+          // Reintentar la petición original con el nuevo token
+          originalRequest.headers.Authorization = `Bearer ${refreshResult.data.token}`;
+          originalRequest._retry = true;
+
+          return api(originalRequest);
+        } else {
+          console.error('❌ Error refrescando token:', refreshResult.error);
+          // Limpiar autenticación si no se pudo refrescar
+          localStorage.removeItem('notaria-auth-storage');
+          window.location.href = '/login';
+        }
+      } catch (refreshError) {
+        console.error('❌ Error en interceptor de refresh:', refreshError);
+        // Limpiar autenticación y redirigir a login
+        localStorage.removeItem('notaria-auth-storage');
+        window.location.href = '/login';
+      }
+    }
+
+    // Para errores JWT específicos, proporcionar mejor información
+    if (error.response?.data?.message?.includes('malformed') ||
+        error.response?.data?.message?.includes('jwt') ||
+        error.response?.data?.message?.includes('token')) {
+      console.error('🚨 Error de token JWT detectado:', error.response.data);
+    }
+
     return Promise.reject(error);
   }
 );

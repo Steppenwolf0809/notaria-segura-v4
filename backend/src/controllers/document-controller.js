@@ -3487,8 +3487,27 @@ async function getDocumentHistory(req, res) {
       documentId: id
     };
 
+    // Validar y filtrar por eventType si se proporciona
     if (eventType) {
-      whereClause.eventType = eventType;
+      // Lista de valores válidos del enum DocumentEventType
+      const validEventTypes = [
+        'DOCUMENT_CREATED',
+        'DOCUMENT_ASSIGNED',
+        'STATUS_CHANGED',
+        'VERIFICATION_GENERATED',
+        'WHATSAPP_SENT',
+        'EXTRACTION_SNAPSHOT',
+        'EXTRACTION_APPLIED',
+        'STATUS_UNDO',
+        'NOTE_ADDED',
+        'UNKNOWN'
+      ];
+
+      if (validEventTypes.includes(eventType)) {
+        whereClause.eventType = eventType;
+      } else {
+        console.warn(`⚠️ EventType no válido recibido: ${eventType}. Ignorando filtro.`);
+      }
     }
 
     // Obtener eventos del historial
