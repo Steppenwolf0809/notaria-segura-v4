@@ -4134,6 +4134,192 @@ async function updateGroupNotificationPolicy(req, res) {
   }
 }
 
+/**
+ * 🎯 NUEVA FUNCIONALIDAD: Obtener documentos con filtros unificados para UI Activos/Entregados
+ * Endpoint principal para la nueva interfaz con pestañas y búsqueda global
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+async function getDocumentsUnified(req, res) {
+  try {
+    const { tab, query, clientId, page = 1, pageSize = 25 } = req.query;
+
+    // Validar parámetros requeridos
+    if (!tab || !['ACTIVOS', 'ENTREGADOS'].includes(tab)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Parámetro "tab" es obligatorio y debe ser "ACTIVOS" o "ENTREGADOS"'
+      });
+    }
+
+    // Validar pageSize
+    const validPageSizes = [25, 50, 100];
+    const limit = validPageSizes.includes(parseInt(pageSize)) ? parseInt(pageSize) : 25;
+    const offset = (parseInt(page) - 1) * limit;
+
+    // Construir filtros según pestaña
+    let statusFilter = [];
+    if (tab === 'ACTIVOS') {
+      statusFilter = ['EN_PROCESO', 'LISTO'];
+    } else if (tab === 'ENTREGADOS') {
+      statusFilter = ['ENTREGADO'];
+    }
+
+    // Construir where clause
+    const whereClause = {
+      status: { in: statusFilter }
+    };
+
+    // Agregar filtro por clientId si se proporciona
+    if (clientId) {
+      whereClause.clientId = clientId;
+    }
+
+    // Agregar búsqueda global si se proporciona query
+    if (query && query.trim()) {
+      const searchTerm = query.trim();
+      whereClause.OR = [
+        { protocolNumber: { contains: searchTerm, mode: 'insensitive' } },
+        { clientName: { contains: searchTerm, mode: 'insensitive' } },
+        { clientId: { contains: searchTerm, mode: 'insensitive' } },
+        { documentType: { contains: searchTerm, mode: 'insensitive' } }
+      ];
+    }
+
+    console.log('🔍 getDocumentsUnified - Filtros aplicados:', {
+      tab,
+      query: query || '(sin búsqueda)',
+      clientId: clientId || '(sin filtro cliente)',
+      page,
+      pageSize: limit,
+      whereClause
+    });
+
+    // Ejecutar consulta con optimización de índices
+    const [documents, total] = await Promise.all([
+      prisma.document.findMany({
+        where: whereClause,
+        include: {
+          createdBy: {
+            select: { id: true, firstName: true, lastName: true, email: true }
+          },
+          assignedTo: {
+            select: { id: true, firstName: true, lastName: true, email: true }
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: offset,
+        take: limit
+      }),
+      prisma.document.count({ where: whereClause })
+    ]);
+
+    // Formatear respuesta optimizada para frontend
+    const formattedDocuments = documents.map(doc => ({
+      id: doc.id,
+      code: doc.protocolNumber,
+      clientId: doc.clientId,
+      clientName: doc.clientName,
+      clientIdentification: doc.clientId, // Para compatibilidad
+      typeLabel: doc.documentType,
+      statusLabel: doc.status,
+      receivedAtFmt: doc.createdAt ? new Date(doc.createdAt).toLocaleDateString('es-EC') : '-',
+      amountFmt: doc.actoPrincipalValor ? `$${doc.actoPrincipalValor.toLocaleString('es-EC')}` : '-'
+    }));
+
+    const totalPages = Math.ceil(total / limit);
+
+    console.log(`✅ getDocumentsUnified completado: ${documents.length} documentos encontrados de ${total} total`);
+
+    res.json({
+      success: true,
+      data: {
+        total,
+        pages: totalPages,
+        items: formattedDocuments
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error en getDocumentsUnified:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor al obtener documentos',
+      error: error.message
+    });
+  }
+}
+
+/**
+ * 🎯 NUEVA FUNCIONALIDAD: Obtener conteos para badges de pestañas
+ * Endpoint optimizado para actualizar badges en tiempo real
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+async function getDocumentsCounts(req, res) {
+  try {
+    const { query, clientId } = req.query;
+
+    // Construir filtros base
+    const baseWhere = {};
+    if (clientId) {
+      baseWhere.clientId = clientId;
+    }
+
+    // Agregar búsqueda global si se proporciona query
+    if (query && query.trim()) {
+      const searchTerm = query.trim();
+      baseWhere.OR = [
+        { protocolNumber: { contains: searchTerm, mode: 'insensitive' } },
+        { clientName: { contains: searchTerm, mode: 'insensitive' } },
+        { clientId: { contains: searchTerm, mode: 'insensitive' } },
+        { documentType: { contains: searchTerm, mode: 'insensitive' } }
+      ];
+    }
+
+    // Ejecutar conteos en paralelo para mejor performance
+    const [activosCount, entregadosCount] = await Promise.all([
+      // Conteo para ACTIVOS (EN_PROCESO + LISTO)
+      prisma.document.count({
+        where: {
+          ...baseWhere,
+          status: { in: ['EN_PROCESO', 'LISTO'] }
+        }
+      }),
+      // Conteo para ENTREGADOS
+      prisma.document.count({
+        where: {
+          ...baseWhere,
+          status: 'ENTREGADO'
+        }
+      })
+    ]);
+
+    console.log('📊 getDocumentsCounts completado:', {
+      query: query || '(sin búsqueda)',
+      clientId: clientId || '(sin filtro)',
+      ACTIVOS: activosCount,
+      ENTREGADOS: entregadosCount
+    });
+
+    res.json({
+      success: true,
+      data: {
+        ACTIVOS: activosCount,
+        ENTREGADOS: entregadosCount
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error en getDocumentsCounts:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor al obtener conteos',
+      error: error.message
+    });
+  }
+}
+
 export {
   uploadXmlDocument,
   uploadXmlDocumentsBatch,
@@ -4169,9 +4355,11 @@ export {
   revertDocumentStatus,
   // 🔔 Políticas de notificación
   updateNotificationPolicy,
-  updateGroupNotificationPolicy
-  ,
+  updateGroupNotificationPolicy,
   // 🧪 Extracción avanzada (flag)
   extractDocumentActs,
-  applyExtractionSuggestions
+  applyExtractionSuggestions,
+  // 🎯 NUEVA FUNCIONALIDAD: UI Activos/Entregados
+  getDocumentsUnified,
+  getDocumentsCounts
 };

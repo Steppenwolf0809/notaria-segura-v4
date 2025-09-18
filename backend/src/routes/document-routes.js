@@ -36,7 +36,10 @@ import {
   revertDocumentStatus,
   // 🔔 Políticas de notificación
   updateNotificationPolicy,
-  updateGroupNotificationPolicy
+  updateGroupNotificationPolicy,
+  // 🎯 NUEVA FUNCIONALIDAD: UI Activos/Entregados
+  getDocumentsUnified,
+  getDocumentsCounts
 } from '../controllers/document-controller.js';
 
 // 🔄 NUEVAS IMPORTACIONES: Operaciones masivas
@@ -192,6 +195,12 @@ router.post('/:id/apply-extraction', authenticateToken, async (req, res, next) =
   return applyExtractionSuggestions(req, res, next);
 });
 
+// 🎯 NUEVAS RUTAS: UI Activos/Entregados con búsqueda global
+// GET /api/documents - Endpoint principal para UI unificada con pestañas
+router.get('/', authenticateToken, getDocumentsUnified);
+
+// GET /api/documents/counts - Endpoint para actualizar badges de pestañas
+router.get('/counts', authenticateToken, getDocumentsCounts);
 
 /**
  * Middleware de manejo de errores para multer
