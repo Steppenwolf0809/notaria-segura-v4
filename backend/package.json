@@ -45,7 +45,8 @@
     "diagnose:p3009": "node scripts/diagnose-p3009.js",
     "recovery:in-place": "node scripts/recovery.js --strategy=in-place",
     "recovery:reset": "node scripts/recovery.js --strategy=reset --confirm",
-    "recovery:hybrid": "node scripts/recovery.js --strategy=hybrid"
+    "recovery:hybrid": "node scripts/recovery.js --strategy=hybrid",
+    "resolve:p3009": "node scripts/resolve-p3009.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
