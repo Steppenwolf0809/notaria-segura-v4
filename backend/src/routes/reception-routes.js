@@ -10,7 +10,10 @@ import {
   getDashboardStats,
   getAlertasRecepcion,
   revertirEstadoDocumento,
-  getNotificationHistoryReception
+  getNotificationHistoryReception,
+  // 🎯 NUEVA FUNCIONALIDAD: UI Activos/Entregados para Recepción
+  getReceptionsUnified,
+  getReceptionsCounts
 } from '../controllers/reception-controller.js';
 import { marcarVariosListos } from '../controllers/reception-bulk-controller.js';
 
@@ -123,10 +126,32 @@ router.get('/notificaciones', authenticateToken, requireRecepcion, getNotificati
  */
 router.post('/documentos/:id/revertir-estado', authenticateToken, requireRecepcion, revertirEstadoDocumento);
 
+/**
+ * 🎯 NUEVAS RUTAS: UI Activos/Entregados para Recepción
+ * @route GET /api/reception
+ * @desc Endpoint principal para UI unificada con pestañas y búsqueda global
+ * @query tab - 'ACTIVOS' | 'ENTREGADOS'
+ * @query query - Término de búsqueda global
+ * @query clientId - Filtro por ID de cliente
+ * @query page - Número de página (default: 1)
+ * @query pageSize - Tamaño de página (25, 50, 100)
+ * @access Private (RECEPCION only)
+ */
+router.get('/', authenticateToken, requireRecepcion, getReceptionsUnified);
+
+/**
+ * @route GET /api/reception/counts
+ * @desc Endpoint para actualizar badges de pestañas
+ * @query query - Término de búsqueda global
+ * @query clientId - Filtro por ID de cliente
+ * @access Private (RECEPCION only)
+ */
+router.get('/counts', authenticateToken, requireRecepcion, getReceptionsCounts);
+
 // Ruta de prueba simple para verificar conectividad
 router.get('/test', (req, res) => {
-  res.json({ 
-    message: 'Reception API funcionando correctamente', 
+  res.json({
+    message: 'Reception API funcionando correctamente',
     timestamp: new Date(),
     service: 'reception-service'
   });
