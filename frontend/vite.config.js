@@ -15,10 +15,22 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true
+    sourcemap: true,
+    manifest: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          ui: ['@mui/material', '@mui/icons-material'],
+          utils: ['zustand', 'react-hotkeys-hook']
+        }
+      }
+    }
   },
   define: {
     // Forzar variables de entorno para producción
-    'import.meta.env.VITE_API_URL': JSON.stringify('/api')
+    'import.meta.env.VITE_API_URL': JSON.stringify('/api'),
+    // Feature flag para nueva UI Activos/Entregados
+    'import.meta.env.VITE_UI_ACTIVOS_ENTREGADOS': JSON.stringify(process.env.VITE_UI_ACTIVOS_ENTREGADOS || 'true')
   }
 })

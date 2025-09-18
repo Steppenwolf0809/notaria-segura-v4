@@ -5,6 +5,12 @@ import { create } from 'zustand';
  * Maneja estado global para la nueva interfaz con pestañas y búsqueda global
  */
 const useUnifiedDocumentsStore = create((set, get) => ({
+  // 🔍 DEBUG: Log de inicialización del store
+  _initialized: (() => {
+    console.log('📦 DOCUMENTS-STORE initialized');
+    return true;
+  })(),
+
   // Estado inicial
   tab: 'ACTIVOS', // 'ACTIVOS' | 'ENTREGADOS'
   query: '',

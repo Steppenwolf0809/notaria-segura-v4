@@ -22,8 +22,10 @@ import {
 import useAuth from '../hooks/use-auth';
 import ThemeToggle from './ThemeToggle';
 import CajaDashboard from './CajaDashboard';
+import DocumentCenter from './DocumentCenter';
 import MatrizadorCenter from './MatrizadorCenter';
 import RecepcionCenter from './RecepcionCenter';
+import ReceptionCenter from './ReceptionCenter';
 import ArchivoCenter from './ArchivoCenter';
 import AdminCenter from './AdminCenter';
 import ChangePassword from './ChangePassword';
@@ -103,23 +105,28 @@ const Dashboard = () => {
 
   // Mostrar dashboard específico según rol
   if (user.role === 'CAJA') {
+    // 🔍 DEBUG: Verificar feature flag para CAJA
+    const featureFlag = import.meta.env.VITE_UI_ACTIVOS_ENTREGADOS;
+    console.log('🎯 DASHBOARD CAJA - Feature flag:', featureFlag);
+    console.log('🎯 DASHBOARD CAJA - User role:', user.role);
+
     return (
       <Box sx={{ flexGrow: 1 }}>
         {/* App Bar */}
-        <AppBar 
+        <AppBar
           position="static"
           color="default"
         >
           <Toolbar>
             <DashboardIcon sx={{ mr: 2 }} />
-            <Typography 
-              variant="h6" 
-              component="div" 
+            <Typography
+              variant="h6"
+              component="div"
               sx={{ flexGrow: 1 }}
             >
               Notaría Segura - CAJA
             </Typography>
-            
+
             {/* User Info */}
             <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
               <Avatar
@@ -142,7 +149,7 @@ const Dashboard = () => {
             <IconButton
               onClick={() => setShowChangePassword(true)}
               title="Cambiar Contraseña"
-              sx={{ 
+              sx={{
                 ml: 1,
                 color: 'text.primary',
                 '&:hover': {
@@ -190,11 +197,21 @@ const Dashboard = () => {
           </Toolbar>
         </AppBar>
 
-        {/* Dashboard de CAJA */}
-        <CajaDashboard />
-        
+        {/* 🔍 DEBUG: Mostrar componente según feature flag */}
+        {featureFlag === 'true' ? (
+          <>
+            {console.log('🎯 DASHBOARD CAJA - Using DocumentCenter v2')}
+            <DocumentCenter />
+          </>
+        ) : (
+          <>
+            {console.log('🎯 DASHBOARD CAJA - Using CajaDashboard legacy')}
+            <CajaDashboard />
+          </>
+        )}
+
         {/* Modal de cambio de contraseña */}
-        <ChangePassword 
+        <ChangePassword
           open={showChangePassword}
           onClose={() => setShowChangePassword(false)}
         />
@@ -207,7 +224,19 @@ const Dashboard = () => {
   }
 
   if (user.role === 'RECEPCION') {
-    return <RecepcionCenter />;
+    // 🔍 DEBUG: Verificar feature flag para RECEPCION
+    const featureFlag = import.meta.env.VITE_UI_ACTIVOS_ENTREGADOS;
+    console.log('🎯 DASHBOARD RECEPCION - Feature flag:', featureFlag);
+    console.log('🎯 DASHBOARD RECEPCION - User role:', user.role);
+
+    // 🔍 DEBUG: Mostrar componente según feature flag
+    if (featureFlag === 'true') {
+      console.log('🎯 DASHBOARD RECEPCION - Using ReceptionCenter v2');
+      return <ReceptionCenter />;
+    } else {
+      console.log('🎯 DASHBOARD RECEPCION - Using RecepcionCenter legacy');
+      return <RecepcionCenter />;
+    }
   }
 
   if (user.role === 'ARCHIVO') {

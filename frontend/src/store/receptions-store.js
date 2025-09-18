@@ -5,6 +5,11 @@ import { create } from 'zustand';
  * Maneja estado global para la nueva interfaz de recepción con pestañas y búsqueda global
  */
 const useReceptionsStore = create((set, get) => ({
+  // 🔍 DEBUG: Log de inicialización del store
+  _initialized: (() => {
+    console.log('📦 RECEPTIONS-STORE initialized');
+    return true;
+  })(),
   // Estado inicial
   tab: 'ACTIVOS', // 'ACTIVOS' | 'ENTREGADOS'
   query: '',
