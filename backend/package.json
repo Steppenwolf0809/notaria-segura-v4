@@ -48,6 +48,7 @@
     "recovery:hybrid": "node scripts/recovery.js --strategy=hybrid",
     "resolve:p3009": "node scripts/resolve-p3009.js",
     "check:document-types": "node scripts/check-document-types.js",
+    "check:document-status": "node scripts/check-document-status.js",
     "prepare:production": "node scripts/prepare-production-deploy.js"
   },
   "dependencies": {

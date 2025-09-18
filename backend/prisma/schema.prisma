@@ -27,6 +27,13 @@ enum DocumentType {
 }
 
 // Enumeración de estados de documento (SQLite compatible)
+enum DocumentStatus {
+  PENDIENTE
+  EN_PROCESO
+  LISTO
+  ENTREGADO
+  ANULADO_NOTA_CREDITO
+}
 
 // Modelo principal de usuarios
 model User {
@@ -67,7 +74,7 @@ model Document {
   comentarios_recepcion   String?                  // Notas especiales para recepción
   
   documentType            DocumentType        // Tipo de documento detectado
-  status                  String @default("PENDIENTE")
+  status                  DocumentStatus @default(PENDIENTE)
   verificationCode        String?                  // Código de 4 dígitos para entrega
   
   // Relaciones
