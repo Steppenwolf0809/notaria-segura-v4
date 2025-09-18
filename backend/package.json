@@ -46,7 +46,9 @@
     "recovery:in-place": "node scripts/recovery.js --strategy=in-place",
     "recovery:reset": "node scripts/recovery.js --strategy=reset --confirm",
     "recovery:hybrid": "node scripts/recovery.js --strategy=hybrid",
-    "resolve:p3009": "node scripts/resolve-p3009.js"
+    "resolve:p3009": "node scripts/resolve-p3009.js",
+    "check:document-types": "node scripts/check-document-types.js",
+    "prepare:production": "node scripts/prepare-production-deploy.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
