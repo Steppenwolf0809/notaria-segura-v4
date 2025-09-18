@@ -11,7 +11,7 @@ try {
   execSync('npx prisma migrate reset --force', { stdio: 'inherit' });
   
   console.log('3. Aplicando schema actual...');
-  execSync('npx prisma db push --accept-data-loss', { stdio: 'inherit' });
+  execSync('npx prisma db push --force-reset', { stdio: 'inherit' });
   
   console.log('4. Iniciando servidor...');
   execSync('node server.js', { stdio: 'inherit' });
