@@ -203,13 +203,13 @@ app.use((req, res, next) => {
 
 // Ruta de salud del sistema
 app.get('/api/health', (req, res) => {
-  res.json({ 
+  res.json({
     message: 'API Notaría Segura v4 funcionando ✅',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
     features: [
       'Autenticación JWT',
-      'Procesamiento XML automático', 
+      'Procesamiento XML automático',
       'Asignación inteligente matrizadores',
       'Agrupación de documentos',
       'Sistema de auditoría',
@@ -219,6 +219,36 @@ app.get('/api/health', (req, res) => {
     ]
   })
 })
+
+// Health check específico para verificar feature flags del frontend
+// Útil para diagnosticar problemas de configuración en Railway
+app.get('/api/health/feature-flags', (req, res) => {
+  // Simular las variables de entorno que usa el frontend
+  const featureFlags = {
+    VITE_UI_ACTIVOS_ENTREGADOS: process.env.VITE_UI_ACTIVOS_ENTREGADOS || 'false',
+    VITE_API_URL: process.env.VITE_API_URL || '/api',
+    NODE_ENV: process.env.NODE_ENV || 'development'
+  };
+
+  console.log('🔍 FEATURE FLAGS CHECK:', {
+    timestamp: new Date().toISOString(),
+    featureFlags,
+    userAgent: req.get('User-Agent'),
+    ip: req.ip || req.connection?.remoteAddress
+  });
+
+  res.json({
+    status: 'ok',
+    message: 'Feature flags check',
+    timestamp: new Date().toISOString(),
+    featureFlags,
+    deployment: {
+      version: process.env.npm_package_version || '1.0.0',
+      environment: process.env.NODE_ENV || 'development',
+      uptime: process.uptime()
+    }
+  });
+});
 
 // RUTAS DE AUTENTICACIÓN (/api/auth/*)
 app.use('/api/auth', authRoutes)
