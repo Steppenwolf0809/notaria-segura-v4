@@ -25,9 +25,10 @@ function log(message, type = 'info') {
 }
 
 async function getPgClient() {
-  const databaseUrl = process.env.DATABASE_URL;
+  // Tomar DATABASE_URL de argumentos de línea de comandos o variable de entorno
+  const databaseUrl = process.argv[2] || process.env.DATABASE_URL;
   if (!databaseUrl) {
-    throw new Error('DATABASE_URL no configurada');
+    throw new Error('DATABASE_URL no configurada. Pasa la URL como primer argumento o configura la variable de entorno');
   }
 
   const client = new pg.Client({
