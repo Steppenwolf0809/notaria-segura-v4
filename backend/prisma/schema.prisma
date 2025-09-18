@@ -18,6 +18,13 @@ enum UserRole {
 }
 
 // Enumeración de tipos de documento (SQLite compatible)
+enum DocumentType {
+  PROTOCOLO
+  DILIGENCIA
+  ARRENDAMIENTO
+  CERTIFICACION
+  OTROS
+}
 
 // Enumeración de estados de documento (SQLite compatible)
 
@@ -59,7 +66,7 @@ model Document {
   detalle_documento       String?                  // Descripción específica del trámite
   comentarios_recepcion   String?                  // Notas especiales para recepción
   
-  documentType            String             // Tipo de documento detectado
+  documentType            DocumentType        // Tipo de documento detectado
   status                  String @default("PENDIENTE")
   verificationCode        String?                  // Código de 4 dígitos para entrega
   
