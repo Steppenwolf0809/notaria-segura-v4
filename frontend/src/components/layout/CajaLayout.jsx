@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Box, AppBar, Toolbar, Typography, IconButton, Avatar, Container } from '@mui/material';
-import MenuIcon from '@mui/icons-material/Menu';
+import { Box, Toolbar, Container } from '@mui/material';
+import Topbar from '../Topbar';
 import useAuth from '../../hooks/use-auth';
 import Sidebar from './Sidebar';
 
@@ -21,43 +21,7 @@ const CajaLayout = ({ children }) => {
 
   return (
     <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
-      <AppBar
-        position="fixed"
-        sx={{
-          zIndex: (theme) => theme.zIndex.drawer + 1
-        }}
-      >
-        <Toolbar>
-          <IconButton
-            color="inherit"
-            edge="start"
-            onClick={() => setMobileOpen(true)}
-            sx={{ mr: 2, display: { md: 'none' } }}
-          >
-            <MenuIcon />
-          </IconButton>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Notaría Segura - Caja
-          </Typography>
-
-          {/* Usuario */}
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Typography variant="body2" sx={{ mr: 1, display: { xs: 'none', md: 'block' } }}>
-              {getFullName()}
-            </Typography>
-            <Avatar
-              sx={{
-                bgcolor: getUserRoleColor(),
-                width: 32,
-                height: 32,
-                fontSize: '0.875rem'
-              }}
-            >
-              {getUserInitials()}
-            </Avatar>
-          </Box>
-        </Toolbar>
-      </AppBar>
+      <Topbar title="Notaría Segura - Caja" onMenuClick={() => setMobileOpen(true)} />
 
       {/* Sidebar */}
       <Sidebar

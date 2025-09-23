@@ -33,11 +33,13 @@ import {
   Notifications as NotificationsIcon,
   WhatsApp as WhatsAppIcon,
   ExpandMore as ExpandMoreIcon,
-  ChevronRight as ChevronRightIcon
+  ChevronRight as ChevronRightIcon,
+  Description as DescriptionIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import useThemeStore from '../store/theme-store';
 import ChangePassword from './ChangePassword';
+import { navItemsByRole } from '../config/nav-items';
 
 // Anchos del sidebar
 const DRAWER_WIDTH = 240;
@@ -54,6 +56,12 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
   const [configMenuOpen, setConfigMenuOpen] = useState(false);
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
   const { isDarkMode, toggleTheme } = useThemeStore();
+
+  // Trazas de verificación del layout
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.info('[LAYOUT]', { role: user?.role, sidebar: 'mounted' });
+  }, [user?.role]);
 
   // Cargar estado del sidebar desde localStorage
   useEffect(() => {
@@ -107,51 +115,43 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
     setMobileOpen(false); // Cerrar drawer en móvil
   };
 
-  /**
-   * Items de navegación específicos para ADMIN
-   */
-  const navigationItems = [
-    {
-      text: 'Panel de Control',
-      icon: <DashboardIcon />,
-      view: 'dashboard',
-      active: currentView === 'dashboard'
-    },
-    {
-      text: 'Gestión de Usuarios',
-      icon: <PersonIcon />,
-      view: 'users',
-      active: currentView === 'users'
-    },
-    {
-      text: 'Supervisión Documentos',
-      icon: <DocumentIcon />,
-      view: 'documents',
-      active: currentView === 'documents'
-    },
-    {
-      text: 'Notificaciones',
-      icon: <NotificationsIcon />,
-      view: 'notifications',
-      active: currentView === 'notifications'
-    }
-  ];
+  // Fuente única desde config + mapeo de iconos
+  const role = user?.role || 'ADMIN';
+  const iconMap = {
+    Dashboard: <DashboardIcon />,
+    Person: <PersonIcon />,
+    Description: <DescriptionIcon />,
+    Notifications: <NotificationsIcon />,
+    Settings: <SettingsIcon />,
+    WhatsApp: <WhatsAppIcon />
+  };
+  const allItems = (navItemsByRole[role] || []);
+  const navigationItems = React.useMemo(() => {
+    // Excluir ítems que van en submenu de configuración
+    const exclude = new Set(['settings', 'whatsapp-templates']);
+    return allItems
+      .filter(i => !exclude.has(i.id))
+      .map(i => ({
+        text: i.label,
+        icon: iconMap[i.icon] || <DashboardIcon />,
+        view: i.view,
+        active: currentView === i.view
+      }));
+  }, [allItems, currentView]);
 
   /**
    * Items del submenu de Configuración
    */
-  const configSubmenuItems = [
-    {
-      text: 'General',
-      view: 'settings',
-      active: currentView === 'settings'
-    },
-    {
-      text: 'Templates WhatsApp',
-      view: 'whatsapp-templates', 
-      active: currentView === 'whatsapp-templates'
-    }
-  ];
+  const configSubmenuItems = React.useMemo(() => {
+    const include = new Set(['settings', 'whatsapp-templates']);
+    return allItems
+      .filter(i => include.has(i.id))
+      .map(i => ({
+        text: i.label,
+        view: i.view,
+        active: currentView === i.view
+      }));
+  }, [allItems, currentView]);
 
   /**
    * Contenido del drawer

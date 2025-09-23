@@ -36,13 +36,25 @@ import RecepcionLayout from './RecepcionLayout';
  * Componente Dashboard principal
  * Muestra información del usuario y acciones según su rol
  */
+const readFlag = (key, defaultVal = false) => {
+  try {
+    const env = import.meta.env || {};
+    const raw = env[key];
+    if (typeof raw === 'string') return raw === 'true' || raw === '1';
+    if (typeof raw === 'boolean') return raw;
+    return defaultVal;
+  } catch {
+    return defaultVal;
+  }
+};
+
 const Dashboard = () => {
-  const { 
-    user, 
-    logout, 
-    getUserRoleColor, 
-    getFullName, 
-    getUserInitials 
+  const {
+    user,
+    logout,
+    getUserRoleColor,
+    getFullName,
+    getUserInitials
   } = useAuth();
 
   const [showChangePassword, setShowChangePassword] = React.useState(false);
@@ -107,26 +119,11 @@ const Dashboard = () => {
 
   // Mostrar dashboard específico según rol
   if (user.role === 'CAJA') {
-    // 🔍 DEBUG: Verificar feature flag para CAJA
-    const featureFlag = import.meta.env.VITE_UI_ACTIVOS_ENTREGADOS;
-    console.log('🎯 DASHBOARD CAJA - Feature flag:', featureFlag);
-    console.log('🎯 DASHBOARD CAJA - User role:', user.role);
-
-    // Montaje consistente del layout con sidebar (no depende del flag)
+    const uiV2 = readFlag('VITE_UI_ACTIVOS_ENTREGADOS', true);
+    console.info('[UI-GATE]', { role: user?.role, uiV2 });
     return (
       <CajaLayout>
-        {featureFlag === 'true' ? (
-          <>
-            {console.log('🎯 DASHBOARD CAJA - Using DocumentCenter v2')}
-            <DocumentCenter />
-          </>
-        ) : (
-          <>
-            {console.log('🎯 DASHBOARD CAJA - Using CajaDashboard legacy')}
-            <CajaDashboard />
-          </>
-        )}
-        {/* Modal de cambio de contraseña (opcional, gatillado desde futuras acciones del layout) */}
+        {uiV2 ? <DocumentCenter /> : <CajaDashboard />}
         <ChangePassword
           open={showChangePassword}
           onClose={() => setShowChangePassword(false)}
@@ -140,21 +137,15 @@ const Dashboard = () => {
   }
 
   if (user.role === 'RECEPCION') {
-    // 🔍 DEBUG: Verificar feature flag para RECEPCION
-    const featureFlag = import.meta.env.VITE_UI_ACTIVOS_ENTREGADOS;
-    console.log('🎯 DASHBOARD RECEPCION - Feature flag:', featureFlag);
-    console.log('🎯 DASHBOARD RECEPCION - User role:', user.role);
-
-    // Montaje consistente: si v2, envolver en RecepcionLayout; si legacy, su propio center ya incluye layout
-    if (featureFlag === 'true') {
-      console.log('🎯 DASHBOARD RECEPCION - Using ReceptionCenter v2 + Layout');
+    const uiV2 = readFlag('VITE_UI_ACTIVOS_ENTREGADOS', true);
+    console.info('[UI-GATE]', { role: user?.role, uiV2 });
+    if (uiV2) {
       return (
         <RecepcionLayout currentView="documentos" onViewChange={() => {}}>
           <ReceptionCenter />
         </RecepcionLayout>
       );
     } else {
-      console.log('🎯 DASHBOARD RECEPCION - Using RecepcionCenter legacy');
       return <RecepcionCenter />;
     }
   }

@@ -89,9 +89,28 @@ const useAuth = () => {
 
   /**
    * Función para cerrar sesión
+   * - Limpia estado/token
+   * - Navega a /login (si es posible)
+   * - Emite traza [SESSION]
    */
   const logout = useCallback(() => {
+    try {
+      // eslint-disable-next-line no-console
+      console.info('[SESSION]', { event: 'logout' });
+    } catch {}
     clearAuth();
+    try {
+      if (typeof window !== 'undefined' && window.location) {
+        // Intentar navegación suave sin recargar
+        if (window.history && window.history.pushState) {
+          window.history.pushState(null, '', '/login');
+        } else {
+          window.location.assign('/login');
+        }
+      }
+    } catch {
+      // Ignorar errores de navegación en entornos sin history/router
+    }
   }, [clearAuth]);
 
   /**

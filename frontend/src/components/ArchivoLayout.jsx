@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Drawer,
@@ -31,6 +31,7 @@ import useAuth from '../hooks/use-auth';
 import ThemeToggle from './ThemeToggle';
 import useThemeStore from '../store/theme-store';
 import ChangePassword from './ChangePassword';
+import { navItemsByRole } from '../config/nav-items';
 
 // Ancho del sidebar
 const DRAWER_WIDTH = 240;
@@ -61,6 +62,12 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
   const { isDarkMode } = useThemeStore();
 
+  // Trazas de verificación del layout
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.info('[LAYOUT]', { role: user?.role, sidebar: 'mounted' });
+  }, [user?.role]);
+
   /**
    * Toggle del drawer móvil
    */
@@ -84,38 +91,25 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
   };
 
   /**
-   * Items de navegación - Específicos para ARCHIVO
+   * Items de navegación - Fuente única (config/nav-items.js)
    */
-  const navigationItems = [
-    {
-      text: 'Dashboard',
-      icon: <DashboardIcon />,
-      view: 'dashboard',
-      active: currentView === 'dashboard',
-      description: 'Vista general de métricas'
-    },
-    {
-      text: 'Mis Documentos',
-      icon: <ArchiveIcon />,
-      view: 'documentos',
-      active: currentView === 'documentos',
-      description: 'Documentos de archivo asignados'
-    },
-    {
-      text: 'Notificaciones',
-      icon: <WhatsAppIcon />,
-      view: 'notificaciones',
-      active: currentView === 'notificaciones',
-      description: 'Historial de notificaciones WhatsApp'
-    },
-    {
-      text: 'Supervisión General',
-      icon: <SupervisionIcon />,
-      view: 'supervision',
-      active: currentView === 'supervision',
-      description: 'Vista global del sistema'
-    }
-  ];
+  const role = user?.role || 'ARCHIVO';
+  const iconMap = {
+    Dashboard: <DashboardIcon />,
+    FolderSpecial: <ArchiveIcon />,
+    WhatsApp: <WhatsAppIcon />,
+    Visibility: <SupervisionIcon />
+  };
+  const navigationItems = useMemo(() => {
+    const allowed = ['dashboard', 'documentos', 'notificaciones', 'supervision'];
+    const source = (navItemsByRole[role] || []).filter(i => allowed.includes(i.id));
+    return source.map(i => ({
+      text: i.label,
+      icon: iconMap[i.icon] || <DashboardIcon />,
+      view: i.view,
+      active: currentView === i.view
+    }));
+  }, [role, currentView]);
 
   /**
    * Manejar logout
