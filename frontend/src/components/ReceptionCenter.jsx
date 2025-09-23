@@ -43,6 +43,7 @@ import DocumentDetailModal from './Documents/DocumentDetailModal.jsx';
 import BulkActionToolbar from './bulk/BulkActionToolbar.jsx';
 import BulkStatusChangeModal from './bulk/BulkStatusChangeModal.jsx';
 import receptionService from '../services/reception-service.js';
+import documentService from '../services/document-service.js';
 import { readFlag } from '../config/featureFlags.js';
 
 /**
@@ -256,23 +257,32 @@ const ReceptionCenter = () => {
   const selectionCount = selectedItems.length;
 
   const getValidTransitions = () => {
-    // Habilitamos LISTO si hay al menos 1 documento del grupo en EN_PROCESO
+    const list = [];
     const hasAnyEnProceso = selectedItems.some(item =>
       Array.isArray(item.documents) && item.documents.some(x => x.status === 'EN_PROCESO')
     );
-    const list = [];
+    const hasAnyListo = selectedItems.some(item =>
+      Array.isArray(item.documents) && item.documents.some(x => x.status === 'LISTO')
+    );
+    const hasAnyDeliverable = hasAnyListo;
+    const hasAnyRevertible = selectedItems.some(item =>
+      Array.isArray(item.documents) && item.documents.some(x => x.status === 'LISTO' || x.status === 'ENTREGADO')
+    );
+
     if (hasAnyEnProceso) list.push('LISTO');
-    // Futuro: ENTREGADO/REVERTIR pueden agregarse aquí
+    if (hasAnyDeliverable) list.push('ENTREGADO');
+    if (hasAnyRevertible) list.push('REVERTIR');
+
     return list;
   };
 
-  const onBulkAction = (targetStatus) => {
+  const onBulkAction = (targetStatus, options = {}) => {
     if (!targetStatus) return;
-    setPendingBulkAction({ toStatus: targetStatus, documents: selectedItems });
+    setPendingBulkAction({ toStatus: targetStatus, documents: selectedItems, options });
     setBulkModalOpen(true);
   };
 
-  const executeBulk = async ({ toStatus }) => {
+  const executeBulk = async ({ toStatus, sendNotifications }) => {
     try {
       if (toStatus === 'LISTO') {
         // Expandir selección por grupos a IDs de documentos EN_PROCESO
@@ -287,16 +297,78 @@ const ReceptionCenter = () => {
           setBulkModalOpen(false);
           return;
         }
-        const resp = await receptionService.bulkMarkReady(ids, true);
+        const resp = await receptionService.bulkMarkReady(ids, typeof sendNotifications === 'boolean' ? sendNotifications : true);
         console.info('[RECEPTION][BULK][LISTO] resp:', resp);
         await fetchDocuments();
         await fetchCounts();
         clearSelection();
         setBulkModalOpen(false);
-      } else {
-        console.info('[RECEPTION][BULK] Acción no implementada:', toStatus);
-        setBulkModalOpen(false);
+        return;
       }
+
+      if (toStatus === 'ENTREGADO') {
+        // Entrega masiva simplificada: entregar todos los documentos LISTO de los grupos seleccionados
+        const deliverIds = [];
+        selectedItems.forEach(item => {
+          (item.documents || []).forEach(d => {
+            if (d.status === 'LISTO') deliverIds.push(d.id);
+          });
+        });
+        if (deliverIds.length === 0) {
+          console.info('[RECEPTION][BULK][ENTREGADO] No hay documentos LISTO para entregar');
+          setBulkModalOpen(false);
+          return;
+        }
+        // Entrega mínima: verificación manual sin código
+        const payload = {
+          entregadoA: 'Entrega masiva',
+          relacionTitular: 'titular',
+          verificacionManual: true,
+          codigoVerificacion: '',
+          facturaPresenta: false,
+          observacionesEntrega: 'Entrega masiva desde Recepción'
+        };
+        await Promise.allSettled(deliverIds.map(id => documentService.deliverDocument(id, payload)));
+        await fetchDocuments();
+        await fetchCounts();
+        clearSelection();
+        setBulkModalOpen(false);
+        return;
+      }
+
+      if (toStatus === 'REVERTIR') {
+        // Revertir masivo:
+        // - Si documento está LISTO → revertir a EN_PROCESO
+        // - Si documento está ENTREGADO → revertir a LISTO
+        let reason = window.prompt('Ingrese la razón para revertir estado (obligatoria):');
+        if (!reason || !reason.trim()) {
+          console.info('[RECEPTION][BULK][REVERTIR] Operación cancelada por falta de razón');
+          setBulkModalOpen(false);
+          return;
+        }
+        const operations = [];
+        selectedItems.forEach(item => {
+          // Buscar un candidato por grupo (cualquier LISTO o ENTREGADO)
+          const cand = (item.documents || []).find(d => d.status === 'LISTO' || d.status === 'ENTREGADO');
+          if (!cand) return;
+          const target = cand.status === 'LISTO' ? 'EN_PROCESO' : 'LISTO';
+          operations.push(receptionService.revertirEstadoDocumento(cand.id, target, reason.trim()));
+        });
+        if (operations.length === 0) {
+          console.info('[RECEPTION][BULK][REVERTIR] No hay documentos revertibles en la selección');
+          setBulkModalOpen(false);
+          return;
+        }
+        await Promise.allSettled(operations);
+        await fetchDocuments();
+        await fetchCounts();
+        clearSelection();
+        setBulkModalOpen(false);
+        return;
+      }
+
+      console.info('[RECEPTION][BULK] Acción no implementada:', toStatus);
+      setBulkModalOpen(false);
     } catch (e) {
       console.error('[RECEPTION][BULK][ERR]', e);
       setBulkModalOpen(false);
