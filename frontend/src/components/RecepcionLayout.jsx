@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Drawer,
@@ -36,6 +36,7 @@ import {
 import useAuth from '../hooks/use-auth';
 import useThemeStore from '../store/theme-store';
 import ChangePassword from './ChangePassword';
+import { navItemsByRole } from '../config/nav-items';
 
 // Anchos del sidebar
 const DRAWER_WIDTH = 240;
@@ -51,6 +52,12 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
   const { isDarkMode, toggleTheme } = useThemeStore();
+
+  // Trazas de verificación del layout
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.info('[LAYOUT]', { role: user?.role, sidebar: 'mounted' });
+  }, [user?.role]);
 
   // Cargar estado del sidebar desde localStorage
   useEffect(() => {
@@ -87,29 +94,24 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
     setMobileOpen(false); // Cerrar drawer en móvil
   };
 
-  /**
-   * Items de navegación específicos para RECEPCION
-   */
-  const navigationItems = [
-    {
-      text: 'Dashboard',
-      icon: <DashboardIcon />,
-      view: 'dashboard',
-      active: currentView === 'dashboard'
-    },
-    {
-      text: 'Gestión de Documentos',
-      icon: <DocumentsIcon />,
-      view: 'documentos',
-      active: currentView === 'documentos'
-    },
-    {
-      text: 'Historial WhatsApp',
-      icon: <WhatsAppIcon />,
-      view: 'notificaciones',
-      active: currentView === 'notificaciones'
-    }
-  ];
+  // Fuente única desde config + mapeo de iconos
+  const role = user?.role || 'RECEPCION';
+  const iconMap = {
+    Dashboard: <DashboardIcon />,
+    Assignment: <DocumentsIcon />,
+    WhatsApp: <WhatsAppIcon />
+  };
+  const navigationItems = useMemo(() => {
+    const source = (navItemsByRole[role] || []).filter(i =>
+      ['dashboard', 'documentos', 'notificaciones'].includes(i.id)
+    );
+    return source.map(i => ({
+      text: i.label,
+      icon: iconMap[i.icon] || <DashboardIcon />,
+      view: i.view,
+      active: currentView === i.view
+    }));
+  }, [role, currentView]);
 
   /**
    * Contenido del drawer con funcionalidad de colapso

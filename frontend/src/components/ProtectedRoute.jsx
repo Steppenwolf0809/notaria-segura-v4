@@ -22,29 +22,27 @@ const ProtectedRoute = ({ children, requiredRoles = [] }) => {
     }
   }, [isAuthenticated, checkAuth]);
 
-  // Mostrar loading mientras se verifica la autenticación
-  if (isLoading) {
+  // Skeleton de layout mientras se verifica autenticación/rol para evitar parpadeo sin barra
+  if (isLoading || !user) {
     return (
-      <Box
-        sx={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          minHeight: '100vh',
-          bgcolor: 'background.default'
-        }}
-      >
-        <CircularProgress 
-          size={50} 
-          sx={{ color: 'primary.main', mb: 2 }} 
+      <Box sx={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+        {/* Sidebar fantasma en desktop */}
+        <Box
+          sx={{
+            width: { xs: 0, md: 240 },
+            bgcolor: 'action.hover',
+            display: { xs: 'none', md: 'block' }
+          }}
         />
-        <Typography 
-          variant="body1" 
-          sx={{ color: 'text.primary' }}
-        >
-          Verificando autenticación...
-        </Typography>
+        {/* Área principal con barra superior fantasma */}
+        <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <Box sx={{ height: 64, bgcolor: 'action.selected' }} />
+          <Box sx={{ flex: 1, p: 3, bgcolor: 'background.default' }}>
+            <Typography variant="body2" color="text.secondary">
+              Cargando interfaz...
+            </Typography>
+          </Box>
+        </Box>
       </Box>
     );
   }

@@ -29,6 +29,8 @@ import ReceptionCenter from './ReceptionCenter';
 import ArchivoCenter from './ArchivoCenter';
 import AdminCenter from './AdminCenter';
 import ChangePassword from './ChangePassword';
+import CajaLayout from './layout/CajaLayout';
+import RecepcionLayout from './RecepcionLayout';
 
 /**
  * Componente Dashboard principal
@@ -110,94 +112,9 @@ const Dashboard = () => {
     console.log('🎯 DASHBOARD CAJA - Feature flag:', featureFlag);
     console.log('🎯 DASHBOARD CAJA - User role:', user.role);
 
+    // Montaje consistente del layout con sidebar (no depende del flag)
     return (
-      <Box sx={{ flexGrow: 1 }}>
-        {/* App Bar */}
-        <AppBar
-          position="static"
-          color="default"
-        >
-          <Toolbar>
-            <DashboardIcon sx={{ mr: 2 }} />
-            <Typography
-              variant="h6"
-              component="div"
-              sx={{ flexGrow: 1 }}
-            >
-              Notaría Segura - CAJA
-            </Typography>
-
-            {/* User Info */}
-            <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
-              <Avatar
-                sx={{
-                  bgcolor: getUserRoleColor(),
-                  width: 32,
-                  height: 32,
-                  mr: 1,
-                  fontSize: '0.875rem'
-                }}
-              >
-                {getUserInitials()}
-              </Avatar>
-              <Typography variant="body2">
-                {getFullName()}
-              </Typography>
-            </Box>
-
-            {/* Settings Button */}
-            <IconButton
-              onClick={() => setShowChangePassword(true)}
-              title="Cambiar Contraseña"
-              sx={{
-                ml: 1,
-                color: 'text.primary',
-                '&:hover': {
-                  bgcolor: 'action.hover'
-                }
-              }}
-            >
-              <SettingsIcon sx={{ color: 'text.primary' }} />
-            </IconButton>
-
-            {/* Theme Toggle */}
-            <ThemeToggle />
-
-            {/* Logout Button - visible en modo claro */}
-            <Button
-              variant="outlined"
-              color="error"
-              onClick={handleLogout}
-              startIcon={<LogoutIcon />}
-              sx={{
-                ml: 1,
-                display: { xs: 'none', sm: 'flex' },
-                borderColor: 'error.main',
-                color: 'error.main',
-                '&:hover': {
-                  bgcolor: (theme) => theme.palette.mode === 'dark' ? 'error.dark' : 'error.light',
-                  borderColor: 'error.dark'
-                }
-              }}
-            >
-              Salir
-            </Button>
-            <IconButton
-              onClick={handleLogout}
-              title="Cerrar Sesión"
-              sx={{
-                ml: 1,
-                color: 'text.primary',
-                '&:hover': { bgcolor: 'action.hover' },
-                display: { xs: 'inline-flex', sm: 'none' }
-              }}
-            >
-              <LogoutIcon sx={{ color: 'text.primary' }} />
-            </IconButton>
-          </Toolbar>
-        </AppBar>
-
-        {/* 🔍 DEBUG: Mostrar componente según feature flag */}
+      <CajaLayout>
         {featureFlag === 'true' ? (
           <>
             {console.log('🎯 DASHBOARD CAJA - Using DocumentCenter v2')}
@@ -209,13 +126,12 @@ const Dashboard = () => {
             <CajaDashboard />
           </>
         )}
-
-        {/* Modal de cambio de contraseña */}
+        {/* Modal de cambio de contraseña (opcional, gatillado desde futuras acciones del layout) */}
         <ChangePassword
           open={showChangePassword}
           onClose={() => setShowChangePassword(false)}
         />
-      </Box>
+      </CajaLayout>
     );
   }
 
@@ -229,10 +145,14 @@ const Dashboard = () => {
     console.log('🎯 DASHBOARD RECEPCION - Feature flag:', featureFlag);
     console.log('🎯 DASHBOARD RECEPCION - User role:', user.role);
 
-    // 🔍 DEBUG: Mostrar componente según feature flag
+    // Montaje consistente: si v2, envolver en RecepcionLayout; si legacy, su propio center ya incluye layout
     if (featureFlag === 'true') {
-      console.log('🎯 DASHBOARD RECEPCION - Using ReceptionCenter v2');
-      return <ReceptionCenter />;
+      console.log('🎯 DASHBOARD RECEPCION - Using ReceptionCenter v2 + Layout');
+      return (
+        <RecepcionLayout currentView="documentos" onViewChange={() => {}}>
+          <ReceptionCenter />
+        </RecepcionLayout>
+      );
     } else {
       console.log('🎯 DASHBOARD RECEPCION - Using RecepcionCenter legacy');
       return <RecepcionCenter />;
@@ -461,4 +381,4 @@ const Dashboard = () => {
   );
 };
 
-export default Dashboard; 
+export default Dashboard;

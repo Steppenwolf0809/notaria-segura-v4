@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Drawer,
@@ -28,11 +28,13 @@ import {
   KeyboardDoubleArrowRight as ExpandIcon,
   Brightness4 as DarkModeIcon,
   Brightness7 as LightModeIcon,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  Article as ArticleIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import useThemeStore from '../store/theme-store';
 import ChangePassword from './ChangePassword';
+import { navItemsByRole } from '../config/nav-items';
 
 // Anchos del sidebar
 const DRAWER_WIDTH = 240;
@@ -49,6 +51,12 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
   const { isDarkMode, toggleTheme } = useThemeStore();
+
+  // Trazas de verificación del layout
+  useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.info('[LAYOUT]', { role: user?.role, sidebar: 'mounted' });
+  }, [user?.role]);
 
   // Cargar estado del sidebar desde localStorage
   useEffect(() => {
@@ -85,36 +93,25 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
     setMobileOpen(false); // Cerrar drawer en móvil
   };
 
-  /**
-   * Items de navegación - EXACTO al prototipo
-   */
-  const navigationItems = [
-    {
-      text: 'Dashboard',
-      icon: <DashboardIcon />,
-      view: 'dashboard',
-      active: currentView === 'dashboard'
-    },
-    {
-      text: 'Documentos',
-      icon: <DocumentsIcon />,
-      view: 'documents',
-      active: currentView === 'documents'
-    },
-    {
-      text: 'Historial',
-      icon: <HistoryIcon />,
-      view: 'history',
-      active: currentView === 'history'
-    },
-    {
-      text: 'Generar Concuerdos',
-      icon: <DocumentsIcon />,
-      view: 'concuerdos',
-      active: currentView === 'concuerdos',
-      beta: true
-    }
-  ];
+  // Fuente única desde config + mapeo de iconos
+  const role = user?.role || 'MATRIZADOR';
+  const iconMap = {
+    Dashboard: <DashboardIcon />,
+    Assignment: <DocumentsIcon />,
+    History: <HistoryIcon />,
+    Article: <ArticleIcon />
+  };
+  const navigationItems = useMemo(() => {
+    const allowed = ['dashboard', 'documents', 'history', 'concuerdos'];
+    const source = (navItemsByRole[role] || []).filter(i => allowed.includes(i.id));
+    return source.map(i => ({
+      text: i.label,
+      icon: iconMap[i.icon] || <DashboardIcon />,
+      view: i.view,
+      active: currentView === i.view,
+      beta: i.beta
+    }));
+  }, [role, currentView]);
 
   /**
    * Contenido del drawer - ESTRUCTURA OPTIMIZADA CON COLAPSO
