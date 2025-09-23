@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useState, useMemo } from 'react';
+import React, { useEffect, useCallback, useState, useMemo, useRef } from 'react';
 import {
   Box,
   Tabs,
@@ -25,7 +25,8 @@ import {
   InputLabel,
   Tooltip,
   Checkbox,
-  Button
+  Button,
+  CircularProgress
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -87,6 +88,13 @@ const ReceptionCenter = () => {
     hasResults
   } = useReceptionsStore();
 
+  // Typeahead state
+  const [suggestions, setSuggestions] = useState({ clients: [], codes: [] });
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [suggestTimer, setSuggestTimer] = useState(null);
+  const searchInputRef = useRef(null);
+
   // Cargar datos iniciales
   useEffect(() => {
     fetchDocuments();
@@ -102,20 +110,88 @@ const ReceptionCenter = () => {
     }
   });
 
+  // Cerrar typeahead con ESC
+  useHotkeys('esc', () => {
+    setSuggestOpen(false);
+  });
+
   // Manejar cambio de pestaña
   const handleTabChange = useCallback((event, newValue) => {
     setTab(newValue);
   }, [setTab]);
 
-  // Manejar búsqueda
+  // Manejar búsqueda + typeahead (debounce)
   const handleSearchChange = useCallback((event) => {
-    setQuery(event.target.value);
-  }, [setQuery]);
+    const value = event.target.value || '';
+    setQuery(value);
+
+    // Sugerencias: debounce 250ms
+    if (suggestTimer) clearTimeout(suggestTimer);
+    if (value.trim().length >= 2) {
+      const t = setTimeout(async () => {
+        try {
+          setSuggestLoading(true);
+          const resp = await receptionService.getSuggestions(value.trim());
+          if (resp.success) {
+            setSuggestions(resp.data || { clients: [], codes: [] });
+            const hasAny = (resp.data?.clients?.length || 0) + (resp.data?.codes?.length || 0) > 0;
+            setSuggestOpen(hasAny);
+          } else {
+            setSuggestions({ clients: [], codes: [] });
+            setSuggestOpen(false);
+          }
+        } catch (e) {
+          console.error('[RECEPTION][SUGGEST][ERR]', e);
+          setSuggestions({ clients: [], codes: [] });
+          setSuggestOpen(false);
+        } finally {
+          setSuggestLoading(false);
+        }
+      }, 250);
+      setSuggestTimer(t);
+    } else {
+      setSuggestions({ clients: [], codes: [] });
+      setSuggestOpen(false);
+    }
+  }, [setQuery, suggestTimer]);
 
   // Limpiar búsqueda
   const handleClearSearch = useCallback(() => {
     setQuery('');
-  }, [setQuery]);
+    // Limpiar typeahead
+    if (suggestTimer) clearTimeout(suggestTimer);
+    setSuggestTimer(null);
+    setSuggestions({ clients: [], codes: [] });
+    setSuggestOpen(false);
+  }, [setQuery, suggestTimer]);
+
+  // Selección de sugerencias
+  const handleSelectClient = useCallback((client) => {
+    try {
+      if (client?.clientId) {
+        setClientId(client.clientId);
+        setQuery('');
+      } else if (client?.clientName) {
+        setQuery(client.clientName);
+      }
+    } finally {
+      if (suggestTimer) clearTimeout(suggestTimer);
+      setSuggestTimer(null);
+      setSuggestOpen(false);
+    }
+  }, [setClientId, setQuery, suggestTimer]);
+
+  const handleSelectCode = useCallback((item) => {
+    try {
+      if (item?.code) {
+        setQuery(item.code);
+      }
+    } finally {
+      if (suggestTimer) clearTimeout(suggestTimer);
+      setSuggestTimer(null);
+      setSuggestOpen(false);
+    }
+  }, [setQuery, suggestTimer]);
 
   // Manejar clic en nombre de cliente
   const handleClientClick = useCallback((clientId, clientName) => {
@@ -387,29 +463,98 @@ const ReceptionCenter = () => {
           Gestión de Recepciones
         </Typography>
 
-        {/* Barra de búsqueda */}
-        <TextField
-          id="reception-search-input"
-          fullWidth
-          placeholder="Buscar por código, cliente, identificación o tipo... (presiona / para enfocar)"
-          value={query}
-          onChange={handleSearchChange}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
-            endAdornment: query && (
-              <InputAdornment position="end">
-                <IconButton onClick={handleClearSearch} size="small">
-                  <ClearIcon />
-                </IconButton>
-              </InputAdornment>
-            )
-          }}
-          sx={{ mb: 2 }}
-        />
+        {/* Barra de búsqueda con typeahead */}
+        <Box sx={{ position: 'relative', mb: 2 }}>
+          <TextField
+            id="reception-search-input"
+            fullWidth
+            inputRef={searchInputRef}
+            placeholder="Buscar por código, cliente, identificación o tipo... (presiona / para enfocar)"
+            value={query}
+            onChange={handleSearchChange}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+              endAdornment: query && (
+                <InputAdornment position="end">
+                  <IconButton onClick={handleClearSearch} size="small">
+                    <ClearIcon />
+                  </IconButton>
+                </InputAdornment>
+              )
+            }}
+          />
+
+          {suggestOpen && (
+            <Paper
+              elevation={6}
+              sx={{
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                zIndex: 20,
+                mt: 0.5,
+                maxHeight: 300,
+                overflowY: 'auto'
+              }}
+              // Evitar que el blur cierre antes del onClick
+              onMouseDown={(e) => e.preventDefault()}
+            >
+              <Box sx={{ p: 1 }}>
+                {suggestLoading ? (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1 }}>
+                    <CircularProgress size={16} />
+                    <Typography variant="body2">Buscando...</Typography>
+                  </Box>
+                ) : (
+                  <>
+                    {(suggestions.clients?.length > 0) && (
+                      <Box sx={{ p: 1 }}>
+                        <Typography variant="caption" color="text.secondary">Clientes</Typography>
+                        {suggestions.clients.map((c, idx) => (
+                          <Box
+                            key={`cli-${idx}`}
+                            sx={{ py: 1, px: 1.5, cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}
+                            onClick={() => handleSelectClient(c)}
+                          >
+                            <Typography variant="body2">{c.clientName}</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              {(c.clientId || 'sin identificación')}{c.clientPhone ? ` · ${c.clientPhone}` : ''}
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    )}
+
+                    {(suggestions.codes?.length > 0) && (
+                      <Box sx={{ p: 1, pt: suggestions.clients?.length ? 0 : 1 }}>
+                        <Typography variant="caption" color="text.secondary">Códigos</Typography>
+                        {suggestions.codes.map((k, idx) => (
+                          <Box
+                            key={`code-${idx}`}
+                            sx={{ py: 1, px: 1.5, cursor: 'pointer', '&:hover': { bgcolor: 'action.hover' } }}
+                            onClick={() => handleSelectCode(k)}
+                          >
+                            <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>{k.code}</Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    )}
+
+                    {(!suggestions.clients?.length && !suggestions.codes?.length) && (
+                      <Box sx={{ p: 1.5 }}>
+                        <Typography variant="body2" color="text.secondary">Sin sugerencias</Typography>
+                      </Box>
+                    )}
+                  </>
+                )}
+              </Box>
+            </Paper>
+          )}
+        </Box>
 
         {/* Filtros activos */}
         {clientId && (
