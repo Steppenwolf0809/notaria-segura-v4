@@ -98,6 +98,12 @@ const useAuth = () => {
       // eslint-disable-next-line no-console
       console.info('[SESSION]', { event: 'logout' });
     } catch {}
+    // Limpiar credenciales persistidas
+    try {
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('notaria-auth-storage');
+    } catch {}
     clearAuth();
     try {
       if (typeof window !== 'undefined' && window.location) {
