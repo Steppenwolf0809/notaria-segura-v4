@@ -47,8 +47,11 @@ const ProtectedRoute = ({ children, requiredRoles = [] }) => {
     );
   }
 
-  // Si no está autenticado, no mostrar nada (App.jsx se encargará de redirigir)
+  // Si no está autenticado, redirigir a /login (evita estados inconsistentes)
   if (!isAuthenticated) {
+    try {
+      window.location.assign('/login');
+    } catch {}
     return null;
   }
 

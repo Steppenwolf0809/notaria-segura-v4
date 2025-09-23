@@ -392,3 +392,93 @@ App
 - Modificado: [frontend/src/hooks/use-auth.js](frontend/src/hooks/use-auth.js:90) → logout con traza [SESSION] y navegación a /login.
 - Modificado: [frontend/src/components/layout/CajaLayout.jsx](frontend/src/components/layout/CajaLayout.jsx:1) → integra Topbar fijo.
 - Modificado: [frontend/src/components/Dashboard.jsx](frontend/src/components/Dashboard.jsx:35) → readFlag + [UI-GATE] + gating de v2 para CAJA/RECEPCION.
+
+
+## Cliente HTTP unificado (Axios) y manejo de 401/403
+
+Fecha: 2025-09-23
+
+1) Objetivo
+- Unificar el acceso HTTP del frontend con Axios, centralizar baseURL, headers y manejo de errores 401/403 (expiración/invalidación de sesión).
+- Evitar fallbacks a localhost en producción para prevenir endpoints incorrectos.
+
+2) Estructura y archivos clave
+- Config base de API: [frontend/src/utils/apiConfig.js](frontend/src/utils/apiConfig.js:1)
+  - Exporta: `export const API_BASE = import.meta.env?.VITE_API_URL || '/api';`
+  - Log de arranque único: `console.info('[HTTP]', { API_BASE })`.
+  - Comentarios: Justificación de no usar localhost en prod; '/api' sirve para dev (proxy Vite) y prod (mismo dominio).
+- Cliente unificado Axios: [frontend/src/services/api-client.js](frontend/src/services/api-client.js:1)
+  - baseURL = API_BASE
+  - timeout = 30000
+  - Interceptor de request:
+    - Lee token desde localStorage('token') o persist de Zustand ('notaria-auth-storage').
+    - Agrega Authorization Bearer si está disponible.
+    - Log: `console.debug('[HTTP][REQ]', { url, hasAuth })`.
+  - Interceptor de response:
+    - Si status 401/403 → handleUnauthorized():
+      - Limpia token/refreshToken/notaria-auth-storage
+      - Emite `console.warn('[AUTH]', '401/403 detectado → logout')`
+      - Navega a /login (window.location.assign)
+    - (Opcional, documentado y comentado): refresh de token con 1 intento, evitando loops con flag local `isRefreshing`.
+- Refactor servicios:
+  - Documentos: [frontend/src/services/document-service.js](frontend/src/services/document-service.js:1)
+    - Usa `apiClient` (interceptores unificados).
+    - Agregados métodos unificados:
+      - `getUnifiedDocuments(params)` → GET /documents
+      - `getUnifiedCounts(params)` → GET /documents/counts
+    - Logs por llamada: `console.debug('[HTTP][CALL]', ...)` y en errores `console.error('[HTTP][ERR]', endpoint, status, message)`.
+  - Recepción: [frontend/src/services/reception-service.js](frontend/src/services/reception-service.js:1)
+    - Usa `apiClient`.
+    - Agregados métodos unificados:
+      - `getUnifiedReceptions(params)` → GET /reception
+      - `getUnifiedCounts(params)` → GET /reception/counts
+    - Operaciones de entrega y otras rutas adaptadas a `api`.
+- Hook de auth: [frontend/src/hooks/use-auth.js](frontend/src/hooks/use-auth.js:1)
+  - logout(): limpia token/refreshToken/notaria-auth-storage, emite `[SESSION]`, navega /login.
+- Ruta protegida: [frontend/src/components/ProtectedRoute.jsx](frontend/src/components/ProtectedRoute.jsx:1)
+  - Si no está autenticado, redirige a /login y retorna null (skeleton ya cubierto para estados de carga).
+- Stores y vistas:
+  - Documentos (UI v2): [frontend/src/store/unified-documents-store.js](frontend/src/store/unified-documents-store.js:1)
+    - fetchDocuments/fetchCounts ahora consumen `documentService.getUnifiedDocuments/getUnifiedCounts`.
+    - Cuando servicio retorna 401 (tras handleUnauthorized), setea `error: 'Sesión expirada. Inicia sesión nuevamente.'` y el componente muestra Alert.
+  - Recepción (UI v2): [frontend/src/store/receptions-store.js](frontend/src/store/receptions-store.js:1)
+    - fetchDocuments/fetchCounts ahora consumen `receptionService.getUnifiedReceptions/getUnifiedCounts`.
+    - Manejo de `error` con el mismo mensaje de sesión expirada.
+
+3) Diagrama breve de interceptores
+```
+UI → apiClient.request
+     ├─ inject Authorization: Bearer ${token}
+     └─ log [HTTP][REQ] { url, hasAuth }
+
+Backend → apiClient.response
+     ├─ 2xx → response
+     └─ 401/403 → handleUnauthorized()
+          ├─ clear tokens/local storage
+          ├─ log [AUTH] 401/403 detectado → logout
+          └─ window.location.assign('/login')
+```
+
+4) Política de refresh (opcional)
+- Comentada en api-client.js:
+  - Si existe refreshToken en localStorage, intentar una vez POST /auth/refresh (con axios plano, no apiClient) para evitar bucles.
+  - En éxito: guardar nuevo token y reintentar la request original.
+  - En falla: handleUnauthorized().
+  - Controlar reintentos con flag local `isRefreshing` (evita loops).
+- Actualmente deshabilitado por simplicidad y consistencia; habilitar según reglas del backend.
+
+5) Cambios en componentes/páginas (comportamiento visible)
+- ReceptionCenter.jsx y DocumentCenter.jsx ya muestran `Alert` cuando store.set({ error }) tiene texto:
+  - Si la sesión expiró (401/403), el error será “Sesión expirada. Inicia sesión nuevamente.”
+  - Luego de iniciar sesión nuevamente, la UI v2 carga Activos/Entregados sin tarjetas rojas persistentes.
+
+6) Checklist de validación
+- [ ] En DevTools, una sola vez: [HTTP] { API_BASE: "/api" }.
+- [ ] Antes de cada request: [HTTP][REQ] { url:"/documents|/reception|...", hasAuth: true } cuando hay token.
+- [ ] Expiración sesión:
+  - [ ] Backend responde 401/403.
+  - [ ] En consola: [AUTH] 401/403 detectado → logout.
+  - [ ] Navegación a /login automática.
+  - [ ] En DocumentCenter/ReceptionCenter, `Alert` muestra: "Sesión expirada. Inicia sesión nuevamente."
+- [ ] Tras login, Activos/Entregados vuelven a cargar datos correctamente.
+- [ ] No hay fallbacks a `http://localhost:3001` en producción.

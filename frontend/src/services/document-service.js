@@ -1,108 +1,13 @@
-import axios from 'axios';
+import apiClient from './api-client';
+import { API_BASE } from '../utils/apiConfig';
 
-// Configuración base de la API - Auto-detectar producción
-const getApiBaseUrl = () => {
-  // Si estamos en producción (mismo dominio), usar rutas relativas
-  if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    return '/api';
-  }
-  // En desarrollo, usar la variable de entorno o fallback
-  return import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
-};
+/** Cliente HTTP unificado */
+const api = apiClient;
 
-const API_BASE_URL = getApiBaseUrl();
-
-// Crear instancia de axios con configuración predeterminada
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json'
-  }
-});
-
-// Interceptor para agregar token automáticamente
-api.interceptors.request.use(
-  (config) => {
-    const authData = localStorage.getItem('notaria-auth-storage');
-    if (authData) {
-      try {
-        const parsed = JSON.parse(authData);
-        if (parsed.state && parsed.state.token) {
-          // Validar que el token tenga un formato básico válido
-          const token = parsed.state.token;
-          if (token && typeof token === 'string' && token.split('.').length === 3) {
-            config.headers.Authorization = `Bearer ${token}`;
-          } else {
-            console.warn('Token JWT malformado detectado, omitiendo header Authorization');
-          }
-        }
-      } catch (error) {
-        console.error('Error parsing auth token:', error);
-      }
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Interceptor para manejar respuestas y errores de autenticación
-api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
-  async (error) => {
-    const originalRequest = error.config;
-
-    // Si es error 401 y no hemos reintentado ya
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      console.warn('🔐 Error 401 detectado, intentando refrescar token...');
-
-      try {
-        // Intentar refrescar el token usando authService
-        const authService = (await import('./auth-service.js')).default;
-        const refreshResult = await authService.refreshToken(localStorage.getItem('notaria-auth-storage'));
-
-        if (refreshResult.success && refreshResult.data?.token) {
-          console.log('✅ Token refrescado exitosamente');
-
-          // Actualizar el token en localStorage
-          const authData = JSON.parse(localStorage.getItem('notaria-auth-storage') || '{}');
-          if (authData.state) {
-            authData.state.token = refreshResult.data.token;
-            localStorage.setItem('notaria-auth-storage', JSON.stringify(authData));
-          }
-
-          // Reintentar la petición original con el nuevo token
-          originalRequest.headers.Authorization = `Bearer ${refreshResult.data.token}`;
-          originalRequest._retry = true;
-
-          return api(originalRequest);
-        } else {
-          console.error('❌ Error refrescando token:', refreshResult.error);
-          // Limpiar autenticación si no se pudo refrescar
-          localStorage.removeItem('notaria-auth-storage');
-          window.location.href = '/login';
-        }
-      } catch (refreshError) {
-        console.error('❌ Error en interceptor de refresh:', refreshError);
-        // Limpiar autenticación y redirigir a login
-        localStorage.removeItem('notaria-auth-storage');
-        window.location.href = '/login';
-      }
-    }
-
-    // Para errores JWT específicos, proporcionar mejor información
-    if (error.response?.data?.message?.includes('malformed') ||
-        error.response?.data?.message?.includes('jwt') ||
-        error.response?.data?.message?.includes('token')) {
-      console.error('🚨 Error de token JWT detectado:', error.response.data);
-    }
-
-    return Promise.reject(error);
-  }
-);
+/**
+* Interceptores centralizados en api-client.
+* Este servicio usa `api` (apiClient) para todas sus llamadas.
+*/
 
 /**
  * Servicio para gestión de documentos
@@ -204,6 +109,43 @@ const documentService = {
                           'Error al subir archivos XML en lote';
       
       return {
+  /**
+   * Unificado: listado de documentos (Activos/Entregados) con búsqueda/paginación
+   */
+  async getUnifiedDocuments(params = {}) {
+    try {
+      console.debug('[HTTP][CALL]', 'getUnifiedDocuments', params);
+      const res = await api.get('/documents', { params });
+      return { success: true, data: res.data?.data };
+    } catch (error) {
+      const status = error?.response?.status;
+      const message = error?.response?.data?.message || error.message || 'Error al cargar documentos';
+      console.error('[HTTP][ERR]', '/documents', status, message);
+      if (status === 401 || status === 403) {
+        return { success: false, error: 'Sesión expirada. Inicia sesión nuevamente.' };
+      }
+      return { success: false, error: message };
+    }
+  },
+
+  /**
+   * Unificado: conteos de documentos por pestaña (para badges)
+   */
+  async getUnifiedCounts(params = {}) {
+    try {
+      console.debug('[HTTP][CALL]', 'getUnifiedCounts', params);
+      const res = await api.get('/documents/counts', { params });
+      return { success: true, data: res.data?.data };
+    } catch (error) {
+      const status = error?.response?.status;
+      const message = error?.response?.data?.message || error.message || 'Error al cargar conteos';
+      console.error('[HTTP][ERR]', '/documents/counts', status, message);
+      if (status === 401 || status === 403) {
+        return { success: false, error: 'Sesión expirada. Inicia sesión nuevamente.' };
+      }
+      return { success: false, error: message };
+    }
+  },
         success: false,
         error: errorMessage
       };

@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import documentService from '../services/document-service';
 
 /**
  * 🎯 Store de documentos unificados para UI Activos/Entregados
@@ -117,50 +118,33 @@ const useUnifiedDocumentsStore = create((set, get) => ({
   },
 
   /**
-   * Cargar documentos desde API
+   * Cargar documentos desde API (cliente HTTP unificado)
    */
   fetchDocuments: async () => {
     const { tab, query, clientId, page, pageSize } = get();
-
     set({ loading: true, error: null });
-
     try {
-      const params = new URLSearchParams({
+      const params = {
         tab,
-        page: page.toString(),
-        pageSize: pageSize.toString()
-      });
-
-      if (query.trim()) {
-        params.append('query', query.trim());
-      }
-
-      if (clientId) {
-        params.append('clientId', clientId);
-      }
-
-      const response = await fetch(`/api/documents?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-
+        page,
+        pageSize,
+        ...(query?.trim() ? { query: query.trim() } : {}),
+        ...(clientId ? { clientId } : {}),
+      };
+      const result = await documentService.getUnifiedDocuments(params);
       if (result.success) {
+        const data = result.data || {};
         set({
-          documents: result.data.items || [],
-          total: result.data.total || 0,
-          pages: result.data.pages || 1,
+          documents: data.items || [],
+          total: data.total || 0,
+          pages: data.pages || 1,
           loading: false
         });
       } else {
-        throw new Error(result.message || 'Error al cargar documentos');
+        set({
+          error: result.error || 'Error al cargar documentos',
+          loading: false
+        });
       }
     } catch (error) {
       console.error('Error fetching documents:', error);
@@ -172,51 +156,29 @@ const useUnifiedDocumentsStore = create((set, get) => ({
   },
 
   /**
-   * Cargar conteos para badges
+   * Cargar conteos para badges (cliente HTTP unificado)
    */
   fetchCounts: async () => {
     const { query, clientId } = get();
-
     set({ loadingCounts: true });
-
     try {
-      const params = new URLSearchParams();
-
-      if (query.trim()) {
-        params.append('query', query.trim());
-      }
-
-      if (clientId) {
-        params.append('clientId', clientId);
-      }
-
-      const response = await fetch(`/api/documents/counts?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-
+      const params = {
+        ...(query?.trim() ? { query: query.trim() } : {}),
+        ...(clientId ? { clientId } : {}),
+      };
+      const result = await documentService.getUnifiedCounts(params);
       if (result.success) {
         set({
           counts: result.data || { ACTIVOS: 0, ENTREGADOS: 0 },
           loadingCounts: false
         });
       } else {
-        throw new Error(result.message || 'Error al cargar conteos');
+        // Mantener UX suave: solo detener loadingCounts
+        set({ loadingCounts: false });
       }
     } catch (error) {
       console.error('Error fetching counts:', error);
-      set({
-        loadingCounts: false
-        // No establecer error para counts, solo log
-      });
+      set({ loadingCounts: false });
     }
   },
 

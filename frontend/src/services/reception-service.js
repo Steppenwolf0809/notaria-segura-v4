@@ -1,53 +1,51 @@
-import axios from 'axios';
+import apiClient from './api-client';
+import { API_BASE } from '../utils/apiConfig';
 
-// URL base de la API
-const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
-
-// Instancia de axios configurada
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  timeout: 10000 // 10 segundos
-});
-
-// Interceptor para agregar token automáticamente
-api.interceptors.request.use(
-  (config) => {
-    const authData = localStorage.getItem('notaria-auth-storage');
-    if (authData) {
-      try {
-        const parsed = JSON.parse(authData);
-        if (parsed.state && parsed.state.token) {
-          config.headers.Authorization = `Bearer ${parsed.state.token}`;
-        }
-      } catch (error) {
-        // Si no hay token, usar el que está en localStorage directamente
-        const token = localStorage.getItem('token');
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
-        }
-      }
-    } else {
-      // Fallback al token directo
-      const token = localStorage.getItem('token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
+/** Cliente HTTP unificado */
+const api = apiClient;
 
 /**
  * Servicio de recepción
  * Maneja todas las peticiones relacionadas con entrega de documentos
  */
 const receptionService = {
+  /**
+   * Unificado: listado con pestañas/búsqueda/paginación (para ReceptionCenter v2)
+   */
+  async getUnifiedReceptions(params = {}) {
+    try {
+      console.debug('[HTTP][CALL]', 'getUnifiedReceptions', params);
+      const res = await api.get('/reception', { params });
+      return { success: true, data: res.data?.data };
+    } catch (error) {
+      const status = error?.response?.status;
+      const message = error?.response?.data?.message || error.message || 'Error al cargar recepciones';
+      console.error('[HTTP][ERR]', '/reception', status, message);
+      if (status === 401 || status === 403) {
+        return { success: false, error: 'Sesión expirada. Inicia sesión nuevamente.' };
+      }
+      return { success: false, error: message };
+    }
+  },
+
+  /**
+   * Unificado: conteos por pestaña (para badges)
+   */
+  async getUnifiedCounts(params = {}) {
+    try {
+      console.debug('[HTTP][CALL]', 'getUnifiedCounts', params);
+      const res = await api.get('/reception/counts', { params });
+      return { success: true, data: res.data?.data };
+    } catch (error) {
+      const status = error?.response?.status;
+      const message = error?.response?.data?.message || error.message || 'Error al cargar conteos';
+      console.error('[HTTP][ERR]', '/reception/counts', status, message);
+      if (status === 401 || status === 403) {
+        return { success: false, error: 'Sesión expirada. Inicia sesión nuevamente.' };
+      }
+      return { success: false, error: message };
+    }
+  },
   /**
    * Obtener estadísticas del dashboard
    * @returns {Promise<Object>} Estadísticas de recepción
@@ -216,23 +214,14 @@ const receptionService = {
    */
   async procesarEntrega(documentId, entregaData) {
     try {
-      // 🔄 CONSERVADOR: Usar endpoint principal de documentos que ya existe
-      const response = await axios.post(`${API_BASE_URL}/documents/${documentId}/deliver`, entregaData, {
-        headers: {
-          'Authorization': `Bearer ${this.getToken()}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      return {
-        success: true,
-        data: response.data.data,
-        message: response.data.message
-      };
+      console.debug('[HTTP][CALL]', 'procesarEntrega', { documentId });
+      const response = await api.post(`/documents/${documentId}/deliver`, entregaData);
+      return { success: true, data: response.data.data, message: response.data.message };
     } catch (error) {
-      return {
-        success: false,
-        error: receptionService.handleError(error)
-      };
+      const status = error?.response?.status;
+      const message = receptionService.handleError(error);
+      console.error('[HTTP][ERR]', `/documents/${documentId}/deliver`, status, message);
+      return { success: false, error: message };
     }
   },
 
@@ -385,18 +374,16 @@ const receptionService = {
    * Obtener token de autenticación
    * @returns {string|null} Token de autenticación
    */
+  // getToken ya no es necesario con apiClient; se mantiene por compatibilidad, pero no se usa
   getToken() {
-    const authData = localStorage.getItem('notaria-auth-storage');
-    if (authData) {
-      try {
-        const parsed = JSON.parse(authData);
-        return parsed.state?.token;
-      } catch (error) {
-        // Si no hay token, usar el que está en localStorage directamente
-        return localStorage.getItem('token');
-      }
+    const token = localStorage.getItem('token');
+    if (token) return token;
+    try {
+      const parsed = JSON.parse(localStorage.getItem('notaria-auth-storage') || '{}');
+      return parsed?.state?.token || null;
+    } catch {
+      return null;
     }
-    return localStorage.getItem('token');
   },
 
   /**

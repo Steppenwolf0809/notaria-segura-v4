@@ -1,20 +1,8 @@
-/**
- * Configuración automática de API URL para desarrollo y producción
- */
+// Configuración unificada de base de API
+// Evitamos fallbacks a localhost en producción. La URL final se inyecta por Vite.
+// Si no existe VITE_API_URL, usamos '/api' que funciona tanto en dev con proxy como en prod detrás del mismo dominio.
+export const API_BASE = (import.meta.env?.VITE_API_URL && String(import.meta.env.VITE_API_URL).trim()) || '/api';
 
-export const getApiBaseUrl = () => {
-  // Si estamos en producción (no localhost), usar rutas relativas
-  if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    return '/api';
-  }
-  
-  // En desarrollo, usar la variable de entorno o fallback a localhost
-  return import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-};
-
-export const API_BASE_URL = getApiBaseUrl();
-
-// Debug: Log de la URL que se está usando
-if (import.meta.env.DEV) {
-  console.log('🔧 API Base URL:', API_BASE_URL);
-}
+// Log de arranque único para diagnóstico
+// Debe verse una sola vez en DevTools al iniciar la app o primer import
+console.info('[HTTP]', { API_BASE });

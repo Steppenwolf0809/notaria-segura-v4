@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import receptionService from '../services/reception-service';
 
 /**
  * 🎯 Store de recepciones unificado para UI Activos/Entregados
@@ -116,50 +117,33 @@ const useReceptionsStore = create((set, get) => ({
   },
 
   /**
-   * Cargar recepciones desde API
+   * Cargar recepciones desde API (cliente HTTP unificado)
    */
   fetchDocuments: async () => {
     const { tab, query, clientId, page, pageSize } = get();
-
     set({ loading: true, error: null });
-
     try {
-      const params = new URLSearchParams({
+      const params = {
         tab,
-        page: page.toString(),
-        pageSize: pageSize.toString()
-      });
-
-      if (query.trim()) {
-        params.append('query', query.trim());
-      }
-
-      if (clientId) {
-        params.append('clientId', clientId);
-      }
-
-      const response = await fetch(`/api/reception?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-
+        page,
+        pageSize,
+        ...(query?.trim() ? { query: query.trim() } : {}),
+        ...(clientId ? { clientId } : {}),
+      };
+      const result = await receptionService.getUnifiedReceptions(params);
       if (result.success) {
+        const data = result.data || {};
         set({
-          documents: result.data.items || [],
-          total: result.data.total || 0,
-          pages: result.data.pages || 1,
+          documents: data.items || [],
+          total: data.total || 0,
+          pages: data.pages || 1,
           loading: false
         });
       } else {
-        throw new Error(result.message || 'Error al cargar recepciones');
+        set({
+          error: result.error || 'Error al cargar recepciones',
+          loading: false
+        });
       }
     } catch (error) {
       console.error('Error fetching receptions:', error);
@@ -171,51 +155,28 @@ const useReceptionsStore = create((set, get) => ({
   },
 
   /**
-   * Cargar conteos para badges
+   * Cargar conteos para badges (cliente HTTP unificado)
    */
   fetchCounts: async () => {
     const { query, clientId } = get();
-
     set({ loadingCounts: true });
-
     try {
-      const params = new URLSearchParams();
-
-      if (query.trim()) {
-        params.append('query', query.trim());
-      }
-
-      if (clientId) {
-        params.append('clientId', clientId);
-      }
-
-      const response = await fetch(`/api/reception/counts?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const result = await response.json();
-
+      const params = {
+        ...(query?.trim() ? { query: query.trim() } : {}),
+        ...(clientId ? { clientId } : {}),
+      };
+      const result = await receptionService.getUnifiedCounts(params);
       if (result.success) {
         set({
           counts: result.data || { ACTIVOS: 0, ENTREGADOS: 0 },
           loadingCounts: false
         });
       } else {
-        throw new Error(result.message || 'Error al cargar conteos');
+        set({ loadingCounts: false });
       }
     } catch (error) {
       console.error('Error fetching reception counts:', error);
-      set({
-        loadingCounts: false
-        // No establecer error para counts, solo log
-      });
+      set({ loadingCounts: false });
     }
   },
 
