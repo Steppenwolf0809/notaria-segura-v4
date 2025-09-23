@@ -306,3 +306,89 @@ d) Checklist de verificación
   - Se resalta el item activo utilizando el hash (#/item) o el id activo provisto por el contenedor.
 - Scroll:
   - El contenedor padre usa overflow:hidden y main usa overflow:auto con altura 100vh.
+
+## Topbar + Theme + Logout + Sidebar CAJA
+
+Fecha: 2025-09-23
+
+1) Árbol de componentes relevante (render principal autenticado)
+```
+App
+└─ ThemeProvider (centralizado en App)
+   └─ ProtectedRoute
+      └─ Dashboard
+         ├─ CAJA (v2 por flag): CajaLayout
+         │  ├─ Topbar (AppBar fijo, z-index > Drawer)
+         │  ├─ Sidebar (permanente ≥md, temporal &lt;md)
+         │  └─ &lt;main&gt; (overflow:auto)
+         │     └─ DocumentCenter (si VITE_UI_ACTIVOS_ENTREGADOS)
+         │     └─ CajaDashboard (legacy si flag desactivado)
+         └─ RECEPCION: RecepcionLayout + (ReceptionCenter v2 | RecepcionCenter legacy)
+```
+
+2) Persistencia de tema (light | dark | system)
+- Fuente única de preferencia: localStorage('theme') con valores 'light' | 'dark' | 'system'.
+- Implementación:
+  - Contexto: [frontend/src/contexts/theme-ctx.jsx](frontend/src/contexts/theme-ctx.jsx)
+  - Utilidad de almacenamiento: [frontend/src/utils/storage.js](frontend/src/utils/storage.js)
+  - Toggle de UI: [frontend/src/components/ThemeToggle.jsx](frontend/src/components/ThemeToggle.jsx)
+- Resolución efectiva:
+  - Si mode === 'system', se observa prefers-color-scheme del SO.
+  - Se sincroniza el booleano isDark en Zustand para retrocompatibilidad.
+  - Se aplica atributo data-theme al documentElement y tema enterprise via ThemeProvider centralizado en [frontend/src/App.jsx](frontend/src/App.jsx:1).
+
+3) Disparo de logout desde Topbar
+- Menú de usuario en Topbar incluye "Cerrar sesión".
+- Acción conecta con hook de auth:
+  - Hook: [frontend/src/hooks/use-auth.js](frontend/src/hooks/use-auth.js:1)
+  - Método: logout() ahora:
+    - Limpia token/estado.
+    - Navega a /login (pushState o assign).
+    - Emite traza: console.info('[SESSION]', { event: 'logout' }).
+- Topbar: [frontend/src/components/Topbar.jsx](frontend/src/components/Topbar.jsx:1)
+
+4) Sidebar CAJA por rol (fuente única)
+- Definición centralizada: [frontend/src/config/nav-items.js](frontend/src/config/nav-items.js:1)
+  - CAJA: Dashboard, Documentos, Subir XML.
+- Sidebar genérico por rol: [frontend/src/components/layout/Sidebar.jsx](frontend/src/components/layout/Sidebar.jsx:1)
+  - Lee role desde use-auth y usa navItemsByRole[role].
+  - Emite traza: console.info('[SIDEBAR]', { role, items: navItems.length }).
+  - Responsive: Drawer temporal (&lt;md) y permanente (≥md); colapsable (60px) en desktop.
+
+5) Accesibilidad y UX
+- Atajo Shift+D en Topbar para enfocar buscador:
+  - Prioriza #global-search-input (DocumentCenter v2) o #reception-search-input (ReceptionCenter v2).
+- Tooltip “Cambiar tema” en ThemeToggle.
+- AppBar fijo con z-index mayor al Drawer para evitar solapes en desktop.
+
+6) Flags de UI y trazas
+- readFlag en Dashboard para gating de v2:
+  - [frontend/src/components/Dashboard.jsx](frontend/src/components/Dashboard.jsx:35)
+  - Log requerido: console.info('[UI-GATE]', { role: user?.role, uiV2: readFlag('VITE_UI_ACTIVOS_ENTREGADOS', true) })
+- Resultado:
+  - CAJA: monta CajaLayout SIEMPRE; dentro, v2 (DocumentCenter) si flag true.
+  - RECEPCION: v2 (ReceptionCenter + RecepcionLayout) si flag true; caso contrario legacy (RecepcionCenter).
+
+7) Checklist de verificación
+- [ ] Sidebar visible en CAJA con items definidos (Dashboard, Documentos, Subir XML).
+- [ ] AppBar fijo (Topbar) con:
+  - [ ] Interruptor de tema funcional y persistente entre recargas (localStorage('theme')).
+  - [ ] Menú de usuario con “Cerrar sesión” que limpia token/estado y navega a /login.
+- [ ] Logs visibles en DevTools:
+  - [ ] [SIDEBAR]
+  - [ ] [THEME]
+  - [ ] [SESSION]
+  - [ ] [UI-GATE]
+- [ ] En móvil (&lt;md), el Sidebar actúa como Drawer (abre con botón menú en Topbar).
+- [ ] Atajo Shift+D enfoca el buscador (si existe en vista actual).
+
+8) Archivos clave modificados/creados
+- Creado: [frontend/src/components/Topbar.jsx](frontend/src/components/Topbar.jsx:1)
+- Creado: [frontend/src/utils/storage.js](frontend/src/utils/storage.js:1)
+- Creado: [frontend/src/contexts/theme-ctx.jsx](frontend/src/contexts/theme-ctx.jsx:1)
+- Modificado: [frontend/src/components/ThemeToggle.jsx](frontend/src/components/ThemeToggle.jsx:1) → ahora usa ThemeCtx y ciclo light|dark|system.
+- Modificado: [frontend/src/main.jsx](frontend/src/main.jsx:1) → envuelve en ThemeCtxProvider.
+- Modificado: [frontend/src/App.jsx](frontend/src/App.jsx:1) → centraliza ThemeProvider (tema enterprise).
+- Modificado: [frontend/src/hooks/use-auth.js](frontend/src/hooks/use-auth.js:90) → logout con traza [SESSION] y navegación a /login.
+- Modificado: [frontend/src/components/layout/CajaLayout.jsx](frontend/src/components/layout/CajaLayout.jsx:1) → integra Topbar fijo.
+- Modificado: [frontend/src/components/Dashboard.jsx](frontend/src/components/Dashboard.jsx:35) → readFlag + [UI-GATE] + gating de v2 para CAJA/RECEPCION.
