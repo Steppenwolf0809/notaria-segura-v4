@@ -4,26 +4,43 @@ import { Brightness4, Brightness7, BrightnessAuto } from '@mui/icons-material'
 import { useThemeCtx } from '../contexts/theme-ctx'
 
 /**
- * Toggle de tema con soporte para light | dark | system
- * - Persistencia en localStorage('theme') vía ThemeCtx
- * - Emite logs [THEME] desde el propio contexto al ciclar
- * - Tooltip de accesibilidad: "Cambiar tema"
+ * Toggle de tema con soporte para:
+ * - Modo normal: light | dark | system (ciclo system→light→dark)
+ * - Modo sin "system": solo light | dark (para CAJA)
+ *
+ * Props:
+ * - noSystem?: boolean → si true, se limita a alternar light/dark
  */
-function ThemeToggle() {
-  const { mode, resolvedIsDark, cycleMode } = useThemeCtx()
+function ThemeToggle({ noSystem = false }) {
+  const { mode, resolvedIsDark, setMode, cycleMode } = useThemeCtx()
 
-  const label =
-    mode === 'system' ? 'Sistema' : (resolvedIsDark ? 'Oscuro' : 'Claro')
+  const label = noSystem
+    ? (resolvedIsDark ? 'Oscuro' : 'Claro')
+    : (mode === 'system' ? 'Sistema' : (resolvedIsDark ? 'Oscuro' : 'Claro'))
 
-  const LeftIcon = mode === 'system' ? BrightnessAuto : Brightness7
+  const LeftIcon = noSystem
+    ? Brightness7
+    : (mode === 'system' ? BrightnessAuto : Brightness7)
+
   const RightIcon = Brightness4
+
+  const handleClick = (event) => {
+    event.preventDefault()
+    if (noSystem) {
+      // Alternar solo entre light y dark (sin pasar por system)
+      setMode(resolvedIsDark ? 'light' : 'dark')
+    } else {
+      // El contexto emite console.info('[THEME]', { nextTheme })
+      cycleMode()
+    }
+  }
 
   return (
     <Tooltip title="Cambiar tema" placement="bottom">
-      <Box 
-        sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
           gap: 1,
           backgroundColor: 'action.hover',
           borderRadius: 3,
@@ -38,21 +55,17 @@ function ThemeToggle() {
             transform: 'scale(1.02)'
           }
         }}
-        onClick={(event) => {
-          event.preventDefault()
-          // El contexto emite console.info('[THEME]', { nextTheme })
-          cycleMode()
-        }}
+        onClick={handleClick}
         aria-label="Cambiar tema"
         role="button"
       >
         {/* Icono izquierdo (light o system) */}
-        <LeftIcon 
-          sx={{ 
-            fontSize: 16, 
+        <LeftIcon
+          sx={{
+            fontSize: 16,
             color: resolvedIsDark ? 'text.secondary' : 'warning.main',
             transition: 'color 0.2s ease-in-out'
-          }} 
+          }}
         />
         
         {/* Switch visual (refleja el modo resuelto) */}
@@ -97,18 +110,18 @@ function ThemeToggle() {
         />
         
         {/* Icono modo oscuro */}
-        <RightIcon 
-          sx={{ 
-            fontSize: 16, 
+        <RightIcon
+          sx={{
+            fontSize: 16,
             color: resolvedIsDark ? 'primary.main' : 'text.secondary',
             transition: 'color 0.2s ease-in-out'
-          }} 
+          }}
         />
         
         {/* Texto opcional (oculto en pantallas pequeñas) */}
-        <Typography 
-          variant="caption" 
-          sx={{ 
+        <Typography
+          variant="caption"
+          sx={{
             display: { xs: 'none', md: 'block' },
             color: 'text.secondary',
             fontSize: '0.75rem',
@@ -123,4 +136,4 @@ function ThemeToggle() {
   )
 }
 
-export default ThemeToggle 
+export default ThemeToggle

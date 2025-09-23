@@ -9,15 +9,18 @@ import {
   Menu,
   MenuItem,
   Tooltip,
+  Divider,
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import AccountCircle from '@mui/icons-material/AccountCircle';
 import ThemeToggle from './ThemeToggle';
 import useAuth from '../hooks/use-auth';
+import ChangePassword from './ChangePassword';
 
 function Topbar({ title = 'Notaría Segura', onMenuClick }) {
   const { user, getFullName, getUserInitials, getUserRoleColor, logout } = useAuth();
   const [anchorEl, setAnchorEl] = React.useState(null);
+  const [openChangePwd, setOpenChangePwd] = React.useState(false);
 
   // Atajo accesibilidad: Shift+D para enfocar buscador si existe
   React.useEffect(() => {
@@ -44,7 +47,12 @@ function Topbar({ title = 'Notaría Segura', onMenuClick }) {
     logout();
   };
 
-  return (
+  const handleOpenChangePwd = () => {
+    handleMenuClose();
+    setOpenChangePwd(true);
+  };
+
+  return (<>
     <AppBar
       position="fixed"
       sx={{
@@ -72,7 +80,7 @@ function Topbar({ title = 'Notaría Segura', onMenuClick }) {
         <Box sx={{ mr: 1 }}>
           <Tooltip title="Cambiar tema" placement="bottom">
             <Box>
-              <ThemeToggle />
+              <ThemeToggle noSystem={user?.role === 'CAJA'} />
             </Box>
           </Tooltip>
         </Box>
@@ -119,11 +127,17 @@ function Topbar({ title = 'Notaría Segura', onMenuClick }) {
             transformOrigin={{ vertical: 'top', horizontal: 'right' }}
           >
             <MenuItem onClick={handleMenuClose}>Perfil (próximamente)</MenuItem>
+            <MenuItem onClick={handleOpenChangePwd}>Cambiar contraseña</MenuItem>
+            <Divider />
             <MenuItem onClick={handleLogout}>Cerrar sesión</MenuItem>
           </Menu>
         </Box>
       </Toolbar>
     </AppBar>
+
+    {/* Modal Cambiar Contraseña - disponible para todos los roles */}
+    <ChangePassword open={openChangePwd} onClose={() => setOpenChangePwd(false)} />
+    </>
   );
 }
 
