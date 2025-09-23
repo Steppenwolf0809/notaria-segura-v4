@@ -260,3 +260,49 @@ Operativa recomendada para encender UI v2 en producción:
 - Tras deploy, en consola del navegador de producción:
   - Verificar flag: `console.log('UI_FLAG', '→', 'debería renderizar v2 si es "true"')`.
   - Verificar build metadata: `console.log(__VITE_BUILD_TIME__, __VITE_COMMIT_HASH__)`.
+
+## Recuperación de Sidebar
+
+a) Diagrama simple del layout
+```
+┌──────────────────────────────────────────────────────────────┐
+│ AppBar (z-index > Drawer)                                    │
+├───────────────┬──────────────────────────────────────────────┤
+│ Sidebar       │  <main>                                      │
+│ (Drawer)      │  - Contenido por rol (Dashboard/Centers)     │
+│               │  - Scroll propio                             │
+└───────────────┴──────────────────────────────────────────────┘
+Altura: 100vh
+Contenedor: display:flex; overflow:hidden
+Main: flex:1; overflow:auto
+```
+
+b) Fuente única de elementos de navegación
+- Archivo de configuración centralizada: [frontend/src/config/nav-items.js](frontend/src/config/nav-items.js)
+- Exporta navItemsByRole con claves por rol (CAJA, RECEPCION, MATRIZADOR, ADMIN, ARCHIVO) y items con { id, label, view, icon }.
+- Sidebar genérico: [frontend/src/components/layout/Sidebar.jsx](frontend/src/components/layout/Sidebar.jsx)
+  - Mapea el icon por nombre (Dashboard, Assignment, WhatsApp, etc.)
+  - Soporta Drawer permanent (≥ md) y temporary (&lt; md), con collapsed y mobileOpen.
+  - zIndex del Drawer por debajo del AppBar (AppBar usa zIndex drawer+1).
+
+c) Montaje consistente y trazas
+- El layout con Sidebar se monta siempre tras autenticación y no depende del flag de UI:
+  - CAJA: Dashboard envuelve el contenido con [frontend/src/components/layout/CajaLayout.jsx](frontend/src/components/layout/CajaLayout.jsx) y renderiza v2 o legacy dentro del main.
+  - RECEPCION: Cuando v2, se envuelve con [frontend/src/components/RecepcionLayout.jsx](frontend/src/components/RecepcionLayout.jsx); cuando legacy, [RecepcionCenter](frontend/src/components/RecepcionCenter.jsx) ya incluye su layout.
+- Trazas:
+  - En el montaje del layout se emite console.info('[LAYOUT]', { role, sidebar: 'mounted' }) desde [CajaLayout.jsx](frontend/src/components/layout/CajaLayout.jsx).
+  - En el Sidebar genérico se emite console.info('[SIDEBAR]', { role, items: navItems?.length }) desde [Sidebar.jsx](frontend/src/components/layout/Sidebar.jsx).
+- Condición de carga:
+  - [ProtectedRoute.jsx](frontend/src/components/ProtectedRoute.jsx) muestra un loader mientras useAuth() verifica token/rol, evitando parpadeo sin barra.
+
+d) Checklist de verificación
+- [LAYOUT] en consola muestra role correcto y sidebar: 'mounted'.
+- [SIDEBAR] en consola muestra role y número de items > 0.
+- El AppBar está por encima del Drawer (no se tapa).
+- Responsive:
+  - ≥ md: Drawer permanente con opción de colapso (ancho 240px/60px).
+  - &lt; md: Drawer temporary que se abre con el botón de menú en AppBar.
+- Active-route:
+  - Se resalta el item activo utilizando el hash (#/item) o el id activo provisto por el contenedor.
+- Scroll:
+  - El contenedor padre usa overflow:hidden y main usa overflow:auto con altura 100vh.
