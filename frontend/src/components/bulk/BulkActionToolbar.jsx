@@ -16,7 +16,9 @@ import {
   CheckCircle as CheckCircleIcon,
   Send as SendIcon,
   PlayArrow as PlayArrowIcon,
-  Warning as WarningIcon
+  Warning as WarningIcon,
+  LocalShipping as LocalShippingIcon,
+  History as HistoryIcon
 } from '@mui/icons-material';
 
 /**
@@ -34,14 +36,14 @@ const BulkActionToolbar = ({
   sx = {}
 }) => {
   
-  // Configuración de botones según el estado común
+  // Configuración de botones basada en validTransitions (independiente de commonStatus)
   const getActionButtons = () => {
-    if (!commonStatus || validTransitions.length === 0) return [];
+    if (!Array.isArray(validTransitions) || validTransitions.length === 0) return [];
 
     const buttons = [];
 
-    // EN_PROCESO → LISTO
-    if (commonStatus === 'EN_PROCESO' && validTransitions.includes('LISTO')) {
+    // Marcar como LISTO
+    if (validTransitions.includes('LISTO')) {
       buttons.push({
         key: 'listo',
         label: 'Marcar Como Listo',
@@ -53,20 +55,33 @@ const BulkActionToolbar = ({
       });
     }
 
-    // AGRUPADO → LISTO
-    if (commonStatus === 'AGRUPADO' && validTransitions.includes('LISTO')) {
+    // ENTREGAR
+    if (validTransitions.includes('ENTREGADO')) {
       buttons.push({
-        key: 'listo',
-        label: 'Marcar Como Listo',
-        icon: <SendIcon />,
-        color: 'success',
+        key: 'entregado',
+        label: 'Entregar',
+        icon: <LocalShippingIcon />,
+        color: 'primary',
         variant: 'contained',
-        targetStatus: 'LISTO',
-        description: 'Marcar grupo como listo y enviar notificaciones WhatsApp'
+        targetStatus: 'ENTREGADO',
+        description: 'Marcar como ENTREGADO los documentos LISTO seleccionados'
       });
     }
 
-    // AGRUPADO → EN_PROCESO (reversión)
+    // REVERTIR
+    if (validTransitions.includes('REVERTIR')) {
+      buttons.push({
+        key: 'revertir',
+        label: 'Revertir estado',
+        icon: <HistoryIcon />,
+        color: 'warning',
+        variant: 'outlined',
+        targetStatus: 'REVERTIR',
+        description: 'Revertir estado de documentos (LISTO → EN_PROCESO, ENTREGADO → LISTO)'
+      });
+    }
+
+    // Opcional: mantener soporte a flujos AGRUPADO si se usa en otras vistas
     if (commonStatus === 'AGRUPADO' && validTransitions.includes('EN_PROCESO')) {
       buttons.push({
         key: 'en_proceso',
