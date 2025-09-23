@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState, useMemo } from 'react';
 import {
   Box,
   Tabs,
@@ -23,7 +23,9 @@ import {
   Select,
   MenuItem,
   InputLabel,
-  Tooltip
+  Tooltip,
+  Checkbox,
+  Button
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -35,6 +37,12 @@ import {
 } from '@mui/icons-material';
 import { useHotkeys } from 'react-hotkeys-hook';
 import useReceptionsStore from '../store/receptions-store';
+import DocumentDetailModal from './Documents/DocumentDetailModal.jsx';
+// Toolbar y modal de acciones masivas (reutilizados)
+import BulkActionToolbar from './bulk/BulkActionToolbar.jsx';
+import BulkStatusChangeModal from './bulk/BulkStatusChangeModal.jsx';
+import receptionService from '../services/reception-service.js';
+import { readFlag } from '../config/featureFlags.js';
 
 /**
  * 🎯 Centro de Recepciones Unificado - UI Activos/Entregados
@@ -42,7 +50,7 @@ import useReceptionsStore from '../store/receptions-store';
  */
 const ReceptionCenter = () => {
   // 🔍 DEBUG: Verificar feature flag y log inicial
-  const featureFlag = import.meta.env.VITE_UI_ACTIVOS_ENTREGADOS;
+  const featureFlag = readFlag('VITE_UI_ACTIVOS_ENTREGADOS', true);
   console.log('🎯 RECEPTION-CENTER v2 mounted - Feature flag:', featureFlag);
   console.log('🎯 RECEPTION-CENTER v2 - Environment:', {
     NODE_ENV: import.meta.env.MODE,
@@ -131,6 +139,94 @@ const ReceptionCenter = () => {
     setPageSize(parseInt(event.target.value));
   }, [setPageSize]);
 
+  // ===== Selección múltiple y acciones masivas =====
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [pendingBulkAction, setPendingBulkAction] = useState(null);
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const pageDocs = useMemo(() => documents, [documents]);
+
+  const isAllSelected = useMemo(() => {
+    if (pageDocs.length === 0) return false;
+    return pageDocs.every(d => selectedIds.has(d.id));
+  }, [pageDocs, selectedIds]);
+
+  const isIndeterminate = useMemo(() => {
+    const count = pageDocs.filter(d => selectedIds.has(d.id)).length;
+    return count > 0 && count < pageDocs.length;
+  }, [pageDocs, selectedIds]);
+
+  const toggleSelectAll = (checked) => {
+    const next = new Set(selectedIds);
+    if (checked) {
+      pageDocs.forEach(d => next.add(d.id));
+    } else {
+      pageDocs.forEach(d => next.delete(d.id));
+    }
+    setSelectedIds(next);
+  };
+
+  const toggleRow = (e, id) => {
+    e.stopPropagation();
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelectedIds(next);
+  };
+
+  // Calcular transición válida: por ahora solo LISTO (EN_PROCESO -> LISTO) masivo para Recepción
+  const selectedItems = useMemo(() => pageDocs.filter(d => selectedIds.has(d.id)), [pageDocs, selectedIds]);
+  const selectionCount = selectedItems.length;
+
+  const getValidTransitions = () => {
+    // Habilitamos LISTO si hay al menos 1 documento del grupo en EN_PROCESO
+    const hasAnyEnProceso = selectedItems.some(item =>
+      Array.isArray(item.documents) && item.documents.some(x => x.status === 'EN_PROCESO')
+    );
+    const list = [];
+    if (hasAnyEnProceso) list.push('LISTO');
+    // Futuro: ENTREGADO/REVERTIR pueden agregarse aquí
+    return list;
+  };
+
+  const onBulkAction = (targetStatus) => {
+    if (!targetStatus) return;
+    setPendingBulkAction({ toStatus: targetStatus, documents: selectedItems });
+    setBulkModalOpen(true);
+  };
+
+  const executeBulk = async ({ toStatus }) => {
+    try {
+      if (toStatus === 'LISTO') {
+        // Expandir selección por grupos a IDs de documentos EN_PROCESO
+        const ids = [];
+        selectedItems.forEach(item => {
+          (item.documents || []).forEach(d => {
+            if (d.status === 'EN_PROCESO') ids.push(d.id);
+          });
+        });
+        if (ids.length === 0) {
+          console.info('[RECEPTION][BULK] Nada por actualizar (no hay EN_PROCESO)');
+          setBulkModalOpen(false);
+          return;
+        }
+        const resp = await receptionService.bulkMarkReady(ids, true);
+        console.info('[RECEPTION][BULK][LISTO] resp:', resp);
+        await fetchDocuments();
+        await fetchCounts();
+        clearSelection();
+        setBulkModalOpen(false);
+      } else {
+        console.info('[RECEPTION][BULK] Acción no implementada:', toStatus);
+        setBulkModalOpen(false);
+      }
+    } catch (e) {
+      console.error('[RECEPTION][BULK][ERR]', e);
+      setBulkModalOpen(false);
+    }
+  };
+
   // Renderizar badge con conteo
   const renderTabWithBadge = (label, count, isLoading) => (
     <Badge
@@ -143,8 +239,26 @@ const ReceptionCenter = () => {
   );
 
   // Renderizar fila de recepción
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState(null);
+
   const renderReceptionRow = (doc) => (
-    <TableRow key={doc.id} hover>
+    <TableRow
+      key={doc.id}
+      hover
+      sx={{ cursor: 'pointer' }}
+      onClick={() => {
+        setSelectedDocument(doc);
+        setDetailOpen(true);
+      }}
+    >
+      <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
+        <Checkbox
+          checked={selectedIds.has(doc.id)}
+          onChange={(e) => toggleRow(e, doc.id)}
+          color="primary"
+        />
+      </TableCell>
       <TableCell>
         <Typography variant="body2" fontFamily="monospace">
           {doc.code}
@@ -159,7 +273,7 @@ const ReceptionCenter = () => {
                 cursor: 'pointer',
                 '&:hover': { textDecoration: 'underline', color: 'primary.main' }
               }}
-              onClick={() => handleClientClick(doc.clientId, doc.clientName)}
+              onClick={(e) => { e.stopPropagation(); handleClientClick(doc.clientId, doc.clientName); }}
             >
               {doc.clientName}
             </Typography>
@@ -176,6 +290,16 @@ const ReceptionCenter = () => {
           variant="outlined"
           icon={<DocumentIcon />}
         />
+      </TableCell>
+      <TableCell>
+        <Typography variant="body2">
+          {doc.mainAct || '—'}
+        </Typography>
+        {!!doc.groupSize && doc.groupSize > 1 && (
+          <Typography variant="caption" color="text.secondary">
+            {doc.groupSize} documentos
+          </Typography>
+        )}
       </TableCell>
       <TableCell>
         <Chip
@@ -331,9 +455,19 @@ const ReceptionCenter = () => {
         <Table>
           <TableHead>
             <TableRow>
+              <TableCell padding="checkbox">
+                <Checkbox
+                  indeterminate={isIndeterminate}
+                  checked={isAllSelected}
+                  onChange={(e) => toggleSelectAll(e.target.checked)}
+                  disabled={documents.length === 0}
+                  color="primary"
+                />
+              </TableCell>
               <TableCell><strong>Código</strong></TableCell>
               <TableCell><strong>Cliente</strong></TableCell>
               <TableCell><strong>Tipo</strong></TableCell>
+              <TableCell><strong>Acto principal</strong></TableCell>
               <TableCell><strong>Estado</strong></TableCell>
               <TableCell><strong>Fecha</strong></TableCell>
               <TableCell align="right"><strong>Valor</strong></TableCell>
@@ -343,7 +477,7 @@ const ReceptionCenter = () => {
             <TableBody>
               {hasResults() ? documents.map(renderReceptionRow) : (
                 <TableRow>
-                  <TableCell colSpan={6}>
+                  <TableCell colSpan={8}>
                     {renderEmptyState()}
                   </TableCell>
                 </TableRow>
@@ -384,6 +518,35 @@ const ReceptionCenter = () => {
           />
         </Box>
       )}
+
+      {/* Toolbar de acciones masivas */}
+      <BulkActionToolbar
+        selectionCount={selectionCount}
+        commonStatus={null}
+        validTransitions={getValidTransitions()}
+        maxSelection={999}
+        isExecuting={false}
+        onClearSelection={clearSelection}
+        onBulkAction={(target) => onBulkAction(target)}
+      />
+
+      {/* Modal de confirmación masiva */}
+      <BulkStatusChangeModal
+        open={bulkModalOpen}
+        onClose={() => { setBulkModalOpen(false); setPendingBulkAction(null); }}
+        documents={pendingBulkAction?.documents || []}
+        fromStatus={null}
+        toStatus={pendingBulkAction?.toStatus}
+        onConfirm={(actionData) => executeBulk({ toStatus: actionData.toStatus })}
+        loading={false}
+      />
+      {/* Drawer/Modal de detalle */}
+      <DocumentDetailModal
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        document={selectedDocument}
+        onDocumentUpdated={() => {}}
+      />
     </Box>
   );
 };

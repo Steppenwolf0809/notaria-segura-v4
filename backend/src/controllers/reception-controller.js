@@ -622,7 +622,7 @@ async function marcarComoListo(req, res) {
                                 userId: req.user.id,
                                 eventType: 'STATUS_CHANGED',
                                 description: `Estado cambiado de ${originalStatus} a LISTO por propagación grupal - ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
-                                details: {
+                                details: JSON.stringify({
                                     previousStatus: originalStatus,
                                     newStatus: 'LISTO',
                                     codigoRetiro: doc.codigoRetiro,
@@ -631,7 +631,7 @@ async function marcarComoListo(req, res) {
                                     changedBy: `${req.user.firstName} ${req.user.lastName}`,
                                     userRole: req.user.role,
                                     timestamp: new Date().toISOString()
-                                },
+                                }),
                                 ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
                                 userAgent: req.get('User-Agent') || 'unknown'
                             }
@@ -925,15 +925,15 @@ async function desagruparDocumentos(req, res) {
                         data: {
                             documentId: doc.id,
                             userId: req.user.id,
-                            eventType: 'DOCUMENT_UNGROUPED',
+                            eventType: 'STATUS_CHANGED',
                             description: `Documento desagrupado. Nuevo código: ${codigosIndividuales[documents.findIndex(d => d.id === doc.id)]}`,
-                            details: {
+                            details: JSON.stringify({
                                 previousGroupCode: doc.groupVerificationCode,
                                 newIndividualCode: codigosIndividuales[documents.findIndex(d => d.id === doc.id)],
                                 ungroupedBy: `${req.user.firstName || 'Sistema'} ${req.user.lastName || ''}`,
                                 userRole: req.user.role || 'RECEPCION',
                                 timestamp: new Date().toISOString()
-                            },
+                            }),
                             ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
                             userAgent: req.get('User-Agent') || 'unknown'
                         }
@@ -1119,7 +1119,10 @@ async function getReceptionsUnified(req, res) {
   try {
     const { tab, query, clientId, page = 1, pageSize = 25 } = req.query;
 
-    // Validar parámetros requeridos
+    // Logs de diagnóstico solicitados
+    console.info('[RECEPTION][QUERY]', { tab, query: query || '', page: Number(page), pageSize: Number(pageSize) });
+
+    // Validación de pestaña
     if (!tab || !['ACTIVOS', 'ENTREGADOS'].includes(tab)) {
       return res.status(400).json({
         success: false,
@@ -1127,100 +1130,139 @@ async function getReceptionsUnified(req, res) {
       });
     }
 
-    // Validar pageSize
+    // Normalizar pageSize
     const validPageSizes = [25, 50, 100];
     const limit = validPageSizes.includes(parseInt(pageSize)) ? parseInt(pageSize) : 25;
-    const offset = (parseInt(page) - 1) * limit;
 
-    // Construir filtros según pestaña
-    let statusFilter = [];
-    if (tab === 'ACTIVOS') {
-      statusFilter = ['EN_PROCESO', 'LISTO'];
-    } else if (tab === 'ENTREGADOS') {
-      statusFilter = ['ENTREGADO'];
-    }
+    // Filtro por estados según pestaña
+    const statusFilter = tab === 'ENTREGADOS' ? ['ENTREGADO'] : ['EN_PROCESO', 'LISTO'];
 
-    // Construir where clause
-    const whereClause = {
-      status: { in: statusFilter }
-    };
-
-    // Agregar filtro por clientId si se proporciona
-    if (clientId) {
-      whereClause.clientId = clientId;
-    }
-
-    // Agregar búsqueda global si se proporciona query
+    // Construir where
+    const whereClause = { status: { in: statusFilter } };
+    if (clientId) whereClause.clientId = clientId;
     if (query && query.trim()) {
       const searchTerm = query.trim();
       whereClause.OR = [
         { protocolNumber: { contains: searchTerm, mode: 'insensitive' } },
         { clientName: { contains: searchTerm, mode: 'insensitive' } },
         { clientId: { contains: searchTerm, mode: 'insensitive' } },
-        { documentType: { contains: searchTerm, mode: 'insensitive' } }
+        { documentType: { contains: searchTerm, mode: 'insensitive' } },
+        { actoPrincipalDescripcion: { contains: searchTerm, mode: 'insensitive' } }
       ];
     }
 
-    console.log('🔍 getReceptionsUnified - Filtros aplicados:', {
-      tab,
-      query: query || '(sin búsqueda)',
-      clientId: clientId || '(sin filtro cliente)',
-      page,
-      pageSize: limit,
-      whereClause
+    // Obtener documentos (sin paginar) para agrupar por "acto principal" por cliente
+    const docs = await prisma.document.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        protocolNumber: true,
+        clientId: true,
+        clientName: true,
+        clientPhone: true,
+        documentType: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        actoPrincipalDescripcion: true,
+        actoPrincipalValor: true,
+        totalFactura: true,
+        verificationCode: true,
+        codigoRetiro: true
+      },
+      orderBy: { createdAt: 'desc' }
     });
 
-    // Ejecutar consulta con optimización de índices
-    const [documents, total] = await Promise.all([
-      prisma.document.findMany({
-        where: whereClause,
-        include: {
-          createdBy: {
-            select: { id: true, firstName: true, lastName: true, email: true }
-          },
-          assignedTo: {
-            select: { id: true, firstName: true, lastName: true, email: true }
-          }
-        },
-        orderBy: { createdAt: 'desc' },
-        skip: offset,
-        take: limit
-      }),
-      prisma.document.count({ where: whereClause })
-    ]);
+    // Normalizador simple
+    const normalize = (s) => (s || '').toString().trim().toLowerCase();
 
-    // Formatear respuesta optimizada para frontend
-    const formattedDocuments = documents.map(doc => ({
-      id: doc.id,
-      code: doc.protocolNumber,
-      clientId: doc.clientId,
-      clientName: doc.clientName,
-      clientIdentification: doc.clientId, // Para compatibilidad
-      typeLabel: doc.documentType,
-      statusLabel: doc.status,
-      receivedAtFmt: doc.createdAt ? new Date(doc.createdAt).toLocaleDateString('es-EC') : '-',
-      amountFmt: doc.actoPrincipalValor ? `$${doc.actoPrincipalValor.toLocaleString('es-EC')}` : '-'
-    }));
+    // Clave de agrupación: cliente + acto principal (paridad con la intención de "acto principal")
+    const makeGroupKey = (d) => {
+      const cKey = normalize(d.clientId) || `${normalize(d.clientName)}__${normalize(d.clientPhone)}`;
+      const act = normalize(d.actoPrincipalDescripcion) || 'sin_acto';
+      return `${cKey}::${act}`;
+    };
 
-    const totalPages = Math.ceil(total / limit);
+    // Agrupar
+    const groups = new Map();
+    for (const d of docs) {
+      const k = makeGroupKey(d);
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(d);
+    }
 
-    console.log(`✅ getReceptionsUnified completado: ${documents.length} recepciones encontradas de ${total} total`);
+    // Convertir grupos a items y paginar por grupo
+    const allGroups = Array.from(groups.values());
 
-    res.json({
+    // Estado del grupo: si todos ENTREGADO => ENTREGADO; si alguno LISTO => LISTO; si no => EN_PROCESO
+    const computeGroupStatus = (arr) => {
+      if (arr.length === 0) return 'EN_PROCESO';
+      const allDelivered = arr.every(x => x.status === 'ENTREGADO');
+      if (allDelivered) return 'ENTREGADO';
+      const anyReady = arr.some(x => x.status === 'LISTO');
+      return anyReady ? 'LISTO' : 'EN_PROCESO';
+    };
+
+    const toCurrency = (n) => {
+      try {
+        const v = Number(n || 0);
+        return isNaN(v) ? '-' : `$${v.toLocaleString('es-EC')}`;
+      } catch { return '-'; }
+    };
+
+    const totalGroups = allGroups.length;
+    const pages = Math.max(1, Math.ceil(totalGroups / limit));
+    const currentPage = Math.max(1, Math.min(parseInt(page), pages));
+    const start = (currentPage - 1) * limit;
+    const pageGroups = allGroups.slice(start, start + limit);
+
+    const items = pageGroups.map(arr => {
+      // Ordenar por createdAt desc para elegir líder estable
+      const sorted = [...arr].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      const leader = sorted[0];
+
+      // Monto del grupo (suma de totalFactura o actoPrincipalValor)
+      const sumAmount = arr.reduce((acc, x) => acc + (Number(x.totalFactura ?? x.actoPrincipalValor ?? 0) || 0), 0);
+
+      return {
+        id: leader.id,
+        code: leader.protocolNumber,
+        clientId: leader.clientId,
+        clientName: leader.clientName,
+        clientIdentification: leader.clientId,
+        typeLabel: leader.documentType,
+        mainAct: leader.actoPrincipalDescripcion || '—',
+        groupSize: arr.length,
+        statusLabel: computeGroupStatus(arr),
+        receivedAtFmt: leader.createdAt ? new Date(leader.createdAt).toLocaleDateString('es-EC') : '-',
+        amountFmt: toCurrency(sumAmount),
+        documents: arr.map(x => ({
+          id: x.id,
+          code: x.protocolNumber,
+          status: x.status,
+          verificationCode: x.verificationCode || x.codigoRetiro || null,
+          act: x.actoPrincipalDescripcion || null,
+          amount: Number(x.totalFactura ?? x.actoPrincipalValor ?? 0) || 0
+        }))
+      };
+    });
+
+    console.info('[RECEPTION][UNIFIED_RESULT]', { totalGroups, pages, currentPage, pageSize: limit });
+
+    return res.json({
       success: true,
       data: {
-        total,
-        pages: totalPages,
-        items: formattedDocuments
+        total: totalGroups,
+        pages,
+        items
       }
     });
-
   } catch (error) {
     console.error('❌ Error en getReceptionsUnified:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Error interno del servidor al obtener recepciones',
-      error: error.message
+      error: error?.message || 'Unknown error'
     });
   }
 }
@@ -1235,62 +1277,163 @@ async function getReceptionsCounts(req, res) {
   try {
     const { query, clientId } = req.query;
 
-    // Construir filtros base
+    // Filtro base
     const baseWhere = {};
-    if (clientId) {
-      baseWhere.clientId = clientId;
-    }
-
-    // Agregar búsqueda global si se proporciona query
+    if (clientId) baseWhere.clientId = clientId;
     if (query && query.trim()) {
       const searchTerm = query.trim();
       baseWhere.OR = [
         { protocolNumber: { contains: searchTerm, mode: 'insensitive' } },
         { clientName: { contains: searchTerm, mode: 'insensitive' } },
         { clientId: { contains: searchTerm, mode: 'insensitive' } },
-        { documentType: { contains: searchTerm, mode: 'insensitive' } }
+        { documentType: { contains: searchTerm, mode: 'insensitive' } },
+        { actoPrincipalDescripcion: { contains: searchTerm, mode: 'insensitive' } }
       ];
     }
 
-    // Ejecutar conteos en paralelo para mejor performance
-    const [activosCount, entregadosCount] = await Promise.all([
-      // Conteo para ACTIVOS (EN_PROCESO + LISTO)
-      prisma.document.count({
-        where: {
-          ...baseWhere,
-          status: { in: ['EN_PROCESO', 'LISTO'] }
-        }
-      }),
-      // Conteo para ENTREGADOS
-      prisma.document.count({
-        where: {
-          ...baseWhere,
-          status: 'ENTREGADO'
-        }
-      })
-    ]);
-
-    console.log('📊 getReceptionsCounts completado:', {
-      query: query || '(sin búsqueda)',
-      clientId: clientId || '(sin filtro)',
-      ACTIVOS: activosCount,
-      ENTREGADOS: entregadosCount
+    // Traer documentos filtrados (sin paginar) para contar por grupos
+    const docs = await prisma.document.findMany({
+      where: baseWhere,
+      select: {
+        id: true,
+        protocolNumber: true,
+        clientId: true,
+        clientName: true,
+        clientPhone: true,
+        status: true,
+        actoPrincipalDescripcion: true
+      },
+      orderBy: { createdAt: 'desc' }
     });
 
-    res.json({
+    const normalize = (s) => (s || '').toString().trim().toLowerCase();
+    const makeGroupKey = (d) => {
+      const cKey = normalize(d.clientId) || `${normalize(d.clientName)}__${normalize(d.clientPhone)}`;
+      const act = normalize(d.actoPrincipalDescripcion) || 'sin_acto';
+      return `${cKey}::${act}`;
+    };
+
+    // Agrupar
+    const groups = new Map();
+    for (const d of docs) {
+      const k = makeGroupKey(d);
+      if (!groups.has(k)) groups.set(k, []);
+      groups.get(k).push(d);
+    }
+
+    // Clasificar grupos a ACTIVOS o ENTREGADOS
+    let activos = 0;
+    let entregados = 0;
+    for (const arr of groups.values()) {
+      const allDelivered = arr.length > 0 && arr.every(x => x.status === 'ENTREGADO');
+      if (allDelivered) entregados += 1;
+      else activos += 1; // Si no todos entregados, el grupo sigue activo
+    }
+
+    console.info('[RECEPTION][COUNTS]', { ACTIVOS: activos, ENTREGADOS: entregados, groups: groups.size });
+
+    return res.json({
       success: true,
-      data: {
-        ACTIVOS: activosCount,
-        ENTREGADOS: entregadosCount
-      }
+      data: { ACTIVOS: activos, ENTREGADOS: entregados }
     });
-
   } catch (error) {
     console.error('❌ Error en getReceptionsCounts:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Error interno del servidor al obtener conteos de recepción',
-      error: error.message
+      error: error?.message || 'Unknown error'
+    });
+  }
+}
+
+/**
+ * 🎯 NUEVA FUNCIONALIDAD: Sugerencias para typeahead en Recepción
+ * Busca clientes y códigos por término con soporte unaccent cuando está disponible.
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+async function getReceptionSuggestions(req, res) {
+  try {
+    const term = (req.query.term || req.query.query || '').trim();
+    if (!term) {
+      return res.json({ success: true, data: { clients: [], codes: [] } });
+    }
+
+    const supportsUnaccent = await supportsUnaccentFn();
+    let rows;
+    if (supportsUnaccent) {
+      const pattern = `%${term}%`;
+      rows = await prisma.$queryRaw`
+        SELECT d.id, d."protocolNumber", d."clientId", d."clientName", d."clientPhone", d."createdAt"
+        FROM "documents" d
+        WHERE (
+          unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
+          unaccent(COALESCE(d."clientId", '')) ILIKE unaccent(${pattern}) OR
+          unaccent(d."protocolNumber") ILIKE unaccent(${pattern})
+        )
+        ORDER BY d."createdAt" DESC
+        LIMIT 50
+      `;
+    } else {
+      rows = await prisma.document.findMany({
+        where: {
+          OR: [
+            { clientName: { contains: term, mode: 'insensitive' } },
+            { clientId: { contains: term, mode: 'insensitive' } },
+            { protocolNumber: { contains: term, mode: 'insensitive' } }
+          ]
+        },
+        select: {
+          id: true,
+          protocolNumber: true,
+          clientId: true,
+          clientName: true,
+          clientPhone: true,
+          createdAt: true
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 50
+      });
+    }
+
+    const clientMap = new Map();
+    const codeSet = new Set();
+    const codes = [];
+
+    for (const r of rows) {
+      const cKey = (r.clientId && r.clientId.trim())
+        ? `id:${r.clientId}`
+        : `name:${(r.clientName || '').trim().toLowerCase()}__${(r.clientPhone || '').trim()}`;
+
+      if (!clientMap.has(cKey)) {
+        clientMap.set(cKey, {
+          clientId: r.clientId || null,
+          clientName: r.clientName,
+          clientPhone: r.clientPhone || null
+        });
+      }
+
+      if (r.protocolNumber && !codeSet.has(r.protocolNumber)) {
+        codeSet.add(r.protocolNumber);
+        codes.push({ code: r.protocolNumber, id: r.id });
+      }
+    }
+
+    const clients = Array.from(clientMap.values()).slice(0, 10);
+    const topCodes = codes.slice(0, 10);
+
+    console.info('[RECEPTION][SUGGEST]', { term, clients: clients.length, codes: topCodes.length });
+
+    return res.json({
+      success: true,
+      data: { clients, codes: topCodes }
+    });
+  } catch (error) {
+    console.error('❌ Error en getReceptionSuggestions:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor en sugerencias',
+      error: error?.message || 'Unknown error'
     });
   }
 }
@@ -1308,5 +1451,6 @@ export {
   getNotificationHistoryReception,
   // 🎯 NUEVA FUNCIONALIDAD: UI Activos/Entregados para Recepción
   getReceptionsUnified,
-  getReceptionsCounts
+  getReceptionsCounts,
+  getReceptionSuggestions
 };

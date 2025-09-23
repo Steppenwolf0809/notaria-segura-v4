@@ -13,7 +13,8 @@ import {
   getNotificationHistoryReception,
   // 🎯 NUEVA FUNCIONALIDAD: UI Activos/Entregados para Recepción
   getReceptionsUnified,
-  getReceptionsCounts
+  getReceptionsCounts,
+  getReceptionSuggestions
 } from '../controllers/reception-controller.js';
 import { marcarVariosListos } from '../controllers/reception-bulk-controller.js';
 
@@ -147,6 +148,14 @@ router.get('/', authenticateToken, requireRecepcion, getReceptionsUnified);
  * @access Private (RECEPCION only)
  */
 router.get('/counts', authenticateToken, requireRecepcion, getReceptionsCounts);
+
+/**
+ * @route GET /api/reception/suggest
+ * @desc Sugerencias para búsqueda (clientes y códigos)
+ * @query term - término de búsqueda
+ * @access Private (RECEPCION only)
+ */
+router.get('/suggest', authenticateToken, requireRecepcion, getReceptionSuggestions);
 
 // Ruta de prueba simple para verificar conectividad
 router.get('/test', (req, res) => {

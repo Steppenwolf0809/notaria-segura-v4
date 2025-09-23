@@ -1,5 +1,4 @@
 import apiClient from './api-client';
-import { API_BASE } from '../utils/apiConfig';
 
 /** Cliente HTTP unificado */
 const api = apiClient;
@@ -40,6 +39,35 @@ const receptionService = {
       const status = error?.response?.status;
       const message = error?.response?.data?.message || error.message || 'Error al cargar conteos';
       console.error('[HTTP][ERR]', '/reception/counts', status, message);
+      if (status === 401 || status === 403) {
+        return { success: false, error: 'Sesión expirada. Inicia sesión nuevamente.' };
+      }
+      return { success: false, error: message };
+    }
+  },
+
+  // 🎯 ALIASES para compatibilidad con unified-documents-store.js
+  // Estos alias permiten que el store siga llamando getUnifiedDocuments/getUnifiedCounts
+  // pero internamente usen los métodos correctos de recepción
+  async getUnifiedDocuments(params = {}) {
+    const { tab, query } = params;
+    console.info('[UI-GATE][RECEPTION_FETCH]', { tab, query });
+    return await this.getUnifiedReceptions(params);
+  },
+
+  /**
+   * Typeahead: sugerencias para clientes y códigos
+   * @param {string} term
+   */
+  async getSuggestions(term) {
+    try {
+      if (!term || !term.trim()) return { success: true, data: { clients: [], codes: [] } };
+      const res = await api.get('/reception/suggest', { params: { term } });
+      return { success: true, data: res.data?.data || { clients: [], codes: [] } };
+    } catch (error) {
+      const status = error?.response?.status;
+      const message = error?.response?.data?.message || error.message || 'Error al obtener sugerencias';
+      console.error('[HTTP][ERR]', '/reception/suggest', status, message);
       if (status === 401 || status === 403) {
         return { success: false, error: 'Sesión expirada. Inicia sesión nuevamente.' };
       }
@@ -342,6 +370,24 @@ const receptionService = {
         success: false,
         error: receptionService.handleError(error)
       };
+    }
+  },
+
+  /**
+   * Cambio masivo a LISTO agrupando por cliente (usa endpoint /reception/documentos/marcar-listos)
+   */
+  async bulkMarkReady(documentIds, sendNotifications = true) {
+    try {
+      const response = await api.post('/reception/documentos/marcar-listos', {
+        documentIds,
+        sendNotifications
+      });
+      if (response?.data?.success) {
+        return { success: true, data: response.data.data, message: response.data.message };
+      }
+      return { success: false, error: response?.data?.error || 'Error marcando documentos masivamente' };
+    } catch (error) {
+      return { success: false, error: receptionService.handleError(error) };
     }
   },
 

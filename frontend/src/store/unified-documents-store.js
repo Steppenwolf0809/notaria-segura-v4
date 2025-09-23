@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import documentService from '../services/document-service';
+import receptionService from '../services/reception-service';
 
 /**
  * 🎯 Store de documentos unificados para UI Activos/Entregados
@@ -131,7 +131,7 @@ const useUnifiedDocumentsStore = create((set, get) => ({
         ...(query?.trim() ? { query: query.trim() } : {}),
         ...(clientId ? { clientId } : {}),
       };
-      const result = await documentService.getUnifiedDocuments(params);
+      const result = await receptionService.getUnifiedDocuments(params);
       if (result.success) {
         const data = result.data || {};
         set({
@@ -166,7 +166,7 @@ const useUnifiedDocumentsStore = create((set, get) => ({
         ...(query?.trim() ? { query: query.trim() } : {}),
         ...(clientId ? { clientId } : {}),
       };
-      const result = await documentService.getUnifiedCounts(params);
+      const result = await receptionService.getUnifiedCounts(params);
       if (result.success) {
         set({
           counts: result.data || { ACTIVOS: 0, ENTREGADOS: 0 },

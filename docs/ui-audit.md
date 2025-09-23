@@ -482,3 +482,141 @@ Backend → apiClient.response
   - [ ] En DocumentCenter/ReceptionCenter, `Alert` muestra: "Sesión expirada. Inicia sesión nuevamente."
 - [ ] Tras login, Activos/Entregados vuelven a cargar datos correctamente.
 - [ ] No hay fallbacks a `http://localhost:3001` en producción.
+
+
+---
+
+Recepción v2 – Endpoints/Contrato y Verificación (Activos | Entregados)
+
+1) Endpoints Backend (Recepción)
+- GET /api/reception
+  - Controlador: [getReceptionsUnified()](backend/src/controllers/reception-controller.js:1118)
+  - Rutas: [router.get('/')](/backend/src/routes/reception-routes.js:140)
+  - Query params:
+    - tab: ACTIVOS | ENTREGADOS (obligatorio)
+    - query: string (búsqueda por code/cliente/identificación/tipo/acto)
+    - clientId: string (opcional)
+    - page: number (1..n)
+    - pageSize: 25 | 50 | 100
+  - Respuesta (contrato unificado y agrupado por cliente + acto principal):
+    {
+      "success": true,
+      "data": {
+        "total": number,      // total de grupos
+        "pages": number,      // páginas por grupos
+        "items": [
+          {
+            "id": string,                  // id del líder (documento más reciente del grupo)
+            "code": string,                // protocolNumber del líder
+            "clientId": string|null,
+            "clientName": string,
+            "clientIdentification": string|null, // alias de clientId para UI
+            "typeLabel": string,           // documentType del líder
+            "mainAct": string,             // actoPrincipalDescripcion
+            "groupSize": number,           // tamaño del grupo
+            "statusLabel": "EN_PROCESO" | "LISTO" | "ENTREGADO", // cálculo por grupo
+            "receivedAtFmt": string,       // fecha creación del líder (locale es-EC)
+            "amountFmt": string,           // suma de montos del grupo ($x.xxx,yy)
+            "documents": [
+              {
+                "id": string,
+                "code": string,            // protocolNumber
+                "status": "EN_PROCESO" | "LISTO" | "ENTREGADO",
+                "verificationCode": string|null, // verificationCode|codigoRetiro
+                "act": string|null,        // actoPrincipalDescripcion
+                "amount": number           // totalFactura|actoPrincipalValor
+              }
+            ]
+          }
+        ]
+      }
+    }
+
+- GET /api/reception/counts
+  - Controlador: [getReceptionsCounts()](backend/src/controllers/reception-controller.js:1276)
+  - Rutas: [router.get('/counts')](/backend/src/routes/reception-routes.js:149)
+  - Query params: query, clientId (mismos filtros aplicados)
+  - Lógica: calcula grupos (cliente + acto) y clasifica:
+    - ENTREGADOS: todos los documentos del grupo en ENTREGADO
+    - ACTIVOS: cualquier otro caso (EN_PROCESO o LISTO parcial)
+  - Respuesta:
+    { "success": true, "data": { "ACTIVOS": number, "ENTREGADOS": number } }
+
+- GET /api/reception/suggest
+  - Controlador: [getReceptionSuggestions()](backend/src/controllers/reception-controller.js:1360)
+  - Rutas: [router.get('/suggest')](/backend/src/routes/reception-routes.js:154)
+  - Query params: term (string) | query (alias)
+  - Respuesta:
+    { "success": true, "data": { "clients": [{ clientId, clientName, clientPhone }...], "codes": [{ code, id }...] } }
+  - Soporta PostgreSQL unaccent cuando está disponible.
+
+- POST /api/reception/documentos/marcar-listos
+  - Rutas: [router.post('/documentos/marcar-listos')](/backend/src/routes/reception-routes.js:88)
+  - Controlador: reception-bulk-controller.marcarVariosListos (agrupa por cliente y notifica por cliente)
+
+2) Fixes de Estabilidad (500 y enums)
+- Detalles de eventos (historial):
+  - Se almacenan como String en Prisma; se normaliza a JSON.stringify:
+    - [documentEvent.create() – STATUS_CHANGED (propagación grupo)](backend/src/controllers/reception-controller.js:619)
+    - [documentEvent.create() – DOCUMENT_UNGROUPED → STATUS_CHANGED](backend/src/controllers/reception-controller.js:924)
+  - eventType: se reemplazó el valor inexistente "DOCUMENT_UNGROUPED" por "STATUS_CHANGED" para cumplir con enum [DocumentEventType](backend/prisma/schema.prisma:39).
+- Logging explícito:
+  - [console.info('[RECEPTION][QUERY]', ...)](backend/src/controllers/reception-controller.js:1123)
+  - [console.info('[RECEPTION][UNIFIED_RESULT]', ...)](backend/src/controllers/reception-controller.js:1250)
+  - [console.info('[RECEPTION][COUNTS]', ...)](backend/src/controllers/reception-controller.js:1333)
+  - [console.info('[RECEPTION][SUGGEST]', ...)](backend/src/controllers/reception-controller.js:1405)
+
+3) Frontend – Servicios y Stores
+- Servicio recepción:
+  - [getUnifiedReceptions(params)](frontend/src/services/reception-service.js:14) → GET /reception
+  - [getUnifiedCounts(params)](frontend/src/services/reception-service.js:33) → GET /reception/counts
+  - Alias de compatibilidad: [getUnifiedDocuments(params)](frontend/src/services/reception-service.js:52) → llama a getUnifiedReceptions (corrige TypeError de “no es una función”)
+  - Typeahead: [getSuggestions(term)](frontend/src/services/reception-service.js:62) → GET /reception/suggest
+- Stores:
+  - Recepción v2: [useReceptionsStore()](frontend/src/store/receptions-store.js:8)
+    - fetchDocuments → getUnifiedReceptions
+    - fetchCounts → getUnifiedCounts
+  - Documentos v2 (CAJA): [useUnifiedDocumentsStore()](frontend/src/store/unified-documents-store.js:8)
+    - fetchDocuments → getUnifiedDocuments (alias activo)
+    - fetchCounts → getUnifiedCounts
+
+4) UI Recepción v2 – Paridad y UX
+- Vista principal: [ReceptionCenter()](frontend/src/components/ReceptionCenter.jsx:50)
+  - Pestañas “Activos | Entregados” con badges de conteo
+  - Tabla agrupada (una fila por grupo “acto principal”) con mainAct + groupSize
+  - Fila clickeable abre detalle con [DocumentDetailModal](frontend/src/components/Documents/DocumentDetailModal.jsx:65)
+  - Selección con checkboxes y acciones masivas (LISTO implementado; ENTREGADO/REVERTIR pendiente)
+  - Paginación y tamaño de página (25/50/100)
+- Feature flag:
+  - Helper: [readFlag('VITE_UI_ACTIVOS_ENTREGADOS')](frontend/src/config/featureFlags.js:1)
+  - Uso: [ReceptionCenter.jsx](frontend/src/components/ReceptionCenter.jsx:53)
+- Manejo de sesión expirada/401:
+  - Cliente unificado: [api-client.js](frontend/src/services/api-client.js:1) con interceptor y logout automático
+
+5) Verificación Manual (Checklist)
+- Carga inicial:
+  - En consola backend: [RECEPTION][QUERY] { tab:'ACTIVOS', query:'', page:1, pageSize:25 }
+  - Frontend: [UI-GATE][RECEPTION_FETCH] con { tab, query }
+  - UI: Tabla muestra grupos, columna “Acto principal” con “n documentos”
+- Búsqueda: “promesa”
+  - GET /api/reception?tab=ACTIVOS&query=promesa → 200, sin 500
+  - items[] agrupados; counts → { ACTIVOS, ENTREGADOS, total implícito = ACTIVOS + ENTREGADOS por grupos }
+- Fila + detalle:
+  - Click abre DocumentDetailModal; pestaña “Historial” no rompe (enum corregido; details como JSON string)
+  - Si no hay eventos, fallback controlado (“Sin eventos” esperado por componente)
+- Bulk LISTO:
+  - Seleccionar 1+ grupos con documentos EN_PROCESO → Acción “Marcar Listo”
+  - POST /api/reception/documentos/marcar-listos
+  - Refresca lista y badges; WhatsApp por cliente (si política lo permite)
+- Paginación:
+  - Cambiar página/size mantiene filtros
+- Logs backend:
+  - No deben aparecer errores de Prisma por enums/details
+
+6) Pendientes Menores y Siguientes Pasos
+- UI typeahead:
+  - Consumir [getSuggestions()](frontend/src/services/reception-service.js:62) para desplegar dropdown bajo el buscador (clientes/códigos)
+- Acciones masivas adicionales:
+  - ENTREGAR y REVERTIR, alineadas al contrato del matrizador/archivo
+- Documentación:
+  - Actualizar referencias a flag para usar [readFlag()](frontend/src/config/featureFlags.js:1) en Dashboard/DocumentCenter si aplica
