@@ -221,6 +221,16 @@ app.get('/api/health', (req, res) => {
   })
 })
 
+// Health check para Railway (endpoint simple en /health)
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    message: 'Notaría Segura API funcionando',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  })
+})
+
 // Health check específico para verificar feature flags del frontend
 // Útil para diagnosticar problemas de configuración en Railway
 app.get('/api/health/feature-flags', (req, res) => {
