@@ -72,6 +72,13 @@ const HOST = '0.0.0.0'
 
 // Liveness simple: siempre 200, no depende de DB ni auth
 app.get('/health', (_req, res) => {
+  console.info('[HEALTH] /health hit', new Date().toISOString());
+  res.status(200).json({ ok: true, ts: Date.now() })
+})
+
+// Duplicado defensivo por si algún middleware/proxy toca /health
+app.get('/healthz', (_req, res) => {
+  console.info('[HEALTH] /healthz hit', new Date().toISOString());
   res.status(200).json({ ok: true, ts: Date.now() })
 })
 

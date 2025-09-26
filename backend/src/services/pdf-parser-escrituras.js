@@ -3,7 +3,17 @@
  * Extrae datos específicos de documentos de la Notaría 18
  */
 
-import pdfParse from 'pdf-parse';
+// Carga de pdf-parse solo bajo demanda (evita costos en arranque)
+async function getPdfParse() {
+  // Evitar cargar en producción sin necesidad; se invoca solo con Buffer real
+  try {
+    const modDirect = await import('pdf-parse/lib/pdf-parse.js')
+    return modDirect?.default || modDirect
+  } catch (_) {
+    const mod = await import('pdf-parse')
+    return mod?.default || mod
+  }
+}
 
 // Debug flag (enable with PDF_PARSER_DEBUG=true)
 const DEBUG = process.env.PDF_PARSER_DEBUG === 'true';
@@ -450,6 +460,10 @@ function mergePersonsUnique(a = [], b = []) {
  */
 export async function parseEscrituraPDF(pdfBuffer, filename) {
   try {
+    if (!pdfBuffer || !(pdfBuffer instanceof Buffer) || pdfBuffer.length === 0) {
+      throw new Error('Buffer de PDF inválido o vacío')
+    }
+    const pdfParse = await getPdfParse()
     // Extraer texto del PDF
     const pdfData = await pdfParse(pdfBuffer);
     const text = pdfData.text;
