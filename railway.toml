@@ -1,0 +1,7 @@
+[deploy]
+healthcheckPath = "/health"
+
+# Railway usará la variable de entorno PORT que inyecta al contenedor.
+# Nuestro servidor ya escucha en process.env.PORT, no hardcodeamos el puerto aquí.
+
+
