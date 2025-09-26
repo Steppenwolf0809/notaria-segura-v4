@@ -1,5 +1,6 @@
 [deploy]
-healthcheckPath = "/health"
+healthcheckPath = "/healthz"
+startCommand = "bash -lc 'cd backend && npx prisma migrate deploy && node server.js'"
 
 # Railway usará la variable de entorno PORT que inyecta al contenedor.
 # Nuestro servidor ya escucha en process.env.PORT, no hardcodeamos el puerto aquí.
