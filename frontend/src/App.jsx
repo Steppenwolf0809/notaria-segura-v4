@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import useAuth from './hooks/use-auth';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
+import VerificacionPublica from './pages/VerificacionPublica';
 import ProtectedRoute from './components/ProtectedRoute';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
@@ -287,6 +288,10 @@ function App() {
     }
   });
 
+  // Detectar si es una ruta de verificación pública
+  const currentPath = window.location.pathname;
+  const isVerificationRoute = currentPath.startsWith('/verify/');
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -303,12 +308,19 @@ function App() {
         theme="colored"
         style={{ zIndex: 20000 }}
       />
-      {isAuthenticated ? (
-        <ProtectedRoute>
-          <DashboardPage />
-        </ProtectedRoute>
+      
+      {/* Ruta pública de verificación */}
+      {isVerificationRoute ? (
+        <VerificacionPublica />
       ) : (
-        <LoginPage />
+        /* Rutas normales del sistema */
+        isAuthenticated ? (
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        ) : (
+          <LoginPage />
+        )
       )}
     </ThemeProvider>
   );

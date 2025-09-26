@@ -3,6 +3,7 @@ import { Box, Alert } from '@mui/material';
 import MatrizadorLayout from './MatrizadorLayout';
 import MatrizadorDashboard from './MatrizadorDashboard';
 import ConcuerdoGenerator from './matrizador/concuerdos/ConcuerdoGenerator.jsx';
+import GeneradorQR from './matrizador/GeneradorQR';
 import GestionDocumentos from './GestionDocumentos';
 import NotificationsHistory from './Documents/NotificationsHistory';
 import useDocumentStore from '../store/document-store';
@@ -83,6 +84,9 @@ const MatrizadorCenter = () => {
       
       case 'concuerdos':
         return <ConcuerdoGenerator />;
+      
+      case 'generador-qr':
+        return <GeneradorQR />;
       
       default:
         return <MatrizadorDashboard />;
