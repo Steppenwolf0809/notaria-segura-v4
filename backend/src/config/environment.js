@@ -359,17 +359,21 @@ function getConfig() {
         console.log('');
       }
 
-      // Validación crítica en producción
+      // Validación crítica en producción (relajada: GOOGLE_API_KEY ya no es crítica)
       if (cfg.NODE_ENV === 'production') {
         const criticalMissing = [];
         if (!cfg.DATABASE_URL) criticalMissing.push('DATABASE_URL');
         if (!cfg.JWT_SECRET) criticalMissing.push('JWT_SECRET');
-        if (!process.env.GOOGLE_API_KEY) criticalMissing.push('GOOGLE_API_KEY');
         if (criticalMissing.length) {
           console.error('❌ VARIABLES CRÍTICAS FALTANTES EN PRODUCCIÓN:');
           criticalMissing.forEach(v => console.error(`   • ${v}`));
           console.error('💥 La aplicación no puede continuar sin estas variables');
           process.exit(1);
+        }
+
+        // Advertencia no bloqueante si falta GOOGLE_API_KEY
+        if (!process.env.GOOGLE_API_KEY) {
+          console.warn('⚠️ GOOGLE_API_KEY no está configurada. Funcionalidades de Gemini AI estarán deshabilitadas.');
         }
       }
 
