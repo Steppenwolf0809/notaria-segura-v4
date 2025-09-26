@@ -4,50 +4,15 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
-// Enumeración de roles de usuario (SQLite compatible)
-enum UserRole {
-  ADMIN
-  CAJA
-  MATRIZADOR
-  RECEPCION
-  ARCHIVO
-}
-
-// Enumeración de tipos de documento (SQLite compatible)
-enum DocumentType {
-  PROTOCOLO
-  DILIGENCIA
-  ARRENDAMIENTO
-  CERTIFICACION
-  OTROS
-}
-
-// Enumeración de estados de documento (SQLite compatible)
-enum DocumentStatus {
-  PENDIENTE
-  EN_PROCESO
-  LISTO
-  ENTREGADO
-  ANULADO_NOTA_CREDITO
-}
-
-// Enumeración de tipos de eventos de auditoría (SQLite compatible)
-enum DocumentEventType {
-  DOCUMENT_CREATED
-  DOCUMENT_ASSIGNED
-  STATUS_CHANGED
-  VERIFICATION_GENERATED
-  WHATSAPP_SENT
-  EXTRACTION_SNAPSHOT
-  EXTRACTION_APPLIED
-  STATUS_UNDO
-  NOTE_ADDED
-  UNKNOWN
-}
+// Enumeraciones convertidas a String para compatibilidad con SQLite
+// UserRole: ADMIN, CAJA, MATRIZADOR, RECEPCION, ARCHIVO
+// DocumentType: PROTOCOLO, DILIGENCIA, ARRENDAMIENTO, CERTIFICACION, OTROS
+// DocumentStatus: PENDIENTE, EN_PROCESO, LISTO, ENTREGADO, ANULADO_NOTA_CREDITO
+// DocumentEventType: DOCUMENT_CREATED, DOCUMENT_ASSIGNED, STATUS_CHANGED, VERIFICATION_GENERATED, WHATSAPP_SENT, EXTRACTION_SNAPSHOT, EXTRACTION_APPLIED, STATUS_UNDO, NOTE_ADDED, UNKNOWN
 
 // Modelo principal de usuarios
 model User {
@@ -56,7 +21,7 @@ model User {
   password    String
   firstName   String
   lastName    String
-  role        UserRole
+  role        String
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -70,6 +35,7 @@ model User {
   // Relación de auditoría - NUEVA FUNCIONALIDAD
   documentEvents    DocumentEvent[]                            // Eventos de auditoría realizados por el usuario
   concuerdoAudits   ConcuerdoAuditLog[]                        // Auditoría de generación de concuerdos
+  escriturasQR      EscrituraQR[]                              // Escrituras QR creadas por el usuario
 
   @@map("users")
 }
@@ -87,8 +53,8 @@ model Document {
   detalle_documento       String?                  // Descripción específica del trámite
   comentarios_recepcion   String?                  // Notas especiales para recepción
   
-  documentType            DocumentType        // Tipo de documento detectado
-  status                  DocumentStatus @default(PENDIENTE)
+  documentType            String        // Tipo de documento detectado
+  status                  String @default("PENDIENTE")
   verificationCode        String?                  // Código de 4 dígitos para entrega
   
   // Relaciones
@@ -200,7 +166,7 @@ model DocumentEvent {
   id              String            @id @default(uuid())
   documentId      String                          // FK al documento
   userId          Int                             // FK al usuario que realizó la acción
-  eventType       DocumentEventType @default(UNKNOWN) // Tipo de evento (enum)
+  eventType       String @default("UNKNOWN") // Tipo de evento (string)
   description     String                         // Descripción del evento
   details         String?                          // Detalles adicionales del evento (JSON string)
   // Detalles enriquecidos de entrega (compatibles hacia atrás)
@@ -312,4 +278,28 @@ model ConcuerdoAuditLog {
   @@index([createdBy])
   @@index([createdAt])
   @@index([estructura])
+}
+
+// MODELO PARA ESCRITURAS QR - Módulo de verificación de escrituras notariales
+model EscrituraQR {
+  id                Int      @id @default(autoincrement())
+  token             String   @unique // Token único de 8 caracteres alfanuméricos
+  numeroEscritura   String?  // Número de escritura extraído (ej: "20251701018P02183")
+  datosCompletos    String?  // JSON con todos los datos extraídos del PDF
+  archivoOriginal   String?  // Nombre del archivo PDF original
+  estado            String   @default("activo") // "activo", "revision_requerida", "inactivo"
+  activo            Boolean  @default(true) // Flag de activación/desactivación
+  createdBy         Int?     // FK al usuario matrizador que creó la escritura
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relaciones
+  creador           User?    @relation(fields: [createdBy], references: [id])
+
+  @@map("escrituras_qr")
+  // Índices para performance
+  @@index([token])
+  @@index([estado])
+  @@index([createdAt])
+  @@index([createdBy])
 }

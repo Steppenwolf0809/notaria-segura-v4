@@ -37,7 +37,7 @@ const environmentSchema = z.object({
       required_error: 'DATABASE_URL es obligatorio',
       invalid_type_error: 'DATABASE_URL debe ser una string'
     })
-    .refine(val => val.startsWith('postgresql://') || val.startsWith('file:'), 'DATABASE_URL debe ser PostgreSQL o SQLite'),
+    .refine(val => val.startsWith('postgresql://') || val.startsWith('postgres://') || val.startsWith('file:'), 'DATABASE_URL debe ser PostgreSQL o SQLite'),
 
   // JWT Secret - Obligatorio, mínimo 32 caracteres
   JWT_SECRET: z

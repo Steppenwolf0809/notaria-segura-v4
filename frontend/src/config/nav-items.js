@@ -16,7 +16,8 @@ export const navItemsByRole = {
     { id: 'dashboard', label: 'Dashboard', view: 'dashboard', icon: 'Dashboard' },
     { id: 'documents', label: 'Documentos', view: 'documents', icon: 'Assignment' },
     { id: 'history', label: 'Historial', view: 'history', icon: 'History' },
-    { id: 'concuerdos', label: 'Generar Concuerdos', view: 'concuerdos', icon: 'Article', beta: true }
+    { id: 'concuerdos', label: 'Generar Concuerdos', view: 'concuerdos', icon: 'Article', beta: true },
+    { id: 'generador-qr', label: 'Generador QR', view: 'generador-qr', icon: 'QrCode' }
   ],
   ADMIN: [
     { id: 'dashboard', label: 'Panel de Control', view: 'dashboard', icon: 'Dashboard' },
