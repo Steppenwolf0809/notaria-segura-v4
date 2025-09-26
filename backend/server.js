@@ -5,7 +5,7 @@ import compression from 'compression'
 import dotenv from 'dotenv'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { closePrismaClient } from './src/db.js'
+import { closePrismaClient, db } from './src/db.js'
 import { getConfig, isConfigurationComplete, validateConfigurationComplete, debugConfiguration } from './src/config/environment.js'
 import xmlWatcherService from './src/services/xml-watcher-service.js'
 import cache from './src/services/cache-service.js'
@@ -64,6 +64,7 @@ if (!validationResult.isComplete) {
 
 const app = express()
 const PORT = config.PORT || 3001
+const HOST = '0.0.0.0'
 
 // Configurar trust proxy de forma segura (evita ERR_ERL_PERMISSIVE_TRUST_PROXY)
 // En Railway/producción confiamos solo en el primer proxy; en desarrollo no confiamos en proxies
@@ -231,6 +232,18 @@ app.get('/health', (req, res) => {
   })
 })
 
+// Readiness probe: refleja estado de dependencias (DB)
+let isReady = false
+app.get('/ready', (req, res) => {
+  const payload = {
+    ready: isReady,
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  }
+  if (isReady) return res.status(200).json(payload)
+  return res.status(503).json(payload)
+})
+
 // Health check específico para verificar feature flags del frontend
 // Útil para diagnosticar problemas de configuración en Railway
 app.get('/api/health/feature-flags', (req, res) => {
@@ -386,10 +399,10 @@ app.use((error, req, res, next) => {
 // INICIO DEL SERVIDOR
 // ============================================================================
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, HOST, () => {
   console.log('🔥=====================================🔥')
   console.log(`🚀 NOTARÍA SEGURA API v4 - SERVIDOR INICIADO`)
-  console.log(`📡 Puerto: ${PORT}`)
+  console.log(`📡 Puerto: ${PORT} en ${HOST}`)
   console.log(`🌐 Health check: http://localhost:${PORT}/api/health`)
   console.log(`🔐 Auth endpoints: http://localhost:${PORT}/api/auth/*`)
   console.log(`📄 Document endpoints: http://localhost:${PORT}/api/documents/*`)
@@ -427,6 +440,20 @@ const server = app.listen(PORT, () => {
     })
     .catch(() => console.log('⚠️ Caché: uso de memoria por defecto'))
 })
+
+// Chequeo de readiness: intentar query ligera a la base de datos
+;(async function initReadiness() {
+  try {
+    console.log('[READY] Verificando conexión a base de datos...')
+    await db.$queryRaw`SELECT 1`
+    isReady = true
+    console.log('[READY] Base de datos OK, servicio listo')
+  } catch (e) {
+    isReady = false
+    console.error('[READY] Falla en verificación de base de datos:', e?.message || e)
+    // No arrojamos excepción: el contenedor sigue vivo y /ready reporta 503 hasta estar OK
+  }
+})()
 
 // ============================================================================
 // SHUTDOWN HANDLERS PARA CIERRE ORDENADO
