@@ -63,8 +63,24 @@ if (!validationResult.isComplete) {
 }
 
 const app = express()
-const PORT = config.PORT || 3001
+const PORT = process.env.PORT || process.env.RAILWAY_PORT || config.PORT || 3001
 const HOST = '0.0.0.0'
+
+// ============================================================================
+// LIVENESS Y READINESS - DEFINIDOS ANTES DE CUALQUIER MIDDLEWARE
+// ============================================================================
+
+// Liveness simple: siempre 200, no depende de DB ni auth
+app.get('/health', (_req, res) => {
+  res.status(200).json({ ok: true, ts: Date.now() })
+})
+
+// Readiness: refleja estado de dependencias (DB)
+let isReady = false
+app.get('/ready', (_req, res) => {
+  if (isReady) return res.status(200).json({ ready: true, ts: Date.now() })
+  return res.status(503).json({ ready: false, ts: Date.now() })
+})
 
 // Configurar trust proxy de forma segura (evita ERR_ERL_PERMISSIVE_TRUST_PROXY)
 // En Railway/producción confiamos solo en el primer proxy; en desarrollo no confiamos en proxies
@@ -222,27 +238,7 @@ app.get('/api/health', (req, res) => {
   })
 })
 
-// Health check para Railway (endpoint simple en /health)
-app.get('/health', (req, res) => {
-  res.status(200).json({
-    status: 'ok',
-    message: 'Notaría Segura API funcionando',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
-  })
-})
-
-// Readiness probe: refleja estado de dependencias (DB)
-let isReady = false
-app.get('/ready', (req, res) => {
-  const payload = {
-    ready: isReady,
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
-  }
-  if (isReady) return res.status(200).json(payload)
-  return res.status(503).json(payload)
-})
+// Nota: liveness /health y readiness /ready se definen antes de middlewares
 
 // Health check específico para verificar feature flags del frontend
 // Útil para diagnosticar problemas de configuración en Railway
@@ -403,7 +399,8 @@ const server = app.listen(PORT, HOST, () => {
   console.log('🔥=====================================🔥')
   console.log(`🚀 NOTARÍA SEGURA API v4 - SERVIDOR INICIADO`)
   console.log(`📡 Puerto: ${PORT} en ${HOST}`)
-  console.log(`🌐 Health check: http://localhost:${PORT}/api/health`)
+  console.log(`🌐 Health check (liveness): http://localhost:${PORT}/health`)
+  console.log(`🩺 Readiness: http://localhost:${PORT}/ready`)
   console.log(`🔐 Auth endpoints: http://localhost:${PORT}/api/auth/*`)
   console.log(`📄 Document endpoints: http://localhost:${PORT}/api/documents/*`)
   console.log(`📂 Archivo endpoints: http://localhost:${PORT}/api/archivo/*`)
