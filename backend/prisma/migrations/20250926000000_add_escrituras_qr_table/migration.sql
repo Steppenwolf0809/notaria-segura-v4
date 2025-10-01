@@ -1,6 +1,6 @@
 -- CreateTable
 CREATE TABLE "escrituras_qr" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "id" SERIAL NOT NULL,
     "token" TEXT NOT NULL,
     "numeroEscritura" TEXT,
     "datosCompletos" TEXT,
@@ -8,10 +8,14 @@ CREATE TABLE "escrituras_qr" (
     "estado" TEXT NOT NULL DEFAULT 'activo',
     "activo" BOOLEAN NOT NULL DEFAULT true,
     "createdBy" INTEGER,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" DATETIME NOT NULL,
-    CONSTRAINT "escrituras_qr_createdBy_fkey" FOREIGN KEY ("createdBy") REFERENCES "users" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "escrituras_qr_pkey" PRIMARY KEY ("id")
 );
+
+-- AddForeignKey
+ALTER TABLE "escrituras_qr" ADD CONSTRAINT "escrituras_qr_createdBy_fkey" FOREIGN KEY ("createdBy") REFERENCES "users"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- CreateIndex
 CREATE UNIQUE INDEX "escrituras_qr_token_key" ON "escrituras_qr"("token");
