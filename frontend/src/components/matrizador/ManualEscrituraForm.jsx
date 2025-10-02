@@ -244,6 +244,7 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
                 value={formData.notario}
                 onChange={(e) => handleFieldChange('notario', e.target.value)}
                 disabled={loading}
+                InputLabelProps={{ shrink: true }}
               />
             </Grid>
 
@@ -254,6 +255,7 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
                 value={formData.notaria}
                 onChange={(e) => handleFieldChange('notaria', e.target.value)}
                 disabled={loading}
+                InputLabelProps={{ shrink: true }}
               />
             </Grid>
 
@@ -271,6 +273,7 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
                 value={formData.ubicacion.provincia}
                 onChange={(e) => handleUbicacionChange('provincia', e.target.value)}
                 disabled={loading}
+                InputLabelProps={{ shrink: true }}
               />
             </Grid>
 
@@ -281,6 +284,7 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
                 value={formData.ubicacion.canton}
                 onChange={(e) => handleUbicacionChange('canton', e.target.value)}
                 disabled={loading}
+                InputLabelProps={{ shrink: true }}
               />
             </Grid>
 
@@ -291,6 +295,7 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
                 value={formData.ubicacion.parroquia}
                 onChange={(e) => handleUbicacionChange('parroquia', e.target.value)}
                 disabled={loading}
+                InputLabelProps={{ shrink: true }}
               />
             </Grid>
           </Grid>
