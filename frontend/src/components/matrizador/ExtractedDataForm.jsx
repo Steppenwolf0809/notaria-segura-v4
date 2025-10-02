@@ -681,6 +681,46 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
         </Card>
       </Grid>
 
+      {/* Texto Completo del Extracto (si existe) */}
+      {escritura?.extractoTextoCompleto && (
+        <Grid item xs={12}>
+          <Accordion>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="h6">Texto Completo del Extracto</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <TextField
+                fullWidth
+                multiline
+                rows={15}
+                value={escritura.extractoTextoCompleto}
+                InputProps={{
+                  readOnly: true,
+                  sx: {
+                    fontFamily: 'monospace',
+                    fontSize: '0.875rem',
+                    bgcolor: 'grey.50'
+                  }
+                }}
+                variant="outlined"
+              />
+            </AccordionDetails>
+          </Accordion>
+        </Grid>
+      )}
+
+      {/* Badge de origen */}
+      {escritura?.origenDatos === 'MANUAL' && (
+        <Grid item xs={12}>
+          <Alert severity="info">
+            <Typography variant="body2">
+              <strong>Ingreso Manual:</strong> Esta escritura fue ingresada manualmente por{' '}
+              {escritura.creador ? `${escritura.creador.firstName} ${escritura.creador.lastName}` : 'un usuario'}.
+            </Typography>
+          </Alert>
+        </Grid>
+      )}
+
       {/* Información adicional */}
       <Box sx={{ mt: 2 }}>
         <Alert severity="info">

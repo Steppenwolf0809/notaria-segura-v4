@@ -66,23 +66,21 @@ const VerificacionPublica = () => {
     return cuantia || 'Indeterminada';
   };
 
-  // Limpia y estructura personas para visualización pública
-  const sanitizePersons = (list) => {
-    const blockWords = ['DOCUMENTO', 'IDENTIDAD', 'COMPARECIENTE', 'INTERVINIENTE', 'NOMBRES', 'RAZON SOCIAL'];
-    const isHeaderish = (s) => {
-      const up = String(s || '').toUpperCase();
-      return blockWords.some(w => up.includes(w)) || up.length < 5;
-    };
-    const onlyDigits = (s) => String(s || '').replace(/\D+/g, '');
-    return (Array.isArray(list) ? list : [])
-      .filter(p => p && p.nombre && !isHeaderish(p.nombre))
-      .map(p => ({
-        nombre: p.nombre.trim(),
-        documento: p.documento && !isHeaderish(p.documento) ? p.documento.trim() : '',
-        numero: onlyDigits(p.numero),
-        nacionalidad: p.nacionalidad && !isHeaderish(p.nacionalidad) ? p.nacionalidad.trim() : '',
-        calidad: p.calidad && !isHeaderish(p.calidad) ? p.calidad.trim() : ''
-      }));
+  /**
+   * El backend ya limpia los datos, solo necesitamos formatearlos para mostrar
+   * @param {Array} list - Lista de personas ya limpia del backend
+   * @returns {Array} Lista formateada para mostrar
+   */
+  const formatPersons = (list) => {
+    if (!Array.isArray(list)) return [];
+    
+    return list.map(p => ({
+      nombre: p.nombre || 'N/A',
+      documento: p.documento || '',
+      numero: p.numero || '',
+      nacionalidad: p.nacionalidad || '',
+      calidad: p.calidad || ''
+    }));
   };
 
   /**
@@ -245,41 +243,53 @@ const VerificacionPublica = () => {
                           <Grid item xs={12} md={6}>
                             <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Otorgado Por</Typography>
                             <Box sx={{ mt: 1 }}>
-                              {sanitizePersons(escritura.otorgantes?.otorgado_por).map((p, idx) => (
-                                <Box key={idx} sx={{ mb: 1.2 }}>
-                                  <Typography variant="body1" sx={{ fontWeight: 600 }}>{p.nombre}</Typography>
-                                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                                    {p.documento && p.numero && (
-                                      <Chip size="small" label={`${p.documento}: ${p.numero}`} />
-                                    )}
-                                    {!p.documento && p.numero && (
-                                      <Chip size="small" label={`N° ${p.numero}`} />
-                                    )}
-                                    {p.nacionalidad && <Chip size="small" label={p.nacionalidad} />}
-                                    {p.calidad && <Chip size="small" label={p.calidad} />}
+                              {formatPersons(escritura.otorgantes?.otorgado_por).length > 0 ? (
+                                formatPersons(escritura.otorgantes?.otorgado_por).map((p, idx) => (
+                                  <Box key={idx} sx={{ mb: 1.2 }}>
+                                    <Typography variant="body1" sx={{ fontWeight: 600 }}>{p.nombre}</Typography>
+                                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                      {p.documento && p.numero && (
+                                        <Chip size="small" label={`${p.documento}: ${p.numero}`} />
+                                      )}
+                                      {!p.documento && p.numero && (
+                                        <Chip size="small" label={`N° ${p.numero}`} />
+                                      )}
+                                      {p.nacionalidad && <Chip size="small" label={p.nacionalidad} />}
+                                      {p.calidad && <Chip size="small" label={p.calidad} />}
+                                    </Box>
                                   </Box>
-                                </Box>
-                              ))}
+                                ))
+                              ) : (
+                                <Typography variant="body2" color="text.secondary">
+                                  No disponible
+                                </Typography>
+                              )}
                             </Box>
                           </Grid>
                           <Grid item xs={12} md={6}>
                             <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>A Favor De</Typography>
                             <Box sx={{ mt: 1 }}>
-                              {sanitizePersons(escritura.otorgantes?.a_favor_de).map((p, idx) => (
-                                <Box key={idx} sx={{ mb: 1.2 }}>
-                                  <Typography variant="body1" sx={{ fontWeight: 600 }}>{p.nombre}</Typography>
-                                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                                    {p.documento && p.numero && (
-                                      <Chip size="small" label={`${p.documento}: ${p.numero}`} />
-                                    )}
-                                    {!p.documento && p.numero && (
-                                      <Chip size="small" label={`N° ${p.numero}`} />
-                                    )}
-                                    {p.nacionalidad && <Chip size="small" label={p.nacionalidad} />}
-                                    {p.calidad && <Chip size="small" label={p.calidad} />}
+                              {formatPersons(escritura.otorgantes?.a_favor_de).length > 0 ? (
+                                formatPersons(escritura.otorgantes?.a_favor_de).map((p, idx) => (
+                                  <Box key={idx} sx={{ mb: 1.2 }}>
+                                    <Typography variant="body1" sx={{ fontWeight: 600 }}>{p.nombre}</Typography>
+                                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                      {p.documento && p.numero && (
+                                        <Chip size="small" label={`${p.documento}: ${p.numero}`} />
+                                      )}
+                                      {!p.documento && p.numero && (
+                                        <Chip size="small" label={`N° ${p.numero}`} />
+                                      )}
+                                      {p.nacionalidad && <Chip size="small" label={p.nacionalidad} />}
+                                      {p.calidad && <Chip size="small" label={p.calidad} />}
+                                    </Box>
                                   </Box>
-                                </Box>
-                              ))}
+                                ))
+                              ) : (
+                                <Typography variant="body2" color="text.secondary">
+                                  No disponible
+                                </Typography>
+                              )}
                             </Box>
                           </Grid>
                         </>

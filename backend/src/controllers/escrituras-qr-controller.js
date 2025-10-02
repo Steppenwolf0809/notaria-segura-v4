@@ -549,12 +549,82 @@ function normalizeDatosEscritura(datosCompletos) {
 }
 
 /**
+ * Limpia una lista de personas removiendo entradas inválidas o basura
+ * @param {Array} personas - Array de personas (otorgantes/beneficiarios)
+ * @returns {Array} Array limpio de personas válidas
+ */
+function sanitizePersonas(personas) {
+  if (!Array.isArray(personas)) return [];
+
+  // Palabras que indican que es un campo de cabecera o basura
+  const palabrasBasura = [
+    'DOCUMENTO', 'IDENTIDAD', 'COMPARECIENTE', 'INTERVINIENTE', 
+    'NOMBRES', 'RAZON SOCIAL', 'DESCONOCIDO', 'CÉDULA', 'CEDULA',
+    'TIPO INTERVINIENTE', 'PERSONA QUE', 'NACIONALIDAD', 'CALIDAD',
+    'PASAPORTE', 'UBICACIÓN', 'UBICACION', 'PROVINCIA', 'CANTON',
+    'PARROQUIA', 'DESCRIPCIÓN', 'DESCRIPCION', 'OBJETO', 'OBSERVACIONES',
+    'CUANTÍA', 'CUANTIA', 'CONTRATO', 'OTORGADO POR', 'A FAVOR DE'
+  ];
+
+  return personas.filter(persona => {
+    if (!persona || !persona.nombre) return false;
+
+    const nombreUpper = String(persona.nombre).toUpperCase().trim();
+    
+    // Filtrar si el nombre es muy corto (menos de 5 caracteres)
+    if (nombreUpper.length < 5) return false;
+
+    // Filtrar si contiene palabras basura
+    const contieneBasura = palabrasBasura.some(basura => 
+      nombreUpper.includes(basura)
+    );
+    
+    if (contieneBasura) return false;
+
+    // Filtrar si el nombre es solo números o caracteres especiales
+    if (/^[\d\s\-\_\.]+$/.test(nombreUpper)) return false;
+
+    // Debe tener al menos 2 palabras (nombre y apellido mínimo)
+    const palabras = nombreUpper.split(/\s+/).filter(p => p.length > 0);
+    if (palabras.length < 2) return false;
+
+    return true;
+  }).map(persona => {
+    // Limpiar los campos de la persona
+    const numero = String(persona.numero || '').replace(/\D+/g, '');
+    
+    return {
+      nombre: String(persona.nombre || '').trim(),
+      documento: String(persona.documento || '').trim() || null,
+      numero: numero || null,
+      nacionalidad: String(persona.nacionalidad || '').trim() || null,
+      calidad: String(persona.calidad || '').trim() || null
+    };
+  });
+}
+
+/**
  * Extrae solo los campos importantes para mostrar públicamente
  * @param {Object} datosNormalizados - Datos normalizados
  * @param {Object} escritura - Registro de escritura de la BD
  * @returns {Object} Datos públicos filtrados
  */
 function extractDatosPublicos(datosNormalizados, escritura) {
+  // Limpiar otorgantes si existen
+  let otorgantesLimpios = null;
+  if (datosNormalizados.otorgantes) {
+    const otorgadoPor = sanitizePersonas(datosNormalizados.otorgantes.otorgado_por || []);
+    const aFavorDe = sanitizePersonas(datosNormalizados.otorgantes.a_favor_de || []);
+    
+    // Solo incluir si hay al menos una persona válida
+    if (otorgadoPor.length > 0 || aFavorDe.length > 0) {
+      otorgantesLimpios = {
+        otorgado_por: otorgadoPor,
+        a_favor_de: aFavorDe
+      };
+    }
+  }
+
   // Whitelist de campos importantes
   const datosPublicos = {
     // Identificación
@@ -568,10 +638,8 @@ function extractDatosPublicos(datosNormalizados, escritura) {
     notario: datosNormalizados.notario || 'N/A',
     notaria: datosNormalizados.notaria || 'N/A',
 
-    // Partes (solo si existen y no están vacías)
-    ...(datosNormalizados.otorgantes && {
-      otorgantes: datosNormalizados.otorgantes
-    }),
+    // Partes (solo si hay personas válidas después de limpiar)
+    ...(otorgantesLimpios && { otorgantes: otorgantesLimpios }),
 
     // Objeto/observaciones (solo si existe y no está vacío)
     ...(datosNormalizados.objeto_observaciones && {
@@ -682,6 +750,135 @@ export async function verifyEscritura(req, res) {
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor'
+    });
+  }
+}
+
+/**
+ * POST /api/escrituras/manual
+ * Crea una escritura ingresando datos manualmente (sin PDF)
+ * Solo para matrizadores
+ */
+export async function createEscrituraManual(req, res) {
+  try {
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    
+    // Verificar que sea matrizador
+    if (userRole !== 'MATRIZADOR' && userRole !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo los matrizadores pueden crear escrituras'
+      });
+    }
+    
+    const {
+      numeroEscritura,
+      acto,
+      fecha_otorgamiento,
+      cuantia,
+      notario,
+      notaria,
+      ubicacion,
+      otorgantes,
+      objeto_observaciones,
+      extractoTextoCompleto
+    } = req.body;
+    
+    // Validar campos requeridos
+    if (!numeroEscritura) {
+      return res.status(400).json({
+        success: false,
+        message: 'El número de escritura es requerido'
+      });
+    }
+    
+    if (!acto) {
+      return res.status(400).json({
+        success: false,
+        message: 'El acto/contrato es requerido'
+      });
+    }
+    
+    if (!fecha_otorgamiento) {
+      return res.status(400).json({
+        success: false,
+        message: 'La fecha de otorgamiento es requerida'
+      });
+    }
+    
+    console.log('[createEscrituraManual] Creando escritura manual:', {
+      numeroEscritura,
+      acto: acto.substring(0, 30) + '...',
+      usuario: req.user.email
+    });
+    
+    // Construir objeto datosCompletos
+    const datosCompletos = {
+      escritura: numeroEscritura,
+      acto: acto || '',
+      fecha_otorgamiento: fecha_otorgamiento || '',
+      cuantia: cuantia || 'INDETERMINADA',
+      notario: notario || '',
+      notaria: notaria || '',
+      ubicacion: ubicacion || {},
+      otorgantes: otorgantes || { otorgado_por: [], a_favor_de: [] },
+      objeto_observaciones: objeto_observaciones || ''
+    };
+    
+    // Generar token único
+    const token = await generateUniqueToken(prisma);
+    
+    // Crear escritura en base de datos
+    const escritura = await prisma.escrituraQR.create({
+      data: {
+        token: token,
+        numeroEscritura: numeroEscritura,
+        datosCompletos: JSON.stringify(datosCompletos),
+        archivoOriginal: null, // No hay archivo PDF
+        extractoTextoCompleto: extractoTextoCompleto || null,
+        origenDatos: 'MANUAL',
+        estado: 'activo', // Ingreso manual se considera revisado
+        createdBy: userId
+      },
+      include: {
+        creador: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        }
+      }
+    });
+    
+    // Generar información del QR
+    const qrInfo = await generateQRInfo(token);
+    
+    console.log('[createEscrituraManual] Escritura manual creada exitosamente:', escritura.id);
+    
+    res.status(201).json({
+      success: true,
+      message: 'Escritura creada exitosamente',
+      data: {
+        id: escritura.id,
+        token: escritura.token,
+        numeroEscritura: escritura.numeroEscritura,
+        datosCompletos: datosCompletos, // Enviar como objeto
+        origenDatos: escritura.origenDatos,
+        estado: escritura.estado,
+        createdAt: escritura.createdAt,
+        creador: escritura.creador,
+        qr: qrInfo
+      }
+    });
+    
+  } catch (error) {
+    console.error('[createEscrituraManual] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 }
