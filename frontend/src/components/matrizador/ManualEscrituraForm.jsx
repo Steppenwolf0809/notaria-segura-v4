@@ -89,7 +89,13 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
         ...prev.otorgantes,
         [tipo]: [
           ...prev.otorgantes[tipo],
-          { nombre: '', documento: 'CÉDULA', numero: '', nacionalidad: 'ECUATORIANA', calidad: '' }
+          { 
+            nombre: '', 
+            documento: 'CÉDULA', 
+            numero: '', 
+            nacionalidad: 'ECUATORIANA', 
+            calidad: tipo === 'otorgado_por' ? 'OTORGANTE' : 'BENEFICIARIO'
+          }
         ]
       }
     }));
@@ -328,6 +334,7 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
                         fullWidth
                         size="small"
                         label="Nombre completo"
+                        placeholder="Ej: Juan Pérez García"
                         value={persona.nombre}
                         onChange={(e) => handleOtorganteChange('otorgado_por', index, 'nombre', e.target.value)}
                         disabled={loading}
@@ -338,6 +345,7 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
                         fullWidth
                         size="small"
                         label="Tipo Doc."
+                        placeholder="CÉDULA"
                         value={persona.documento}
                         onChange={(e) => handleOtorganteChange('otorgado_por', index, 'documento', e.target.value)}
                         disabled={loading}
@@ -348,6 +356,7 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
                         fullWidth
                         size="small"
                         label="N° Documento"
+                        placeholder="1234567890"
                         value={persona.numero}
                         onChange={(e) => handleOtorganteChange('otorgado_por', index, 'numero', e.target.value)}
                         disabled={loading}
@@ -358,6 +367,7 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
                         fullWidth
                         size="small"
                         label="Nacionalidad"
+                        placeholder="ECUATORIANA"
                         value={persona.nacionalidad}
                         onChange={(e) => handleOtorganteChange('otorgado_por', index, 'nacionalidad', e.target.value)}
                         disabled={loading}
@@ -368,6 +378,7 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
                         fullWidth
                         size="small"
                         label="Calidad"
+                        placeholder="OTORGANTE"
                         value={persona.calidad}
                         onChange={(e) => handleOtorganteChange('otorgado_por', index, 'calidad', e.target.value)}
                         disabled={loading}
@@ -413,6 +424,7 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
                         fullWidth
                         size="small"
                         label="Nombre completo"
+                        placeholder="Ej: María Rodríguez López"
                         value={persona.nombre}
                         onChange={(e) => handleOtorganteChange('a_favor_de', index, 'nombre', e.target.value)}
                         disabled={loading}
@@ -423,6 +435,7 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
                         fullWidth
                         size="small"
                         label="Tipo Doc."
+                        placeholder="CÉDULA"
                         value={persona.documento}
                         onChange={(e) => handleOtorganteChange('a_favor_de', index, 'documento', e.target.value)}
                         disabled={loading}
@@ -433,6 +446,7 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
                         fullWidth
                         size="small"
                         label="N° Documento"
+                        placeholder="0987654321"
                         value={persona.numero}
                         onChange={(e) => handleOtorganteChange('a_favor_de', index, 'numero', e.target.value)}
                         disabled={loading}
@@ -443,6 +457,7 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
                         fullWidth
                         size="small"
                         label="Nacionalidad"
+                        placeholder="ECUATORIANA"
                         value={persona.nacionalidad}
                         onChange={(e) => handleOtorganteChange('a_favor_de', index, 'nacionalidad', e.target.value)}
                         disabled={loading}
@@ -453,6 +468,7 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
                         fullWidth
                         size="small"
                         label="Calidad"
+                        placeholder="BENEFICIARIO"
                         value={persona.calidad}
                         onChange={(e) => handleOtorganteChange('a_favor_de', index, 'calidad', e.target.value)}
                         disabled={loading}
