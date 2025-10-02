@@ -114,6 +114,17 @@ const corsOptions = {
         }
       }
       
+      // Agregar dominio personalizado de la notaría (con y sin www)
+      const notariaOrigins = [
+        'https://www.notaria18quito.com.ec',
+        'https://notaria18quito.com.ec'
+      ];
+      notariaOrigins.forEach(url => {
+        if (!productionOrigins.includes(url)) {
+          productionOrigins.push(url);
+        }
+      });
+      
       // Permitir requests sin origin (API calls) o desde orígenes permitidos
       if (!origin || productionOrigins.includes(origin)) {
         callback(null, true);
