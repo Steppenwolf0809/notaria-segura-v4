@@ -302,7 +302,7 @@ export async function updateEscritura(req, res) {
     const { id } = req.params;
     const userId = req.user.id;
     const userRole = req.user.role;
-    const { datosCompletos, estado } = req.body;
+    const { datosCompletos, estado, numeroEscritura } = req.body;
     
     const escritura = await prisma.escrituraQR.findUnique({
       where: { id: parseInt(id) }
@@ -337,7 +337,8 @@ export async function updateEscritura(req, res) {
       where: { id: parseInt(id) },
       data: {
         ...(datosCompletos && { datosCompletos }),
-        ...(estado && { estado })
+        ...(estado && { estado }),
+        ...(numeroEscritura && { numeroEscritura })
       },
       include: {
         creador: {

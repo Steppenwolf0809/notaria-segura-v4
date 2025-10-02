@@ -215,7 +215,9 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
 
     try {
       const updatedData = {
-        datosCompletos: JSON.stringify(formData, null, 2)
+        datosCompletos: JSON.stringify(formData, null, 2),
+        // Actualizar también numeroEscritura si cambió
+        numeroEscritura: formData.escritura || formData.numeroEscritura || escritura.numeroEscritura
       };
 
       const response = await updateEscritura(escritura.id, updatedData);

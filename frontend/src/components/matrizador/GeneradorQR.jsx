@@ -386,6 +386,9 @@ const GeneradorQR = () => {
                         <Typography variant="body2">
                           {new Date(escritura.createdAt).toLocaleDateString()}
                         </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {new Date(escritura.createdAt).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}
+                        </Typography>
                       </TableCell>
                       
                       <TableCell align="center">
@@ -625,7 +628,20 @@ const GeneradorQR = () => {
           )}
         </DialogContent>
         
-        <DialogActions>
+        <DialogActions sx={{ justifyContent: 'space-between', px: 3, py: 2 }}>
+          <Button
+            variant="outlined"
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={() => {
+              if (selectedEscritura && window.confirm('¿Estás seguro de que quieres eliminar esta escritura? Esta acción no se puede deshacer.')) {
+                handleDelete(selectedEscritura.id);
+                setShowDetailsDialog(false);
+              }
+            }}
+          >
+            Eliminar Escritura
+          </Button>
           <Button onClick={() => setShowDetailsDialog(false)}>
             Cerrar
           </Button>
