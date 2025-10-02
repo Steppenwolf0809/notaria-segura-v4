@@ -192,9 +192,11 @@ const VerificacionPublica = () => {
               sx={{
                 height: 80,
                 width: 'auto',
-                filter: 'brightness(0) invert(1)', // Hace el logo blanco
                 objectFit: 'contain',
-                display: 'block'
+                display: 'block',
+                // Sin filtro para que se vea el logo original
+                borderRadius: 1,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
               }}
               onError={(e) => {
                 // Si no existe el logo, ocultar el elemento
