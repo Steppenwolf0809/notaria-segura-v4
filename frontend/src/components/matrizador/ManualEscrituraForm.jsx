@@ -40,7 +40,7 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
   const [formData, setFormData] = useState({
     numeroEscritura: '',
     acto: '',
-    fecha_otorgamiento: new Date().toISOString().split('T')[0],
+    fecha_otorgamiento: '', // Texto libre en lugar de date
     cuantia: '',
     cuantiaIndeterminada: true,
     notario: 'GLENDA ZAPATA SILVA',
@@ -199,12 +199,12 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
               <TextField
                 fullWidth
                 required
-                type="date"
                 label="Fecha de Otorgamiento"
+                placeholder="22 DE SEPTIEMBRE DEL 2025, (16:06)"
                 value={formData.fecha_otorgamiento}
                 onChange={(e) => handleFieldChange('fecha_otorgamiento', e.target.value)}
-                InputLabelProps={{ shrink: true }}
                 disabled={loading}
+                helperText="Copia y pega el texto exacto del extracto"
               />
             </Grid>
 
