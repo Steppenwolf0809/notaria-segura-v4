@@ -50,6 +50,47 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
   const [originalData, setOriginalData] = useState({});
 
   /**
+   * Limpia una lista de personas removiendo entradas con basura
+   * (Misma lógica que el backend para consistencia)
+   */
+  const sanitizePersonas = (personas) => {
+    if (!Array.isArray(personas)) return [];
+
+    const palabrasBasura = [
+      'DOCUMENTO', 'IDENTIDAD', 'COMPARECIENTE', 'INTERVINIENTE',
+      'NOMBRES', 'RAZON SOCIAL', 'DESCONOCIDO', 'CÉDULA', 'CEDULA',
+      'TIPO INTERVINIENTE', 'PERSONA QUE', 'NACIONALIDAD', 'CALIDAD',
+      'PASAPORTE', 'UBICACIÓN', 'UBICACION', 'PROVINCIA', 'CANTON',
+      'PARROQUIA', 'DESCRIPCIÓN', 'DESCRIPCION', 'OBJETO', 'OBSERVACIONES',
+      'CUANTÍA', 'CUANTIA', 'CONTRATO', 'OTORGADO POR', 'A FAVOR DE'
+    ];
+
+    return personas.filter(persona => {
+      if (!persona || !persona.nombre) return false;
+
+      const nombreUpper = String(persona.nombre).toUpperCase().trim();
+
+      // Filtrar si muy corto
+      if (nombreUpper.length < 5) return false;
+
+      // Filtrar si contiene palabras basura
+      const contieneBasura = palabrasBasura.some(basura =>
+        nombreUpper.includes(basura)
+      );
+      if (contieneBasura) return false;
+
+      // Filtrar si es solo números
+      if (/^[\d\s\-\_\.]+$/.test(nombreUpper)) return false;
+
+      // Debe tener al menos 2 palabras
+      const palabras = nombreUpper.split(/\s+/).filter(p => p.length > 0);
+      if (palabras.length < 2) return false;
+
+      return true;
+    });
+  };
+
+  /**
    * Inicializa los datos del formulario
    * Maneja datosCompletos tanto como string JSON o como objeto ya parseado
    */
@@ -72,6 +113,19 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
         }
         else {
           throw new Error('datosCompletos tiene un formato inesperado');
+        }
+        
+        // Limpiar otorgantes si existen (aplicar misma lógica que backend)
+        if (parsed.otorgantes) {
+          const otorgantesLimpios = {
+            otorgado_por: sanitizePersonas(parsed.otorgantes.otorgado_por || []),
+            a_favor_de: sanitizePersonas(parsed.otorgantes.a_favor_de || [])
+          };
+          parsed.otorgantes = otorgantesLimpios;
+          console.log('[ExtractedDataForm] Otorgantes limpiados:', {
+            otorgadoPor: otorgantesLimpios.otorgado_por.length,
+            aFavorDe: otorgantesLimpios.a_favor_de.length
+          });
         }
         
         setFormData(parsed);
