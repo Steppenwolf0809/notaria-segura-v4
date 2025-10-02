@@ -85,6 +85,16 @@ export async function uploadEscritura(req, res) {
     // Generar información del QR
     const qrInfo = await generateQRInfo(token);
     
+    // Parsear datosCompletos si viene como string (para consistencia con el frontend)
+    let datosCompletosParsed = escritura.datosCompletos;
+    if (typeof datosCompletosParsed === 'string') {
+      try {
+        datosCompletosParsed = JSON.parse(datosCompletosParsed);
+      } catch (e) {
+        console.warn('[uploadEscritura] No se pudo parsear datosCompletos:', e.message);
+      }
+    }
+    
     res.status(201).json({
       success: true,
       message: 'Escritura procesada exitosamente',
@@ -92,6 +102,7 @@ export async function uploadEscritura(req, res) {
         id: escritura.id,
         token: escritura.token,
         numeroEscritura: escritura.numeroEscritura,
+        datosCompletos: datosCompletosParsed, // ← Enviar parseado para uso inmediato en frontend
         estado: escritura.estado,
         archivoOriginal: escritura.archivoOriginal,
         createdAt: escritura.createdAt,
@@ -175,10 +186,26 @@ export async function getEscrituras(req, res) {
       prisma.escrituraQR.count({ where })
     ]);
     
+    // Parsear datosCompletos de cada escritura para consistencia
+    const escriturasConDatosParsed = escrituras.map(esc => {
+      let datosCompletosParsed = esc.datosCompletos;
+      if (typeof datosCompletosParsed === 'string') {
+        try {
+          datosCompletosParsed = JSON.parse(datosCompletosParsed);
+        } catch (e) {
+          console.warn(`[getEscrituras] No se pudo parsear datosCompletos de escritura ${esc.id}`);
+        }
+      }
+      return {
+        ...esc,
+        datosCompletos: datosCompletosParsed
+      };
+    });
+    
     res.json({
       success: true,
       data: {
-        escrituras,
+        escrituras: escriturasConDatosParsed,
         pagination: {
           page,
           limit,
@@ -238,10 +265,21 @@ export async function getEscritura(req, res) {
     // Generar QR actualizado
     const qrInfo = await generateQRInfo(escritura.token);
     
+    // Parsear datosCompletos para consistencia
+    let datosCompletosParsed = escritura.datosCompletos;
+    if (typeof datosCompletosParsed === 'string') {
+      try {
+        datosCompletosParsed = JSON.parse(datosCompletosParsed);
+      } catch (e) {
+        console.warn('[getEscritura] No se pudo parsear datosCompletos:', e.message);
+      }
+    }
+    
     res.json({
       success: true,
       data: {
         ...escritura,
+        datosCompletos: datosCompletosParsed,
         qr: qrInfo
       }
     });
@@ -312,10 +350,23 @@ export async function updateEscritura(req, res) {
       }
     });
     
+    // Parsear datosCompletos para consistencia
+    let datosCompletosParsed = updatedEscritura.datosCompletos;
+    if (typeof datosCompletosParsed === 'string') {
+      try {
+        datosCompletosParsed = JSON.parse(datosCompletosParsed);
+      } catch (e) {
+        console.warn('[updateEscritura] No se pudo parsear datosCompletos:', e.message);
+      }
+    }
+    
     res.json({
       success: true,
       message: 'Escritura actualizada exitosamente',
-      data: updatedEscritura
+      data: {
+        ...updatedEscritura,
+        datosCompletos: datosCompletosParsed
+      }
     });
     
   } catch (error) {
@@ -377,11 +428,183 @@ export async function getEscrituraQR(req, res) {
 }
 
 /**
+ * Parsea recursivamente un valor que puede estar doblemente stringificado
+ * @param {any} v - Valor a parsear
+ * @returns {any} Valor parseado
+ */
+function safeParseDeep(v) {
+  try {
+    if (typeof v === 'string') {
+      v = JSON.parse(v);
+    }
+    // Intentar parsear una segunda vez por si llegó doble stringificado
+    if (typeof v === 'string') {
+      v = JSON.parse(v);
+    }
+  } catch (_) {
+    // Si no se puede parsear, devolver el valor original
+  }
+  return v;
+}
+
+/**
+ * Normaliza la cuantía a un formato consistente
+ * @param {any} cuantiaRaw - Valor crudo de cuantía
+ * @returns {number|string} Valor normalizado (número o 'INDETERMINADA')
+ */
+function normalizeCuantia(cuantiaRaw) {
+  if (cuantiaRaw === null || cuantiaRaw === undefined || cuantiaRaw === '') {
+    return 'INDETERMINADA';
+  }
+
+  // Si ya es un número, devolverlo
+  if (typeof cuantiaRaw === 'number') {
+    return cuantiaRaw;
+  }
+
+  // Convertir a string y limpiar
+  const cuantiaStr = String(cuantiaRaw).trim().toUpperCase();
+
+  // Valores que se consideran indeterminados
+  const valoresIndeterminados = [
+    'INDETERMINADA',
+    'NO APLICA',
+    'INDETERMINADO',
+    'S/N',
+    'N/A',
+    'SIN CUANTIA',
+    'SIN CUANTÍA'
+  ];
+
+  if (valoresIndeterminados.includes(cuantiaStr)) {
+    return 'INDETERMINADA';
+  }
+
+  // Intentar extraer número: "$ 1.234,56" → 1234.56
+  // Remover todo excepto dígitos, comas, puntos y guiones
+  const numeroLimpio = cuantiaStr
+    .replace(/[^\d,.-]/g, '') // Remover símbolos de moneda y letras
+    .replace(/\.(?=\d{3}(?:[,.]|$))/g, '') // Remover puntos de miles
+    .replace(',', '.'); // Convertir coma decimal a punto
+
+  const numeroFloat = parseFloat(numeroLimpio);
+
+  return Number.isFinite(numeroFloat) ? numeroFloat : 'INDETERMINADA';
+}
+
+/**
+ * Normaliza los datos completos de una escritura para verificación pública
+ * @param {Object} datosCompletos - Datos crudos parseados
+ * @returns {Object} Datos normalizados y limpios
+ */
+function normalizeDatosEscritura(datosCompletos) {
+  const datos = safeParseDeep(datosCompletos) || {};
+
+  // Normalizar cuantía desde diferentes posibles campos
+  const cuantiaRaw = datos.cuantia ?? datos.cuantiaDelActo ?? datos.monto ?? datos.valor ?? '';
+  const cuantiaNormalizada = normalizeCuantia(cuantiaRaw);
+
+  // Normalizar notario y notaría desde diferentes posibles campos
+  const notario = (
+    datos.notarioNombre ?? 
+    datos.notario ?? 
+    datos.titularNotaria ?? 
+    datos.encabezadoNotario ?? 
+    ''
+  ).toString().trim();
+
+  const notaria = (
+    datos.notariaNombre ?? 
+    datos.notaria ?? 
+    datos.oficina ?? 
+    datos.encabezadoNotaria ?? 
+    ''
+  ).toString().trim();
+
+  // Normalizar acto/contrato
+  const acto = (
+    datos.acto ?? 
+    datos.actoContrato ?? 
+    datos.tipoActo ?? 
+    datos.contrato ?? 
+    ''
+  ).toString().trim();
+
+  // Normalizar fecha
+  const fechaOtorgamiento = (
+    datos.fecha_otorgamiento ?? 
+    datos.fechaOtorgamiento ?? 
+    datos.fecha ?? 
+    ''
+  ).toString().trim();
+
+  return {
+    ...datos,
+    cuantia: cuantiaNormalizada,
+    notario,
+    notaria,
+    acto,
+    fecha_otorgamiento: fechaOtorgamiento
+  };
+}
+
+/**
+ * Extrae solo los campos importantes para mostrar públicamente
+ * @param {Object} datosNormalizados - Datos normalizados
+ * @param {Object} escritura - Registro de escritura de la BD
+ * @returns {Object} Datos públicos filtrados
+ */
+function extractDatosPublicos(datosNormalizados, escritura) {
+  // Whitelist de campos importantes
+  const datosPublicos = {
+    // Identificación
+    token: escritura.token,
+    numeroEscritura: escritura.numeroEscritura || 'N/A',
+
+    // Información del acto (6 campos clave)
+    acto: datosNormalizados.acto || 'N/A',
+    fecha_otorgamiento: datosNormalizados.fecha_otorgamiento || 'N/A',
+    cuantia: datosNormalizados.cuantia,
+    notario: datosNormalizados.notario || 'N/A',
+    notaria: datosNormalizados.notaria || 'N/A',
+
+    // Partes (solo si existen y no están vacías)
+    ...(datosNormalizados.otorgantes && {
+      otorgantes: datosNormalizados.otorgantes
+    }),
+
+    // Objeto/observaciones (solo si existe y no está vacío)
+    ...(datosNormalizados.objeto_observaciones && {
+      objeto_observaciones: datosNormalizados.objeto_observaciones
+    }),
+
+    // Ubicación (solo campos principales si existe)
+    ...(datosNormalizados.ubicacion && {
+      ubicacion: {
+        provincia: datosNormalizados.ubicacion.provincia || null,
+        canton: datosNormalizados.ubicacion.canton || null,
+        parroquia: datosNormalizados.ubicacion.parroquia || null
+      }
+    }),
+
+    // Metadata de verificación
+    verificadoEn: new Date().toISOString(),
+    procesadoPor: escritura.creador ? 
+      `${escritura.creador.firstName} ${escritura.creador.lastName}` : 
+      'Sistema'
+  };
+
+  return datosPublicos;
+}
+
+/**
  * GET /api/verify/:token
  * Verificación pública de escritura (sin autenticación)
  */
 export async function verifyEscritura(req, res) {
   try {
+    console.log('[API-QR] Verificando token:', req.params.token?.substring(0, 4) + '****');
+    
     const { token } = req.params;
     
     // Validar formato del token
@@ -406,6 +629,7 @@ export async function verifyEscritura(req, res) {
     });
     
     if (!escritura) {
+      console.log('[API-QR] Escritura no encontrada para token:', token);
       return res.status(404).json({
         success: false,
         message: 'Escritura no encontrada'
@@ -413,37 +637,36 @@ export async function verifyEscritura(req, res) {
     }
     
     if (escritura.estado !== 'activo') {
+      console.log('[API-QR] Escritura inactiva:', token, 'estado:', escritura.estado);
       return res.status(400).json({
         success: false,
         message: 'Esta escritura no está disponible para verificación'
       });
     }
     
-    // Parsear datos completos
+    // Parsear datos completos (puede venir stringificado)
     let datosCompletos = {};
     try {
-      datosCompletos = JSON.parse(escritura.datosCompletos || '{}');
+      datosCompletos = typeof escritura.datosCompletos === 'string' 
+        ? JSON.parse(escritura.datosCompletos)
+        : escritura.datosCompletos || {};
     } catch (e) {
-      console.error('Error parsing datosCompletos:', e);
+      console.error('[API-QR] Error parsing datosCompletos:', e.message);
+      datosCompletos = {};
     }
     
-    // Datos públicos para mostrar
-    const datosPublicos = {
-      token: escritura.token,
-      numeroEscritura: escritura.numeroEscritura,
-      acto: datosCompletos.acto,
-      fecha_otorgamiento: datosCompletos.fecha_otorgamiento,
-      notario: datosCompletos.notario,
-      notaria: datosCompletos.notaria,
-      ubicacion: datosCompletos.ubicacion,
-      cuantia: datosCompletos.cuantia,
-      otorgantes: datosCompletos.otorgantes || null,
-      objeto_observaciones: datosCompletos.objeto_observaciones || null,
-      verificadoEn: new Date().toISOString(),
-      procesadoPor: escritura.creador ? 
-        `${escritura.creador.firstName} ${escritura.creador.lastName}` : 
-        'Sistema'
-    };
+    // Normalizar datos (cuantía, notario, etc.)
+    const datosNormalizados = normalizeDatosEscritura(datosCompletos);
+    
+    // Extraer solo campos públicos importantes
+    const datosPublicos = extractDatosPublicos(datosNormalizados, escritura);
+    
+    console.log('[API-QR] Verificación exitosa:', {
+      token: token.substring(0, 4) + '****',
+      numeroEscritura: datosPublicos.numeroEscritura,
+      acto: datosPublicos.acto?.substring(0, 30) + '...',
+      cuantia: typeof datosPublicos.cuantia === 'number' ? `$${datosPublicos.cuantia}` : datosPublicos.cuantia
+    });
     
     // TODO: Registrar verificación para analytics
     // await registrarVerificacion(token, req.ip, req.get('User-Agent'));
@@ -455,7 +678,7 @@ export async function verifyEscritura(req, res) {
     });
     
   } catch (error) {
-    console.error('Error en verifyEscritura:', error);
+    console.error('[API-QR] Error en verifyEscritura:', error);
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor'

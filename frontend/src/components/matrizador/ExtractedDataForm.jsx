@@ -51,17 +51,42 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
 
   /**
    * Inicializa los datos del formulario
+   * Maneja datosCompletos tanto como string JSON o como objeto ya parseado
    */
   useEffect(() => {
+    console.log('[ExtractedDataForm] Cargando datos de escritura:', escritura?.id);
+    
     if (escritura?.datosCompletos) {
       try {
-        const parsed = JSON.parse(escritura.datosCompletos);
+        let parsed;
+        
+        // Si datosCompletos ya es un objeto, usarlo directamente
+        if (typeof escritura.datosCompletos === 'object') {
+          parsed = escritura.datosCompletos;
+          console.log('[ExtractedDataForm] datosCompletos ya parseado como objeto');
+        } 
+        // Si es un string, parsearlo como JSON
+        else if (typeof escritura.datosCompletos === 'string') {
+          parsed = JSON.parse(escritura.datosCompletos);
+          console.log('[ExtractedDataForm] datosCompletos parseado desde string');
+        }
+        else {
+          throw new Error('datosCompletos tiene un formato inesperado');
+        }
+        
         setFormData(parsed);
         setOriginalData(parsed);
+        console.log('[ExtractedDataForm] Datos cargados exitosamente:', {
+          acto: parsed.acto?.substring(0, 30) + '...',
+          numeroEscritura: parsed.escritura,
+          cuantia: parsed.cuantia
+        });
       } catch (e) {
-        console.error('Error parsing datos completos:', e);
+        console.error('[ExtractedDataForm] Error parsing datos completos:', e);
         setError('Error al cargar los datos extraídos');
       }
+    } else {
+      console.warn('[ExtractedDataForm] No hay datosCompletos en la escritura');
     }
   }, [escritura]);
 
