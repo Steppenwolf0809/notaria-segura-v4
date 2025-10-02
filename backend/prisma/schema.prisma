@@ -291,19 +291,21 @@ model ConcuerdoAuditLog {
 
 // MODELO PARA ESCRITURAS QR - Módulo de verificación de escrituras notariales
 model EscrituraQR {
-  id                Int      @id @default(autoincrement())
-  token             String   @unique // Token único de 8 caracteres alfanuméricos
-  numeroEscritura   String?  // Número de escritura extraído (ej: "20251701018P02183")
-  datosCompletos    String?  // JSON con todos los datos extraídos del PDF
-  archivoOriginal   String?  // Nombre del archivo PDF original
-  estado            String   @default("activo") // "activo", "revision_requerida", "inactivo"
-  activo            Boolean  @default(true) // Flag de activación/desactivación
-  createdBy         Int?     // FK al usuario matrizador que creó la escritura
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id                      Int      @id @default(autoincrement())
+  token                   String   @unique // Token único de 8 caracteres alfanuméricos
+  numeroEscritura         String?  // Número de escritura extraído (ej: "20251701018P02183")
+  datosCompletos          String?  // JSON con todos los datos extraídos del PDF
+  archivoOriginal         String?  // Nombre del archivo PDF original
+  extractoTextoCompleto   String?  @db.Text // Texto completo del extracto (opcional, para consulta)
+  origenDatos             String   @default("PDF") // "PDF" | "MANUAL" - cómo se ingresó
+  estado                  String   @default("activo") // "activo", "revision_requerida", "inactivo"
+  activo                  Boolean  @default(true) // Flag de activación/desactivación
+  createdBy               Int?     // FK al usuario matrizador que creó la escritura
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
   // Relaciones
-  creador           User?    @relation(fields: [createdBy], references: [id])
+  creador                 User?    @relation(fields: [createdBy], references: [id])
 
   @@map("escrituras_qr")
   // Índices para performance
@@ -311,4 +313,5 @@ model EscrituraQR {
   @@index([estado])
   @@index([createdAt])
   @@index([createdBy])
+  @@index([origenDatos])
 }

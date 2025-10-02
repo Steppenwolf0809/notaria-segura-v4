@@ -32,6 +32,24 @@ export async function uploadEscritura(pdfFile) {
 }
 
 /**
+ * Crea una escritura ingresando datos manualmente
+ * @param {Object} datosEscritura - Datos de la escritura
+ * @returns {Promise<Object>} Respuesta con datos de la escritura y QR
+ */
+export async function createEscrituraManual(datosEscritura) {
+  try {
+    const response = await apiClient.post('/escrituras/manual', datosEscritura);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating manual escritura:', error);
+    throw new Error(
+      error.response?.data?.message || 
+      'Error al crear la escritura manualmente'
+    );
+  }
+}
+
+/**
  * Obtiene la lista de escrituras del usuario actual
  * @param {Object} params - Parámetros de consulta
  * @param {number} params.page - Página actual

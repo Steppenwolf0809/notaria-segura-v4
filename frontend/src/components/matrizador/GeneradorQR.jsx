@@ -52,10 +52,12 @@ import { toast } from 'react-toastify';
 import PDFUploader from './PDFUploader';
 import ExtractedDataForm from './ExtractedDataForm';
 import QRDisplay from './QRDisplay';
+import ManualEscrituraForm from './ManualEscrituraForm';
 
 // Servicios
 import {
   uploadEscritura,
+  createEscrituraManual,
   getEscrituras,
   deleteEscritura,
   getEstadoInfo,
@@ -70,7 +72,9 @@ const GeneradorQR = () => {
   const [selectedEscritura, setSelectedEscritura] = useState(null);
 
   // Estados de UI
+  const [showMethodDialog, setShowMethodDialog] = useState(false); // Dialog para elegir método
   const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [showManualDialog, setShowManualDialog] = useState(false); // Dialog para ingreso manual
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [uploadLoading, setUploadLoading] = useState(false);
 
@@ -137,6 +141,32 @@ const GeneradorQR = () => {
       }
     } catch (err) {
       toast.error(err.message);
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
+  /**
+   * Maneja la creación manual de escritura
+   */
+  const handleManualSubmit = async (datosEscritura) => {
+    setUploadLoading(true);
+
+    try {
+      const response = await createEscrituraManual(datosEscritura);
+      
+      if (response.success) {
+        toast.success('Escritura creada exitosamente');
+        setShowManualDialog(false);
+        loadEscrituras(); // Recargar lista
+        
+        // Mostrar detalles de la escritura creada
+        setSelectedEscritura(response.data);
+        setShowDetailsDialog(true);
+      }
+    } catch (err) {
+      toast.error(err.message);
+      throw err; // Re-lanzar para que el formulario lo maneje
     } finally {
       setUploadLoading(false);
     }
@@ -227,10 +257,10 @@ const GeneradorQR = () => {
         <Button
           variant="contained"
           startIcon={<AddIcon />}
-          onClick={() => setShowUploadDialog(true)}
+          onClick={() => setShowMethodDialog(true)}
           size="large"
         >
-          Subir PDF
+          Nueva Escritura
         </Button>
       </Box>
 
@@ -419,8 +449,8 @@ const GeneradorQR = () => {
       {/* FAB para agregar nueva escritura */}
       <Fab
         color="primary"
-        aria-label="Subir PDF"
-        onClick={() => setShowUploadDialog(true)}
+        aria-label="Nueva Escritura"
+        onClick={() => setShowMethodDialog(true)}
         sx={{
           position: 'fixed',
           bottom: 16,
@@ -430,6 +460,62 @@ const GeneradorQR = () => {
       >
         <AddIcon />
       </Fab>
+
+      {/* Diálogo de selección de método */}
+      <Dialog
+        open={showMethodDialog}
+        onClose={() => setShowMethodDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          Crear Nueva Escritura
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+            <Button
+              variant="outlined"
+              size="large"
+              startIcon={<QrCodeIcon />}
+              onClick={() => {
+                setShowMethodDialog(false);
+                setShowUploadDialog(true);
+              }}
+              sx={{ py: 3 }}
+            >
+              <Box>
+                <Typography variant="h6">Subir PDF y Extraer</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Sube un extracto de escritura en PDF para extraer automáticamente los datos
+                </Typography>
+              </Box>
+            </Button>
+
+            <Button
+              variant="outlined"
+              size="large"
+              startIcon={<EditIcon />}
+              onClick={() => {
+                setShowMethodDialog(false);
+                setShowManualDialog(true);
+              }}
+              sx={{ py: 3 }}
+            >
+              <Box>
+                <Typography variant="h6">Ingresar Manualmente</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Ingresa los datos de la escritura de forma manual
+                </Typography>
+              </Box>
+            </Button>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowMethodDialog(false)}>
+            Cancelar
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Diálogo de upload */}
       <Dialog
@@ -458,6 +544,28 @@ const GeneradorQR = () => {
             Cancelar
           </Button>
         </DialogActions>
+      </Dialog>
+
+      {/* Diálogo de ingreso manual */}
+      <Dialog
+        open={showManualDialog}
+        onClose={() => !uploadLoading && setShowManualDialog(false)}
+        maxWidth="md"
+        fullWidth
+        disableEscapeKeyDown={uploadLoading}
+      >
+        <DialogTitle>
+          Ingresar Escritura Manualmente
+        </DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <ManualEscrituraForm
+              onSubmit={handleManualSubmit}
+              onCancel={() => setShowManualDialog(false)}
+              loading={uploadLoading}
+            />
+          </Box>
+        </DialogContent>
       </Dialog>
 
       {/* Diálogo de detalles */}

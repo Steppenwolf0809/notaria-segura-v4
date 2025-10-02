@@ -8,6 +8,7 @@ import multer from 'multer';
 import { authenticateToken, requireMatrizador } from '../middleware/auth-middleware.js';
 import {
   uploadEscritura,
+  createEscrituraManual,
   getEscrituras,
   getEscritura,
   updateEscritura,
@@ -52,6 +53,13 @@ router.post('/upload',
   requireMatrizador, 
   upload.single('pdfFile'), 
   uploadEscritura
+);
+
+// POST /api/escrituras/manual - Crear escritura manualmente (solo matrizadores)
+router.post('/manual',
+  authenticateToken,
+  requireMatrizador,
+  createEscrituraManual
 );
 
 // GET /api/escrituras - Listar escrituras del usuario
