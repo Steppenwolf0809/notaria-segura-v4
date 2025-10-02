@@ -167,9 +167,42 @@ const VerificacionPublica = () => {
             mb: 3, 
             textAlign: 'center',
             background: 'linear-gradient(135deg, #20B2AA 0%, #1A5799 100%)',
-            color: 'white'
+            color: 'white',
+            cursor: 'pointer',
+            transition: 'transform 0.2s',
+            '&:hover': {
+              transform: 'scale(1.01)'
+            }
           }}
+          onClick={() => window.open('https://www.notaria18quito.com.ec', '_blank')}
         >
+          {/* Logo de la Notaría */}
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center',
+              mb: 2 
+            }}
+          >
+            <Box
+              component="img"
+              src="/logo-notaria.png"
+              alt="Logo Notaría 18"
+              sx={{
+                height: 80,
+                width: 'auto',
+                filter: 'brightness(0) invert(1)', // Hace el logo blanco
+                objectFit: 'contain',
+                display: 'block'
+              }}
+              onError={(e) => {
+                // Si no existe el logo, ocultar el elemento
+                e.target.style.display = 'none';
+              }}
+            />
+          </Box>
+
           <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold' }}>
             GLENDA ZAPATA SILVA
           </Typography>
@@ -188,6 +221,11 @@ const VerificacionPublica = () => {
               Teléfono: (02) 224-7787 / 099-695-1682 | Email: notaria18uio@gmail.com
             </Typography>
           </Box>
+          
+          {/* Indicador de clickeable */}
+          <Typography variant="caption" sx={{ opacity: 0.7, mt: 1, display: 'block' }}>
+            Click para visitar nuestro sitio web
+          </Typography>
         </Paper>
 
         {/* Contenido principal */}
