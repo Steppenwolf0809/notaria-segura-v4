@@ -10,6 +10,15 @@ datasource db {
 
 // Enumeraciones convertidas a String para compatibilidad con SQLite
 // UserRole: ADMIN, CAJA, MATRIZADOR, RECEPCION, ARCHIVO
+
+// Enum de roles para PostgreSQL
+enum UserRole {
+  ADMIN
+  CAJA
+  MATRIZADOR
+  RECEPCION
+  ARCHIVO
+}
 // DocumentType: PROTOCOLO, DILIGENCIA, ARRENDAMIENTO, CERTIFICACION, OTROS
 // DocumentStatus: PENDIENTE, EN_PROCESO, LISTO, ENTREGADO, ANULADO_NOTA_CREDITO
 // DocumentEventType: DOCUMENT_CREATED, DOCUMENT_ASSIGNED, STATUS_CHANGED, VERIFICATION_GENERATED, WHATSAPP_SENT, EXTRACTION_SNAPSHOT, EXTRACTION_APPLIED, STATUS_UNDO, NOTE_ADDED, UNKNOWN
@@ -21,7 +30,7 @@ model User {
   password    String
   firstName   String
   lastName    String
-  role        String
+  role        UserRole
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
