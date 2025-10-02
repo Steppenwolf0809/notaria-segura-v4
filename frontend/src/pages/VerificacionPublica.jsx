@@ -50,6 +50,22 @@ const VerificacionPublica = () => {
   const [error, setError] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
 
+  /**
+   * Formatea la cuantía para mostrar
+   * @param {number|string} cuantia - Cuantía normalizada del backend
+   * @returns {string} Cuantía formateada
+   */
+  const formatCuantia = (cuantia) => {
+    if (typeof cuantia === 'number') {
+      return new Intl.NumberFormat('es-EC', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2
+      }).format(cuantia);
+    }
+    return cuantia || 'Indeterminada';
+  };
+
   // Limpia y estructura personas para visualización pública
   const sanitizePersons = (list) => {
     const blockWords = ['DOCUMENTO', 'IDENTIDAD', 'COMPARECIENTE', 'INTERVINIENTE', 'NOMBRES', 'RAZON SOCIAL'];
@@ -327,7 +343,7 @@ const VerificacionPublica = () => {
                         Cuantía:
                       </Typography>
                       <Typography variant="body1">
-                        {escritura.cuantia || 'N/A'}
+                        {formatCuantia(escritura.cuantia)}
                       </Typography>
                     </Grid>
                   </Grid>
