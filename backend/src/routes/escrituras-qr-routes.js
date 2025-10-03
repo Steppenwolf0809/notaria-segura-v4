@@ -19,20 +19,33 @@ import {
 
 const router = express.Router();
 
-// Configuración de multer para upload de PDFs
+// Configuración de multer para upload de PDFs y fotos
 const upload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
-    // Verificar tipo MIME
-    if (file.mimetype === 'application/pdf') {
-      cb(null, true);
+    // Verificar tipo según el nombre del campo
+    if (file.fieldname === 'pdfFile') {
+      // Para PDF
+      if (file.mimetype === 'application/pdf') {
+        cb(null, true);
+      } else {
+        cb(new Error('Solo se permiten archivos PDF'), false);
+      }
+    } else if (file.fieldname === 'foto') {
+      // Para fotos
+      const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      if (validImageTypes.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Solo se permiten imágenes JPG, PNG o WEBP'), false);
+      }
     } else {
-      cb(new Error('Solo se permiten archivos PDF'), false);
+      cb(new Error('Campo de archivo no reconocido'), false);
     }
   },
   limits: {
-    fileSize: 10 * 1024 * 1024, // Máximo 10MB
-    files: 1
+    fileSize: 10 * 1024 * 1024, // Máximo 10MB por archivo
+    files: 2 // Permitir PDF + foto
   }
 });
 
@@ -48,10 +61,14 @@ router.get('/verify/:token', verifyEscritura);
  */
 
 // POST /api/escrituras/upload - Subir PDF y generar QR (solo matrizadores)
+// Acepta 'pdfFile' (obligatorio) y 'foto' (opcional)
 router.post('/upload', 
   authenticateToken, 
   requireMatrizador, 
-  upload.single('pdfFile'), 
+  upload.fields([
+    { name: 'pdfFile', maxCount: 1 },
+    { name: 'foto', maxCount: 1 }
+  ]), 
   uploadEscritura
 );
 
@@ -115,6 +132,13 @@ router.use((error, req, res, next) => {
     return res.status(400).json({
       success: false,
       message: 'Formato de archivo no válido. Solo se permiten archivos PDF'
+    });
+  }
+  
+  if (error.message === 'Solo se permiten imágenes JPG, PNG o WEBP') {
+    return res.status(400).json({
+      success: false,
+      message: 'Formato de imagen no válido. Solo se permiten JPG, PNG o WEBP'
     });
   }
 

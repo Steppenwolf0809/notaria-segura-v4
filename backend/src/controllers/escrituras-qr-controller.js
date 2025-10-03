@@ -7,6 +7,7 @@ import prisma from '../db.js';
 import { parseEscrituraPDF, validatePDFFile, sanitizeFilename } from '../services/pdf-parser-escrituras.js';
 import { generateUniqueToken } from '../utils/token-generator.js';
 import { generateQRInfo, generateMultiFormatQR } from '../services/qr-generator-service.js';
+import { uploadPhotoToFTP } from '../services/cpanel-ftp-service.js';
 
 /**
  * POST /api/escrituras/upload
@@ -26,29 +27,54 @@ export async function uploadEscritura(req, res) {
       });
     }
     
-    // Verificar que se subió un archivo
-    if (!req.file) {
+    // Con multer.fields(), los archivos están en req.files
+    const files = req.files || {};
+    const pdfFile = files.pdfFile ? files.pdfFile[0] : null;
+    const fotoFile = files.foto ? files.foto[0] : null;
+    
+    // Verificar que se subió el PDF (obligatorio)
+    if (!pdfFile) {
       return res.status(400).json({
         success: false,
         message: 'No se proporcionó ningún archivo PDF'
       });
     }
     
-    const file = req.file;
-    
     // Validar que sea un PDF
-    if (!validatePDFFile(file.buffer, file.mimetype)) {
+    if (!validatePDFFile(pdfFile.buffer, pdfFile.mimetype)) {
       return res.status(400).json({
         success: false,
         message: 'El archivo debe ser un PDF válido'
       });
     }
     
-    // Sanitizar nombre del archivo
-    const sanitizedFilename = sanitizeFilename(file.originalname);
+    // Validar foto si se proporcionó
+    if (fotoFile) {
+      const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      if (!validImageTypes.includes(fotoFile.mimetype)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Formato de foto inválido. Solo JPG, PNG o WEBP'
+        });
+      }
+      
+      // Verificar tamaño de foto (máximo 5MB)
+      const maxFotoSize = 5 * 1024 * 1024; // 5MB
+      if (fotoFile.size > maxFotoSize) {
+        return res.status(400).json({
+          success: false,
+          message: 'La foto es demasiado grande (máximo 5MB)'
+        });
+      }
+      
+      console.log(`[uploadEscritura] Foto recibida: ${fotoFile.originalname} (${(fotoFile.size / 1024).toFixed(2)} KB)`);
+    }
+    
+    // Sanitizar nombre del archivo PDF
+    const sanitizedFilename = sanitizeFilename(pdfFile.originalname);
     
     // Parsear el PDF
-    const parseResult = await parseEscrituraPDF(file.buffer, sanitizedFilename);
+    const parseResult = await parseEscrituraPDF(pdfFile.buffer, sanitizedFilename);
     
     if (!parseResult.success) {
       return res.status(400).json({
@@ -61,6 +87,31 @@ export async function uploadEscritura(req, res) {
     // Generar token único
     const token = await generateUniqueToken(prisma);
     
+    // Variable para la URL de la foto
+    let fotoURL = null;
+    let fotoUploadWarning = null;
+    
+    // Procesar foto si existe
+    if (fotoFile) {
+      try {
+        console.log(`[uploadEscritura] Subiendo foto al FTP para token ${token}...`);
+        
+        // Nombre del archivo: token + extensión original
+        const fotoExtension = fotoFile.originalname.split('.').pop().toLowerCase();
+        const fotoFilename = `${token}.${fotoExtension}`;
+        
+        // Subir foto al FTP
+        fotoURL = await uploadPhotoToFTP(fotoFile.buffer, fotoFilename);
+        
+        console.log(`[uploadEscritura] ✅ Foto subida exitosamente: ${fotoURL}`);
+      } catch (fotoError) {
+        // Si falla la foto, NO bloquear la creación de la escritura
+        console.error('[uploadEscritura] ❌ Error subiendo foto:', fotoError.message);
+        fotoUploadWarning = `La escritura se creó correctamente, pero no se pudo subir la foto: ${fotoError.message}`;
+        fotoURL = null; // Asegurar que quede null
+      }
+    }
+    
     // Guardar en base de datos
     const escritura = await prisma.escrituraQR.create({
       data: {
@@ -68,6 +119,7 @@ export async function uploadEscritura(req, res) {
         numeroEscritura: parseResult.numeroEscritura,
         datosCompletos: parseResult.datosCompletos,
         archivoOriginal: sanitizedFilename,
+        fotoURL: fotoURL, // Puede ser null si no hay foto o si falló
         estado: parseResult.estado,
         createdBy: userId
       },
@@ -95,20 +147,35 @@ export async function uploadEscritura(req, res) {
       }
     }
     
+    // Construir warnings
+    const allWarnings = [...(parseResult.warnings || [])];
+    if (fotoUploadWarning) {
+      allWarnings.push(fotoUploadWarning);
+    }
+    
+    // Construir mensaje de respuesta
+    let successMessage = 'Escritura procesada exitosamente';
+    if (fotoURL) {
+      successMessage += ' con fotografía';
+    } else if (fotoFile) {
+      successMessage += ' (sin fotografía debido a error en upload)';
+    }
+    
     res.status(201).json({
       success: true,
-      message: 'Escritura procesada exitosamente',
+      message: successMessage,
       data: {
         id: escritura.id,
         token: escritura.token,
         numeroEscritura: escritura.numeroEscritura,
-        datosCompletos: datosCompletosParsed, // ← Enviar parseado para uso inmediato en frontend
+        datosCompletos: datosCompletosParsed,
         estado: escritura.estado,
         archivoOriginal: escritura.archivoOriginal,
+        fotoURL: escritura.fotoURL, // Incluir URL de foto (o null)
         createdAt: escritura.createdAt,
         creador: escritura.creador,
         qr: qrInfo,
-        warnings: parseResult.warnings || []
+        warnings: allWarnings
       }
     });
     
@@ -655,6 +722,9 @@ function extractDatosPublicos(datosNormalizados, escritura) {
         parroquia: datosNormalizados.ubicacion.parroquia || null
       }
     }),
+
+    // Fotografía del menor (si existe)
+    ...(escritura.fotoURL && { fotoURL: escritura.fotoURL }),
 
     // Metadata de verificación
     verificadoEn: new Date().toISOString(),

@@ -1,6 +1,7 @@
 /**
  * Componente PDFUploader
  * Permite subir archivos PDF con drag & drop y validación
+ * También soporta subida de foto opcional para escrituras de menores
  */
 
 import React, { useState, useCallback } from 'react';
@@ -18,7 +19,10 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
-  ListItemSecondaryAction
+  ListItemSecondaryAction,
+  Divider,
+  Card,
+  CardMedia
 } from '@mui/material';
 import {
   CloudUpload as UploadIcon,
@@ -26,7 +30,9 @@ import {
   Delete as DeleteIcon,
   CheckCircle as CheckIcon,
   Error as ErrorIcon,
-  Warning as WarningIcon
+  Warning as WarningIcon,
+  Image as ImageIcon,
+  Close as CloseIcon
 } from '@mui/icons-material';
 import { validatePDFFile, formatFileSize } from '../../services/escrituras-qr-service';
 
@@ -40,6 +46,8 @@ const PDFUploader = ({
 }) => {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [validationResults, setValidationResults] = useState({});
+  const [selectedPhoto, setSelectedPhoto] = useState(null); // Nueva: foto del menor
+  const [photoPreview, setPhotoPreview] = useState(null); // Nueva: preview de foto
 
   /**
    * Maneja la selección de archivos
@@ -129,12 +137,53 @@ const PDFUploader = ({
   };
 
   /**
-   * Maneja el upload
+   * Maneja la selección de foto
+   */
+  const handlePhotoSelect = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    // Validar tipo de archivo
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      alert('Solo se permiten imágenes JPG, PNG o WEBP');
+      return;
+    }
+    
+    // Validar tamaño (máximo 5MB)
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      alert('La imagen es demasiado grande (máximo 5MB)');
+      return;
+    }
+    
+    // Guardar archivo y generar preview
+    setSelectedPhoto(file);
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setPhotoPreview(e.target.result);
+    };
+    reader.readAsDataURL(file);
+  };
+  
+  /**
+   * Elimina la foto seleccionada
+   */
+  const handleRemovePhoto = () => {
+    setSelectedPhoto(null);
+    setPhotoPreview(null);
+  };
+
+  /**
+   * Maneja el upload (PDF + foto opcional)
    */
   const handleUpload = () => {
     const validFiles = selectedFiles.filter(f => f.status === 'valid');
     if (validFiles.length > 0 && onUpload) {
-      onUpload(maxFiles === 1 ? validFiles[0].file : validFiles.map(f => f.file));
+      const pdfFile = maxFiles === 1 ? validFiles[0].file : validFiles.map(f => f.file);
+      // Pasar PDF y foto al callback
+      onUpload(pdfFile, selectedPhoto);
     }
   };
 
@@ -234,12 +283,85 @@ const PDFUploader = ({
         )}
       </Paper>
 
-      {/* Lista de archivos seleccionados */}
+      {/* Sección para subir foto del menor (opcional) */}
+      <Box sx={{ mt: 3 }}>
+        <Divider sx={{ my: 2 }} />
+        
+        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <ImageIcon />
+          Fotografía del Menor (Opcional)
+        </Typography>
+        
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          Si la escritura es una autorización de salida del país, puedes adjuntar una fotografía del menor.
+        </Typography>
+        
+        {!photoPreview ? (
+          <Box>
+            <input
+              accept="image/jpeg,image/jpg,image/png,image/webp"
+              style={{ display: 'none' }}
+              id="foto-input"
+              type="file"
+              onChange={handlePhotoSelect}
+              disabled={disabled || loading}
+            />
+            <label htmlFor="foto-input">
+              <Button
+                variant="outlined"
+                component="span"
+                startIcon={<ImageIcon />}
+                disabled={disabled || loading}
+              >
+                Seleccionar Fotografía
+              </Button>
+            </label>
+            <Typography variant="caption" display="block" sx={{ mt: 1, color: 'text.secondary' }}>
+              Formatos: JPG, PNG, WEBP • Tamaño máximo: 5MB
+            </Typography>
+          </Box>
+        ) : (
+          <Card sx={{ maxWidth: 400, position: 'relative' }}>
+            <IconButton
+              onClick={handleRemovePhoto}
+              disabled={loading}
+              sx={{
+                position: 'absolute',
+                top: 8,
+                right: 8,
+                bgcolor: 'background.paper',
+                '&:hover': { bgcolor: 'error.main', color: 'white' }
+              }}
+              size="small"
+            >
+              <CloseIcon />
+            </IconButton>
+            <CardMedia
+              component="img"
+              image={photoPreview}
+              alt="Vista previa de fotografía"
+              sx={{ maxHeight: 300, objectFit: 'contain', p: 2 }}
+            />
+            <Box sx={{ p: 2, bgcolor: 'action.hover' }}>
+              <Typography variant="body2">
+                {selectedPhoto?.name}
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                {formatFileSize(selectedPhoto?.size || 0)}
+              </Typography>
+            </Box>
+          </Card>
+        )}
+      </Box>
+
+      {/* Lista de archivos PDF seleccionados */}
       {showPreview && selectedFiles.length > 0 && (
         <Box sx={{ mt: 3 }}>
+          <Divider sx={{ my: 2 }} />
+          
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Typography variant="h6">
-              Archivos Seleccionados ({selectedFiles.length})
+              Archivos PDF Seleccionados ({selectedFiles.length})
             </Typography>
             <Button
               size="small"
@@ -363,16 +485,17 @@ const PDFUploader = ({
       <Box sx={{ mt: 2 }}>
         <Alert severity="info" sx={{ mb: 1 }}>
           <Typography variant="body2">
-            <strong>Formatos aceptados:</strong> PDF únicamente
+            <strong>PDF:</strong> Extracto de escritura (obligatorio)
           </Typography>
           <Typography variant="body2">
-            <strong>Tamaño máximo:</strong> 10MB por archivo
+            <strong>Fotografía:</strong> Imagen del menor (opcional, solo para autorizaciones de salida)
           </Typography>
-          {maxFiles > 1 && (
-            <Typography variant="body2">
-              <strong>Archivos máximos:</strong> {maxFiles}
-            </Typography>
-          )}
+          <Typography variant="body2">
+            <strong>Tamaño máximo PDF:</strong> 10MB
+          </Typography>
+          <Typography variant="body2">
+            <strong>Tamaño máximo foto:</strong> 5MB
+          </Typography>
         </Alert>
       </Box>
     </Box>
