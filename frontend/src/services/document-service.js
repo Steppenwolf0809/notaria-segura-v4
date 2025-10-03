@@ -109,6 +109,12 @@ const documentService = {
                           'Error al subir archivos XML en lote';
       
       return {
+        success: false,
+        error: errorMessage
+      };
+    }
+  },
+
   /**
    * Unificado: listado de documentos (Activos/Entregados) con búsqueda/paginación
    */
@@ -144,11 +150,6 @@ const documentService = {
         return { success: false, error: 'Sesión expirada. Inicia sesión nuevamente.' };
       }
       return { success: false, error: message };
-    }
-  },
-        success: false,
-        error: errorMessage
-      };
     }
   },
 
