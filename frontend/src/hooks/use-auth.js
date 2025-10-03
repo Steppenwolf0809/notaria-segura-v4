@@ -156,6 +156,7 @@ const useAuth = () => {
       const response = await authService.refreshToken(token);
       
       if (response.success) {
+        // setAuth ya sincroniza el token en localStorage
         setAuth(user, response.data.token);
         return true;
       } else {

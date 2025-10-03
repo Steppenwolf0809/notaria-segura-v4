@@ -37,27 +37,44 @@ const apiClient = axios.create({
 // Interceptor de request: agrega Authorization si hay token
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers = config.headers || {};
-      config.headers.Authorization = `Bearer ${token}`;
-    } else {
-      // Fallback para proyectos previos (persist de Zustand)
-      const raw = localStorage.getItem('notaria-auth-storage');
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw);
-          const t = parsed?.state?.token;
-          if (t) {
-            config.headers = config.headers || {};
-            config.headers.Authorization = `Bearer ${t}`;
-          }
-        } catch {}
-      }
+    // PRIORIDAD 1: Token en Zustand (siempre más actual después del login)
+    let tokenToUse = null;
+    const raw = localStorage.getItem('notaria-auth-storage');
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        tokenToUse = parsed?.state?.token;
+      } catch {}
     }
+    
+    // PRIORIDAD 2: Fallback a localStorage directo (por compatibilidad)
+    if (!tokenToUse) {
+      tokenToUse = localStorage.getItem('token');
+    }
+    
+    // SINCRONIZACIÓN: Si encontramos token en Zustand, sincronizar en localStorage
+    if (tokenToUse && raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        const zustandToken = parsed?.state?.token;
+        const localToken = localStorage.getItem('token');
+        
+        // Si los tokens no coinciden, actualizar localStorage con el de Zustand
+        if (zustandToken && zustandToken !== localToken) {
+          localStorage.setItem('token', zustandToken);
+        }
+      } catch {}
+    }
+    
+    // Agregar token a headers si existe
+    if (tokenToUse) {
+      config.headers = config.headers || {};
+      config.headers.Authorization = `Bearer ${tokenToUse}`;
+    }
+    
     // Log no intrusivo
     // eslint-disable-next-line no-console
-    console.debug('[HTTP][REQ]', { url: config.url, hasAuth: !!(config.headers?.Authorization) });
+    console.debug('[HTTP][REQ]', { url: config.url, hasAuth: !!tokenToUse });
     return config;
   },
   (error) => Promise.reject(error)
