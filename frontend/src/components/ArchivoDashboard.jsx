@@ -266,7 +266,7 @@ const ArchivoDashboard = ({ data, loading, onDataUpdate }) => {
                 {/* Sin documentos activos */}
                 {(estadisticas.pendientes + estadisticas.enProceso + estadisticas.listos) === 0 && (
                   <Box sx={{ textAlign: 'center', py: 3 }}>
-                    <CheckCircle sx={{ fontSize: 48, color: 'success.main', mb: 2 }} />
+                    <ReadyIcon sx={{ fontSize: 48, color: 'success.main', mb: 2 }} />
                     <Typography variant="body1" color="text.secondary">
                       ¡Excelente! No hay documentos pendientes
                     </Typography>
