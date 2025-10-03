@@ -1014,6 +1014,46 @@ const documentService = {
   },
 
   /**
+   * 💳 NUEVA FUNCIONALIDAD: Marcar documento como Nota de Crédito
+   * @param {string} documentId - ID del documento
+   * @param {string} motivo - Motivo de la anulación (mínimo 10 caracteres)
+   * @returns {Promise<Object>} Resultado de la operación
+   */
+  async markAsNotaCredito(documentId, motivo) {
+    try {
+      console.log('💳 SERVICE: markAsNotaCredito iniciado:', {
+        documentId,
+        motivo,
+        url: `/documents/${documentId}/nota-credito`
+      });
+      
+      const response = await api.put(`/documents/${documentId}/nota-credito`, {
+        motivo
+      });
+      
+      console.log('✅ Documento marcado como Nota de Crédito:', response.data);
+      
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message || 'Documento marcado como Nota de Crédito exitosamente'
+      };
+    } catch (error) {
+      console.error('❌ Error marcando documento como Nota de Crédito:', error);
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Error al marcar documento como Nota de Crédito';
+      
+      return {
+        success: false,
+        error: errorMessage,
+        message: errorMessage
+      };
+    }
+  },
+
+  /**
    * Marcar documento como entregado inmediatamente (para política de entrega inmediata)
    * @param {string} documentId - ID del documento
    * @param {Object} deliveryData - Datos mínimos de entrega

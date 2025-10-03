@@ -39,7 +39,9 @@ import {
   updateGroupNotificationPolicy,
   // 🎯 NUEVA FUNCIONALIDAD: UI Activos/Entregados
   getDocumentsUnified,
-  getDocumentsCounts
+  getDocumentsCounts,
+  // 💳 NUEVA FUNCIONALIDAD: Nota de Crédito
+  markAsNotaCredito
 } from '../controllers/document-controller.js';
 
 // 🔄 NUEVAS IMPORTACIONES: Operaciones masivas
@@ -98,11 +100,17 @@ router.post('/upload-xml-batch', authenticateToken, uploadBatch.array('xmlFiles'
 // GET /api/documents/all - CAJA/ADMIN: Ver todos los documentos
 router.get('/all', authenticateToken, getAllDocuments);
 
-// PUT /api/documents/:id/assign - CAJA: Asignar documento a matrizador
-router.put('/:id/assign', authenticateToken, assignDocument);
+// 📊 GET /api/documents/counts - Conteos para badges (DEBE IR ANTES QUE /:id)
+router.get('/counts', authenticateToken, getDocumentsCounts);
 
 // GET /api/documents/my-documents - MATRIZADOR: Documentos del usuario
 router.get('/my-documents', authenticateToken, getMyDocuments);
+
+// 💳 PUT /api/documents/:id/nota-credito - CAJA: Marcar como Nota de Crédito (ANTES DE /:id/assign)
+router.put('/:id/nota-credito', authenticateToken, markAsNotaCredito);
+
+// PUT /api/documents/:id/assign - CAJA: Asignar documento a matrizador
+router.put('/:id/assign', authenticateToken, assignDocument);
 
 // 🔗 PUT /api/documents/group/status - Actualizar estado de grupo de documentos (DEBE IR ANTES QUE /:id/status)
 router.put('/group/status', authenticateToken, updateDocumentGroupStatus);
@@ -198,9 +206,6 @@ router.post('/:id/apply-extraction', authenticateToken, async (req, res, next) =
 // 🎯 NUEVAS RUTAS: UI Activos/Entregados con búsqueda global
 // GET /api/documents - Endpoint principal para UI unificada con pestañas
 router.get('/', authenticateToken, getDocumentsUnified);
-
-// GET /api/documents/counts - Endpoint para actualizar badges de pestañas
-router.get('/counts', authenticateToken, getDocumentsCounts);
 
 /**
  * Middleware de manejo de errores para multer
