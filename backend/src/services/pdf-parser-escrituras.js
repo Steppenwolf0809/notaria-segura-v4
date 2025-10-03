@@ -99,6 +99,71 @@ const PATTERNS = {
 };
 
 /**
+ * Limpia y valida el valor extraído de cuantía
+ * @param {string|null} cuantiaRaw - Valor crudo de cuantía
+ * @returns {string|null} Cuantía limpia o null si no es válida
+ */
+function cleanCuantia(cuantiaRaw) {
+  if (!cuantiaRaw) return null;
+  
+  const cuantiaStr = String(cuantiaRaw).trim().toUpperCase();
+  
+  // Si solo contiene palabras clave sin valor numérico, retornar null
+  const palabrasClave = ['CUANTIA', 'CUANTÍA', 'DEL ACTO', 'VALOR', 'O.', 'O', 'CONTRATO'];
+  const soloClaves = palabrasClave.some(palabra => cuantiaStr.includes(palabra)) 
+                     && !/\d/.test(cuantiaStr); // No contiene dígitos
+  
+  if (soloClaves) {
+    return null;
+  }
+  
+  // Si es muy corto (menos de 2 caracteres) o solo tiene letras sin sentido
+  if (cuantiaStr.length < 2) {
+    return null;
+  }
+  
+  // Si ya dice "INDETERMINADA" o variantes, retornar null para usar el default
+  if (cuantiaStr.includes('INDETERMINAD') || cuantiaStr === 'N/A' || cuantiaStr === 'S/N') {
+    return null;
+  }
+  
+  return cuantiaStr;
+}
+
+/**
+ * Limpia el texto de observaciones removiendo encabezados no deseados
+ * @param {string|null} obsRaw - Texto crudo de observaciones
+ * @returns {string|null} Observaciones limpias o null
+ */
+function cleanObservaciones(obsRaw) {
+  if (!obsRaw) return null;
+  
+  let texto = String(obsRaw).trim();
+  
+  // Remover encabezados de otras secciones que pueden haberse colado
+  const encabezadosBasura = [
+    /^CUANTÍA\s*(?:DEL\s*)?(?:ACTO\s*)?(?:O\s*)?(?:CONTRATO\s*)?:?\s*/i,
+    /^CUANTIA\s*(?:DEL\s*)?(?:ACTO\s*)?(?:O\s*)?(?:CONTRATO\s*)?:?\s*/i,
+    /^VALOR\s*:?\s*/i,
+    /^UBICACIÓN\s*:?\s*/i,
+    /^UBICACION\s*:?\s*/i,
+  ];
+  
+  for (const patron of encabezadosBasura) {
+    texto = texto.replace(patron, '');
+  }
+  
+  texto = texto.trim();
+  
+  // Si después de limpiar queda muy poco texto o vacío, retornar null
+  if (texto.length < 5) {
+    return null;
+  }
+  
+  return texto;
+}
+
+/**
  * Extrae el número de escritura del texto
  * @param {string} text - Texto del PDF
  * @returns {string|null} Número de escritura encontrado
@@ -488,15 +553,28 @@ export async function parseEscrituraPDF(pdfBuffer, filename) {
     const fecha = extractWithPatterns(text, PATTERNS.fecha);
     const notario = extractWithPatterns(text, PATTERNS.notario);
     const notaria = extractWithPatterns(text, PATTERNS.notaria);
-    const cuantia = extractWithPatterns(text, PATTERNS.cuantia);
+    
+    // Extraer y limpiar cuantía
+    const cuantiaRaw = extractWithPatterns(text, PATTERNS.cuantia);
+    const cuantia = cleanCuantia(cuantiaRaw);
+    
     if (DEBUG) {
-      console.info('[PDF-PARSER] acto:', !!acto, 'fecha:', !!fecha, 'notario:', !!notario, 'notaria:', !!notaria, 'cuantia:', !!cuantia);
+      console.info('[PDF-PARSER] acto:', !!acto, 'fecha:', !!fecha, 'notario:', !!notario, 'notaria:', !!notaria, 'cuantiaRaw:', cuantiaRaw, 'cuantiaLimpia:', cuantia);
     }
+    
     // Extraer bloque de OBJETO/OBSERVACIONES (preferir sección explícita si existe)
-    const objetoObs = extractWithPatterns(text, PATTERNS.objetoObservaciones)
+    const objetoObsRaw = extractWithPatterns(text, PATTERNS.objetoObservaciones)
       || (extractSectionText(text, /(OBJETO\s*(?:\/|\s*[OY]\s+|\s*[–-]\s*)\s*OBSERVACIONES|OBSERVACIONES|OBJETO)\s*:?/i) || '')
           .replace(/^.*?\b(OBJETO|OBSERVACIONES)\b\s*:?[ \t]*/i, '')
           .trim() || null;
+    
+    // Limpiar observaciones
+    const objetoObs = cleanObservaciones(objetoObsRaw);
+    
+    if (DEBUG) {
+      console.info('[PDF-PARSER] objetoObsRaw:', objetoObsRaw?.substring(0, 100), 'objetoObsLimpio:', objetoObs?.substring(0, 100));
+    }
+    
     const ubicacion = extractUbicacion(text);
 
     // OTORGANTES: Se dejan en blanco por defecto para ingreso manual
