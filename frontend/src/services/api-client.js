@@ -80,12 +80,12 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Interceptor de respuesta: maneja 401/403
+// Interceptor de respuesta: maneja 401 y trata 403 sin forzar logout
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
     const status = error?.response?.status;
-    if (status === 401 || status === 403) {
+    if (status === 401) {
       // Flujo opcional de refresh (comentado por defecto):
       // const refreshToken = localStorage.getItem('refreshToken');
       // if (refreshToken && !isRefreshing) {
@@ -109,6 +109,11 @@ apiClient.interceptors.response.use(
       //   }
       // }
       handleUnauthorized();
+    }
+    // Para 403 (forbidden), no forzar logout. Dejar que la UI maneje permisos.
+    if (status === 403) {
+      // eslint-disable-next-line no-console
+      console.warn('[AUTH]', '403 detectado → sin logout (permiso insuficiente)');
     }
     return Promise.reject(error);
   }
