@@ -45,10 +45,11 @@ const passwordChangeRateLimit = rateLimit({
 /**
  * Rate limiter para intentos de login
  * Límite por combinación email+IP para entornos de oficina
+ * Configurable via variables de entorno para pruebas
  */
 const loginRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 10, // Máximo 10 intentos por combinación email+IP
+  windowMs: parseInt(process.env.LOGIN_RATE_LIMIT_WINDOW || '900000'), // Default: 15 minutos (15 * 60 * 1000)
+  max: parseInt(process.env.LOGIN_RATE_LIMIT_MAX || '50'), // Default: 50 intentos (aumentado para pruebas)
   message: {
     success: false,
     message: 'Demasiados intentos de inicio de sesión para esta cuenta. Intente nuevamente en 15 minutos.',
@@ -92,10 +93,11 @@ const loginRateLimit = rateLimit({
 /**
  * Rate limiter general para rutas de autenticación
  * Límite general para todas las operaciones de auth
+ * Configurable via variables de entorno para pruebas
  */
 const authGeneralRateLimit = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 20, // Máximo 20 requests por IP por ventana
+  windowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW || '900000'), // Default: 15 minutos
+  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '100'), // Default: 100 requests (aumentado para pruebas)
   message: {
     success: false,
     message: 'Demasiadas peticiones a servicios de autenticación. Intente nuevamente más tarde.',
