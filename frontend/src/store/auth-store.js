@@ -21,6 +21,13 @@ const useAuthStore = create(
        * @param {string} userToken - Token JWT
        */
       setAuth: (userData, userToken) => {
+        // Sincronizar token en localStorage directo para api-client.js
+        try {
+          localStorage.setItem('token', userToken);
+        } catch (error) {
+          console.error('Error guardando token en localStorage:', error);
+        }
+        
         set({
           user: userData,
           token: userToken,
@@ -34,6 +41,15 @@ const useAuthStore = create(
        * Función para limpiar el estado de autenticación
        */
       clearAuth: () => {
+        // Limpiar todos los tokens en localStorage
+        try {
+          localStorage.removeItem('token');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('notaria-auth-storage');
+        } catch (error) {
+          console.error('Error limpiando tokens de localStorage:', error);
+        }
+        
         set({
           user: null,
           token: null,
