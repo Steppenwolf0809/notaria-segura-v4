@@ -36,13 +36,15 @@ import {
   Assignment as AssignmentIcon,
   Person as PersonIcon,
   Search as SearchIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  CreditCard as CreditCardIcon
 } from '@mui/icons-material';
 import { useDropzone } from 'react-dropzone';
 import useDocumentStore from '../store/document-store';
 import useDebounce from '../hooks/useDebounce';
 import { toast } from 'react-toastify';
 import BatchUpload from './BatchUpload';
+import documentService from '../services/document-service';
 
 /**
  * Dashboard donde CAJA sube XMLs, crea documentos y asigna matrizadores
@@ -71,6 +73,11 @@ const CajaDashboard = () => {
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [selectedMatrizador, setSelectedMatrizador] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  
+  // Estados para Nota de Crédito
+  const [notaCreditoDialogOpen, setNotaCreditoDialogOpen] = useState(false);
+  const [notaCreditoMotivo, setNotaCreditoMotivo] = useState('');
+  const [notaCreditoDocument, setNotaCreditoDocument] = useState(null);
 
   // DEBOUNCING: Solo buscar después de que el usuario pause por 400ms
   const debouncedSearchTerm = useDebounce(inputValue, 400);
@@ -207,9 +214,54 @@ const CajaDashboard = () => {
       PENDIENTE: 'warning',
       EN_PROCESO: 'info',
       LISTO: 'success',
-      ENTREGADO: 'default'
+      ENTREGADO: 'default',
+      ANULADO_NOTA_CREDITO: 'error'
     };
     return colors[status] || 'default';
+  };
+
+  /**
+   * 💳 Abrir diálogo de Nota de Crédito
+   */
+  const handleOpenNotaCreditoDialog = (document) => {
+    setNotaCreditoDocument(document);
+    setNotaCreditoMotivo('');
+    setNotaCreditoDialogOpen(true);
+  };
+
+  /**
+   * 💳 Cerrar diálogo de Nota de Crédito
+   */
+  const handleCloseNotaCreditoDialog = () => {
+    setNotaCreditoDialogOpen(false);
+    setNotaCreditoDocument(null);
+    setNotaCreditoMotivo('');
+  };
+
+  /**
+   * 💳 Marcar documento como Nota de Crédito
+   */
+  const handleMarkNotaCredito = async () => {
+    if (!notaCreditoDocument || !notaCreditoMotivo || notaCreditoMotivo.trim().length < 10) {
+      toast.error('El motivo debe tener al menos 10 caracteres');
+      return;
+    }
+
+    try {
+      const result = await documentService.markAsNotaCredito(notaCreditoDocument.id, notaCreditoMotivo);
+      
+      if (result.success) {
+        toast.success('Documento marcado como Nota de Crédito exitosamente');
+        handleCloseNotaCreditoDialog();
+        // Recargar documentos
+        await fetchAllDocuments(page + 1, rowsPerPage);
+      } else {
+        toast.error(result.error || 'Error al marcar documento como Nota de Crédito');
+      }
+    } catch (error) {
+      console.error('Error in handleMarkNotaCredito:', error);
+      toast.error('Error inesperado al marcar documento como Nota de Crédito');
+    }
   };
 
   /**
@@ -438,12 +490,33 @@ const CajaDashboard = () => {
               </TableHead>
               <TableBody>
                 {filteredDocuments.map((document) => (
-                  <TableRow key={document.id} hover>
+                  <TableRow 
+                    key={document.id} 
+                    hover
+                    sx={{
+                      // Fila atenuada para documentos anulados
+                      opacity: document.status === 'ANULADO_NOTA_CREDITO' ? 0.6 : 1,
+                      bgcolor: document.status === 'ANULADO_NOTA_CREDITO' ? 'error.50' : 'inherit'
+                    }}
+                  >
                     <TableCell>
                       <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                          {document.clientName}
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Typography variant="body2" sx={{ 
+                            fontWeight: 'bold',
+                            textDecoration: document.status === 'ANULADO_NOTA_CREDITO' ? 'line-through' : 'none'
+                          }}>
+                            {document.clientName}
+                          </Typography>
+                          {document.status === 'ANULADO_NOTA_CREDITO' && (
+                            <Chip
+                              label="NOTA DE CRÉDITO"
+                              size="small"
+                              color="error"
+                              sx={{ fontWeight: 'bold' }}
+                            />
+                          )}
+                        </Box>
                         {document.clientPhone && (
                           <Typography variant="caption" color="text.secondary">
                             📱 {document.clientPhone}
@@ -452,7 +525,10 @@ const CajaDashboard = () => {
                       </Box>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                      <Typography variant="body2" sx={{ 
+                        fontFamily: 'monospace',
+                        textDecoration: document.status === 'ANULADO_NOTA_CREDITO' ? 'line-through' : 'none'
+                      }}>
                         {document.protocolNumber}
                       </Typography>
                     </TableCell>
@@ -495,20 +571,33 @@ const CajaDashboard = () => {
                       )}
                     </TableCell>
                     <TableCell>
-                      {!document.assignedTo && (
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          onClick={() => handleOpenAssignDialog(document)}
-                          startIcon={<AssignmentIcon />}
-                          sx={{ 
-                            color: 'primary.main', 
-                            borderColor: 'primary.main' 
-                          }}
-                        >
-                          Asignar
-                        </Button>
-                      )}
+                      <Box sx={{ display: 'flex', gap: 1, flexDirection: 'column' }}>
+                        {!document.assignedTo && (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={() => handleOpenAssignDialog(document)}
+                            startIcon={<AssignmentIcon />}
+                            sx={{ 
+                              color: 'primary.main', 
+                              borderColor: 'primary.main' 
+                            }}
+                          >
+                            Asignar
+                          </Button>
+                        )}
+                        {document.status !== 'ANULADO_NOTA_CREDITO' && document.status !== 'ENTREGADO' && (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            onClick={() => handleOpenNotaCreditoDialog(document)}
+                            startIcon={<CreditCardIcon />}
+                          >
+                            Nota Crédito
+                          </Button>
+                        )}
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -539,6 +628,66 @@ const CajaDashboard = () => {
           </Box>
         </CardContent>
       </Card>
+
+      {/* Diálogo de Nota de Crédito */}
+      <Dialog open={notaCreditoDialogOpen} onClose={handleCloseNotaCreditoDialog} maxWidth="sm" fullWidth>
+        <DialogTitle sx={{ bgcolor: 'error.main', color: 'white' }}>
+          💳 Marcar como Nota de Crédito
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          {notaCreditoDocument && (
+            <Box sx={{ mb: 3 }}>
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                  ⚠️ ADVERTENCIA: Esta acción marcará el documento como anulado
+                </Typography>
+                <Typography variant="caption">
+                  El documento NO aparecerá en estadísticas de entrega ni en pendientes
+                </Typography>
+              </Alert>
+              
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Documento a anular:
+              </Typography>
+              <Typography variant="h6">
+                {notaCreditoDocument.clientName}
+              </Typography>
+              <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                {notaCreditoDocument.protocolNumber}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {notaCreditoDocument.actoPrincipalDescripcion}
+              </Typography>
+            </Box>
+          )}
+          
+          <TextField
+            fullWidth
+            multiline
+            rows={4}
+            label="Motivo de la Nota de Crédito *"
+            placeholder="Explique por qué se está anulando este documento (mínimo 10 caracteres)..."
+            value={notaCreditoMotivo}
+            onChange={(e) => setNotaCreditoMotivo(e.target.value)}
+            helperText={`${notaCreditoMotivo.length} / 10 caracteres mínimos`}
+            error={notaCreditoMotivo.length > 0 && notaCreditoMotivo.length < 10}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseNotaCreditoDialog}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleMarkNotaCredito}
+            variant="contained"
+            color="error"
+            disabled={!notaCreditoMotivo || notaCreditoMotivo.trim().length < 10}
+            startIcon={<CreditCardIcon />}
+          >
+            Confirmar Nota de Crédito
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Diálogo de asignación */}
       <Dialog open={assignDialogOpen} onClose={handleCloseAssignDialog} maxWidth="sm" fullWidth>

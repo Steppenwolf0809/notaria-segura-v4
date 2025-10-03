@@ -383,6 +383,10 @@ async function getAllDocuments(req, res) {
 
     const [documents, total] = await Promise.all([
       prisma.document.findMany({
+        where: {
+          // 🔥 NOTA DE CRÉDITO: Por defecto CAJA ve todos incluyendo NC
+          // Si quiere solo activos, puede usar filtros en frontend
+        },
         include: {
           createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
           assignedTo: { select: { id: true, firstName: true, lastName: true, email: true } }
@@ -391,7 +395,9 @@ async function getAllDocuments(req, res) {
         skip,
         take: limit
       }),
-      prisma.document.count()
+      prisma.document.count({
+        // CAJA ve el total incluyendo Notas de Crédito
+      })
     ]);
 
     const payload = {
@@ -4186,7 +4192,11 @@ async function getDocumentsUnified(req, res) {
 
     // Construir where clause
     const whereClause = {
-      status: { in: statusFilter }
+      status: { in: statusFilter },
+      // 🔥 EXCLUIR Notas de Crédito de vista unificada
+      NOT: {
+        status: 'ANULADO_NOTA_CREDITO'
+      }
     };
 
     // Agregar filtro por clientId si se proporciona
@@ -4270,8 +4280,129 @@ async function getDocumentsUnified(req, res) {
 }
 
 /**
+ * 💳 NUEVA FUNCIONALIDAD: Marcar documento como Nota de Crédito
+ * Permite a CAJA anular documentos sin impactar estadísticas de entrega
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+async function markAsNotaCredito(req, res) {
+  try {
+    const { id } = req.params;
+    const { motivo } = req.body;
+
+    console.log('💳 markAsNotaCredito iniciado:', {
+      documentId: id,
+      motivo,
+      user: `${req.user.firstName} ${req.user.lastName} (${req.user.role})`
+    });
+
+    // Validar que el usuario tiene permiso (CAJA o ADMIN)
+    if (req.user.role !== 'CAJA' && req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo CAJA y ADMIN pueden marcar documentos como Nota de Crédito'
+      });
+    }
+
+    // Validar que se proporcione un motivo
+    if (!motivo || motivo.trim().length < 10) {
+      return res.status(400).json({
+        success: false,
+        message: 'El motivo es obligatorio y debe tener al menos 10 caracteres'
+      });
+    }
+
+    // Buscar documento
+    const document = await prisma.document.findUnique({
+      where: { id },
+      include: {
+        assignedTo: true,
+        createdBy: true
+      }
+    });
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Documento no encontrado'
+      });
+    }
+
+    // Verificar que no esté ya anulado
+    if (document.status === 'ANULADO_NOTA_CREDITO') {
+      return res.status(400).json({
+        success: false,
+        message: 'Este documento ya está marcado como Nota de Crédito'
+      });
+    }
+
+    // Verificar que no esté entregado
+    if (document.status === 'ENTREGADO') {
+      return res.status(400).json({
+        success: false,
+        message: 'No se puede marcar como Nota de Crédito un documento ya entregado. Use reversión de estado primero.'
+      });
+    }
+
+    // Actualizar documento a ANULADO_NOTA_CREDITO
+    const updatedDocument = await prisma.document.update({
+      where: { id },
+      data: {
+        status: 'ANULADO_NOTA_CREDITO',
+        notaCreditoMotivo: motivo.trim(),
+        notaCreditoEstadoPrevio: document.status,
+        notaCreditoFecha: new Date()
+      },
+      include: {
+        assignedTo: true,
+        createdBy: true
+      }
+    });
+
+    // Registrar evento en auditoría
+    await prisma.documentEvent.create({
+      data: {
+        documentId: id,
+        userId: req.user.id,
+        eventType: 'STATUS_CHANGED',
+        description: `Documento marcado como NOTA DE CRÉDITO por ${req.user.firstName} ${req.user.lastName}`,
+        details: JSON.stringify({
+          estadoAnterior: document.status,
+          estadoNuevo: 'ANULADO_NOTA_CREDITO',
+          motivo: motivo.trim(),
+          timestamp: new Date().toISOString()
+        })
+      }
+    });
+
+    console.log('✅ Documento marcado como Nota de Crédito exitosamente:', {
+      documentId: id,
+      protocolNumber: document.protocolNumber,
+      estadoAnterior: document.status
+    });
+
+    res.json({
+      success: true,
+      message: 'Documento marcado como Nota de Crédito exitosamente',
+      data: {
+        document: updatedDocument
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error en markAsNotaCredito:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor al marcar documento como Nota de Crédito',
+      error: error.message
+    });
+  }
+}
+
+/**
  * 🎯 NUEVA FUNCIONALIDAD: Obtener conteos para badges de pestañas
  * Endpoint optimizado para actualizar badges en tiempo real
+ * EXCLUYE documentos con Nota de Crédito de las estadísticas
  * @param {Object} req - Request object
  * @param {Object} res - Response object
  */
@@ -4280,7 +4411,11 @@ async function getDocumentsCounts(req, res) {
     const { query, clientId } = req.query;
 
     // Construir filtros base
-    const baseWhere = {};
+    const baseWhere = {
+      // 🔥 IMPORTANTE: Excluir Notas de Crédito de todos los conteos
+      status: { not: 'ANULADO_NOTA_CREDITO' }
+    };
+    
     if (clientId) {
       baseWhere.clientId = clientId;
     }
@@ -4380,5 +4515,7 @@ export {
   applyExtractionSuggestions,
   // 🎯 NUEVA FUNCIONALIDAD: UI Activos/Entregados
   getDocumentsUnified,
-  getDocumentsCounts
+  getDocumentsCounts,
+  // 💳 NUEVA FUNCIONALIDAD: Nota de Crédito
+  markAsNotaCredito
 };

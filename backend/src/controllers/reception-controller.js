@@ -25,18 +25,22 @@ async function supportsUnaccentFn() {
 async function getDashboardStats(req, res) {
   try {
     // 🔄 CONSERVADOR: Estadísticas básicas para dashboard de recepción
+    // 🔥 EXCLUYE Notas de Crédito de todas las estadísticas
+    const baseFilter = { NOT: { status: 'ANULADO_NOTA_CREDITO' } };
+    
     const stats = await Promise.all([
-      // Total de documentos
-      prisma.document.count(),
+      // Total de documentos (sin NC)
+      prisma.document.count({ where: baseFilter }),
       // Documentos en proceso
       prisma.document.count({ where: { status: 'EN_PROCESO' } }),
       // Documentos listos para entrega
       prisma.document.count({ where: { status: 'LISTO' } }),
       // Documentos entregados
       prisma.document.count({ where: { status: 'ENTREGADO' } }),
-      // Documentos creados hoy
+      // Documentos creados hoy (sin NC)
       prisma.document.count({
         where: {
+          ...baseFilter,
           createdAt: {
             gte: new Date(new Date().setHours(0, 0, 0, 0))
           }
@@ -1138,7 +1142,11 @@ async function getReceptionsUnified(req, res) {
     const statusFilter = tab === 'ENTREGADOS' ? ['ENTREGADO'] : ['EN_PROCESO', 'LISTO'];
 
     // Construir where
-    const whereClause = { status: { in: statusFilter } };
+    const whereClause = { 
+      status: { in: statusFilter },
+      // 🔥 EXCLUIR Notas de Crédito
+      NOT: { status: 'ANULADO_NOTA_CREDITO' }
+    };
     if (clientId) whereClause.clientId = clientId;
     if (query && query.trim()) {
       const searchTerm = query.trim();
@@ -1278,7 +1286,10 @@ async function getReceptionsCounts(req, res) {
     const { query, clientId } = req.query;
 
     // Filtro base
-    const baseWhere = {};
+    const baseWhere = {
+      // 🔥 EXCLUIR Notas de Crédito
+      NOT: { status: 'ANULADO_NOTA_CREDITO' }
+    };
     if (clientId) baseWhere.clientId = clientId;
     if (query && query.trim()) {
       const searchTerm = query.trim();
