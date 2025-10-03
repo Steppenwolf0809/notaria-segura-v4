@@ -22,6 +22,7 @@ import {
 import useAuth from '../hooks/use-auth';
 import ThemeToggle from './ThemeToggle';
 import CajaDashboard from './CajaDashboard';
+import CajaCenter from './CajaCenter';
 import DocumentCenter from './DocumentCenter';
 import MatrizadorCenter from './MatrizadorCenter';
 import RecepcionCenter from './RecepcionCenter';
@@ -119,11 +120,9 @@ const Dashboard = () => {
 
   // Mostrar dashboard específico según rol
   if (user.role === 'CAJA') {
-    const uiV2 = readFlag('VITE_UI_ACTIVOS_ENTREGADOS', true);
-    console.info('[UI-GATE]', { role: user?.role, uiV2 });
     return (
       <CajaLayout>
-        {uiV2 ? <DocumentCenter /> : <CajaDashboard />}
+        <CajaCenter />
         <ChangePassword
           open={showChangePassword}
           onClose={() => setShowChangePassword(false)}

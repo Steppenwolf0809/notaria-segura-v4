@@ -4,8 +4,7 @@
 export const navItemsByRole = {
   CAJA: [
     { id: 'dashboard', label: 'Dashboard', view: 'dashboard', icon: 'Dashboard' },
-    { id: 'documentos', label: 'Documentos', view: 'documents', icon: 'Assignment' },
-    { id: 'cargas', label: 'Subir XML', view: 'uploads', icon: 'CloudUpload' }
+    { id: 'subir-xml', label: 'Subir XML', view: 'uploads', icon: 'CloudUpload' }
   ],
   RECEPCION: [
     { id: 'dashboard', label: 'Dashboard', view: 'dashboard', icon: 'Dashboard' },
