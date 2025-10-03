@@ -820,8 +820,8 @@ export async function createEscrituraManual(req, res) {
       acto: acto || '',
       fecha_otorgamiento: fecha_otorgamiento || '',
       cuantia: cuantia || 'INDETERMINADA',
-      notario: notario || '',
-      notaria: notaria || '',
+      notario: notario || 'GLENDA ELIZABETH ZAPATA SILVA',
+      notaria: notaria || 'DÉCIMA OCTAVA DEL CANTÓN QUITO',
       ubicacion: ubicacion || {},
       otorgantes: otorgantes || { otorgado_por: [], a_favor_de: [] },
       objeto_observaciones: objeto_observaciones || ''

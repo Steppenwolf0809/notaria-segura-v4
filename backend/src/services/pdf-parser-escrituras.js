@@ -499,16 +499,17 @@ export async function parseEscrituraPDF(pdfBuffer, filename) {
           .trim() || null;
     const ubicacion = extractUbicacion(text);
 
-    // Extraer otorgantes y beneficiarios (separando secciones)
-    const otorgadoPorPersons = extractNamesForLabeledSection(text, /OTORGADO\s+POR/i);
-    const aFavorDePersons = extractNamesForLabeledSection(text, /(OTORGADO\s+A\s+FAVOR|A\s+FAVOR\s+DE|BENEFICIARIO)/i);
-    if (DEBUG) {
-      console.info('[PDF-PARSER] otorgadoPorPersons:', otorgadoPorPersons.length, 'aFavorDePersons:', aFavorDePersons.length);
-    }
-
+    // OTORGANTES: Se dejan en blanco por defecto para ingreso manual
+    // La extracción automática de nombres genera muchos errores y requiere limpieza
+    // Es más confiable que el matrizador los agregue manualmente si es necesario
+    
+    // ⚠️ Código de extracción deshabilitado (descomentar solo si se necesita en el futuro):
+    // const otorgadoPorPersons = extractNamesForLabeledSection(text, /OTORGADO\s+POR/i);
+    // const aFavorDePersons = extractNamesForLabeledSection(text, /(OTORGADO\s+A\s+FAVOR|A\s+FAVOR\s+DE|BENEFICIARIO)/i);
+    
     const otorgantes = {
-      otorgado_por: otorgadoPorPersons,
-      a_favor_de: aFavorDePersons
+      otorgado_por: [],
+      a_favor_de: []
     };
 
     // Extraer pares etiqueta:valor genéricos
@@ -519,7 +520,7 @@ export async function parseEscrituraPDF(pdfBuffer, filename) {
       escritura: numeroEscritura,
       acto: acto,
       fecha_otorgamiento: fecha,
-      notario: notario,
+      notario: notario || 'GLENDA ELIZABETH ZAPATA SILVA',
       notaria: notaria || 'DÉCIMA OCTAVA DEL CANTÓN QUITO',
       otorgantes: otorgantes,
       ubicacion: ubicacion || {
