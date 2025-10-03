@@ -297,6 +297,7 @@ model EscrituraQR {
   datosCompletos          String?  // JSON con todos los datos extraídos del PDF
   archivoOriginal         String?  // Nombre del archivo PDF original
   extractoTextoCompleto   String?  @db.Text // Texto completo del extracto (opcional, para consulta)
+  fotoURL                 String?  // URL pública de la foto del menor (opcional)
   origenDatos             String   @default("PDF") // "PDF" | "MANUAL" - cómo se ingresó
   estado                  String   @default("activo") // "activo", "revision_requerida", "inactivo"
   activo                  Boolean  @default(true) // Flag de activación/desactivación

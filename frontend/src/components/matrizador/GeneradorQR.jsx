@@ -122,16 +122,24 @@ const GeneradorQR = () => {
   }, [page, rowsPerPage, searchTerm, estadoFilter]);
 
   /**
-   * Maneja el upload de PDF
+   * Maneja el upload de PDF y foto opcional
    */
-  const handleUpload = async (file) => {
+  const handleUpload = async (pdfFile, photoFile = null) => {
     setUploadLoading(true);
 
     try {
-      const response = await uploadEscritura(file);
+      const response = await uploadEscritura(pdfFile, photoFile);
       
       if (response.success) {
-        toast.success('PDF procesado exitosamente');
+        // Mensaje personalizado si hay foto
+        if (response.data.fotoURL) {
+          toast.success('PDF y fotografía procesados exitosamente');
+        } else if (photoFile) {
+          toast.warning('PDF procesado exitosamente, pero la foto no se pudo subir');
+        } else {
+          toast.success('PDF procesado exitosamente');
+        }
+        
         setShowUploadDialog(false);
         loadEscrituras(); // Recargar lista
         

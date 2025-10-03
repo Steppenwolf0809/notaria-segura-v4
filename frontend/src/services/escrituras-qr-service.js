@@ -8,12 +8,18 @@ import apiClient from './api-client.js';
 /**
  * Sube un PDF y genera la escritura QR
  * @param {File} pdfFile - Archivo PDF a procesar
+ * @param {File} photoFile - Archivo de foto (opcional)
  * @returns {Promise<Object>} Respuesta con datos de la escritura y QR
  */
-export async function uploadEscritura(pdfFile) {
+export async function uploadEscritura(pdfFile, photoFile = null) {
   try {
     const formData = new FormData();
     formData.append('pdfFile', pdfFile);
+    
+    // Agregar foto si se proporcionó
+    if (photoFile) {
+      formData.append('foto', photoFile);
+    }
     
     const response = await apiClient.post('/escrituras/upload', formData, {
       headers: {

@@ -400,6 +400,58 @@ const VerificacionPublica = () => {
                 </CardContent>
               </Card>
 
+              {/* Fotografía del menor (si existe) */}
+              {escritura.fotoURL && (
+                <Card sx={{ mb: 3 }}>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom sx={{ textAlign: 'center', mb: 2 }}>
+                      Fotografía del Menor
+                    </Typography>
+                    <Box 
+                      sx={{ 
+                        display: 'flex', 
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Box
+                        component="img"
+                        src={escritura.fotoURL}
+                        alt="Fotografía del menor"
+                        onError={(e) => {
+                          // Si la imagen no carga, mostrar placeholder
+                          e.target.style.display = 'none';
+                          e.target.nextSibling.style.display = 'block';
+                        }}
+                        sx={{
+                          maxWidth: { xs: '100%', sm: '80%', md: '400px' },
+                          height: 'auto',
+                          borderRadius: 2,
+                          boxShadow: 2,
+                          border: '1px solid',
+                          borderColor: 'divider',
+                        }}
+                      />
+                      <Box
+                        sx={{
+                          display: 'none', // Oculto por defecto, solo se muestra si falla la imagen
+                          textAlign: 'center',
+                          p: 3,
+                          bgcolor: 'action.hover',
+                          borderRadius: 2,
+                          border: '1px dashed',
+                          borderColor: 'divider'
+                        }}
+                      >
+                        <Typography variant="body2" color="text.secondary">
+                          Imagen no disponible
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Botones de acción */}
               <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mb: 3 }}>
                 <Button
