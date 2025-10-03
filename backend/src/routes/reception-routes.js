@@ -22,9 +22,9 @@ const router = express.Router();
 
 /**
  * MIDDLEWARE DE RECEPCIÓN
- * Todas las rutas requieren autenticación y rol RECEPCION
+ * Todas las rutas requieren autenticación y rol RECEPCION o ADMIN
  */
-const requireRecepcion = requireRoles(['RECEPCION']);
+const requireRecepcion = requireRoles(['RECEPCION', 'ADMIN']);
 
 /**
  * RUTAS DE RECEPCIÓN - Gestión de entregas de documentos
