@@ -362,15 +362,30 @@ export async function getEscritura(req, res) {
 
 /**
  * PUT /api/escrituras/:id
- * Actualiza datos de una escritura
+ * Actualiza datos de una escritura (ahora soporta actualizar foto)
  */
 export async function updateEscritura(req, res) {
   try {
     const { id } = req.params;
     const userId = req.user.id;
     const userRole = req.user.role;
-    const { datosCompletos, estado, numeroEscritura } = req.body;
     
+    // Extraer datos del body
+    // Si viene con foto, los datos pueden estar en req.body.data como JSON string
+    let bodyData;
+    if (req.body.data) {
+      try {
+        bodyData = JSON.parse(req.body.data);
+      } catch (parseError) {
+        bodyData = req.body;
+      }
+    } else {
+      bodyData = req.body;
+    }
+    
+    const { datosCompletos, estado, numeroEscritura } = bodyData;
+    
+    // Buscar escritura actual
     const escritura = await prisma.escrituraQR.findUnique({
       where: { id: parseInt(id) }
     });
@@ -399,14 +414,69 @@ export async function updateEscritura(req, res) {
       });
     }
     
-    // Actualizar escritura
+    // Procesar foto si se está actualizando
+    let nuevaFotoURL = null;
+    let fotoWarning = null;
+    const files = req.files || {};
+    const fotoFile = files.foto ? files.foto[0] : null;
+    
+    if (fotoFile) {
+      console.log(`[updateEscritura] Procesando nueva foto para escritura ${id}...`);
+      
+      try {
+        // Si existe una foto anterior, eliminarla del FTP
+        if (escritura.fotoURL) {
+          try {
+            // Extraer nombre del archivo de la URL antigua
+            const urlParts = escritura.fotoURL.split('/');
+            const oldFilename = urlParts[urlParts.length - 1];
+            
+            console.log(`[updateEscritura] Eliminando foto antigua del FTP: ${oldFilename}`);
+            
+            // Importar función de eliminación dinámicamente
+            const { deletePhotoFromFTP } = await import('../services/cpanel-ftp-service.js');
+            await deletePhotoFromFTP(oldFilename);
+            
+            console.log(`[updateEscritura] ✅ Foto antigua eliminada del FTP`);
+          } catch (deleteError) {
+            // Si falla la eliminación, solo registrar warning pero continuar
+            console.warn(`[updateEscritura] ⚠️ No se pudo eliminar foto antigua: ${deleteError.message}`);
+          }
+        }
+        
+        // Generar nombre único para la nueva foto
+        const timestamp = Date.now();
+        const originalExtension = fotoFile.originalname.split('.').pop().toLowerCase();
+        const sanitizedBasename = sanitizeFilename(
+          fotoFile.originalname.replace(/\.[^/.]+$/, '') // Remover extensión
+        );
+        const newFilename = `${timestamp}-${sanitizedBasename}.${originalExtension}`;
+        
+        console.log(`[updateEscritura] Subiendo nueva foto al FTP: ${newFilename}`);
+        
+        // Subir nueva foto al FTP
+        nuevaFotoURL = await uploadPhotoToFTP(fotoFile.buffer, newFilename);
+        
+        console.log(`[updateEscritura] ✅ Nueva foto subida exitosamente: ${nuevaFotoURL}`);
+        
+      } catch (fotoError) {
+        // Si falla la actualización de foto, registrar warning pero no bloquear la actualización
+        console.error('[updateEscritura] ❌ Error procesando foto:', fotoError.message);
+        fotoWarning = `Datos actualizados, pero no se pudo actualizar la foto: ${fotoError.message}`;
+      }
+    }
+    
+    // Preparar datos para actualización
+    const dataToUpdate = {};
+    if (datosCompletos) dataToUpdate.datosCompletos = datosCompletos;
+    if (estado) dataToUpdate.estado = estado;
+    if (numeroEscritura) dataToUpdate.numeroEscritura = numeroEscritura;
+    if (nuevaFotoURL) dataToUpdate.fotoURL = nuevaFotoURL;
+    
+    // Actualizar escritura en base de datos
     const updatedEscritura = await prisma.escrituraQR.update({
       where: { id: parseInt(id) },
-      data: {
-        ...(datosCompletos && { datosCompletos }),
-        ...(estado && { estado }),
-        ...(numeroEscritura && { numeroEscritura })
-      },
+      data: dataToUpdate,
       include: {
         creador: {
           select: {
@@ -428,14 +498,21 @@ export async function updateEscritura(req, res) {
       }
     }
     
-    res.json({
+    // Construir respuesta
+    const response = {
       success: true,
-      message: 'Escritura actualizada exitosamente',
+      message: fotoWarning || 'Escritura actualizada exitosamente',
       data: {
         ...updatedEscritura,
         datosCompletos: datosCompletosParsed
       }
-    });
+    };
+    
+    if (fotoWarning) {
+      response.warning = fotoWarning;
+    }
+    
+    res.json(response);
     
   } catch (error) {
     console.error('Error en updateEscritura:', error);

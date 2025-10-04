@@ -96,9 +96,12 @@ router.get('/:id',
   getEscritura
 );
 
-// PUT /api/escrituras/:id - Actualizar datos de escritura
+// PUT /api/escrituras/:id - Actualizar datos de escritura (soporta foto opcional)
 router.put('/:id', 
-  authenticateToken, 
+  authenticateToken,
+  upload.fields([
+    { name: 'foto', maxCount: 1 }
+  ]),
   updateEscritura
 );
 

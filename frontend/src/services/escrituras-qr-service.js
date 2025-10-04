@@ -126,12 +126,30 @@ export async function getEscritura(id) {
  * @param {Object} data - Datos a actualizar
  * @param {string} data.datosCompletos - JSON con datos completos
  * @param {string} data.estado - Nuevo estado
+ * @param {File} photoFile - Archivo de foto (opcional)
  * @returns {Promise<Object>} Escritura actualizada
  */
-export async function updateEscritura(id, data) {
+export async function updateEscritura(id, data, photoFile = null) {
   try {
-    const response = await apiClient.put(`/escrituras/${id}`, data);
-    return response.data;
+    // Si hay foto, usar FormData
+    if (photoFile) {
+      const formData = new FormData();
+      // Agregar datos como JSON
+      formData.append('data', JSON.stringify(data));
+      // Agregar foto
+      formData.append('foto', photoFile);
+      
+      const response = await apiClient.put(`/escrituras/${id}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } else {
+      // Sin foto, enviar JSON normal
+      const response = await apiClient.put(`/escrituras/${id}`, data);
+      return response.data;
+    }
   } catch (error) {
     console.error('Error updating escritura:', error);
     throw new Error(
