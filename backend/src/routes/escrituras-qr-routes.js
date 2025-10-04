@@ -14,7 +14,8 @@ import {
   updateEscritura,
   getEscrituraQR,
   verifyEscritura,
-  deleteEscritura
+  deleteEscritura,
+  hardDeleteEscritura
 } from '../controllers/escrituras-qr-controller.js';
 
 const router = express.Router();
@@ -107,10 +108,17 @@ router.get('/:id/qr',
   getEscrituraQR
 );
 
-// DELETE /api/escrituras/:id - Desactivar escritura
+// DELETE /api/escrituras/:id - Desactivar escritura (soft delete)
 router.delete('/:id', 
   authenticateToken, 
   deleteEscritura
+);
+
+// DELETE /api/escrituras/:id/hard-delete - Eliminar permanentemente escritura
+router.delete('/:id/hard-delete',
+  authenticateToken,
+  requireMatrizador,
+  hardDeleteEscritura
 );
 
 /**

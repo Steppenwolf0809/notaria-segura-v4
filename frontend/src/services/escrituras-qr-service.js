@@ -179,6 +179,25 @@ export async function deleteEscritura(id) {
 }
 
 /**
+ * Elimina permanentemente una escritura de la base de datos (hard delete)
+ * ⚠️ ACCIÓN IRREVERSIBLE
+ * @param {number} id - ID de la escritura
+ * @returns {Promise<Object>} Confirmación de eliminación permanente
+ */
+export async function hardDeleteEscritura(id) {
+  try {
+    const response = await apiClient.delete(`/escrituras/${id}/hard-delete`);
+    return response.data;
+  } catch (error) {
+    console.error('Error hard deleting escritura:', error);
+    throw new Error(
+      error.response?.data?.message || 
+      'Error al eliminar la escritura permanentemente'
+    );
+  }
+}
+
+/**
  * Verifica una escritura usando su token (público, sin autenticación)
  * @param {string} token - Token de verificación
  * @returns {Promise<Object>} Datos públicos de la escritura

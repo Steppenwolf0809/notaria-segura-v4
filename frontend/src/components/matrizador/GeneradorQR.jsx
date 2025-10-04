@@ -60,6 +60,7 @@ import {
   createEscrituraManual,
   getEscrituras,
   deleteEscritura,
+  hardDeleteEscritura,
   getEstadoInfo,
   ESTADOS_ESCRITURA
 } from '../../services/escrituras-qr-service';
@@ -76,6 +77,7 @@ const GeneradorQR = () => {
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [showManualDialog, setShowManualDialog] = useState(false); // Dialog para ingreso manual
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
+  const [showHardDeleteDialog, setShowHardDeleteDialog] = useState(false); // Dialog para confirmación de eliminación permanente
   const [uploadLoading, setUploadLoading] = useState(false);
 
   // Estados de filtros y paginación
@@ -189,7 +191,7 @@ const GeneradorQR = () => {
   };
 
   /**
-   * Maneja la eliminación de escritura
+   * Maneja la eliminación de escritura (soft delete)
    */
   const handleDelete = async (escrituraId) => {
     if (!window.confirm('¿Estás seguro de que quieres desactivar esta escritura?')) {
@@ -205,6 +207,30 @@ const GeneradorQR = () => {
       }
     } catch (err) {
       toast.error(err.message);
+    }
+  };
+
+  /**
+   * Maneja la eliminación permanente de escritura (hard delete)
+   */
+  const handleHardDelete = async () => {
+    if (!selectedEscritura) return;
+
+    try {
+      setUploadLoading(true);
+      const response = await hardDeleteEscritura(selectedEscritura.id);
+      
+      if (response.success) {
+        toast.success('✅ Escritura eliminada permanentemente');
+        setShowHardDeleteDialog(false);
+        setShowDetailsDialog(false);
+        setSelectedEscritura(null);
+        loadEscrituras();
+      }
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setUploadLoading(false);
     }
   };
 
@@ -645,21 +671,103 @@ const GeneradorQR = () => {
         </DialogContent>
         
         <DialogActions sx={{ justifyContent: 'space-between', px: 3, py: 2 }}>
-          <Button
-            variant="outlined"
-            color="error"
-            startIcon={<DeleteIcon />}
-            onClick={() => {
-              if (selectedEscritura && window.confirm('¿Estás seguro de que quieres eliminar esta escritura? Esta acción no se puede deshacer.')) {
-                handleDelete(selectedEscritura.id);
-                setShowDetailsDialog(false);
-              }
-            }}
-          >
-            Eliminar Escritura
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant="outlined"
+              color="warning"
+              startIcon={<DeleteIcon />}
+              onClick={() => {
+                if (selectedEscritura) {
+                  handleDelete(selectedEscritura.id);
+                  setShowDetailsDialog(false);
+                }
+              }}
+            >
+              Desactivar
+            </Button>
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<DeleteIcon />}
+              onClick={() => setShowHardDeleteDialog(true)}
+            >
+              Eliminar Permanentemente
+            </Button>
+          </Box>
           <Button onClick={() => setShowDetailsDialog(false)}>
             Cerrar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Diálogo de confirmación para eliminación permanente */}
+      <Dialog
+        open={showHardDeleteDialog}
+        onClose={() => !uploadLoading && setShowHardDeleteDialog(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ bgcolor: 'error.main', color: 'white' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <DeleteIcon />
+            <Typography variant="h6">
+              ⚠️ Confirmación de Eliminación Permanente
+            </Typography>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent sx={{ mt: 2 }}>
+          <Alert severity="error" sx={{ mb: 2 }}>
+            <Typography variant="body1" gutterBottom sx={{ fontWeight: 'bold' }}>
+              ¡ATENCIÓN! Esta acción es IRREVERSIBLE
+            </Typography>
+            <Typography variant="body2">
+              Se eliminará permanentemente de la base de datos:
+            </Typography>
+          </Alert>
+
+          {selectedEscritura && (
+            <Box sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+              <Typography variant="body2" gutterBottom>
+                <strong>Escritura:</strong> {selectedEscritura.numeroEscritura || 'N/A'}
+              </Typography>
+              <Typography variant="body2" gutterBottom>
+                <strong>Token:</strong> {selectedEscritura.token}
+              </Typography>
+              <Typography variant="body2" gutterBottom>
+                <strong>Archivo:</strong> {selectedEscritura.archivoOriginal || 'Ingreso manual'}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Creado:</strong> {new Date(selectedEscritura.createdAt).toLocaleString()}
+              </Typography>
+            </Box>
+          )}
+
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            <Typography variant="body2">
+              • El código QR dejará de funcionar inmediatamente<br />
+              • Los datos no se podrán recuperar<br />
+              • Esta acción no se puede deshacer
+            </Typography>
+          </Alert>
+        </DialogContent>
+        
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button 
+            onClick={() => setShowHardDeleteDialog(false)}
+            disabled={uploadLoading}
+            variant="outlined"
+          >
+            Cancelar
+          </Button>
+          <Button 
+            onClick={handleHardDelete}
+            disabled={uploadLoading}
+            variant="contained"
+            color="error"
+            startIcon={uploadLoading ? <CircularProgress size={20} /> : <DeleteIcon />}
+          >
+            {uploadLoading ? 'Eliminando...' : 'Confirmar Eliminación'}
           </Button>
         </DialogActions>
       </Dialog>
