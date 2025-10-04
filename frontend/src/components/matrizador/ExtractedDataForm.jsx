@@ -27,7 +27,8 @@ import {
   Select,
   MenuItem,
   Checkbox,
-  FormControlLabel
+  FormControlLabel,
+  CardMedia
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
@@ -39,7 +40,9 @@ import {
   ContentCopy as CopyIcon,
   CheckCircle as CheckIcon,
   Warning as WarningIcon,
-  Error as ErrorIcon
+  Error as ErrorIcon,
+  PhotoCamera as PhotoCameraIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import { updateEscritura, getEstadoInfo } from '../../services/escrituras-qr-service';
 
@@ -50,6 +53,8 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
   const [showRawData, setShowRawData] = useState(false);
   const [formData, setFormData] = useState({});
   const [originalData, setOriginalData] = useState({});
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
 
   /**
    * Limpia una lista de personas removiendo entradas con basura
@@ -209,6 +214,44 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
   };
 
   /**
+   * Maneja selección de foto
+   */
+  const handlePhotoSelect = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      // Validar que sea imagen
+      if (!file.type.startsWith('image/')) {
+        setError('Por favor selecciona un archivo de imagen válido');
+        return;
+      }
+      
+      // Validar tamaño (máximo 5MB)
+      const maxSize = 5 * 1024 * 1024;
+      if (file.size > maxSize) {
+        setError('La foto es demasiado grande (máximo 5MB)');
+        return;
+      }
+      
+      setSelectedPhoto(file);
+      
+      // Generar preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  /**
+   * Elimina la foto seleccionada
+   */
+  const handlePhotoRemove = () => {
+    setSelectedPhoto(null);
+    setPhotoPreview(null);
+  };
+
+  /**
    * Guarda los cambios
    */
   const handleSave = async () => {
@@ -222,11 +265,14 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
         numeroEscritura: formData.escritura || formData.numeroEscritura || escritura.numeroEscritura
       };
 
-      const response = await updateEscritura(escritura.id, updatedData);
+      // Pasar la foto si se seleccionó una
+      const response = await updateEscritura(escritura.id, updatedData, selectedPhoto);
       
       if (response.success) {
         setOriginalData(formData);
         setEditMode(false);
+        setSelectedPhoto(null);
+        setPhotoPreview(null);
         if (onUpdate) {
           onUpdate(response.data);
         }
@@ -245,6 +291,8 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
     setFormData(originalData);
     setEditMode(false);
     setError(null);
+    setSelectedPhoto(null);
+    setPhotoPreview(null);
   };
 
   /**
@@ -455,6 +503,103 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
                     size="small"
                   />
                 </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+        </Grid>
+
+        {/* Fotografía del Menor */}
+        <Grid item xs={12}>
+          <Card>
+            <CardHeader 
+              title="Fotografía del Menor (Opcional)" 
+              subheader="Fotografía para verificación de identidad"
+            />
+            <CardContent>
+              <Grid container spacing={2}>
+                {/* Foto actual */}
+                {(escritura?.fotoURL || photoPreview) && (
+                  <Grid item xs={12} md={6}>
+                    <Box>
+                      <Typography variant="subtitle2" gutterBottom>
+                        {photoPreview ? 'Nueva Foto (Sin Guardar)' : 'Foto Actual'}
+                      </Typography>
+                      <Card variant="outlined">
+                        <CardMedia
+                          component="img"
+                          image={photoPreview || escritura.fotoURL}
+                          alt="Fotografía del menor"
+                          sx={{
+                            maxHeight: 300,
+                            objectFit: 'contain',
+                            bgcolor: 'grey.100'
+                          }}
+                        />
+                      </Card>
+                      {photoPreview && editMode && (
+                        <Button
+                          fullWidth
+                          variant="outlined"
+                          color="error"
+                          startIcon={<DeleteIcon />}
+                          onClick={handlePhotoRemove}
+                          sx={{ mt: 1 }}
+                          size="small"
+                        >
+                          Cancelar Cambio de Foto
+                        </Button>
+                      )}
+                    </Box>
+                  </Grid>
+                )}
+
+                {/* Input para nueva foto */}
+                {editMode && (
+                  <Grid item xs={12} md={escritura?.fotoURL || photoPreview ? 6 : 12}>
+                    <Box sx={{ 
+                      border: '2px dashed', 
+                      borderColor: 'primary.main',
+                      borderRadius: 2,
+                      p: 3,
+                      textAlign: 'center',
+                      bgcolor: 'grey.50'
+                    }}>
+                      <PhotoCameraIcon sx={{ fontSize: 48, color: 'primary.main', mb: 1 }} />
+                      <Typography variant="h6" gutterBottom>
+                        {escritura?.fotoURL ? 'Cambiar Fotografía' : 'Agregar Fotografía'}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        JPG, PNG o WEBP (máximo 5MB)
+                      </Typography>
+                      <input
+                        accept="image/jpeg,image/jpg,image/png,image/webp"
+                        style={{ display: 'none' }}
+                        id="photo-upload-button"
+                        type="file"
+                        onChange={handlePhotoSelect}
+                      />
+                      <label htmlFor="photo-upload-button">
+                        <Button
+                          variant="contained"
+                          component="span"
+                          startIcon={<PhotoCameraIcon />}
+                        >
+                          Seleccionar Foto
+                        </Button>
+                      </label>
+                    </Box>
+                  </Grid>
+                )}
+
+                {/* Mensaje si no hay foto */}
+                {!editMode && !escritura?.fotoURL && (
+                  <Grid item xs={12}>
+                    <Alert severity="info">
+                      No se ha agregado una fotografía para esta escritura. 
+                      Puedes agregar una usando el botón "Editar datos" arriba.
+                    </Alert>
+                  </Grid>
+                )}
               </Grid>
             </CardContent>
           </Card>
