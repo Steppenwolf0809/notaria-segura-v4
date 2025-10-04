@@ -67,8 +67,9 @@ const VerificacionPublica = () => {
   };
 
   /**
-   * El backend ya limpia los datos, solo necesitamos formatearlos para mostrar
-   * @param {Array} list - Lista de personas ya limpia del backend
+   * Formatea la lista de personas con estructura simplificada
+   * Solo nombre, documento, número y representante (si aplica)
+   * @param {Array} list - Lista de personas del backend
    * @returns {Array} Lista formateada para mostrar
    */
   const formatPersons = (list) => {
@@ -78,8 +79,7 @@ const VerificacionPublica = () => {
       nombre: p.nombre || 'N/A',
       documento: p.documento || '',
       numero: p.numero || '',
-      nacionalidad: p.nacionalidad || '',
-      calidad: p.calidad || ''
+      representadoPor: p.representadoPor || ''
     }));
   };
 
@@ -281,22 +281,22 @@ const VerificacionPublica = () => {
                       {escritura.otorgantes && (
                         <>
                           <Grid item xs={12} md={6}>
-                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Otorgado Por</Typography>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Otorgantes (Padres/Apoderados)</Typography>
                             <Box sx={{ mt: 1 }}>
                               {formatPersons(escritura.otorgantes?.otorgado_por).length > 0 ? (
                                 formatPersons(escritura.otorgantes?.otorgado_por).map((p, idx) => (
-                                  <Box key={idx} sx={{ mb: 1.2 }}>
-                                    <Typography variant="body1" sx={{ fontWeight: 600 }}>{p.nombre}</Typography>
-                                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                  <Box key={idx} sx={{ mb: 1.5, p: 1.5, bgcolor: 'action.hover', borderRadius: 1 }}>
+                                    <Typography variant="body1" sx={{ fontWeight: 600, mb: 0.5 }}>{p.nombre}</Typography>
+                                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 0.5 }}>
                                       {p.documento && p.numero && (
-                                        <Chip size="small" label={`${p.documento}: ${p.numero}`} />
+                                        <Chip size="small" label={`${p.documento}: ${p.numero}`} color="primary" variant="outlined" />
                                       )}
-                                      {!p.documento && p.numero && (
-                                        <Chip size="small" label={`N° ${p.numero}`} />
-                                      )}
-                                      {p.nacionalidad && <Chip size="small" label={p.nacionalidad} />}
-                                      {p.calidad && <Chip size="small" label={p.calidad} />}
                                     </Box>
+                                    {p.representadoPor && (
+                                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                        Representado por: <strong>{p.representadoPor}</strong>
+                                      </Typography>
+                                    )}
                                   </Box>
                                 ))
                               ) : (
@@ -307,22 +307,22 @@ const VerificacionPublica = () => {
                             </Box>
                           </Grid>
                           <Grid item xs={12} md={6}>
-                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>A Favor De</Typography>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>Beneficiarios (Menores)</Typography>
                             <Box sx={{ mt: 1 }}>
                               {formatPersons(escritura.otorgantes?.a_favor_de).length > 0 ? (
                                 formatPersons(escritura.otorgantes?.a_favor_de).map((p, idx) => (
-                                  <Box key={idx} sx={{ mb: 1.2 }}>
-                                    <Typography variant="body1" sx={{ fontWeight: 600 }}>{p.nombre}</Typography>
-                                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                                  <Box key={idx} sx={{ mb: 1.5, p: 1.5, bgcolor: 'action.hover', borderRadius: 1 }}>
+                                    <Typography variant="body1" sx={{ fontWeight: 600, mb: 0.5 }}>{p.nombre}</Typography>
+                                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 0.5 }}>
                                       {p.documento && p.numero && (
-                                        <Chip size="small" label={`${p.documento}: ${p.numero}`} />
+                                        <Chip size="small" label={`${p.documento}: ${p.numero}`} color="secondary" variant="outlined" />
                                       )}
-                                      {!p.documento && p.numero && (
-                                        <Chip size="small" label={`N° ${p.numero}`} />
-                                      )}
-                                      {p.nacionalidad && <Chip size="small" label={p.nacionalidad} />}
-                                      {p.calidad && <Chip size="small" label={p.calidad} />}
                                     </Box>
+                                    {p.representadoPor && (
+                                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                        Representado por: <strong>{p.representadoPor}</strong>
+                                      </Typography>
+                                    )}
                                   </Box>
                                 ))
                               ) : (

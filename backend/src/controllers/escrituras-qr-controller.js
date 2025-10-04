@@ -658,16 +658,21 @@ function sanitizePersonas(personas) {
 
     return true;
   }).map(persona => {
-    // Limpiar los campos de la persona
+    // Limpiar los campos de la persona - estructura simplificada
     const numero = String(persona.numero || '').replace(/\D+/g, '');
     
-    return {
+    const personaLimpia = {
       nombre: String(persona.nombre || '').trim(),
       documento: String(persona.documento || '').trim() || null,
-      numero: numero || null,
-      nacionalidad: String(persona.nacionalidad || '').trim() || null,
-      calidad: String(persona.calidad || '').trim() || null
+      numero: numero || null
     };
+    
+    // Solo incluir representadoPor si tiene valor
+    if (persona.representadoPor && String(persona.representadoPor).trim()) {
+      personaLimpia.representadoPor = String(persona.representadoPor).trim();
+    }
+    
+    return personaLimpia;
   });
 }
 
@@ -827,7 +832,7 @@ export async function verifyEscritura(req, res) {
 
 /**
  * POST /api/escrituras/manual
- * Crea una escritura ingresando datos manualmente (sin PDF)
+ * Crea una escritura ingresando datos manualmente (sin PDF, con foto opcional)
  * Solo para matrizadores
  */
 export async function createEscrituraManual(req, res) {
@@ -843,6 +848,26 @@ export async function createEscrituraManual(req, res) {
       });
     }
     
+    // Con multer.fields(), los archivos están en req.files
+    const files = req.files || {};
+    const fotoFile = files.foto ? files.foto[0] : null;
+    
+    // Si viene con foto, los datos están en req.body.data como string JSON
+    // Si viene sin foto, los datos están directamente en req.body
+    let datosBody;
+    if (fotoFile && req.body.data) {
+      try {
+        datosBody = JSON.parse(req.body.data);
+      } catch (parseError) {
+        return res.status(400).json({
+          success: false,
+          message: 'Error al parsear los datos de la escritura'
+        });
+      }
+    } else {
+      datosBody = req.body;
+    }
+    
     const {
       numeroEscritura,
       acto,
@@ -854,7 +879,7 @@ export async function createEscrituraManual(req, res) {
       otorgantes,
       objeto_observaciones,
       extractoTextoCompleto
-    } = req.body;
+    } = datosBody;
     
     // Validar campos requeridos
     if (!numeroEscritura) {
@@ -881,10 +906,38 @@ export async function createEscrituraManual(req, res) {
     console.log('[createEscrituraManual] Creando escritura manual:', {
       numeroEscritura,
       acto: acto.substring(0, 30) + '...',
+      tieneFoto: !!fotoFile,
       usuario: req.user.email
     });
     
-    // Construir objeto datosCompletos
+    // Generar token único
+    const token = await generateUniqueToken(prisma);
+    
+    // Procesar foto si existe
+    let fotoURL = null;
+    let fotoUploadWarning = null;
+    
+    if (fotoFile) {
+      try {
+        console.log(`[createEscrituraManual] Subiendo foto al FTP para token ${token}...`);
+        
+        // Nombre del archivo: token + extensión original
+        const fotoExtension = fotoFile.originalname.split('.').pop().toLowerCase();
+        const fotoFilename = `${token}.${fotoExtension}`;
+        
+        // Subir foto al FTP
+        fotoURL = await uploadPhotoToFTP(fotoFile.buffer, fotoFilename);
+        
+        console.log(`[createEscrituraManual] ✅ Foto subida exitosamente: ${fotoURL}`);
+      } catch (fotoError) {
+        // Si falla la foto, NO bloquear la creación de la escritura
+        console.error('[createEscrituraManual] ❌ Error subiendo foto:', fotoError.message);
+        fotoUploadWarning = `La escritura se creó correctamente, pero no se pudo subir la foto: ${fotoError.message}`;
+        fotoURL = null; // Asegurar que quede null
+      }
+    }
+    
+    // Construir objeto datosCompletos (estructura simplificada)
     const datosCompletos = {
       escritura: numeroEscritura,
       acto: acto || '',
@@ -897,9 +950,6 @@ export async function createEscrituraManual(req, res) {
       objeto_observaciones: objeto_observaciones || ''
     };
     
-    // Generar token único
-    const token = await generateUniqueToken(prisma);
-    
     // Crear escritura en base de datos
     const escritura = await prisma.escrituraQR.create({
       data: {
@@ -908,6 +958,7 @@ export async function createEscrituraManual(req, res) {
         datosCompletos: JSON.stringify(datosCompletos),
         archivoOriginal: null, // No hay archivo PDF
         extractoTextoCompleto: extractoTextoCompleto || null,
+        fotoURL: fotoURL, // Puede ser null si no hay foto o si falló
         origenDatos: 'MANUAL',
         estado: 'activo', // Ingreso manual se considera revisado
         createdBy: userId
@@ -928,21 +979,29 @@ export async function createEscrituraManual(req, res) {
     
     console.log('[createEscrituraManual] Escritura manual creada exitosamente:', escritura.id);
     
-    res.status(201).json({
+    // Respuesta con o sin warning de foto
+    const response = {
       success: true,
-      message: 'Escritura creada exitosamente',
+      message: fotoUploadWarning || 'Escritura creada exitosamente',
       data: {
         id: escritura.id,
         token: escritura.token,
         numeroEscritura: escritura.numeroEscritura,
         datosCompletos: datosCompletos, // Enviar como objeto
+        fotoURL: fotoURL, // Incluir URL de foto si existe
         origenDatos: escritura.origenDatos,
         estado: escritura.estado,
         createdAt: escritura.createdAt,
         creador: escritura.creador,
         qr: qrInfo
       }
-    });
+    };
+    
+    if (fotoUploadWarning) {
+      response.warning = fotoUploadWarning;
+    }
+    
+    res.status(201).json(response);
     
   } catch (error) {
     console.error('[createEscrituraManual] Error:', error);
