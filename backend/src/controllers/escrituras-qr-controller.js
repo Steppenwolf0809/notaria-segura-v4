@@ -663,7 +663,7 @@ function sanitizePersonas(personas) {
     
     const personaLimpia = {
       nombre: String(persona.nombre || '').trim(),
-      documento: String(persona.documento || '').trim() || null,
+      documento: String(persona.documento || '').trim() || 'CÉDULA',
       numero: numero || null
     };
     
@@ -1061,6 +1061,90 @@ export async function deleteEscritura(req, res) {
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor'
+    });
+  }
+}
+
+/**
+ * DELETE /api/escrituras/:id/hard-delete
+ * Elimina permanentemente una escritura de la base de datos (hard delete)
+ * ACCIÓN IRREVERSIBLE - Solo para matrizadores
+ */
+export async function hardDeleteEscritura(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    
+    console.log(`[hardDelete] Usuario ${userId} (${userRole}) intentando eliminar escritura ${id}`);
+    
+    // Verificar que sea matrizador (el middleware ya validó, pero doble verificación)
+    if (userRole !== 'MATRIZADOR' && userRole !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo los matrizadores pueden eliminar escrituras permanentemente'
+      });
+    }
+    
+    // Buscar escritura
+    const escritura = await prisma.escrituraQR.findUnique({
+      where: { id: parseInt(id) }
+    });
+    
+    if (!escritura) {
+      return res.status(404).json({
+        success: false,
+        message: 'Escritura no encontrada'
+      });
+    }
+    
+    // Verificar permisos: solo el creador puede eliminar (o admin)
+    if (userRole === 'MATRIZADOR' && escritura.createdBy !== userId) {
+      console.log(`[hardDelete] Permiso denegado: escritura creada por ${escritura.createdBy}, solicitante ${userId}`);
+      return res.status(403).json({
+        success: false,
+        message: 'Solo puedes eliminar escrituras que tú creaste'
+      });
+    }
+    
+    // Guardar info para logs antes de eliminar
+    const numeroEscritura = escritura.numeroEscritura;
+    const token = escritura.token;
+    const fotoURL = escritura.fotoURL;
+    
+    // ELIMINACIÓN PERMANENTE de la base de datos
+    await prisma.escrituraQR.delete({
+      where: { id: parseInt(id) }
+    });
+    
+    console.log(`[hardDelete] ✅ Escritura ${id} (${numeroEscritura}, token: ${token}) eliminada permanentemente por usuario ${userId}`);
+    
+    // TODO FUTURO: Eliminar foto del FTP si existe
+    // if (fotoURL) {
+    //   try {
+    //     await deletePhotoFromFTP(fotoURL);
+    //     console.log(`[hardDelete] Foto eliminada del FTP: ${fotoURL}`);
+    //   } catch (ftpError) {
+    //     console.warn(`[hardDelete] No se pudo eliminar foto del FTP: ${ftpError.message}`);
+    //   }
+    // }
+    
+    res.json({
+      success: true,
+      message: 'Escritura eliminada permanentemente',
+      data: {
+        id: parseInt(id),
+        numeroEscritura,
+        token
+      }
+    });
+    
+  } catch (error) {
+    console.error('[hardDelete] Error eliminando escritura:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 }

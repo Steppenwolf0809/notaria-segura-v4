@@ -44,10 +44,10 @@ const PATTERNS = {
     /AUTORIZACI[ÓO]N\s+DE\s+([A-ZÁÉÍÓÚÑÜ0-9\s,.;:-]+?)(?=\n{1,}|\n[A-ZÁÉÍÓÚÑÜ/ \t]{3,}:|OTORGADO|FECHA|$)/i
   ],
   
-  // Fecha de otorgamiento
+  // Fecha de otorgamiento (con hora opcional entre paréntesis)
   fecha: [
-    /FECHA\s+DE\s+OTORGAMIENTO\s*:?\s*([0-9]{1,2}\s+DE\s+[A-ZÁÉÍÓÚÑÜ]+\s+DEL?\s+[0-9]{4}[^0-9]*(?:\([0-9]{1,2}:[0-9]{2}\))?)/i,
-    /OTORGADO\s+EL\s*:?\s*([0-9]{1,2}\s+DE\s+[A-ZÁÉÍÓÚÑÜ]+\s+DEL?\s+[0-9]{4}[^0-9]*(?:\([0-9]{1,2}:[0-9]{2}\))?)/i
+    /FECHA\s+DE\s+OTORGAMIENTO\s*:?\s*([0-9]{1,2}\s+DE\s+[A-ZÁÉÍÓÚÑÜ]+\s+DEL?\s+[0-9]{4}(?:\s*,\s*\([0-9]{1,2}:[0-9]{2}\))?)/i,
+    /OTORGADO\s+EL\s*:?\s*([0-9]{1,2}\s+DE\s+[A-ZÁÉÍÓÚÑÜ]+\s+DEL?\s+[0-9]{4}(?:\s*,\s*\([0-9]{1,2}:[0-9]{2}\))?)/i
   ],
   
   // Notario
@@ -222,6 +222,7 @@ function extractNumeroEscritura(text) {
 
 /**
  * Extrae información de personas (otorgantes/beneficiarios)
+ * Ahora detecta y extrae información de representantes legales
  * @param {string} text - Texto que contiene información de personas
  * @returns {Array} Array de objetos con información de personas
  */
@@ -240,15 +241,46 @@ function extractPersonas(text) {
       documento: 'CÉDULA',
       numero: null,
       nacionalidad: 'ECUATORIANA',
-      calidad: 'COMPARECIENTE'
+      calidad: 'COMPARECIENTE',
+      representadoPor: null
     };
     
-    // Buscar cédula en la línea
-    const cedulaMatch = trimmedLine.match(/([0-9]{10})/);
-    if (cedulaMatch) {
-      persona.numero = cedulaMatch[1];
-      // Limpiar el nombre removiendo la cédula
-      persona.nombre = trimmedLine.replace(/[0-9]{10}/, '').trim();
+    // Buscar patrón de representación: "NOMBRE representado/a por REPRESENTANTE"
+    const representadoMatch = trimmedLine.match(
+      /^(.+?)\s+representad[oa]\s+por[:\s]+(.+?)(?:\s*[,.]|$)/i
+    );
+    
+    if (representadoMatch) {
+      // Hay un representante
+      const nombrePrincipal = representadoMatch[1].trim();
+      const nombreRepresentante = representadoMatch[2].trim();
+      
+      // Buscar cédula en el nombre principal
+      const cedulaPrincipalMatch = nombrePrincipal.match(/([0-9]{10})/);
+      if (cedulaPrincipalMatch) {
+        persona.numero = cedulaPrincipalMatch[1];
+        persona.nombre = nombrePrincipal.replace(/[0-9]{10}/, '').trim();
+      } else {
+        persona.nombre = nombrePrincipal;
+      }
+      
+      // Buscar cédula en el nombre del representante
+      const cedulaRepresentanteMatch = nombreRepresentante.match(/([0-9]{10})/);
+      if (cedulaRepresentanteMatch) {
+        // Incluir cédula en el representante
+        persona.representadoPor = nombreRepresentante;
+      } else {
+        persona.representadoPor = nombreRepresentante;
+      }
+    } else {
+      // No hay representante, extracción normal
+      // Buscar cédula en la línea
+      const cedulaMatch = trimmedLine.match(/([0-9]{10})/);
+      if (cedulaMatch) {
+        persona.numero = cedulaMatch[1];
+        // Limpiar el nombre removiendo la cédula
+        persona.nombre = trimmedLine.replace(/[0-9]{10}/, '').trim();
+      }
     }
     
     // Buscar nacionalidad
@@ -257,7 +289,10 @@ function extractPersonas(text) {
       persona.nacionalidad = nacionalidadMatch[1].toUpperCase();
     }
     
-    personas.push(persona);
+    // Solo agregar si hay información útil del nombre
+    if (persona.nombre && persona.nombre.length > 2) {
+      personas.push(persona);
+    }
   }
   
   return personas;
@@ -379,11 +414,20 @@ function parsePersonsTableFromSection(sectionText) {
 
     const cells = splitRow(line);
     if (cells.length === 0) continue;
-    const person = { nombre: '', documento: '', numero: '', nacionalidad: '', calidad: 'COMPARECIENTE' };
+    const person = { nombre: '', documento: '', numero: '', nacionalidad: '', calidad: 'COMPARECIENTE', representadoPor: null };
     cells.forEach((val, cidx) => {
       const key = headerMap[cidx];
       if (!key) return;
-      if (key === 'nombre') person.nombre = val;
+      if (key === 'nombre') {
+        // Verificar si el nombre contiene "representado por"
+        const representadoMatch = val.match(/^(.+?)\s+representad[oa]\s+por[:\s]+(.+?)$/i);
+        if (representadoMatch) {
+          person.nombre = representadoMatch[1].trim();
+          person.representadoPor = representadoMatch[2].trim();
+        } else {
+          person.nombre = val;
+        }
+      }
       else if (key === 'numero') person.numero = val.replace(/[^0-9A-Za-z]/g, '');
       else person[key] = val;
     });
