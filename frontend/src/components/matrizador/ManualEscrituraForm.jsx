@@ -382,10 +382,10 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
               <Divider sx={{ my: 2 }} />
               <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <ImageIcon />
-                Fotografía del Menor (Opcional)
+                Fotografía de Verificación (Opcional)
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Si la escritura es una autorización de salida del país, adjunta una fotografía del menor.
+                Adjunta una fotografía que servirá como respaldo para la verificación de identidad.
               </Typography>
               
               {!photoPreview ? (

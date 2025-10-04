@@ -140,18 +140,48 @@ function cleanObservaciones(obsRaw) {
   
   let texto = String(obsRaw).trim();
   
-  // Remover encabezados de otras secciones que pueden haberse colado
+  // Remover encabezados de otras secciones que pueden haberse colado (al inicio y al final)
   const encabezadosBasura = [
-    /^CUANTÍA\s*(?:DEL\s*)?(?:ACTO\s*)?(?:O\s*)?(?:CONTRATO\s*)?:?\s*/i,
-    /^CUANTIA\s*(?:DEL\s*)?(?:ACTO\s*)?(?:O\s*)?(?:CONTRATO\s*)?:?\s*/i,
-    /^VALOR\s*:?\s*/i,
-    /^UBICACIÓN\s*:?\s*/i,
-    /^UBICACION\s*:?\s*/i,
+    // Al inicio del texto
+    /^CUANTÍA\s*(?:DEL\s*)?(?:ACTO\s*)?(?:O\s*)?(?:CONTRATO\s*)?:?\s*/gi,
+    /^CUANTIA\s*(?:DEL\s*)?(?:ACTO\s*)?(?:O\s*)?(?:CONTRATO\s*)?:?\s*/gi,
+    /^VALOR\s*:?\s*/gi,
+    /^UBICACIÓN\s*:?\s*/gi,
+    /^UBICACION\s*:?\s*/gi,
+    // Al final del texto (más común)
+    /\s*CUANTÍA\s*(?:DEL\s*)?(?:ACTO\s*)?(?:O\s*)?(?:CONTRATO\s*)?:?\s*$/gi,
+    /\s*CUANTIA\s*(?:DEL\s*)?(?:ACTO\s*)?(?:O\s*)?(?:CONTRATO\s*)?:?\s*$/gi,
+    /\s*VALOR\s*:?\s*$/gi,
+    /\s*UBICACIÓN\s*:?\s*$/gi,
+    /\s*UBICACION\s*:?\s*$/gi
   ];
   
+  // Aplicar todos los patrones
   for (const patron of encabezadosBasura) {
     texto = texto.replace(patron, '');
   }
+  
+  // Limpiar líneas que solo contienen estos encabezados
+  texto = texto
+    .split('\n')
+    .filter(linea => {
+      const lineaLimpia = linea.trim().toUpperCase();
+      // Filtrar líneas que solo son encabezados basura
+      if (!lineaLimpia) return false;
+      if (lineaLimpia === 'CUANTÍA DEL ACTO O' || 
+          lineaLimpia === 'CUANTIA DEL ACTO O' ||
+          lineaLimpia === 'CUANTÍA DEL ACTO' ||
+          lineaLimpia === 'CUANTIA DEL ACTO' ||
+          lineaLimpia === 'CUANTÍA' ||
+          lineaLimpia === 'CUANTIA' ||
+          lineaLimpia === 'VALOR' ||
+          lineaLimpia === 'UBICACIÓN' ||
+          lineaLimpia === 'UBICACION') {
+        return false;
+      }
+      return true;
+    })
+    .join('\n');
   
   texto = texto.trim();
   

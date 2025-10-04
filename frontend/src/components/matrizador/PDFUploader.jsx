@@ -289,11 +289,11 @@ const PDFUploader = ({
         
         <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <ImageIcon />
-          Fotografía del Menor (Opcional)
+          Fotografía de Verificación (Opcional)
         </Typography>
         
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Si la escritura es una autorización de salida del país, puedes adjuntar una fotografía del menor.
+          Adjunta una fotografía que servirá como respaldo para la verificación de identidad.
         </Typography>
         
         {!photoPreview ? (
@@ -488,7 +488,7 @@ const PDFUploader = ({
             <strong>PDF:</strong> Extracto de escritura (obligatorio)
           </Typography>
           <Typography variant="body2">
-            <strong>Fotografía:</strong> Imagen del menor (opcional, solo para autorizaciones de salida)
+            <strong>Fotografía:</strong> Imagen de verificación (opcional)
           </Typography>
           <Typography variant="body2">
             <strong>Tamaño máximo PDF:</strong> 10MB
