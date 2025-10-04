@@ -155,16 +155,24 @@ const GeneradorQR = () => {
   };
 
   /**
-   * Maneja la creación manual de escritura
+   * Maneja la creación manual de escritura (con foto opcional)
    */
-  const handleManualSubmit = async (datosEscritura) => {
+  const handleManualSubmit = async (datosEscritura, photoFile = null) => {
     setUploadLoading(true);
 
     try {
-      const response = await createEscrituraManual(datosEscritura);
+      const response = await createEscrituraManual(datosEscritura, photoFile);
       
       if (response.success) {
-        toast.success('Escritura creada exitosamente');
+        // Mensaje personalizado si hay foto
+        if (response.data.fotoURL) {
+          toast.success('Escritura y fotografía creadas exitosamente');
+        } else if (photoFile) {
+          toast.warning('Escritura creada exitosamente, pero la foto no se pudo subir');
+        } else {
+          toast.success('Escritura creada exitosamente');
+        }
+        
         setShowManualDialog(false);
         loadEscrituras(); // Recargar lista
         

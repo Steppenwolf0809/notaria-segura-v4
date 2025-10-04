@@ -73,9 +73,13 @@ router.post('/upload',
 );
 
 // POST /api/escrituras/manual - Crear escritura manualmente (solo matrizadores)
+// Acepta 'data' (JSON con los datos) y 'foto' (opcional)
 router.post('/manual',
   authenticateToken,
   requireMatrizador,
+  upload.fields([
+    { name: 'foto', maxCount: 1 }
+  ]),
   createEscrituraManual
 );
 

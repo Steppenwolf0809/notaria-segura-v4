@@ -38,14 +38,32 @@ export async function uploadEscritura(pdfFile, photoFile = null) {
 }
 
 /**
- * Crea una escritura ingresando datos manualmente
+ * Crea una escritura ingresando datos manualmente (con foto opcional)
  * @param {Object} datosEscritura - Datos de la escritura
+ * @param {File} photoFile - Archivo de foto (opcional)
  * @returns {Promise<Object>} Respuesta con datos de la escritura y QR
  */
-export async function createEscrituraManual(datosEscritura) {
+export async function createEscrituraManual(datosEscritura, photoFile = null) {
   try {
-    const response = await apiClient.post('/escrituras/manual', datosEscritura);
-    return response.data;
+    // Si hay foto, usar FormData, sino JSON
+    if (photoFile) {
+      const formData = new FormData();
+      // Agregar datos de la escritura como JSON
+      formData.append('data', JSON.stringify(datosEscritura));
+      // Agregar foto
+      formData.append('foto', photoFile);
+      
+      const response = await apiClient.post('/escrituras/manual', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } else {
+      // Sin foto, enviar JSON normal
+      const response = await apiClient.post('/escrituras/manual', datosEscritura);
+      return response.data;
+    }
   } catch (error) {
     console.error('Error creating manual escritura:', error);
     throw new Error(

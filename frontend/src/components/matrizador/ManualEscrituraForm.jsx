@@ -1,6 +1,7 @@
 /**
  * Componente ManualEscrituraForm
- * Formulario para crear escrituras ingresando datos manualmente
+ * Formulario simplificado para crear escrituras ingresando datos manualmente
+ * Solo información esencial para autoridades migratorias
  */
 
 import React, { useState } from 'react';
@@ -20,21 +21,32 @@ import {
   FormControlLabel,
   Alert,
   CircularProgress,
-  Divider
+  Divider,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  CardMedia
 } from '@mui/material';
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
   ArrowBack as BackIcon,
   ArrowForward as ForwardIcon,
-  Save as SaveIcon
+  Save as SaveIcon,
+  Image as ImageIcon,
+  Close as CloseIcon
 } from '@mui/icons-material';
 
-const STEPS = ['Información Básica', 'Información Notarial', 'Otorgantes y Detalles'];
+const STEPS = ['Información Básica', 'Información Notarial', 'Otorgantes y Beneficiarios'];
 
 const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
   const [activeStep, setActiveStep] = useState(0);
   const [error, setError] = useState(null);
+  
+  // Estado para la foto
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
 
   // Estado del formulario
   const [formData, setFormData] = useState({
@@ -81,7 +93,7 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
     });
   };
 
-  // Añade un otorgante/beneficiario
+  // Añade un otorgante/beneficiario (estructura simplificada)
   const addPersona = (tipo) => {
     setFormData(prev => ({
       ...prev,
@@ -91,10 +103,9 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
           ...prev.otorgantes[tipo],
           { 
             nombre: '', 
-            documento: 'CÉDULA', 
-            numero: '', 
-            nacionalidad: 'ECUATORIANA', 
-            calidad: tipo === 'otorgado_por' ? 'OTORGANTE' : 'BENEFICIARIO'
+            documento: 'Cédula', 
+            numero: '',
+            representadoPor: '' // Solo se guarda si se marca el checkbox
           }
         ]
       }
@@ -147,17 +158,73 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
     setError(null);
   };
 
-  // Envía el formulario
+  // Maneja la selección de foto
+  const handlePhotoSelect = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    
+    // Validar tipo de archivo
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      setError('Solo se permiten imágenes JPG, PNG o WEBP');
+      return;
+    }
+    
+    // Validar tamaño (máximo 5MB)
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setError('La imagen es demasiado grande (máximo 5MB)');
+      return;
+    }
+    
+    // Guardar archivo y generar preview
+    setSelectedPhoto(file);
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setPhotoPreview(e.target.result);
+    };
+    reader.readAsDataURL(file);
+  };
+  
+  // Elimina la foto seleccionada
+  const handleRemovePhoto = () => {
+    setSelectedPhoto(null);
+    setPhotoPreview(null);
+  };
+
+  // Envía el formulario (con foto opcional)
   const handleSubmit = async () => {
     if (!validateStep()) return;
 
+    // Limpiar estructura: eliminar campos de representadoPor vacíos
+    const limpiarOtorgantes = (personas) => {
+      return personas.map(p => {
+        const persona = {
+          nombre: p.nombre,
+          documento: p.documento,
+          numero: p.numero
+        };
+        // Solo incluir representadoPor si tiene valor
+        if (p.representadoPor && p.representadoPor.trim()) {
+          persona.representadoPor = p.representadoPor.trim();
+        }
+        return persona;
+      });
+    };
+
     const datosParaEnviar = {
       ...formData,
-      cuantia: formData.cuantiaIndeterminada ? 'INDETERMINADA' : formData.cuantia
+      cuantia: formData.cuantiaIndeterminada ? 'INDETERMINADA' : formData.cuantia,
+      otorgantes: {
+        otorgado_por: limpiarOtorgantes(formData.otorgantes.otorgado_por),
+        a_favor_de: limpiarOtorgantes(formData.otorgantes.a_favor_de)
+      }
     };
 
     try {
-      await onSubmit(datosParaEnviar);
+      // Pasar datos y foto al componente padre
+      await onSubmit(datosParaEnviar, selectedPhoto);
     } catch (err) {
       setError(err.message || 'Error al crear la escritura');
     }
@@ -310,80 +377,165 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
       case 2:
         return (
           <Grid container spacing={3}>
+            {/* Sección de Fotografía */}
+            <Grid item xs={12}>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <ImageIcon />
+                Fotografía del Menor (Opcional)
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Si la escritura es una autorización de salida del país, adjunta una fotografía del menor.
+              </Typography>
+              
+              {!photoPreview ? (
+                <Box>
+                  <input
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    style={{ display: 'none' }}
+                    id="foto-input-manual"
+                    type="file"
+                    onChange={handlePhotoSelect}
+                    disabled={loading}
+                  />
+                  <label htmlFor="foto-input-manual">
+                    <Button
+                      variant="outlined"
+                      component="span"
+                      startIcon={<ImageIcon />}
+                      disabled={loading}
+                    >
+                      Seleccionar Fotografía
+                    </Button>
+                  </label>
+                  <Typography variant="caption" display="block" sx={{ mt: 1, color: 'text.secondary' }}>
+                    Formatos: JPG, PNG, WEBP • Tamaño máximo: 5MB
+                  </Typography>
+                </Box>
+              ) : (
+                <Card sx={{ maxWidth: 400, position: 'relative' }}>
+                  <IconButton
+                    onClick={handleRemovePhoto}
+                    disabled={loading}
+                    sx={{
+                      position: 'absolute',
+                      top: 8,
+                      right: 8,
+                      bgcolor: 'background.paper',
+                      '&:hover': { bgcolor: 'error.main', color: 'white' }
+                    }}
+                    size="small"
+                  >
+                    <CloseIcon />
+                  </IconButton>
+                  <CardMedia
+                    component="img"
+                    image={photoPreview}
+                    alt="Vista previa de fotografía"
+                    sx={{ maxHeight: 300, objectFit: 'contain', p: 2 }}
+                  />
+                  <Box sx={{ p: 2, bgcolor: 'action.hover' }}>
+                    <Typography variant="body2">
+                      {selectedPhoto?.name}
+                    </Typography>
+                  </Box>
+                </Card>
+              )}
+            </Grid>
+
+            <Grid item xs={12}>
+              <Divider sx={{ my: 2 }} />
+            </Grid>
+
             {/* Otorgantes */}
             <Grid item xs={12}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                <Typography variant="subtitle2" color="text.secondary">
-                  Otorgado por (Opcional)
+                <Typography variant="h6" color="primary">
+                  Otorgantes (Padres/Apoderados)
                 </Typography>
                 <Button
+                  variant="contained"
                   size="small"
                   startIcon={<AddIcon />}
                   onClick={() => addPersona('otorgado_por')}
                   disabled={loading}
                 >
-                  Añadir
+                  Agregar Otorgante
                 </Button>
               </Box>
 
               {formData.otorgantes.otorgado_por.map((persona, index) => (
-                <Card key={index} variant="outlined" sx={{ mb: 1, p: 1 }}>
-                  <Grid container spacing={1}>
-                    <Grid item xs={12} md={6}>
+                <Card key={index} variant="outlined" sx={{ mb: 2, p: 2, bgcolor: 'background.default' }}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12}>
                       <TextField
                         fullWidth
-                        size="small"
-                        label="Nombre completo"
+                        label="Nombre Completo"
                         placeholder="Ej: Juan Pérez García"
                         value={persona.nombre}
                         onChange={(e) => handleOtorganteChange('otorgado_por', index, 'nombre', e.target.value)}
                         disabled={loading}
+                        required
                       />
                     </Grid>
-                    <Grid item xs={6} md={3}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Tipo Doc."
-                        placeholder="CÉDULA"
-                        value={persona.documento}
-                        onChange={(e) => handleOtorganteChange('otorgado_por', index, 'documento', e.target.value)}
-                        disabled={loading}
-                      />
+                    
+                    <Grid item xs={12} md={6}>
+                      <FormControl fullWidth>
+                        <InputLabel>Tipo de Documento</InputLabel>
+                        <Select
+                          value={persona.documento}
+                          onChange={(e) => handleOtorganteChange('otorgado_por', index, 'documento', e.target.value)}
+                          label="Tipo de Documento"
+                          disabled={loading}
+                        >
+                          <MenuItem value="Cédula">Cédula</MenuItem>
+                          <MenuItem value="Pasaporte">Pasaporte</MenuItem>
+                        </Select>
+                      </FormControl>
                     </Grid>
-                    <Grid item xs={6} md={3}>
+                    
+                    <Grid item xs={12} md={6}>
                       <TextField
                         fullWidth
-                        size="small"
-                        label="N° Documento"
+                        label="Número de Documento"
                         placeholder="1234567890"
                         value={persona.numero}
                         onChange={(e) => handleOtorganteChange('otorgado_por', index, 'numero', e.target.value)}
                         disabled={loading}
+                        required
                       />
                     </Grid>
-                    <Grid item xs={6}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Nacionalidad"
-                        placeholder="ECUATORIANA"
-                        value={persona.nacionalidad}
-                        onChange={(e) => handleOtorganteChange('otorgado_por', index, 'nacionalidad', e.target.value)}
-                        disabled={loading}
+                    
+                    <Grid item xs={12}>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={!!persona.esRepresentado}
+                            onChange={(e) => {
+                              handleOtorganteChange('otorgado_por', index, 'esRepresentado', e.target.checked);
+                              if (!e.target.checked) {
+                                handleOtorganteChange('otorgado_por', index, 'representadoPor', '');
+                              }
+                            }}
+                            disabled={loading}
+                          />
+                        }
+                        label="Es representado por"
                       />
+                      
+                      {persona.esRepresentado && (
+                        <TextField
+                          fullWidth
+                          label="Nombre del Representante"
+                          placeholder="Ej: María González López"
+                          value={persona.representadoPor || ''}
+                          onChange={(e) => handleOtorganteChange('otorgado_por', index, 'representadoPor', e.target.value)}
+                          disabled={loading}
+                          sx={{ mt: 1 }}
+                        />
+                      )}
                     </Grid>
-                    <Grid item xs={6}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Calidad"
-                        placeholder="OTORGANTE"
-                        value={persona.calidad}
-                        onChange={(e) => handleOtorganteChange('otorgado_por', index, 'calidad', e.target.value)}
-                        disabled={loading}
-                      />
-                    </Grid>
+                    
                     <Grid item xs={12}>
                       <Button
                         size="small"
@@ -392,7 +544,7 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
                         onClick={() => removePersona('otorgado_por', index)}
                         disabled={loading}
                       >
-                        Eliminar
+                        Eliminar Otorgante
                       </Button>
                     </Grid>
                   </Grid>
@@ -403,77 +555,96 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
             {/* Beneficiarios */}
             <Grid item xs={12}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-                <Typography variant="subtitle2" color="text.secondary">
-                  A favor de (Opcional)
+                <Typography variant="h6" color="secondary">
+                  Beneficiarios (Menores Viajando)
                 </Typography>
                 <Button
+                  variant="contained"
                   size="small"
                   startIcon={<AddIcon />}
                   onClick={() => addPersona('a_favor_de')}
                   disabled={loading}
+                  color="secondary"
                 >
-                  Añadir
+                  Agregar Beneficiario
                 </Button>
               </Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Pueden ser varios menores viajando en la misma autorización
+              </Typography>
 
               {formData.otorgantes.a_favor_de.map((persona, index) => (
-                <Card key={index} variant="outlined" sx={{ mb: 1, p: 1 }}>
-                  <Grid container spacing={1}>
-                    <Grid item xs={12} md={6}>
+                <Card key={index} variant="outlined" sx={{ mb: 2, p: 2, bgcolor: 'background.default' }}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12}>
                       <TextField
                         fullWidth
-                        size="small"
-                        label="Nombre completo"
+                        label="Nombre Completo"
                         placeholder="Ej: María Rodríguez López"
                         value={persona.nombre}
                         onChange={(e) => handleOtorganteChange('a_favor_de', index, 'nombre', e.target.value)}
                         disabled={loading}
+                        required
                       />
                     </Grid>
-                    <Grid item xs={6} md={3}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Tipo Doc."
-                        placeholder="CÉDULA"
-                        value={persona.documento}
-                        onChange={(e) => handleOtorganteChange('a_favor_de', index, 'documento', e.target.value)}
-                        disabled={loading}
-                      />
+                    
+                    <Grid item xs={12} md={6}>
+                      <FormControl fullWidth>
+                        <InputLabel>Tipo de Documento</InputLabel>
+                        <Select
+                          value={persona.documento}
+                          onChange={(e) => handleOtorganteChange('a_favor_de', index, 'documento', e.target.value)}
+                          label="Tipo de Documento"
+                          disabled={loading}
+                        >
+                          <MenuItem value="Cédula">Cédula</MenuItem>
+                          <MenuItem value="Pasaporte">Pasaporte</MenuItem>
+                        </Select>
+                      </FormControl>
                     </Grid>
-                    <Grid item xs={6} md={3}>
+                    
+                    <Grid item xs={12} md={6}>
                       <TextField
                         fullWidth
-                        size="small"
-                        label="N° Documento"
+                        label="Número de Documento"
                         placeholder="0987654321"
                         value={persona.numero}
                         onChange={(e) => handleOtorganteChange('a_favor_de', index, 'numero', e.target.value)}
                         disabled={loading}
+                        required
                       />
                     </Grid>
-                    <Grid item xs={6}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Nacionalidad"
-                        placeholder="ECUATORIANA"
-                        value={persona.nacionalidad}
-                        onChange={(e) => handleOtorganteChange('a_favor_de', index, 'nacionalidad', e.target.value)}
-                        disabled={loading}
+                    
+                    <Grid item xs={12}>
+                      <FormControlLabel
+                        control={
+                          <Checkbox
+                            checked={!!persona.esRepresentado}
+                            onChange={(e) => {
+                              handleOtorganteChange('a_favor_de', index, 'esRepresentado', e.target.checked);
+                              if (!e.target.checked) {
+                                handleOtorganteChange('a_favor_de', index, 'representadoPor', '');
+                              }
+                            }}
+                            disabled={loading}
+                          />
+                        }
+                        label="Es representado por"
                       />
+                      
+                      {persona.esRepresentado && (
+                        <TextField
+                          fullWidth
+                          label="Nombre del Representante"
+                          placeholder="Ej: Pedro García Morales"
+                          value={persona.representadoPor || ''}
+                          onChange={(e) => handleOtorganteChange('a_favor_de', index, 'representadoPor', e.target.value)}
+                          disabled={loading}
+                          sx={{ mt: 1 }}
+                        />
+                      )}
                     </Grid>
-                    <Grid item xs={6}>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        label="Calidad"
-                        placeholder="BENEFICIARIO"
-                        value={persona.calidad}
-                        onChange={(e) => handleOtorganteChange('a_favor_de', index, 'calidad', e.target.value)}
-                        disabled={loading}
-                      />
-                    </Grid>
+                    
                     <Grid item xs={12}>
                       <Button
                         size="small"
@@ -482,7 +653,7 @@ const ManualEscrituraForm = ({ onSubmit, onCancel, loading }) => {
                         onClick={() => removePersona('a_favor_de', index)}
                         disabled={loading}
                       >
-                        Eliminar
+                        Eliminar Beneficiario
                       </Button>
                     </Grid>
                   </Grid>
