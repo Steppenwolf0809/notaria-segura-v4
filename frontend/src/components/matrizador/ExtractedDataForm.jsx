@@ -25,7 +25,9 @@ import {
   FormControl,
   InputLabel,
   Select,
-  MenuItem
+  MenuItem,
+  Checkbox,
+  FormControlLabel
 } from '@mui/material';
 import {
   ExpandMore as ExpandMoreIcon,
@@ -187,7 +189,7 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
       const safe = { ...(prev || {}) };
       const otorg = { ...(safe.otorgantes || {}) };
       const arr = Array.isArray(otorg[type]) ? [...otorg[type]] : [];
-      arr.push({ nombre: '', documento: '', numero: '', nacionalidad: '', calidad: '' });
+      arr.push({ nombre: '', documento: 'Cédula', numero: '', representadoPor: '' });
       otorg[type] = arr;
       safe.otorgantes = otorg;
       return safe;
@@ -520,13 +522,13 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
                     </Box>
                   )}
                   {formData.otorgantes?.otorgado_por?.map((persona, index) => (
-                    <Card key={index} variant="outlined" sx={{ mb: 1 }}>
+                    <Card key={index} variant="outlined" sx={{ mb: 1, bgcolor: 'action.hover' }}>
                       <CardContent sx={{ p: 2 }}>
                         <Grid container spacing={1}>
                           <Grid item xs={12}>
                             <TextField
                               fullWidth
-                              label="Nombre"
+                              label="Nombre Completo"
                               value={persona.nombre || ''}
                               onChange={(e) => handleOtorganteChange('otorgado_por', index, 'nombre', e.target.value)}
                               disabled={!editMode}
@@ -534,44 +536,57 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
                             />
                           </Grid>
                           <Grid item xs={6}>
-                            <TextField
-                              fullWidth
-                              label="Documento"
-                              value={persona.documento || ''}
-                              onChange={(e) => handleOtorganteChange('otorgado_por', index, 'documento', e.target.value)}
-                              disabled={!editMode}
-                              size="small"
-                            />
+                            <FormControl fullWidth size="small">
+                              <InputLabel>Tipo de Documento</InputLabel>
+                              <Select
+                                value={persona.documento || 'Cédula'}
+                                onChange={(e) => handleOtorganteChange('otorgado_por', index, 'documento', e.target.value)}
+                                label="Tipo de Documento"
+                                disabled={!editMode}
+                              >
+                                <MenuItem value="Cédula">Cédula</MenuItem>
+                                <MenuItem value="Pasaporte">Pasaporte</MenuItem>
+                              </Select>
+                            </FormControl>
                           </Grid>
                           <Grid item xs={6}>
                             <TextField
                               fullWidth
-                              label="Número"
+                              label="Número de Documento"
                               value={persona.numero || ''}
                               onChange={(e) => handleOtorganteChange('otorgado_por', index, 'numero', e.target.value)}
                               disabled={!editMode}
                               size="small"
                             />
                           </Grid>
-                          <Grid item xs={6}>
-                            <TextField
-                              fullWidth
-                              label="Nacionalidad"
-                              value={persona.nacionalidad || ''}
-                              onChange={(e) => handleOtorganteChange('otorgado_por', index, 'nacionalidad', e.target.value)}
-                              disabled={!editMode}
-                              size="small"
+                          <Grid item xs={12}>
+                            <FormControlLabel
+                              control={
+                                <Checkbox
+                                  checked={!!persona.esRepresentado}
+                                  onChange={(e) => {
+                                    handleOtorganteChange('otorgado_por', index, 'esRepresentado', e.target.checked);
+                                    if (!e.target.checked) {
+                                      handleOtorganteChange('otorgado_por', index, 'representadoPor', '');
+                                    }
+                                  }}
+                                  disabled={!editMode}
+                                  size="small"
+                                />
+                              }
+                              label="Es representado por"
                             />
-                          </Grid>
-                          <Grid item xs={6}>
-                            <TextField
-                              fullWidth
-                              label="Calidad"
-                              value={persona.calidad || ''}
-                              onChange={(e) => handleOtorganteChange('otorgado_por', index, 'calidad', e.target.value)}
-                              disabled={!editMode}
-                              size="small"
-                            />
+                            {persona.esRepresentado && (
+                              <TextField
+                                fullWidth
+                                label="Nombre del Representante"
+                                value={persona.representadoPor || ''}
+                                onChange={(e) => handleOtorganteChange('otorgado_por', index, 'representadoPor', e.target.value)}
+                                disabled={!editMode}
+                                size="small"
+                                sx={{ mt: 1 }}
+                              />
+                            )}
                           </Grid>
                           {editMode && (
                             <Grid item xs={12}>
@@ -601,13 +616,13 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
                     </Box>
                   )}
                   {formData.otorgantes?.a_favor_de?.map((persona, index) => (
-                    <Card key={index} variant="outlined" sx={{ mb: 1 }}>
+                    <Card key={index} variant="outlined" sx={{ mb: 1, bgcolor: 'action.hover' }}>
                       <CardContent sx={{ p: 2 }}>
                         <Grid container spacing={1}>
                           <Grid item xs={12}>
                             <TextField
                               fullWidth
-                              label="Nombre"
+                              label="Nombre Completo"
                               value={persona.nombre || ''}
                               onChange={(e) => handleOtorganteChange('a_favor_de', index, 'nombre', e.target.value)}
                               disabled={!editMode}
@@ -615,44 +630,57 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
                             />
                           </Grid>
                           <Grid item xs={6}>
-                            <TextField
-                              fullWidth
-                              label="Documento"
-                              value={persona.documento || ''}
-                              onChange={(e) => handleOtorganteChange('a_favor_de', index, 'documento', e.target.value)}
-                              disabled={!editMode}
-                              size="small"
-                            />
+                            <FormControl fullWidth size="small">
+                              <InputLabel>Tipo de Documento</InputLabel>
+                              <Select
+                                value={persona.documento || 'Cédula'}
+                                onChange={(e) => handleOtorganteChange('a_favor_de', index, 'documento', e.target.value)}
+                                label="Tipo de Documento"
+                                disabled={!editMode}
+                              >
+                                <MenuItem value="Cédula">Cédula</MenuItem>
+                                <MenuItem value="Pasaporte">Pasaporte</MenuItem>
+                              </Select>
+                            </FormControl>
                           </Grid>
                           <Grid item xs={6}>
                             <TextField
                               fullWidth
-                              label="Número"
+                              label="Número de Documento"
                               value={persona.numero || ''}
                               onChange={(e) => handleOtorganteChange('a_favor_de', index, 'numero', e.target.value)}
                               disabled={!editMode}
                               size="small"
                             />
                           </Grid>
-                          <Grid item xs={6}>
-                            <TextField
-                              fullWidth
-                              label="Nacionalidad"
-                              value={persona.nacionalidad || ''}
-                              onChange={(e) => handleOtorganteChange('a_favor_de', index, 'nacionalidad', e.target.value)}
-                              disabled={!editMode}
-                              size="small"
+                          <Grid item xs={12}>
+                            <FormControlLabel
+                              control={
+                                <Checkbox
+                                  checked={!!persona.esRepresentado}
+                                  onChange={(e) => {
+                                    handleOtorganteChange('a_favor_de', index, 'esRepresentado', e.target.checked);
+                                    if (!e.target.checked) {
+                                      handleOtorganteChange('a_favor_de', index, 'representadoPor', '');
+                                    }
+                                  }}
+                                  disabled={!editMode}
+                                  size="small"
+                                />
+                              }
+                              label="Es representado por"
                             />
-                          </Grid>
-                          <Grid item xs={6}>
-                            <TextField
-                              fullWidth
-                              label="Calidad"
-                              value={persona.calidad || ''}
-                              onChange={(e) => handleOtorganteChange('a_favor_de', index, 'calidad', e.target.value)}
-                              disabled={!editMode}
-                              size="small"
-                            />
+                            {persona.esRepresentado && (
+                              <TextField
+                                fullWidth
+                                label="Nombre del Representante"
+                                value={persona.representadoPor || ''}
+                                onChange={(e) => handleOtorganteChange('a_favor_de', index, 'representadoPor', e.target.value)}
+                                disabled={!editMode}
+                                size="small"
+                                sx={{ mt: 1 }}
+                              />
+                            )}
                           </Grid>
                           {editMode && (
                             <Grid item xs={12}>

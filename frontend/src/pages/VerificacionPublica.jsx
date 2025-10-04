@@ -405,7 +405,7 @@ const VerificacionPublica = () => {
                 <Card sx={{ mb: 3 }}>
                   <CardContent>
                     <Typography variant="h6" gutterBottom sx={{ textAlign: 'center', mb: 2 }}>
-                      Fotografía del Menor
+                      Fotografía de Verificación
                     </Typography>
                     <Box 
                       sx={{ 
@@ -417,7 +417,7 @@ const VerificacionPublica = () => {
                       <Box
                         component="img"
                         src={escritura.fotoURL}
-                        alt="Fotografía del menor"
+                        alt="Fotografía de verificación"
                         onError={(e) => {
                           // Si la imagen no carga, mostrar placeholder
                           e.target.style.display = 'none';
