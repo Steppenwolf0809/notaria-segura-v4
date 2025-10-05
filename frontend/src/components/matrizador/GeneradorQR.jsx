@@ -45,7 +45,10 @@ import {
   Refresh as RefreshIcon,
   FilterList as FilterIcon,
   GetApp as DownloadIcon,
-  CheckCircle as CheckCircleIcon
+  CheckCircle as CheckCircleIcon,
+  PictureAsPdf as PdfIcon,
+  CloudUpload as UploadIcon,
+  RemoveRedEye as EyeIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 
@@ -54,6 +57,8 @@ import PDFUploader from './PDFUploader';
 import ExtractedDataForm from './ExtractedDataForm';
 import QRDisplay from './QRDisplay';
 import ManualEscrituraForm from './ManualEscrituraForm';
+import PDFUploaderModal from '../escrituras/PDFUploaderModalV2';
+import SecurePDFViewer from '../escrituras/SecurePDFViewer';
 
 // Servicios
 import {
@@ -64,7 +69,9 @@ import {
   hardDeleteEscritura,
   updateEscritura,
   getEstadoInfo,
-  ESTADOS_ESCRITURA
+  ESTADOS_ESCRITURA,
+  hasPDFUploaded,
+  getPDFUrlPrivate
 } from '../../services/escrituras-qr-service';
 
 const GeneradorQR = () => {
@@ -81,6 +88,11 @@ const GeneradorQR = () => {
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showHardDeleteDialog, setShowHardDeleteDialog] = useState(false); // Dialog para confirmación de eliminación permanente
   const [uploadLoading, setUploadLoading] = useState(false);
+  
+  // Estados para PDFs completos
+  const [showPDFUploadModal, setShowPDFUploadModal] = useState(false);
+  const [showPDFViewerModal, setShowPDFViewerModal] = useState(false);
+  const [selectedEscrituraForPDF, setSelectedEscrituraForPDF] = useState(null);
 
   // Estados de filtros y paginación
   const [page, setPage] = useState(0);
@@ -309,6 +321,36 @@ const GeneradorQR = () => {
     );
     setSelectedEscritura(updatedEscritura);
   };
+  
+  /**
+   * Abre el modal para subir PDF
+   */
+  const handleUploadPDF = (escritura) => {
+    setSelectedEscrituraForPDF(escritura);
+    setShowPDFUploadModal(true);
+  };
+  
+  /**
+   * Abre el modal para ver PDF
+   */
+  const handleViewPDF = (escritura) => {
+    setSelectedEscrituraForPDF(escritura);
+    setShowPDFViewerModal(true);
+  };
+  
+  /**
+   * Callback cuando se sube exitosamente un PDF
+   */
+  const handlePDFUploadSuccess = (pdfData) => {
+    toast.success('PDF subido exitosamente');
+    
+    // Recargar la lista de escrituras para actualizar los datos
+    loadEscrituras();
+    
+    // Cerrar modal
+    setShowPDFUploadModal(false);
+    setSelectedEscrituraForPDF(null);
+  };
 
   return (
     <Box>
@@ -400,6 +442,7 @@ const GeneradorQR = () => {
                 <TableCell>Archivo</TableCell>
                 <TableCell>Estado</TableCell>
                 <TableCell>Token</TableCell>
+                <TableCell align="center">PDF</TableCell>
                 <TableCell>Creado</TableCell>
                 <TableCell align="center">Acciones</TableCell>
               </TableRow>
@@ -407,13 +450,13 @@ const GeneradorQR = () => {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                     <CircularProgress />
                   </TableCell>
                 </TableRow>
               ) : escrituras.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
                     <Typography color="text.secondary">
                       No hay escrituras registradas
                     </Typography>
@@ -449,6 +492,41 @@ const GeneradorQR = () => {
                         <Typography variant="body2" fontFamily="monospace">
                           {escritura.token}
                         </Typography>
+                      </TableCell>
+                      
+                      {/* Columna de PDF */}
+                      <TableCell align="center">
+                        {hasPDFUploaded(escritura) ? (
+                          <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                            <Tooltip title="Ver PDF">
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={() => handleViewPDF(escritura)}
+                              >
+                                <EyeIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Reemplazar PDF">
+                              <IconButton
+                                size="small"
+                                onClick={() => handleUploadPDF(escritura)}
+                              >
+                                <UploadIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Box>
+                        ) : (
+                          <Tooltip title="Subir PDF">
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              onClick={() => handleUploadPDF(escritura)}
+                            >
+                              <UploadIcon />
+                            </IconButton>
+                          </Tooltip>
+                        )}
                       </TableCell>
                       
                       <TableCell>
@@ -846,6 +924,60 @@ const GeneradorQR = () => {
             </Typography>
           </Alert>
         </Box>
+      )}
+      
+      {/* Modal de subida de PDF completo */}
+      {selectedEscrituraForPDF && (
+        <PDFUploaderModal
+          open={showPDFUploadModal}
+          onClose={() => {
+            setShowPDFUploadModal(false);
+            setSelectedEscrituraForPDF(null);
+          }}
+          escritura={selectedEscrituraForPDF}
+          onSuccess={handlePDFUploadSuccess}
+        />
+      )}
+      
+      {/* Modal de visualización de PDF */}
+      {selectedEscrituraForPDF && hasPDFUploaded(selectedEscrituraForPDF) && (
+        <Dialog
+          open={showPDFViewerModal}
+          onClose={() => {
+            setShowPDFViewerModal(false);
+            setSelectedEscrituraForPDF(null);
+          }}
+          maxWidth="lg"
+          fullWidth
+        >
+          <DialogTitle>
+            <Box display="flex" alignItems="center" justifyContent="space-between">
+              <Box display="flex" alignItems="center" gap={1}>
+                <PdfIcon color="primary" />
+                <Typography variant="h6">
+                  Vista Previa del PDF
+                </Typography>
+              </Box>
+              <IconButton
+                onClick={() => {
+                  setShowPDFViewerModal(false);
+                  setSelectedEscrituraForPDF(null);
+                }}
+                size="small"
+              >
+                <DeleteIcon />
+              </IconButton>
+            </Box>
+          </DialogTitle>
+          <DialogContent>
+            <SecurePDFViewer
+              pdfUrl={getPDFUrlPrivate(selectedEscrituraForPDF.id)}
+              numeroEscritura={selectedEscrituraForPDF.numeroEscritura}
+              showControls={true}
+              showBanner={false}
+            />
+          </DialogContent>
+        </Dialog>
       )}
     </Box>
   );
