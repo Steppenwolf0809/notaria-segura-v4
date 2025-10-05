@@ -67,7 +67,6 @@ import {
   getEscrituras,
   deleteEscritura,
   hardDeleteEscritura,
-  updateEscritura,
   getEstadoInfo,
   ESTADOS_ESCRITURA,
   hasPDFUploaded,
@@ -218,31 +217,6 @@ const GeneradorQR = () => {
       if (response.success) {
         toast.success('Escritura desactivada');
         loadEscrituras();
-      }
-    } catch (err) {
-      toast.error(err.message);
-    }
-  };
-
-  /**
-   * Maneja la reactivación de una escritura
-   */
-  const handleReactivate = async (escrituraId) => {
-    if (!window.confirm('¿Estás seguro de que quieres reactivar esta escritura?')) {
-      return;
-    }
-
-    try {
-      const response = await updateEscritura(escrituraId, { estado: 'activo' });
-      
-      if (response.success) {
-        toast.success('✅ Escritura reactivada exitosamente');
-        loadEscrituras();
-        
-        // Si estamos viendo los detalles, actualizar la escritura seleccionada
-        if (selectedEscritura && selectedEscritura.id === escrituraId) {
-          setSelectedEscritura(response.data);
-        }
       }
     } catch (err) {
       toast.error(err.message);
@@ -777,36 +751,19 @@ const GeneradorQR = () => {
         
         <DialogActions sx={{ justifyContent: 'space-between', px: 3, py: 2 }}>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            {/* Mostrar "Reactivar" si está inactivo, "Desactivar" si está activo */}
-            {selectedEscritura?.estado === 'inactivo' ? (
-              <Button
-                variant="contained"
-                color="success"
-                startIcon={<CheckCircleIcon />}
-                onClick={() => {
-                  if (selectedEscritura) {
-                    handleReactivate(selectedEscritura.id);
-                  }
-                }}
-              >
-                Reactivar Escritura
-              </Button>
-            ) : (
-              <Button
-                variant="outlined"
-                color="warning"
-                startIcon={<DeleteIcon />}
-                onClick={() => {
-                  if (selectedEscritura) {
-                    handleDelete(selectedEscritura.id);
-                    setShowDetailsDialog(false);
-                  }
-                }}
-              >
-                Desactivar
-              </Button>
-            )}
-            
+            <Button
+              variant="outlined"
+              color="warning"
+              startIcon={<DeleteIcon />}
+              onClick={() => {
+                if (selectedEscritura) {
+                  handleDelete(selectedEscritura.id);
+                  setShowDetailsDialog(false);
+                }
+              }}
+            >
+              Desactivar
+            </Button>
             <Button
               variant="outlined"
               color="error"
