@@ -398,22 +398,10 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
               size="small"
               onClick={() => handleStateChange('activo')}
               disabled={loading}
-              startIcon={<CheckIcon />}
             >
-              {escritura?.estado === 'inactivo' ? 'Reactivar Escritura' : 'Aprobar'}
+              Aprobar
             </Button>
-            {escritura?.estado === 'revision_requerida' && (
-              <Button
-                variant="outlined"
-                color="error"
-                size="small"
-                onClick={() => handleStateChange('inactivo')}
-                disabled={loading}
-              >
-                Desactivar
-              </Button>
-            )}
-            {escritura?.estado !== 'revision_requerida' && escritura?.estado !== 'inactivo' && (
+            {escritura?.estado !== 'revision_requerida' && (
               <Button
                 variant="outlined"
                 color="warning"
@@ -520,11 +508,11 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
           </Card>
         </Grid>
 
-        {/* Fotografía del notario */}
+        {/* Fotografía del Menor */}
         <Grid item xs={12}>
           <Card>
             <CardHeader 
-              title="Fotografía de Verificación (Opcional)" 
+              title="Fotografía del Menor (Opcional)" 
               subheader="Fotografía para verificación de identidad"
             />
             <CardContent>
