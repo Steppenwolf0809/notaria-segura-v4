@@ -8,6 +8,11 @@ import { parseEscrituraPDF, validatePDFFile, sanitizeFilename } from '../service
 import { generateUniqueToken } from '../utils/token-generator.js';
 import { generateQRInfo, generateMultiFormatQR } from '../services/qr-generator-service.js';
 import { uploadPhotoToFTP } from '../services/cpanel-ftp-service.js';
+import { 
+  uploadPDFToFTP, 
+  downloadPDFFromFTP, 
+  validatePDFFile as validatePDFBuffer 
+} from '../services/cpanel-ftp-service.js';
 
 /**
  * POST /api/escrituras/upload
@@ -1221,6 +1226,402 @@ export async function hardDeleteEscritura(req, res) {
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+}
+
+/**
+ * POST /api/escrituras/:id/pdf
+ * Sube el PDF completo de una escritura al FTP
+ * Solo para ADMIN y MATRIZADOR (protegido)
+ */
+export async function uploadPDFToEscritura(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    
+    console.log(`[uploadPDF] Usuario ${userId} (${userRole}) subiendo PDF para escritura ${id}`);
+    
+    // Verificar permisos (ADMIN o MATRIZADOR)
+    if (userRole !== 'ADMIN' && userRole !== 'MATRIZADOR') {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo administradores y matrizadores pueden subir PDFs'
+      });
+    }
+    
+    // Verificar que se recibió el archivo
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No se proporcionó ningún archivo PDF'
+      });
+    }
+    
+    const pdfFile = req.file;
+    
+    // Obtener páginas ocultas si se proporcionaron
+    const hiddenPages = req.body.hiddenPages || null;
+    let hiddenPagesArray = null;
+    
+    if (hiddenPages) {
+      try {
+        hiddenPagesArray = JSON.parse(hiddenPages);
+        // Validar que sea un array de números
+        if (!Array.isArray(hiddenPagesArray) || !hiddenPagesArray.every(p => typeof p === 'number' && p > 0)) {
+          return res.status(400).json({
+            success: false,
+            message: 'Las páginas ocultas deben ser un array de números positivos'
+          });
+        }
+        console.log(`[uploadPDF] Páginas a ocultar: ${hiddenPagesArray.join(', ')}`);
+      } catch (parseError) {
+        return res.status(400).json({
+          success: false,
+          message: 'Formato inválido de páginas ocultas'
+        });
+      }
+    }
+    
+    // Validar que sea un PDF (verificar magic bytes)
+    if (!validatePDFBuffer(pdfFile.buffer)) {
+      return res.status(400).json({
+        success: false,
+        message: 'El archivo no es un PDF válido'
+      });
+    }
+    
+    // Validar tamaño máximo (10MB)
+    const maxSize = 10 * 1024 * 1024;
+    if (pdfFile.size > maxSize) {
+      const sizeMB = (pdfFile.size / (1024 * 1024)).toFixed(2);
+      return res.status(400).json({
+        success: false,
+        message: `El archivo es demasiado grande (${sizeMB}MB). Máximo permitido: 10MB`
+      });
+    }
+    
+    // Buscar escritura
+    const escritura = await prisma.escrituraQR.findUnique({
+      where: { id: parseInt(id) }
+    });
+    
+    if (!escritura) {
+      return res.status(404).json({
+        success: false,
+        message: 'Escritura no encontrada'
+      });
+    }
+    
+    // Nombre del archivo: {TOKEN}.pdf
+    const filename = `${escritura.token}.pdf`;
+    
+    console.log(`[uploadPDF] Subiendo PDF al FTP: ${filename} (${(pdfFile.size / 1024).toFixed(2)} KB)`);
+    
+    // Subir PDF al FTP (si ya existe, se reemplaza automáticamente)
+    const pdfURL = await uploadPDFToFTP(pdfFile.buffer, filename);
+    
+    // Actualizar base de datos
+    const updateData = {
+      pdfFileName: filename,
+      pdfUploadedAt: new Date(),
+      pdfUploadedBy: userId,
+      pdfFileSize: pdfFile.size
+    };
+    
+    // Agregar páginas ocultas si se proporcionaron
+    if (hiddenPagesArray && hiddenPagesArray.length > 0) {
+      updateData.pdfHiddenPages = JSON.stringify(hiddenPagesArray);
+      console.log(`[uploadPDF] Guardando ${hiddenPagesArray.length} página(s) oculta(s)`);
+    } else {
+      // Si no hay páginas ocultas, establecer como null (todas visibles)
+      updateData.pdfHiddenPages = null;
+    }
+    
+    await prisma.escrituraQR.update({
+      where: { id: parseInt(id) },
+      data: updateData
+    });
+    
+    console.log(`[uploadPDF] ✅ PDF subido exitosamente para escritura ${id}`);
+    
+    // Respuesta
+    res.json({
+      success: true,
+      message: 'PDF subido exitosamente',
+      data: {
+        fileName: filename,
+        fileSize: pdfFile.size,
+        uploadedAt: new Date(),
+        pdfURL: pdfURL,
+        hiddenPages: hiddenPagesArray || []
+      }
+    });
+    
+  } catch (error) {
+    console.error('[uploadPDF] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error subiendo el PDF',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+}
+
+/**
+ * GET /api/verify/:token/pdf
+ * Sirve el PDF completo de una escritura (PÚBLICO)
+ * Cualquiera con el token puede ver el PDF
+ */
+export async function getPDFPublic(req, res) {
+  try {
+    const { token } = req.params;
+    
+    console.log(`[getPDFPublic] Solicitud de PDF con token: ${token.substring(0, 4)}****`);
+    
+    // Validar formato del token
+    if (!token || !/^[A-Za-z0-9]{8}$/.test(token)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Token inválido'
+      });
+    }
+    
+    // Buscar escritura por token
+    const escritura = await prisma.escrituraQR.findUnique({
+      where: { token }
+    });
+    
+    if (!escritura) {
+      console.log(`[getPDFPublic] Escritura no encontrada para token: ${token}`);
+      return res.status(404).json({
+        success: false,
+        message: 'Escritura no encontrada'
+      });
+    }
+    
+    // Verificar que esté activa
+    if (escritura.estado !== 'activo') {
+      console.log(`[getPDFPublic] Escritura inactiva: ${token}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Esta escritura no está disponible para verificación'
+      });
+    }
+    
+    // Verificar que tenga PDF subido
+    if (!escritura.pdfFileName) {
+      console.log(`[getPDFPublic] Escritura sin PDF subido: ${token}`);
+      return res.status(404).json({
+        success: false,
+        message: 'El PDF de esta escritura no está disponible'
+      });
+    }
+    
+    // Descargar PDF del FTP
+    console.log(`[getPDFPublic] Descargando PDF del FTP: ${escritura.pdfFileName}`);
+    const pdfBuffer = await downloadPDFFromFTP(escritura.pdfFileName);
+    
+    // Incrementar contador de visualizaciones (no esperar)
+    prisma.escrituraQR.update({
+      where: { id: escritura.id },
+      data: {
+        pdfViewCount: {
+          increment: 1
+        }
+      }
+    }).catch(err => {
+      console.warn('[getPDFPublic] Error actualizando contador de vistas:', err.message);
+    });
+    
+    // Registrar visualización (IP, fecha) - TODO: implementar sistema de auditoría
+    const clientIP = req.ip || req.headers['x-forwarded-for'] || 'unknown';
+    console.log(`[getPDFPublic] ✅ PDF servido exitosamente. IP: ${clientIP}, Token: ${token.substring(0, 4)}****`);
+    
+    // Configurar headers para visualización inline
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline');
+    res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache de 1 hora
+    res.setHeader('Content-Length', pdfBuffer.length);
+    
+    // Enviar el PDF
+    res.send(pdfBuffer);
+    
+  } catch (error) {
+    console.error('[getPDFPublic] Error:', error);
+    
+    // Respuesta específica según el error
+    if (error.message.includes('PDF no encontrado')) {
+      return res.status(404).json({
+        success: false,
+        message: 'El archivo PDF no se encuentra en el servidor'
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener el PDF',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+}
+
+/**
+ * GET /api/verify/:token/pdf/metadata
+ * Obtiene la metadata del PDF (incluyendo páginas ocultas) - PÚBLICO
+ * No requiere autenticación
+ */
+export async function getPDFMetadata(req, res) {
+  try {
+    const { token } = req.params;
+    
+    // Validar formato del token
+    if (!token || !/^[A-Za-z0-9]{8}$/.test(token)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Token inválido'
+      });
+    }
+    
+    // Buscar escritura por token
+    const escritura = await prisma.escrituraQR.findUnique({
+      where: { token },
+      select: {
+        id: true,
+        token: true,
+        numeroEscritura: true,
+        pdfFileName: true,
+        pdfFileSize: true,
+        pdfHiddenPages: true,
+        estado: true
+      }
+    });
+    
+    if (!escritura) {
+      return res.status(404).json({
+        success: false,
+        message: 'Escritura no encontrada'
+      });
+    }
+    
+    // Verificar que esté activa
+    if (escritura.estado !== 'activo') {
+      return res.status(400).json({
+        success: false,
+        message: 'Esta escritura no está disponible para verificación'
+      });
+    }
+    
+    // Verificar que tenga PDF
+    if (!escritura.pdfFileName) {
+      return res.status(404).json({
+        success: false,
+        message: 'Esta escritura no tiene PDF disponible'
+      });
+    }
+    
+    // Parsear páginas ocultas
+    let hiddenPages = [];
+    if (escritura.pdfHiddenPages) {
+      try {
+        hiddenPages = JSON.parse(escritura.pdfHiddenPages);
+      } catch (e) {
+        console.error('[getPDFMetadata] Error parsing hiddenPages:', e);
+        hiddenPages = [];
+      }
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        numeroEscritura: escritura.numeroEscritura,
+        pdfFileName: escritura.pdfFileName,
+        pdfFileSize: escritura.pdfFileSize,
+        hiddenPages: hiddenPages,
+        hasHiddenPages: hiddenPages.length > 0
+      }
+    });
+    
+  } catch (error) {
+    console.error('[getPDFMetadata] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener metadata del PDF'
+    });
+  }
+}
+
+/**
+ * GET /api/escrituras/:id/pdf
+ * Obtiene el PDF de una escritura por ID (PROTEGIDO)
+ * Solo para ADMIN y MATRIZADOR
+ */
+export async function getPDFPrivate(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    
+    console.log(`[getPDFPrivate] Usuario ${userId} (${userRole}) solicitando PDF de escritura ${id}`);
+    
+    // Verificar permisos
+    if (userRole !== 'ADMIN' && userRole !== 'MATRIZADOR') {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para acceder a este PDF'
+      });
+    }
+    
+    // Buscar escritura
+    const escritura = await prisma.escrituraQR.findUnique({
+      where: { id: parseInt(id) }
+    });
+    
+    if (!escritura) {
+      return res.status(404).json({
+        success: false,
+        message: 'Escritura no encontrada'
+      });
+    }
+    
+    // Verificar que tenga PDF subido
+    if (!escritura.pdfFileName) {
+      return res.status(404).json({
+        success: false,
+        message: 'Esta escritura no tiene un PDF subido'
+      });
+    }
+    
+    // Descargar PDF del FTP
+    console.log(`[getPDFPrivate] Descargando PDF del FTP: ${escritura.pdfFileName}`);
+    const pdfBuffer = await downloadPDFFromFTP(escritura.pdfFileName);
+    
+    console.log(`[getPDFPrivate] ✅ PDF servido exitosamente a usuario ${userId}`);
+    
+    // Configurar headers para visualización inline
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'inline');
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.setHeader('Content-Length', pdfBuffer.length);
+    
+    // Enviar el PDF
+    res.send(pdfBuffer);
+    
+  } catch (error) {
+    console.error('[getPDFPrivate] Error:', error);
+    
+    if (error.message.includes('PDF no encontrado')) {
+      return res.status(404).json({
+        success: false,
+        message: 'El archivo PDF no se encuentra en el servidor'
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener el PDF',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }

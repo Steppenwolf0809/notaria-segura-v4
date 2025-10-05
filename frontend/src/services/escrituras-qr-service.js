@@ -400,3 +400,173 @@ export function downloadQRImage(dataURL, filename = 'escritura-qr.png') {
     throw new Error('Error al descargar la imagen QR');
   }
 }
+
+// ========================================
+// FUNCIONES PARA MANEJAR PDFs COMPLETOS
+// ========================================
+
+/**
+ * Sube el PDF completo de una escritura (protegido - ADMIN/MATRIZADOR)
+ * @param {number} escrituraId - ID de la escritura
+ * @param {File} pdfFile - Archivo PDF a subir
+ * @param {Array<number>} hiddenPages - Array de números de página a ocultar
+ * @param {Function} onUploadProgress - Callback para progreso de subida
+ * @returns {Promise<Object>} Respuesta con información del PDF subido
+ */
+export async function uploadPDFToEscritura(escrituraId, pdfFile, hiddenPages = [], onUploadProgress = null) {
+  try {
+    const formData = new FormData();
+    formData.append('pdf', pdfFile);
+    
+    // Agregar páginas ocultas si hay alguna
+    if (hiddenPages && hiddenPages.length > 0) {
+      formData.append('hiddenPages', JSON.stringify(hiddenPages));
+    }
+    
+    const config = {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    };
+    
+    // Agregar callback de progreso si se proporcionó
+    if (onUploadProgress) {
+      config.onUploadProgress = (progressEvent) => {
+        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        onUploadProgress(percentCompleted);
+      };
+    }
+    
+    const response = await apiClient.post(`/escrituras/${escrituraId}/pdf`, formData, config);
+    return response.data;
+  } catch (error) {
+    console.error('Error uploading PDF:', error);
+    throw new Error(
+      error.response?.data?.message || 
+      'Error al subir el PDF'
+    );
+  }
+}
+
+/**
+ * Obtiene la metadata del PDF (incluyendo páginas ocultas)
+ * @param {string} token - Token de la escritura
+ * @returns {Promise<Object>} Metadata del PDF
+ */
+export async function getPDFMetadata(token) {
+  try {
+    const response = await fetch(`${apiClient.defaults.baseURL}/verify/${token}/pdf/metadata`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Error al obtener metadata');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching PDF metadata:', error);
+    throw new Error(
+      error.message || 'Error al obtener metadata del PDF'
+    );
+  }
+}
+
+/**
+ * Obtiene la URL del PDF público (cualquiera con el token puede acceder)
+ * @param {string} token - Token de la escritura
+ * @returns {string} URL del PDF público
+ */
+export function getPDFUrlPublic(token) {
+  return `${apiClient.defaults.baseURL}/verify/${token}/pdf`;
+}
+
+/**
+ * Obtiene la URL del PDF privado (requiere autenticación)
+ * @param {number} escrituraId - ID de la escritura
+ * @returns {string} URL del PDF privado
+ */
+export function getPDFUrlPrivate(escrituraId) {
+  return `${apiClient.defaults.baseURL}/escrituras/${escrituraId}/pdf`;
+}
+
+/**
+ * Verifica si una escritura tiene PDF subido
+ * @param {Object} escritura - Objeto de escritura
+ * @returns {boolean} True si tiene PDF subido
+ */
+export function hasPDFUploaded(escritura) {
+  return !!(escritura && escritura.pdfFileName);
+}
+
+/**
+ * Obtiene información formateada del PDF
+ * @param {Object} escritura - Objeto de escritura
+ * @returns {Object|null} Información del PDF o null si no tiene
+ */
+export function getPDFInfo(escritura) {
+  if (!hasPDFUploaded(escritura)) {
+    return null;
+  }
+  
+  return {
+    fileName: escritura.pdfFileName,
+    uploadedAt: escritura.pdfUploadedAt ? new Date(escritura.pdfUploadedAt) : null,
+    fileSize: escritura.pdfFileSize ? formatFileSize(escritura.pdfFileSize) : 'Desconocido',
+    viewCount: escritura.pdfViewCount || 0
+  };
+}
+
+/**
+ * Valida un archivo PDF antes de subirlo (para PDFs completos)
+ * @param {File} file - Archivo a validar
+ * @returns {Object} Resultado de la validación
+ */
+export function validatePDFFileUpload(file) {
+  const errors = [];
+  const warnings = [];
+  
+  // Verificar que sea un archivo
+  if (!file) {
+    errors.push('No se ha seleccionado ningún archivo');
+    return { isValid: false, errors, warnings };
+  }
+  
+  // Verificar extensión
+  const extension = file.name.split('.').pop().toLowerCase();
+  if (extension !== 'pdf') {
+    errors.push('El archivo debe tener extensión .pdf');
+  }
+  
+  // Verificar tipo MIME
+  if (file.type !== 'application/pdf' && file.type !== '') {
+    errors.push('El archivo debe ser un PDF válido');
+  }
+  
+  // Verificar tamaño máximo (10MB)
+  const maxSize = 10 * 1024 * 1024; // 10MB
+  if (file.size > maxSize) {
+    const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+    errors.push(`El archivo es demasiado grande (${sizeMB}MB). Máximo permitido: 10MB`);
+  }
+  
+  // Verificar tamaño mínimo (10KB)
+  if (file.size < 10 * 1024) {
+    errors.push('El archivo parece ser demasiado pequeño para ser un PDF válido');
+  }
+  
+  // Advertencias
+  if (file.size > 7 * 1024 * 1024) { // Mayor a 7MB
+    warnings.push('El archivo es grande, la subida puede tomar varios segundos');
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors,
+    warnings
+  };
+}

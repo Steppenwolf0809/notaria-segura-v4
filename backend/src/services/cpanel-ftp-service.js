@@ -233,9 +233,324 @@ export async function testFTPConnection() {
   }
 }
 
+/**
+ * Configuración para carpeta de PDFs
+ */
+const PDF_CONFIG = {
+  basePath: '/public_html/pdf-escrituras',
+  publicBaseURL: 'https://notaria18quito.com.ec/pdf-escrituras',
+  maxFileSize: 10 * 1024 * 1024 // 10MB
+};
+
+/**
+ * Valida que un archivo sea un PDF real verificando magic bytes
+ * 
+ * @param {Buffer} pdfBuffer - Buffer del archivo a validar
+ * @returns {boolean} true si es un PDF válido
+ */
+export function validatePDFFile(pdfBuffer) {
+  if (!pdfBuffer || !Buffer.isBuffer(pdfBuffer)) {
+    return false;
+  }
+  
+  // Verificar magic bytes de PDF: %PDF
+  const pdfSignature = Buffer.from([0x25, 0x50, 0x44, 0x46]); // %PDF en hex
+  
+  if (pdfBuffer.length < 4) {
+    return false;
+  }
+  
+  // Comparar los primeros 4 bytes
+  for (let i = 0; i < 4; i++) {
+    if (pdfBuffer[i] !== pdfSignature[i]) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+/**
+ * Sube un PDF al servidor FTP de cPanel
+ * 
+ * @param {Buffer} pdfBuffer - Buffer del PDF a subir
+ * @param {string} filename - Nombre del archivo (ej: "TOKEN.pdf")
+ * @param {number} maxRetries - Número máximo de reintentos (default: 3)
+ * @returns {Promise<string>} URL pública del PDF subido
+ * 
+ * @throws {Error} Si falla la validación o después de todos los reintentos
+ * 
+ * @example
+ * const pdfURL = await uploadPDFToFTP(buffer, 'C8GHIWTZ.pdf');
+ * console.log(pdfURL); // https://notaria18quito.com.ec/pdf-escrituras/C8GHIWTZ.pdf
+ */
+export async function uploadPDFToFTP(pdfBuffer, filename, maxRetries = 3) {
+  // Validar configuración
+  validateFTPConfig();
+  
+  // Validar parámetros
+  if (!pdfBuffer || !Buffer.isBuffer(pdfBuffer)) {
+    throw new Error('pdfBuffer debe ser un Buffer válido');
+  }
+  
+  if (!filename || typeof filename !== 'string') {
+    throw new Error('filename debe ser un string válido');
+  }
+  
+  // Validar tamaño
+  if (pdfBuffer.length > PDF_CONFIG.maxFileSize) {
+    const sizeMB = (pdfBuffer.length / (1024 * 1024)).toFixed(2);
+    throw new Error(`El PDF es demasiado grande (${sizeMB}MB). Máximo permitido: 10MB`);
+  }
+  
+  // Validar magic bytes
+  if (!validatePDFFile(pdfBuffer)) {
+    throw new Error('El archivo no es un PDF válido (magic bytes incorrectos)');
+  }
+  
+  console.log(`[FTP-PDF] Validación exitosa. Tamaño: ${(pdfBuffer.length / 1024).toFixed(2)} KB`);
+  
+  let lastError = null;
+  
+  // Intentar subir con reintentos
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const client = new Client();
+    client.ftp.timeout = 60000; // 60 segundos para PDFs (más grandes que fotos)
+    
+    try {
+      console.log(`[FTP-PDF] Intento ${attempt}/${maxRetries} - Conectando a ${FTP_CONFIG.host}...`);
+      
+      // Conectar al servidor FTP
+      await client.access({
+        host: FTP_CONFIG.host,
+        user: FTP_CONFIG.user,
+        password: FTP_CONFIG.password,
+        port: FTP_CONFIG.port,
+        secure: FTP_CONFIG.secure
+      });
+      
+      console.log(`[FTP-PDF] Conectado. Navegando a ${PDF_CONFIG.basePath}...`);
+      
+      // Navegar a la carpeta destino (crear si no existe)
+      try {
+        await client.ensureDir(PDF_CONFIG.basePath);
+      } catch (dirError) {
+        console.warn(`[FTP-PDF] Advertencia al crear/navegar directorio: ${dirError.message}`);
+        await client.cd(PDF_CONFIG.basePath);
+      }
+      
+      console.log(`[FTP-PDF] Subiendo PDF ${filename}...`);
+      
+      // Subir el archivo desde el buffer
+      const { Readable } = await import('stream');
+      const stream = Readable.from(pdfBuffer);
+      await client.uploadFrom(stream, filename);
+      
+      console.log(`[FTP-PDF] ✅ PDF subido exitosamente: ${filename}`);
+      
+      // Cerrar conexión
+      client.close();
+      
+      // Generar URL pública
+      const publicURL = `${PDF_CONFIG.publicBaseURL}/${filename}`;
+      console.log(`[FTP-PDF] URL pública generada: ${publicURL}`);
+      
+      return publicURL;
+      
+    } catch (error) {
+      lastError = error;
+      console.error(`[FTP-PDF] ❌ Error en intento ${attempt}/${maxRetries}:`, error.message);
+      
+      // Asegurar que la conexión se cierre
+      try {
+        client.close();
+      } catch (closeError) {
+        console.warn('[FTP-PDF] Error al cerrar conexión:', closeError.message);
+      }
+      
+      // Si no es el último intento, esperar antes de reintentar
+      if (attempt < maxRetries) {
+        const waitTime = attempt * 1500; // 1.5s, 3s, 4.5s...
+        console.log(`[FTP-PDF] Esperando ${waitTime}ms antes de reintentar...`);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
+      }
+    }
+  }
+  
+  // Si llegamos aquí, todos los intentos fallaron
+  console.error('[FTP-PDF] ❌ Todos los intentos de subida fallaron');
+  throw new Error(
+    `No se pudo subir el PDF después de ${maxRetries} intentos: ${lastError?.message || 'Error desconocido'}`
+  );
+}
+
+/**
+ * Descarga un PDF del servidor FTP
+ * 
+ * @param {string} filename - Nombre del archivo a descargar (ej: "TOKEN.pdf")
+ * @returns {Promise<Buffer>} Buffer con el contenido del PDF
+ * 
+ * @throws {Error} Si el archivo no existe o falla la descarga
+ * 
+ * @example
+ * const pdfBuffer = await downloadPDFFromFTP('C8GHIWTZ.pdf');
+ */
+export async function downloadPDFFromFTP(filename) {
+  validateFTPConfig();
+  
+  if (!filename || typeof filename !== 'string') {
+    throw new Error('filename debe ser un string válido');
+  }
+  
+  const client = new Client();
+  client.ftp.timeout = 60000; // 60 segundos
+  
+  try {
+    console.log(`[FTP-PDF] Descargando PDF: ${filename}...`);
+    
+    // Conectar al servidor FTP
+    await client.access({
+      host: FTP_CONFIG.host,
+      user: FTP_CONFIG.user,
+      password: FTP_CONFIG.password,
+      port: FTP_CONFIG.port,
+      secure: FTP_CONFIG.secure
+    });
+    
+    // Navegar a la carpeta de PDFs
+    await client.cd(PDF_CONFIG.basePath);
+    
+    // Descargar a un buffer
+    const { Writable } = await import('stream');
+    const chunks = [];
+    
+    const bufferStream = new Writable({
+      write(chunk, encoding, callback) {
+        chunks.push(chunk);
+        callback();
+      }
+    });
+    
+    await client.downloadTo(bufferStream, filename);
+    
+    const pdfBuffer = Buffer.concat(chunks);
+    
+    console.log(`[FTP-PDF] ✅ PDF descargado: ${filename} (${(pdfBuffer.length / 1024).toFixed(2)} KB)`);
+    
+    // Cerrar conexión
+    client.close();
+    
+    return pdfBuffer;
+    
+  } catch (error) {
+    console.error('[FTP-PDF] ❌ Error descargando PDF:', error.message);
+    
+    try {
+      client.close();
+    } catch (closeError) {
+      // Ignorar error al cerrar
+    }
+    
+    // Si el archivo no existe, mensaje más específico
+    if (error.message.includes('No such file') || error.code === 550) {
+      throw new Error(`PDF no encontrado en el servidor: ${filename}`);
+    }
+    
+    throw error;
+  }
+}
+
+/**
+ * Elimina un PDF del servidor FTP
+ * 
+ * @param {string} filename - Nombre del archivo a eliminar
+ * @returns {Promise<boolean>} true si se eliminó exitosamente
+ */
+export async function deletePDFFromFTP(filename) {
+  validateFTPConfig();
+  
+  const client = new Client();
+  client.ftp.timeout = 30000;
+  
+  try {
+    await client.access({
+      host: FTP_CONFIG.host,
+      user: FTP_CONFIG.user,
+      password: FTP_CONFIG.password,
+      port: FTP_CONFIG.port,
+      secure: FTP_CONFIG.secure
+    });
+    
+    await client.cd(PDF_CONFIG.basePath);
+    await client.remove(filename);
+    
+    console.log(`[FTP-PDF] PDF eliminado: ${filename}`);
+    client.close();
+    
+    return true;
+  } catch (error) {
+    console.error('[FTP-PDF] Error eliminando PDF:', error.message);
+    
+    try {
+      client.close();
+    } catch (closeError) {
+      // Ignorar error al cerrar
+    }
+    
+    throw error;
+  }
+}
+
+/**
+ * Verifica si un PDF existe en el FTP
+ * 
+ * @param {string} filename - Nombre del archivo a verificar
+ * @returns {Promise<boolean>} true si el archivo existe
+ */
+export async function checkPDFExists(filename) {
+  validateFTPConfig();
+  
+  const client = new Client();
+  client.ftp.timeout = 10000;
+  
+  try {
+    await client.access({
+      host: FTP_CONFIG.host,
+      user: FTP_CONFIG.user,
+      password: FTP_CONFIG.password,
+      port: FTP_CONFIG.port,
+      secure: FTP_CONFIG.secure
+    });
+    
+    await client.cd(PDF_CONFIG.basePath);
+    const list = await client.list();
+    
+    const exists = list.some(item => item.name === filename);
+    
+    client.close();
+    
+    return exists;
+  } catch (error) {
+    console.error('[FTP-PDF] Error verificando existencia de PDF:', error.message);
+    
+    try {
+      client.close();
+    } catch (closeError) {
+      // Ignorar
+    }
+    
+    return false;
+  }
+}
+
 export default {
   uploadPhotoToFTP,
   deletePhotoFromFTP,
-  testFTPConnection
+  testFTPConnection,
+  uploadPDFToFTP,
+  downloadPDFFromFTP,
+  deletePDFFromFTP,
+  checkPDFExists,
+  validatePDFFile
 };
 

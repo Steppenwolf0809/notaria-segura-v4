@@ -297,13 +297,21 @@ model EscrituraQR {
   datosCompletos          String?  // JSON con todos los datos extraídos del PDF
   archivoOriginal         String?  // Nombre del archivo PDF original
   extractoTextoCompleto   String?  @db.Text // Texto completo del extracto (opcional, para consulta)
-  fotoURL                 String?  // URL pública de la foto del menor (opcional)
+  fotoURL                 String?  // URL pública de la foto (opcional)
   origenDatos             String   @default("PDF") // "PDF" | "MANUAL" - cómo se ingresó
   estado                  String   @default("activo") // "activo", "revision_requerida", "inactivo"
   activo                  Boolean  @default(true) // Flag de activación/desactivación
   createdBy               Int?     // FK al usuario matrizador que creó la escritura
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
+  
+  // Campos para PDF completo (verificación pública)
+  pdfFileName             String?  // Nombre del archivo PDF en FTP (TOKEN.pdf)
+  pdfUploadedAt           DateTime? // Fecha de subida del PDF
+  pdfUploadedBy           Int?     // ID del usuario que subió el PDF
+  pdfFileSize             Int?     // Tamaño del archivo en bytes
+  pdfViewCount            Int      @default(0) // Contador de visualizaciones públicas
+  pdfHiddenPages          String?  // Array JSON de páginas ocultas (ej: "[2,5,7]") por privacidad
 
   // Relaciones
   creador                 User?    @relation(fields: [createdBy], references: [id])

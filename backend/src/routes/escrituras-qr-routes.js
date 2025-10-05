@@ -15,7 +15,11 @@ import {
   getEscrituraQR,
   verifyEscritura,
   deleteEscritura,
-  hardDeleteEscritura
+  hardDeleteEscritura,
+  uploadPDFToEscritura,
+  getPDFPublic,
+  getPDFPrivate,
+  getPDFMetadata
 } from '../controllers/escrituras-qr-controller.js';
 
 const router = express.Router();
@@ -56,6 +60,12 @@ const upload = multer({
 
 // GET /api/verify/:token - Verificación pública de escritura
 router.get('/verify/:token', verifyEscritura);
+
+// GET /api/verify/:token/pdf/metadata - Obtener metadata del PDF (incluyendo páginas ocultas)
+router.get('/verify/:token/pdf/metadata', getPDFMetadata);
+
+// GET /api/verify/:token/pdf - Obtener PDF público de escritura
+router.get('/verify/:token/pdf', getPDFPublic);
 
 /**
  * RUTAS PROTEGIDAS (requieren autenticación)
@@ -122,6 +132,19 @@ router.delete('/:id/hard-delete',
   authenticateToken,
   requireMatrizador,
   hardDeleteEscritura
+);
+
+// POST /api/escrituras/:id/pdf - Subir PDF completo de escritura (protegido)
+router.post('/:id/pdf',
+  authenticateToken,
+  upload.single('pdf'),
+  uploadPDFToEscritura
+);
+
+// GET /api/escrituras/:id/pdf - Obtener PDF de escritura por ID (protegido)
+router.get('/:id/pdf',
+  authenticateToken,
+  getPDFPrivate
 );
 
 /**
