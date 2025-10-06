@@ -44,17 +44,18 @@ import {
 } from '../../services/escrituras-qr-service';
 import { toast } from 'react-toastify';
 
-// Configurar worker de PDF.js
-pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+// Configurar worker de PDF.js - IMPORTANTE: Usar la misma versión que react-pdf
+// react-pdf 9.1.1 usa pdfjs-dist 4.8.69
+pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@4.8.69/build/pdf.worker.min.mjs`;
 
 // URL base pública del FTP (sin autenticación)
 const PUBLIC_FOTOS_URL = 'https://www.notaria18quito.com.ec/fotos-escrituras';
 
 // Opciones para cargar PDFs con CORS
 const pdfOptions = {
-  cMapUrl: 'https://unpkg.com/pdfjs-dist@3.11.174/cmaps/',
+  cMapUrl: 'https://unpkg.com/pdfjs-dist@4.8.69/cmaps/',
   cMapPacked: true,
-  standardFontDataUrl: 'https://unpkg.com/pdfjs-dist@3.11.174/standard_fonts/',
+  standardFontDataUrl: 'https://unpkg.com/pdfjs-dist@4.8.69/standard_fonts/',
 };
 
 export default function PDFPageManagerModal({ open, onClose, escritura, onSuccess }) {
