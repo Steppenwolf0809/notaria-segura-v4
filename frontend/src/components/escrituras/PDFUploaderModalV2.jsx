@@ -46,8 +46,8 @@ import {
   hasPDFUploaded
 } from '../../services/escrituras-qr-service';
 
-// Configurar worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+// Configurar worker de PDF.js con versión específica conocida
+pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 export default function PDFUploaderModalV2({ open, onClose, escritura, onSuccess }) {
   const [selectedFile, setSelectedFile] = useState(null);
