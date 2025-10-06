@@ -51,7 +51,7 @@ export function generateVerificationURL(token) {
   // En producción, usar el dominio oficial de la notaría con ruta en español
   if (env === 'production') {
     const publicURL = process.env.PUBLIC_URL || 'https://www.notaria18quito.com.ec';
-    return `${publicURL}/docs/verificar.html?token=${token}`;
+    return `${publicURL}/verificar.html?token=${token}`;
   }
   
   // En desarrollo/staging, mantener ruta en inglés para consistencia con backend
