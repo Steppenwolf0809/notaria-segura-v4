@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Verificación de Escritura - Notaría 18 Quito</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Segoe UI', Arial, sans-serif; background:#f5f7fa; padding:20px; line-height:1.6; }
+    .container { max-width:900px; margin:0 auto; background:#fff; border-radius:12px; box-shadow:0 4px 20px rgba(0,0,0,0.08); overflow:hidden; }
+    .header { background:linear-gradient(135deg,#1A5799 0%,#2874B8 100%); color:#fff; padding:40px 30px; text-align:center; position:relative; }
+    .header h1 { font-size:1.8em; margin-bottom:10px; }
+    .header h2 { font-size:1.2em; font-weight:400; opacity:.95; margin-bottom:15px; }
+    .btn-volver-header { display:inline-block; padding:8px 20px; background:rgba(255,255,255,0.2); color:#fff; text-decoration:none; border-radius:6px; font-size:0.9em; transition:all 0.3s ease; border:1px solid rgba(255,255,255,0.3); }
+    .btn-volver-header:hover { background:rgba(255,255,255,0.3); transform:translateY(-2px); }
+    .content { padding:40px 30px; }
+    .loader { text-align:center; padding:60px 20px; }
+    .spinner { border:4px solid #f3f3f3; border-top:4px solid #1A5799; border-radius:50%; width:50px; height:50px; animation:spin 1s linear infinite; margin:0 auto 20px; }
+    @keyframes spin { 0% { transform:rotate(0deg);} 100% { transform:rotate(360deg);} }
+    .error { background:#fee; border-left:4px solid #c33; padding:20px; border-radius:6px; color:#721c24; }
+    .info-section { background:#f8f9fa; border-left:4px solid #1A5799; padding:20px; margin:20px 0; border-radius:6px; }
+    .info-section h3 { color:#1A5799; margin-bottom:15px; font-size:1.3em; }
+    .info-row { display:flex; margin:10px 0; padding:8px 0; border-bottom:1px solid #e9ecef; }
+    .info-row:last-child { border-bottom:none; }
+    .info-label { font-weight:600; min-width:180px; color:#495057; }
+    .info-value { color:#212529; }
+    .ubicacion-compacta { display:flex; gap:20px; flex-wrap:wrap; padding:10px 0; }
+    .ubicacion-item { display:flex; gap:8px; }
+    .ubicacion-item .info-label { min-width:auto; }
+    .otorgantes-list { list-style:none; margin:10px 0; }
+    .otorgantes-list li { padding:10px; background:#fff; margin:8px 0; border-radius:4px; border:1px solid #dee2e6; }
+    .representante-info { margin-top:8px; padding:8px; background:#e7f3ff; border-left:3px solid #1A5799; border-radius:4px; }
+    .footer { background:#f8f9fa; padding:20px 30px; text-align:center; color:#6c757d; font-size:.95em; border-top:1px solid #dee2e6; }
+    .footer .contact { margin-top:8px; color:#3a3a3a; }
+    .btn { display:inline-block; padding:10px 16px; border-radius:8px; border:none; text-decoration:none; cursor:pointer; font-weight:600; }
+    .btn-primary { background:#1A5799; color:#fff; }
+    .btn-primary:hover { filter:brightness(1.05); }
+    .foto-section { background:#f8f9fa; border-left:4px solid #1A5799; padding:20px; margin:20px 0; border-radius:6px; text-align:center; }
+    .foto-section h3 { color:#1A5799; margin-bottom:15px; font-size:1.3em; }
+    .foto-menor { max-width:400px; width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.1); margin-top:10px; }
+    .foto-placeholder { color:#6c757d; font-style:italic; padding:10px; }
+    @media (max-width:768px){ .header h1{font-size:1.4em;} .content{padding:20px 15px;} .info-row{flex-direction:column;} .info-label{min-width:0; margin-bottom:5px;} .foto-menor{max-width:100%;} }
+    .logo { height:72px; max-width:280px; display:block; margin:0 auto 12px; object-fit:contain; }
+    
+    /* Estilos para el visor de PDF */
+    .pdf-section { background:#f8f9fa; border-left:4px solid #1A5799; padding:20px; margin:20px 0; border-radius:6px; }
+    .pdf-section h3 { color:#1A5799; margin-bottom:15px; font-size:1.3em; text-align:center; }
+    .pdf-viewer-container { background:#525659; border-radius:8px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.15); }
+    .pdf-controls { background:#fff; padding:15px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; border-bottom:2px solid #dee2e6; }
+    .pdf-controls button { padding:8px 16px; background:#1A5799; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:0.9em; transition:background 0.2s; }
+    .pdf-controls button:hover { background:#2874B8; }
+    .pdf-controls button:disabled { background:#6c757d; cursor:not-allowed; opacity:0.6; }
+    .pdf-page-info { color:#495057; font-weight:600; }
+    .pdf-canvas-container { display:flex; justify-content:center; align-items:center; min-height:400px; padding:20px; background:#525659; }
+    .pdf-canvas { max-width:100%; height:auto; box-shadow:0 2px 8px rgba(0,0,0,0.3); }
+    .pdf-loading { text-align:center; padding:40px; color:#fff; }
+    .pdf-loading .spinner { border-color:#f3f3f3; border-top-color:#1A5799; }
+    .pdf-error { background:#fee; border:2px solid #c33; padding:20px; margin:20px; border-radius:6px; color:#721c24; }
+    .hidden-page-notice { background:#fff3cd; border-left:4px solid #ffc107; padding:15px; margin:10px 0; border-radius:6px; color:#856404; text-align:center; }
+    @media (max-width:768px) { .pdf-controls{flex-direction:column;} .pdf-canvas-container{padding:10px;min-height:300px;} }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <a href="https://www.notaria18quito.com.ec" aria-label="Ir al inicio" style="display:inline-block">
+        <img src="/images/logo-notaria18.jpg" alt="Notaría 18 Quito" class="logo">
+      </a>
+      <h1>Notaría Décima Octava del Cantón Quito</h1>
+      <h2>Verificación de Escritura Notarial</h2>
+      <a href="https://www.notaria18quito.com.ec" class="btn-volver-header">← Volver al inicio</a>
+    </div>
+
+    <div class="content">
+      <div id="content" class="loader">
+        <div class="spinner"></div>
+        <p>Verificando escritura...</p>
+      </div>
+    </div>
+
+    <div class="footer" id="footer" style="display:none;">
+      <p>Sistema de Validación de Escrituras Notariales · Notaría 18 Quito — 2025</p>
+      <div class="contact">
+        <p><strong>Contacto</strong></p>
+        <p>(02) 224-7787 / 099-695-1682 · <a href="mailto:notaria18uio@gmail.com">notaria18uio@gmail.com</a></p>
+        <p>Calle Azuay E2-231 entre Av. Amazonas y Av. Azuay, Quito, Ecuador</p>
+      </div>
+      <div style="margin-top:12px;">
+        <a class="btn btn-primary" href="https://www.notaria18quito.com.ec">Ir al inicio</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- PDF.js Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    // Configurar worker de PDF.js
+    if (typeof pdfjsLib !== 'undefined') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
+    const API_BASE = "https://notaria-segura-v4-production.up.railway.app";
+
+    const isEmpty = v => v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0);
+    const firstNonEmpty = (...vals) => vals.find(v => !isEmpty(v));
+    const formatMoneyOrIndeterminate = (v) => {
+      if (v === null || v === undefined) return "N/A";
+      if (typeof v === "number" && Number.isFinite(v)) {
+        try { return new Intl.NumberFormat("es-EC", { style: "currency", currency: "USD" }).format(v); }
+        catch { return `$${v}`; }
+      }
+      const s = String(v).trim().toUpperCase();
+      if (!s || ["INDETERMINADA","NO APLICA","INDETERMINADO","S/N","NA","N/A"].includes(s)) return "Indeterminada";
+      const numTxt = String(v).replace(/[^\d,.-]/g,"").replace(/\.(?=\d{3}(?:\.|,))/g,"").replace(",",".");
+      const f = parseFloat(numTxt);
+      return Number.isFinite(f) ? formatMoneyOrIndeterminate(f) : s;
+    };
+
+    function mostrarError(mensaje) {
+      document.getElementById('content').innerHTML =
+        `<div class="error">
+          <h3>⚠️ Error de verificación</h3>
+          <p>${mensaje}</p>
+          <p style="margin-top:15px;"><small>Verifique que el código QR sea válido o contacte a la notaría.</small></p>
+        </div>`;
+      document.getElementById('footer').style.display = 'block';
+    }
+
+    function formatearOtorgantes(otorgantes) {
+      if (!otorgantes) return '';
+      let html = '';
+
+      if (Array.isArray(otorgantes.otorgado_por) && otorgantes.otorgado_por.length) {
+        html += '<h4 style="margin:15px 0 10px;">Otorgado por:</h4><ul class="otorgantes-list">';
+        otorgantes.otorgado_por.forEach(o => {
+          const cedula = o?.numero || o?.cedula;
+          html += `<li>
+            <strong>${o?.nombre || ''}</strong><br>
+            ${cedula ? `<small>Cédula: ${cedula}</small><br>` : ''}
+            ${o?.documento && !cedula ? `<small>${o.documento}</small><br>` : ''}
+            ${o?.calidad ? `<small>${o.calidad}</small>` : ''}`;
+          
+          // Mostrar representante si existe (soporta ambos formatos)
+          const representante = o?.representado_por || o?.representadoPor;
+          if (representante) {
+            let repNombre;
+            
+            // Si es string directo (formato antiguo)
+            if (typeof representante === 'string') {
+              repNombre = representante;
+            } else {
+              // Si es objeto (formato correcto)
+              repNombre = representante.nombre;
+            }
+            
+            html += `<div class="representante-info">
+              <strong>Representado por:</strong> ${repNombre}
+            </div>`;
+          }
+          
+          html += `</li>`;
+        });
+        html += '</ul>';
+      }
+
+      if (Array.isArray(otorgantes.a_favor_de) && otorgantes.a_favor_de.length) {
+        html += '<h4 style="margin:15px 0 10px;">A favor de:</h4><ul class="otorgantes-list">';
+        otorgantes.a_favor_de.forEach(o => {
+          const cedula = o?.cedula || o?.numero;
+          html += `<li>
+            <strong>${o?.nombre || ''}</strong><br>
+            ${cedula ? `<small>Cédula: ${cedula}</small><br>` : ''}
+            ${o?.calidad ? `<small>${o.calidad}</small>` : ''}
+          </li>`;
+        });
+        html += '</ul>';
+      }
+
+      return html;
+    }
+
+    // ============================================================================
+    // VISOR DE PDF
+    // ============================================================================
+    
+    let pdfDoc = null;
+    let currentPage = 1;
+    let hiddenPages = [];
+    let totalVisiblePages = 0;
+    
+    /**
+     * Obtiene la URL del PDF público para un token
+     */
+    function getPDFPublicURL(token) {
+      return `${API_BASE}/api/verify/${encodeURIComponent(token)}/pdf`;
+    }
+    
+    /**
+     * Renderiza una página del PDF en el canvas
+     */
+    async function renderPDFPage(pageNum) {
+      if (!pdfDoc) return;
+      
+      const canvas = document.getElementById('pdf-canvas');
+      const loadingDiv = document.getElementById('pdf-loading');
+      const canvasContainer = document.getElementById('pdf-canvas-container');
+      const hiddenNotice = document.getElementById('hidden-page-notice');
+      
+      // Mostrar loading
+      if (loadingDiv) loadingDiv.style.display = 'block';
+      if (canvas) canvas.style.display = 'none';
+      if (hiddenNotice) hiddenNotice.style.display = 'none';
+      
+      try {
+        // Verificar si la página está oculta
+        if (hiddenPages.includes(pageNum)) {
+          if (loadingDiv) loadingDiv.style.display = 'none';
+          if (hiddenNotice) {
+            hiddenNotice.style.display = 'block';
+            hiddenNotice.innerHTML = `
+              <strong>⚠️ Página ${pageNum} oculta por privacidad</strong>
+              <p style="margin-top:8px;font-size:0.9em;">Esta página contiene información confidencial y no está disponible públicamente.</p>
+            `;
+          }
+          
+          // Actualizar controles
+          updatePDFControls();
+          return;
+        }
+        
+        const page = await pdfDoc.getPage(pageNum);
+        const viewport = page.getViewport({ scale: 1.5 });
+        
+        // Ajustar el canvas
+        const context = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        
+        // Renderizar la página
+        await page.render({
+          canvasContext: context,
+          viewport: viewport
+        }).promise;
+        
+        // Ocultar loading y mostrar canvas
+        if (loadingDiv) loadingDiv.style.display = 'none';
+        if (canvas) canvas.style.display = 'block';
+        
+        // Actualizar controles
+        updatePDFControls();
+        
+      } catch (error) {
+        console.error('Error renderizando página PDF:', error);
+        if (loadingDiv) {
+          loadingDiv.innerHTML = `
+            <div class="pdf-error">
+              <strong>Error al cargar la página</strong>
+              <p>${error.message}</p>
+            </div>
+          `;
+        }
+      }
+    }
+    
+    /**
+     * Actualiza los controles de navegación del PDF
+     */
+    function updatePDFControls() {
+      const pageInfo = document.getElementById('pdf-page-info');
+      const prevBtn = document.getElementById('pdf-prev-btn');
+      const nextBtn = document.getElementById('pdf-next-btn');
+      
+      if (pageInfo && pdfDoc) {
+        pageInfo.textContent = `Página ${currentPage} de ${pdfDoc.numPages}`;
+        if (hiddenPages.length > 0) {
+          pageInfo.textContent += ` (${hiddenPages.length} página${hiddenPages.length > 1 ? 's' : ''} oculta${hiddenPages.length > 1 ? 's' : ''})`;
+        }
+      }
+      
+      if (prevBtn) prevBtn.disabled = currentPage <= 1;
+      if (nextBtn) nextBtn.disabled = !pdfDoc || currentPage >= pdfDoc.numPages;
+    }
+    
+    /**
+     * Navega a la página anterior
+     */
+    function prevPage() {
+      if (currentPage <= 1) return;
+      currentPage--;
+      renderPDFPage(currentPage);
+    }
+    
+    /**
+     * Navega a la página siguiente
+     */
+    function nextPage() {
+      if (!pdfDoc || currentPage >= pdfDoc.numPages) return;
+      currentPage++;
+      renderPDFPage(currentPage);
+    }
+    
+    /**
+     * Carga y muestra el PDF
+     */
+    async function loadPDF(token, pdfHiddenPages) {
+      const pdfContainer = document.getElementById('pdf-viewer-container');
+      if (!pdfContainer) return;
+      
+      // Parsear páginas ocultas
+      if (pdfHiddenPages) {
+        try {
+          hiddenPages = typeof pdfHiddenPages === 'string' 
+            ? JSON.parse(pdfHiddenPages) 
+            : pdfHiddenPages;
+          
+          if (!Array.isArray(hiddenPages)) hiddenPages = [];
+        } catch (e) {
+          console.error('Error parseando páginas ocultas:', e);
+          hiddenPages = [];
+        }
+      }
+      
+      try {
+        const pdfURL = getPDFPublicURL(token);
+        
+        // Cargar el PDF
+        const loadingTask = pdfjsLib.getDocument(pdfURL);
+        pdfDoc = await loadingTask.promise;
+        
+        console.log(`PDF cargado: ${pdfDoc.numPages} páginas totales, ${hiddenPages.length} ocultas`);
+        
+        // Renderizar la primera página
+        currentPage = 1;
+        await renderPDFPage(currentPage);
+        
+      } catch (error) {
+        console.error('Error cargando PDF:', error);
+        const loadingDiv = document.getElementById('pdf-loading');
+        if (loadingDiv) {
+          loadingDiv.innerHTML = `
+            <div class="pdf-error">
+              <strong>⚠️ No se pudo cargar el PDF</strong>
+              <p>El PDF de esta escritura no está disponible o aún no ha sido subido.</p>
+            </div>
+          `;
+        }
+      }
+    }
+    
+    /**
+     * Crea el HTML del visor de PDF
+     */
+    function createPDFViewerHTML() {
+      return `
+        <div class="pdf-section">
+          <h3>📄 Documento PDF Completo</h3>
+          
+          <div id="hidden-page-notice" class="hidden-page-notice" style="display:none;"></div>
+          
+          <div class="pdf-viewer-container" id="pdf-viewer-container">
+            <div class="pdf-controls">
+              <button id="pdf-prev-btn" onclick="prevPage()" disabled>← Anterior</button>
+              <span id="pdf-page-info" class="pdf-page-info">Cargando...</span>
+              <button id="pdf-next-btn" onclick="nextPage()" disabled>Siguiente →</button>
+            </div>
+            
+            <div class="pdf-canvas-container" id="pdf-canvas-container">
+              <div id="pdf-loading" class="pdf-loading">
+                <div class="spinner"></div>
+                <p>Cargando PDF...</p>
+              </div>
+              <canvas id="pdf-canvas" class="pdf-canvas" style="display:none;"></canvas>
+            </div>
+          </div>
+          
+          <p style="text-align:center;margin-top:15px;color:#6c757d;font-size:0.9em;">
+            Este documento es de verificación pública. Algunas páginas pueden estar ocultas por contener información confidencial.
+          </p>
+        </div>
+      `;
+    }
+
+    function render(datos) {
+      const numeroEscritura = firstNonEmpty(datos.numeroEscritura, datos.numero_escritura, datos.escrituraNumero, "N/A");
+      const acto = firstNonEmpty(datos.acto, datos.actoContrato, datos.tipoActo, "N/A");
+      const fecha = firstNonEmpty(datos.fecha_otorgamiento, datos.fechaOtorgamiento, datos.fecha, "N/A");
+      const cuantia = formatMoneyOrIndeterminate(firstNonEmpty(datos.cuantia, datos.cuantiaDelActo, datos.monto, datos.valor));
+      const notario = firstNonEmpty(datos.notario, datos.notarioNombre, datos.titularNotaria, "");
+      const notaria = firstNonEmpty(datos.notaria, datos.notariaNombre, datos.oficina, "");
+      const fotoURL = datos.fotoURL;
+
+      const ubic = datos.ubicacion || {};
+      const otorg = datos.otorgantes || null;
+
+      const extra = `
+        <div style="margin-top:30px;padding:20px;background:#e7f3ff;border-radius:6px;text-align:center;">
+          ${datos.token ? `<p><small><strong>Token de verificación:</strong> ${datos.token}</small></p>` : ""}
+          ${datos.verificadoEn ? `<p><small><strong>Verificado el:</strong> ${new Date(datos.verificadoEn).toLocaleString('es-EC')}</small></p>` : ""}
+          ${datos.procesadoPor ? `<p><small><strong>Procesado por:</strong> ${datos.procesadoPor}</small></p>` : ''}
+        </div>`;
+
+      const fotoHTML = fotoURL ? `
+        <div class="foto-section">
+          <h3>📸 Fotografía de Verificación</h3>
+          <img src="${fotoURL}" alt="Fotografía del menor" class="foto-menor" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+          <p class="foto-placeholder" style="display:none;">Imagen no disponible</p>
+        </div>` : '';
+
+      const html = `
+        <div class="info-section">
+          <h3>📄 Información Básica</h3>
+          <div class="info-row"><span class="info-label">Número de Escritura:</span><span class="info-value">${numeroEscritura}</span></div>
+          <div class="info-row"><span class="info-label">Acto/Contrato:</span><span class="info-value"><strong>${acto}</strong></span></div>
+          <div class="info-row"><span class="info-label">Fecha de Otorgamiento:</span><span class="info-value">${fecha}</span></div>
+          <div class="info-row"><span class="info-label">Cuantía:</span><span class="info-value">${cuantia}</span></div>
+        </div>
+
+        <div class="info-section">
+          <h3>👤 Información Notarial</h3>
+          <div class="info-row"><span class="info-label">Notario(a):</span><span class="info-value">${notario || 'N/A'}</span></div>
+          <div class="info-row"><span class="info-label">Notaría:</span><span class="info-value">${notaria || 'N/A'}</span></div>
+        </div>
+
+        ${(!isEmpty(ubic.provincia) || !isEmpty(ubic.canton) || !isEmpty(ubic.parroquia)) ? `
+          <div class="info-section">
+            <h3>📍 Ubicación</h3>
+            <div class="ubicacion-compacta">
+              ${ubic.provincia ? `<div class="ubicacion-item"><span class="info-label">Provincia:</span><span class="info-value">${ubic.provincia}</span></div>` : ''}
+              ${ubic.canton ? `<div class="ubicacion-item"><span class="info-label">Cantón:</span><span class="info-value">${ubic.canton}</span></div>` : ''}
+              ${ubic.parroquia ? `<div class="ubicacion-item"><span class="info-label">Parroquia:</span><span class="info-value">${ubic.parroquia}</span></div>` : ''}
+            </div>
+          </div>` : ''}
+
+        ${otorg ? `<div class="info-section"><h3>👥 Otorgantes y Beneficiarios</h3>${formatearOtorgantes(otorg)}</div>` : ''}
+
+        ${fotoHTML}
+
+        ${datos.pdfFileName ? createPDFViewerHTML() : ''}
+
+        ${datos.objeto_observaciones ? `<div class="info-section"><h3>📋 Observaciones</h3><p>${datos.objeto_observaciones}</p></div>` : ''}
+
+        ${extra}
+      `;
+
+      document.getElementById('content').innerHTML = html;
+      document.getElementById('footer').style.display = 'block';
+      
+      // Si hay PDF, cargarlo
+      if (datos.pdfFileName && datos.token) {
+        setTimeout(() => {
+          loadPDF(datos.token, datos.pdfHiddenPages);
+        }, 100);
+      }
+    }
+
+    async function verificarEscritura() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get('token');
+      if (!token) return mostrarError("Token de verificación no encontrado en la URL");
+
+      try {
+        const resp = await fetch(`${API_BASE}/api/verify/${encodeURIComponent(token)}`);
+        if (!resp.ok) throw new Error("Escritura no encontrada o token inválido");
+
+        const payload = await resp.json();
+
+        if (payload?.success && payload?.data) {
+          let datos = payload.data;
+          try {
+            if (typeof datos === 'string') datos = JSON.parse(datos);
+            if (typeof datos === 'string') datos = JSON.parse(datos);
+          } catch (_) {}
+          render(datos);
+        } else {
+          throw new Error(payload?.message || "Error al verificar escritura");
+        }
+      } catch (e) {
+        console.error(e);
+        mostrarError(e.message);
+      }
+    }
+
+    verificarEscritura();
+  </script>
+</body>
+</html>
