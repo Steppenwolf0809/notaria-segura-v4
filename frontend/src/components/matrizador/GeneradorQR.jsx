@@ -48,7 +48,9 @@ import {
   CheckCircle as CheckCircleIcon,
   PictureAsPdf as PdfIcon,
   CloudUpload as UploadIcon,
-  RemoveRedEye as EyeIcon
+  RemoveRedEye as EyeIcon,
+  VisibilityOff as ManageHiddenIcon,
+  Settings as ManageIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 
@@ -59,6 +61,7 @@ import QRDisplay from './QRDisplay';
 import ManualEscrituraForm from './ManualEscrituraForm';
 import PDFUploaderModal from '../escrituras/PDFUploaderModalV2';
 import SecurePDFViewer from '../escrituras/SecurePDFViewer';
+import PDFPageManagerModal from '../escrituras/PDFPageManagerModal';
 
 // Servicios
 import {
@@ -91,6 +94,7 @@ const GeneradorQR = () => {
   // Estados para PDFs completos
   const [showPDFUploadModal, setShowPDFUploadModal] = useState(false);
   const [showPDFViewerModal, setShowPDFViewerModal] = useState(false);
+  const [showPDFPageManagerModal, setShowPDFPageManagerModal] = useState(false);
   const [selectedEscrituraForPDF, setSelectedEscrituraForPDF] = useState(null);
 
   // Estados de filtros y paginación
@@ -313,6 +317,14 @@ const GeneradorQR = () => {
   };
   
   /**
+   * Abre el modal para gestionar páginas ocultas del PDF
+   */
+  const handleManagePDFPages = (escritura) => {
+    setSelectedEscrituraForPDF(escritura);
+    setShowPDFPageManagerModal(true);
+  };
+  
+  /**
    * Callback cuando se sube exitosamente un PDF
    */
   const handlePDFUploadSuccess = (pdfData) => {
@@ -479,6 +491,15 @@ const GeneradorQR = () => {
                                 onClick={() => handleViewPDF(escritura)}
                               >
                                 <EyeIcon />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Gestionar páginas ocultas">
+                              <IconButton
+                                size="small"
+                                color="warning"
+                                onClick={() => handleManagePDFPages(escritura)}
+                              >
+                                <ManageHiddenIcon fontSize="small" />
                               </IconButton>
                             </Tooltip>
                             <Tooltip title="Reemplazar PDF">
@@ -744,6 +765,54 @@ const GeneradorQR = () => {
                     </Typography>
                   </Paper>
                 )}
+                
+                {/* Acciones del PDF */}
+                {hasPDFUploaded(selectedEscritura) && (
+                  <Paper sx={{ p: 2, mt: 2 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Gestión del PDF
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        startIcon={<EyeIcon />}
+                        onClick={() => {
+                          handleViewPDF(selectedEscritura);
+                          setShowDetailsDialog(false);
+                        }}
+                        size="small"
+                      >
+                        Ver PDF
+                      </Button>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        color="warning"
+                        startIcon={<ManageHiddenIcon />}
+                        onClick={() => {
+                          handleManagePDFPages(selectedEscritura);
+                          setShowDetailsDialog(false);
+                        }}
+                        size="small"
+                      >
+                        Gestionar Páginas Ocultas
+                      </Button>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        startIcon={<UploadIcon />}
+                        onClick={() => {
+                          handleUploadPDF(selectedEscritura);
+                          setShowDetailsDialog(false);
+                        }}
+                        size="small"
+                      >
+                        Reemplazar PDF
+                      </Button>
+                    </Box>
+                  </Paper>
+                )}
               </Grid>
             </Grid>
           )}
@@ -935,6 +1004,23 @@ const GeneradorQR = () => {
             />
           </DialogContent>
         </Dialog>
+      )}
+      
+      {/* Modal de gestión de páginas ocultas */}
+      {selectedEscrituraForPDF && hasPDFUploaded(selectedEscrituraForPDF) && (
+        <PDFPageManagerModal
+          open={showPDFPageManagerModal}
+          onClose={() => {
+            setShowPDFPageManagerModal(false);
+            setSelectedEscrituraForPDF(null);
+          }}
+          escritura={selectedEscrituraForPDF}
+          onSuccess={(data) => {
+            // Recargar la lista para reflejar los cambios
+            loadEscrituras();
+            toast.success('Páginas ocultas actualizadas correctamente');
+          }}
+        />
       )}
     </Box>
   );
