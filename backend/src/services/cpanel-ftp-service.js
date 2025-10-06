@@ -103,6 +103,15 @@ export async function uploadPhotoToFTP(imageBuffer, filename, maxRetries = 3) {
       const stream = Readable.from(imageBuffer);
       await client.uploadFrom(stream, filename);
       
+      // Establecer permisos de lectura pública (644)
+      try {
+        await client.send('SITE CHMOD 644 ' + filename);
+        console.log(`[FTP] Permisos establecidos (644) para: ${filename}`);
+      } catch (chmodError) {
+        console.warn(`[FTP] No se pudieron establecer permisos automáticamente: ${chmodError.message}`);
+        console.warn('[FTP] Verifica manualmente que el archivo tenga permisos 644');
+      }
+      
       console.log(`[FTP] ✅ Archivo subido exitosamente: ${filename}`);
       
       // Cerrar conexión
@@ -361,6 +370,15 @@ export async function uploadPDFToFTP(pdfBuffer, filename, maxRetries = 3) {
       const { Readable } = await import('stream');
       const stream = Readable.from(pdfBuffer);
       await client.uploadFrom(stream, filename);
+      
+      // Establecer permisos de lectura pública (644)
+      try {
+        await client.send('SITE CHMOD 644 ' + filename);
+        console.log(`[FTP-PDF] Permisos establecidos (644) para: ${filename}`);
+      } catch (chmodError) {
+        console.warn(`[FTP-PDF] No se pudieron establecer permisos automáticamente: ${chmodError.message}`);
+        console.warn('[FTP-PDF] Verifica manualmente que el archivo tenga permisos 644');
+      }
       
       console.log(`[FTP-PDF] ✅ PDF subido exitosamente: ${filename}`);
       

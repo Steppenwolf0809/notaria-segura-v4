@@ -1372,8 +1372,10 @@ export async function uploadPDFToEscritura(req, res) {
 
 /**
  * GET /api/verify/:token/pdf
- * Sirve el PDF completo de una escritura (PÚBLICO)
+ * Redirige al PDF completo de una escritura hospedado en el dominio (PÚBLICO)
  * Cualquiera con el token puede ver el PDF
+ * 
+ * NOTA: El PDF se sirve directamente desde el dominio de la notaría para mejor performance
  */
 export async function getPDFPublic(req, res) {
   try {
@@ -1420,10 +1422,6 @@ export async function getPDFPublic(req, res) {
       });
     }
     
-    // Descargar PDF del FTP
-    console.log(`[getPDFPublic] Descargando PDF del FTP: ${escritura.pdfFileName}`);
-    const pdfBuffer = await downloadPDFFromFTP(escritura.pdfFileName);
-    
     // Incrementar contador de visualizaciones (no esperar)
     prisma.escrituraQR.update({
       where: { id: escritura.id },
@@ -1436,29 +1434,22 @@ export async function getPDFPublic(req, res) {
       console.warn('[getPDFPublic] Error actualizando contador de vistas:', err.message);
     });
     
-    // Registrar visualización (IP, fecha) - TODO: implementar sistema de auditoría
+    // Registrar visualización (IP, fecha)
     const clientIP = req.ip || req.headers['x-forwarded-for'] || 'unknown';
-    console.log(`[getPDFPublic] ✅ PDF servido exitosamente. IP: ${clientIP}, Token: ${token.substring(0, 4)}****`);
+    console.log(`[getPDFPublic] ✅ Redirigiendo a PDF. IP: ${clientIP}, Token: ${token.substring(0, 4)}****`);
     
-    // Configurar headers para visualización inline
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', 'inline');
-    res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache de 1 hora
-    res.setHeader('Content-Length', pdfBuffer.length);
+    // Construir URL pública del PDF (sirve directamente desde el dominio)
+    const publicBaseURL = process.env.PUBLIC_FOTOS_URL || 'https://notaria18quito.com.ec/fotos-escrituras';
+    const pdfURL = `${publicBaseURL}/${escritura.pdfFileName}`;
     
-    // Enviar el PDF
-    res.send(pdfBuffer);
+    console.log(`[getPDFPublic] Redirigiendo a: ${pdfURL}`);
+    
+    // Redirigir al PDF hospedado en el dominio
+    // Usamos 302 (temporal) en caso de que necesitemos cambiar la ubicación en el futuro
+    res.redirect(302, pdfURL);
     
   } catch (error) {
     console.error('[getPDFPublic] Error:', error);
-    
-    // Respuesta específica según el error
-    if (error.message.includes('PDF no encontrado')) {
-      return res.status(404).json({
-        success: false,
-        message: 'El archivo PDF no se encuentra en el servidor'
-      });
-    }
     
     res.status(500).json({
       success: false,
