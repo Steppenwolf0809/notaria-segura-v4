@@ -44,9 +44,9 @@ import {
 } from '../../services/escrituras-qr-service';
 import { toast } from 'react-toastify';
 
-// Configurar worker de PDF.js - Usar worker desde bundle de react-pdf
-// No configurar el worker explícitamente, dejar que react-pdf lo maneje
-// pdfjs.GlobalWorkerOptions.workerSrc ya está configurado por react-pdf
+// Configurar worker de PDF.js para que coincida con la versión instalada
+// react-pdf v9 requiere pdfjs-dist v4.x
+pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.8.69/pdf.worker.min.mjs`;
 
 // URL base pública del FTP (sin autenticación)
 const PUBLIC_FOTOS_URL = 'https://www.notaria18quito.com.ec/fotos-escrituras';
