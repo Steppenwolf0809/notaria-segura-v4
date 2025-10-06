@@ -887,11 +887,33 @@ export async function verifyEscritura(req, res) {
     // Extraer solo campos públicos importantes
     const datosPublicos = extractDatosPublicos(datosNormalizados, escritura);
     
+    // Agregar información del PDF si existe
+    if (escritura.pdfFileName) {
+      datosPublicos.pdfFileName = escritura.pdfFileName;
+      datosPublicos.pdfFileSize = escritura.pdfFileSize;
+      
+      // Parsear páginas ocultas
+      let hiddenPages = [];
+      if (escritura.pdfHiddenPages) {
+        try {
+          hiddenPages = JSON.parse(escritura.pdfHiddenPages);
+        } catch (e) {
+          console.error('[API-QR] Error parsing pdfHiddenPages:', e);
+        }
+      }
+      datosPublicos.pdfHiddenPages = hiddenPages;
+      
+      // URL pública del PDF
+      const publicBaseURL = process.env.PUBLIC_FOTOS_URL || 'https://notaria18quito.com.ec/fotos-escrituras';
+      datosPublicos.pdfPublicUrl = `${publicBaseURL}/${escritura.pdfFileName}`;
+    }
+    
     console.log('[API-QR] Verificación exitosa:', {
       token: token.substring(0, 4) + '****',
       numeroEscritura: datosPublicos.numeroEscritura,
       acto: datosPublicos.acto?.substring(0, 30) + '...',
-      cuantia: typeof datosPublicos.cuantia === 'number' ? `$${datosPublicos.cuantia}` : datosPublicos.cuantia
+      cuantia: typeof datosPublicos.cuantia === 'number' ? `$${datosPublicos.cuantia}` : datosPublicos.cuantia,
+      tienePDF: !!escritura.pdfFileName
     });
     
     // TODO: Registrar verificación para analytics
@@ -1540,6 +1562,96 @@ export async function getPDFMetadata(req, res) {
     res.status(500).json({
       success: false,
       message: 'Error al obtener metadata del PDF'
+    });
+  }
+}
+
+/**
+ * PUT /api/escrituras/:id/pdf-hidden-pages
+ * Actualiza las páginas ocultas de un PDF existente (sin re-subir el archivo)
+ * Solo para ADMIN y MATRIZADOR
+ */
+export async function updatePDFHiddenPages(req, res) {
+  try {
+    const { id } = req.params;
+    const { hiddenPages } = req.body;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    
+    console.log(`[updatePDFHiddenPages] Usuario ${userId} (${userRole}) actualizando páginas ocultas de escritura ${id}`);
+    
+    // Verificar permisos
+    if (userRole !== 'ADMIN' && userRole !== 'MATRIZADOR') {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para editar las páginas ocultas'
+      });
+    }
+    
+    // Validar hiddenPages
+    if (hiddenPages !== null && hiddenPages !== undefined) {
+      if (!Array.isArray(hiddenPages)) {
+        return res.status(400).json({
+          success: false,
+          message: 'hiddenPages debe ser un array de números'
+        });
+      }
+      
+      // Validar que todos sean números positivos
+      if (!hiddenPages.every(p => typeof p === 'number' && p > 0 && Number.isInteger(p))) {
+        return res.status(400).json({
+          success: false,
+          message: 'Las páginas ocultas deben ser números enteros positivos'
+        });
+      }
+    }
+    
+    // Buscar escritura
+    const escritura = await prisma.escrituraQR.findUnique({
+      where: { id: parseInt(id) }
+    });
+    
+    if (!escritura) {
+      return res.status(404).json({
+        success: false,
+        message: 'Escritura no encontrada'
+      });
+    }
+    
+    // Verificar que tenga PDF subido
+    if (!escritura.pdfFileName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Esta escritura no tiene un PDF subido. Sube el PDF primero.'
+      });
+    }
+    
+    // Actualizar páginas ocultas
+    const updateData = {
+      pdfHiddenPages: hiddenPages && hiddenPages.length > 0 ? JSON.stringify(hiddenPages) : null
+    };
+    
+    await prisma.escrituraQR.update({
+      where: { id: parseInt(id) },
+      data: updateData
+    });
+    
+    console.log(`[updatePDFHiddenPages] ✅ Páginas ocultas actualizadas para escritura ${id}: ${hiddenPages || 'ninguna'}`);
+    
+    res.json({
+      success: true,
+      message: 'Páginas ocultas actualizadas exitosamente',
+      data: {
+        hiddenPages: hiddenPages || []
+      }
+    });
+    
+  } catch (error) {
+    console.error('[updatePDFHiddenPages] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error actualizando las páginas ocultas',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 }

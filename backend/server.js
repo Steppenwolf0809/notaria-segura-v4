@@ -20,6 +20,7 @@ import receptionRoutes from './src/routes/reception-routes.js'
 import alertasRoutes from './src/routes/alertas-routes.js'
 import concuerdoRoutes from './src/routes/concuerdo-routes.js'
 import escriturasQRRoutes from './src/routes/escrituras-qr-routes.js'
+import pdfProxyRoutes from './src/routes/pdf-proxy-routes.js'
 
 // Cargar variables de entorno
 dotenv.config({ path: './.env' })
@@ -318,6 +319,9 @@ app.use('/api/concuerdos', concuerdoRoutes)
 // RUTAS DE ESCRITURAS QR (/api/escrituras/* y /api/verify/*)
 app.use('/api/escrituras', escriturasQRRoutes)
 app.use('/api', escriturasQRRoutes) // Para la ruta pública /api/verify/:token
+
+// RUTA PROXY PARA PDFs (/api/proxy-pdf)
+app.use('/api', pdfProxyRoutes)
 
 // ============================================================================
 // SERVIR ARCHIVOS ESTÁTICOS DEL FRONTEND
