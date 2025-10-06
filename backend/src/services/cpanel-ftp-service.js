@@ -331,12 +331,21 @@ export async function uploadPDFToFTP(pdfBuffer, filename, maxRetries = 3) {
       
       console.log(`[FTP-PDF] Conectado. Navegando a ${PDF_CONFIG.basePath}...`);
       
-      // Navegar a la carpeta destino (crear si no existe)
+      // Asegurar que estamos en la raíz primero
+      await client.cd('/');
+      
+      // Navegar a public_html
+      await client.cd('public_html');
+      
+      // Verificar si existe pdf-escrituras, si no, crearlo
       try {
-        await client.ensureDir(PDF_CONFIG.basePath);
-      } catch (dirError) {
-        console.warn(`[FTP-PDF] Advertencia al crear/navegar directorio: ${dirError.message}`);
-        await client.cd(PDF_CONFIG.basePath);
+        await client.cd('pdf-escrituras');
+        console.log(`[FTP-PDF] Directorio pdf-escrituras encontrado`);
+      } catch (cdError) {
+        console.log(`[FTP-PDF] Directorio pdf-escrituras no existe, creándolo...`);
+        await client.mkdir('pdf-escrituras');
+        await client.cd('pdf-escrituras');
+        console.log(`[FTP-PDF] ✅ Directorio pdf-escrituras creado`);
       }
       
       console.log(`[FTP-PDF] Subiendo PDF ${filename}...`);
@@ -417,8 +426,10 @@ export async function downloadPDFFromFTP(filename) {
       secure: FTP_CONFIG.secure
     });
     
-    // Navegar a la carpeta de PDFs
-    await client.cd(PDF_CONFIG.basePath);
+    // Navegar a la carpeta de PDFs de forma explícita
+    await client.cd('/');
+    await client.cd('public_html');
+    await client.cd('pdf-escrituras');
     
     // Descargar a un buffer
     const { Writable } = await import('stream');
@@ -481,7 +492,11 @@ export async function deletePDFFromFTP(filename) {
       secure: FTP_CONFIG.secure
     });
     
-    await client.cd(PDF_CONFIG.basePath);
+    // Navegar a la carpeta de PDFs de forma explícita
+    await client.cd('/');
+    await client.cd('public_html');
+    await client.cd('pdf-escrituras');
+    
     await client.remove(filename);
     
     console.log(`[FTP-PDF] PDF eliminado: ${filename}`);
@@ -522,7 +537,11 @@ export async function checkPDFExists(filename) {
       secure: FTP_CONFIG.secure
     });
     
-    await client.cd(PDF_CONFIG.basePath);
+    // Navegar a la carpeta de PDFs de forma explícita
+    await client.cd('/');
+    await client.cd('public_html');
+    await client.cd('pdf-escrituras');
+    
     const list = await client.list();
     
     const exists = list.some(item => item.name === filename);
