@@ -416,7 +416,7 @@ export function downloadQRImage(dataURL, filename = 'escritura-qr.png') {
 export async function uploadPDFToEscritura(escrituraId, pdfFile, hiddenPages = [], onUploadProgress = null) {
   try {
     const formData = new FormData();
-    formData.append('pdf', pdfFile);
+    formData.append('pdfFile', pdfFile); // Cambiado de 'pdf' a 'pdfFile'
     
     // Agregar páginas ocultas si hay alguna
     if (hiddenPages && hiddenPages.length > 0) {
