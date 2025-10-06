@@ -1,0 +1,12 @@
+*   [33m5ca5894[m[33m ([m[1;31morigin/main[m[33m, [m[1;32mmain[m[33m)[m Merge: Implementación de proxy PDF y fix de versiones pdfjs
+[31m|[m[32m\[m  
+[31m|[m * [33mb77e37d[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mfeature/pdf-page-censorship[m[33m, [m[1;31morigin/feature/pdf-page-censorship[m[33m)[m Fix: Corregir versión de pdfjs-dist para coincidir con react-pdf v9
+[31m|[m * [33m8f90bb5[m Fix: Corregir proxy PDF usando fetch nativo de Node.js (sin node-fetch)
+[31m|[m * [33ma3ec485[m  Proxy instead of CORS
+[31m|[m * [33mb51e5de[m fix: Remover configuracion manual del worker de PDF.js - Dejar que react-pdf use su worker interno automaticamente - Elimina problemas de carga de CDN externa
+[31m|[m * [33m89b077e[m fix: Actualizar worker de PDF.js a version 4.8.69 para coincidir con react-pdf 9.1.1 - Corrige error de mismatch de versiones API/Worker
+[31m|[m * [33m0754a07[m fix: Mejorar configuracion de react-pdf para cargar PDFs desde FTP publico - Agregar opciones de cMapUrl y standardFontDataUrl - Deshabilitar withCredentials para evitar CORS - Configurar opciones correctas para PDF.js 3.11.174
+[31m|[m * [33m9b49417[m fix: Usar URL publica del FTP para cargar PDFs en gestor de paginas ocultas - Evita problemas de CORS y autenticacion con react-pdf - Mejora mensajes de error con URL completa - Agrega panel de acciones rapidas de PDF en dialogo de detalles
+[31m|[m * [33maf2fc39[m docs: Agregar documentacion completa del sistema de censura PDF
+[31m|[m * [33m65b3795[m feat: Sistema completo de censura de paginas PDF - Backend: Nuevo endpoint PUT /api/escrituras/:id/pdf-hidden-pages - Backend: Actualizado GET /api/verify/:token para incluir pdfFileName y pdfHiddenPages - Frontend: Componente PDFPageManagerModal para gestionar paginas ocultas - Frontend: Integracion en GeneradorQR con boton de gestion - Frontend: Servicios updatePDFHiddenPages y getPDFHiddenPages - UX: Visualizacion side-by-side con miniaturas de todas las paginas - UX: Indicadores visuales de paginas ocultas en preview
+[31m|[m[31m/[m  

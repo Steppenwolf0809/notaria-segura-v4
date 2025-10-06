@@ -15,6 +15,8 @@ El archivo `.htaccess` configura:
 - ✅ Caché para mejorar rendimiento
 - ✅ Seguridad básica
 
+**NOTA IMPORTANTE:** Si la carpeta `/fotos-escrituras/` tiene protección HTTP Basic (autenticación con usuario y contraseña), el sistema backend utilizará automáticamente las credenciales FTP (`FTP_USER` y `FTP_PASSWORD`) para autenticarse. Esto es típico en configuraciones de cPanel.
+
 ---
 
 ## 📁 Ubicación del Archivo
@@ -181,6 +183,51 @@ Access to fetch at 'https://notaria18quito.com.ec/...' from origin 'https://nota
 1. Crear la carpeta `fotos-escrituras` manualmente en cPanel
 2. Establecer permisos 755
 3. Subir el .htaccess
+
+### Problema 5: Error 401 (Unauthorized) al visualizar PDFs
+
+**Síntoma:**
+```
+GET /api/proxy-pdf?url=... 401 (Unauthorized)
+Error loading PDF: Unexpected server response (401)
+```
+
+**Causa:** La carpeta `/fotos-escrituras/` está protegida con autenticación HTTP Basic en el servidor web.
+
+**Solución Automática (ya implementada):**
+- ✅ El proxy del backend usa automáticamente las credenciales FTP (`FTP_USER` y `FTP_PASSWORD`) para autenticarse
+- ✅ Esto funciona en la mayoría de configuraciones de cPanel donde las credenciales FTP también sirven para HTTP
+
+**Solución Permanente (Recomendado):**
+1. **Remover la protección HTTP Basic de la carpeta:**
+   - Acceder a cPanel
+   - Ir a "Directory Privacy" o "Privacidad de Directorios"
+   - Buscar la carpeta `public_html/fotos-escrituras`
+   - Desmarcar "Password protect this directory"
+   - Guardar cambios
+
+2. **O configurar un .htaccess que permita acceso público:**
+   ```apache
+   # Permitir acceso público (remover autenticación HTTP Basic)
+   Satisfy Any
+   
+   # Headers CORS
+   <IfModule mod_headers.c>
+       Header set Access-Control-Allow-Origin "*"
+   </IfModule>
+   
+   # Prevenir listado de directorios
+   Options -Indexes
+   ```
+
+**Verificación:**
+```bash
+# Probar acceso sin autenticación
+curl -I https://www.notaria18quito.com.ec/fotos-escrituras/archivo.pdf
+
+# Resultado esperado: HTTP/2 200
+# Si dice 401, aún tiene protección HTTP Basic
+```
 
 ---
 

@@ -77,6 +77,16 @@ router.get('/proxy-pdf', async (req, res) => {
     // Preparar headers para el request remoto
     const headers = {};
     
+    // Agregar autenticación HTTP Basic si está configurada
+    // Usa las mismas credenciales FTP para acceso HTTP (típico en cPanel)
+    if (process.env.FTP_USER && process.env.FTP_PASSWORD) {
+      const credentials = Buffer.from(
+        `${process.env.FTP_USER}:${process.env.FTP_PASSWORD}`
+      ).toString('base64');
+      headers['Authorization'] = `Basic ${credentials}`;
+      console.log(`🔐 PROXY-PDF: Usando autenticación HTTP Basic (usuario: ${process.env.FTP_USER})`);
+    }
+    
     // Reenviar Range header si viene (importante para streaming de PDFs grandes)
     if (req.headers.range) {
       headers['Range'] = req.headers.range;

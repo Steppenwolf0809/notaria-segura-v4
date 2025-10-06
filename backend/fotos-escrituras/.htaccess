@@ -3,6 +3,13 @@
 # Configuración para permitir acceso a PDFs y fotos
 # ===========================================
 
+# ===========================================
+# PERMITIR ACCESO PÚBLICO (remover protección HTTP Basic)
+# Esta directiva permite acceso sin autenticación incluso si
+# la carpeta padre tiene protección HTTP Basic configurada
+# ===========================================
+Satisfy Any
+
 # Habilitar RewriteEngine
 <IfModule mod_rewrite.c>
     RewriteEngine On
