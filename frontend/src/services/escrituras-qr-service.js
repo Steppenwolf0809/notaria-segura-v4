@@ -495,6 +495,59 @@ export function getPDFUrlPrivate(escrituraId) {
 }
 
 /**
+ * Actualiza las páginas ocultas de un PDF (sin re-subir el archivo)
+ * @param {number} escrituraId - ID de la escritura
+ * @param {Array<number>} hiddenPages - Array de números de página a ocultar
+ * @returns {Promise<Object>} Respuesta con confirmación
+ */
+export async function updatePDFHiddenPages(escrituraId, hiddenPages = []) {
+  try {
+    const response = await apiClient.put(`/escrituras/${escrituraId}/pdf-hidden-pages`, {
+      hiddenPages: hiddenPages
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error updating hidden pages:', error);
+    throw new Error(
+      error.response?.data?.message || 
+      'Error al actualizar las páginas ocultas'
+    );
+  }
+}
+
+/**
+ * Obtiene las páginas ocultas de una escritura
+ * @param {number} escrituraId - ID de la escritura
+ * @returns {Promise<Array<number>>} Array de números de página ocultos
+ */
+export async function getPDFHiddenPages(escrituraId) {
+  try {
+    const response = await apiClient.get(`/escrituras/${escrituraId}`);
+    const escritura = response.data.data;
+    
+    // Parsear pdfHiddenPages si existe
+    if (escritura.pdfHiddenPages) {
+      try {
+        return typeof escritura.pdfHiddenPages === 'string' 
+          ? JSON.parse(escritura.pdfHiddenPages)
+          : escritura.pdfHiddenPages;
+      } catch (e) {
+        console.error('Error parsing pdfHiddenPages:', e);
+        return [];
+      }
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('Error getting hidden pages:', error);
+    throw new Error(
+      error.response?.data?.message || 
+      'Error al obtener las páginas ocultas'
+    );
+  }
+}
+
+/**
  * Verifica si una escritura tiene PDF subido
  * @param {Object} escritura - Objeto de escritura
  * @returns {boolean} True si tiene PDF subido

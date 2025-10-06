@@ -19,7 +19,8 @@ import {
   uploadPDFToEscritura,
   getPDFPublic,
   getPDFPrivate,
-  getPDFMetadata
+  getPDFMetadata,
+  updatePDFHiddenPages
 } from '../controllers/escrituras-qr-controller.js';
 
 const router = express.Router();
@@ -145,6 +146,12 @@ router.post('/:id/pdf',
 router.get('/:id/pdf',
   authenticateToken,
   getPDFPrivate
+);
+
+// PUT /api/escrituras/:id/pdf-hidden-pages - Actualizar páginas ocultas (protegido)
+router.put('/:id/pdf-hidden-pages',
+  authenticateToken,
+  updatePDFHiddenPages
 );
 
 /**
