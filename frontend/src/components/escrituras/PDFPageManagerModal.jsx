@@ -39,7 +39,6 @@ import {
   ZoomOut as ZoomOutIcon
 } from '@mui/icons-material';
 import { 
-  getPDFUrlPrivate,
   updatePDFHiddenPages,
   getPDFHiddenPages
 } from '../../services/escrituras-qr-service';
@@ -47,6 +46,9 @@ import { toast } from 'react-toastify';
 
 // Configurar worker de PDF.js
 pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// URL base pública del FTP (sin autenticación)
+const PUBLIC_FOTOS_URL = 'https://www.notaria18quito.com.ec/fotos-escrituras';
 
 export default function PDFPageManagerModal({ open, onClose, escritura, onSuccess }) {
   const [numPages, setNumPages] = useState(null);
@@ -58,7 +60,10 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
   const [scale, setScale] = useState(1.0);
   const [hasChanges, setHasChanges] = useState(false);
 
-  const pdfUrl = escritura ? getPDFUrlPrivate(escritura.id) : null;
+  // Usar URL pública del FTP (no requiere autenticación, evita problemas de CORS)
+  const pdfUrl = escritura?.pdfFileName 
+    ? `${PUBLIC_FOTOS_URL}/${escritura.pdfFileName}`
+    : null;
 
   // Cargar páginas ocultas existentes
   useEffect(() => {
@@ -88,7 +93,11 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
 
   const onDocumentLoadError = (error) => {
     console.error('Error loading PDF:', error);
-    setError('Error al cargar el PDF. Por favor intenta nuevamente.');
+    console.error('PDF URL:', pdfUrl);
+    setError(
+      'Error al cargar el PDF. Verifica que el archivo esté correctamente subido al servidor FTP. ' +
+      'URL: ' + (pdfUrl || 'No disponible')
+    );
     setLoading(false);
   };
 
@@ -200,6 +209,19 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
         {error && (
           <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
             {error}
+          </Alert>
+        )}
+
+        {!pdfUrl && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <Typography variant="body2">
+              <strong>PDF no encontrado.</strong> Verifica que el archivo haya sido subido correctamente.
+            </Typography>
+            {escritura?.pdfFileName && (
+              <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
+                Buscando: {PUBLIC_FOTOS_URL}/{escritura.pdfFileName}
+              </Typography>
+            )}
           </Alert>
         )}
 
