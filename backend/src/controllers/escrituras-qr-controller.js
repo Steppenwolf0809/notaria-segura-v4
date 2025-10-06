@@ -1610,19 +1610,29 @@ export async function getPDFPrivate(req, res) {
     res.send(pdfBuffer);
     
   } catch (error) {
-    console.error('[getPDFPrivate] Error:', error);
+    console.error('[getPDFPrivate] Error completo:', error);
+    console.error('[getPDFPrivate] Stack trace:', error.stack);
     
-    if (error.message.includes('PDF no encontrado')) {
+    // Errores específicos del FTP
+    if (error.message.includes('PDF no encontrado') || error.message.includes('not found')) {
       return res.status(404).json({
         success: false,
-        message: 'El archivo PDF no se encuentra en el servidor'
+        message: 'El archivo PDF no se encuentra en el servidor FTP'
+      });
+    }
+    
+    if (error.message.includes('FTP') || error.message.includes('timeout')) {
+      return res.status(503).json({
+        success: false,
+        message: 'Error al conectar con el servidor de archivos. Intenta nuevamente en unos momentos.'
       });
     }
     
     res.status(500).json({
       success: false,
       message: 'Error al obtener el PDF',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }
