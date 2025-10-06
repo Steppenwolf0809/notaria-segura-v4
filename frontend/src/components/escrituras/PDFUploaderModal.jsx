@@ -52,8 +52,8 @@ import {
   hasPDFUploaded
 } from '../../services/escrituras-qr-service';
 
-// Configurar worker de PDF.js
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+// Configurar worker de PDF.js con versión específica conocida
+pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 /**
  * Componente PDFUploaderModal

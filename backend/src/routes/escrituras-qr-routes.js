@@ -137,7 +137,7 @@ router.delete('/:id/hard-delete',
 // POST /api/escrituras/:id/pdf - Subir PDF completo de escritura (protegido)
 router.post('/:id/pdf',
   authenticateToken,
-  upload.single('pdf'),
+  upload.single('pdfFile'),
   uploadPDFToEscritura
 );
 
