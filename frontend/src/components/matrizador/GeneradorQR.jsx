@@ -765,6 +765,54 @@ const GeneradorQR = () => {
                     </Typography>
                   </Paper>
                 )}
+                
+                {/* Acciones del PDF */}
+                {hasPDFUploaded(selectedEscritura) && (
+                  <Paper sx={{ p: 2, mt: 2 }}>
+                    <Typography variant="subtitle2" gutterBottom>
+                      Gestión del PDF
+                    </Typography>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        startIcon={<EyeIcon />}
+                        onClick={() => {
+                          handleViewPDF(selectedEscritura);
+                          setShowDetailsDialog(false);
+                        }}
+                        size="small"
+                      >
+                        Ver PDF
+                      </Button>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        color="warning"
+                        startIcon={<ManageHiddenIcon />}
+                        onClick={() => {
+                          handleManagePDFPages(selectedEscritura);
+                          setShowDetailsDialog(false);
+                        }}
+                        size="small"
+                      >
+                        Gestionar Páginas Ocultas
+                      </Button>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                        startIcon={<UploadIcon />}
+                        onClick={() => {
+                          handleUploadPDF(selectedEscritura);
+                          setShowDetailsDialog(false);
+                        }}
+                        size="small"
+                      >
+                        Reemplazar PDF
+                      </Button>
+                    </Box>
+                  </Paper>
+                )}
               </Grid>
             </Grid>
           )}
