@@ -44,19 +44,12 @@ import {
 } from '../../services/escrituras-qr-service';
 import { toast } from 'react-toastify';
 
-// Configurar worker de PDF.js - IMPORTANTE: Usar la misma versión que react-pdf
-// react-pdf 9.1.1 usa pdfjs-dist 4.8.69
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@4.8.69/build/pdf.worker.min.mjs`;
+// Configurar worker de PDF.js - Usar worker desde bundle de react-pdf
+// No configurar el worker explícitamente, dejar que react-pdf lo maneje
+// pdfjs.GlobalWorkerOptions.workerSrc ya está configurado por react-pdf
 
 // URL base pública del FTP (sin autenticación)
 const PUBLIC_FOTOS_URL = 'https://www.notaria18quito.com.ec/fotos-escrituras';
-
-// Opciones para cargar PDFs con CORS
-const pdfOptions = {
-  cMapUrl: 'https://unpkg.com/pdfjs-dist@4.8.69/cmaps/',
-  cMapPacked: true,
-  standardFontDataUrl: 'https://unpkg.com/pdfjs-dist@4.8.69/standard_fonts/',
-};
 
 export default function PDFPageManagerModal({ open, onClose, escritura, onSuccess }) {
   const [numPages, setNumPages] = useState(null);
@@ -328,7 +321,6 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
                       url: pdfUrl,
                       withCredentials: false
                     }}
-                    options={pdfOptions}
                     onLoadSuccess={onDocumentLoadSuccess}
                     onLoadError={onDocumentLoadError}
                     loading={
@@ -428,7 +420,6 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
                                 url: pdfUrl,
                                 withCredentials: false
                               }}
-                              options={pdfOptions}
                               loading={<CircularProgress size={20} />}
                             >
                               <Page 
