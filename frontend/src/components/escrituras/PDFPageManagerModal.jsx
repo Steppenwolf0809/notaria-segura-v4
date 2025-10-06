@@ -51,6 +51,31 @@ import { toast } from 'react-toastify';
 // URL base pública del FTP (sin autenticación)
 const PUBLIC_FOTOS_URL = 'https://www.notaria18quito.com.ec/fotos-escrituras';
 
+/**
+ * Helper: Convierte una URL externa a la URL del proxy del backend
+ * Esto evita problemas de CORS al cargar PDFs desde dominios externos
+ * 
+ * @param {string} pdfFileName - Nombre del archivo PDF
+ * @returns {string} URL del proxy en el backend
+ */
+function buildProxyPdfUrl(pdfFileName) {
+  if (!pdfFileName) return null;
+  
+  // Construir URL completa del PDF remoto
+  const remoteUrl = `${PUBLIC_FOTOS_URL}/${pdfFileName}`;
+  
+  // Usar el proxy del backend (mismo origen, sin CORS)
+  const proxyUrl = `/api/proxy-pdf?url=${encodeURIComponent(remoteUrl)}`;
+  
+  console.log('📄 PDF Modal: Usando proxy', { 
+    archivo: pdfFileName, 
+    urlRemota: remoteUrl,
+    urlProxy: proxyUrl 
+  });
+  
+  return proxyUrl;
+}
+
 export default function PDFPageManagerModal({ open, onClose, escritura, onSuccess }) {
   const [numPages, setNumPages] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -61,10 +86,8 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
   const [scale, setScale] = useState(1.0);
   const [hasChanges, setHasChanges] = useState(false);
 
-  // Usar URL pública del FTP (no requiere autenticación, evita problemas de CORS)
-  const pdfUrl = escritura?.pdfFileName 
-    ? `${PUBLIC_FOTOS_URL}/${escritura.pdfFileName}`
-    : null;
+  // Usar proxy del backend para evitar CORS
+  const pdfUrl = buildProxyPdfUrl(escritura?.pdfFileName);
 
   // Cargar páginas ocultas existentes
   useEffect(() => {
@@ -93,11 +116,12 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
   };
 
   const onDocumentLoadError = (error) => {
-    console.error('Error loading PDF:', error);
-    console.error('PDF URL:', pdfUrl);
+    console.error('❌ Error loading PDF:', error);
+    console.error('📄 PDF URL (proxy):', pdfUrl);
+    console.error('📁 Archivo original:', escritura?.pdfFileName);
     setError(
       'Error al cargar el PDF. Verifica que el archivo esté correctamente subido al servidor FTP. ' +
-      'URL: ' + (pdfUrl || 'No disponible')
+      'Archivo: ' + (escritura?.pdfFileName || 'No disponible')
     );
     setLoading(false);
   };
@@ -220,7 +244,7 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
             </Typography>
             {escritura?.pdfFileName && (
               <Typography variant="caption" sx={{ mt: 1, display: 'block' }}>
-                Buscando: {PUBLIC_FOTOS_URL}/{escritura.pdfFileName}
+                Archivo: {escritura.pdfFileName}
               </Typography>
             )}
           </Alert>
