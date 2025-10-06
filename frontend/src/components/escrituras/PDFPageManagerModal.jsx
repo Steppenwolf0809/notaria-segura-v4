@@ -50,6 +50,13 @@ pdfjs.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pd
 // URL base pública del FTP (sin autenticación)
 const PUBLIC_FOTOS_URL = 'https://www.notaria18quito.com.ec/fotos-escrituras';
 
+// Opciones para cargar PDFs con CORS
+const pdfOptions = {
+  cMapUrl: 'https://unpkg.com/pdfjs-dist@3.11.174/cmaps/',
+  cMapPacked: true,
+  standardFontDataUrl: 'https://unpkg.com/pdfjs-dist@3.11.174/standard_fonts/',
+};
+
 export default function PDFPageManagerModal({ open, onClose, escritura, onSuccess }) {
   const [numPages, setNumPages] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -316,7 +323,11 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
                   </Box>
                 ) : (
                   <Document
-                    file={pdfUrl}
+                    file={{
+                      url: pdfUrl,
+                      withCredentials: false
+                    }}
+                    options={pdfOptions}
                     onLoadSuccess={onDocumentLoadSuccess}
                     onLoadError={onDocumentLoadError}
                     loading={
@@ -412,7 +423,11 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
                             }}
                           >
                             <Document
-                              file={pdfUrl}
+                              file={{
+                                url: pdfUrl,
+                                withCredentials: false
+                              }}
+                              options={pdfOptions}
                               loading={<CircularProgress size={20} />}
                             >
                               <Page 
