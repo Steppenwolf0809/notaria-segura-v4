@@ -78,16 +78,22 @@ export async function uploadPhotoToFTP(imageBuffer, filename, maxRetries = 3) {
         secure: FTP_CONFIG.secure
       });
       
-      console.log(`[FTP] Conectado exitosamente. Navegando a ${FTP_CONFIG.basePath}...`);
+      console.log(`[FTP] Conectado exitosamente. Directorio actual: ${await client.pwd()}`);
       
-      // Navegar a la carpeta destino
-      // Intentar crear la carpeta si no existe
-      try {
-        await client.ensureDir(FTP_CONFIG.basePath);
-      } catch (dirError) {
-        console.warn(`[FTP] Advertencia al crear/navegar directorio: ${dirError.message}`);
-        // Intentar cambiar directamente
-        await client.cd(FTP_CONFIG.basePath);
+      // Si basePath no es "/" navegar a la carpeta
+      if (FTP_CONFIG.basePath && FTP_CONFIG.basePath !== '/') {
+        console.log(`[FTP] Navegando a ${FTP_CONFIG.basePath}...`);
+        try {
+          await client.cd(FTP_CONFIG.basePath);
+          console.log(`[FTP] ✅ En directorio: ${await client.pwd()}`);
+        } catch (cdError) {
+          console.log(`[FTP] Carpeta no existe, creando ${FTP_CONFIG.basePath}...`);
+          await client.mkdir(FTP_CONFIG.basePath);
+          await client.cd(FTP_CONFIG.basePath);
+          console.log(`[FTP] ✅ Carpeta creada y navegada: ${await client.pwd()}`);
+        }
+      } else {
+        console.log(`[FTP] Usando directorio raíz: ${await client.pwd()}`);
       }
       
       console.log(`[FTP] Subiendo archivo ${filename}...`);
@@ -331,15 +337,22 @@ export async function uploadPDFToFTP(pdfBuffer, filename, maxRetries = 3) {
         secure: FTP_CONFIG.secure
       });
       
-      console.log(`[FTP-PDF] Conectado. Navegando a ${PDF_CONFIG.basePath}...`);
+      console.log(`[FTP-PDF] Conectado. Directorio actual: ${await client.pwd()}`);
       
-      // Navegar a la carpeta destino (misma lógica que fotos)
-      try {
-        await client.ensureDir(PDF_CONFIG.basePath);
-      } catch (dirError) {
-        console.warn(`[FTP-PDF] Advertencia al navegar directorio: ${dirError.message}`);
-        // Intentar navegar manualmente
-        await client.cd(PDF_CONFIG.basePath);
+      // Si basePath no es "/" navegar a la carpeta (misma lógica que fotos)
+      if (PDF_CONFIG.basePath && PDF_CONFIG.basePath !== '/') {
+        console.log(`[FTP-PDF] Navegando a ${PDF_CONFIG.basePath}...`);
+        try {
+          await client.cd(PDF_CONFIG.basePath);
+          console.log(`[FTP-PDF] ✅ En directorio: ${await client.pwd()}`);
+        } catch (cdError) {
+          console.log(`[FTP-PDF] Carpeta no existe, creando ${PDF_CONFIG.basePath}...`);
+          await client.mkdir(PDF_CONFIG.basePath);
+          await client.cd(PDF_CONFIG.basePath);
+          console.log(`[FTP-PDF] ✅ Carpeta creada y navegada: ${await client.pwd()}`);
+        }
+      } else {
+        console.log(`[FTP-PDF] Usando directorio raíz: ${await client.pwd()}`);
       }
       
       console.log(`[FTP-PDF] Subiendo PDF ${filename}...`);
@@ -420,8 +433,10 @@ export async function downloadPDFFromFTP(filename) {
       secure: FTP_CONFIG.secure
     });
     
-    // Navegar a la carpeta de PDFs (misma que fotos)
-    await client.cd(PDF_CONFIG.basePath);
+    // Navegar a la carpeta de PDFs si no es raíz
+    if (PDF_CONFIG.basePath && PDF_CONFIG.basePath !== '/') {
+      await client.cd(PDF_CONFIG.basePath);
+    }
     
     // Descargar a un buffer
     const { Writable } = await import('stream');
@@ -484,8 +499,10 @@ export async function deletePDFFromFTP(filename) {
       secure: FTP_CONFIG.secure
     });
     
-    // Navegar a la carpeta de PDFs (misma que fotos)
-    await client.cd(PDF_CONFIG.basePath);
+    // Navegar a la carpeta de PDFs si no es raíz
+    if (PDF_CONFIG.basePath && PDF_CONFIG.basePath !== '/') {
+      await client.cd(PDF_CONFIG.basePath);
+    }
     
     await client.remove(filename);
     
@@ -527,8 +544,10 @@ export async function checkPDFExists(filename) {
       secure: FTP_CONFIG.secure
     });
     
-    // Navegar a la carpeta de PDFs (misma que fotos)
-    await client.cd(PDF_CONFIG.basePath);
+    // Navegar a la carpeta de PDFs si no es raíz
+    if (PDF_CONFIG.basePath && PDF_CONFIG.basePath !== '/') {
+      await client.cd(PDF_CONFIG.basePath);
+    }
     
     const list = await client.list();
     
