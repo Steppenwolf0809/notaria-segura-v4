@@ -1,0 +1,121 @@
+# ===========================================
+# .htaccess para carpeta fotos-escrituras
+# Configuración para permitir acceso a PDFs y fotos
+# ===========================================
+
+# Habilitar RewriteEngine
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+</IfModule>
+
+# ===========================================
+# CORS - Permitir acceso desde cualquier origen
+# ===========================================
+<IfModule mod_headers.c>
+    # Permitir todos los orígenes (producción)
+    Header set Access-Control-Allow-Origin "*"
+    
+    # Permitir métodos HTTP
+    Header set Access-Control-Allow-Methods "GET, OPTIONS"
+    
+    # Permitir headers
+    Header set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+    
+    # Tiempo de cache para preflight requests
+    Header set Access-Control-Max-Age "3600"
+    
+    # Permitir credenciales (opcional)
+    # Header set Access-Control-Allow-Credentials "true"
+</IfModule>
+
+# ===========================================
+# Configuración de tipos MIME
+# ===========================================
+<IfModule mod_mime.c>
+    # PDFs
+    AddType application/pdf .pdf
+    
+    # Imágenes
+    AddType image/jpeg .jpg .jpeg
+    AddType image/png .png
+    AddType image/gif .gif
+    AddType image/webp .webp
+</IfModule>
+
+# ===========================================
+# Configuración de Cache
+# ===========================================
+<IfModule mod_expires.c>
+    ExpiresActive On
+    
+    # Cache para PDFs (1 hora)
+    ExpiresByType application/pdf "access plus 1 hour"
+    
+    # Cache para imágenes (1 día)
+    ExpiresByType image/jpeg "access plus 1 day"
+    ExpiresByType image/png "access plus 1 day"
+    ExpiresByType image/gif "access plus 1 day"
+    ExpiresByType image/webp "access plus 1 day"
+</IfModule>
+
+# Control de cache alternativo
+<IfModule mod_headers.c>
+    # Cache para PDFs
+    <FilesMatch "\.(pdf)$">
+        Header set Cache-Control "public, max-age=3600"
+    </FilesMatch>
+    
+    # Cache para imágenes
+    <FilesMatch "\.(jpg|jpeg|png|gif|webp)$">
+        Header set Cache-Control "public, max-age=86400"
+    </FilesMatch>
+</IfModule>
+
+# ===========================================
+# Seguridad
+# ===========================================
+
+# Prevenir listado de directorios
+Options -Indexes
+
+# Proteger el .htaccess mismo
+<Files .htaccess>
+    Order allow,deny
+    Deny from all
+</Files>
+
+# Permitir solo archivos PDF y de imagen
+<FilesMatch "\.(pdf|jpg|jpeg|png|gif|webp)$">
+    Order allow,deny
+    Allow from all
+</FilesMatch>
+
+# ===========================================
+# Compresión (opcional, mejora velocidad)
+# ===========================================
+<IfModule mod_deflate.c>
+    # No comprimir PDFs (ya están comprimidos)
+    SetEnvIfNoCase Request_URI \.pdf$ no-gzip dont-vary
+</IfModule>
+
+# ===========================================
+# Prevenir hotlinking (opcional - desactivado por defecto)
+# ===========================================
+# Descomenta si quieres prevenir que otros sitios usen tus PDFs/imágenes
+# <IfModule mod_rewrite.c>
+#     RewriteEngine on
+#     RewriteCond %{HTTP_REFERER} !^$
+#     RewriteCond %{HTTP_REFERER} !^https?://(www\.)?notaria18quito\.com\.ec [NC]
+#     RewriteCond %{HTTP_REFERER} !^https?://(www\.)?notaria-segura.*\.railway\.app [NC]
+#     RewriteRule \.(jpg|jpeg|png|gif|pdf)$ - [F,NC]
+# </IfModule>
+
+# ===========================================
+# Responder a OPTIONS preflight requests
+# ===========================================
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_METHOD} OPTIONS
+    RewriteRule ^(.*)$ $1 [R=200,L]
+</IfModule>
+
