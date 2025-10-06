@@ -48,11 +48,11 @@ export function generateVerificationURL(token) {
   const baseURL = getBaseURL();
   const env = process.env.NODE_ENV;
   
-  // En producción, usar el dominio oficial de la notaría con ruta en español
+  // En producción, usar el dominio oficial de la notaría (FIJO, no variable)
   if (env === 'production') {
-    const publicURL = process.env.PUBLIC_URL || 'https://www.notaria18quito.com.ec';
-    console.log(`[QR] Generando URL de verificación con PUBLIC_URL: ${publicURL}`);
-    const url = `${publicURL}/verificar.html?token=${token}`;
+    const notariaURL = 'https://www.notaria18quito.com.ec'; // URL fija del dominio de la notaría
+    console.log(`[QR] Generando URL de verificación con dominio fijo: ${notariaURL}`);
+    const url = `${notariaURL}/verificar.html?token=${token}`;
     console.log(`[QR] URL generada: ${url}`);
     return url;
   }
