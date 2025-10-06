@@ -235,10 +235,12 @@ export async function testFTPConnection() {
 
 /**
  * Configuración para carpeta de PDFs
+ * NOTA: Usamos la misma carpeta que las fotos para evitar problemas de navegación FTP
+ * Los PDFs se distinguen por extensión .pdf
  */
 const PDF_CONFIG = {
-  basePath: '/public_html/pdf-escrituras',
-  publicBaseURL: 'https://notaria18quito.com.ec/pdf-escrituras',
+  basePath: FTP_CONFIG.basePath, // Usar la misma ruta que fotos
+  publicBaseURL: FTP_CONFIG.publicBaseURL, // Usar la misma URL base
   maxFileSize: 10 * 1024 * 1024 // 10MB
 };
 
@@ -282,7 +284,7 @@ export function validatePDFFile(pdfBuffer) {
  * 
  * @example
  * const pdfURL = await uploadPDFToFTP(buffer, 'C8GHIWTZ.pdf');
- * console.log(pdfURL); // https://notaria18quito.com.ec/pdf-escrituras/C8GHIWTZ.pdf
+ * console.log(pdfURL); // https://notaria18quito.com.ec/fotos-escrituras/C8GHIWTZ.pdf
  */
 export async function uploadPDFToFTP(pdfBuffer, filename, maxRetries = 3) {
   // Validar configuración
@@ -331,21 +333,13 @@ export async function uploadPDFToFTP(pdfBuffer, filename, maxRetries = 3) {
       
       console.log(`[FTP-PDF] Conectado. Navegando a ${PDF_CONFIG.basePath}...`);
       
-      // Asegurar que estamos en la raíz primero
-      await client.cd('/');
-      
-      // Navegar a public_html
-      await client.cd('public_html');
-      
-      // Verificar si existe pdf-escrituras, si no, crearlo
+      // Navegar a la carpeta destino (misma lógica que fotos)
       try {
-        await client.cd('pdf-escrituras');
-        console.log(`[FTP-PDF] Directorio pdf-escrituras encontrado`);
-      } catch (cdError) {
-        console.log(`[FTP-PDF] Directorio pdf-escrituras no existe, creándolo...`);
-        await client.mkdir('pdf-escrituras');
-        await client.cd('pdf-escrituras');
-        console.log(`[FTP-PDF] ✅ Directorio pdf-escrituras creado`);
+        await client.ensureDir(PDF_CONFIG.basePath);
+      } catch (dirError) {
+        console.warn(`[FTP-PDF] Advertencia al navegar directorio: ${dirError.message}`);
+        // Intentar navegar manualmente
+        await client.cd(PDF_CONFIG.basePath);
       }
       
       console.log(`[FTP-PDF] Subiendo PDF ${filename}...`);
@@ -426,10 +420,8 @@ export async function downloadPDFFromFTP(filename) {
       secure: FTP_CONFIG.secure
     });
     
-    // Navegar a la carpeta de PDFs de forma explícita
-    await client.cd('/');
-    await client.cd('public_html');
-    await client.cd('pdf-escrituras');
+    // Navegar a la carpeta de PDFs (misma que fotos)
+    await client.cd(PDF_CONFIG.basePath);
     
     // Descargar a un buffer
     const { Writable } = await import('stream');
@@ -492,10 +484,8 @@ export async function deletePDFFromFTP(filename) {
       secure: FTP_CONFIG.secure
     });
     
-    // Navegar a la carpeta de PDFs de forma explícita
-    await client.cd('/');
-    await client.cd('public_html');
-    await client.cd('pdf-escrituras');
+    // Navegar a la carpeta de PDFs (misma que fotos)
+    await client.cd(PDF_CONFIG.basePath);
     
     await client.remove(filename);
     
@@ -537,10 +527,8 @@ export async function checkPDFExists(filename) {
       secure: FTP_CONFIG.secure
     });
     
-    // Navegar a la carpeta de PDFs de forma explícita
-    await client.cd('/');
-    await client.cd('public_html');
-    await client.cd('pdf-escrituras');
+    // Navegar a la carpeta de PDFs (misma que fotos)
+    await client.cd(PDF_CONFIG.basePath);
     
     const list = await client.list();
     
