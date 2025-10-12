@@ -54,6 +54,42 @@ router.get('/proxy-pdf/health', (req, res) => {
 });
 
 /**
+ * HELPER: Función auxiliar para hacer petición HTTP con/sin autenticación
+ * 
+ * @param {string} url - URL completa del PDF
+ * @param {string|null} credentials - Credenciales Base64 (null = sin auth)
+ * @param {object} extraHeaders - Headers adicionales (ej: Range)
+ * @param {AbortSignal} signal - Signal para cancelar la petición
+ * @returns {Promise<Response>} Respuesta de fetch
+ */
+async function fetchPDFWithAuth(url, credentials = null, extraHeaders = {}, signal) {
+  const headers = {
+    'User-Agent': 'Mozilla/5.0 (compatible; NotariaProxy/1.0)',
+    'Accept': 'application/pdf,*/*',
+    ...extraHeaders
+  };
+  
+  // Solo agregar auth si se proporciona
+  if (credentials) {
+    headers['Authorization'] = `Basic ${credentials}`;
+  }
+  
+  console.log(`📡 Intentando fetch a: ${url}`);
+  console.log(`🔐 Con autenticación: ${credentials ? 'SÍ' : 'NO'}`);
+  
+  const response = await fetch(url, { 
+    method: 'GET',
+    headers,
+    signal,
+    redirect: 'follow'
+  });
+  
+  console.log(`📊 Respuesta: ${response.status} ${response.statusText}`);
+  
+  return response;
+}
+
+/**
  * GET /api/proxy-pdf
  * Proxy seguro para PDFs desde el servidor remoto
  * 
@@ -112,39 +148,90 @@ router.get('/proxy-pdf', async (req, res) => {
 
     console.log(`📄 PROXY-PDF: Solicitando ${remoteUrl.href}`);
 
-    // Preparar headers para el request remoto
-    const headers = {};
-    
-    // Agregar autenticación HTTP Basic si está configurada
-    // Usa las mismas credenciales FTP para acceso HTTP (típico en cPanel)
+    // Preparar credenciales (pero no usarlas aún)
+    let credentials = null;
     if (process.env.FTP_USER && process.env.FTP_PASSWORD) {
-      const credentials = Buffer.from(
+      credentials = Buffer.from(
         `${process.env.FTP_USER}:${process.env.FTP_PASSWORD}`
       ).toString('base64');
-      headers['Authorization'] = `Basic ${credentials}`;
-      console.log(`🔐 PROXY-PDF: Usando autenticación HTTP Basic (usuario: ${process.env.FTP_USER})`);
+      console.log(`🔑 PROXY-PDF: Credenciales disponibles (usuario: ${process.env.FTP_USER})`);
     } else {
       console.warn(`⚠️ PROXY-PDF: Variables FTP_USER/FTP_PASSWORD no configuradas`);
-      console.warn(`⚠️ PROXY-PDF: Si el servidor requiere autenticación, la petición fallará con 401`);
     }
     
-    // Reenviar Range header si viene (importante para streaming de PDFs grandes)
+    // Preparar headers adicionales (ej: Range para streaming)
+    const extraHeaders = {};
     if (req.headers.range) {
-      headers['Range'] = req.headers.range;
+      extraHeaders['Range'] = req.headers.range;
       console.log(`📊 PROXY-PDF: Range request: ${req.headers.range}`);
     }
 
-    // Hacer request al servidor remoto usando fetch global de Node.js
+    // Setup timeout
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 segundos timeout
 
     let response;
     try {
-      response = await fetch(remoteUrl.href, { 
-        method: 'GET', 
-        headers,
-        signal: controller.signal
-      });
+      // ════════════════════════════════════════════════════════════
+      // ESTRATEGIA DE FALLBACK: Primero sin auth, luego con auth
+      // ════════════════════════════════════════════════════════════
+      
+      // 🔓 INTENTO 1: Sin autenticación (acceso público)
+      console.log('🔓 INTENTO 1: Sin autenticación (acceso público)');
+      response = await fetchPDFWithAuth(remoteUrl.href, null, extraHeaders, controller.signal);
+      
+      // 🔐 Si recibe 401 y hay credenciales, INTENTO 2: Con autenticación
+      if (response.status === 401 && credentials) {
+        console.log('🔐 INTENTO 2: Con autenticación HTTP Basic (primera petición rechazada)');
+        response = await fetchPDFWithAuth(remoteUrl.href, credentials, extraHeaders, controller.signal);
+      }
+      
+      clearTimeout(timeoutId);
+      
+      // ════════════════════════════════════════════════════════════
+      // VERIFICAR RESULTADO DE LOS INTENTOS
+      // ════════════════════════════════════════════════════════════
+      
+      // Si SIGUE siendo 401, retornar error detallado
+      if (response.status === 401) {
+        console.error('❌ Ambos intentos fallaron con 401');
+        console.error(`🔍 PROXY-PDF: Credenciales usadas: ${credentials ? 'SÍ' : 'NO'}`);
+        
+        return res.status(401).json({
+          success: false,
+          error: 'Unauthorized',
+          message: credentials 
+            ? 'El servidor rechazó las credenciales proporcionadas'
+            : 'El servidor requiere autenticación pero no hay credenciales configuradas',
+          hint: 'Verifica que la URL sea correcta y accesible públicamente',
+          helpUrl: remoteUrl.href
+        });
+      }
+      
+      // Verificar otros errores HTTP
+      if (!response.ok) {
+        console.error(`❌ PROXY-PDF: Error HTTP ${response.status}: ${response.statusText}`);
+        
+        // Intentar leer el cuerpo de la respuesta para más detalles
+        let errorBody = '';
+        try {
+          errorBody = await response.text();
+          console.error(`❌ PROXY-PDF: Respuesta del servidor: ${errorBody.substring(0, 200)}`);
+        } catch (e) {
+          // Ignorar si no se puede leer el body
+        }
+        
+        return res.status(response.status).json({
+          success: false,
+          error: `HTTP ${response.status}`,
+          message: response.statusText,
+          details: errorBody ? errorBody.substring(0, 200) : undefined
+        });
+      }
+      
+      // ✅ Si todo está bien, continuar con el streaming
+      console.log('✅ PDF obtenido exitosamente');
+      
     } catch (fetchError) {
       clearTimeout(timeoutId);
       
@@ -152,50 +239,17 @@ router.get('/proxy-pdf', async (req, res) => {
         console.error('❌ PROXY-PDF: Timeout después de 30 segundos');
         return res.status(504).json({ 
           success: false, 
-          error: 'Request timeout - El servidor remoto no respondió a tiempo' 
+          error: 'Request timeout',
+          message: 'El servidor remoto no respondió a tiempo'
         });
       }
       
       console.error('❌ PROXY-PDF: Error en fetch:', fetchError.message);
       return res.status(500).json({ 
         success: false, 
-        error: 'Error al conectar con el servidor remoto',
+        error: 'Connection error',
+        message: 'Error al conectar con el servidor remoto',
         details: process.env.NODE_ENV === 'development' ? fetchError.message : undefined
-      });
-    }
-
-    clearTimeout(timeoutId);
-
-    // Verificar respuesta exitosa
-    if (!response.ok) {
-      console.error(`❌ PROXY-PDF: Error del servidor remoto: ${response.status} ${response.statusText}`);
-      
-      // Caso especial: 401 Unauthorized
-      if (response.status === 401) {
-        console.error(`🚫 PROXY-PDF: Error 401 - Autenticación rechazada por el servidor remoto`);
-        console.error(`🔍 PROXY-PDF: Verifica que FTP_USER y FTP_PASSWORD estén correctamente configurados`);
-        console.error(`🔍 PROXY-PDF: Credenciales configuradas: ${process.env.FTP_USER ? 'SÍ' : 'NO'}`);
-        
-        return res.status(401).json({ 
-          success: false, 
-          error: 'Autenticación requerida para acceder al PDF',
-          details: 'Configura las variables FTP_USER y FTP_PASSWORD en el archivo .env',
-          helpUrl: remoteUrl.href
-        });
-      }
-      
-      // Intentar leer el cuerpo de la respuesta para más detalles
-      let errorBody = '';
-      try {
-        errorBody = await response.text();
-        console.error(`❌ PROXY-PDF: Respuesta del servidor: ${errorBody.substring(0, 200)}`);
-      } catch (e) {
-        // Ignorar si no se puede leer el body
-      }
-      
-      return res.status(response.status).json({ 
-        success: false, 
-        error: `Remote server error: ${response.status} ${response.statusText}` 
       });
     }
 
