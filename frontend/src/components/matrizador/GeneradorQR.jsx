@@ -31,7 +31,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Fab,
   Backdrop,
   CircularProgress
 } from '@mui/material';
@@ -590,21 +589,6 @@ const GeneradorQR = () => {
           }
         />
       </Paper>
-
-      {/* FAB para agregar nueva escritura */}
-      <Fab
-        color="primary"
-        aria-label="Nueva Escritura"
-        onClick={() => setShowMethodDialog(true)}
-        sx={{
-          position: 'fixed',
-          bottom: 100,
-          right: 32,
-          zIndex: 1000
-        }}
-      >
-        <AddIcon />
-      </Fab>
 
       {/* Diálogo de selección de método */}
       <Dialog

@@ -19,7 +19,6 @@ import {
   uploadPDFToEscritura,
   getPDFPublic,
   getPDFPrivate,
-  getPDFWithWatermark,
   getPDFMetadata,
   updatePDFHiddenPages
 } from '../controllers/escrituras-qr-controller.js';
@@ -147,12 +146,6 @@ router.post('/:id/pdf',
 router.get('/:id/pdf',
   authenticateToken,
   getPDFPrivate
-);
-
-// GET /api/escrituras/:id/pdf-watermarked - Obtener PDF con marca de agua (protegido)
-router.get('/:id/pdf-watermarked',
-  authenticateToken,
-  getPDFWithWatermark
 );
 
 // PUT /api/escrituras/:id/pdf-hidden-pages - Actualizar páginas ocultas (protegido)

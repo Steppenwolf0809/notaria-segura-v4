@@ -30,8 +30,6 @@ import {
   Print as PrintIcon,
   Refresh as RefreshIcon,
   CheckCircle as CheckIcon,
-  PictureAsPdf as PdfIcon,
-  Security as SecurityIcon,
   PhotoCamera as CaptureIcon
 } from '@mui/icons-material';
 import QRCode from 'react-qr-code';
@@ -245,73 +243,18 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
   };
 
   /**
-   * Descarga el PDF con marca de agua
-   * EDUCATIVO: Esta función hace un request al backend que:
-   * 1. Descarga el PDF original del FTP
-   * 2. Le agrega una marca de agua usando pdf-lib
-   * 3. Devuelve el PDF modificado para descarga
-   * 4. NO modifica el PDF original en el servidor
-   */
-  const handleDownloadWatermarkedPDF = async () => {
-    if (!escrituraId || !escritura?.pdfFileName) return;
-
-    try {
-      // Obtener el token de autenticación
-      const token = localStorage.getItem('token');
-      if (!token) {
-        console.error('No hay token de autenticación');
-        return;
-      }
-
-      // Hacer request al endpoint de PDF con marca de agua
-      const response = await fetch(`/api/escrituras/${escrituraId}/pdf-watermarked`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Error al descargar el PDF con marca de agua');
-      }
-
-      // Convertir la respuesta a blob
-      const blob = await response.blob();
-
-      // Crear URL temporal para el blob
-      const url = window.URL.createObjectURL(blob);
-
-      // Crear elemento <a> temporal para descargar
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `escritura-${escritura.numeroEscritura || qrData?.token}-verificacion.pdf`;
-      document.body.appendChild(link);
-      link.click();
-
-      // Limpiar
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-
-      console.log('PDF con marca de agua descargado exitosamente');
-    } catch (error) {
-      console.error('Error descargando PDF con marca de agua:', error);
-      alert('Error al descargar el PDF con marca de agua');
-    }
-  };
-
-  /**
-   * Captura el código QR con leyenda como imagen
+   * Captura el código QR con leyenda como imagen y lo copia al portapapeles
    * EDUCATIVO: Esta función:
    * 1. Usa html2canvas para capturar el div del QR con leyenda
-   * 2. Convierte el canvas a blob/dataURL
-   * 3. Ofrece descarga o copia al portapapeles
+   * 2. Intenta copiar al portapapeles usando navigator.clipboard.write()
+   * 3. Si falla, hace fallback a descarga del archivo
    */
   const handleCaptureQRWithLegend = async () => {
     if (!qrContainerRef.current) return;
 
     setCapturingQR(true);
     try {
-      // Capturar el contenedor del QR con html2canvas
+      // 1. Capturar el contenedor del QR con html2canvas
       const canvas = await html2canvas(qrContainerRef.current, {
         backgroundColor: '#ffffff',
         scale: 2, // Alta calidad
@@ -319,30 +262,53 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
         useCORS: true
       });
 
-      // Convertir canvas a blob
-      canvas.toBlob((blob) => {
+      // 2. Convertir canvas a blob
+      canvas.toBlob(async (blob) => {
         if (!blob) {
           throw new Error('Error al generar la imagen');
         }
 
-        // Crear URL para descarga
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `qr-escritura-${escritura?.numeroEscritura || qrData?.token}.png`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
+        try {
+          // 3. Intentar copiar al portapapeles
+          if (navigator.clipboard && window.ClipboardItem) {
+            await navigator.clipboard.write([
+              new ClipboardItem({
+                'image/png': blob
+              })
+            ]);
+            
+            console.log('✅ QR con leyenda copiado al portapapeles');
+            setShowCopySuccess(true);
+            
+          } else {
+            // Navegador no soporta clipboard API, hacer fallback a descarga
+            throw new Error('Clipboard API no disponible');
+          }
+          
+        } catch (clipboardError) {
+          console.warn('No se pudo copiar al portapapeles, descargando archivo:', clipboardError.message);
+          
+          // Fallback: Descargar la imagen
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `qr-escritura-${escritura?.numeroEscritura || qrData?.token}.png`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
 
-        console.log('QR con leyenda descargado exitosamente');
-        setShowCopySuccess(true);
+          console.log('QR con leyenda descargado como archivo');
+          alert('No se pudo copiar al portapapeles. El QR se descargó como archivo.');
+        }
+        
+        setCapturingQR(false);
+        
       }, 'image/png');
 
     } catch (error) {
       console.error('Error capturando QR con leyenda:', error);
       alert('Error al capturar el QR. Por favor intenta nuevamente.');
-    } finally {
       setCapturingQR(false);
     }
   };
@@ -587,33 +553,6 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
           </CardActions>
         </Card>
       </Box>
-
-      {/* Descarga de PDF con marca de agua */}
-      {escritura?.pdfFileName && (
-        <Paper sx={{ p: 2, mt: 2, bgcolor: 'success.light', borderLeft: 4, borderColor: 'success.main' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <SecurityIcon sx={{ fontSize: 40, color: 'success.dark' }} />
-            <Box sx={{ flex: 1 }}>
-              <Typography variant="subtitle1" fontWeight="bold" color="success.dark">
-                PDF Disponible con Marca de Agua
-              </Typography>
-              <Typography variant="body2" color="success.dark">
-                Descarga una copia del PDF con marca de agua "COPIA DE VERIFICACIÓN - SIN VALOR LEGAL" 
-                para prevenir mal uso del documento.
-              </Typography>
-            </Box>
-            <Button
-              variant="contained"
-              color="success"
-              startIcon={<PdfIcon />}
-              onClick={handleDownloadWatermarkedPDF}
-              size="large"
-            >
-              Descargar PDF
-            </Button>
-          </Box>
-        </Paper>
-      )}
 
       {/* Instrucciones de uso */}
       <Alert severity="info" sx={{ mt: 2 }}>
