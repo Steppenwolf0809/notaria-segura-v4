@@ -1,8 +1,21 @@
 /**
  * RUTA PROXY PARA PDFs
  * 
+ * 🔓 ROUTER COMPLETAMENTE PÚBLICO - NO REQUIERE AUTENTICACIÓN JWT
+ * 
  * Permite cargar PDFs desde el servidor FTP remoto (www.notaria18quito.com.ec)
  * sin problemas de CORS. El backend actúa como intermediario seguro.
+ * 
+ * ¿Por qué es público?
+ * - react-pdf (usado en el frontend) no puede enviar headers personalizados
+ * - No se puede incluir Authorization en las peticiones del visor PDF
+ * - La seguridad se maneja mediante whitelist de dominio permitido
+ * 
+ * Seguridad implementada:
+ * - ✅ Solo dominio www.notaria18quito.com.ec
+ * - ✅ Solo archivos .pdf
+ * - ✅ Validación de URL completa
+ * - ✅ Protección contra SSRF
  * 
  * Uso: /api/proxy-pdf?url=https://www.notaria18quito.com.ec/fotos-escrituras/archivo.pdf
  */
@@ -18,6 +31,8 @@ const ALLOWED_DOMAIN = 'www.notaria18quito.com.ec';
 /**
  * GET /api/proxy-pdf/health
  * Endpoint de diagnóstico para verificar configuración FTP
+ * 
+ * ⚠️ PÚBLICO (sin autenticación)
  * 
  * Retorna:
  * - Estado de las variables FTP
@@ -93,17 +108,26 @@ async function fetchPDFWithAuth(url, credentials = null, extraHeaders = {}, sign
  * GET /api/proxy-pdf
  * Proxy seguro para PDFs desde el servidor remoto
  * 
+ * ⚠️ ENDPOINT PÚBLICO (sin autenticación JWT)
+ * Este endpoint NO requiere token JWT porque react-pdf no puede enviar headers personalizados
+ * 
  * Query params:
  * - url: URL completa del PDF a proxear
  * 
  * Seguridad:
- * - Solo permite PDFs (.pdf)
- * - Solo permite dominio específico (www.notaria18quito.com.ec)
- * - Valida URL antes de hacer request
+ * - ✅ Solo permite PDFs (.pdf)
+ * - ✅ Solo permite dominio específico (www.notaria18quito.com.ec)
+ * - ✅ Valida URL antes de hacer request
+ * - ✅ No puede acceder a recursos internos (SSRF protegido)
  * 
  * Nota: Usa fetch global de Node.js 18+ (no necesita node-fetch)
  */
 router.get('/proxy-pdf', async (req, res) => {
+  // 🔓 LOG DE ACCESO PÚBLICO (sin autenticación requerida)
+  console.log(`🔓 PROXY-PDF: Petición recibida (PÚBLICO - sin auth)`);
+  console.log(`📍 IP: ${req.ip || req.connection?.remoteAddress || 'unknown'}`);
+  console.log(`🌐 Origin: ${req.headers.origin || 'no-origin'}`);
+  
   try {
     const rawUrl = String(req.query.url || '');
     

@@ -320,7 +320,10 @@ app.use('/api/concuerdos', concuerdoRoutes)
 app.use('/api/escrituras', escriturasQRRoutes)
 app.use('/api', escriturasQRRoutes) // Para la ruta pública /api/verify/:token
 
-// RUTA PROXY PARA PDFs (/api/proxy-pdf)
+// 🔓 RUTA PROXY PARA PDFs - PÚBLICO (sin autenticación JWT)
+// Este router NO tiene middleware de autenticación porque react-pdf
+// no puede enviar headers personalizados. La seguridad se maneja mediante
+// validación de dominio permitido (whitelist).
 app.use('/api', pdfProxyRoutes)
 
 // ============================================================================
