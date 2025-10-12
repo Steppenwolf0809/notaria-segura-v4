@@ -85,6 +85,7 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
   const [scale, setScale] = useState(1.0);
   const [hasChanges, setHasChanges] = useState(false);
   const [pdfKey, setPdfKey] = useState(Date.now()); // Key para forzar remount del PDF
+  const [tearingDown, setTearingDown] = useState(false); // Evitar renders durante desmontaje
 
   // Usar proxy del backend para evitar CORS
   const pdfUrl = buildProxyPdfUrl(escritura?.pdfFileName);
@@ -92,6 +93,7 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
   // Cargar páginas ocultas existentes y resetear PDF key
   useEffect(() => {
     if (open && escritura) {
+      setTearingDown(false); // Al abrir, permitir render del PDF
       setPdfKey(Date.now()); // Forzar remount del PDF al abrir el modal
       loadHiddenPages();
     }
@@ -161,6 +163,9 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
         onSuccess(result.data);
       }
       
+      // Ocultar PDF inmediatamente para evitar llamadas sobre doc destruido
+      setTearingDown(true);
+
       // Dar tiempo para mostrar el toast antes de cerrar
       setTimeout(() => {
         handleClose();
@@ -183,6 +188,9 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
       }
     }
     
+    // Evitar que <Document>/<Page> intenten leer del documento durante cierre
+    setTearingDown(true);
+
     // ✅ RESETEAR COMPLETAMENTE EL ESTADO DEL PDF AL CERRAR
     setNumPages(null);
     setCurrentPage(1);
@@ -354,7 +362,7 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
                       Cargando PDF...
                     </Typography>
                   </Box>
-                ) : (
+                ) : (!tearingDown && (
                   <Document
                     key={`pdf-main-${pdfKey}`}
                     file={{
@@ -409,7 +417,7 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
                       )}
                     </Box>
                   </Document>
-                )}
+                ))}
               </Box>
             </Paper>
           </Grid>
@@ -455,6 +463,7 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
                               position: 'relative'
                             }}
                           >
+                            {!tearingDown && (
                             <Document
                               key={`pdf-thumb-${pdfKey}-${pageNum}`}
                               file={{
@@ -470,6 +479,7 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
                                 renderAnnotationLayer={false}
                               />
                             </Document>
+                            )}
                             
                             {hidden && (
                               <Box
