@@ -119,10 +119,20 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
     console.error('❌ Error loading PDF:', error);
     console.error('📄 PDF URL (proxy):', pdfUrl);
     console.error('📁 Archivo original:', escritura?.pdfFileName);
-    setError(
-      'Error al cargar el PDF. Verifica que el archivo esté correctamente subido al servidor FTP. ' +
-      'Archivo: ' + (escritura?.pdfFileName || 'No disponible')
-    );
+    
+    // Detectar error 401 (problema de autenticación)
+    if (error?.status === 401 || error?.message?.includes('401')) {
+      setError(
+        '🔒 Error de autenticación: El servidor web requiere credenciales FTP. ' +
+        'Por favor contacta al administrador para configurar las variables FTP_USER y FTP_PASSWORD. ' +
+        'Archivo: ' + (escritura?.pdfFileName || 'No disponible')
+      );
+    } else {
+      setError(
+        'Error al cargar el PDF. Verifica que el archivo esté correctamente subido al servidor FTP. ' +
+        'Archivo: ' + (escritura?.pdfFileName || 'No disponible')
+      );
+    }
     setLoading(false);
   };
 

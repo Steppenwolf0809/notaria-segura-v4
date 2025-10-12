@@ -16,6 +16,44 @@ const router = express.Router();
 const ALLOWED_DOMAIN = 'www.notaria18quito.com.ec';
 
 /**
+ * GET /api/proxy-pdf/health
+ * Endpoint de diagnóstico para verificar configuración FTP
+ * 
+ * Retorna:
+ * - Estado de las variables FTP
+ * - Si el sistema está listo para proxear PDFs
+ * 
+ * NOTA: No expone credenciales, solo indica si están configuradas
+ */
+router.get('/proxy-pdf/health', (req, res) => {
+  const ftpConfigured = Boolean(process.env.FTP_USER && process.env.FTP_PASSWORD);
+  const ftpHost = process.env.FTP_HOST || 'NOT_SET';
+  
+  const status = {
+    service: 'PDF Proxy',
+    status: ftpConfigured ? 'ready' : 'not_configured',
+    timestamp: new Date().toISOString(),
+    configuration: {
+      ftpHost: ftpHost !== 'NOT_SET' ? ftpHost : null,
+      ftpUser: process.env.FTP_USER ? '✓ Configured' : '✗ Missing',
+      ftpPassword: process.env.FTP_PASSWORD ? '✓ Configured' : '✗ Missing',
+      ftpPort: process.env.FTP_PORT || '21 (default)',
+      allowedDomain: ALLOWED_DOMAIN
+    },
+    message: ftpConfigured 
+      ? 'PDF proxy is ready to serve authenticated requests'
+      : 'FTP credentials not configured. Proxy may fail with 401 errors.'
+  };
+  
+  // Log para debugging
+  if (!ftpConfigured) {
+    console.warn('⚠️ PROXY-PDF HEALTH: FTP credentials not configured');
+  }
+  
+  res.json(status);
+});
+
+/**
  * GET /api/proxy-pdf
  * Proxy seguro para PDFs desde el servidor remoto
  * 
@@ -85,6 +123,9 @@ router.get('/proxy-pdf', async (req, res) => {
       ).toString('base64');
       headers['Authorization'] = `Basic ${credentials}`;
       console.log(`🔐 PROXY-PDF: Usando autenticación HTTP Basic (usuario: ${process.env.FTP_USER})`);
+    } else {
+      console.warn(`⚠️ PROXY-PDF: Variables FTP_USER/FTP_PASSWORD no configuradas`);
+      console.warn(`⚠️ PROXY-PDF: Si el servidor requiere autenticación, la petición fallará con 401`);
     }
     
     // Reenviar Range header si viene (importante para streaming de PDFs grandes)
@@ -128,6 +169,20 @@ router.get('/proxy-pdf', async (req, res) => {
     // Verificar respuesta exitosa
     if (!response.ok) {
       console.error(`❌ PROXY-PDF: Error del servidor remoto: ${response.status} ${response.statusText}`);
+      
+      // Caso especial: 401 Unauthorized
+      if (response.status === 401) {
+        console.error(`🚫 PROXY-PDF: Error 401 - Autenticación rechazada por el servidor remoto`);
+        console.error(`🔍 PROXY-PDF: Verifica que FTP_USER y FTP_PASSWORD estén correctamente configurados`);
+        console.error(`🔍 PROXY-PDF: Credenciales configuradas: ${process.env.FTP_USER ? 'SÍ' : 'NO'}`);
+        
+        return res.status(401).json({ 
+          success: false, 
+          error: 'Autenticación requerida para acceder al PDF',
+          details: 'Configura las variables FTP_USER y FTP_PASSWORD en el archivo .env',
+          helpUrl: remoteUrl.href
+        });
+      }
       
       // Intentar leer el cuerpo de la respuesta para más detalles
       let errorBody = '';
