@@ -339,7 +339,7 @@ const GeneradorQR = () => {
   };
 
   return (
-    <Box>
+    <Box sx={{ pb: 10 }}>
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Box>
@@ -598,8 +598,8 @@ const GeneradorQR = () => {
         onClick={() => setShowMethodDialog(true)}
         sx={{
           position: 'fixed',
-          bottom: 16,
-          right: 16,
+          bottom: 80,
+          right: 24,
           zIndex: 1000
         }}
       >

@@ -3,7 +3,7 @@
  * Muestra códigos QR generados con opciones de descarga y compartir
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Paper,
@@ -29,9 +29,13 @@ import {
   QrCode as QrCodeIcon,
   Print as PrintIcon,
   Refresh as RefreshIcon,
-  CheckCircle as CheckIcon
+  CheckCircle as CheckIcon,
+  PictureAsPdf as PdfIcon,
+  Security as SecurityIcon,
+  PhotoCamera as CaptureIcon
 } from '@mui/icons-material';
 import QRCode from 'react-qr-code';
+import html2canvas from 'html2canvas';
 import { 
   getEscrituraQR, 
   generateVerificationURL, 
@@ -45,6 +49,10 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
   const [error, setError] = useState(null);
   const [selectedFormat, setSelectedFormat] = useState('display');
   const [showCopySuccess, setShowCopySuccess] = useState(false);
+  const [capturingQR, setCapturingQR] = useState(false);
+  
+  // Ref para capturar el QR con leyenda
+  const qrContainerRef = useRef(null);
 
   // Formatos disponibles
   const formats = [
@@ -236,6 +244,109 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
     printWindow.document.close();
   };
 
+  /**
+   * Descarga el PDF con marca de agua
+   * EDUCATIVO: Esta función hace un request al backend que:
+   * 1. Descarga el PDF original del FTP
+   * 2. Le agrega una marca de agua usando pdf-lib
+   * 3. Devuelve el PDF modificado para descarga
+   * 4. NO modifica el PDF original en el servidor
+   */
+  const handleDownloadWatermarkedPDF = async () => {
+    if (!escrituraId || !escritura?.pdfFileName) return;
+
+    try {
+      // Obtener el token de autenticación
+      const token = localStorage.getItem('token');
+      if (!token) {
+        console.error('No hay token de autenticación');
+        return;
+      }
+
+      // Hacer request al endpoint de PDF con marca de agua
+      const response = await fetch(`/api/escrituras/${escrituraId}/pdf-watermarked`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al descargar el PDF con marca de agua');
+      }
+
+      // Convertir la respuesta a blob
+      const blob = await response.blob();
+
+      // Crear URL temporal para el blob
+      const url = window.URL.createObjectURL(blob);
+
+      // Crear elemento <a> temporal para descargar
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `escritura-${escritura.numeroEscritura || qrData?.token}-verificacion.pdf`;
+      document.body.appendChild(link);
+      link.click();
+
+      // Limpiar
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      console.log('PDF con marca de agua descargado exitosamente');
+    } catch (error) {
+      console.error('Error descargando PDF con marca de agua:', error);
+      alert('Error al descargar el PDF con marca de agua');
+    }
+  };
+
+  /**
+   * Captura el código QR con leyenda como imagen
+   * EDUCATIVO: Esta función:
+   * 1. Usa html2canvas para capturar el div del QR con leyenda
+   * 2. Convierte el canvas a blob/dataURL
+   * 3. Ofrece descarga o copia al portapapeles
+   */
+  const handleCaptureQRWithLegend = async () => {
+    if (!qrContainerRef.current) return;
+
+    setCapturingQR(true);
+    try {
+      // Capturar el contenedor del QR con html2canvas
+      const canvas = await html2canvas(qrContainerRef.current, {
+        backgroundColor: '#ffffff',
+        scale: 2, // Alta calidad
+        logging: false,
+        useCORS: true
+      });
+
+      // Convertir canvas a blob
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          throw new Error('Error al generar la imagen');
+        }
+
+        // Crear URL para descarga
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `qr-escritura-${escritura?.numeroEscritura || qrData?.token}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
+        console.log('QR con leyenda descargado exitosamente');
+        setShowCopySuccess(true);
+      }, 'image/png');
+
+    } catch (error) {
+      console.error('Error capturando QR con leyenda:', error);
+      alert('Error al capturar el QR. Por favor intenta nuevamente.');
+    } finally {
+      setCapturingQR(false);
+    }
+  };
+
   if (loading) {
     return (
       <Paper sx={{ p: 3, textAlign: 'center' }}>
@@ -306,14 +417,18 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
               Código QR
             </Typography>
             
-            <Box sx={{ 
-              display: 'inline-block', 
-              p: 2, 
-              bgcolor: 'white', 
-              borderRadius: 1,
-              border: 1,
-              borderColor: 'divider'
-            }}>
+            {/* Contenedor capurable con ref */}
+            <Box 
+              ref={qrContainerRef}
+              sx={{ 
+                display: 'inline-block', 
+                p: 3, 
+                bgcolor: 'white', 
+                borderRadius: 1,
+                border: 1,
+                borderColor: 'divider'
+              }}
+            >
               <QRCode
                 value={qrData.verificationURL}
                 size={200}
@@ -321,6 +436,22 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
                 fgColor={selectedFormat === 'official' ? '#1A5799' : '#000000'}
                 bgColor="#FFFFFF"
               />
+              
+              {/* Leyenda descriptiva */}
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  mt: 2,
+                  fontSize: '15px',
+                  color: '#333',
+                  fontWeight: 500,
+                  lineHeight: 1.4,
+                  maxWidth: '240px',
+                  margin: '16px auto 0'
+                }}
+              >
+                Para verificar la autenticidad de esta escritura, escanee este código QR
+              </Typography>
             </Box>
 
             <Box sx={{ mt: 2 }}>
@@ -334,10 +465,20 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
             </Box>
           </CardContent>
 
-          <CardActions sx={{ justifyContent: 'center', flexWrap: 'wrap', gap: 1 }}>
-            <Tooltip title="Descargar imagen">
+          <CardActions sx={{ justifyContent: 'center', flexWrap: 'wrap', gap: 1, pb: 2 }}>
+            <Tooltip title="Descargar QR simple">
               <IconButton onClick={handleDownload} color="primary">
                 <DownloadIcon />
+              </IconButton>
+            </Tooltip>
+            
+            <Tooltip title="Descargar QR con leyenda">
+              <IconButton 
+                onClick={handleCaptureQRWithLegend} 
+                color="success"
+                disabled={capturingQR}
+              >
+                <CaptureIcon />
               </IconButton>
             </Tooltip>
             
@@ -359,6 +500,21 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
               </IconButton>
             </Tooltip>
           </CardActions>
+          
+          {/* Botón destacado para capturar QR con leyenda */}
+          <Box sx={{ px: 2, pb: 2 }}>
+            <Button
+              fullWidth
+              variant="outlined"
+              color="success"
+              startIcon={<CaptureIcon />}
+              onClick={handleCaptureQRWithLegend}
+              disabled={capturingQR}
+              size="small"
+            >
+              {capturingQR ? 'Capturando...' : 'Descargar QR con Leyenda'}
+            </Button>
+          </Box>
         </Card>
 
         {/* Información de verificación */}
@@ -456,6 +612,33 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
           </CardActions>
         </Card>
       </Box>
+
+      {/* Descarga de PDF con marca de agua */}
+      {escritura?.pdfFileName && (
+        <Paper sx={{ p: 2, mt: 2, bgcolor: 'success.light', borderLeft: 4, borderColor: 'success.main' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <SecurityIcon sx={{ fontSize: 40, color: 'success.dark' }} />
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="subtitle1" fontWeight="bold" color="success.dark">
+                PDF Disponible con Marca de Agua
+              </Typography>
+              <Typography variant="body2" color="success.dark">
+                Descarga una copia del PDF con marca de agua "COPIA DE VERIFICACIÓN - SIN VALOR LEGAL" 
+                para prevenir mal uso del documento.
+              </Typography>
+            </Box>
+            <Button
+              variant="contained"
+              color="success"
+              startIcon={<PdfIcon />}
+              onClick={handleDownloadWatermarkedPDF}
+              size="large"
+            >
+              Descargar PDF
+            </Button>
+          </Box>
+        </Paper>
+      )}
 
       {/* Instrucciones de uso */}
       <Alert severity="info" sx={{ mt: 2 }}>

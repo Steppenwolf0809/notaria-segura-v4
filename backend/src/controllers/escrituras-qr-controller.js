@@ -13,6 +13,7 @@ import {
   downloadPDFFromFTP, 
   validatePDFFile as validatePDFBuffer 
 } from '../services/cpanel-ftp-service.js';
+import { addWatermarkToPDF } from '../services/pdf-watermark-service.js';
 
 /**
  * POST /api/escrituras/upload
@@ -1734,6 +1735,109 @@ export async function getPDFPrivate(req, res) {
     res.status(500).json({
       success: false,
       message: 'Error al obtener el PDF',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+}
+
+/**
+ * GET /api/escrituras/:id/pdf-watermarked
+ * Obtiene el PDF de una escritura con marca de agua (PROTEGIDO)
+ * Solo para ADMIN y MATRIZADOR
+ * 
+ * EDUCATIVO: Este endpoint:
+ * 1. Descarga el PDF original del FTP
+ * 2. Le agrega una marca de agua usando pdf-lib
+ * 3. Devuelve el PDF modificado SIN guardar cambios en el servidor
+ * 4. El PDF original permanece intacto
+ */
+export async function getPDFWithWatermark(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const userRole = req.user.role;
+    
+    console.log(`[getPDFWithWatermark] Usuario ${userId} (${userRole}) solicitando PDF con marca de agua de escritura ${id}`);
+    
+    // Verificar permisos
+    if (userRole !== 'ADMIN' && userRole !== 'MATRIZADOR') {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para acceder a este PDF'
+      });
+    }
+    
+    // Buscar escritura
+    const escritura = await prisma.escrituraQR.findUnique({
+      where: { id: parseInt(id) }
+    });
+    
+    if (!escritura) {
+      return res.status(404).json({
+        success: false,
+        message: 'Escritura no encontrada'
+      });
+    }
+    
+    // Verificar que tenga PDF subido
+    if (!escritura.pdfFileName) {
+      return res.status(404).json({
+        success: false,
+        message: 'Esta escritura no tiene un PDF subido'
+      });
+    }
+    
+    // 1. Descargar PDF original del FTP
+    console.log(`[getPDFWithWatermark] Descargando PDF del FTP: ${escritura.pdfFileName}`);
+    const originalPdfBuffer = await downloadPDFFromFTP(escritura.pdfFileName);
+    
+    // 2. Agregar marca de agua
+    console.log(`[getPDFWithWatermark] Agregando marca de agua al PDF...`);
+    const watermarkedPdfBuffer = await addWatermarkToPDF(originalPdfBuffer);
+    
+    console.log(`[getPDFWithWatermark] ✅ PDF con marca de agua generado exitosamente para usuario ${userId}`);
+    
+    // 3. Configurar headers para descarga automática
+    const downloadFilename = `escritura-${escritura.numeroEscritura || escritura.token}-verificacion.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${downloadFilename}"`);
+    res.setHeader('Cache-Control', 'private, no-cache');
+    res.setHeader('Content-Length', watermarkedPdfBuffer.length);
+    
+    // 4. Enviar el PDF con marca de agua
+    res.send(watermarkedPdfBuffer);
+    
+  } catch (error) {
+    console.error('[getPDFWithWatermark] Error completo:', error);
+    console.error('[getPDFWithWatermark] Stack trace:', error.stack);
+    
+    // Errores específicos del FTP
+    if (error.message.includes('PDF no encontrado') || error.message.includes('not found')) {
+      return res.status(404).json({
+        success: false,
+        message: 'El archivo PDF no se encuentra en el servidor FTP'
+      });
+    }
+    
+    if (error.message.includes('FTP') || error.message.includes('timeout')) {
+      return res.status(503).json({
+        success: false,
+        message: 'Error al conectar con el servidor de archivos. Intenta nuevamente en unos momentos.'
+      });
+    }
+    
+    // Error de marca de agua
+    if (error.message.includes('marca de agua')) {
+      return res.status(500).json({
+        success: false,
+        message: 'Error al agregar marca de agua al PDF'
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Error al generar el PDF con marca de agua',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
