@@ -131,6 +131,11 @@ router.get('/proxy-pdf', async (req, res) => {
   try {
     const rawUrl = String(req.query.url || '');
     
+    // 🔍 LOGS DE DEBUGGING PARA DOUBLE ENCODING
+    console.log('📥 URL recibida (raw):', rawUrl);
+    console.log('🔍 Contiene doble encoding? (buscar %25):', rawUrl.includes('%25'));
+    console.log('🔍 Tiene encoding simple? (buscar %XX):', /%(2|3|5)[0-9A-F]/i.test(rawUrl));
+    
     // Validación 1: URL debe existir
     if (!rawUrl) {
       console.warn('⚠️ PROXY-PDF: Petición sin parámetro URL');

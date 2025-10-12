@@ -55,6 +55,10 @@ const PUBLIC_FOTOS_URL = 'https://www.notaria18quito.com.ec/fotos-escrituras';
  * Helper: Convierte una URL externa a la URL del proxy del backend
  * Esto evita problemas de CORS al cargar PDFs desde dominios externos
  * 
+ * NOTA: NO se usa encodeURIComponent() porque el navegador codifica
+ * automáticamente los query params al hacer fetch/request.
+ * Usar encodeURIComponent() aquí causaría DOUBLE ENCODING.
+ * 
  * @param {string} pdfFileName - Nombre del archivo PDF
  * @returns {string} URL del proxy en el backend
  */
@@ -64,13 +68,14 @@ function buildProxyPdfUrl(pdfFileName) {
   // Construir URL completa del PDF remoto
   const remoteUrl = `${PUBLIC_FOTOS_URL}/${pdfFileName}`;
   
-  // Usar el proxy del backend (mismo origen, sin CORS)
-  const proxyUrl = `/api/proxy-pdf?url=${encodeURIComponent(remoteUrl)}`;
+  // ✅ Sin encodeURIComponent - el navegador lo hace automáticamente
+  const proxyUrl = `/api/proxy-pdf?url=${remoteUrl}`;
   
   console.log('📄 PDF Modal: Usando proxy', { 
     archivo: pdfFileName, 
     urlRemota: remoteUrl,
-    urlProxy: proxyUrl 
+    urlProxy: proxyUrl,
+    tieneEncodingManual: remoteUrl.includes('%')
   });
   
   return proxyUrl;
