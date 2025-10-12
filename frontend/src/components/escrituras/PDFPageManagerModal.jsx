@@ -161,10 +161,18 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
         onSuccess(result.data);
       }
       
+      // ✅ RESETEAR ESTADO DEL PDF PARA EVITAR ERROR DE REFERENCIA NULA
+      setNumPages(null);
+      setCurrentPage(1);
+      setPdfKey(Date.now()); // Forzar remount completo del PDF
+      
+      // Pequeño delay para asegurar limpieza antes de cerrar
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Dar tiempo para mostrar el toast antes de cerrar
       setTimeout(() => {
         handleClose();
-      }, 1000);
+      }, 800);
       
     } catch (err) {
       setError(err.message);
@@ -183,10 +191,14 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
       }
     }
     
+    // ✅ RESETEAR COMPLETAMENTE EL ESTADO DEL PDF AL CERRAR
+    setNumPages(null);
     setCurrentPage(1);
     setScale(1.0);
     setHasChanges(false);
     setError(null);
+    setPdfKey(Date.now()); // Forzar remount para la próxima apertura
+    
     onClose();
   };
 
