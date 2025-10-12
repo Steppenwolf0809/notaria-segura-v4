@@ -598,8 +598,8 @@ const GeneradorQR = () => {
         onClick={() => setShowMethodDialog(true)}
         sx={{
           position: 'fixed',
-          bottom: 80,
-          right: 24,
+          bottom: 100,
+          right: 32,
           zIndex: 1000
         }}
       >

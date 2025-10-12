@@ -465,54 +465,29 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
             </Box>
           </CardContent>
 
-          <CardActions sx={{ justifyContent: 'center', flexWrap: 'wrap', gap: 1, pb: 2 }}>
-            <Tooltip title="Descargar QR simple">
-              <IconButton onClick={handleDownload} color="primary">
-                <DownloadIcon />
-              </IconButton>
-            </Tooltip>
-            
-            <Tooltip title="Descargar QR con leyenda">
-              <IconButton 
-                onClick={handleCaptureQRWithLegend} 
-                color="success"
-                disabled={capturingQR}
-              >
-                <CaptureIcon />
-              </IconButton>
-            </Tooltip>
-            
-            <Tooltip title="Compartir">
-              <IconButton onClick={handleShare} color="primary">
-                <ShareIcon />
-              </IconButton>
-            </Tooltip>
-            
-            <Tooltip title="Imprimir">
-              <IconButton onClick={handlePrint} color="primary">
-                <PrintIcon />
-              </IconButton>
-            </Tooltip>
-            
-            <Tooltip title="Regenerar">
-              <IconButton onClick={() => loadQRData()} color="primary">
-                <RefreshIcon />
-              </IconButton>
-            </Tooltip>
-          </CardActions>
-          
-          {/* Botón destacado para capturar QR con leyenda */}
-          <Box sx={{ px: 2, pb: 2 }}>
+          {/* Botones principales simplificados */}
+          <Box sx={{ px: 2, pb: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
             <Button
               fullWidth
-              variant="outlined"
-              color="success"
+              variant="contained"
+              color="primary"
               startIcon={<CaptureIcon />}
               onClick={handleCaptureQRWithLegend}
               disabled={capturingQR}
-              size="small"
+              size="medium"
             >
-              {capturingQR ? 'Capturando...' : 'Descargar QR con Leyenda'}
+              {capturingQR ? 'Capturando...' : 'Capturar QR'}
+            </Button>
+            
+            <Button
+              fullWidth
+              variant="outlined"
+              color="primary"
+              startIcon={<PrintIcon />}
+              onClick={handlePrint}
+              size="medium"
+            >
+              Imprimir QR
             </Button>
           </Box>
         </Card>

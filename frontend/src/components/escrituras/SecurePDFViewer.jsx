@@ -323,29 +323,68 @@ export default function SecurePDFViewer({
                 />
               </Box>
             ) : (
-              // Mostrar página normal
-              <Document
-                file={pdfUrl}
-                onLoadSuccess={onDocumentLoadSuccess}
-                onLoadError={onDocumentLoadError}
-                loading={null}
-              >
-                <Page
-                  pageNumber={pageNumber}
-                  scale={scale}
-                  loading={
-                    <Box textAlign="center" py={4}>
-                      <CircularProgress size={40} />
-                      <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
-                        Cargando página {pageNumber}...
-                      </Typography>
-                    </Box>
-                  }
-                  onLoadSuccess={() => setLoadingPage(false)}
-                  renderTextLayer={false} // Desactivar capa de texto para mayor seguridad
-                  renderAnnotationLayer={true}
-                />
-              </Document>
+              // Mostrar página normal con marca de agua
+              <Box sx={{ position: 'relative', display: 'inline-block' }}>
+                <Document
+                  file={pdfUrl}
+                  onLoadSuccess={onDocumentLoadSuccess}
+                  onLoadError={onDocumentLoadError}
+                  loading={null}
+                >
+                  <Page
+                    pageNumber={pageNumber}
+                    scale={scale}
+                    loading={
+                      <Box textAlign="center" py={4}>
+                        <CircularProgress size={40} />
+                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+                          Cargando página {pageNumber}...
+                        </Typography>
+                      </Box>
+                    }
+                    onLoadSuccess={() => setLoadingPage(false)}
+                    renderTextLayer={false} // Desactivar capa de texto para mayor seguridad
+                    renderAnnotationLayer={true}
+                  />
+                </Document>
+                
+                {/* Marca de agua superpuesta */}
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    pointerEvents: 'none',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    justifyContent: 'space-evenly',
+                    alignItems: 'center',
+                    zIndex: 10
+                  }}
+                >
+                  {/* Marca de agua repetida 3 veces */}
+                  {[0, 1, 2].map((index) => (
+                    <Typography
+                      key={index}
+                      sx={{
+                        transform: 'rotate(-45deg)',
+                        fontSize: { xs: '32px', sm: '48px', md: '56px' },
+                        fontWeight: 700,
+                        color: '#888888',
+                        opacity: 0.20,
+                        whiteSpace: 'nowrap',
+                        userSelect: 'none',
+                        textAlign: 'center',
+                        letterSpacing: '0.05em'
+                      }}
+                    >
+                      COPIA DE VERIFICACIÓN - SIN VALIDEZ LEGAL
+                    </Typography>
+                  ))}
+                </Box>
+              </Box>
             )}
           </>
         )}
