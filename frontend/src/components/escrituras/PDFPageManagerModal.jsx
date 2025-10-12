@@ -68,15 +68,9 @@ function buildProxyPdfUrl(pdfFileName) {
   // Construir URL completa del PDF remoto
   const remoteUrl = `${PUBLIC_FOTOS_URL}/${pdfFileName}`;
   
-  // ✅ Sin encodeURIComponent - el navegador lo hace automáticamente
-  const proxyUrl = `/api/proxy-pdf?url=${remoteUrl}`;
-  
-  console.log('📄 PDF Modal: Usando proxy', { 
-    archivo: pdfFileName, 
-    urlRemota: remoteUrl,
-    urlProxy: proxyUrl,
-    tieneEncodingManual: remoteUrl.includes('%')
-  });
+  // 🔓 BYPASS: Cargar PDF directamente sin proxy
+  const proxyUrl = remoteUrl;
+  console.log('📄 Cargando PDF directamente (sin proxy):', remoteUrl);
   
   return proxyUrl;
 }
