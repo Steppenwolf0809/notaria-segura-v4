@@ -84,13 +84,15 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
   const [error, setError] = useState(null);
   const [scale, setScale] = useState(1.0);
   const [hasChanges, setHasChanges] = useState(false);
+  const [pdfKey, setPdfKey] = useState(Date.now()); // Key para forzar remount del PDF
 
   // Usar proxy del backend para evitar CORS
   const pdfUrl = buildProxyPdfUrl(escritura?.pdfFileName);
 
-  // Cargar páginas ocultas existentes
+  // Cargar páginas ocultas existentes y resetear PDF key
   useEffect(() => {
     if (open && escritura) {
+      setPdfKey(Date.now()); // Forzar remount del PDF al abrir el modal
       loadHiddenPages();
     }
   }, [open, escritura]);
@@ -350,6 +352,7 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
                   </Box>
                 ) : (
                   <Document
+                    key={`pdf-main-${pdfKey}`}
                     file={{
                       url: pdfUrl,
                       withCredentials: false
@@ -449,6 +452,7 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
                             }}
                           >
                             <Document
+                              key={`pdf-thumb-${pdfKey}-${pageNum}`}
                               file={{
                                 url: pdfUrl,
                                 withCredentials: false
