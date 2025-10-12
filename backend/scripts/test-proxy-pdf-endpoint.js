@@ -1,114 +1,227 @@
 /**
- * Script de prueba: Verificar endpoint proxy-pdf
+ * 🧪 SCRIPT DE PRUEBA: Endpoint Proxy PDF
  * 
- * Verifica que el endpoint /api/proxy-pdf funcione correctamente
- * SIN autenticación JWT (debe ser público)
+ * Verifica que el endpoint /api/proxy-pdf esté funcionando correctamente
+ * 
+ * Uso:
+ * node backend/scripts/test-proxy-pdf-endpoint.js
  */
 
-const API_BASE = process.env.API_BASE || 'http://localhost:3001';
+import fetch from 'node-fetch';
 
-async function testProxyEndpoint() {
-  console.log('🧪 TEST: Endpoint Proxy PDF (sin autenticación)\n');
-  console.log('━'.repeat(60));
+const BASE_URL = process.env.API_URL || 'http://localhost:3001';
+const TEST_PDF_URL = 'https://www.notaria18quito.com.ec/fotos-escrituras/Saq163wu.pdf';
+
+console.log('🧪 INICIANDO PRUEBAS DEL PROXY PDF');
+console.log('='.repeat(50));
+console.log(`📡 Base URL: ${BASE_URL}`);
+console.log(`📄 URL de prueba: ${TEST_PDF_URL}`);
+console.log('='.repeat(50));
+
+/**
+ * Test 1: Health Check
+ */
+async function testHealthCheck() {
+  console.log('\n✅ TEST 1: Health Check');
+  console.log('-'.repeat(50));
   
-  // Test 1: Health check (debe funcionar sin token)
-  console.log('\n📋 TEST 1: Health Check (sin autenticación)');
   try {
-    const response = await fetch(`${API_BASE}/api/proxy-pdf/health`);
+    const response = await fetch(`${BASE_URL}/api/proxy-pdf/health`);
     const data = await response.json();
     
-    console.log(`   Status: ${response.status} ${response.ok ? '✅' : '❌'}`);
-    console.log(`   Service: ${data.service}`);
-    console.log(`   Status: ${data.status}`);
-    console.log(`   FTP User: ${data.configuration?.ftpUser || 'N/A'}`);
-    console.log(`   FTP Password: ${data.configuration?.ftpPassword || 'N/A'}`);
+    console.log(`Status: ${response.status}`);
+    console.log('Response:', JSON.stringify(data, null, 2));
     
-    if (data.status === 'ready') {
-      console.log('   ✅ Credenciales FTP configuradas correctamente');
+    if (response.status === 200) {
+      console.log('✅ Health check exitoso');
+      return true;
     } else {
-      console.warn('   ⚠️ Credenciales FTP NO configuradas (se necesitan FTP_USER y FTP_PASSWORD)');
+      console.log('❌ Health check falló');
+      return false;
     }
-  } catch (err) {
-    console.error('   ❌ Error:', err.message);
+  } catch (error) {
+    console.error('❌ Error en health check:', error.message);
+    return false;
   }
-  
-  // Test 2: Proxy de PDF sin token (debe funcionar)
-  console.log('\n📋 TEST 2: Proxy PDF (sin autenticación)');
-  const testPdfUrl = 'https://www.notaria18quito.com.ec/fotos-escrituras/test.pdf';
-  const proxyUrl = `${API_BASE}/api/proxy-pdf?url=${encodeURIComponent(testPdfUrl)}`;
-  
-  try {
-    console.log(`   URL: ${proxyUrl}`);
-    console.log('   Headers: (ninguno - sin Authorization)');
-    
-    const startTime = Date.now();
-    const response = await fetch(proxyUrl);
-    const duration = Date.now() - startTime;
-    
-    console.log(`   Status: ${response.status} ${response.ok ? '✅' : '❌'}`);
-    console.log(`   Duration: ${duration}ms`);
-    console.log(`   Content-Type: ${response.headers.get('content-type')}`);
-    
-    if (response.status === 401) {
-      console.error('   ❌ ERROR 401: Unauthorized');
-      console.error('   📝 Esto indica que el servidor FTP remoto requiere autenticación');
-      console.error('   📝 Verifica que las variables FTP_USER y FTP_PASSWORD estén configuradas');
-    } else if (response.status === 404) {
-      console.warn('   ⚠️ ERROR 404: PDF no encontrado en el servidor remoto');
-      console.warn('   📝 El archivo test.pdf no existe (esto es normal si es un test)');
-    } else if (response.ok) {
-      const contentLength = response.headers.get('content-length');
-      console.log(`   ✅ PDF obtenido exitosamente (${contentLength} bytes)`);
-    } else {
-      console.error(`   ❌ ERROR ${response.status}: ${response.statusText}`);
-    }
-  } catch (err) {
-    console.error('   ❌ Error:', err.message);
-  }
-  
-  // Test 3: Verificar que rechaza dominios no permitidos
-  console.log('\n📋 TEST 3: Seguridad - Dominio no permitido (debe fallar)');
-  const badUrl = 'https://evil.com/malicious.pdf';
-  const badProxyUrl = `${API_BASE}/api/proxy-pdf?url=${encodeURIComponent(badUrl)}`;
-  
-  try {
-    const response = await fetch(badProxyUrl);
-    console.log(`   Status: ${response.status} ${response.status === 403 ? '✅' : '❌'}`);
-    
-    if (response.status === 403) {
-      console.log('   ✅ Dominio no permitido rechazado correctamente (seguridad funciona)');
-    } else {
-      console.error('   ❌ FALLO DE SEGURIDAD: Dominio no permitido fue aceptado');
-    }
-  } catch (err) {
-    console.error('   ❌ Error:', err.message);
-  }
-  
-  // Test 4: Verificar que rechaza archivos no-PDF
-  console.log('\n📋 TEST 4: Seguridad - Archivo no-PDF (debe fallar)');
-  const nonPdfUrl = 'https://www.notaria18quito.com.ec/fotos-escrituras/test.jpg';
-  const nonPdfProxyUrl = `${API_BASE}/api/proxy-pdf?url=${encodeURIComponent(nonPdfUrl)}`;
-  
-  try {
-    const response = await fetch(nonPdfProxyUrl);
-    console.log(`   Status: ${response.status} ${response.status === 400 ? '✅' : '❌'}`);
-    
-    if (response.status === 400) {
-      console.log('   ✅ Archivo no-PDF rechazado correctamente (seguridad funciona)');
-    } else {
-      console.error('   ❌ FALLO DE SEGURIDAD: Archivo no-PDF fue aceptado');
-    }
-  } catch (err) {
-    console.error('   ❌ Error:', err.message);
-  }
-  
-  console.log('\n' + '━'.repeat(60));
-  console.log('✅ Tests completados\n');
 }
 
-// Ejecutar tests
-testProxyEndpoint().catch(err => {
-  console.error('💥 Error ejecutando tests:', err);
+/**
+ * Test 2: Proxy PDF válido
+ */
+async function testProxyPDF() {
+  console.log('\n✅ TEST 2: Proxy PDF válido');
+  console.log('-'.repeat(50));
+  
+  try {
+    const url = `${BASE_URL}/api/proxy-pdf?url=${encodeURIComponent(TEST_PDF_URL)}`;
+    console.log(`📡 Petición: ${url}`);
+    
+    const response = await fetch(url);
+    
+    console.log(`Status: ${response.status}`);
+    console.log(`Content-Type: ${response.headers.get('content-type')}`);
+    console.log(`Content-Length: ${response.headers.get('content-length')} bytes`);
+    
+    if (response.status === 200) {
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/pdf')) {
+        console.log('✅ PDF obtenido exitosamente');
+        return true;
+      } else {
+        console.log('❌ Content-Type incorrecto');
+        return false;
+      }
+    } else if (response.status === 401) {
+      console.log('❌ ERROR 401: Endpoint requiere autenticación (NO DEBERÍA)');
+      const body = await response.text();
+      console.log('Response body:', body);
+      return false;
+    } else {
+      console.log(`❌ Error HTTP ${response.status}`);
+      const body = await response.text();
+      console.log('Response body:', body);
+      return false;
+    }
+  } catch (error) {
+    console.error('❌ Error en proxy PDF:', error.message);
+    return false;
+  }
+}
+
+/**
+ * Test 3: Validación de dominio
+ */
+async function testDomainValidation() {
+  console.log('\n✅ TEST 3: Validación de dominio');
+  console.log('-'.repeat(50));
+  
+  try {
+    const invalidUrl = 'https://example.com/test.pdf';
+    const url = `${BASE_URL}/api/proxy-pdf?url=${encodeURIComponent(invalidUrl)}`;
+    console.log(`📡 Petición con dominio inválido: ${invalidUrl}`);
+    
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    console.log(`Status: ${response.status}`);
+    console.log('Response:', JSON.stringify(data, null, 2));
+    
+    if (response.status === 403) {
+      console.log('✅ Validación de dominio funcionando correctamente');
+      return true;
+    } else {
+      console.log('❌ Debería rechazar dominios no permitidos');
+      return false;
+    }
+  } catch (error) {
+    console.error('❌ Error en validación de dominio:', error.message);
+    return false;
+  }
+}
+
+/**
+ * Test 4: Validación de extensión
+ */
+async function testExtensionValidation() {
+  console.log('\n✅ TEST 4: Validación de extensión');
+  console.log('-'.repeat(50));
+  
+  try {
+    const invalidUrl = 'https://www.notaria18quito.com.ec/fotos-escrituras/archivo.txt';
+    const url = `${BASE_URL}/api/proxy-pdf?url=${encodeURIComponent(invalidUrl)}`;
+    console.log(`📡 Petición con extensión inválida: ${invalidUrl}`);
+    
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    console.log(`Status: ${response.status}`);
+    console.log('Response:', JSON.stringify(data, null, 2));
+    
+    if (response.status === 400) {
+      console.log('✅ Validación de extensión funcionando correctamente');
+      return true;
+    } else {
+      console.log('❌ Debería rechazar archivos no-PDF');
+      return false;
+    }
+  } catch (error) {
+    console.error('❌ Error en validación de extensión:', error.message);
+    return false;
+  }
+}
+
+/**
+ * Test 5: URL faltante
+ */
+async function testMissingURL() {
+  console.log('\n✅ TEST 5: URL faltante');
+  console.log('-'.repeat(50));
+  
+  try {
+    const url = `${BASE_URL}/api/proxy-pdf`;
+    console.log(`📡 Petición sin parámetro URL`);
+    
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    console.log(`Status: ${response.status}`);
+    console.log('Response:', JSON.stringify(data, null, 2));
+    
+    if (response.status === 400) {
+      console.log('✅ Validación de URL faltante funcionando correctamente');
+      return true;
+    } else {
+      console.log('❌ Debería rechazar peticiones sin URL');
+      return false;
+    }
+  } catch (error) {
+    console.error('❌ Error en validación de URL faltante:', error.message);
+    return false;
+  }
+}
+
+/**
+ * Ejecutar todas las pruebas
+ */
+async function runAllTests() {
+  console.log('\n🚀 EJECUTANDO TODAS LAS PRUEBAS');
+  console.log('='.repeat(50));
+  
+  const results = [];
+  
+  results.push({ name: 'Health Check', passed: await testHealthCheck() });
+  results.push({ name: 'Proxy PDF válido', passed: await testProxyPDF() });
+  results.push({ name: 'Validación de dominio', passed: await testDomainValidation() });
+  results.push({ name: 'Validación de extensión', passed: await testExtensionValidation() });
+  results.push({ name: 'URL faltante', passed: await testMissingURL() });
+  
+  console.log('\n');
+  console.log('='.repeat(50));
+  console.log('📊 RESUMEN DE PRUEBAS');
+  console.log('='.repeat(50));
+  
+  results.forEach((result, index) => {
+    const icon = result.passed ? '✅' : '❌';
+    console.log(`${icon} Test ${index + 1}: ${result.name}`);
+  });
+  
+  const passedTests = results.filter(r => r.passed).length;
+  const totalTests = results.length;
+  
+  console.log('\n');
+  console.log(`📊 Total: ${passedTests}/${totalTests} pruebas pasadas`);
+  
+  if (passedTests === totalTests) {
+    console.log('✅ TODAS LAS PRUEBAS PASARON');
+  } else {
+    console.log('❌ ALGUNAS PRUEBAS FALLARON');
+  }
+  
+  console.log('='.repeat(50));
+}
+
+// Ejecutar pruebas
+runAllTests().catch(error => {
+  console.error('💥 Error fatal:', error);
   process.exit(1);
 });
-

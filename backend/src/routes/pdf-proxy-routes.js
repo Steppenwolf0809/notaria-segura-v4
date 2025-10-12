@@ -40,7 +40,7 @@ const ALLOWED_DOMAIN = 'www.notaria18quito.com.ec';
  * 
  * NOTA: No expone credenciales, solo indica si están configuradas
  */
-router.get('/proxy-pdf/health', (req, res) => {
+router.get('/api/proxy-pdf/health', (req, res) => {
   const ftpConfigured = Boolean(process.env.FTP_USER && process.env.FTP_PASSWORD);
   const ftpHost = process.env.FTP_HOST || 'NOT_SET';
   
@@ -122,7 +122,7 @@ async function fetchPDFWithAuth(url, credentials = null, extraHeaders = {}, sign
  * 
  * Nota: Usa fetch global de Node.js 18+ (no necesita node-fetch)
  */
-router.get('/proxy-pdf', async (req, res) => {
+router.get('/api/proxy-pdf', async (req, res) => {
   // 🔓 LOG DE ACCESO PÚBLICO (sin autenticación requerida)
   console.log(`🔓 PROXY-PDF: Petición recibida (PÚBLICO - sin auth)`);
   console.log(`📍 IP: ${req.ip || req.connection?.remoteAddress || 'unknown'}`);

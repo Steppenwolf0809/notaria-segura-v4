@@ -321,10 +321,30 @@ app.use('/api/escrituras', escriturasQRRoutes)
 app.use('/api', escriturasQRRoutes) // Para la ruta pública /api/verify/:token
 
 // 🔓 RUTA PROXY PARA PDFs - PÚBLICO (sin autenticación JWT)
+// ✅ IMPORTANTE: Este router se registra SIN prefijo porque las rutas ya incluyen /api/proxy-pdf
 // Este router NO tiene middleware de autenticación porque react-pdf
 // no puede enviar headers personalizados. La seguridad se maneja mediante
 // validación de dominio permitido (whitelist).
-app.use('/api', pdfProxyRoutes)
+app.use(pdfProxyRoutes)
+
+console.log('✅ PDF Proxy routes registradas en /api/proxy-pdf');
+
+// Log de todas las rutas registradas (debugging)
+if (process.env.NODE_ENV !== 'production') {
+  console.log('📍 Rutas registradas:');
+  app._router.stack.forEach(function(r){
+    if (r.route && r.route.path){
+      console.log(`   ${Object.keys(r.route.methods).join(', ').toUpperCase()} ${r.route.path}`);
+    } else if (r.name === 'router') {
+      // Para routers anidados
+      r.handle.stack.forEach(function(nestedRoute) {
+        if (nestedRoute.route && nestedRoute.route.path) {
+          console.log(`   ${Object.keys(nestedRoute.route.methods).join(', ').toUpperCase()} ${nestedRoute.route.path}`);
+        }
+      });
+    }
+  });
+}
 
 // ============================================================================
 // SERVIR ARCHIVOS ESTÁTICOS DEL FRONTEND
