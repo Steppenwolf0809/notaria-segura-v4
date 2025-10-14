@@ -47,7 +47,6 @@ import {
   CheckCircle as CheckCircleIcon,
   PictureAsPdf as PdfIcon,
   CloudUpload as UploadIcon,
-  RemoveRedEye as EyeIcon,
   VisibilityOff as ManageHiddenIcon,
   Settings as ManageIcon
 } from '@mui/icons-material';
@@ -483,15 +482,6 @@ const GeneradorQR = () => {
                       <TableCell align="center">
                         {hasPDFUploaded(escritura) ? (
                           <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
-                            <Tooltip title="Ver PDF">
-                              <IconButton
-                                size="small"
-                                color="primary"
-                                onClick={() => handleViewPDF(escritura)}
-                              >
-                                <EyeIcon />
-                              </IconButton>
-                            </Tooltip>
                             <Tooltip title="Gestionar páginas ocultas">
                               <IconButton
                                 size="small"
@@ -757,18 +747,6 @@ const GeneradorQR = () => {
                       Gestión del PDF
                     </Typography>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
-                      <Button
-                        fullWidth
-                        variant="outlined"
-                        startIcon={<EyeIcon />}
-                        onClick={() => {
-                          handleViewPDF(selectedEscritura);
-                          setShowDetailsDialog(false);
-                        }}
-                        size="small"
-                      >
-                        Ver PDF
-                      </Button>
                       <Button
                         fullWidth
                         variant="outlined"
