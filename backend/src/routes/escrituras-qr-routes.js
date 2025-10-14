@@ -5,7 +5,11 @@
 
 import express from 'express';
 import multer from 'multer';
-import { authenticateToken, requireMatrizador } from '../middleware/auth-middleware.js';
+import { 
+  authenticateToken, 
+  requireMatrizador, 
+  requireRoles 
+} from '../middleware/auth-middleware.js';
 import {
   uploadEscritura,
   createEscrituraManual,
@@ -20,7 +24,9 @@ import {
   getPDFPublic,
   getPDFPrivate,
   getPDFMetadata,
-  updatePDFHiddenPages
+  updatePDFHiddenPages,
+  getAllQRForAdmin,
+  getQRStats
 } from '../controllers/escrituras-qr-controller.js';
 
 const router = express.Router();
@@ -72,11 +78,27 @@ router.get('/verify/:token/pdf', getPDFPublic);
  * RUTAS PROTEGIDAS (requieren autenticación)
  */
 
-// POST /api/escrituras/upload - Subir PDF y generar QR (solo matrizadores)
+// === RUTAS ADMIN ===
+// GET /api/escrituras/admin/all-qr - Obtener todos los QR (solo admin)
+router.get('/admin/all-qr', 
+  authenticateToken, 
+  requireRoles(['ADMIN']), 
+  getAllQRForAdmin
+);
+
+// GET /api/escrituras/admin/qr-stats - Obtener estadísticas de QR (solo admin)
+router.get('/admin/qr-stats', 
+  authenticateToken, 
+  requireRoles(['ADMIN']), 
+  getQRStats
+);
+
+// === RUTAS GENERALES ===
+// POST /api/escrituras/upload - Subir PDF y generar QR (matrizadores y archivo)
 // Acepta 'pdfFile' (obligatorio) y 'foto' (opcional)
 router.post('/upload', 
   authenticateToken, 
-  requireMatrizador, 
+  requireRoles(['MATRIZADOR', 'ARCHIVO']), 
   upload.fields([
     { name: 'pdfFile', maxCount: 1 },
     { name: 'foto', maxCount: 1 }
@@ -84,11 +106,11 @@ router.post('/upload',
   uploadEscritura
 );
 
-// POST /api/escrituras/manual - Crear escritura manualmente (solo matrizadores)
+// POST /api/escrituras/manual - Crear escritura manualmente (matrizadores y archivo)
 // Acepta 'data' (JSON con los datos) y 'foto' (opcional)
 router.post('/manual',
   authenticateToken,
-  requireMatrizador,
+  requireRoles(['MATRIZADOR', 'ARCHIVO', 'ADMIN']),
   upload.fields([
     { name: 'foto', maxCount: 1 }
   ]),
@@ -131,7 +153,7 @@ router.delete('/:id',
 // DELETE /api/escrituras/:id/hard-delete - Eliminar permanentemente escritura
 router.delete('/:id/hard-delete',
   authenticateToken,
-  requireMatrizador,
+  requireRoles(['MATRIZADOR', 'ARCHIVO', 'ADMIN']),
   hardDeleteEscritura
 );
 

@@ -24,11 +24,11 @@ export async function uploadEscritura(req, res) {
     const userId = req.user.id;
     const userRole = req.user.role;
     
-    // Verificar que sea matrizador
-    if (userRole !== 'MATRIZADOR') {
+    // Verificar que sea matrizador o archivo
+    if (!['MATRIZADOR', 'ARCHIVO'].includes(userRole)) {
       return res.status(403).json({
         success: false,
-        message: 'Solo los matrizadores pueden subir escrituras'
+        message: 'Solo los matrizadores y usuarios de archivo pueden subir escrituras'
       });
     }
     
@@ -204,7 +204,7 @@ export async function getEscrituras(req, res) {
     const userRole = req.user.role;
     
     // Verificar permisos
-    if (userRole !== 'MATRIZADOR' && userRole !== 'ADMIN') {
+    if (!['MATRIZADOR', 'ARCHIVO', 'ADMIN'].includes(userRole)) {
       return res.status(403).json({
         success: false,
         message: 'No tienes permisos para ver las escrituras'
@@ -222,8 +222,8 @@ export async function getEscrituras(req, res) {
     // Construir filtros
     const where = {};
     
-    // Solo matrizadores ven sus propias escrituras, admins ven todas
-    if (userRole === 'MATRIZADOR') {
+    // Solo matrizadores y archivo ven sus propias escrituras, admins ven todas
+    if (userRole === 'MATRIZADOR' || userRole === 'ARCHIVO') {
       where.createdBy = userId;
     }
     
@@ -326,8 +326,8 @@ export async function getEscritura(req, res) {
       });
     }
     
-    // Verificar permisos
-    if (userRole === 'MATRIZADOR' && escritura.createdBy !== userId) {
+    // Verificar permisos (MATRIZADOR y ARCHIVO solo ven sus propias escrituras)
+    if ((userRole === 'MATRIZADOR' || userRole === 'ARCHIVO') && escritura.createdBy !== userId) {
       return res.status(403).json({
         success: false,
         message: 'No tienes permisos para ver esta escritura'
@@ -402,8 +402,8 @@ export async function updateEscritura(req, res) {
       });
     }
     
-    // Verificar permisos
-    if (userRole === 'MATRIZADOR' && escritura.createdBy !== userId) {
+    // Verificar permisos (MATRIZADOR y ARCHIVO solo editan sus propias escrituras)
+    if ((userRole === 'MATRIZADOR' || userRole === 'ARCHIVO') && escritura.createdBy !== userId) {
       return res.status(403).json({
         success: false,
         message: 'No tienes permisos para editar esta escritura'
@@ -944,11 +944,11 @@ export async function createEscrituraManual(req, res) {
     const userId = req.user.id;
     const userRole = req.user.role;
     
-    // Verificar que sea matrizador
-    if (userRole !== 'MATRIZADOR' && userRole !== 'ADMIN') {
+    // Verificar que sea matrizador, archivo o admin
+    if (!['MATRIZADOR', 'ARCHIVO', 'ADMIN'].includes(userRole)) {
       return res.status(403).json({
         success: false,
-        message: 'Solo los matrizadores pueden crear escrituras'
+        message: 'Solo los matrizadores y usuarios de archivo pueden crear escrituras'
       });
     }
     
@@ -1138,8 +1138,8 @@ export async function deleteEscritura(req, res) {
       });
     }
     
-    // Verificar permisos
-    if (userRole === 'MATRIZADOR' && escritura.createdBy !== userId) {
+    // Verificar permisos (MATRIZADOR y ARCHIVO solo eliminan sus propias escrituras)
+    if ((userRole === 'MATRIZADOR' || userRole === 'ARCHIVO') && escritura.createdBy !== userId) {
       return res.status(403).json({
         success: false,
         message: 'No tienes permisos para eliminar esta escritura'
@@ -1182,11 +1182,11 @@ export async function hardDeleteEscritura(req, res) {
     
     console.log(`[hardDelete] Usuario ${userId} (${userRole}) intentando eliminar escritura ${id}`);
     
-    // Verificar que sea matrizador (el middleware ya validó, pero doble verificación)
-    if (userRole !== 'MATRIZADOR' && userRole !== 'ADMIN') {
+    // Verificar que sea matrizador, archivo o admin
+    if (!['MATRIZADOR', 'ARCHIVO', 'ADMIN'].includes(userRole)) {
       return res.status(403).json({
         success: false,
-        message: 'Solo los matrizadores pueden eliminar escrituras permanentemente'
+        message: 'Solo los matrizadores y usuarios de archivo pueden eliminar escrituras permanentemente'
       });
     }
     
@@ -1203,7 +1203,7 @@ export async function hardDeleteEscritura(req, res) {
     }
     
     // Verificar permisos: solo el creador puede eliminar (o admin)
-    if (userRole === 'MATRIZADOR' && escritura.createdBy !== userId) {
+    if ((userRole === 'MATRIZADOR' || userRole === 'ARCHIVO') && escritura.createdBy !== userId) {
       console.log(`[hardDelete] Permiso denegado: escritura creada por ${escritura.createdBy}, solicitante ${userId}`);
       return res.status(403).json({
         success: false,
@@ -1266,11 +1266,11 @@ export async function uploadPDFToEscritura(req, res) {
     
     console.log(`[uploadPDF] Usuario ${userId} (${userRole}) subiendo PDF para escritura ${id}`);
     
-    // Verificar permisos (ADMIN o MATRIZADOR)
-    if (userRole !== 'ADMIN' && userRole !== 'MATRIZADOR') {
+    // Verificar permisos (ADMIN, MATRIZADOR o ARCHIVO)
+    if (!['ADMIN', 'MATRIZADOR', 'ARCHIVO'].includes(userRole)) {
       return res.status(403).json({
         success: false,
-        message: 'Solo administradores y matrizadores pueden subir PDFs'
+        message: 'Solo administradores, matrizadores y usuarios de archivo pueden subir PDFs'
       });
     }
     
@@ -1581,7 +1581,7 @@ export async function updatePDFHiddenPages(req, res) {
     console.log(`[updatePDFHiddenPages] Usuario ${userId} (${userRole}) actualizando páginas ocultas de escritura ${id}`);
     
     // Verificar permisos
-    if (userRole !== 'ADMIN' && userRole !== 'MATRIZADOR') {
+    if (!['ADMIN', 'MATRIZADOR', 'ARCHIVO'].includes(userRole)) {
       return res.status(403).json({
         success: false,
         message: 'No tienes permisos para editar las páginas ocultas'
@@ -1657,9 +1657,334 @@ export async function updatePDFHiddenPages(req, res) {
 }
 
 /**
+ * GET /api/escrituras/admin/all-qr
+ * Obtiene TODOS los QR generados en el sistema (SOLO ADMIN)
+ */
+export async function getAllQRForAdmin(req, res) {
+  try {
+    const userRole = req.user.role;
+    
+    // Verificar que sea admin
+    if (userRole !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo administradores pueden acceder a esta información'
+      });
+    }
+    
+    // Parámetros de consulta
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const estado = req.query.estado;
+    const createdBy = req.query.createdBy ? parseInt(req.query.createdBy) : null;
+    const search = req.query.search;
+    const desde = req.query.desde; // Fecha desde
+    const hasta = req.query.hasta; // Fecha hasta
+    
+    const skip = (page - 1) * limit;
+    
+    // Construir filtros
+    const where = {};
+    
+    if (estado) {
+      where.estado = estado;
+    }
+    
+    if (createdBy) {
+      where.createdBy = createdBy;
+    }
+    
+    if (search) {
+      where.OR = [
+        { numeroEscritura: { contains: search, mode: 'insensitive' } },
+        { token: { contains: search, mode: 'insensitive' } },
+        { archivoOriginal: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+    
+    // Filtrar por rango de fechas
+    if (desde || hasta) {
+      where.createdAt = {};
+      if (desde) {
+        where.createdAt.gte = new Date(desde);
+      }
+      if (hasta) {
+        // Agregar un día para incluir todo el día "hasta"
+        const hastaDate = new Date(hasta);
+        hastaDate.setHours(23, 59, 59, 999);
+        where.createdAt.lte = hastaDate;
+      }
+    }
+    
+    console.log(`[getAllQRForAdmin] Admin ${req.user.id} consultando QR con filtros:`, { 
+      page, 
+      limit, 
+      estado, 
+      createdBy, 
+      search,
+      desde,
+      hasta
+    });
+    
+    // Obtener escrituras con paginación
+    const [escrituras, total] = await Promise.all([
+      prisma.escrituraQR.findMany({
+        where,
+        include: {
+          creador: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              role: true
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit
+      }),
+      prisma.escrituraQR.count({ where })
+    ]);
+    
+    // Parsear datosCompletos de cada escritura
+    const escriturasConDatosParsed = escrituras.map(esc => {
+      let datosCompletosParsed = esc.datosCompletos;
+      if (typeof datosCompletosParsed === 'string') {
+        try {
+          datosCompletosParsed = JSON.parse(datosCompletosParsed);
+        } catch (e) {
+          console.warn(`[getAllQRForAdmin] No se pudo parsear datosCompletos de escritura ${esc.id}`);
+        }
+      }
+      return {
+        ...esc,
+        datosCompletos: datosCompletosParsed
+      };
+    });
+    
+    res.json({
+      success: true,
+      data: {
+        escrituras: escriturasConDatosParsed,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('[getAllQRForAdmin] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+}
+
+/**
+ * GET /api/escrituras/admin/qr-stats
+ * Obtiene estadísticas de QR para el panel admin
+ */
+export async function getQRStats(req, res) {
+  try {
+    const userRole = req.user.role;
+    
+    // Verificar que sea admin
+    if (userRole !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo administradores pueden acceder a esta información'
+      });
+    }
+    
+    console.log(`[getQRStats] Admin ${req.user.id} consultando estadísticas QR`);
+    
+    // Obtener límite del plan (desde variable de entorno o default 100)
+    const planLimit = parseInt(process.env.QR_PLAN_LIMIT) || 100;
+    const planPrice = parseInt(process.env.QR_PLAN_PRICE) || 50;
+    
+    // Total de QR generados
+    const totalQR = await prisma.escrituraQR.count();
+    
+    // QR por estado
+    const qrPorEstado = await prisma.escrituraQR.groupBy({
+      by: ['estado'],
+      _count: {
+        estado: true
+      }
+    });
+    
+    // QR por usuario (top 10)
+    const qrPorUsuario = await prisma.escrituraQR.groupBy({
+      by: ['createdBy'],
+      _count: {
+        createdBy: true
+      },
+      orderBy: {
+        _count: {
+          createdBy: 'desc'
+        }
+      },
+      take: 10
+    });
+    
+    // Obtener información de los usuarios del top 10
+    const usuariosIds = qrPorUsuario.map(q => q.createdBy).filter(Boolean);
+    const usuarios = await prisma.user.findMany({
+      where: {
+        id: { in: usuariosIds }
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        role: true
+      }
+    });
+    
+    // Mapear usuarios con sus conteos
+    const qrPorUsuarioConInfo = qrPorUsuario.map(q => {
+      const usuario = usuarios.find(u => u.id === q.createdBy);
+      return {
+        usuarioId: q.createdBy,
+        cantidad: q._count.createdBy,
+        usuario: usuario ? {
+          nombre: `${usuario.firstName} ${usuario.lastName}`,
+          email: usuario.email,
+          role: usuario.role
+        } : null
+      };
+    });
+    
+    // QR por origen de datos
+    const qrPorOrigen = await prisma.escrituraQR.groupBy({
+      by: ['origenDatos'],
+      _count: {
+        origenDatos: true
+      }
+    });
+    
+    // QR del mes actual
+    const inicioMes = new Date();
+    inicioMes.setDate(1);
+    inicioMes.setHours(0, 0, 0, 0);
+    
+    const qrEsteMes = await prisma.escrituraQR.count({
+      where: {
+        createdAt: {
+          gte: inicioMes
+        }
+      }
+    });
+    
+    // QR de esta semana
+    const hoy = new Date();
+    const inicioSemana = new Date(hoy);
+    inicioSemana.setDate(hoy.getDate() - hoy.getDay());
+    inicioSemana.setHours(0, 0, 0, 0);
+    
+    const qrEstaSemana = await prisma.escrituraQR.count({
+      where: {
+        createdAt: {
+          gte: inicioSemana
+        }
+      }
+    });
+    
+    // QR de hoy
+    const inicioHoy = new Date();
+    inicioHoy.setHours(0, 0, 0, 0);
+    
+    const qrHoy = await prisma.escrituraQR.count({
+      where: {
+        createdAt: {
+          gte: inicioHoy
+        }
+      }
+    });
+    
+    // Cálculos del plan
+    const restantes = Math.max(0, planLimit - totalQR);
+    const porcentajeUsado = Math.round((totalQR / planLimit) * 100);
+    const costoActual = planPrice * Math.ceil(totalQR / planLimit);
+    
+    // QR por mes (últimos 6 meses para gráfico)
+    const seisMesesAtras = new Date();
+    seisMesesAtras.setMonth(seisMesesAtras.getMonth() - 6);
+    seisMesesAtras.setDate(1);
+    seisMesesAtras.setHours(0, 0, 0, 0);
+    
+    // Procesar datos por mes
+    const qrPorMesProcesado = [];
+    for (let i = 5; i >= 0; i--) {
+      const mes = new Date();
+      mes.setMonth(mes.getMonth() - i);
+      const nombreMes = mes.toLocaleString('es', { month: 'long', year: 'numeric' });
+      const inicioMesCiclo = new Date(mes.getFullYear(), mes.getMonth(), 1);
+      const finMesCiclo = new Date(mes.getFullYear(), mes.getMonth() + 1, 0, 23, 59, 59);
+      
+      const cantidadMes = await prisma.escrituraQR.count({
+        where: {
+          createdAt: {
+            gte: inicioMesCiclo,
+            lte: finMesCiclo
+          }
+        }
+      });
+      
+      qrPorMesProcesado.push({
+        mes: nombreMes,
+        cantidad: cantidadMes
+      });
+    }
+    
+    // Construir respuesta
+    res.json({
+      success: true,
+      data: {
+        resumenGeneral: {
+          totalQR,
+          qrHoy,
+          qrEstaSemana,
+          qrEsteMes
+        },
+        plan: {
+          limite: planLimit,
+          usado: totalQR,
+          restantes,
+          porcentajeUsado,
+          precio: planPrice,
+          costoActual
+        },
+        estadisticas: {
+          porEstado: qrPorEstado,
+          porUsuario: qrPorUsuarioConInfo,
+          porOrigen: qrPorOrigen,
+          porMes: qrPorMesProcesado
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('[getQRStats] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+}
+
+/**
  * GET /api/escrituras/:id/pdf
  * Obtiene el PDF de una escritura por ID (PROTEGIDO)
- * Solo para ADMIN y MATRIZADOR
+ * Solo para ADMIN, MATRIZADOR y ARCHIVO (sin censura)
  */
 export async function getPDFPrivate(req, res) {
   try {
@@ -1669,8 +1994,8 @@ export async function getPDFPrivate(req, res) {
     
     console.log(`[getPDFPrivate] Usuario ${userId} (${userRole}) solicitando PDF de escritura ${id}`);
     
-    // Verificar permisos
-    if (userRole !== 'ADMIN' && userRole !== 'MATRIZADOR') {
+    // Verificar permisos (ADMIN, MATRIZADOR y ARCHIVO pueden descargar PDFs sin censura)
+    if (!['ADMIN', 'MATRIZADOR', 'ARCHIVO'].includes(userRole)) {
       return res.status(403).json({
         success: false,
         message: 'No tienes permisos para acceder a este PDF'

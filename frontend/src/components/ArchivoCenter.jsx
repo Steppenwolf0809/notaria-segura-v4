@@ -5,6 +5,7 @@ import ArchivoDashboard from './ArchivoDashboard';
 import GestionArchivo from './GestionArchivo';
 import SupervisionGeneral from './archivo/SupervisionGeneral';
 import NotificationHistory from './archivo/NotificationHistory';
+import GeneradorQR from './archivo/GeneradorQR';
 import archivoService from '../services/archivo-service';
 import useAuth from '../hooks/use-auth';
 
@@ -100,6 +101,9 @@ const ArchivoCenter = () => {
             onDataUpdate={handleDataUpdate}
           />
         );
+      
+      case 'generador-qr':
+        return <GeneradorQR />;
       
       case 'notificaciones':
         return <NotificationHistory />;

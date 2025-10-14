@@ -25,7 +25,8 @@ import {
   Logout as LogoutIcon,
   Settings as SettingsIcon,
   KeyboardDoubleArrowLeft as CollapseIcon,
-  KeyboardDoubleArrowRight as ExpandIcon
+  KeyboardDoubleArrowRight as ExpandIcon,
+  QrCode as QrCodeIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import ThemeToggle from './ThemeToggle';
@@ -97,11 +98,12 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
   const iconMap = {
     Dashboard: <DashboardIcon />,
     FolderSpecial: <ArchiveIcon />,
+    QrCode: <QrCodeIcon />,
     WhatsApp: <WhatsAppIcon />,
     Visibility: <SupervisionIcon />
   };
   const navigationItems = useMemo(() => {
-    const allowed = ['dashboard', 'documentos', 'notificaciones', 'supervision'];
+    const allowed = ['dashboard', 'documentos', 'generador-qr', 'notificaciones', 'supervision'];
     const source = (navItemsByRole[role] || []).filter(i => allowed.includes(i.id));
     return source.map(i => ({
       text: i.label,

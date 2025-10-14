@@ -508,11 +508,11 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
           </Card>
         </Grid>
 
-        {/* Fotografía del Menor */}
+        {/* Fotografía de verificación de identidad */}
         <Grid item xs={12}>
           <Card>
             <CardHeader 
-              title="Fotografía del Menor (Opcional)" 
+              title="Fotografía de verificación de identidad" 
               subheader="Fotografía para verificación de identidad"
             />
             <CardContent>
@@ -528,7 +528,7 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
                         <CardMedia
                           component="img"
                           image={photoPreview || escritura.fotoURL}
-                          alt="Fotografía del menor"
+                          alt="Fotografía de verificación"
                           sx={{
                             maxHeight: 300,
                             objectFit: 'contain',
