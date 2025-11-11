@@ -4485,7 +4485,7 @@ async function getDocumentsCounts(req, res) {
  */
 async function deleteDocument(req, res) {
   try {
-    const documentId = parseInt(req.params.id);
+    const documentId = req.params.id; // ID es String (UUID), no Int
     const userRole = req.user.role;
 
     // Verificar que sea ADMIN
