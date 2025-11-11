@@ -35,7 +35,8 @@ import {
   Phone as PhoneIcon,
   Email as EmailIcon,
   CalendarToday as CalendarIcon,
-  AttachMoney as MoneyIcon
+  AttachMoney as MoneyIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -44,6 +45,15 @@ import useStats from '../../hooks/useStats';
 import useDebounce from '../../hooks/useDebounce';
 import DocumentDetailModal from './DocumentDetailModal';
 import GroupingAlert from '../grouping/GroupingAlert';
+import documentService from '../../services/document-service';
+import useAuth from '../../hooks/use-auth';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogActions from '@mui/material/DialogActions';
+import Alert from '@mui/material/Alert';
+import CircularProgress from '@mui/material/CircularProgress';
 
 /**
  * Componente DocumentsList - Vista de tabla con búsqueda y filtros avanzados
@@ -65,6 +75,12 @@ const DocumentsList = () => {
   const [sortDirection, setSortDirection] = useState('desc');
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState(null);
+
+  const { user } = useAuth();
 
   // DEBOUNCING: Solo buscar después de que el usuario pause por 400ms
   const debouncedSearchTerm = useDebounce(inputValue, 400);
@@ -273,6 +289,45 @@ const DocumentsList = () => {
   const closeDetailModal = () => {
     setDetailModalOpen(false);
     setSelectedDocument(null);
+  };
+
+  /**
+   * Abrir confirmación de eliminación (solo ADMIN)
+   */
+  const handleOpenDeleteDialog = (doc) => {
+    setDocumentToDelete(doc);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleCloseDeleteDialog = () => {
+    setDeleteDialogOpen(false);
+    setDocumentToDelete(null);
+  };
+
+  /**
+   * Eliminar documento permanentemente (solo ADMIN)
+   */
+  const handleDeleteDocument = async () => {
+    if (!documentToDelete) return;
+
+    setDeleting(true);
+    setError(null);
+    try {
+      const result = await documentService.deleteDocument(documentToDelete.id);
+
+      if (result.success) {
+        // Refrescar lista desde el store
+        window.location.reload(); // Forzar recarga para actualizar el store
+        handleCloseDeleteDialog();
+      } else {
+        setError(result.message || 'Error eliminando documento');
+      }
+    } catch (error) {
+      console.error('Error eliminando documento:', error);
+      setError('Error al eliminar el documento');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -568,6 +623,22 @@ const DocumentsList = () => {
                           </IconButton>
                         </Tooltip>
                       )}
+
+                      {/* Botón eliminar solo para ADMIN */}
+                      {user?.role === 'ADMIN' && (
+                        <Tooltip title="Eliminar documento (solo ADMIN)">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleOpenDeleteDialog(document)}
+                            sx={{
+                              color: 'error.main',
+                              '&:hover': { bgcolor: 'error.light' }
+                            }}
+                          >
+                            <DeleteIcon sx={{ fontSize: 18 }} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </Stack>
                   </TableCell>
                 </TableRow>
@@ -598,6 +669,62 @@ const DocumentsList = () => {
         onClose={closeDetailModal}
         document={selectedDocument}
       />
+
+      {/* Dialog de confirmación para eliminar documento */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleCloseDeleteDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ color: 'error.main', fontWeight: 600 }}>
+          ⚠️ Eliminar Documento Permanentemente
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            ¿Estás seguro de que deseas eliminar permanentemente este documento?
+          </DialogContentText>
+          {documentToDelete && (
+            <Box sx={{ mt: 2, p: 2, bgcolor: 'error.lighter', borderRadius: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                Protocolo: {documentToDelete.protocolNumber}
+              </Typography>
+              <Typography variant="body2">
+                Cliente: {documentToDelete.clientName}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Estado: {documentToDelete.status}
+              </Typography>
+            </Box>
+          )}
+          <Alert severity="error" sx={{ mt: 2 }}>
+            <strong>Esta acción no se puede deshacer.</strong> El documento y todos sus eventos asociados serán eliminados permanentemente de la base de datos.
+          </Alert>
+          {error && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {error}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={handleCloseDeleteDialog}
+            disabled={deleting}
+            variant="outlined"
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleDeleteDocument}
+            disabled={deleting}
+            variant="contained"
+            color="error"
+            startIcon={deleting ? <CircularProgress size={16} /> : <DeleteIcon />}
+          >
+            {deleting ? 'Eliminando...' : 'Eliminar Permanentemente'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
