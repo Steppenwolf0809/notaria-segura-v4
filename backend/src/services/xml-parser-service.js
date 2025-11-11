@@ -137,39 +137,55 @@ async function parseXmlDocument(xmlContent) {
  */
 function extractClientDataFromXml(factura) {
   const infoFactura = factura.infoFactura?.[0] || {};
-  const infoAdicional = factura.infoAdicional?.[0]?.campoAdicional || [];
-  
+
   // Extraer nombre del cliente (razonSocialComprador)
   const clientName = infoFactura.razonSocialComprador?.[0] || 'Sin nombre';
-  
+
   // ⭐ NUEVO: Extraer ID del cliente (cualquier tipo de identificación: cédula, RUC, pasaporte, etc.)
   const clientId = infoFactura.identificacionComprador?.[0] || null;
-  
-  // Buscar email en infoAdicional
+
+  // Obtener array de campos adicionales
+  const camposAdicionales = factura.infoAdicional?.[0]?.campoAdicional || [];
+
+  if (!Array.isArray(camposAdicionales)) {
+    console.warn('⚠️ extractClientDataFromXml: campoAdicional no es array');
+    return {
+      clientName,
+      clientId,
+      clientEmail: null,
+      clientPhone: null
+    };
+  }
+
+  // Buscar email en infoAdicional (case-insensitive)
   let clientEmail = null;
-  const emailField = infoAdicional.find(campo => 
-    campo.$.nombre === 'Email Cliente'
-  );
+  const emailField = camposAdicionales.find(campo => {
+    if (!campo || !campo.$) return false;
+    const nombreNormalizado = (campo.$.nombre || '').trim().toUpperCase();
+    return nombreNormalizado === 'EMAIL CLIENTE';
+  });
   if (emailField && emailField._) {
     clientEmail = emailField._;
   }
-  
+
   // Buscar CELULAR (NO teléfono) en infoAdicional para WhatsApp
   let clientPhone = null;
-  const celularField = infoAdicional.find(campo => 
-    campo.$.nombre === 'CELULAR'
-  );
+  const celularField = camposAdicionales.find(campo => {
+    if (!campo || !campo.$) return false;
+    const nombreNormalizado = (campo.$.nombre || '').trim().toUpperCase();
+    return nombreNormalizado === 'CELULAR';
+  });
   if (celularField && celularField._) {
     clientPhone = celularField._;
   }
-  
+
   console.log('🔍 XML Parser: Datos del cliente extraídos:', {
     clientName,
     clientId: clientId || 'Sin identificación',
     clientEmail: clientEmail || 'Sin email',
     clientPhone: clientPhone || 'Sin celular'
   });
-  
+
   return {
     clientName,
     clientId,
@@ -184,13 +200,59 @@ function extractClientDataFromXml(factura) {
  * @returns {string|null} Número de protocolo
  */
 function extractProtocolNumber(factura) {
-  const infoAdicional = factura.infoAdicional?.[0]?.campoAdicional || [];
-  
-  const protocolField = infoAdicional.find(campo => 
-    campo.$.nombre === 'NÚMERO DE LIBRO'
-  );
-  
-  return protocolField && protocolField._ ? protocolField._ : null;
+  // Debug: Log estructura de infoAdicional
+  console.log('🔍 extractProtocolNumber - Estructura infoAdicional:', {
+    exists: !!factura.infoAdicional,
+    isArray: Array.isArray(factura.infoAdicional),
+    length: factura.infoAdicional?.length,
+    firstElement: factura.infoAdicional?.[0] ? Object.keys(factura.infoAdicional[0]) : 'N/A'
+  });
+
+  const infoAdicionalArray = factura.infoAdicional?.[0];
+
+  if (!infoAdicionalArray) {
+    console.error('❌ extractProtocolNumber: No hay infoAdicional[0]');
+    return null;
+  }
+
+  const camposAdicionales = infoAdicionalArray.campoAdicional || [];
+
+  if (!Array.isArray(camposAdicionales)) {
+    console.error('❌ extractProtocolNumber: campoAdicional no es array:', typeof camposAdicionales);
+    return null;
+  }
+
+  console.log(`📋 extractProtocolNumber: Encontrados ${camposAdicionales.length} campos adicionales`);
+
+  // Log de todos los campos para debugging
+  camposAdicionales.forEach((campo, index) => {
+    const nombre = campo?.$ ? campo.$.nombre : 'SIN ATRIBUTO';
+    const valor = campo?._ || 'SIN VALOR';
+    console.log(`  [${index}] nombre="${nombre}" valor="${valor.substring(0, 50)}"`);
+  });
+
+  // Buscar el campo NÚMERO DE LIBRO (con comparación case-insensitive y trim)
+  const protocolField = camposAdicionales.find(campo => {
+    if (!campo || !campo.$) return false;
+    const nombreNormalizado = (campo.$.nombre || '').trim().toUpperCase();
+    return nombreNormalizado === 'NÚMERO DE LIBRO';
+  });
+
+  if (!protocolField) {
+    console.error('❌ extractProtocolNumber: Campo "NÚMERO DE LIBRO" no encontrado');
+    console.error('   Campos disponibles:', camposAdicionales.map(c => c.$.nombre || 'N/A'));
+    return null;
+  }
+
+  const protocolNumber = protocolField?._ || null;
+
+  if (!protocolNumber) {
+    console.error('❌ extractProtocolNumber: Campo "NÚMERO DE LIBRO" está vacío');
+    return null;
+  }
+
+  console.log(`✅ extractProtocolNumber: Encontrado número de protocolo: ${protocolNumber}`);
+  return protocolNumber;
 }
 
 /**
@@ -199,13 +261,26 @@ function extractProtocolNumber(factura) {
  * @returns {string} Nombre del matrizador
  */
 function extractMatrizadorName(factura) {
-  const infoAdicional = factura.infoAdicional?.[0]?.campoAdicional || [];
-  
-  const matrizadorField = infoAdicional.find(campo => 
-    campo.$.nombre === 'Matrizador'
-  );
-  
-  return matrizadorField && matrizadorField._ ? matrizadorField._ : 'Sin asignar';
+  const camposAdicionales = factura.infoAdicional?.[0]?.campoAdicional || [];
+
+  if (!Array.isArray(camposAdicionales)) {
+    console.warn('⚠️ extractMatrizadorName: campoAdicional no es array');
+    return 'Sin asignar';
+  }
+
+  // Buscar campo Matrizador (case-insensitive)
+  const matrizadorField = camposAdicionales.find(campo => {
+    if (!campo || !campo.$) return false;
+    const nombreNormalizado = (campo.$.nombre || '').trim().toUpperCase();
+    return nombreNormalizado === 'MATRIZADOR';
+  });
+
+  if (matrizadorField && matrizadorField._) {
+    return matrizadorField._;
+  }
+
+  console.warn('⚠️ extractMatrizadorName: Campo "Matrizador" no encontrado');
+  return 'Sin asignar';
 }
 
 /**
