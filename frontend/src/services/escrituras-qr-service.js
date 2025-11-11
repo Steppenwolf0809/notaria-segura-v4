@@ -348,8 +348,9 @@ export function getEstadoInfo(estado) {
  * @returns {string} URL completa de verificación
  */
 export function generateVerificationURL(token) {
-  const baseURL = window.location.origin;
-  return `${baseURL}/verify/${token}`;
+  // URL oficial de la notaría para verificación pública
+  const baseURL = 'https://www.notaria18quito.com.ec';
+  return `${baseURL}/verificar.html?token=${token}`;
 }
 
 /**
