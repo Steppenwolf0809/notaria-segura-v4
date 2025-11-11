@@ -3830,14 +3830,14 @@ async function revertDocumentStatus(req, res) {
               userId: req.user.id,
               eventType: 'STATUS_CHANGED',
               description: `Estado revertido grupalmente de ${doc.status} a ${newStatus} por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
-              details: {
+              details: JSON.stringify({
                 previousStatus: doc.status,
                 newStatus,
                 reversionReason: reversionReason.trim(),
                 groupReversion: true,
                 documentGroupId: document.documentGroupId,
                 timestamp: new Date().toISOString()
-              },
+              }),
               ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
               userAgent: req.get('User-Agent') || 'unknown'
             }
@@ -3881,13 +3881,13 @@ async function revertDocumentStatus(req, res) {
           userId: req.user.id,
           eventType: 'STATUS_CHANGED',
           description: `Estado revertido de ${document.status} a ${newStatus} por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
-          details: {
+          details: JSON.stringify({
             previousStatus: document.status,
             newStatus,
             reversionReason: reversionReason.trim(),
             groupReversion: false,
             timestamp: new Date().toISOString()
-          },
+          }),
           ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
           userAgent: req.get('User-Agent') || 'unknown'
         }
