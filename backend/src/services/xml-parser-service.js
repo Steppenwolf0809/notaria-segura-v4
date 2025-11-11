@@ -39,28 +39,56 @@ const ITEMS_A_IGNORAR = [
  */
 async function parseXmlDocument(xmlContent) {
   try {
+    // Validar que xmlContent sea string y no esté vacío
+    if (!xmlContent || typeof xmlContent !== 'string') {
+      throw new Error('El contenido del XML debe ser un string válido');
+    }
+
     // Parse del XML
-    const result = await parseXML(xmlContent);
+    let result;
+    try {
+      result = await parseXML(xmlContent);
+    } catch (parseError) {
+      throw new Error(`Error al parsear XML: ${parseError.message}`);
+    }
+
     const factura = result.factura;
-    
+
     if (!factura) {
-      throw new Error('XML no válido: falta elemento factura');
+      throw new Error('XML no válido: falta elemento raíz <factura>');
+    }
+
+    // Validar estructura mínima del XML
+    const infoFactura = factura.infoFactura?.[0];
+    if (!infoFactura) {
+      throw new Error('XML no válido: falta elemento <infoFactura>');
     }
 
     // 1. Extraer código del documento del XML (campo NÚMERO DE LIBRO)
     const protocolNumber = extractProtocolNumber(factura);
     if (!protocolNumber) {
-      throw new Error('No se pudo extraer el número de protocolo del XML');
+      throw new Error('XML no válido: no se encontró campo "NÚMERO DE LIBRO" en infoAdicional');
     }
 
     // 2. Identificar tipo por letra del código
     const documentType = classifyDocumentByCode(protocolNumber);
-    
+
     // 3. Extraer información del cliente y matrizador
     const clientData = extractClientDataFromXml(factura);
-    
-    // 4. Extraer información de la factura
-    const totalFactura = parseFloat(factura.infoFactura[0].importeTotal[0]) || 0;
+
+    // 4. Extraer información de la factura con validación
+    let totalFactura = 0;
+    try {
+      const importeTotal = infoFactura.importeTotal?.[0];
+      if (!importeTotal) {
+        console.warn('⚠️ XML Parser: Campo importeTotal no encontrado en infoFactura, usando 0');
+      } else {
+        totalFactura = parseFloat(importeTotal) || 0;
+      }
+    } catch (err) {
+      console.error('Error extrayendo totalFactura:', err.message);
+      totalFactura = 0;
+    }
     
     // 5. Procesar detalles según tipo de documento
     const detalles = factura.detalles?.[0]?.detalle || [];

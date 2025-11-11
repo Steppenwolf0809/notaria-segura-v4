@@ -198,11 +198,33 @@ async function uploadXmlDocument(req, res) {
     });
 
   } catch (error) {
-    console.error('Error procesando XML:', error);
-    res.status(500).json({
+    console.error('💥 Error procesando XML:', {
+      message: error.message,
+      stack: error.stack
+    });
+
+    // Mensajes más descriptivos según el tipo de error
+    let statusCode = 500;
+    let userMessage = 'Error al procesar archivo XML';
+
+    if (error.message.includes('XML no válido')) {
+      statusCode = 400;
+      userMessage = error.message;
+    } else if (error.message.includes('No se pudo extraer')) {
+      statusCode = 400;
+      userMessage = error.message;
+    } else if (error.message.includes('protocolNumber')) {
+      statusCode = 400;
+      userMessage = 'El documento XML debe contener el número de protocolo en el campo "NÚMERO DE LIBRO"';
+    } else if (error.message.includes('parseFloat')) {
+      statusCode = 400;
+      userMessage = 'Error al procesar valores numéricos en el XML';
+    }
+
+    res.status(statusCode).json({
       success: false,
-      message: 'Error procesando archivo XML',
-      error: error.message
+      message: userMessage,
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 }

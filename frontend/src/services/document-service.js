@@ -37,15 +37,24 @@ const documentService = {
         message: response.data.message
       };
     } catch (error) {
-      console.error('Error uploading XML document:', error);
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
+      // Log detallado del error para debugging
+      console.error('Error uploading XML document:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        message: error.response?.data?.message,
+        errorDetail: error.response?.data?.error,
+        fullError: error.message
+      });
+
+      // Priorizar mensaje del servidor, luego mensaje de error, luego genérico
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
                           'Error al subir archivo XML';
-      
+
       return {
         success: false,
-        error: errorMessage
+        error: errorMessage,
+        details: error.response?.data?.error // Información adicional en desarrollo
       };
     }
   },
@@ -102,15 +111,24 @@ const documentService = {
         message: response.data.message
       };
     } catch (error) {
-      console.error('Error uploading XML documents batch:', error);
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
+      // Log detallado del error para debugging
+      console.error('Error uploading XML documents batch:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        message: error.response?.data?.message,
+        errorDetail: error.response?.data?.error,
+        fullError: error.message
+      });
+
+      // Priorizar mensaje del servidor, luego mensaje de error, luego genérico
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
                           'Error al subir archivos XML en lote';
-      
+
       return {
         success: false,
-        error: errorMessage
+        error: errorMessage,
+        details: error.response?.data?.error // Información adicional en desarrollo
       };
     }
   },
