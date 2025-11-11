@@ -33,7 +33,11 @@ import {
   CircularProgress,
   LinearProgress,
   Divider,
-  Stack
+  Stack,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -47,15 +51,23 @@ import {
   PictureAsPdf as PdfIcon,
   Person as PersonIcon,
   Visibility as ViewIcon,
-  CalendarToday as CalendarIcon
+  CalendarToday as CalendarIcon,
+  Info as InfoIcon,
+  Close as CloseIcon,
+  ContentCopy as CopyIcon,
+  Download as DownloadIcon,
+  OpenInNew as OpenInNewIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
+import { QRCodeSVG } from 'qrcode.react';
 
 // Servicios
 import {
   getQRStatistics,
   getAllQRForAdmin,
-  getEstadoInfo
+  getEstadoInfo,
+  generateVerificationURL,
+  copyToClipboard
 } from '../../services/escrituras-qr-service';
 
 const AdminQRDashboard = () => {
@@ -76,6 +88,10 @@ const AdminQRDashboard = () => {
   const [estadoFilter, setEstadoFilter] = useState('');
   const [origenFilter, setOrigenFilter] = useState('');
   const [pdfFilter, setPdfFilter] = useState('');
+
+  // Estados para modal de detalles
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [selectedEscritura, setSelectedEscritura] = useState(null);
 
   // Cargar estadísticas al montar el componente
   useEffect(() => {
@@ -220,6 +236,75 @@ const AdminQRDashboard = () => {
     if (percentage >= 90) return 'error';
     if (percentage >= 70) return 'warning';
     return 'success';
+  };
+
+  /**
+   * Abre el modal de detalles con la escritura seleccionada
+   */
+  const handleViewDetails = (escritura) => {
+    setSelectedEscritura(escritura);
+    setDetailsModalOpen(true);
+  };
+
+  /**
+   * Cierra el modal de detalles
+   */
+  const handleCloseDetails = () => {
+    setDetailsModalOpen(false);
+    setSelectedEscritura(null);
+  };
+
+  /**
+   * Copia el token al portapapeles
+   */
+  const handleCopyToken = async (token) => {
+    const success = await copyToClipboard(token);
+    if (success) {
+      toast.success('Token copiado al portapapeles');
+    } else {
+      toast.error('Error al copiar el token');
+    }
+  };
+
+  /**
+   * Copia la URL de verificación al portapapeles
+   */
+  const handleCopyURL = async (token) => {
+    const url = generateVerificationURL(token);
+    const success = await copyToClipboard(url);
+    if (success) {
+      toast.success('URL copiada al portapapeles');
+    } else {
+      toast.error('Error al copiar la URL');
+    }
+  };
+
+  /**
+   * Descarga el QR como imagen
+   */
+  const handleDownloadQR = (token) => {
+    const svg = document.getElementById(`qr-svg-${token}`);
+    if (!svg) return;
+
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+      const pngFile = canvas.toDataURL('image/png');
+
+      const downloadLink = document.createElement('a');
+      downloadLink.download = `QR-${token}.png`;
+      downloadLink.href = pngFile;
+      downloadLink.click();
+      toast.success('QR descargado exitosamente');
+    };
+
+    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
   };
 
   return (
@@ -534,24 +619,25 @@ const AdminQRDashboard = () => {
                 <TableCell>Fecha</TableCell>
                 <TableCell align="center">PDF</TableCell>
                 <TableCell align="center">Vistas</TableCell>
+                <TableCell align="center">Acciones</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                     <CircularProgress />
                   </TableCell>
                 </TableRow>
               ) : error ? (
                 <TableRow>
-                  <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                     <Alert severity="error">{error}</Alert>
                   </TableCell>
                 </TableRow>
               ) : escrituras.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                  <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                     <Typography variant="body2" color="text.secondary">
                       No se encontraron códigos QR
                     </Typography>
@@ -637,6 +723,17 @@ const AdminQRDashboard = () => {
                           variant="outlined"
                         />
                       </TableCell>
+                      <TableCell align="center">
+                        <Tooltip title="Ver detalles completos">
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() => handleViewDetails(escritura)}
+                          >
+                            <InfoIcon />
+                          </IconButton>
+                        </Tooltip>
+                      </TableCell>
                     </TableRow>
                   );
                 })
@@ -658,6 +755,333 @@ const AdminQRDashboard = () => {
           labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
         />
       </Paper>
+
+      {/* Modal de Detalles de QR */}
+      <Dialog
+        open={detailsModalOpen}
+        onClose={handleCloseDetails}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <QrCodeIcon sx={{ mr: 1, color: 'primary.main' }} />
+              <Typography variant="h6">Detalles del Código QR</Typography>
+            </Box>
+            <IconButton onClick={handleCloseDetails} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          {selectedEscritura && (
+            <Grid container spacing={3}>
+              {/* Sección: Información Básica */}
+              <Grid item xs={12}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2 }}>
+                  📋 Información Básica
+                </Typography>
+                <Paper variant="outlined" sx={{ p: 2 }}>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Token:
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                        <Chip
+                          label={selectedEscritura.token}
+                          color="primary"
+                          size="small"
+                          sx={{ mr: 1 }}
+                        />
+                        <Tooltip title="Copiar token">
+                          <IconButton size="small" onClick={() => handleCopyToken(selectedEscritura.token)}>
+                            <CopyIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Estado:
+                      </Typography>
+                      <Box sx={{ mt: 0.5 }}>
+                        <Chip
+                          label={getEstadoInfo(selectedEscritura.estado).label}
+                          color={getEstadoInfo(selectedEscritura.estado).color}
+                          size="small"
+                        />
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Número de Escritura:
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 'medium', mt: 0.5 }}>
+                        {selectedEscritura.numeroEscritura || 'N/A'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Origen de Datos:
+                      </Typography>
+                      <Box sx={{ mt: 0.5 }}>
+                        <Chip
+                          label={selectedEscritura.origenDatos}
+                          size="small"
+                          variant="outlined"
+                          color={selectedEscritura.origenDatos === 'PDF' ? 'primary' : 'secondary'}
+                        />
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </Paper>
+              </Grid>
+
+              {/* Sección: Código QR Visual */}
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2 }}>
+                  🔲 Código QR
+                </Typography>
+                <Paper variant="outlined" sx={{ p: 3, textAlign: 'center' }}>
+                  <QRCodeSVG
+                    id={`qr-svg-${selectedEscritura.token}`}
+                    value={generateVerificationURL(selectedEscritura.token)}
+                    size={200}
+                    level="M"
+                    includeMargin={true}
+                  />
+                  <Box sx={{ mt: 2, display: 'flex', gap: 1, justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<DownloadIcon />}
+                      onClick={() => handleDownloadQR(selectedEscritura.token)}
+                    >
+                      Descargar
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<CopyIcon />}
+                      onClick={() => handleCopyURL(selectedEscritura.token)}
+                    >
+                      Copiar URL
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<OpenInNewIcon />}
+                      onClick={() => window.open(generateVerificationURL(selectedEscritura.token), '_blank')}
+                    >
+                      Abrir
+                    </Button>
+                  </Box>
+                </Paper>
+              </Grid>
+
+              {/* Sección: Datos de la Escritura */}
+              <Grid item xs={12} md={6}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2 }}>
+                  📄 Datos de la Escritura
+                </Typography>
+                <Paper variant="outlined" sx={{ p: 2 }}>
+                  <Stack spacing={1.5}>
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">
+                        Acto:
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                        {selectedEscritura.acto}
+                      </Typography>
+                    </Box>
+                    {selectedEscritura.datosCompletos?.fecha_otorgamiento && (
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">
+                          Fecha de Otorgamiento:
+                        </Typography>
+                        <Typography variant="body2">
+                          {selectedEscritura.datosCompletos.fecha_otorgamiento}
+                        </Typography>
+                      </Box>
+                    )}
+                    {selectedEscritura.datosCompletos?.cuantia && (
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">
+                          Cuantía:
+                        </Typography>
+                        <Typography variant="body2">
+                          {selectedEscritura.datosCompletos.cuantia}
+                        </Typography>
+                      </Box>
+                    )}
+                    {selectedEscritura.datosCompletos?.notario && (
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">
+                          Notario:
+                        </Typography>
+                        <Typography variant="body2">
+                          {selectedEscritura.datosCompletos.notario}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Stack>
+                </Paper>
+              </Grid>
+
+              {/* Sección: Información del Creador */}
+              <Grid item xs={12} sm={6}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2 }}>
+                  👤 Creador
+                </Typography>
+                <Paper variant="outlined" sx={{ p: 2 }}>
+                  {selectedEscritura.creador ? (
+                    <Stack spacing={1}>
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">
+                          Nombre:
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                          {selectedEscritura.creador.nombre}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">
+                          Email:
+                        </Typography>
+                        <Typography variant="body2">
+                          {selectedEscritura.creador.email}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">
+                          Rol:
+                        </Typography>
+                        <Chip label={selectedEscritura.creador.role} size="small" />
+                      </Box>
+                    </Stack>
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      Sin información del creador
+                    </Typography>
+                  )}
+                </Paper>
+              </Grid>
+
+              {/* Sección: Fechas */}
+              <Grid item xs={12} sm={6}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2 }}>
+                  📅 Fechas
+                </Typography>
+                <Paper variant="outlined" sx={{ p: 2 }}>
+                  <Stack spacing={1}>
+                    <Box>
+                      <Typography variant="body2" color="text.secondary">
+                        Creación:
+                      </Typography>
+                      <Typography variant="body2">
+                        {formatDate(selectedEscritura.createdAt)}
+                      </Typography>
+                    </Box>
+                    {selectedEscritura.updatedAt && (
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">
+                          Última Actualización:
+                        </Typography>
+                        <Typography variant="body2">
+                          {formatDate(selectedEscritura.updatedAt)}
+                        </Typography>
+                      </Box>
+                    )}
+                    {selectedEscritura.pdfUploadedAt && (
+                      <Box>
+                        <Typography variant="body2" color="text.secondary">
+                          PDF Subido:
+                        </Typography>
+                        <Typography variant="body2">
+                          {formatDate(selectedEscritura.pdfUploadedAt)}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Stack>
+                </Paper>
+              </Grid>
+
+              {/* Sección: PDF Completo */}
+              <Grid item xs={12}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2 }}>
+                  📎 Archivo PDF Completo
+                </Typography>
+                <Paper variant="outlined" sx={{ p: 2 }}>
+                  <Grid container spacing={2} alignItems="center">
+                    <Grid item xs={12} sm={6}>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        {selectedEscritura.tienePDF ? (
+                          <CheckCircleIcon color="success" sx={{ mr: 1 }} />
+                        ) : (
+                          <CancelIcon color="disabled" sx={{ mr: 1 }} />
+                        )}
+                        <Typography variant="body2">
+                          {selectedEscritura.tienePDF
+                            ? 'PDF completo disponible'
+                            : 'Sin PDF completo'}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Typography variant="body2" color="text.secondary">
+                        Verificaciones Públicas:
+                      </Typography>
+                      <Chip
+                        label={`${selectedEscritura.pdfViewCount || 0} vistas`}
+                        size="small"
+                        icon={<ViewIcon />}
+                        color="primary"
+                        variant="outlined"
+                      />
+                    </Grid>
+                    {selectedEscritura.tienePDF && selectedEscritura.pdfHiddenPages && selectedEscritura.pdfHiddenPages.length > 0 && (
+                      <Grid item xs={12}>
+                        <Alert severity="info" icon={<WarningIcon />}>
+                          <Typography variant="body2">
+                            Páginas ocultas: {selectedEscritura.pdfHiddenPages.join(', ')}
+                          </Typography>
+                        </Alert>
+                      </Grid>
+                    )}
+                  </Grid>
+                </Paper>
+              </Grid>
+
+              {/* Sección: Foto del Menor (si existe) */}
+              {selectedEscritura.tieneFoto && (
+                <Grid item xs={12}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2 }}>
+                    🖼️ Fotografía
+                  </Typography>
+                  <Paper variant="outlined" sx={{ p: 2, textAlign: 'center' }}>
+                    <Box
+                      component="img"
+                      src={selectedEscritura.fotoURL}
+                      alt="Foto adjunta"
+                      sx={{
+                        maxWidth: '100%',
+                        maxHeight: 300,
+                        borderRadius: 1,
+                        objectFit: 'contain'
+                      }}
+                    />
+                  </Paper>
+                </Grid>
+              )}
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDetails}>Cerrar</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
