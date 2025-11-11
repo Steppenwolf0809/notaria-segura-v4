@@ -682,3 +682,33 @@ export async function getAllQRForAdmin(params = {}) {
     );
   }
 }
+
+/**
+ * Obtiene el historial de verificaciones de una escritura QR (solo para ADMIN)
+ * @param {number} escrituraId - ID de la escritura QR
+ * @param {Object} params - Parámetros de consulta
+ * @param {number} params.page - Página actual
+ * @param {number} params.limit - Elementos por página
+ * @param {string} params.tipo - Filtro por tipo ('datos' o 'pdf_completo')
+ * @returns {Promise<Object>} Historial de verificaciones con estadísticas
+ */
+export async function getVerificaciones(escrituraId, params = {}) {
+  try {
+    const queryParams = new URLSearchParams();
+
+    if (params.page) queryParams.append('page', params.page);
+    if (params.limit) queryParams.append('limit', params.limit);
+    if (params.tipo) queryParams.append('tipo', params.tipo);
+
+    const response = await apiClient.get(
+      `/escrituras/admin/verificaciones/${escrituraId}?${queryParams.toString()}`
+    );
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching verificaciones:', error);
+    throw new Error(
+      error.response?.data?.message ||
+      'Error al obtener el historial de verificaciones'
+    );
+  }
+}

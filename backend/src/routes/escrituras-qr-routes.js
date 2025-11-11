@@ -22,7 +22,8 @@ import {
   getPDFMetadata,
   updatePDFHiddenPages,
   getQRStatistics,
-  getAllQRForAdmin
+  getAllQRForAdmin,
+  getVerificaciones
 } from '../controllers/escrituras-qr-controller.js';
 
 const router = express.Router();
@@ -89,6 +90,12 @@ router.get('/admin/statistics',
 router.get('/admin/all',
   authenticateToken,
   getAllQRForAdmin
+);
+
+// GET /api/escrituras/admin/verificaciones/:id - Obtener historial de verificaciones de un QR (solo admin)
+router.get('/admin/verificaciones/:id',
+  authenticateToken,
+  getVerificaciones
 );
 
 // POST /api/escrituras/upload - Subir PDF y generar QR (solo matrizadores)

@@ -315,6 +315,7 @@ model EscrituraQR {
 
   // Relaciones
   creador                 User?    @relation(fields: [createdBy], references: [id])
+  verificaciones          VerificacionQR[] // Historial de verificaciones de este QR
 
   @@map("escrituras_qr")
   // Índices para performance
@@ -323,4 +324,28 @@ model EscrituraQR {
   @@index([createdAt])
   @@index([createdBy])
   @@index([origenDatos])
+}
+
+// MODELO PARA AUDITORÍA DE VERIFICACIONES DE QR - Tracking de cada escaneo/acceso
+model VerificacionQR {
+  id                  Int      @id @default(autoincrement())
+  escrituraQRId       Int      // FK a la escritura QR verificada
+  timestamp           DateTime @default(now())
+  ipAddress           String?  // Dirección IP del visitante
+  userAgent           String?  // User agent (navegador, sistema operativo, dispositivo)
+  referrer            String?  // De dónde viene (URL referente)
+  tipoVerificacion    String   // "datos" (solo info) | "pdf_completo" (descargó/vio PDF)
+  country             String?  // País (geolocalización por IP - opcional)
+  city                String?  // Ciudad (geolocalización por IP - opcional)
+  duracionSegundos    Int?     // Tiempo que pasó en la página (opcional, para futuro)
+
+  // Relaciones
+  escrituraQR         EscrituraQR @relation(fields: [escrituraQRId], references: [id], onDelete: Cascade)
+
+  @@map("verificaciones_qr")
+  // Índices para análisis y reportes
+  @@index([escrituraQRId, timestamp])
+  @@index([timestamp])
+  @@index([tipoVerificacion])
+  @@index([country])
 }

@@ -67,7 +67,8 @@ import {
   getAllQRForAdmin,
   getEstadoInfo,
   generateVerificationURL,
-  copyToClipboard
+  copyToClipboard,
+  getVerificaciones
 } from '../../services/escrituras-qr-service';
 
 const AdminQRDashboard = () => {
@@ -92,6 +93,11 @@ const AdminQRDashboard = () => {
   // Estados para modal de detalles
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [selectedEscritura, setSelectedEscritura] = useState(null);
+
+  // Estados para verificaciones
+  const [verificaciones, setVerificaciones] = useState([]);
+  const [verificacionesStats, setVerificacionesStats] = useState(null);
+  const [loadingVerificaciones, setLoadingVerificaciones] = useState(false);
 
   // Cargar estadísticas al montar el componente
   useEffect(() => {
@@ -215,6 +221,25 @@ const AdminQRDashboard = () => {
   };
 
   /**
+   * Obtiene el historial de verificaciones de una escritura
+   */
+  const fetchVerificaciones = async (escrituraId) => {
+    setLoadingVerificaciones(true);
+    try {
+      const response = await getVerificaciones(escrituraId, { limit: 20 });
+      setVerificaciones(response.data.verificaciones);
+      setVerificacionesStats(response.data.estadisticas);
+    } catch (error) {
+      console.error('Error fetching verificaciones:', error);
+      toast.error('Error al cargar el historial de verificaciones');
+      setVerificaciones([]);
+      setVerificacionesStats(null);
+    } finally {
+      setLoadingVerificaciones(false);
+    }
+  };
+
+  /**
    * Formatea la fecha
    */
   const formatDate = (dateString) => {
@@ -244,6 +269,8 @@ const AdminQRDashboard = () => {
   const handleViewDetails = (escritura) => {
     setSelectedEscritura(escritura);
     setDetailsModalOpen(true);
+    // Cargar historial de verificaciones
+    fetchVerificaciones(escritura.id);
   };
 
   /**
@@ -1078,6 +1105,130 @@ const AdminQRDashboard = () => {
                   </Paper>
                 </Grid>
               )}
+
+              {/* Sección: Historial de Verificaciones */}
+              <Grid item xs={12}>
+                <Divider sx={{ my: 2 }} />
+                <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 2 }}>
+                  📊 Historial de Verificaciones
+                </Typography>
+                <Paper variant="outlined" sx={{ p: 2 }}>
+                  {loadingVerificaciones ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+                      <CircularProgress size={40} />
+                    </Box>
+                  ) : (
+                    <>
+                      {/* Estadísticas de verificaciones */}
+                      {verificacionesStats && (
+                        <Grid container spacing={2} sx={{ mb: 3 }}>
+                          <Grid item xs={12} sm={4}>
+                            <Paper variant="outlined" sx={{ p: 2, textAlign: 'center', bgcolor: 'primary.50' }}>
+                              <Typography variant="h4" color="primary">
+                                {verificacionesStats.total}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                Total Verificaciones
+                              </Typography>
+                            </Paper>
+                          </Grid>
+                          <Grid item xs={12} sm={4}>
+                            <Paper variant="outlined" sx={{ p: 2, textAlign: 'center', bgcolor: 'info.50' }}>
+                              <Typography variant="h4" color="info.main">
+                                {verificacionesStats.porTipo.datos}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                Solo Datos
+                              </Typography>
+                            </Paper>
+                          </Grid>
+                          <Grid item xs={12} sm={4}>
+                            <Paper variant="outlined" sx={{ p: 2, textAlign: 'center', bgcolor: 'success.50' }}>
+                              <Typography variant="h4" color="success.main">
+                                {verificacionesStats.porTipo.pdf_completo}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                PDF Completo
+                              </Typography>
+                            </Paper>
+                          </Grid>
+                        </Grid>
+                      )}
+
+                      {/* Tabla de verificaciones recientes */}
+                      {verificaciones.length > 0 ? (
+                        <TableContainer sx={{ maxHeight: 400 }}>
+                          <Table size="small" stickyHeader>
+                            <TableHead>
+                              <TableRow>
+                                <TableCell>Fecha y Hora</TableCell>
+                                <TableCell>Tipo</TableCell>
+                                <TableCell>IP</TableCell>
+                                <TableCell>Dispositivo</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {verificaciones.map((verificacion) => (
+                                <TableRow key={verificacion.id} hover>
+                                  <TableCell>
+                                    <Typography variant="body2">
+                                      {formatDate(verificacion.timestamp)}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Chip
+                                      label={verificacion.tipoVerificacion === 'datos' ? 'Solo Datos' : 'PDF Completo'}
+                                      size="small"
+                                      color={verificacion.tipoVerificacion === 'datos' ? 'info' : 'success'}
+                                      variant="outlined"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                                      {verificacion.ipAddress || 'N/A'}
+                                    </Typography>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Tooltip title={verificacion.userAgent || 'N/A'}>
+                                      <Typography
+                                        variant="body2"
+                                        sx={{
+                                          maxWidth: 200,
+                                          overflow: 'hidden',
+                                          textOverflow: 'ellipsis',
+                                          whiteSpace: 'nowrap'
+                                        }}
+                                      >
+                                        {verificacion.userAgent ? (
+                                          verificacion.userAgent.includes('Mobile') ? '📱 Móvil' :
+                                          verificacion.userAgent.includes('Windows') ? '💻 Windows' :
+                                          verificacion.userAgent.includes('Mac') ? '🍎 Mac' :
+                                          verificacion.userAgent.includes('Linux') ? '🐧 Linux' :
+                                          '🖥️ Desconocido'
+                                        ) : 'N/A'}
+                                      </Typography>
+                                    </Tooltip>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </TableContainer>
+                      ) : (
+                        <Alert severity="info">
+                          No hay verificaciones registradas para este código QR.
+                        </Alert>
+                      )}
+
+                      {verificaciones.length > 0 && (
+                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 2 }}>
+                          Mostrando las últimas 20 verificaciones
+                        </Typography>
+                      )}
+                    </>
+                  )}
+                </Paper>
+              </Grid>
             </Grid>
           )}
         </DialogContent>

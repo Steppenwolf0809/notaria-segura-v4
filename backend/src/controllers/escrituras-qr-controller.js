@@ -8,11 +8,46 @@ import { parseEscrituraPDF, validatePDFFile, sanitizeFilename } from '../service
 import { generateUniqueToken } from '../utils/token-generator.js';
 import { generateQRInfo, generateMultiFormatQR } from '../services/qr-generator-service.js';
 import { uploadPhotoToFTP } from '../services/cpanel-ftp-service.js';
-import { 
-  uploadPDFToFTP, 
-  downloadPDFFromFTP, 
-  validatePDFFile as validatePDFBuffer 
+import {
+  uploadPDFToFTP,
+  downloadPDFFromFTP,
+  validatePDFFile as validatePDFBuffer
 } from '../services/cpanel-ftp-service.js';
+
+/**
+ * Registra una verificación de QR para auditoría
+ * @param {number} escrituraQRId - ID de la escritura QR
+ * @param {string} tipoVerificacion - "datos" o "pdf_completo"
+ * @param {Object} req - Request object de Express
+ */
+async function registrarVerificacion(escrituraQRId, tipoVerificacion, req) {
+  try {
+    // Extraer información del request
+    const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown';
+    const userAgent = req.get('User-Agent') || null;
+    const referrer = req.get('Referer') || req.get('Referrer') || null;
+
+    // Log para debugging
+    console.log(`[registrarVerificacion] Registrando: escrituraQRId=${escrituraQRId}, tipo=${tipoVerificacion}, ip=${ipAddress}`);
+
+    // Crear registro de verificación
+    await prisma.verificacionQR.create({
+      data: {
+        escrituraQRId: escrituraQRId,
+        tipoVerificacion: tipoVerificacion,
+        ipAddress: ipAddress,
+        userAgent: userAgent,
+        referrer: referrer
+        // country y city quedan null por ahora (geolocalización opcional para futuro)
+      }
+    });
+
+    console.log(`[registrarVerificacion] ✅ Verificación registrada exitosamente`);
+  } catch (error) {
+    // No queremos que falle la verificación si el logging falla
+    console.error('[registrarVerificacion] ⚠️ Error registrando verificación:', error.message);
+  }
+}
 
 /**
  * POST /api/escrituras/upload
@@ -915,10 +950,12 @@ export async function verifyEscritura(req, res) {
       cuantia: typeof datosPublicos.cuantia === 'number' ? `$${datosPublicos.cuantia}` : datosPublicos.cuantia,
       tienePDF: !!escritura.pdfFileName
     });
-    
-    // TODO: Registrar verificación para analytics
-    // await registrarVerificacion(token, req.ip, req.get('User-Agent'));
-    
+
+    // Registrar verificación para auditoría (no esperar, ejecutar en background)
+    registrarVerificacion(escritura.id, 'datos', req).catch(err => {
+      console.warn('[verifyEscritura] Error registrando verificación:', err.message);
+    });
+
     res.json({
       success: true,
       message: 'Escritura verificada exitosamente',
@@ -1455,8 +1492,13 @@ export async function getPDFPublic(req, res) {
     }).catch(err => {
       console.warn('[getPDFPublic] Error actualizando contador de vistas:', err.message);
     });
-    
-    // Registrar visualización (IP, fecha)
+
+    // Registrar verificación de PDF para auditoría (no esperar)
+    registrarVerificacion(escritura.id, 'pdf_completo', req).catch(err => {
+      console.warn('[getPDFPublic] Error registrando verificación:', err.message);
+    });
+
+    // Log de visualización
     const clientIP = req.ip || req.headers['x-forwarded-for'] || 'unknown';
     console.log(`[getPDFPublic] ✅ Redirigiendo a PDF. IP: ${clientIP}, Token: ${token.substring(0, 4)}****`);
     
@@ -2101,6 +2143,144 @@ export async function getAllQRForAdmin(req, res) {
     res.status(500).json({
       success: false,
       message: 'Error al obtener las escrituras',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+}
+
+/**
+ * GET /api/escrituras/admin/verificaciones/:id
+ * Obtiene el historial de verificaciones de una escritura QR específica
+ * Solo para ADMIN
+ */
+export async function getVerificaciones(req, res) {
+  try {
+    const { id } = req.params;
+    const userRole = req.user.role;
+
+    // Verificar que sea ADMIN
+    if (userRole !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo los administradores pueden acceder a esta información'
+      });
+    }
+
+    // Parámetros de consulta
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const tipoVerificacion = req.query.tipo; // 'datos' o 'pdf_completo'
+
+    const skip = (page - 1) * limit;
+
+    // Verificar que la escritura existe
+    const escritura = await prisma.escrituraQR.findUnique({
+      where: { id: parseInt(id) },
+      select: {
+        id: true,
+        token: true,
+        numeroEscritura: true
+      }
+    });
+
+    if (!escritura) {
+      return res.status(404).json({
+        success: false,
+        message: 'Escritura no encontrada'
+      });
+    }
+
+    // Construir filtros
+    const where = {
+      escrituraQRId: parseInt(id)
+    };
+
+    if (tipoVerificacion) {
+      where.tipoVerificacion = tipoVerificacion;
+    }
+
+    console.log(`[getVerificaciones] Obteniendo verificaciones de escritura ${id}`);
+
+    // Obtener verificaciones con paginación
+    const [verificaciones, total, stats] = await Promise.all([
+      prisma.verificacionQR.findMany({
+        where,
+        orderBy: { timestamp: 'desc' },
+        skip,
+        take: limit
+      }),
+      prisma.verificacionQR.count({ where }),
+      // Estadísticas adicionales
+      prisma.verificacionQR.groupBy({
+        by: ['tipoVerificacion'],
+        where: { escrituraQRId: parseInt(id) },
+        _count: {
+          id: true
+        }
+      })
+    ]);
+
+    // Calcular estadísticas por tipo
+    const estadisticasPorTipo = {
+      datos: 0,
+      pdf_completo: 0
+    };
+
+    stats.forEach(stat => {
+      estadisticasPorTipo[stat.tipoVerificacion] = stat._count.id;
+    });
+
+    // Obtener países únicos (si hay datos de geolocalización)
+    const paisesUnicos = await prisma.verificacionQR.groupBy({
+      by: ['country'],
+      where: {
+        escrituraQRId: parseInt(id),
+        country: { not: null }
+      },
+      _count: {
+        id: true
+      },
+      orderBy: {
+        _count: {
+          id: 'desc'
+        }
+      },
+      take: 10
+    });
+
+    console.log(`[getVerificaciones] ✅ Retornando ${verificaciones.length} de ${total} verificaciones`);
+
+    res.json({
+      success: true,
+      data: {
+        escritura: {
+          id: escritura.id,
+          token: escritura.token,
+          numeroEscritura: escritura.numeroEscritura
+        },
+        verificaciones: verificaciones,
+        estadisticas: {
+          total: total,
+          porTipo: estadisticasPorTipo,
+          porPais: paisesUnicos.map(p => ({
+            pais: p.country,
+            cantidad: p._count.id
+          }))
+        },
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('[getVerificaciones] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener las verificaciones',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
