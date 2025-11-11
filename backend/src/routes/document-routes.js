@@ -130,6 +130,12 @@ router.post('/:id/deliver', authenticateToken, deliverDocument);
 // GET /api/documents/matrizadores - CAJA/ADMIN: Lista de matrizadores disponibles
 router.get('/matrizadores', authenticateToken, getAvailableMatrizadores);
 
+// 🗑️ DELETE /api/documents/:id - ADMIN ONLY: Eliminar documento completamente
+router.delete('/:id', authenticateToken, async (req, res, next) => {
+  const { deleteDocument } = await import('../controllers/document-controller.js');
+  return deleteDocument(req, res, next);
+});
+
 // GET /api/documents/:id - Detalle documento (según permisos por rol)
 router.get('/:id', authenticateToken, getDocumentById);
 

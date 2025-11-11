@@ -4501,6 +4501,143 @@ async function getDocumentsCounts(req, res) {
   }
 }
 
+/**
+ * 🗑️ Eliminar documento completamente (solo ADMIN)
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+async function deleteDocument(req, res) {
+  try {
+    // ⭐ VALIDACIÓN: Solo ADMIN puede eliminar documentos
+    if (req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo administradores pueden eliminar documentos'
+      });
+    }
+
+    const { id } = req.params;
+
+    // Validar que el ID sea válido
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID de documento requerido'
+      });
+    }
+
+    // Obtener documento antes de eliminarlo para auditoría
+    const document = await prisma.document.findUnique({
+      where: { id },
+      include: {
+        createdBy: {
+          select: { id: true, firstName: true, lastName: true, email: true }
+        },
+        assignedTo: {
+          select: { id: true, firstName: true, lastName: true, email: true }
+        }
+      }
+    });
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Documento no encontrado'
+      });
+    }
+
+    // Log del documento a eliminar
+    console.log('🗑️ Documento a eliminar:', {
+      id: document.id,
+      protocolNumber: document.protocolNumber,
+      clientName: document.clientName,
+      status: document.status,
+      createdBy: document.createdBy?.firstName + ' ' + document.createdBy?.lastName
+    });
+
+    // 📈 Registrar evento de eliminación ANTES de borrar
+    try {
+      await prisma.documentEvent.create({
+        data: {
+          documentId: document.id,
+          userId: req.user.id,
+          eventType: 'DOCUMENT_DELETED',
+          description: `Documento eliminado completamente por ${req.user.firstName} ${req.user.lastName} (ADMIN)`,
+          details: JSON.stringify({
+            deletedBy: {
+              id: req.user.id,
+              name: `${req.user.firstName} ${req.user.lastName}`,
+              email: req.user.email,
+              role: req.user.role
+            },
+            deletedDocument: {
+              id: document.id,
+              protocolNumber: document.protocolNumber,
+              clientName: document.clientName,
+              documentType: document.documentType,
+              status: document.status,
+              createdBy: document.createdBy ? `${document.createdBy.firstName} ${document.createdBy.lastName}` : 'N/A',
+              assignedTo: document.assignedTo ? `${document.assignedTo.firstName} ${document.assignedTo.lastName}` : 'Sin asignar',
+              totalFactura: document.totalFactura
+            },
+            timestamp: new Date().toISOString(),
+            reason: req.body.reason || 'Sin especificar'
+          }),
+          ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown'
+        }
+      });
+    } catch (auditError) {
+      console.error('Error registrando eliminación en auditoría:', auditError);
+      // No fallar la eliminación si hay error en auditoría
+    }
+
+    // ⭐ ELIMINAR DOCUMENTO: Primero eliminar eventos asociados, luego el documento
+    await prisma.documentEvent.deleteMany({
+      where: { documentId: id }
+    });
+
+    // Eliminar notificaciones asociadas
+    await prisma.whatsAppNotification.deleteMany({
+      where: { documentId: id }
+    });
+
+    // Finalmente eliminar el documento
+    const deletedDocument = await prisma.document.delete({
+      where: { id }
+    });
+
+    console.log(`✅ Documento ${id} eliminado completamente por ${req.user.firstName} ${req.user.lastName}`);
+
+    res.json({
+      success: true,
+      message: `Documento "${deletedDocument.protocolNumber}" eliminado completamente`,
+      data: {
+        id: deletedDocument.id,
+        protocolNumber: deletedDocument.protocolNumber,
+        clientName: deletedDocument.clientName,
+        deletedAt: new Date().toISOString(),
+        deletedBy: {
+          id: req.user.id,
+          name: `${req.user.firstName} ${req.user.lastName}`,
+          role: req.user.role
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('💥 Error eliminando documento:', error);
+
+    const errorMessage = error.message || 'Error al eliminar documento';
+
+    res.status(500).json({
+      success: false,
+      message: errorMessage,
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+}
+
 export {
   uploadXmlDocument,
   uploadXmlDocumentsBatch,
@@ -4544,5 +4681,7 @@ export {
   getDocumentsUnified,
   getDocumentsCounts,
   // 💳 NUEVA FUNCIONALIDAD: Nota de Crédito
-  markAsNotaCredito
+  markAsNotaCredito,
+  // 🗑️ NUEVA FUNCIONALIDAD: Eliminar documento (ADMIN ONLY)
+  deleteDocument
 };

@@ -1113,6 +1113,46 @@ const documentService = {
         message: errorMessage
       };
     }
+  },
+
+  /**
+   * 🗑️ Eliminar documento completamente (ADMIN ONLY)
+   * @param {string} documentId - ID del documento a eliminar
+   * @param {string} reason - Razón de la eliminación (opcional)
+   * @returns {Promise<Object>} Resultado de la eliminación
+   */
+  async deleteDocument(documentId, reason = '') {
+    try {
+      console.log('🗑️ Eliminando documento completamente:', { documentId, reason });
+
+      const response = await api.delete(`/documents/${documentId}`, {
+        data: { reason }  // Enviar razón en el body de DELETE
+      });
+
+      console.log('✅ Documento eliminado exitosamente:', response.data);
+
+      return {
+        success: true,
+        data: response.data.data || response.data,
+        message: response.data.message || 'Documento eliminado completamente'
+      };
+    } catch (error) {
+      console.error('❌ Error eliminando documento:', {
+        status: error.response?.status,
+        message: error.response?.data?.message,
+        fullError: error.message
+      });
+
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Error al eliminar documento';
+
+      return {
+        success: false,
+        error: errorMessage,
+        message: errorMessage
+      };
+    }
   }
 };
 
