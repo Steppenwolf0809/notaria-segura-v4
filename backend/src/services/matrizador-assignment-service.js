@@ -54,8 +54,8 @@ class MatrizadorAssignmentService {
 
       // 1. Buscar coincidencia exacta (nombre completo)
       const coincidenciaExacta = matrizadores.find(matrizador => {
-        const nombreCompleto = `${matrizador.firstName} ${matrizador.lastName}`.toLowerCase();
-        return nombreCompleto === nombreLimpio.toLowerCase();
+        const nombreCompleto = this.normalizeMatrizadorName(`${matrizador.firstName} ${matrizador.lastName}`);
+        return nombreCompleto === nombreLimpio;
       });
 
       if (coincidenciaExacta) {
@@ -123,6 +123,7 @@ class MatrizadorAssignmentService {
       .trim()
       .replace(/\s+/g, ' ') // Múltiples espacios a uno solo
       .replace(/[^\w\sáéíóúüñ]/gi, '') // Remover caracteres especiales
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // Remover acentos/tildes
       .toLowerCase();
   }
 
@@ -135,7 +136,9 @@ class MatrizadorAssignmentService {
    */
   matchesPartialName(nombreXml, firstName, lastName) {
     const palabrasXml = nombreXml.toLowerCase().split(' ');
-    const palabrasUsuario = `${firstName} ${lastName}`.toLowerCase().split(' ');
+    // Normalizar el nombre del usuario para remover acentos
+    const nombreUsuarioNormalizado = this.normalizeMatrizadorName(`${firstName} ${lastName}`);
+    const palabrasUsuario = nombreUsuarioNormalizado.split(' ');
 
     // Verificar que al menos coincida el primer nombre
     const primerNombreXml = palabrasXml[0];
@@ -220,7 +223,7 @@ class MatrizadorAssignmentService {
             userId: originalDocument.createdById, // Usuario que creó el documento
             eventType: 'DOCUMENT_ASSIGNED',
             description: `Documento asignado automáticamente a ${matrizador.firstName} ${matrizador.lastName} (${matrizador.role})`,
-            details: {
+            details: JSON.stringify({
               assignedFrom: originalDocument.assignedToId,
               assignedTo: matrizador.id,
               matrizadorName: `${matrizador.firstName} ${matrizador.lastName}`,
@@ -230,7 +233,7 @@ class MatrizadorAssignmentService {
               assignmentType: 'AUTOMATIC',
               xmlMatrizadorName: matrizadorNameFromXml,
               timestamp: new Date().toISOString()
-            },
+            }),
             ipAddress: 'system',
             userAgent: 'auto-assignment-service'
           }
