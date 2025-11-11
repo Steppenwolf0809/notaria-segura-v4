@@ -102,7 +102,7 @@ async function uploadXmlDocument(req, res) {
           userId: req.user.id,
           eventType: 'DOCUMENT_CREATED',
           description: `Documento creado desde XML por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
-          details: {
+          details: JSON.stringify({
             protocolNumber: parsedData.protocolNumber,
             documentType: parsedData.documentType,
             clientName: parsedData.clientName,
@@ -111,7 +111,7 @@ async function uploadXmlDocument(req, res) {
             fileSize: req.file.size,
             totalFactura: parsedData.totalFactura,
             timestamp: new Date().toISOString()
-          },
+          }),
           ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
           userAgent: req.get('User-Agent') || 'unknown'
         }
@@ -152,14 +152,14 @@ async function uploadXmlDocument(req, res) {
             userId: req.user.id,
             eventType: 'EXTRACTION_SNAPSHOT',
             description: `Snapshot extracción avanzada (auto) al crear desde XML` ,
-            details: {
+            details: JSON.stringify({
               acts: actos.acts,
               parties,
               signals: base.fields.filter(f => ['valor_operacion','forma_pago','articulo_29'].includes(f.fieldName)),
               confidence: base.confidence,
               meta: base.metadata,
               extractor: 'advanced-actos-v1'
-            },
+            }),
             ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
             userAgent: req.get('User-Agent') || 'unknown'
           }
