@@ -77,7 +77,9 @@ async function uploadXmlDocument(req, res) {
         actoPrincipalValor: parsedData.actoPrincipalValor,
         totalFactura: parsedData.totalFactura,
         matrizadorName: parsedData.matrizadorName,
-        itemsSecundarios: parsedData.itemsSecundarios,
+        itemsSecundarios: Array.isArray(parsedData.itemsSecundarios) && parsedData.itemsSecundarios.length > 0
+          ? JSON.stringify(parsedData.itemsSecundarios)
+          : null,
         xmlOriginal: parsedData.xmlOriginal,
         createdById: req.user.id
         // assignedToId será null inicialmente, se asignará automáticamente después
