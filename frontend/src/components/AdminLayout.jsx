@@ -34,7 +34,8 @@ import {
   WhatsApp as WhatsAppIcon,
   ExpandMore as ExpandMoreIcon,
   ChevronRight as ChevronRightIcon,
-  Description as DescriptionIcon
+  Description as DescriptionIcon,
+  QrCode as QrCodeIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import useThemeStore from '../store/theme-store';
@@ -121,6 +122,7 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
     Dashboard: <DashboardIcon />,
     Person: <PersonIcon />,
     Description: <DescriptionIcon />,
+    QrCode: <QrCodeIcon />,
     Notifications: <NotificationsIcon />,
     Settings: <SettingsIcon />,
     WhatsApp: <WhatsAppIcon />

@@ -25,6 +25,7 @@ import NotificationSettings from './admin/NotificationSettings';
 import NotificationTemplates from './admin/NotificationTemplates';
 import WhatsAppTemplates from './admin/WhatsAppTemplates';
 import AdminSettings from './admin/AdminSettings';
+import AdminQRDashboard from './admin/AdminQRDashboard';
 
 /**
  * Centro de administración - Panel principal para ADMIN
@@ -47,25 +48,28 @@ const AdminCenter = () => {
     switch (currentView) {
       case 'dashboard':
         return <AdminDashboard />;
-      
+
       case 'users':
         return <UserManagement />;
-      
+
       case 'documents':
         return <DocumentOversight />;
-      
+
+      case 'qr-dashboard':
+        return <AdminQRDashboard />;
+
       case 'notifications':
         return <NotificationHistory />;
-      
+
       case 'notification-templates':
         return <NotificationTemplates />;
-      
+
       case 'whatsapp-templates':
         return <WhatsAppTemplates />;
-      
+
       case 'settings':
         return <AdminSettings />;
-      
+
       default:
         return <AdminDashboard />;
     }

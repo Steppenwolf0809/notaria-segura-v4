@@ -20,7 +20,9 @@ import {
   getPDFPublic,
   getPDFPrivate,
   getPDFMetadata,
-  updatePDFHiddenPages
+  updatePDFHiddenPages,
+  getQRStatistics,
+  getAllQRForAdmin
 } from '../controllers/escrituras-qr-controller.js';
 
 const router = express.Router();
@@ -71,6 +73,23 @@ router.get('/verify/:token/pdf', getPDFPublic);
 /**
  * RUTAS PROTEGIDAS (requieren autenticación)
  */
+
+/**
+ * RUTAS DE ADMINISTRACIÓN (solo ADMIN)
+ * IMPORTANTE: Estas rutas deben ir ANTES de las rutas con parámetros dinámicos (:id)
+ */
+
+// GET /api/escrituras/admin/statistics - Obtener estadísticas de QR (solo admin)
+router.get('/admin/statistics',
+  authenticateToken,
+  getQRStatistics
+);
+
+// GET /api/escrituras/admin/all - Listar todos los QR del sistema (solo admin)
+router.get('/admin/all',
+  authenticateToken,
+  getAllQRForAdmin
+);
 
 // POST /api/escrituras/upload - Subir PDF y generar QR (solo matrizadores)
 // Acepta 'pdfFile' (obligatorio) y 'foto' (opcional)

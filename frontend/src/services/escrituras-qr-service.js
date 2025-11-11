@@ -582,44 +582,103 @@ export function getPDFInfo(escritura) {
 export function validatePDFFileUpload(file) {
   const errors = [];
   const warnings = [];
-  
+
   // Verificar que sea un archivo
   if (!file) {
     errors.push('No se ha seleccionado ningún archivo');
     return { isValid: false, errors, warnings };
   }
-  
+
   // Verificar extensión
   const extension = file.name.split('.').pop().toLowerCase();
   if (extension !== 'pdf') {
     errors.push('El archivo debe tener extensión .pdf');
   }
-  
+
   // Verificar tipo MIME
   if (file.type !== 'application/pdf' && file.type !== '') {
     errors.push('El archivo debe ser un PDF válido');
   }
-  
+
   // Verificar tamaño máximo (10MB)
   const maxSize = 10 * 1024 * 1024; // 10MB
   if (file.size > maxSize) {
     const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
     errors.push(`El archivo es demasiado grande (${sizeMB}MB). Máximo permitido: 10MB`);
   }
-  
+
   // Verificar tamaño mínimo (10KB)
   if (file.size < 10 * 1024) {
     errors.push('El archivo parece ser demasiado pequeño para ser un PDF válido');
   }
-  
+
   // Advertencias
   if (file.size > 7 * 1024 * 1024) { // Mayor a 7MB
     warnings.push('El archivo es grande, la subida puede tomar varios segundos');
   }
-  
+
   return {
     isValid: errors.length === 0,
     errors,
     warnings
   };
+}
+
+// ========================================
+// FUNCIONES DE ADMINISTRACIÓN (solo ADMIN)
+// ========================================
+
+/**
+ * Obtiene estadísticas de códigos QR para el panel de administración
+ * Solo para ADMIN
+ * @returns {Promise<Object>} Estadísticas completas de QR
+ */
+export async function getQRStatistics() {
+  try {
+    const response = await apiClient.get('/escrituras/admin/statistics');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching QR statistics:', error);
+    throw new Error(
+      error.response?.data?.message ||
+      'Error al obtener estadísticas de QR'
+    );
+  }
+}
+
+/**
+ * Obtiene todos los QR del sistema con filtros (solo para ADMIN)
+ * @param {Object} params - Parámetros de consulta
+ * @param {number} params.page - Página actual
+ * @param {number} params.limit - Elementos por página
+ * @param {string} params.estado - Filtro por estado
+ * @param {string} params.search - Término de búsqueda
+ * @param {number} params.userId - Filtro por ID de usuario
+ * @param {string} params.origenDatos - Filtro por origen ('PDF' o 'MANUAL')
+ * @param {boolean} params.conPDF - Filtro por si tiene PDF completo
+ * @returns {Promise<Object>} Lista de todos los QR con paginación
+ */
+export async function getAllQRForAdmin(params = {}) {
+  try {
+    const queryParams = new URLSearchParams();
+
+    if (params.page) queryParams.append('page', params.page);
+    if (params.limit) queryParams.append('limit', params.limit);
+    if (params.estado) queryParams.append('estado', params.estado);
+    if (params.search) queryParams.append('search', params.search);
+    if (params.userId) queryParams.append('userId', params.userId);
+    if (params.origenDatos) queryParams.append('origenDatos', params.origenDatos);
+    if (params.conPDF !== undefined && params.conPDF !== null) {
+      queryParams.append('conPDF', params.conPDF);
+    }
+
+    const response = await apiClient.get(`/escrituras/admin/all?${queryParams.toString()}`);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching all QR for admin:', error);
+    throw new Error(
+      error.response?.data?.message ||
+      'Error al obtener los códigos QR'
+    );
+  }
 }

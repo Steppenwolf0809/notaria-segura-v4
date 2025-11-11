@@ -22,6 +22,7 @@ export const navItemsByRole = {
     { id: 'dashboard', label: 'Panel de Control', view: 'dashboard', icon: 'Dashboard' },
     { id: 'users', label: 'Gestión de Usuarios', view: 'users', icon: 'Person' },
     { id: 'documents', label: 'Supervisión Documentos', view: 'documents', icon: 'Description' },
+    { id: 'qr-dashboard', label: 'Admin QR Escrituras', view: 'qr-dashboard', icon: 'QrCode' },
     { id: 'notifications', label: 'Notificaciones', view: 'notifications', icon: 'Notifications' },
     { id: 'settings', label: 'Configuración', view: 'settings', icon: 'Settings' },
     { id: 'whatsapp-templates', label: 'Templates WhatsApp', view: 'whatsapp-templates', icon: 'WhatsApp' }

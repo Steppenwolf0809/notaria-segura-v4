@@ -1666,9 +1666,9 @@ export async function getPDFPrivate(req, res) {
     const { id } = req.params;
     const userId = req.user.id;
     const userRole = req.user.role;
-    
+
     console.log(`[getPDFPrivate] Usuario ${userId} (${userRole}) solicitando PDF de escritura ${id}`);
-    
+
     // Verificar permisos
     if (userRole !== 'ADMIN' && userRole !== 'MATRIZADOR') {
       return res.status(403).json({
@@ -1676,19 +1676,19 @@ export async function getPDFPrivate(req, res) {
         message: 'No tienes permisos para acceder a este PDF'
       });
     }
-    
+
     // Buscar escritura
     const escritura = await prisma.escrituraQR.findUnique({
       where: { id: parseInt(id) }
     });
-    
+
     if (!escritura) {
       return res.status(404).json({
         success: false,
         message: 'Escritura no encontrada'
       });
     }
-    
+
     // Verificar que tenga PDF subido
     if (!escritura.pdfFileName) {
       return res.status(404).json({
@@ -1696,26 +1696,26 @@ export async function getPDFPrivate(req, res) {
         message: 'Esta escritura no tiene un PDF subido'
       });
     }
-    
+
     // Descargar PDF del FTP
     console.log(`[getPDFPrivate] Descargando PDF del FTP: ${escritura.pdfFileName}`);
     const pdfBuffer = await downloadPDFFromFTP(escritura.pdfFileName);
-    
+
     console.log(`[getPDFPrivate] ✅ PDF servido exitosamente a usuario ${userId}`);
-    
+
     // Configurar headers para visualización inline
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'inline');
     res.setHeader('Cache-Control', 'private, max-age=3600');
     res.setHeader('Content-Length', pdfBuffer.length);
-    
+
     // Enviar el PDF
     res.send(pdfBuffer);
-    
+
   } catch (error) {
     console.error('[getPDFPrivate] Error completo:', error);
     console.error('[getPDFPrivate] Stack trace:', error.stack);
-    
+
     // Errores específicos del FTP
     if (error.message.includes('PDF no encontrado') || error.message.includes('not found')) {
       return res.status(404).json({
@@ -1723,19 +1723,385 @@ export async function getPDFPrivate(req, res) {
         message: 'El archivo PDF no se encuentra en el servidor FTP'
       });
     }
-    
+
     if (error.message.includes('FTP') || error.message.includes('timeout')) {
       return res.status(503).json({
         success: false,
         message: 'Error al conectar con el servidor de archivos. Intenta nuevamente en unos momentos.'
       });
     }
-    
+
     res.status(500).json({
       success: false,
       message: 'Error al obtener el PDF',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined,
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+}
+
+/**
+ * GET /api/escrituras/admin/statistics
+ * Obtiene estadísticas de códigos QR para el panel de administración
+ * Solo para ADMIN
+ */
+export async function getQRStatistics(req, res) {
+  try {
+    const userRole = req.user.role;
+
+    // Verificar que sea ADMIN
+    if (userRole !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo los administradores pueden acceder a las estadísticas'
+      });
+    }
+
+    // Obtener fecha de inicio del mes actual
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    console.log(`[getQRStatistics] Calculando estadísticas. Mes actual: ${startOfMonth.toISOString()} - ${endOfMonth.toISOString()}`);
+
+    // Obtener estadísticas en paralelo
+    const [
+      totalQR,
+      qrEsteMes,
+      qrActivos,
+      qrInactivos,
+      qrRevision,
+      qrPorUsuario,
+      qrPorEstado,
+      qrConPDF,
+      totalVerificaciones
+    ] = await Promise.all([
+      // Total de QR creados
+      prisma.escrituraQR.count(),
+
+      // QR creados este mes
+      prisma.escrituraQR.count({
+        where: {
+          createdAt: {
+            gte: startOfMonth,
+            lte: endOfMonth
+          }
+        }
+      }),
+
+      // QR activos
+      prisma.escrituraQR.count({
+        where: { estado: 'activo' }
+      }),
+
+      // QR inactivos
+      prisma.escrituraQR.count({
+        where: { estado: 'inactivo' }
+      }),
+
+      // QR en revisión
+      prisma.escrituraQR.count({
+        where: { estado: 'revision_requerida' }
+      }),
+
+      // QR agrupados por usuario (top 5)
+      prisma.escrituraQR.groupBy({
+        by: ['createdBy'],
+        _count: {
+          id: true
+        },
+        orderBy: {
+          _count: {
+            id: 'desc'
+          }
+        },
+        take: 5
+      }),
+
+      // QR agrupados por estado
+      prisma.escrituraQR.groupBy({
+        by: ['estado'],
+        _count: {
+          id: true
+        }
+      }),
+
+      // QR con PDF completo subido
+      prisma.escrituraQR.count({
+        where: {
+          pdfFileName: {
+            not: null
+          }
+        }
+      }),
+
+      // Total de verificaciones (suma de pdfViewCount)
+      prisma.escrituraQR.aggregate({
+        _sum: {
+          pdfViewCount: true
+        }
+      })
+    ]);
+
+    // Obtener información de usuarios para el top
+    const userIds = qrPorUsuario.map(item => item.createdBy).filter(id => id !== null);
+    const usuarios = await prisma.user.findMany({
+      where: {
+        id: { in: userIds }
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        email: true
+      }
+    });
+
+    // Mapear usuarios con su conteo
+    const topUsuarios = qrPorUsuario.map(item => {
+      const usuario = usuarios.find(u => u.id === item.createdBy);
+      return {
+        usuario: usuario ? {
+          id: usuario.id,
+          nombre: `${usuario.firstName} ${usuario.lastName}`,
+          email: usuario.email
+        } : {
+          id: null,
+          nombre: 'Sin usuario',
+          email: 'N/A'
+        },
+        cantidad: item._count.id
+      };
+    });
+
+    // Calcular QR restantes del mes (límite de 100)
+    const limiteDelMes = 100;
+    const qrRestantes = Math.max(0, limiteDelMes - qrEsteMes);
+    const porcentajeUsado = Math.min(100, (qrEsteMes / limiteDelMes) * 100);
+
+    console.log(`[getQRStatistics] ✅ Estadísticas calculadas: Total=${totalQR}, EsteMes=${qrEsteMes}/${limiteDelMes}, Restantes=${qrRestantes}`);
+
+    res.json({
+      success: true,
+      data: {
+        // Resumen general
+        total: totalQR,
+        esteMes: qrEsteMes,
+        limiteDelMes: limiteDelMes,
+        qrRestantes: qrRestantes,
+        porcentajeUsado: Math.round(porcentajeUsado * 100) / 100,
+
+        // Por estado
+        porEstado: {
+          activos: qrActivos,
+          inactivos: qrInactivos,
+          revision: qrRevision
+        },
+
+        // Distribución de estados (para gráficos)
+        distribucionEstados: qrPorEstado.map(item => ({
+          estado: item.estado,
+          cantidad: item._count.id
+        })),
+
+        // Top usuarios
+        topUsuarios: topUsuarios,
+
+        // Métricas adicionales
+        metricas: {
+          conPDFCompleto: qrConPDF,
+          totalVerificaciones: totalVerificaciones._sum.pdfViewCount || 0,
+          promedioVerificacionesPorQR: totalQR > 0
+            ? Math.round(((totalVerificaciones._sum.pdfViewCount || 0) / totalQR) * 100) / 100
+            : 0
+        },
+
+        // Metadata
+        periodoActual: {
+          inicio: startOfMonth,
+          fin: endOfMonth,
+          mes: now.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
+        },
+        generadoEn: new Date()
+      }
+    });
+
+  } catch (error) {
+    console.error('[getQRStatistics] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener estadísticas',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+}
+
+/**
+ * GET /api/escrituras/admin/all
+ * Lista todos los QR del sistema con filtros y búsqueda (solo para ADMIN)
+ * Versión mejorada del getEscrituras específica para el dashboard de administración
+ */
+export async function getAllQRForAdmin(req, res) {
+  try {
+    const userRole = req.user.role;
+
+    // Verificar que sea ADMIN
+    if (userRole !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo los administradores pueden acceder a esta información'
+      });
+    }
+
+    // Parámetros de consulta
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 25;
+    const estado = req.query.estado;
+    const search = req.query.search;
+    const userId = req.query.userId ? parseInt(req.query.userId) : null;
+    const origenDatos = req.query.origenDatos; // 'PDF' o 'MANUAL'
+    const conPDF = req.query.conPDF === 'true' ? true : (req.query.conPDF === 'false' ? false : null);
+
+    const skip = (page - 1) * limit;
+
+    // Construir filtros
+    const where = {};
+
+    if (estado) {
+      where.estado = estado;
+    }
+
+    if (userId) {
+      where.createdBy = userId;
+    }
+
+    if (origenDatos) {
+      where.origenDatos = origenDatos;
+    }
+
+    if (conPDF !== null) {
+      if (conPDF) {
+        where.pdfFileName = { not: null };
+      } else {
+        where.pdfFileName = null;
+      }
+    }
+
+    if (search) {
+      where.OR = [
+        { numeroEscritura: { contains: search, mode: 'insensitive' } },
+        { archivoOriginal: { contains: search, mode: 'insensitive' } },
+        { token: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+
+    console.log(`[getAllQRForAdmin] Filtros aplicados:`, JSON.stringify(where, null, 2));
+
+    // Obtener escrituras con paginación
+    const [escrituras, total] = await Promise.all([
+      prisma.escrituraQR.findMany({
+        where,
+        include: {
+          creador: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              role: true
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit
+      }),
+      prisma.escrituraQR.count({ where })
+    ]);
+
+    // Parsear datosCompletos y agregar información adicional
+    const escriturasConInfo = escrituras.map(esc => {
+      let datosCompletosParsed = esc.datosCompletos;
+      if (typeof datosCompletosParsed === 'string') {
+        try {
+          datosCompletosParsed = JSON.parse(datosCompletosParsed);
+        } catch (e) {
+          console.warn(`[getAllQRForAdmin] No se pudo parsear datosCompletos de escritura ${esc.id}`);
+        }
+      }
+
+      // Parsear páginas ocultas
+      let hiddenPages = [];
+      if (esc.pdfHiddenPages) {
+        try {
+          hiddenPages = JSON.parse(esc.pdfHiddenPages);
+        } catch (e) {
+          hiddenPages = [];
+        }
+      }
+
+      // Extraer acto del datosCompletos
+      const acto = datosCompletosParsed?.acto || datosCompletosParsed?.actoContrato || 'N/A';
+
+      return {
+        id: esc.id,
+        token: esc.token,
+        numeroEscritura: esc.numeroEscritura,
+        acto: acto,
+        estado: esc.estado,
+        origenDatos: esc.origenDatos,
+        archivoOriginal: esc.archivoOriginal,
+
+        // Info del creador
+        creador: esc.creador ? {
+          id: esc.creador.id,
+          nombre: `${esc.creador.firstName} ${esc.creador.lastName}`,
+          email: esc.creador.email,
+          role: esc.creador.role
+        } : null,
+
+        // Info del PDF
+        tienePDF: !!esc.pdfFileName,
+        pdfFileName: esc.pdfFileName,
+        pdfFileSize: esc.pdfFileSize,
+        pdfViewCount: esc.pdfViewCount || 0,
+        pdfHiddenPages: hiddenPages,
+
+        // Info de foto
+        tieneFoto: !!esc.fotoURL,
+        fotoURL: esc.fotoURL,
+
+        // Fechas
+        createdAt: esc.createdAt,
+        updatedAt: esc.updatedAt,
+        pdfUploadedAt: esc.pdfUploadedAt,
+
+        // Datos completos (solo si se necesitan)
+        datosCompletos: datosCompletosParsed
+      };
+    });
+
+    console.log(`[getAllQRForAdmin] ✅ Retornando ${escrituras.length} de ${total} escrituras (página ${page}/${Math.ceil(total / limit)})`);
+
+    res.json({
+      success: true,
+      data: {
+        escrituras: escriturasConInfo,
+        pagination: {
+          page,
+          limit,
+          total,
+          pages: Math.ceil(total / limit)
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('[getAllQRForAdmin] Error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener las escrituras',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 }
