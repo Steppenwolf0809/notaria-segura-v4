@@ -59,7 +59,7 @@ import {
   OpenInNew as OpenInNewIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
-import { QRCodeSVG } from 'qrcode.react';
+import QRCode from 'react-qr-code';
 
 // Servicios
 import {
@@ -283,7 +283,10 @@ const AdminQRDashboard = () => {
    * Descarga el QR como imagen
    */
   const handleDownloadQR = (token) => {
-    const svg = document.getElementById(`qr-svg-${token}`);
+    const container = document.getElementById(`qr-svg-${token}`);
+    if (!container) return;
+
+    const svg = container.querySelector('svg');
     if (!svg) return;
 
     const svgData = new XMLSerializer().serializeToString(svg);
@@ -845,13 +848,13 @@ const AdminQRDashboard = () => {
                   🔲 Código QR
                 </Typography>
                 <Paper variant="outlined" sx={{ p: 3, textAlign: 'center' }}>
-                  <QRCodeSVG
-                    id={`qr-svg-${selectedEscritura.token}`}
-                    value={generateVerificationURL(selectedEscritura.token)}
-                    size={200}
-                    level="M"
-                    includeMargin={true}
-                  />
+                  <div id={`qr-svg-${selectedEscritura.token}`}>
+                    <QRCode
+                      value={generateVerificationURL(selectedEscritura.token)}
+                      size={200}
+                      level="M"
+                    />
+                  </div>
                   <Box sx={{ mt: 2, display: 'flex', gap: 1, justifyContent: 'center', flexWrap: 'wrap' }}>
                     <Button
                       size="small"
