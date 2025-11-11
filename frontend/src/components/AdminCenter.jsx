@@ -55,7 +55,7 @@ const AdminCenter = () => {
       case 'documents':
         return <DocumentOversight />;
 
-      case 'escrituras-qr':
+      case 'gestionar-qr':
         return <EscrituraQRManagement />;
 
       case 'notifications':
