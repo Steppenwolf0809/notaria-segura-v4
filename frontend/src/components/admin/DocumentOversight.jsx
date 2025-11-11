@@ -54,11 +54,13 @@ import {
   SwapHoriz as ReassignIcon,
   Timeline as TimelineIcon,
   Group as GroupIcon,
-  Clear as ClearIcon
+  Clear as ClearIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { useDebounce } from '../../hooks/useDebounce';
 import useAuthStore from '../../store/auth-store';
+import documentService from '../../services/document-service';
 import DocumentStatusTimeline from './DocumentStatusTimeline';
 import BulkOperationsDialog from './BulkOperationsDialog';
 
@@ -94,6 +96,7 @@ const DocumentOversight = () => {
   const [selectedDocumentForTimeline, setSelectedDocumentForTimeline] = useState(null);
   const [showBulkOperations, setShowBulkOperations] = useState(false);
   const [matrizadores, setMatrizadores] = useState([]);
+  const [deleteDialog, setDeleteDialog] = useState({ open: false, documentId: null, documentInfo: null });
 
   // Debounce para búsqueda
   const debouncedSearch = useDebounce(search, 500);
@@ -235,6 +238,44 @@ const DocumentOversight = () => {
       setSelectedDocuments([]);
     } else {
       setSelectedDocuments(documents.map(doc => doc.id));
+    }
+  };
+
+  /**
+   * Abrir dialogo de confirmación para eliminar documento
+   */
+  const handleOpenDeleteDialog = (document) => {
+    setDeleteDialog({
+      open: true,
+      documentId: document.id,
+      documentInfo: {
+        protocolNumber: document.protocolNumber,
+        clientName: document.clientName,
+        documentType: document.documentType
+      }
+    });
+  };
+
+  /**
+   * Confirmar y ejecutar eliminación de documento
+   */
+  const handleConfirmDelete = async () => {
+    try {
+      const { documentId, documentInfo } = deleteDialog;
+
+      const result = await documentService.deleteDocument(documentId, 'Eliminado por administrador');
+
+      if (result.success) {
+        setDeleteDialog({ open: false, documentId: null, documentInfo: null });
+        toast.success(`Documento "${documentInfo.protocolNumber}" eliminado completamente`);
+        // Recargar la lista de documentos
+        loadDocuments();
+      } else {
+        toast.error(result.error || 'Error al eliminar el documento');
+      }
+    } catch (error) {
+      console.error('Error eliminando documento:', error);
+      toast.error('Error al eliminar el documento');
     }
   };
 
@@ -721,6 +762,15 @@ const DocumentOversight = () => {
                             <TimelineIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
+                        <Tooltip title="Eliminar documento">
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => handleOpenDeleteDialog(document)}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                       </TableCell>
                     </TableRow>
                   );
@@ -762,6 +812,60 @@ const DocumentOversight = () => {
           loadDocuments();
         }}
       />
+
+      {/* Dialog de confirmación para eliminar documento */}
+      <Dialog
+        open={deleteDialog.open}
+        onClose={() => setDeleteDialog({ open: false, documentId: null, documentInfo: null })}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ color: 'error.main', fontWeight: 'bold' }}>
+          ⚠️ Eliminar Documento
+        </DialogTitle>
+        <DialogContent sx={{ pt: 2 }}>
+          <Typography gutterBottom>
+            Estás a punto de eliminar completamente el siguiente documento:
+          </Typography>
+          {deleteDialog.documentInfo && (
+            <Box sx={{
+              bgcolor: 'grey.100',
+              p: 2,
+              borderRadius: 1,
+              my: 2
+            }}>
+              <Typography variant="body2" gutterBottom>
+                <strong>Protocolo:</strong> {deleteDialog.documentInfo.protocolNumber}
+              </Typography>
+              <Typography variant="body2" gutterBottom>
+                <strong>Cliente:</strong> {deleteDialog.documentInfo.clientName}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Tipo:</strong> {deleteDialog.documentInfo.documentType}
+              </Typography>
+            </Box>
+          )}
+          <Alert severity="error" sx={{ mt: 2 }}>
+            <strong>Advertencia:</strong> Esta acción NO se puede deshacer. El documento y toda su información asociada será eliminada permanentemente del sistema.
+          </Alert>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button
+            onClick={() => setDeleteDialog({ open: false, documentId: null, documentInfo: null })}
+            color="inherit"
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleConfirmDelete}
+            color="error"
+            variant="contained"
+            startIcon={<DeleteIcon />}
+          >
+            Sí, Eliminar Documento
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
