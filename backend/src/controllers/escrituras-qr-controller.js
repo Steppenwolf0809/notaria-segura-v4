@@ -19,9 +19,13 @@ import {
  * @param {number} escrituraQRId - ID de la escritura QR
  * @param {string} tipoVerificacion - "datos" o "pdf_completo"
  * @param {Object} req - Request object de Express
+ *
+ * TEMPORALMENTE DESHABILITADO - Aplicar migración de verificaciones_qr primero
  */
 async function registrarVerificacion(escrituraQRId, tipoVerificacion, req) {
   try {
+    // TEMPORALMENTE COMENTADO - Descomentar cuando se aplique la migración
+    /*
     // Extraer información del request
     const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || 'unknown';
     const userAgent = req.get('User-Agent') || null;
@@ -43,6 +47,9 @@ async function registrarVerificacion(escrituraQRId, tipoVerificacion, req) {
     });
 
     console.log(`[registrarVerificacion] ✅ Verificación registrada exitosamente`);
+    */
+    // Temporalmente solo logear sin guardar en BD
+    console.log(`[registrarVerificacion] TEMPORAL: escrituraQRId=${escrituraQRId}, tipo=${tipoVerificacion} (no guardado en BD)`);
   } catch (error) {
     // No queremos que falle la verificación si el logging falla
     console.error('[registrarVerificacion] ⚠️ Error registrando verificación:', error.message);
@@ -2152,6 +2159,8 @@ export async function getAllQRForAdmin(req, res) {
  * GET /api/escrituras/admin/verificaciones/:id
  * Obtiene el historial de verificaciones de una escritura QR específica
  * Solo para ADMIN
+ *
+ * TEMPORALMENTE DESHABILITADO - Aplicar migración de verificaciones_qr primero
  */
 export async function getVerificaciones(req, res) {
   try {
@@ -2166,113 +2175,33 @@ export async function getVerificaciones(req, res) {
       });
     }
 
-    // Parámetros de consulta
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 50;
-    const tipoVerificacion = req.query.tipo; // 'datos' o 'pdf_completo'
+    console.log(`[getVerificaciones] TEMPORAL: Endpoint deshabilitado hasta aplicar migración`);
 
-    const skip = (page - 1) * limit;
-
-    // Verificar que la escritura existe
-    const escritura = await prisma.escrituraQR.findUnique({
-      where: { id: parseInt(id) },
-      select: {
-        id: true,
-        token: true,
-        numeroEscritura: true
-      }
-    });
-
-    if (!escritura) {
-      return res.status(404).json({
-        success: false,
-        message: 'Escritura no encontrada'
-      });
-    }
-
-    // Construir filtros
-    const where = {
-      escrituraQRId: parseInt(id)
-    };
-
-    if (tipoVerificacion) {
-      where.tipoVerificacion = tipoVerificacion;
-    }
-
-    console.log(`[getVerificaciones] Obteniendo verificaciones de escritura ${id}`);
-
-    // Obtener verificaciones con paginación
-    const [verificaciones, total, stats] = await Promise.all([
-      prisma.verificacionQR.findMany({
-        where,
-        orderBy: { timestamp: 'desc' },
-        skip,
-        take: limit
-      }),
-      prisma.verificacionQR.count({ where }),
-      // Estadísticas adicionales
-      prisma.verificacionQR.groupBy({
-        by: ['tipoVerificacion'],
-        where: { escrituraQRId: parseInt(id) },
-        _count: {
-          id: true
-        }
-      })
-    ]);
-
-    // Calcular estadísticas por tipo
-    const estadisticasPorTipo = {
-      datos: 0,
-      pdf_completo: 0
-    };
-
-    stats.forEach(stat => {
-      estadisticasPorTipo[stat.tipoVerificacion] = stat._count.id;
-    });
-
-    // Obtener países únicos (si hay datos de geolocalización)
-    const paisesUnicos = await prisma.verificacionQR.groupBy({
-      by: ['country'],
-      where: {
-        escrituraQRId: parseInt(id),
-        country: { not: null }
-      },
-      _count: {
-        id: true
-      },
-      orderBy: {
-        _count: {
-          id: 'desc'
-        }
-      },
-      take: 10
-    });
-
-    console.log(`[getVerificaciones] ✅ Retornando ${verificaciones.length} de ${total} verificaciones`);
-
+    // Retornar datos vacíos temporalmente
     res.json({
       success: true,
       data: {
         escritura: {
-          id: escritura.id,
-          token: escritura.token,
-          numeroEscritura: escritura.numeroEscritura
+          id: parseInt(id),
+          token: 'N/A',
+          numeroEscritura: 'N/A'
         },
-        verificaciones: verificaciones,
+        verificaciones: [],
         estadisticas: {
-          total: total,
-          porTipo: estadisticasPorTipo,
-          porPais: paisesUnicos.map(p => ({
-            pais: p.country,
-            cantidad: p._count.id
-          }))
+          total: 0,
+          porTipo: {
+            datos: 0,
+            pdf_completo: 0
+          },
+          porPais: []
         },
         pagination: {
-          page,
-          limit,
-          total,
-          pages: Math.ceil(total / limit)
-        }
+          page: 1,
+          limit: 50,
+          total: 0,
+          pages: 0
+        },
+        _note: 'Funcionalidad temporalmente deshabilitada - migración pendiente'
       }
     });
 

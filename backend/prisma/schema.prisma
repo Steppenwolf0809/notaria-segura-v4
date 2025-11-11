@@ -315,7 +315,7 @@ model EscrituraQR {
 
   // Relaciones
   creador                 User?    @relation(fields: [createdBy], references: [id])
-  verificaciones          VerificacionQR[] // Historial de verificaciones de este QR
+  // verificaciones          VerificacionQR[] // Historial de verificaciones de este QR - TEMPORALMENTE COMENTADO
 
   @@map("escrituras_qr")
   // Índices para performance
@@ -327,6 +327,8 @@ model EscrituraQR {
 }
 
 // MODELO PARA AUDITORÍA DE VERIFICACIONES DE QR - Tracking de cada escaneo/acceso
+// TEMPORALMENTE COMENTADO - Aplicar migración primero en producción
+/*
 model VerificacionQR {
   id                  Int      @id @default(autoincrement())
   escrituraQRId       Int      // FK a la escritura QR verificada
@@ -349,3 +351,4 @@ model VerificacionQR {
   @@index([tipoVerificacion])
   @@index([country])
 }
+*/
