@@ -115,43 +115,54 @@ class MatrizadorAssignmentService {
 
   /**
    * Normaliza el nombre del matrizador del XML
+   * Elimina acentos, mayúsculas y caracteres especiales para comparación
    * @param {string} nombre - Nombre a normalizar
-   * @returns {string} Nombre normalizado
+   * @returns {string} Nombre normalizado (sin acentos, minúsculas)
    */
   normalizeMatrizadorName(nombre) {
+    if (!nombre) return '';
+
     return nombre
       .trim()
       .replace(/\s+/g, ' ') // Múltiples espacios a uno solo
-      .replace(/[^\w\sáéíóúüñ]/gi, '') // Remover caracteres especiales
+      // ⭐ IMPORTANTE: Remover acentos usando normalización Unicode
+      .normalize('NFD')                           // Descomponer caracteres acentuados
+      .replace(/[\u0300-\u036f]/g, '')           // Remover diacríticos
+      .replace(/[^\w\s]/gi, '')                   // Remover caracteres especiales
       .toLowerCase();
   }
 
   /**
    * Verifica si hay coincidencia parcial entre nombres
-   * @param {string} nombreXml - Nombre del XML normalizado
-   * @param {string} firstName - Nombre del usuario
-   * @param {string} lastName - Apellido del usuario
+   * @param {string} nombreXml - Nombre del XML normalizado (ya sin acentos)
+   * @param {string} firstName - Nombre del usuario (puede tener acentos)
+   * @param {string} lastName - Apellido del usuario (puede tener acentos)
    * @returns {boolean} True si hay coincidencia
    */
   matchesPartialName(nombreXml, firstName, lastName) {
-    const palabrasXml = nombreXml.toLowerCase().split(' ');
-    const palabrasUsuario = `${firstName} ${lastName}`.toLowerCase().split(' ');
+    // ⭐ Normalizar también los nombres del usuario para comparación justa
+    const nombreUsuarioCompleto = `${firstName} ${lastName}`;
+    const nombreUsuarioNormalizado = this.normalizeMatrizadorName(nombreUsuarioCompleto);
+
+    const palabrasXml = nombreXml.split(' ');
+    const palabrasUsuario = nombreUsuarioNormalizado.split(' ');
 
     // Verificar que al menos coincida el primer nombre
     const primerNombreXml = palabrasXml[0];
     const primerNombreUsuario = palabrasUsuario[0];
-    
+
     // Si el primer nombre no coincide, no es una buena coincidencia
     if (!primerNombreUsuario.includes(primerNombreXml) && !primerNombreXml.includes(primerNombreUsuario)) {
+      console.log(`  🔴 Primer nombre no coincide: "${primerNombreXml}" vs "${primerNombreUsuario}"`);
       return false;
     }
 
     // Contar cuántas palabras del XML coinciden con palabras del usuario
     let coincidencias = 0;
-    
+
     for (const palabraXml of palabrasXml) {
       if (palabraXml.length < 3) continue; // Ignorar palabras muy cortas
-      
+
       for (const palabraUsuario of palabrasUsuario) {
         if (palabraUsuario.includes(palabraXml) || palabraXml.includes(palabraUsuario)) {
           coincidencias++;
@@ -163,7 +174,13 @@ class MatrizadorAssignmentService {
     // Considerar coincidencia si al menos 2 palabras coinciden
     // o si el nombre tiene pocas palabras y coincide al menos 1
     const minimoCoincidencias = palabrasXml.length <= 2 ? 1 : 2;
-    return coincidencias >= minimoCoincidencias;
+    const esCoincidencia = coincidencias >= minimoCoincidencias;
+
+    if (esCoincidencia) {
+      console.log(`  🟢 Coincidencia parcial: "${nombreXml}" ≈ "${nombreUsuarioNormalizado}" (${coincidencias} coincidencias)`);
+    }
+
+    return esCoincidencia;
   }
 
   /**
@@ -220,7 +237,8 @@ class MatrizadorAssignmentService {
             userId: originalDocument.createdById, // Usuario que creó el documento
             eventType: 'DOCUMENT_ASSIGNED',
             description: `Documento asignado automáticamente a ${matrizador.firstName} ${matrizador.lastName} (${matrizador.role})`,
-            details: {
+            // ⭐ Convertir objeto a JSON string para Prisma
+            details: JSON.stringify({
               assignedFrom: originalDocument.assignedToId,
               assignedTo: matrizador.id,
               matrizadorName: `${matrizador.firstName} ${matrizador.lastName}`,
@@ -230,7 +248,7 @@ class MatrizadorAssignmentService {
               assignmentType: 'AUTOMATIC',
               xmlMatrizadorName: matrizadorNameFromXml,
               timestamp: new Date().toISOString()
-            },
+            }),
             ipAddress: 'system',
             userAgent: 'auto-assignment-service'
           }
