@@ -41,7 +41,9 @@ import {
   getDocumentsUnified,
   getDocumentsCounts,
   // 💳 NUEVA FUNCIONALIDAD: Nota de Crédito
-  markAsNotaCredito
+  markAsNotaCredito,
+  // 🗑️ Eliminación de documentos (solo ADMIN)
+  deleteDocument
 } from '../controllers/document-controller.js';
 
 // 🔄 NUEVAS IMPORTACIONES: Operaciones masivas
@@ -202,6 +204,9 @@ router.post('/:id/apply-extraction', authenticateToken, async (req, res, next) =
   const { applyExtractionSuggestions } = await import('../controllers/document-controller.js');
   return applyExtractionSuggestions(req, res, next);
 });
+
+// 🗑️ DELETE /api/documents/:id - Eliminar documento (solo ADMIN)
+router.delete('/:id', authenticateToken, deleteDocument);
 
 // 🎯 NUEVAS RUTAS: UI Activos/Entregados con búsqueda global
 // GET /api/documents - Endpoint principal para UI unificada con pestañas

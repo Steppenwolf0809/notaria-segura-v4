@@ -4476,6 +4476,96 @@ async function getDocumentsCounts(req, res) {
   }
 }
 
+/**
+ * DELETE /api/documents/:id
+ * Elimina un documento permanentemente (solo ADMIN)
+ * ⚠️ ACCIÓN IRREVERSIBLE
+ */
+async function deleteDocument(req, res) {
+  try {
+    const documentId = parseInt(req.params.id);
+    const userRole = req.user.role;
+
+    // Verificar que sea ADMIN
+    if (userRole !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo los administradores pueden eliminar documentos'
+      });
+    }
+
+    // Verificar que el documento existe
+    const document = await prisma.document.findUnique({
+      where: { id: documentId },
+      select: {
+        id: true,
+        protocolNumber: true,
+        clientName: true,
+        status: true
+      }
+    });
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Documento no encontrado'
+      });
+    }
+
+    console.log(`🗑️ ADMIN eliminando documento #${documentId}: ${document.protocolNumber} - ${document.clientName}`);
+
+    // Registrar evento ANTES de eliminar
+    try {
+      await prisma.documentEvent.create({
+        data: {
+          documentId: document.id,
+          userId: req.user.id,
+          eventType: 'DOCUMENT_DELETED',
+          description: `Documento eliminado permanentemente por ADMIN: ${req.user.firstName} ${req.user.lastName}`,
+          details: JSON.stringify({
+            protocolNumber: document.protocolNumber,
+            clientName: document.clientName,
+            previousStatus: document.status,
+            deletedBy: req.user.email,
+            timestamp: new Date().toISOString()
+          }),
+          ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+          userAgent: req.get('User-Agent') || 'unknown'
+        }
+      });
+    } catch (auditError) {
+      console.error('Error registrando evento de eliminación:', auditError);
+    }
+
+    // Eliminar documento (CASCADE eliminará eventos relacionados)
+    await prisma.document.delete({
+      where: { id: documentId }
+    });
+
+    console.log(`✅ Documento #${documentId} eliminado exitosamente`);
+
+    res.json({
+      success: true,
+      message: 'Documento eliminado permanentemente',
+      data: {
+        deletedDocument: {
+          id: document.id,
+          protocolNumber: document.protocolNumber,
+          clientName: document.clientName
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error eliminando documento:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al eliminar el documento',
+      error: error.message
+    });
+  }
+}
+
 export {
   uploadXmlDocument,
   uploadXmlDocumentsBatch,
@@ -4519,5 +4609,7 @@ export {
   getDocumentsUnified,
   getDocumentsCounts,
   // 💳 NUEVA FUNCIONALIDAD: Nota de Crédito
-  markAsNotaCredito
+  markAsNotaCredito,
+  // 🗑️ Eliminación de documentos (solo ADMIN)
+  deleteDocument
 };

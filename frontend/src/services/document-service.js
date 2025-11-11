@@ -1095,6 +1095,40 @@ const documentService = {
         message: errorMessage
       };
     }
+  },
+
+  /**
+   * ADMIN: Eliminar documento permanentemente
+   * ⚠️ ACCIÓN IRREVERSIBLE - Solo para ADMIN
+   * @param {string} documentId - ID del documento a eliminar
+   * @returns {Promise<Object>} Resultado de la eliminación
+   */
+  async deleteDocument(documentId) {
+    try {
+      console.log('🗑️ ADMIN eliminando documento:', documentId);
+
+      const response = await api.delete(`/documents/${documentId}`);
+
+      console.log('✅ Documento eliminado exitosamente:', response.data);
+
+      return {
+        success: true,
+        data: response.data.data || response.data,
+        message: response.data.message || 'Documento eliminado permanentemente'
+      };
+    } catch (error) {
+      console.error('❌ Error eliminando documento:', error);
+
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Error al eliminar el documento';
+
+      return {
+        success: false,
+        error: errorMessage,
+        message: errorMessage
+      };
+    }
   }
 };
 
