@@ -39,12 +39,19 @@ import {
   Sort as SortIcon,
   TrendingUp as TrendIcon,
   Assignment as DocumentIcon,
-  Person as PersonIcon
+  Person as PersonIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import archivoService from '../../services/archivo-service';
+import documentService from '../../services/document-service';
 import DocumentDetailModal from '../Documents/DocumentDetailModal';
 import useAuth from '../../hooks/use-auth';
 import useDebounce from '../../hooks/useDebounce';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogActions from '@mui/material/DialogActions';
 
 /**
  * Componente de Supervisión General
@@ -62,6 +69,9 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
   const [totalDocuments, setTotalDocuments] = useState(0);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   
   const [filtros, setFiltros] = useState(() => {
     try {
@@ -100,7 +110,7 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
   // Debounce para la búsqueda (500ms)
   const debouncedSearch = useDebounce(filtros.search, 500);
 
-  const { token } = useAuth();
+  const { token, user } = useAuth();
 
   /**
    * Cargar datos al montar
@@ -194,6 +204,48 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
   const handleCloseDetail = () => {
     setDetailModalOpen(false);
     setSelectedDocument(null);
+  };
+
+  /**
+   * Abrir confirmación de eliminación (solo ADMIN)
+   */
+  const handleOpenDeleteDialog = (doc) => {
+    setDocumentToDelete(doc);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleCloseDeleteDialog = () => {
+    setDeleteDialogOpen(false);
+    setDocumentToDelete(null);
+  };
+
+  /**
+   * Eliminar documento permanentemente (solo ADMIN)
+   */
+  const handleDeleteDocument = async () => {
+    if (!documentToDelete || !token) return;
+
+    setDeleting(true);
+    try {
+      const result = await documentService.deleteDocument(documentToDelete.id);
+
+      if (result.success) {
+        // Refrescar lista
+        await cargarDocumentos();
+        onDataUpdate?.();
+        handleCloseDeleteDialog();
+
+        // Mostrar mensaje de éxito (opcional - puedes agregar un Snackbar)
+        console.log('✅ Documento eliminado:', documentToDelete.protocolNumber);
+      } else {
+        setError(result.message || 'Error eliminando documento');
+      }
+    } catch (error) {
+      console.error('Error eliminando documento:', error);
+      setError('Error al eliminar el documento');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   /**
@@ -636,11 +688,29 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
                   </TableCell>
                   
                   <TableCell>
-                    <Tooltip title="Ver detalles (solo lectura)">
-                      <IconButton size="small" onClick={() => handleOpenDetail(documento)}>
-                        <ViewIcon />
-                      </IconButton>
-                    </Tooltip>
+                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                      <Tooltip title="Ver detalles (solo lectura)">
+                        <IconButton size="small" onClick={() => handleOpenDetail(documento)}>
+                          <ViewIcon />
+                        </IconButton>
+                      </Tooltip>
+
+                      {/* Botón eliminar solo para ADMIN */}
+                      {user?.role === 'ADMIN' && (
+                        <Tooltip title="Eliminar documento (solo ADMIN)">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleOpenDeleteDialog(documento)}
+                            sx={{
+                              color: 'error.main',
+                              '&:hover': { bgcolor: 'error.light', color: 'error.dark' }
+                            }}
+                          >
+                            <DeleteIcon />
+                          </IconButton>
+                        </Tooltip>
+                      )}
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}
@@ -687,6 +757,57 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
           }}
         />
       )}
+
+      {/* Dialog de confirmación para eliminar documento */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleCloseDeleteDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ color: 'error.main', fontWeight: 600 }}>
+          ⚠️ Eliminar Documento Permanentemente
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            ¿Estás seguro de que deseas eliminar permanentemente este documento?
+          </DialogContentText>
+          {documentToDelete && (
+            <Box sx={{ mt: 2, p: 2, bgcolor: 'error.lighter', borderRadius: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                Protocolo: {documentToDelete.protocolNumber}
+              </Typography>
+              <Typography variant="body2">
+                Cliente: {documentToDelete.clientName}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Estado: {documentToDelete.status}
+              </Typography>
+            </Box>
+          )}
+          <Alert severity="error" sx={{ mt: 2 }}>
+            <strong>Esta acción no se puede deshacer.</strong> El documento y todos sus eventos asociados serán eliminados permanentemente de la base de datos.
+          </Alert>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={handleCloseDeleteDialog}
+            disabled={deleting}
+            variant="outlined"
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleDeleteDocument}
+            disabled={deleting}
+            variant="contained"
+            color="error"
+            startIcon={deleting ? <CircularProgress size={16} /> : <DeleteIcon />}
+          >
+            {deleting ? 'Eliminando...' : 'Eliminar Permanentemente'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
     </Box>
   );
