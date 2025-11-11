@@ -54,13 +54,17 @@ import {
   SwapHoriz as ReassignIcon,
   Timeline as TimelineIcon,
   Group as GroupIcon,
-  Clear as ClearIcon
+  Clear as ClearIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { useDebounce } from '../../hooks/useDebounce';
 import useAuthStore from '../../store/auth-store';
 import DocumentStatusTimeline from './DocumentStatusTimeline';
 import BulkOperationsDialog from './BulkOperationsDialog';
+import documentService from '../../services/document-service';
+import CircularProgress from '@mui/material/CircularProgress';
+import DialogContentText from '@mui/material/DialogContentText';
 
 /**
  * Componente de supervisión integral de documentos para administradores
@@ -94,6 +98,9 @@ const DocumentOversight = () => {
   const [selectedDocumentForTimeline, setSelectedDocumentForTimeline] = useState(null);
   const [showBulkOperations, setShowBulkOperations] = useState(false);
   const [matrizadores, setMatrizadores] = useState([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   // Debounce para búsqueda
   const debouncedSearch = useDebounce(search, 500);
@@ -297,6 +304,45 @@ const DocumentOversight = () => {
   const showDocumentTimeline = (document) => {
     setSelectedDocumentForTimeline(document);
     setShowTimeline(true);
+  };
+
+  /**
+   * Abrir confirmación de eliminación (solo ADMIN)
+   */
+  const handleOpenDeleteDialog = (doc) => {
+    setDocumentToDelete(doc);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleCloseDeleteDialog = () => {
+    setDeleteDialogOpen(false);
+    setDocumentToDelete(null);
+  };
+
+  /**
+   * Eliminar documento permanentemente (solo ADMIN)
+   */
+  const handleDeleteDocument = async () => {
+    if (!documentToDelete) return;
+
+    setDeleting(true);
+    try {
+      const result = await documentService.deleteDocument(documentToDelete.id);
+
+      if (result.success) {
+        toast.success('Documento eliminado permanentemente');
+        handleCloseDeleteDialog();
+        // Refrescar lista
+        fetchDocuments();
+      } else {
+        toast.error(result.message || 'Error eliminando documento');
+      }
+    } catch (error) {
+      console.error('Error eliminando documento:', error);
+      toast.error('Error al eliminar el documento');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   /**
@@ -713,14 +759,29 @@ const DocumentOversight = () => {
                         </Typography>
                       </TableCell>
                       <TableCell align="center">
-                        <Tooltip title="Ver timeline">
-                          <IconButton
-                            size="small"
-                            onClick={() => showDocumentTimeline(document)}
-                          >
-                            <TimelineIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
+                        <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                          <Tooltip title="Ver timeline">
+                            <IconButton
+                              size="small"
+                              onClick={() => showDocumentTimeline(document)}
+                            >
+                              <TimelineIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+
+                          <Tooltip title="Eliminar documento (solo ADMIN)">
+                            <IconButton
+                              size="small"
+                              onClick={() => handleOpenDeleteDialog(document)}
+                              sx={{
+                                color: 'error.main',
+                                '&:hover': { bgcolor: 'error.light' }
+                              }}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
                       </TableCell>
                     </TableRow>
                   );
@@ -762,6 +823,57 @@ const DocumentOversight = () => {
           loadDocuments();
         }}
       />
+
+      {/* Dialog de confirmación para eliminar documento */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleCloseDeleteDialog}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ color: 'error.main', fontWeight: 600 }}>
+          ⚠️ Eliminar Documento Permanentemente
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            ¿Estás seguro de que deseas eliminar permanentemente este documento?
+          </DialogContentText>
+          {documentToDelete && (
+            <Box sx={{ mt: 2, p: 2, bgcolor: 'error.lighter', borderRadius: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                Protocolo: {documentToDelete.protocolNumber}
+              </Typography>
+              <Typography variant="body2">
+                Cliente: {documentToDelete.clientName}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Estado: {documentToDelete.status}
+              </Typography>
+            </Box>
+          )}
+          <Alert severity="error" sx={{ mt: 2 }}>
+            <strong>Esta acción no se puede deshacer.</strong> El documento y todos sus eventos asociados serán eliminados permanentemente de la base de datos.
+          </Alert>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={handleCloseDeleteDialog}
+            disabled={deleting}
+            variant="outlined"
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleDeleteDocument}
+            disabled={deleting}
+            variant="contained"
+            color="error"
+            startIcon={deleting ? <CircularProgress size={16} /> : <DeleteIcon />}
+          >
+            {deleting ? 'Eliminando...' : 'Eliminar Permanentemente'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
