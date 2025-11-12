@@ -1,9 +1,10 @@
 import express from 'express';
-import { 
-  register, 
-  login, 
-  getUserProfile, 
+import {
+  register,
+  login,
+  getUserProfile,
   refreshToken,
+  refreshTokenWithRotation,
   initUsers,
   changePassword
 } from '../controllers/auth-controller.js';
@@ -50,10 +51,17 @@ router.get('/profile', authenticateToken, getUserProfile);
 
 /**
  * @route POST /api/auth/refresh
- * @desc Refrescar token JWT
+ * @desc Refrescar token JWT (método legacy)
  * @access Private
  */
 router.post('/refresh', authenticateToken, refreshToken);
+
+/**
+ * @route POST /api/auth/refresh-token
+ * @desc Refrescar token con rotación automática (recomendado)
+ * @access Public
+ */
+router.post('/refresh-token', refreshTokenWithRotation);
 
 /**
  * @route GET /api/auth/verify

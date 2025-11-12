@@ -9,9 +9,20 @@ import { closePrismaClient, db } from './src/db.js'
 import { getConfig, isConfigurationComplete, validateConfigurationComplete, debugConfiguration } from './src/config/environment.js'
 import xmlWatcherService from './src/services/xml-watcher-service.js'
 import cache from './src/services/cache-service.js'
+import { log } from './src/utils/logger.js'
+import { requestLogger } from './src/middleware/request-logger.js'
+import {
+  noSqlSanitizer,
+  hppProtection,
+  xssSanitizer,
+  validateContentType,
+  sanitizeSensitiveFields
+} from './src/middleware/sanitization.js'
 
 // Importar rutas implementadas
 import authRoutes from './src/routes/auth-routes.js'
+import passwordRecoveryRoutes from './src/routes/password-recovery-routes.js'
+import profileRoutes from './src/routes/profile-routes.js'
 import documentRoutes from './src/routes/document-routes.js'
 import notificationsRoutes from './src/routes/notifications-routes.js'
 import adminRoutes from './src/routes/admin-routes.js'
@@ -184,7 +195,7 @@ const corsOptions = {
 // MIDDLEWARES DE SEGURIDAD Y OPTIMIZACIÓN
 // ============================================================================
 
-// Helmet - Headers de seguridad HTTP
+// Helmet - Headers de seguridad HTTP mejorados
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -201,9 +212,23 @@ app.use(helmet({
       frameSrc: ["'none'"],
       workerSrc: ["'self'", "blob:", "https://cdnjs.cloudflare.com"],
       childSrc: ["'self'", "blob:"],
+      formAction: ["'self'"],
+      baseUri: ["'self'"],
+      upgradeInsecureRequests: config.NODE_ENV === 'production' ? [] : null
     },
   },
-  crossOriginEmbedderPolicy: false // Permitir embedding para notificaciones WhatsApp
+  crossOriginEmbedderPolicy: false, // Permitir embedding para notificaciones WhatsApp
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  },
+  referrerPolicy: { policy: "strict-origin-when-cross-origin" },
+  noSniff: true,
+  xssFilter: true,
+  hidePoweredBy: true,
+  frameguard: { action: 'deny' }
 }));
 
 // Compression - Optimizar respuestas
@@ -222,6 +247,28 @@ app.use(cors(corsOptions))
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
+// ============================================================================
+// MIDDLEWARES DE SANITIZACIÓN Y SEGURIDAD ADICIONALES
+// ============================================================================
+
+// Validar Content-Type
+app.use(validateContentType)
+
+// Protección contra NoSQL injection
+app.use(noSqlSanitizer)
+
+// Protección contra HTTP Parameter Pollution
+app.use(hppProtection)
+
+// Sanitización XSS
+app.use(xssSanitizer)
+
+// Sanitización de campos sensibles
+app.use(sanitizeSensitiveFields)
+
+// Request logger con Winston
+app.use(requestLogger)
+
 // Performance logger: registra requests lentas (>500ms)
 app.use((req, res, next) => {
   const start = process.hrtime.bigint();
@@ -229,10 +276,18 @@ app.use((req, res, next) => {
     try {
       const end = process.hrtime.bigint();
       const ms = Number((end - start) / 1000000n);
-      if (ms > (parseInt(process.env.SLOW_REQUEST_MS || '500', 10))) {
-        console.log(`🐢 Slow ${req.method} ${req.originalUrl} → ${ms}ms`);
+      const threshold = parseInt(process.env.SLOW_REQUEST_MS || '500', 10);
+      if (ms > threshold) {
+        log.warn(`Slow request detected: ${req.method} ${req.originalUrl} → ${ms}ms`, {
+          method: req.method,
+          url: req.originalUrl,
+          duration: ms,
+          threshold
+        });
       }
-    } catch {}
+    } catch (error) {
+      log.error('Error in performance logger', error);
+    }
   });
   next();
 });
@@ -295,7 +350,13 @@ app.get('/api/health/feature-flags', (req, res) => {
 // RUTAS DE AUTENTICACIÓN (/api/auth/*)
 app.use('/api/auth', authRoutes)
 
-// RUTAS DE DOCUMENTOS (/api/documents/*)  
+// RUTAS DE RECUPERACIÓN DE CONTRASEÑA (/api/password-recovery/*)
+app.use('/api/password-recovery', passwordRecoveryRoutes)
+
+// RUTAS DE GESTIÓN DE PERFIL (/api/profile/*)
+app.use('/api/profile', profileRoutes)
+
+// RUTAS DE DOCUMENTOS (/api/documents/*)
 app.use('/api/documents', documentRoutes)
 
 // RUTAS DE NOTIFICACIONES (/api/notifications/*)

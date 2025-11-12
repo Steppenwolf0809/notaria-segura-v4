@@ -4,6 +4,17 @@ import prisma from '../db.js';
 import { sendSuccess, sendError, sendUnauthorized, sendValidationError, sanitizeResponse } from '../utils/http.js';
 import { validatePassword, sanitizePassword } from '../utils/password-validator.js';
 import { logPasswordChange, logLoginAttempt, extractRequestInfo } from '../utils/audit-logger.js';
+import { log } from '../utils/logger.js';
+import {
+  recordFailedLogin,
+  resetLoginAttempts,
+  isAccountLocked,
+  addPasswordToHistory,
+  isPasswordReused,
+  detectSuspiciousActivity
+} from '../services/security-service.js';
+import { sendPasswordChangedEmail } from '../services/email-service.js';
+import { createRefreshToken, verifyAndRotateRefreshToken } from '../services/token-service.js';
 
 /**
  * Roles válidos del sistema (completo con ARCHIVO)
@@ -130,6 +141,7 @@ async function register(req, res) {
 async function login(req, res) {
   try {
     const { email, password } = req.body;
+    const requestInfo = extractRequestInfo(req);
 
     // Validar campos obligatorios
     if (!email || !password) {
@@ -145,20 +157,42 @@ async function login(req, res) {
     });
 
     if (!user) {
+      log.warn('Login attempt for non-existent user', { email, ipAddress: requestInfo.ipAddress });
       return sendUnauthorized(res, 'Credenciales inválidas');
     }
 
     // Verificar si el usuario está activo
     if (!user.isActive) {
+      log.warn('Login attempt for inactive user', { userId: user.id, email });
       return sendUnauthorized(res, 'Usuario desactivado');
+    }
+
+    // Verificar si la cuenta está bloqueada
+    if (isAccountLocked(user)) {
+      const minutesLeft = Math.ceil((user.lockedUntil - new Date()) / 60000);
+      log.warn('Login attempt for locked account', {
+        userId: user.id,
+        email,
+        lockedUntil: user.lockedUntil,
+        ipAddress: requestInfo.ipAddress
+      });
+
+      return res.status(429).json({
+        success: false,
+        message: `Cuenta bloqueada temporalmente. Intenta nuevamente en ${minutesLeft} minutos.`,
+        lockedUntil: user.lockedUntil
+      });
     }
 
     // Verificar contraseña
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
+      // Registrar intento fallido
+      await recordFailedLogin(user.id, requestInfo.ipAddress, requestInfo.userAgent);
+
       // Log intento fallido
-      const requestInfo = extractRequestInfo(req);
       logLoginAttempt({
+        userId: user.id,
         userEmail: email,
         ipAddress: requestInfo.ipAddress,
         userAgent: requestInfo.userAgent,
@@ -169,14 +203,17 @@ async function login(req, res) {
       return sendUnauthorized(res, 'Credenciales inválidas');
     }
 
-    // Actualizar último login
+    // Login exitoso - resetear intentos y actualizar último login
+    await resetLoginAttempts(user.id);
     await prisma.user.update({
       where: { id: user.id },
-      data: { lastLogin: new Date() }
+      data: {
+        lastLogin: new Date(),
+        lastLoginIp: requestInfo.ipAddress
+      }
     });
 
     // Log login exitoso
-    const requestInfo = extractRequestInfo(req);
     logLoginAttempt({
       userId: user.id,
       userEmail: email,
@@ -185,8 +222,15 @@ async function login(req, res) {
       success: true
     });
 
-    // Generar token
-    const token = generateToken(user);
+    log.info('User logged in successfully', {
+      userId: user.id,
+      email: user.email,
+      ipAddress: requestInfo.ipAddress
+    });
+
+    // Generar tokens
+    const accessToken = generateToken(user);
+    const refreshToken = await createRefreshToken(user.id, requestInfo.ipAddress, requestInfo.userAgent);
 
     return sendSuccess(res, {
       message: 'Inicio de sesión exitoso',
@@ -197,14 +241,16 @@ async function login(req, res) {
           firstName: user.firstName,
           lastName: user.lastName,
           role: user.role,
-          roleColor: getRoleColor(user.role)
+          roleColor: getRoleColor(user.role),
+          emailVerified: user.emailVerified
         }),
-        token
+        token: accessToken,
+        refreshToken
       }
     });
 
   } catch (error) {
-    console.error('Error en login:', error);
+    log.error('Error in login', error);
     return sendError(res);
   }
 }
@@ -522,13 +568,37 @@ async function changePassword(req, res) {
       });
     }
 
+    // Verificar que no reutilice contraseñas anteriores
+    const isReused = await isPasswordReused(userId, sanitizedNewPassword);
+    if (isReused) {
+      logPasswordChange({
+        userId,
+        userEmail: user.email,
+        ipAddress: requestInfo.ipAddress,
+        userAgent: requestInfo.userAgent,
+        success: false,
+        reason: 'Intento de reutilizar contraseña anterior'
+      });
+
+      return res.status(400).json({
+        success: false,
+        message: 'No puedes usar una contraseña que hayas utilizado recientemente'
+      });
+    }
+
+    // Detectar actividad sospechosa
+    await detectSuspiciousActivity(userId, requestInfo.ipAddress, 'PASSWORD_CHANGE');
+
+    // Guardar contraseña anterior en historial
+    await addPasswordToHistory(userId, user.password);
+
     // Encriptar nueva contraseña
     const hashedNewPassword = await bcrypt.hash(sanitizedNewPassword, 12);
 
     // Actualizar contraseña en la base de datos
     await prisma.user.update({
       where: { id: userId },
-      data: { 
+      data: {
         password: hashedNewPassword,
         updatedAt: new Date()
       }
@@ -542,6 +612,20 @@ async function changePassword(req, res) {
       userAgent: requestInfo.userAgent,
       success: true
     });
+
+    log.info('Password changed successfully', {
+      userId,
+      email: user.email,
+      ipAddress: requestInfo.ipAddress
+    });
+
+    // Enviar email de notificación
+    try {
+      await sendPasswordChangedEmail(user.email, user.firstName, requestInfo.ipAddress);
+    } catch (emailError) {
+      log.error('Failed to send password changed email', emailError);
+      // No fallar la operación por error de email
+    }
 
     res.json({
       success: true,
@@ -580,11 +664,83 @@ async function changePassword(req, res) {
   }
 }
 
+/**
+ * Refresh token con rotación automática
+ * POST /api/auth/refresh-token
+ */
+async function refreshTokenWithRotation(req, res) {
+  try {
+    const { refreshToken: token } = req.body;
+    const requestInfo = extractRequestInfo(req);
+
+    if (!token) {
+      return sendValidationError(res, 'Refresh token no proporcionado');
+    }
+
+    // Verificar y rotar el refresh token
+    const result = await verifyAndRotateRefreshToken(
+      token,
+      requestInfo.ipAddress,
+      requestInfo.userAgent
+    );
+
+    if (!result) {
+      log.warn('Invalid or revoked refresh token used', {
+        token: token.substring(0, 8),
+        ipAddress: requestInfo.ipAddress
+      });
+
+      return res.status(401).json({
+        success: false,
+        message: 'Refresh token inválido o revocado'
+      });
+    }
+
+    const { user, newToken } = result;
+
+    if (!user.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: 'Usuario desactivado'
+      });
+    }
+
+    // Generar nuevo access token
+    const accessToken = generateToken(user);
+
+    log.info('Tokens refreshed successfully', {
+      userId: user.id,
+      email: user.email
+    });
+
+    return sendSuccess(res, {
+      message: 'Tokens actualizados exitosamente',
+      data: {
+        token: accessToken,
+        refreshToken: newToken,
+        user: sanitizeResponse({
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          roleColor: getRoleColor(user.role)
+        })
+      }
+    });
+
+  } catch (error) {
+    log.error('Error in refreshTokenWithRotation', error);
+    return sendError(res);
+  }
+}
+
 export {
   register,
   login,
   getUserProfile,
   refreshToken,
+  refreshTokenWithRotation,
   initUsers,
   changePassword
 }; 
