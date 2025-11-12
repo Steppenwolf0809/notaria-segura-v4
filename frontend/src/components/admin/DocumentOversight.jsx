@@ -54,11 +54,13 @@ import {
   SwapHoriz as ReassignIcon,
   Timeline as TimelineIcon,
   Group as GroupIcon,
-  Clear as ClearIcon
+  Clear as ClearIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { useDebounce } from '../../hooks/useDebounce';
 import useAuthStore from '../../store/auth-store';
+import adminService from '../../services/admin-service';
 import DocumentStatusTimeline from './DocumentStatusTimeline';
 import BulkOperationsDialog from './BulkOperationsDialog';
 
@@ -94,6 +96,12 @@ const DocumentOversight = () => {
   const [selectedDocumentForTimeline, setSelectedDocumentForTimeline] = useState(null);
   const [showBulkOperations, setShowBulkOperations] = useState(false);
   const [matrizadores, setMatrizadores] = useState([]);
+
+  // Estados para eliminación
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState(null);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Debounce para búsqueda
   const debouncedSearch = useDebounce(search, 500);
@@ -297,6 +305,85 @@ const DocumentOversight = () => {
   const showDocumentTimeline = (document) => {
     setSelectedDocumentForTimeline(document);
     setShowTimeline(true);
+  };
+
+  /**
+   * Abrir diálogo de confirmación para eliminar documento individual
+   */
+  const openDeleteDialog = (document) => {
+    setDocumentToDelete(document);
+    setDeleteDialogOpen(true);
+  };
+
+  /**
+   * Eliminar documento individual
+   */
+  const handleDeleteDocument = async () => {
+    if (!documentToDelete) return;
+
+    try {
+      setDeleting(true);
+      await adminService.deleteDocument(documentToDelete.id, token);
+
+      toast.success(`Documento ${documentToDelete.protocolNumber} eliminado exitosamente`);
+
+      // Recargar documentos
+      loadDocuments();
+
+      // Cerrar diálogo
+      setDeleteDialogOpen(false);
+      setDocumentToDelete(null);
+    } catch (error) {
+      console.error('Error eliminando documento:', error);
+      toast.error(error.message || 'Error al eliminar el documento');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  /**
+   * Abrir diálogo de confirmación para eliminar múltiples documentos
+   */
+  const openBulkDeleteDialog = () => {
+    if (selectedDocuments.length === 0) {
+      toast.warning('Seleccione al menos un documento para eliminar');
+      return;
+    }
+    setBulkDeleteDialogOpen(true);
+  };
+
+  /**
+   * Eliminar múltiples documentos
+   */
+  const handleBulkDelete = async () => {
+    if (selectedDocuments.length === 0) return;
+
+    try {
+      setDeleting(true);
+      const result = await adminService.bulkDeleteDocuments(selectedDocuments, token);
+
+      if (result.success) {
+        const { successCount, errorCount } = result.data.results;
+
+        if (errorCount === 0) {
+          toast.success(`${successCount} documento(s) eliminado(s) exitosamente`);
+        } else {
+          toast.warning(`${successCount} documento(s) eliminado(s), ${errorCount} con errores`);
+        }
+
+        // Limpiar selección y recargar
+        setSelectedDocuments([]);
+        loadDocuments();
+      }
+
+      // Cerrar diálogo
+      setBulkDeleteDialogOpen(false);
+    } catch (error) {
+      console.error('Error eliminando documentos:', error);
+      toast.error(error.message || 'Error al eliminar los documentos');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   /**
@@ -539,16 +626,26 @@ const DocumentOversight = () => {
 
       {/* Operaciones en lote */}
       {selectedDocuments.length > 0 && (
-        <Alert 
-          severity="info" 
+        <Alert
+          severity="info"
           sx={{ mb: 2 }}
           action={
-            <Button
-              size="small"
-              onClick={() => setShowBulkOperations(true)}
-            >
-              Acciones en Lote
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                size="small"
+                onClick={() => setShowBulkOperations(true)}
+              >
+                Acciones en Lote
+              </Button>
+              <Button
+                size="small"
+                color="error"
+                startIcon={<DeleteIcon />}
+                onClick={openBulkDeleteDialog}
+              >
+                Eliminar Seleccionados
+              </Button>
+            </Box>
           }
         >
           {selectedDocuments.length} documento(s) seleccionado(s)
@@ -713,14 +810,25 @@ const DocumentOversight = () => {
                         </Typography>
                       </TableCell>
                       <TableCell align="center">
-                        <Tooltip title="Ver timeline">
-                          <IconButton
-                            size="small"
-                            onClick={() => showDocumentTimeline(document)}
-                          >
-                            <TimelineIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
+                        <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                          <Tooltip title="Ver timeline">
+                            <IconButton
+                              size="small"
+                              onClick={() => showDocumentTimeline(document)}
+                            >
+                              <TimelineIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Eliminar documento">
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => openDeleteDialog(document)}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
                       </TableCell>
                     </TableRow>
                   );
@@ -762,6 +870,105 @@ const DocumentOversight = () => {
           loadDocuments();
         }}
       />
+
+      {/* Diálogo de confirmación - Eliminar documento individual */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => !deleting && setDeleteDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <WarningIcon color="error" />
+            <Typography variant="h6">Confirmar Eliminación</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" gutterBottom>
+            ¿Está seguro que desea eliminar el siguiente documento?
+          </Typography>
+          {documentToDelete && (
+            <Box sx={{ mt: 2, p: 2, bgcolor: 'grey.100', borderRadius: 1 }}>
+              <Typography variant="body2">
+                <strong>Número de Protocolo:</strong> {documentToDelete.protocolNumber}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Cliente:</strong> {documentToDelete.clientName}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Tipo:</strong> {documentToDelete.documentType}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Estado:</strong> {documentToDelete.status}
+              </Typography>
+            </Box>
+          )}
+          <Alert severity="error" sx={{ mt: 2 }}>
+            <strong>ADVERTENCIA:</strong> Esta acción es irreversible. El documento y todos sus eventos asociados serán eliminados permanentemente.
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setDeleteDialogOpen(false)}
+            disabled={deleting}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleDeleteDocument}
+            disabled={deleting}
+            startIcon={deleting ? <LinearProgress size={20} /> : <DeleteIcon />}
+          >
+            {deleting ? 'Eliminando...' : 'Eliminar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Diálogo de confirmación - Eliminar múltiples documentos */}
+      <Dialog
+        open={bulkDeleteDialogOpen}
+        onClose={() => !deleting && setBulkDeleteDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <WarningIcon color="error" />
+            <Typography variant="h6">Confirmar Eliminación Masiva</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" gutterBottom>
+            ¿Está seguro que desea eliminar <strong>{selectedDocuments.length}</strong> documento(s) seleccionado(s)?
+          </Typography>
+          <Alert severity="error" sx={{ mt: 2 }}>
+            <strong>ADVERTENCIA:</strong> Esta acción es irreversible. Los documentos y todos sus eventos asociados serán eliminados permanentemente.
+          </Alert>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+            Se eliminarán {selectedDocuments.length} documento(s) del sistema.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => setBulkDeleteDialogOpen(false)}
+            disabled={deleting}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleBulkDelete}
+            disabled={deleting}
+            startIcon={deleting ? <LinearProgress size={20} /> : <DeleteIcon />}
+          >
+            {deleting ? 'Eliminando...' : `Eliminar ${selectedDocuments.length} Documento(s)`}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
