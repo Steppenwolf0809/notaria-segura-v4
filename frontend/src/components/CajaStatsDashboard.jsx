@@ -23,7 +23,8 @@ import {
   AttachMoney as MoneyIcon,
   Description as DocumentIcon,
   Refresh as RefreshIcon,
-  Assessment as AssessmentIcon
+  Assessment as AssessmentIcon,
+  CloudUpload as CloudUploadIcon
 } from '@mui/icons-material';
 import documentService from '../services/document-service';
 import useDocumentStore from '../store/document-store';
@@ -170,6 +171,63 @@ const CajaStatsDashboard = () => {
           Actualizar
         </Button>
       </Box>
+
+      {/* Botón destacado para subir XML */}
+      <Card
+        sx={{
+          mb: 4,
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          cursor: 'pointer',
+          transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+          '&:hover': {
+            transform: 'translateY(-4px)',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.2)'
+          }
+        }}
+        onClick={() => window.location.hash = '#/subir-xml'}
+      >
+        <CardContent>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: 3,
+                  bgcolor: 'rgba(255, 255, 255, 0.2)',
+                  backdropFilter: 'blur(10px)'
+                }}
+              >
+                <CloudUploadIcon sx={{ fontSize: 48, color: 'white' }} />
+              </Box>
+              <Box>
+                <Typography variant="h5" sx={{ color: 'white', fontWeight: 'bold', mb: 0.5 }}>
+                  Subir Archivos XML
+                </Typography>
+                <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+                  Sube documentos individuales o en lote (hasta 20 archivos)
+                </Typography>
+              </Box>
+            </Box>
+            <Button
+              variant="contained"
+              sx={{
+                bgcolor: 'white',
+                color: 'primary.main',
+                px: 4,
+                py: 1.5,
+                fontSize: '1.1rem',
+                fontWeight: 'bold',
+                '&:hover': {
+                  bgcolor: 'rgba(255, 255, 255, 0.9)'
+                }
+              }}
+              startIcon={<CloudUploadIcon />}
+            >
+              Ir a Subir XML
+            </Button>
+          </Box>
+        </CardContent>
+      </Card>
 
       {/* Estadísticas Generales */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
