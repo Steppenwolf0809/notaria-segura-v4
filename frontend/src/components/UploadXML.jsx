@@ -21,6 +21,7 @@ import {
 } from '@mui/icons-material';
 import { useDropzone } from 'react-dropzone';
 import documentService from '../services/document-service';
+import useDocumentStore from '../store/document-store';
 import { toast } from 'react-toastify';
 
 /**
@@ -28,6 +29,7 @@ import { toast } from 'react-toastify';
  * Permite drag & drop o selección de archivos
  */
 const UploadXML = () => {
+  const { fetchAllDocuments } = useDocumentStore();
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [results, setResults] = useState([]);
@@ -77,6 +79,15 @@ const UploadXML = () => {
           message: `Documento creado: ${result.data.document.protocolNumber}`,
           document: result.data.document
         }]);
+
+        // ⭐ FIX: Actualizar el store de documentos para que el dashboard muestre el nuevo documento
+        try {
+          await fetchAllDocuments(1, 50);
+          console.log('📊 Store de documentos actualizado después de subir XML');
+        } catch (fetchError) {
+          console.error('Error actualizando store después de subir XML:', fetchError);
+          // No mostrar error al usuario ya que el documento se subió correctamente
+        }
       } else {
         toast.error(result.error || 'Error al procesar el XML');
         setResults([{
@@ -94,7 +105,7 @@ const UploadXML = () => {
     } finally {
       setUploading(false);
     }
-  }, []);
+  }, [fetchAllDocuments]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,

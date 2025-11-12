@@ -107,7 +107,7 @@ const GeneradorQR = () => {
   /**
    * Carga la lista de escrituras
    */
-  const loadEscrituras = async () => {
+  const loadEscrituras = async (showErrorToast = true) => {
     setLoading(true);
     setError(null);
 
@@ -120,14 +120,16 @@ const GeneradorQR = () => {
       };
 
       const response = await getEscrituras(params);
-      
+
       if (response.success) {
         setEscrituras(response.data.escrituras);
         setTotalCount(response.data.pagination.total);
       }
     } catch (err) {
       setError(err.message);
-      toast.error('Error al cargar las escrituras');
+      if (showErrorToast) {
+        toast.error('Error al cargar las escrituras');
+      }
     } finally {
       setLoading(false);
     }
@@ -160,8 +162,8 @@ const GeneradorQR = () => {
         }
         
         setShowUploadDialog(false);
-        loadEscrituras(); // Recargar lista
-        
+        loadEscrituras(false); // Recargar lista
+
         // Mostrar detalles de la escritura creada
         setSelectedEscritura(response.data);
         setShowDetailsDialog(true);
@@ -193,8 +195,8 @@ const GeneradorQR = () => {
         }
         
         setShowManualDialog(false);
-        loadEscrituras(); // Recargar lista
-        
+        loadEscrituras(false); // Recargar lista
+
         // Mostrar detalles de la escritura creada
         setSelectedEscritura(response.data);
         setShowDetailsDialog(true);
@@ -220,7 +222,7 @@ const GeneradorQR = () => {
       
       if (response.success) {
         toast.success('Escritura desactivada');
-        loadEscrituras();
+        loadEscrituras(false);
       }
     } catch (err) {
       toast.error(err.message);
@@ -242,7 +244,7 @@ const GeneradorQR = () => {
         setShowHardDeleteDialog(false);
         setShowDetailsDialog(false);
         setSelectedEscritura(null);
-        loadEscrituras();
+        loadEscrituras(false);
       }
     } catch (err) {
       toast.error(err.message);
@@ -329,10 +331,10 @@ const GeneradorQR = () => {
    */
   const handlePDFUploadSuccess = (pdfData) => {
     toast.success('PDF subido exitosamente');
-    
+
     // Recargar la lista de escrituras para actualizar los datos
-    loadEscrituras();
-    
+    loadEscrituras(false);
+
     // Cerrar modal
     setShowPDFUploadModal(false);
     setSelectedEscrituraForPDF(null);
@@ -751,7 +753,7 @@ const GeneradorQR = () => {
                     escritura={selectedEscritura}
                     onRefresh={() => {
                       // Recargar datos de la escritura
-                      loadEscrituras();
+                      loadEscrituras(false);
                     }}
                   />
                 ) : (
@@ -1017,7 +1019,7 @@ const GeneradorQR = () => {
           escritura={selectedEscrituraForPDF}
           onSuccess={(data) => {
             // Recargar la lista para reflejar los cambios
-            loadEscrituras();
+            loadEscrituras(false);
             toast.success('Páginas ocultas actualizadas correctamente');
           }}
         />
