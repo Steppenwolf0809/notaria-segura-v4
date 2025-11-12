@@ -64,7 +64,10 @@ USE_ENHANCED_PROMPT=true   # ← Por defecto activo
 # Configuración Gemini
 GEMINI_ENABLED=true
 GOOGLE_API_KEY=tu_api_key_aqui
-GEMINI_MODEL=gemini-1.5-flash
+# IMPORTANTE: Gemini 1.5 fue deprecado en Abril 2025
+# Modelos válidos: gemini-2.5-flash (recomendado), gemini-2.0-flash, gemini-2.5-pro
+GEMINI_MODEL=gemini-2.5-flash
+GEMINI_TIMEOUT=30000
 ```
 
 ### **Opción 2: Usar Prompt Básico (Legacy)**
