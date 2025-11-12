@@ -77,10 +77,10 @@ async function parseXmlDocument(xmlContent) {
     
     console.log(`✅ Acto principal seleccionado: ${processedDetails.actoPrincipalDescripcion}`);
     console.log(`💰 Valor asignado: Total factura $${totalFactura} (en lugar del acto principal $${processedDetails.actoPrincipalValor})`);
-    
+
     // 6. Extraer nombre del matrizador
     const matrizadorName = extractMatrizadorName(factura);
-    
+
     return {
       protocolNumber,
       clientName: clientData.clientName,
@@ -92,7 +92,7 @@ async function parseXmlDocument(xmlContent) {
       actoPrincipalValor: totalFactura, // ⭐ CAMBIO: Usar valor total de factura en lugar del acto principal
       totalFactura,
       matrizadorName,
-      itemsSecundarios: processedDetails.itemsSecundarios,
+      itemsSecundarios: JSON.stringify(processedDetails.itemsSecundarios), // ⭐ FIX: Convertir a JSON string
       xmlOriginal: xmlContent // Guardar XML completo
     };
     

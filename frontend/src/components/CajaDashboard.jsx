@@ -31,23 +31,22 @@ import {
   Snackbar
 } from '@mui/material';
 import {
-  CloudUpload as CloudUploadIcon,
   Refresh as RefreshIcon,
   Assignment as AssignmentIcon,
   Person as PersonIcon,
   Search as SearchIcon,
   Close as CloseIcon,
-  CreditCard as CreditCardIcon
+  CreditCard as CreditCardIcon,
+  Description as DescriptionIcon
 } from '@mui/icons-material';
-import { useDropzone } from 'react-dropzone';
 import useDocumentStore from '../store/document-store';
 import useDebounce from '../hooks/useDebounce';
 import { toast } from 'react-toastify';
-import BatchUpload from './BatchUpload';
 import documentService from '../services/document-service';
 
 /**
- * Dashboard donde CAJA sube XMLs, crea documentos y asigna matrizadores
+ * Gestión de documentos para CAJA
+ * Tabla de documentos con funcionalidad de búsqueda, asignación y gestión
  */
 const CajaDashboard = () => {
   const {
@@ -55,10 +54,8 @@ const CajaDashboard = () => {
     matrizadores,
     loading,
     error,
-    uploadProgress,
     fetchAllDocuments,
     fetchMatrizadores,
-    uploadXmlDocument,
     assignDocument,
     getDocumentStats,
     searchDocuments,
@@ -106,40 +103,6 @@ const CajaDashboard = () => {
   useEffect(() => {
     fetchAllDocuments(page + 1, rowsPerPage);
   }, [page, rowsPerPage]);
-
-  /**
-   * Configuración de dropzone para upload de XMLs
-   */
-  const onDrop = useCallback(async (acceptedFiles) => {
-    const file = acceptedFiles[0];
-    if (!file) return;
-
-    // Verificar que es un archivo XML
-    if (!file.name.toLowerCase().endsWith('.xml')) {
-      toast.error('Error: Solo se permiten archivos XML');
-      return;
-    }
-
-    const result = await uploadXmlDocument(file);
-    if (result.success) {
-      toast.success(`XML procesado exitosamente: ${result.data.document.protocolNumber}`);
-      // Recargar documentos para mostrar el nuevo
-      setPage(0);
-      await fetchAllDocuments(1, rowsPerPage);
-    } else {
-      toast.error(result.error || 'Ocurrió un error al procesar el XML');
-    }
-  }, [uploadXmlDocument, fetchAllDocuments, rowsPerPage]);
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      'text/xml': ['.xml'],
-      'application/xml': ['.xml']
-    },
-    maxFiles: 1,
-    multiple: false
-  });
 
   /**
    * Refrescar datos manualmente
@@ -290,9 +253,12 @@ const CajaDashboard = () => {
     <Box sx={{ p: 3 }}>
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" sx={{ color: 'primary.main', fontWeight: 'bold' }}>
-          Gestión de Documentos - CAJA
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <DescriptionIcon sx={{ fontSize: 40, color: 'primary.main' }} />
+          <Typography variant="h4" sx={{ color: 'primary.main', fontWeight: 'bold' }}>
+            Gestión de Documentos
+          </Typography>
+        </Box>
         <Button
           variant="outlined"
           onClick={handleRefresh}
@@ -306,142 +272,14 @@ const CajaDashboard = () => {
 
       {/* Error Alert */}
       {error && (
-        <Alert 
-          severity="error" 
+        <Alert
+          severity="error"
           onClose={clearError}
           sx={{ mb: 3 }}
         >
           {error}
         </Alert>
       )}
-
-      {/* Upload Zone para XML */}
-      <Card sx={{ mb: 4 }}>
-        <CardContent>
-          <Typography variant="h6" gutterBottom sx={{ color: 'primary.main' }}>
-            Subir Archivo XML
-          </Typography>
-          
-          <Box
-            {...getRootProps()}
-            sx={{
-              border: '2px dashed',
-              borderColor: isDragActive ? 'primary.main' : 'divider',
-              borderRadius: 2,
-              p: 4,
-              textAlign: 'center',
-              cursor: 'pointer',
-              bgcolor: isDragActive ? 'action.hover' : 'action.hover',
-              transition: 'all 0.2s ease-in-out',
-              '&:hover': {
-                borderColor: 'primary.main',
-                bgcolor: 'action.selected'
-              }
-            }}
-          >
-            <input {...getInputProps()} />
-            <CloudUploadIcon sx={{ fontSize: 48, color: 'primary.main', mb: 2 }} />
-            
-            {isDragActive ? (
-              <Typography variant="h6" color="primary.main">
-                Suelta el archivo XML aquí...
-              </Typography>
-            ) : (
-              <>
-                <Typography variant="h6" gutterBottom color="text.primary">
-                  Arrastra un archivo XML aquí
-                </Typography>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  o haz clic para seleccionar
-                </Typography>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  sx={{ 
-                    mt: 2
-                  }}
-                >
-                  Seleccionar XML
-                </Button>
-              </>
-            )}
-          </Box>
-
-          {/* Progress Bar */}
-          {uploadProgress !== null && (
-            <Box sx={{ mt: 2 }}>
-              <LinearProgress 
-                variant="determinate" 
-                value={uploadProgress} 
-                sx={{ 
-                  height: 8, 
-                  borderRadius: 4,
-                  '& .MuiLinearProgress-bar': {
-                    bgcolor: 'primary.main'
-                  }
-                }}
-              />
-              <Typography variant="body2" sx={{ mt: 1, textAlign: 'center' }}>
-                Procesando XML... {uploadProgress}%
-              </Typography>
-            </Box>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Carga en Lote de Archivos XML */}
-      <BatchUpload />
-
-      {/* Estadísticas */}
-      <Card sx={{ mb: 4 }}>
-        <CardContent>
-          <Typography variant="h6" gutterBottom sx={{ color: 'primary.main' }}>
-            Estadísticas de Documentos
-          </Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={6} sm={3}>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" sx={{ color: 'primary.main', fontWeight: 'bold' }}>
-                  {stats.total}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Total
-                </Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={6} sm={3}>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" sx={{ color: 'warning.main', fontWeight: 'bold' }}>
-                  {stats.PENDIENTE}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Pendientes
-                </Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={6} sm={3}>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" sx={{ color: 'info.main', fontWeight: 'bold' }}>
-                  {stats.EN_PROCESO}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  En Proceso
-                </Typography>
-              </Box>
-            </Grid>
-            <Grid item xs={6} sm={3}>
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography variant="h4" sx={{ color: 'success.main', fontWeight: 'bold' }}>
-                  {stats.LISTO}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Listos
-                </Typography>
-              </Box>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
 
       {/* Barra de búsqueda */}
       <Box sx={{ mb: 3 }}>

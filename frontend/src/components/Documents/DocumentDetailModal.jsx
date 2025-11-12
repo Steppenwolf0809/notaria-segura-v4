@@ -45,7 +45,6 @@ import {
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import DocumentTimeline from './DocumentTimeline';
-import ActosPanel from './ActosPanel.jsx';
 import useDocumentHistory from '../../hooks/useDocumentHistory';
 import useDocumentStore from '../../store/document-store';
 import useAuthStore from '../../store/auth-store';
@@ -455,24 +454,19 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
 
       {/* Navegación por pestañas */}
       <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs 
-          value={currentTab} 
+        <Tabs
+          value={currentTab}
           onChange={(e, newValue) => setCurrentTab(newValue)}
           variant="fullWidth"
         >
-          <Tab 
-            icon={<InfoIcon />} 
-            label="Información General" 
+          <Tab
+            icon={<InfoIcon />}
+            label="Información General"
             sx={{ fontWeight: 'bold' }}
           />
-          <Tab 
-            icon={<HistoryIcon />} 
-            label="Historial" 
-            sx={{ fontWeight: 'bold' }}
-          />
-          <Tab 
-            icon={<InfoIcon />} 
-            label="Actos" 
+          <Tab
+            icon={<HistoryIcon />}
+            label="Historial"
             sx={{ fontWeight: 'bold' }}
           />
         </Tabs>
@@ -639,7 +633,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
         {/* Pestaña: Historial */}
         {currentTab === 1 && (
           <Box sx={{ p: 3 }}>
-            <DocumentTimeline 
+            <DocumentTimeline
               documentId={document?.id}
               showRefresh={true}
               showLoadMore={true}
@@ -649,14 +643,6 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
                 fallbackToSimulated: true
               }}
             />
-          </Box>
-        )}
-
-        {currentTab === 2 && (
-          <Box sx={{ p: 3 }}>
-            <Paper variant="outlined" sx={{ p: 2 }}>
-              <ActosPanel document={localDocument} />
-            </Paper>
           </Box>
         )}
 

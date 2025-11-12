@@ -169,9 +169,20 @@ async function uploadXmlDocument(req, res) {
       console.warn('No se pudo crear snapshot de extracción avanzada en uploadXmlDocument:', snapErr?.message || snapErr);
     }
 
+    // ⭐ FIX: Invalidar caché de documentos para que se muestren los nuevos
+    try {
+      const cache = (await import('../services/cache-service.js')).default;
+      await cache.invalidateByTag('documents');
+      await cache.invalidateByTag('caja:all');
+      console.log('🗑️ Caché de documentos invalidado después de subir XML');
+    } catch (cacheError) {
+      console.warn('Error invalidando caché:', cacheError);
+      // No fallar la respuesta si hay error en caché
+    }
+
     res.status(201).json({
       success: true,
-      message: assignmentResult.assigned 
+      message: assignmentResult.assigned
         ? `Documento XML procesado y asignado automáticamente a ${assignmentResult.matrizador.firstName} ${assignmentResult.matrizador.lastName}`
         : 'Documento XML procesado exitosamente (sin asignación automática)',
       data: {
@@ -199,10 +210,24 @@ async function uploadXmlDocument(req, res) {
 
   } catch (error) {
     console.error('Error procesando XML:', error);
+
+    // Determinar el tipo de error para mejor debugging
+    let userMessage = 'Error procesando archivo XML';
+    let errorDetail = error.message || 'Error desconocido';
+
+    if (error.message && error.message.includes('prisma')) {
+      userMessage = 'Error al guardar el documento en la base de datos';
+      errorDetail = error.message;
+    } else if (error.message && error.message.includes('XML')) {
+      userMessage = 'Error al analizar el archivo XML';
+      errorDetail = error.message;
+    }
+
     res.status(500).json({
       success: false,
-      message: 'Error procesando archivo XML',
-      error: error.message
+      message: userMessage,
+      error: errorDetail,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }
@@ -1662,11 +1687,13 @@ async function uploadXmlDocumentsBatch(req, res) {
         console.log(`✅ Archivo ${i + 1} procesado: ${archivo.originalname} (${parsedData.protocolNumber})`);
 
       } catch (archivoError) {
-        console.error(`❌ Error procesando archivo ${archivo.originalname}:`, archivoError.message);
+        console.error(`❌ Error procesando archivo ${archivo.originalname}:`, archivoError);
+        const errorMessage = archivoError.message || 'Error desconocido al procesar archivo';
         errores.push({
           archivo: archivo.originalname,
-          error: archivoError.message,
-          indice: i + 1
+          error: errorMessage,
+          indice: i + 1,
+          detalles: process.env.NODE_ENV === 'development' ? archivoError.stack : undefined
         });
       }
     }
@@ -1680,6 +1707,19 @@ async function uploadXmlDocumentsBatch(req, res) {
     };
 
     console.log(`📊 Procesamiento en lote completado: ${exitosos.length}/${req.files.length} exitosos`);
+
+    // ⭐ FIX: Invalidar caché de documentos si hubo éxitos
+    if (exitosos.length > 0) {
+      try {
+        const cache = (await import('../services/cache-service.js')).default;
+        await cache.invalidateByTag('documents');
+        await cache.invalidateByTag('caja:all');
+        console.log('🗑️ Caché de documentos invalidado después de batch upload');
+      } catch (cacheError) {
+        console.warn('Error invalidando caché:', cacheError);
+        // No fallar la respuesta si hay error en caché
+      }
+    }
 
     res.status(exitosos.length > 0 ? 201 : 400).json({
       success: exitosos.length > 0,
@@ -1705,10 +1745,18 @@ async function uploadXmlDocumentsBatch(req, res) {
 
   } catch (error) {
     console.error('Error en procesamiento en lote:', error);
+
+    // Mejor manejo de errores para debugging
+    const errorMessage = error.message || 'Error desconocido';
+    const userMessage = error.message && error.message.includes('archivos')
+      ? error.message
+      : 'Error interno del servidor durante procesamiento en lote';
+
     res.status(500).json({
       success: false,
-      message: 'Error interno del servidor durante procesamiento en lote',
-      error: error.message
+      message: userMessage,
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }
@@ -4474,6 +4522,194 @@ async function getDocumentsCounts(req, res) {
   }
 }
 
+/**
+ * 📊 Obtener estadísticas completas para dashboard de CAJA
+ * GET /api/documents/caja-stats
+ * Retorna métricas de negocio: montos, trámites por tipo, tendencias
+ */
+async function getCajaStats(req, res) {
+  try {
+    // Solo CAJA y ADMIN pueden ver estas estadísticas
+    if (req.user.role !== 'CAJA' && req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para ver estas estadísticas'
+      });
+    }
+
+    // Calcular fecha de hace 7 y 30 días
+    const fecha7DiasAtras = new Date();
+    fecha7DiasAtras.setDate(fecha7DiasAtras.getDate() - 7);
+
+    const fecha30DiasAtras = new Date();
+    fecha30DiasAtras.setDate(fecha30DiasAtras.getDate() - 30);
+
+    // 📊 Estadísticas generales
+    const [
+      totalDocumentos,
+      totalFacturado,
+      tramitesPorTipo,
+      tramitesPorEstado,
+      tramitesUltimos7Dias,
+      tramitesUltimos30Dias,
+      montoUltimos7Dias,
+      montoUltimos30Dias
+    ] = await Promise.all([
+      // Total de documentos (excluyendo notas de crédito)
+      prisma.document.count({
+        where: {
+          status: {
+            not: 'ANULADO_NOTA_CREDITO'
+          }
+        }
+      }),
+
+      // Total facturado (excluyendo notas de crédito)
+      prisma.document.aggregate({
+        where: {
+          status: {
+            not: 'ANULADO_NOTA_CREDITO'
+          }
+        },
+        _sum: {
+          totalFactura: true
+        }
+      }),
+
+      // Trámites por tipo de documento
+      prisma.document.groupBy({
+        by: ['documentType'],
+        where: {
+          status: {
+            not: 'ANULADO_NOTA_CREDITO'
+          }
+        },
+        _count: {
+          id: true
+        },
+        _sum: {
+          totalFactura: true
+        }
+      }),
+
+      // Trámites por estado
+      prisma.document.groupBy({
+        by: ['status'],
+        where: {
+          status: {
+            not: 'ANULADO_NOTA_CREDITO'
+          }
+        },
+        _count: {
+          id: true
+        }
+      }),
+
+      // Trámites últimos 7 días
+      prisma.document.count({
+        where: {
+          status: {
+            not: 'ANULADO_NOTA_CREDITO'
+          },
+          createdAt: {
+            gte: fecha7DiasAtras
+          }
+        }
+      }),
+
+      // Trámites últimos 30 días
+      prisma.document.count({
+        where: {
+          status: {
+            not: 'ANULADO_NOTA_CREDITO'
+          },
+          createdAt: {
+            gte: fecha30DiasAtras
+          }
+        }
+      }),
+
+      // Monto últimos 7 días
+      prisma.document.aggregate({
+        where: {
+          status: {
+            not: 'ANULADO_NOTA_CREDITO'
+          },
+          createdAt: {
+            gte: fecha7DiasAtras
+          }
+        },
+        _sum: {
+          totalFactura: true
+        }
+      }),
+
+      // Monto últimos 30 días
+      prisma.document.aggregate({
+        where: {
+          status: {
+            not: 'ANULADO_NOTA_CREDITO'
+          },
+          createdAt: {
+            gte: fecha30DiasAtras
+          }
+        },
+        _sum: {
+          totalFactura: true
+        }
+      })
+    ]);
+
+    // Formatear datos de trámites por tipo
+    const tramitesPorTipoFormateado = tramitesPorTipo.reduce((acc, item) => {
+      acc[item.documentType] = {
+        cantidad: item._count.id,
+        monto: item._sum.totalFactura || 0
+      };
+      return acc;
+    }, {});
+
+    // Formatear datos de trámites por estado
+    const tramitesPorEstadoFormateado = tramitesPorEstado.reduce((acc, item) => {
+      acc[item.status] = item._count.id;
+      return acc;
+    }, {});
+
+    // Respuesta
+    res.json({
+      success: true,
+      data: {
+        general: {
+          totalTramites: totalDocumentos,
+          totalFacturado: totalFacturado._sum.totalFactura || 0
+        },
+        porTipo: tramitesPorTipoFormateado,
+        porEstado: tramitesPorEstadoFormateado,
+        tendencias: {
+          ultimos7Dias: {
+            cantidad: tramitesUltimos7Dias,
+            monto: montoUltimos7Dias._sum.totalFactura || 0
+          },
+          ultimos30Dias: {
+            cantidad: tramitesUltimos30Dias,
+            monto: montoUltimos30Dias._sum.totalFactura || 0
+          }
+        }
+      }
+    });
+
+    console.log('📊 Estadísticas de CAJA generadas exitosamente');
+
+  } catch (error) {
+    console.error('❌ Error en getCajaStats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor al obtener estadísticas',
+      error: error.message
+    });
+  }
+}
+
 export {
   uploadXmlDocument,
   uploadXmlDocumentsBatch,
@@ -4517,5 +4753,7 @@ export {
   getDocumentsUnified,
   getDocumentsCounts,
   // 💳 NUEVA FUNCIONALIDAD: Nota de Crédito
-  markAsNotaCredito
+  markAsNotaCredito,
+  // 📊 NUEVA FUNCIONALIDAD: Estadísticas de CAJA
+  getCajaStats
 };
