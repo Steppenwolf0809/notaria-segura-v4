@@ -199,10 +199,24 @@ async function uploadXmlDocument(req, res) {
 
   } catch (error) {
     console.error('Error procesando XML:', error);
+
+    // Determinar el tipo de error para mejor debugging
+    let userMessage = 'Error procesando archivo XML';
+    let errorDetail = error.message || 'Error desconocido';
+
+    if (error.message && error.message.includes('prisma')) {
+      userMessage = 'Error al guardar el documento en la base de datos';
+      errorDetail = error.message;
+    } else if (error.message && error.message.includes('XML')) {
+      userMessage = 'Error al analizar el archivo XML';
+      errorDetail = error.message;
+    }
+
     res.status(500).json({
       success: false,
-      message: 'Error procesando archivo XML',
-      error: error.message
+      message: userMessage,
+      error: errorDetail,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }
@@ -1662,11 +1676,13 @@ async function uploadXmlDocumentsBatch(req, res) {
         console.log(`✅ Archivo ${i + 1} procesado: ${archivo.originalname} (${parsedData.protocolNumber})`);
 
       } catch (archivoError) {
-        console.error(`❌ Error procesando archivo ${archivo.originalname}:`, archivoError.message);
+        console.error(`❌ Error procesando archivo ${archivo.originalname}:`, archivoError);
+        const errorMessage = archivoError.message || 'Error desconocido al procesar archivo';
         errores.push({
           archivo: archivo.originalname,
-          error: archivoError.message,
-          indice: i + 1
+          error: errorMessage,
+          indice: i + 1,
+          detalles: process.env.NODE_ENV === 'development' ? archivoError.stack : undefined
         });
       }
     }
@@ -1705,10 +1721,18 @@ async function uploadXmlDocumentsBatch(req, res) {
 
   } catch (error) {
     console.error('Error en procesamiento en lote:', error);
+
+    // Mejor manejo de errores para debugging
+    const errorMessage = error.message || 'Error desconocido';
+    const userMessage = error.message && error.message.includes('archivos')
+      ? error.message
+      : 'Error interno del servidor durante procesamiento en lote';
+
     res.status(500).json({
       success: false,
-      message: 'Error interno del servidor durante procesamiento en lote',
-      error: error.message
+      message: userMessage,
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }
