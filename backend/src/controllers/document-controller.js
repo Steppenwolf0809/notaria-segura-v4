@@ -4522,6 +4522,194 @@ async function getDocumentsCounts(req, res) {
   }
 }
 
+/**
+ * 📊 Obtener estadísticas completas para dashboard de CAJA
+ * GET /api/documents/caja-stats
+ * Retorna métricas de negocio: montos, trámites por tipo, tendencias
+ */
+async function getCajaStats(req, res) {
+  try {
+    // Solo CAJA y ADMIN pueden ver estas estadísticas
+    if (req.user.role !== 'CAJA' && req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para ver estas estadísticas'
+      });
+    }
+
+    // Calcular fecha de hace 7 y 30 días
+    const fecha7DiasAtras = new Date();
+    fecha7DiasAtras.setDate(fecha7DiasAtras.getDate() - 7);
+
+    const fecha30DiasAtras = new Date();
+    fecha30DiasAtras.setDate(fecha30DiasAtras.getDate() - 30);
+
+    // 📊 Estadísticas generales
+    const [
+      totalDocumentos,
+      totalFacturado,
+      tramitesPorTipo,
+      tramitesPorEstado,
+      tramitesUltimos7Dias,
+      tramitesUltimos30Dias,
+      montoUltimos7Dias,
+      montoUltimos30Dias
+    ] = await Promise.all([
+      // Total de documentos (excluyendo notas de crédito)
+      prisma.document.count({
+        where: {
+          status: {
+            not: 'ANULADO_NOTA_CREDITO'
+          }
+        }
+      }),
+
+      // Total facturado (excluyendo notas de crédito)
+      prisma.document.aggregate({
+        where: {
+          status: {
+            not: 'ANULADO_NOTA_CREDITO'
+          }
+        },
+        _sum: {
+          totalFactura: true
+        }
+      }),
+
+      // Trámites por tipo de documento
+      prisma.document.groupBy({
+        by: ['documentType'],
+        where: {
+          status: {
+            not: 'ANULADO_NOTA_CREDITO'
+          }
+        },
+        _count: {
+          id: true
+        },
+        _sum: {
+          totalFactura: true
+        }
+      }),
+
+      // Trámites por estado
+      prisma.document.groupBy({
+        by: ['status'],
+        where: {
+          status: {
+            not: 'ANULADO_NOTA_CREDITO'
+          }
+        },
+        _count: {
+          id: true
+        }
+      }),
+
+      // Trámites últimos 7 días
+      prisma.document.count({
+        where: {
+          status: {
+            not: 'ANULADO_NOTA_CREDITO'
+          },
+          createdAt: {
+            gte: fecha7DiasAtras
+          }
+        }
+      }),
+
+      // Trámites últimos 30 días
+      prisma.document.count({
+        where: {
+          status: {
+            not: 'ANULADO_NOTA_CREDITO'
+          },
+          createdAt: {
+            gte: fecha30DiasAtras
+          }
+        }
+      }),
+
+      // Monto últimos 7 días
+      prisma.document.aggregate({
+        where: {
+          status: {
+            not: 'ANULADO_NOTA_CREDITO'
+          },
+          createdAt: {
+            gte: fecha7DiasAtras
+          }
+        },
+        _sum: {
+          totalFactura: true
+        }
+      }),
+
+      // Monto últimos 30 días
+      prisma.document.aggregate({
+        where: {
+          status: {
+            not: 'ANULADO_NOTA_CREDITO'
+          },
+          createdAt: {
+            gte: fecha30DiasAtras
+          }
+        },
+        _sum: {
+          totalFactura: true
+        }
+      })
+    ]);
+
+    // Formatear datos de trámites por tipo
+    const tramitesPorTipoFormateado = tramitesPorTipo.reduce((acc, item) => {
+      acc[item.documentType] = {
+        cantidad: item._count.id,
+        monto: item._sum.totalFactura || 0
+      };
+      return acc;
+    }, {});
+
+    // Formatear datos de trámites por estado
+    const tramitesPorEstadoFormateado = tramitesPorEstado.reduce((acc, item) => {
+      acc[item.status] = item._count.id;
+      return acc;
+    }, {});
+
+    // Respuesta
+    res.json({
+      success: true,
+      data: {
+        general: {
+          totalTramites: totalDocumentos,
+          totalFacturado: totalFacturado._sum.totalFactura || 0
+        },
+        porTipo: tramitesPorTipoFormateado,
+        porEstado: tramitesPorEstadoFormateado,
+        tendencias: {
+          ultimos7Dias: {
+            cantidad: tramitesUltimos7Dias,
+            monto: montoUltimos7Dias._sum.totalFactura || 0
+          },
+          ultimos30Dias: {
+            cantidad: tramitesUltimos30Dias,
+            monto: montoUltimos30Dias._sum.totalFactura || 0
+          }
+        }
+      }
+    });
+
+    console.log('📊 Estadísticas de CAJA generadas exitosamente');
+
+  } catch (error) {
+    console.error('❌ Error en getCajaStats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor al obtener estadísticas',
+      error: error.message
+    });
+  }
+}
+
 export {
   uploadXmlDocument,
   uploadXmlDocumentsBatch,
@@ -4565,5 +4753,7 @@ export {
   getDocumentsUnified,
   getDocumentsCounts,
   // 💳 NUEVA FUNCIONALIDAD: Nota de Crédito
-  markAsNotaCredito
+  markAsNotaCredito,
+  // 📊 NUEVA FUNCIONALIDAD: Estadísticas de CAJA
+  getCajaStats
 };

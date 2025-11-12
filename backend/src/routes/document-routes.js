@@ -41,7 +41,9 @@ import {
   getDocumentsUnified,
   getDocumentsCounts,
   // 💳 NUEVA FUNCIONALIDAD: Nota de Crédito
-  markAsNotaCredito
+  markAsNotaCredito,
+  // 📊 NUEVA FUNCIONALIDAD: Estadísticas de CAJA
+  getCajaStats
 } from '../controllers/document-controller.js';
 
 // 🔄 NUEVAS IMPORTACIONES: Operaciones masivas
@@ -102,6 +104,9 @@ router.get('/all', authenticateToken, getAllDocuments);
 
 // 📊 GET /api/documents/counts - Conteos para badges (DEBE IR ANTES QUE /:id)
 router.get('/counts', authenticateToken, getDocumentsCounts);
+
+// 📊 GET /api/documents/caja-stats - Estadísticas completas para dashboard de CAJA
+router.get('/caja-stats', authenticateToken, getCajaStats);
 
 // GET /api/documents/my-documents - MATRIZADOR: Documentos del usuario
 router.get('/my-documents', authenticateToken, getMyDocuments);
