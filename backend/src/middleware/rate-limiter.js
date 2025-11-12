@@ -1,13 +1,17 @@
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { logSecurityViolation } from '../utils/audit-logger.js';
 
+// Determinar si estamos en modo desarrollo
+const isDevelopment = process.env.NODE_ENV !== 'production';
+
 /**
  * Rate limiter para cambio de contraseñas
  * Límite más estricto para operaciones sensibles
+ * EN DESARROLLO: Límite muy permisivo para facilitar pruebas
  */
 const passwordChangeRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 3, // Máximo 3 intentos por ventana de tiempo
+  max: isDevelopment ? 1000 : 3, // Desarrollo: 1000, Producción: 3
   message: {
     success: false,
     message: 'Demasiados intentos de cambio de contraseña. Intente nuevamente en 15 minutos.',
@@ -46,10 +50,13 @@ const passwordChangeRateLimit = rateLimit({
  * Rate limiter para intentos de login
  * Límite por combinación email+IP para entornos de oficina
  * Configurable via variables de entorno para pruebas
+ * EN DESARROLLO: Límite muy permisivo (10000) para facilitar pruebas múltiples
  */
 const loginRateLimit = rateLimit({
   windowMs: parseInt(process.env.LOGIN_RATE_LIMIT_WINDOW || '900000'), // Default: 15 minutos (15 * 60 * 1000)
-  max: parseInt(process.env.LOGIN_RATE_LIMIT_MAX || '50'), // Default: 50 intentos (aumentado para pruebas)
+  max: isDevelopment
+    ? 10000 // Desarrollo: límite muy alto
+    : parseInt(process.env.LOGIN_RATE_LIMIT_MAX || '50'), // Producción: 50 intentos
   message: {
     success: false,
     message: 'Demasiados intentos de inicio de sesión para esta cuenta. Intente nuevamente en 15 minutos.',
@@ -94,10 +101,13 @@ const loginRateLimit = rateLimit({
  * Rate limiter general para rutas de autenticación
  * Límite general para todas las operaciones de auth
  * Configurable via variables de entorno para pruebas
+ * EN DESARROLLO: Límite muy permisivo para facilitar pruebas
  */
 const authGeneralRateLimit = rateLimit({
   windowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW || '900000'), // Default: 15 minutos
-  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '100'), // Default: 100 requests (aumentado para pruebas)
+  max: isDevelopment
+    ? 10000 // Desarrollo: límite muy alto
+    : parseInt(process.env.AUTH_RATE_LIMIT_MAX || '100'), // Producción: 100 requests
   message: {
     success: false,
     message: 'Demasiadas peticiones a servicios de autenticación. Intente nuevamente más tarde.',
@@ -111,10 +121,11 @@ const authGeneralRateLimit = rateLimit({
 /**
  * Rate limiter muy estricto para registro de usuarios
  * Solo ADMIN puede registrar, pero limitamos para mayor seguridad
+ * EN DESARROLLO: Límite permisivo para facilitar pruebas
  */
 const registerRateLimit = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hora
-  max: 10, // Máximo 10 registros por hora por IP
+  max: isDevelopment ? 1000 : 10, // Desarrollo: 1000, Producción: 10
   message: {
     success: false,
     message: 'Límite de registros de usuarios alcanzado. Intente nuevamente en 1 hora.',
@@ -141,10 +152,11 @@ const addRateLimitHeaders = (req, res, next) => {
 /**
  * Rate limiter para operaciones administrativas
  * Límite por hora como solicitado en Sprint 1
+ * EN DESARROLLO: Límite permisivo para facilitar pruebas
  */
 const adminRateLimit = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hora
-  max: 100, // Máximo 100 requests por hora por IP
+  max: isDevelopment ? 10000 : 100, // Desarrollo: 10000, Producción: 100
   message: {
     success: false,
     message: 'Demasiadas operaciones administrativas. Intente nuevamente en 1 hora.',
