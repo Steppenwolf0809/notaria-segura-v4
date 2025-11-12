@@ -25,44 +25,28 @@ enum UserRole {
 
 // Modelo principal de usuarios
 model User {
-  id                Int       @id @default(autoincrement())
-  email             String    @unique
-  password          String
-  firstName         String
-  lastName          String
-  role              UserRole
-  isActive          Boolean   @default(true)
-  emailVerified     Boolean   @default(false)  // NUEVO: Verificación de email
-  emailVerifiedAt   DateTime?                  // NUEVO: Fecha de verificación
-  twoFactorEnabled  Boolean   @default(false)  // NUEVO: 2FA habilitado
-  twoFactorSecret   String?                    // NUEVO: Secret para 2FA
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-  lastLogin         DateTime?
-  lastLoginIp       String?                    // NUEVO: IP del último login
-  loginAttempts     Int       @default(0)      // NUEVO: Contador de intentos fallidos
-  lockedUntil       DateTime?                  // NUEVO: Bloqueo temporal por intentos fallidos
+  id          Int      @id @default(autoincrement())
+  email       String   @unique
+  password    String
+  firstName   String
+  lastName    String
+  role        UserRole
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lastLogin   DateTime?
 
   // Relaciones con documentos
   documents         Document[] @relation("AssignedDocuments")   // Documentos asignados (matrizador)
   createdDocuments  Document[] @relation("CreatedDocuments")    // Documentos creados (caja)
   deliveredDocuments Document[] @relation("DeliveredDocuments") // Documentos entregados (recepción)
-
+  
   // Relación de auditoría - NUEVA FUNCIONALIDAD
   documentEvents    DocumentEvent[]                            // Eventos de auditoría realizados por el usuario
   concuerdoAudits   ConcuerdoAuditLog[]                        // Auditoría de generación de concuerdos
   escriturasQR      EscrituraQR[]                              // Escrituras QR creadas por el usuario
 
-  // NUEVAS RELACIONES DE SEGURIDAD
-  passwordResetTokens      PasswordResetToken[]      // Tokens de recuperación de contraseña
-  emailVerificationTokens  EmailVerificationToken[]  // Tokens de verificación de email
-  refreshTokens            RefreshToken[]            // Refresh tokens para JWT
-  passwordHistory          PasswordHistory[]         // Historial de contraseñas
-  securityAlerts           SecurityAlert[]           // Alertas de seguridad
-
   @@map("users")
-  @@index([email])
-  @@index([lastLogin])
 }
 
 // Modelo de documentos
@@ -320,7 +304,7 @@ model EscrituraQR {
   createdBy               Int?     // FK al usuario matrizador que creó la escritura
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
-
+  
   // Campos para PDF completo (verificación pública)
   pdfFileName             String?  // Nombre del archivo PDF en FTP (TOKEN.pdf)
   pdfUploadedAt           DateTime? // Fecha de subida del PDF
@@ -339,111 +323,4 @@ model EscrituraQR {
   @@index([createdAt])
   @@index([createdBy])
   @@index([origenDatos])
-}
-
-// ============================================================================
-// NUEVOS MODELOS DE SEGURIDAD AVANZADA
-// ============================================================================
-
-// Token para recuperación de contraseña
-model PasswordResetToken {
-  id        String   @id @default(uuid())
-  token     String   @unique
-  userId    Int
-  expiresAt DateTime
-  used      Boolean  @default(false)
-  usedAt    DateTime?
-  ipAddress String?  // IP desde donde se solicitó
-  userAgent String?  // User agent del navegador
-  createdAt DateTime @default(now())
-
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("password_reset_tokens")
-  @@index([token])
-  @@index([userId])
-  @@index([expiresAt])
-}
-
-// Token para verificación de email
-model EmailVerificationToken {
-  id        String   @id @default(uuid())
-  token     String   @unique
-  userId    Int
-  email     String   // Email a verificar (puede ser nuevo email)
-  expiresAt DateTime
-  used      Boolean  @default(false)
-  usedAt    DateTime?
-  ipAddress String?
-  userAgent String?
-  createdAt DateTime @default(now())
-
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("email_verification_tokens")
-  @@index([token])
-  @@index([userId])
-  @@index([expiresAt])
-}
-
-// Refresh tokens con rotación
-model RefreshToken {
-  id           String    @id @default(uuid())
-  token        String    @unique
-  userId       Int
-  expiresAt    DateTime
-  revoked      Boolean   @default(false)
-  revokedAt    DateTime?
-  replacedBy   String?   // ID del token que reemplazó a este
-  ipAddress    String?
-  userAgent    String?
-  createdAt    DateTime  @default(now())
-  lastUsedAt   DateTime  @default(now())
-
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("refresh_tokens")
-  @@index([token])
-  @@index([userId])
-  @@index([expiresAt])
-  @@index([revoked])
-}
-
-// Historial de contraseñas (evitar reutilización)
-model PasswordHistory {
-  id           String   @id @default(uuid())
-  userId       Int
-  passwordHash String
-  createdAt    DateTime @default(now())
-
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("password_history")
-  @@index([userId])
-  @@index([createdAt])
-}
-
-// Alertas de seguridad
-model SecurityAlert {
-  id          String   @id @default(uuid())
-  userId      Int?     // Puede ser null para alertas globales
-  alertType   String   // "MULTIPLE_FAILED_LOGINS", "PASSWORD_CHANGED", "SUSPICIOUS_IP", etc
-  severity    String   // "low", "medium", "high", "critical"
-  message     String
-  details     String?  // JSON con información adicional
-  ipAddress   String?
-  userAgent   String?
-  resolved    Boolean  @default(false)
-  resolvedAt  DateTime?
-  resolvedBy  Int?     // Admin que resolvió la alerta
-  createdAt   DateTime @default(now())
-
-  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("security_alerts")
-  @@index([userId])
-  @@index([alertType])
-  @@index([severity])
-  @@index([resolved])
-  @@index([createdAt])
 }
