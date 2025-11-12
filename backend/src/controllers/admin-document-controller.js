@@ -731,7 +731,8 @@ async function deleteDocument(req, res) {
     });
 
     // Invalidar caché
-    await cache.invalidate(['documents', 'search:admin:oversight']);
+    await cache.invalidateByTag('documents');
+    await cache.invalidateByTag('search:admin:oversight');
 
     res.json({
       success: true,
@@ -847,7 +848,8 @@ async function bulkDeleteDocuments(req, res) {
     });
 
     // Invalidar caché
-    await cache.invalidate(['documents', 'search:admin:oversight']);
+    await cache.invalidateByTag('documents');
+    await cache.invalidateByTag('search:admin:oversight');
 
     res.json({
       success: true,
