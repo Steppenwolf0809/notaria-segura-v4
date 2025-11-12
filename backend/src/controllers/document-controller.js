@@ -169,9 +169,20 @@ async function uploadXmlDocument(req, res) {
       console.warn('No se pudo crear snapshot de extracción avanzada en uploadXmlDocument:', snapErr?.message || snapErr);
     }
 
+    // ⭐ FIX: Invalidar caché de documentos para que se muestren los nuevos
+    try {
+      const cache = (await import('../services/cache-service.js')).default;
+      await cache.invalidateByTag('documents');
+      await cache.invalidateByTag('caja:all');
+      console.log('🗑️ Caché de documentos invalidado después de subir XML');
+    } catch (cacheError) {
+      console.warn('Error invalidando caché:', cacheError);
+      // No fallar la respuesta si hay error en caché
+    }
+
     res.status(201).json({
       success: true,
-      message: assignmentResult.assigned 
+      message: assignmentResult.assigned
         ? `Documento XML procesado y asignado automáticamente a ${assignmentResult.matrizador.firstName} ${assignmentResult.matrizador.lastName}`
         : 'Documento XML procesado exitosamente (sin asignación automática)',
       data: {
@@ -1696,6 +1707,19 @@ async function uploadXmlDocumentsBatch(req, res) {
     };
 
     console.log(`📊 Procesamiento en lote completado: ${exitosos.length}/${req.files.length} exitosos`);
+
+    // ⭐ FIX: Invalidar caché de documentos si hubo éxitos
+    if (exitosos.length > 0) {
+      try {
+        const cache = (await import('../services/cache-service.js')).default;
+        await cache.invalidateByTag('documents');
+        await cache.invalidateByTag('caja:all');
+        console.log('🗑️ Caché de documentos invalidado después de batch upload');
+      } catch (cacheError) {
+        console.warn('Error invalidando caché:', cacheError);
+        // No fallar la respuesta si hay error en caché
+      }
+    }
 
     res.status(exitosos.length > 0 ? 201 : 400).json({
       success: exitosos.length > 0,
