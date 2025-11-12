@@ -458,6 +458,47 @@ const adminService = {
     };
   },
 
+  /**
+   * Eliminar un documento específico (hard delete)
+   * @param {string} documentId - ID del documento a eliminar
+   * @param {string} token - Token JWT del admin
+   * @returns {Promise<Object>} Confirmación de eliminación
+   */
+  deleteDocument: async (documentId, token) => {
+    try {
+      const response = await api.delete(`/documents/${documentId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      return response.data;
+    } catch (error) {
+      throw adminService.handleError(error);
+    }
+  },
+
+  /**
+   * Eliminar múltiples documentos en lote (hard delete)
+   * @param {Array} documentIds - Array de IDs de documentos a eliminar
+   * @param {string} token - Token JWT del admin
+   * @returns {Promise<Object>} Resultado de la eliminación masiva
+   */
+  bulkDeleteDocuments: async (documentIds, token) => {
+    try {
+      const response = await api.post('/documents/bulk-delete',
+        { documentIds },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw adminService.handleError(error);
+    }
+  },
+
   // ============================================================================
   // WHATSAPP TEMPLATES - Gestión de plantillas de mensajes
   // ============================================================================

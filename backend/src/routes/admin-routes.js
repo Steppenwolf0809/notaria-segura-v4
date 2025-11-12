@@ -15,7 +15,9 @@ import {
   getDocumentEvents,
   getBulkDocumentsInfo,
   executeBulkDocumentOperation,
-  exportDocuments
+  exportDocuments,
+  deleteDocument,
+  bulkDeleteDocuments
 } from '../controllers/admin-document-controller.js';
 
 import {
@@ -177,6 +179,23 @@ router.post('/documents/bulk-operation', executeBulkDocumentOperation);
  * @query Otros filtros como en oversight
  */
 router.get('/documents/export', exportDocuments);
+
+/**
+ * @route DELETE /api/admin/documents/:id
+ * @desc Eliminar un documento específico (hard delete)
+ * @access Private (ADMIN only)
+ * @warning Esta acción es irreversible y eliminará el documento y todos sus eventos asociados
+ */
+router.delete('/documents/:id', deleteDocument);
+
+/**
+ * @route POST /api/admin/documents/bulk-delete
+ * @desc Eliminar múltiples documentos en lote
+ * @access Private (ADMIN only)
+ * @body documentIds - Array de IDs de documentos a eliminar
+ * @warning Esta acción es irreversible
+ */
+router.post('/documents/bulk-delete', bulkDeleteDocuments);
 
 // ============================================================================
 // RUTAS DE GESTIÓN DE NOTIFICACIONES - ADMIN
