@@ -681,10 +681,197 @@ async function getBasicDocumentStats() {
   }
 }
 
+/**
+ * Eliminar un documento específico (hard delete)
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+async function deleteDocument(req, res) {
+  try {
+    const { id } = req.params;
+    const requestInfo = extractRequestInfo(req);
+
+    // Verificar que el documento existe
+    const document = await prisma.document.findUnique({
+      where: { id },
+      include: {
+        assignedTo: { select: { firstName: true, lastName: true } },
+        createdBy: { select: { firstName: true, lastName: true } }
+      }
+    });
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Documento no encontrado'
+      });
+    }
+
+    // Eliminar el documento (los eventos asociados se eliminarán en cascada)
+    await prisma.document.delete({
+      where: { id }
+    });
+
+    // Log de auditoría
+    await logAdminAction({
+      adminUserId: req.user.id,
+      adminEmail: req.user.email,
+      action: 'DELETE_DOCUMENT',
+      targetType: 'document',
+      targetId: id,
+      details: JSON.stringify({
+        protocolNumber: document.protocolNumber,
+        clientName: document.clientName,
+        documentType: document.documentType,
+        status: document.status,
+        adminOverride: true
+      }),
+      ipAddress: requestInfo.ipAddress,
+      userAgent: requestInfo.userAgent
+    });
+
+    // Invalidar caché
+    await cache.invalidateByTag('documents');
+    await cache.invalidateByTag('search:admin:oversight');
+
+    res.json({
+      success: true,
+      message: `Documento ${document.protocolNumber} eliminado exitosamente`,
+      data: {
+        deletedDocument: {
+          id: document.id,
+          protocolNumber: document.protocolNumber,
+          clientName: document.clientName
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error en deleteDocument:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+}
+
+/**
+ * Eliminar múltiples documentos en lote (hard delete)
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+async function bulkDeleteDocuments(req, res) {
+  try {
+    const { documentIds } = req.body;
+    const requestInfo = extractRequestInfo(req);
+
+    if (!Array.isArray(documentIds) || documentIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Se requiere un array de IDs de documentos'
+      });
+    }
+
+    const results = {
+      successCount: 0,
+      errorCount: 0,
+      deletedDocuments: [],
+      errors: []
+    };
+
+    // Obtener información de los documentos antes de eliminarlos
+    const documentsToDelete = await prisma.document.findMany({
+      where: { id: { in: documentIds } },
+      select: {
+        id: true,
+        protocolNumber: true,
+        clientName: true,
+        documentType: true,
+        status: true
+      }
+    });
+
+    // Eliminar documentos uno por uno para mantener un registro preciso
+    for (const doc of documentsToDelete) {
+      try {
+        await prisma.document.delete({
+          where: { id: doc.id }
+        });
+
+        results.deletedDocuments.push({
+          id: doc.id,
+          protocolNumber: doc.protocolNumber,
+          clientName: doc.clientName
+        });
+
+        results.successCount++;
+
+        // Log de auditoría para cada documento
+        await logAdminAction({
+          adminUserId: req.user.id,
+          adminEmail: req.user.email,
+          action: 'BULK_DELETE_DOCUMENT',
+          targetType: 'document',
+          targetId: doc.id,
+          details: JSON.stringify({
+            protocolNumber: doc.protocolNumber,
+            clientName: doc.clientName,
+            documentType: doc.documentType,
+            status: doc.status,
+            bulkOperation: true
+          }),
+          ipAddress: requestInfo.ipAddress,
+          userAgent: requestInfo.userAgent
+        });
+
+      } catch (error) {
+        console.error(`Error eliminando documento ${doc.id}:`, error);
+        results.errors.push({
+          documentId: doc.id,
+          protocolNumber: doc.protocolNumber,
+          message: error.message || 'Error al eliminar'
+        });
+        results.errorCount++;
+      }
+    }
+
+    // Verificar si algunos IDs no se encontraron
+    const foundIds = documentsToDelete.map(d => d.id);
+    const notFoundIds = documentIds.filter(id => !foundIds.includes(id));
+
+    notFoundIds.forEach(id => {
+      results.errors.push({
+        documentId: id,
+        message: 'Documento no encontrado'
+      });
+      results.errorCount++;
+    });
+
+    // Invalidar caché
+    await cache.invalidateByTag('documents');
+    await cache.invalidateByTag('search:admin:oversight');
+
+    res.json({
+      success: true,
+      message: `Eliminación completada: ${results.successCount} documentos eliminados`,
+      data: { results }
+    });
+
+  } catch (error) {
+    console.error('Error en bulkDeleteDocuments:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+}
+
 export {
   getAllDocumentsOversight,
   getDocumentEvents,
   getBulkDocumentsInfo,
   executeBulkDocumentOperation,
-  exportDocuments
+  exportDocuments,
+  deleteDocument,
+  bulkDeleteDocuments
 };

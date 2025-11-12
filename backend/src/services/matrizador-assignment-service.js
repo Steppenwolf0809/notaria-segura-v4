@@ -54,8 +54,9 @@ class MatrizadorAssignmentService {
 
       // 1. Buscar coincidencia exacta (nombre completo)
       const coincidenciaExacta = matrizadores.find(matrizador => {
-        const nombreCompleto = `${matrizador.firstName} ${matrizador.lastName}`.toLowerCase();
-        return nombreCompleto === nombreLimpio.toLowerCase();
+        const nombreCompleto = `${matrizador.firstName} ${matrizador.lastName}`;
+        const nombreCompletoNormalizado = this.normalizeMatrizadorName(nombreCompleto);
+        return nombreCompletoNormalizado === nombreLimpio;
       });
 
       if (coincidenciaExacta) {
@@ -115,32 +116,38 @@ class MatrizadorAssignmentService {
 
   /**
    * Normaliza el nombre del matrizador del XML
+   * Elimina tildes, acentos, caracteres especiales y normaliza espacios
    * @param {string} nombre - Nombre a normalizar
-   * @returns {string} Nombre normalizado
+   * @returns {string} Nombre normalizado sin tildes
    */
   normalizeMatrizadorName(nombre) {
     return nombre
       .trim()
       .replace(/\s+/g, ' ') // Múltiples espacios a uno solo
-      .replace(/[^\w\sáéíóúüñ]/gi, '') // Remover caracteres especiales
+      .normalize('NFD') // Descomponer caracteres unicode (á -> a + ´)
+      .replace(/[\u0300-\u036f]/g, '') // Eliminar diacríticos (tildes, acentos)
+      .replace(/[^\w\s]/gi, '') // Remover caracteres especiales
       .toLowerCase();
   }
 
   /**
    * Verifica si hay coincidencia parcial entre nombres
-   * @param {string} nombreXml - Nombre del XML normalizado
+   * @param {string} nombreXml - Nombre del XML normalizado (ya sin tildes)
    * @param {string} firstName - Nombre del usuario
    * @param {string} lastName - Apellido del usuario
    * @returns {boolean} True si hay coincidencia
    */
   matchesPartialName(nombreXml, firstName, lastName) {
-    const palabrasXml = nombreXml.toLowerCase().split(' ');
-    const palabrasUsuario = `${firstName} ${lastName}`.toLowerCase().split(' ');
+    // Normalizar el nombre del usuario (eliminar tildes igual que el XML)
+    const nombreUsuarioNormalizado = this.normalizeMatrizadorName(`${firstName} ${lastName}`);
+
+    const palabrasXml = nombreXml.split(' ');
+    const palabrasUsuario = nombreUsuarioNormalizado.split(' ');
 
     // Verificar que al menos coincida el primer nombre
     const primerNombreXml = palabrasXml[0];
     const primerNombreUsuario = palabrasUsuario[0];
-    
+
     // Si el primer nombre no coincide, no es una buena coincidencia
     if (!primerNombreUsuario.includes(primerNombreXml) && !primerNombreXml.includes(primerNombreUsuario)) {
       return false;
@@ -148,10 +155,10 @@ class MatrizadorAssignmentService {
 
     // Contar cuántas palabras del XML coinciden con palabras del usuario
     let coincidencias = 0;
-    
+
     for (const palabraXml of palabrasXml) {
       if (palabraXml.length < 3) continue; // Ignorar palabras muy cortas
-      
+
       for (const palabraUsuario of palabrasUsuario) {
         if (palabraUsuario.includes(palabraXml) || palabraXml.includes(palabraUsuario)) {
           coincidencias++;
@@ -220,7 +227,7 @@ class MatrizadorAssignmentService {
             userId: originalDocument.createdById, // Usuario que creó el documento
             eventType: 'DOCUMENT_ASSIGNED',
             description: `Documento asignado automáticamente a ${matrizador.firstName} ${matrizador.lastName} (${matrizador.role})`,
-            details: {
+            details: JSON.stringify({
               assignedFrom: originalDocument.assignedToId,
               assignedTo: matrizador.id,
               matrizadorName: `${matrizador.firstName} ${matrizador.lastName}`,
@@ -230,7 +237,7 @@ class MatrizadorAssignmentService {
               assignmentType: 'AUTOMATIC',
               xmlMatrizadorName: matrizadorNameFromXml,
               timestamp: new Date().toISOString()
-            },
+            }),
             ipAddress: 'system',
             userAgent: 'auto-assignment-service'
           }
