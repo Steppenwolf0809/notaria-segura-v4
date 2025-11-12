@@ -165,7 +165,8 @@ export async function extractDataWithGemini(pdfText) {
   }
 
   const debugExtraction = String(process.env.DEBUG_EXTRACTION_METHOD || '').toLowerCase() === 'true'
-  const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-flash'
+  // NOTA: Gemini 1.5 fue deprecado en Abril 2025. Usar Gemini 2.x
+  const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
 
   for (let attempt = 0; attempt <= CONFIG.maxRetries; attempt++) {
     try {
