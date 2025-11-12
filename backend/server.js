@@ -9,20 +9,20 @@ import { closePrismaClient, db } from './src/db.js'
 import { getConfig, isConfigurationComplete, validateConfigurationComplete, debugConfiguration } from './src/config/environment.js'
 import xmlWatcherService from './src/services/xml-watcher-service.js'
 import cache from './src/services/cache-service.js'
-import { log } from './src/utils/logger.js'
-import { requestLogger } from './src/middleware/request-logger.js'
-import {
-  noSqlSanitizer,
-  hppProtection,
-  xssSanitizer,
-  validateContentType,
-  sanitizeSensitiveFields
-} from './src/middleware/sanitization.js'
+// import { log } from './src/utils/logger.js'
+// import { requestLogger } from './src/middleware/request-logger.js'
+// import {
+//   noSqlSanitizer,
+//   hppProtection,
+//   xssSanitizer,
+//   validateContentType,
+//   sanitizeSensitiveFields
+// } from './src/middleware/sanitization.js'
 
 // Importar rutas implementadas
 import authRoutes from './src/routes/auth-routes.js'
-import passwordRecoveryRoutes from './src/routes/password-recovery-routes.js'
-import profileRoutes from './src/routes/profile-routes.js'
+// import passwordRecoveryRoutes from './src/routes/password-recovery-routes.js'
+// import profileRoutes from './src/routes/profile-routes.js'
 import documentRoutes from './src/routes/document-routes.js'
 import notificationsRoutes from './src/routes/notifications-routes.js'
 import adminRoutes from './src/routes/admin-routes.js'
@@ -248,26 +248,26 @@ app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
 // ============================================================================
-// MIDDLEWARES DE SANITIZACIÓN Y SEGURIDAD ADICIONALES
+// MIDDLEWARES DE SANITIZACIÓN Y SEGURIDAD ADICIONALES - TEMPORALMENTE DESHABILITADOS
 // ============================================================================
 
-// Validar Content-Type
-app.use(validateContentType)
+// // Validar Content-Type
+// app.use(validateContentType)
 
-// Protección contra NoSQL injection
-app.use(noSqlSanitizer)
+// // Protección contra NoSQL injection
+// app.use(noSqlSanitizer)
 
-// Protección contra HTTP Parameter Pollution
-app.use(hppProtection)
+// // Protección contra HTTP Parameter Pollution
+// app.use(hppProtection)
 
-// Sanitización XSS
-app.use(xssSanitizer)
+// // Sanitización XSS
+// app.use(xssSanitizer)
 
-// Sanitización de campos sensibles
-app.use(sanitizeSensitiveFields)
+// // Sanitización de campos sensibles
+// app.use(sanitizeSensitiveFields)
 
-// Request logger con Winston
-app.use(requestLogger)
+// // Request logger con Winston
+// app.use(requestLogger)
 
 // Performance logger: registra requests lentas (>500ms)
 app.use((req, res, next) => {
@@ -278,15 +278,10 @@ app.use((req, res, next) => {
       const ms = Number((end - start) / 1000000n);
       const threshold = parseInt(process.env.SLOW_REQUEST_MS || '500', 10);
       if (ms > threshold) {
-        log.warn(`Slow request detected: ${req.method} ${req.originalUrl} → ${ms}ms`, {
-          method: req.method,
-          url: req.originalUrl,
-          duration: ms,
-          threshold
-        });
+        console.log(`🐢 Slow ${req.method} ${req.originalUrl} → ${ms}ms`);
       }
     } catch (error) {
-      log.error('Error in performance logger', error);
+      // Ignore errors in performance logger
     }
   });
   next();
@@ -350,11 +345,11 @@ app.get('/api/health/feature-flags', (req, res) => {
 // RUTAS DE AUTENTICACIÓN (/api/auth/*)
 app.use('/api/auth', authRoutes)
 
-// RUTAS DE RECUPERACIÓN DE CONTRASEÑA (/api/password-recovery/*)
-app.use('/api/password-recovery', passwordRecoveryRoutes)
+// RUTAS DE RECUPERACIÓN DE CONTRASEÑA (/api/password-recovery/*) - TEMPORALMENTE DESHABILITADAS
+// app.use('/api/password-recovery', passwordRecoveryRoutes)
 
-// RUTAS DE GESTIÓN DE PERFIL (/api/profile/*)
-app.use('/api/profile', profileRoutes)
+// RUTAS DE GESTIÓN DE PERFIL (/api/profile/*) - TEMPORALMENTE DESHABILITADAS
+// app.use('/api/profile', profileRoutes)
 
 // RUTAS DE DOCUMENTOS (/api/documents/*)
 app.use('/api/documents', documentRoutes)
