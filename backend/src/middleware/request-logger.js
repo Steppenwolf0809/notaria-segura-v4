@@ -1,4 +1,4 @@
-import { logRequest } from '../utils/logger.js';
+import { logRequest, log } from '../utils/logger.js';
 
 /**
  * Middleware para logging de requests HTTP
@@ -57,7 +57,6 @@ export function slowRequestLogger(req, res, next) {
   res.on('finish', () => {
     const duration = Date.now() - startTime;
     if (duration > slowThreshold) {
-      const { log } = await import('../utils/logger.js');
       log.warn(`Slow request detected`, {
         method: req.method,
         url: req.originalUrl,
