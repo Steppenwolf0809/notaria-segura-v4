@@ -4,7 +4,6 @@ import {
   login,
   getUserProfile,
   refreshToken,
-  refreshTokenWithRotation,
   initUsers,
   changePassword
 } from '../controllers/auth-controller.js';
@@ -60,8 +59,9 @@ router.post('/refresh', authenticateToken, refreshToken);
  * @route POST /api/auth/refresh-token
  * @desc Refrescar token con rotación automática (recomendado)
  * @access Public
+ * @note TEMPORALMENTE DESHABILITADO - Requiere migración de DB
  */
-router.post('/refresh-token', refreshTokenWithRotation);
+// router.post('/refresh-token', refreshTokenWithRotation);
 
 /**
  * @route GET /api/auth/verify
