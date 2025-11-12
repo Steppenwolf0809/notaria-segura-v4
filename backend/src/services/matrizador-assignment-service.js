@@ -220,7 +220,7 @@ class MatrizadorAssignmentService {
             userId: originalDocument.createdById, // Usuario que creó el documento
             eventType: 'DOCUMENT_ASSIGNED',
             description: `Documento asignado automáticamente a ${matrizador.firstName} ${matrizador.lastName} (${matrizador.role})`,
-            details: {
+            details: JSON.stringify({
               assignedFrom: originalDocument.assignedToId,
               assignedTo: matrizador.id,
               matrizadorName: `${matrizador.firstName} ${matrizador.lastName}`,
@@ -230,7 +230,7 @@ class MatrizadorAssignmentService {
               assignmentType: 'AUTOMATIC',
               xmlMatrizadorName: matrizadorNameFromXml,
               timestamp: new Date().toISOString()
-            },
+            }),
             ipAddress: 'system',
             userAgent: 'auto-assignment-service'
           }
