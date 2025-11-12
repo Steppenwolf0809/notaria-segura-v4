@@ -151,9 +151,10 @@ const BatchUpload = () => {
         
         // Limpiar archivos seleccionados después del éxito
         setSelectedFiles([]);
-        
-        // Recargar documentos
-        await fetchAllDocuments();
+
+        // ⭐ Recargar documentos con parámetros explícitos para asegurar actualización
+        await fetchAllDocuments(1, 50);
+        console.log('📊 Store de documentos actualizado después de batch upload');
       } else {
         toast.error(`Error en procesamiento: ${result.error}`);
       }

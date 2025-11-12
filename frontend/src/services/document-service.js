@@ -1095,6 +1095,32 @@ const documentService = {
         message: errorMessage
       };
     }
+  },
+
+  /**
+   * 📊 Obtener estadísticas completas para dashboard de CAJA
+   * @returns {Promise<Object>} Estadísticas de negocio (montos, trámites, tendencias)
+   */
+  async getCajaStats() {
+    try {
+      const response = await api.get('/documents/caja-stats');
+
+      return {
+        success: true,
+        data: response.data.data
+      };
+    } catch (error) {
+      console.error('Error obteniendo estadísticas de CAJA:', error);
+
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
+                          'Error al cargar estadísticas';
+
+      return {
+        success: false,
+        error: errorMessage
+      };
+    }
   }
 };
 
