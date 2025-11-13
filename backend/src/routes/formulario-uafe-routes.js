@@ -75,7 +75,7 @@ router.post('/asignar', authenticateToken, async (req, res) => {
     })
 
     // Generar link público
-    const linkPublico = `${process.env.FRONTEND_URL || 'https://notaria18quito.com.ec'}/formulario-uafe/${token}`
+    const linkPublico = `${process.env.PUBLIC_FORMS_URL || 'https://notaria18quito.com.ec'}/formulario-uafe/${token}`
 
     res.json({
       success: true,
@@ -166,7 +166,7 @@ router.get('/mis-asignaciones', authenticateToken, async (req, res) => {
         calidadPersona: a.calidadPersona,
         actuaPor: a.actuaPor,
         token: a.token,
-        linkPublico: `${process.env.FRONTEND_URL || 'https://notaria18quito.com.ec'}/formulario-uafe/${a.token}`,
+        linkPublico: `${process.env.PUBLIC_FORMS_URL || 'https://notaria18quito.com.ec'}/formulario-uafe/${a.token}`,
         estado: a.estado,
         persona: {
           numeroIdentificacion: a.persona.numeroIdentificacion,
@@ -247,7 +247,7 @@ router.get('/asignacion/:id', authenticateToken, async (req, res) => {
       success: true,
       asignacion: {
         ...asignacion,
-        linkPublico: `${process.env.FRONTEND_URL || 'https://notaria18quito.com.ec'}/formulario-uafe/${asignacion.token}`
+        linkPublico: `${process.env.PUBLIC_FORMS_URL || 'https://notaria18quito.com.ec'}/formulario-uafe/${asignacion.token}`
       }
     })
   } catch (error) {
