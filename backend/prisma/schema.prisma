@@ -45,6 +45,7 @@ model User {
   documentEvents    DocumentEvent[]                            // Eventos de auditoría realizados por el usuario
   concuerdoAudits   ConcuerdoAuditLog[]                        // Auditoría de generación de concuerdos
   escriturasQR      EscrituraQR[]                              // Escrituras QR creadas por el usuario
+  auditoriaPersonas AuditoriaPersona[]                         // Auditoría de reseteos de PIN de personas
 
   @@map("users")
 }
@@ -323,4 +324,97 @@ model EscrituraQR {
   @@index([createdAt])
   @@index([createdBy])
   @@index([origenDatos])
+}
+
+// ============================================================================
+// SISTEMA DE PERSONAS - AUTENTICACIÓN CON PIN (SUBSISTEMA 1)
+// ============================================================================
+
+// Modelo principal de personas registradas con PIN
+model PersonaRegistrada {
+  id                    String   @id @default(uuid())
+  numeroIdentificacion  String   @unique
+  tipoPersona           String   // "NATURAL" o "JURIDICA"
+
+  // 🔐 AUTENTICACIÓN
+  pinHash               String   // Hash bcrypt del PIN (NUNCA el PIN en texto plano)
+  pinCreado             Boolean  @default(false)
+  pinResetCount         Int      @default(0)  // Contador de veces que se reseteo
+
+  // 🛡️ SEGURIDAD
+  intentosFallidos      Int      @default(0)
+  bloqueadoHasta        DateTime? // NULL = no bloqueado, DateTime = bloqueado hasta...
+  ultimoAcceso          DateTime?
+  ultimoIntentoFallido  DateTime?
+
+  // 📄 DATOS DEL FORMULARIO UAFE
+  // JSON porque P. Natural y P. Jurídica tienen estructuras MUY diferentes
+  datosPersonaNatural   Json?
+  datosPersonaJuridica  Json?
+  completado            Boolean  @default(false)  // true = formulario completo
+
+  // 📅 METADATA
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // 🔗 RELACIONES
+  sesiones              SesionPersonal[]
+  auditoria             AuditoriaPersona[]
+
+  @@map("personas_registradas")
+  @@index([numeroIdentificacion])  // Búsqueda rápida por cédula
+  @@index([bloqueadoHasta])         // Consulta eficiente de bloqueados
+}
+
+// Modelo para gestionar sesiones temporales de personas
+model SesionPersonal {
+  id              String   @id @default(uuid())
+  personaId       String
+  token           String   @unique  // Token de sesión (UUID)
+
+  // ⏰ EXPIRACIÓN
+  expiraEn        DateTime  // Timestamp absoluto de expiración
+  ultimaActividad DateTime @default(now())  // Se actualiza en cada request
+
+  // 🌐 TRACKING (para auditoría y seguridad)
+  ipAddress       String?
+  userAgent       String?
+
+  createdAt       DateTime @default(now())
+
+  // 🔗 RELACIÓN
+  persona         PersonaRegistrada @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  @@map("sesiones_personales")
+  @@index([token])       // Búsqueda ultra-rápida por token
+  @@index([personaId])   // Ver sesiones de una persona
+  @@index([expiraEn])    // Cleanup de sesiones expiradas
+}
+
+// Modelo para auditoría de acciones de personas
+model AuditoriaPersona {
+  id              String   @id @default(uuid())
+  personaId       String
+
+  // 📝 EVENTO
+  tipo            String   // "REGISTRO", "LOGIN", "PIN_FALLIDO", "PIN_RESET", "BLOQUEO", "DESBLOQUEO", "ACTUALIZACION"
+  descripcion     String   // Descripción legible del evento
+
+  // 👤 RESPONSABLE
+  matrizadorId    Int?     // NULL = acción del propio usuario, INT = matrizador que hizo el reseteo
+  matrizador      User?    @relation(fields: [matrizadorId], references: [id])
+
+  // 🌐 TRACKING
+  ipAddress       String?
+  userAgent       String?
+
+  createdAt       DateTime @default(now())
+
+  // 🔗 RELACIÓN
+  persona         PersonaRegistrada @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  @@map("auditoria_personas")
+  @@index([personaId])    // Historial de una persona
+  @@index([tipo])         // Filtrar por tipo de evento
+  @@index([createdAt])    // Orden cronológico
 }
