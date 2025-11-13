@@ -6,6 +6,24 @@ import crypto from 'crypto'
 
 const router = express.Router()
 
+console.log('✅ Formulario UAFE routes loaded successfully')
+
+// ============================================================================
+// HEALTH CHECK
+// ============================================================================
+
+/**
+ * GET /api/formulario-uafe/health
+ * Health check para verificar que las rutas están funcionando
+ */
+router.get('/health', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Formulario UAFE routes are working',
+    timestamp: new Date().toISOString()
+  })
+})
+
 // ============================================================================
 // ENDPOINTS PARA MATRIZADORES
 // ============================================================================
