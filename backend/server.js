@@ -22,6 +22,7 @@ import concuerdoRoutes from './src/routes/concuerdo-routes.js'
 import escriturasQRRoutes from './src/routes/escrituras-qr-routes.js'
 import pdfProxyRoutes from './src/routes/pdf-proxy-routes.js'
 import personalRoutes from './src/routes/personal-routes.js'
+import formularioUAFERoutes from './src/routes/formulario-uafe-routes.js'
 
 // Cargar variables de entorno
 dotenv.config({ path: './.env' })
@@ -327,6 +328,9 @@ app.use('/api', pdfProxyRoutes)
 
 // RUTAS DE SISTEMA PERSONAL (/api/personal/*)
 app.use('/api/personal', personalRoutes)
+
+// RUTAS DE FORMULARIOS UAFE (/api/formulario-uafe/*)
+app.use('/api/formulario-uafe', formularioUAFERoutes)
 
 // ============================================================================
 // SERVIR ARCHIVOS ESTÁTICOS DEL FRONTEND
