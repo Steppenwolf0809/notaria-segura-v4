@@ -34,7 +34,8 @@ import {
   Person as PersonIcon,
   Description as DocumentIcon,
   CalendarToday as CalendarIcon,
-  AttachMoney as MoneyIcon
+  AttachMoney as MoneyIcon,
+  AssignmentInd as AssignmentIndIcon
 } from '@mui/icons-material';
 import { useHotkeys } from 'react-hotkeys-hook';
 import useReceptionsStore from '../store/receptions-store';
