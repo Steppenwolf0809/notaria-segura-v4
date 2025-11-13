@@ -297,7 +297,12 @@ const useDocumentStore = create((set, get) => ({
           documents: updatedDocuments,
           loading: false
         });
-        
+
+        // Forzar re-render para asegurar actualización visual
+        setTimeout(() => {
+          set({ documents: [...updatedDocuments] });
+        }, 100);
+
         // Devolver el resultado completo para que el modal pueda usarlo
         return result;
       } else {
