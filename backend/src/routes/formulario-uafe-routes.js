@@ -333,6 +333,71 @@ router.put('/asignacion/:id', authenticateToken, async (req, res) => {
   }
 })
 
+/**
+ * DELETE /api/formulario-uafe/asignacion/:id
+ * Eliminar asignación de formulario
+ */
+router.delete('/asignacion/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params
+
+    // Validar que el usuario sea matrizador
+    if (req.user.role !== 'MATRIZADOR' && req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        error: 'Solo los matrizadores pueden eliminar asignaciones'
+      })
+    }
+
+    // Verificar que la asignación existe
+    const asignacion = await db.formularioUAFEAsignacion.findUnique({
+      where: { id },
+      include: {
+        respuesta: true
+      }
+    })
+
+    if (!asignacion) {
+      return res.status(404).json({
+        success: false,
+        error: 'Asignación no encontrada'
+      })
+    }
+
+    // Verificar que la asignación pertenece al matrizador
+    if (asignacion.matrizadorId !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        error: 'No tienes permiso para eliminar esta asignación'
+      })
+    }
+
+    // Si existe respuesta, eliminarla primero
+    if (asignacion.respuesta) {
+      await db.formularioUAFERespuesta.delete({
+        where: { id: asignacion.respuesta.id }
+      })
+    }
+
+    // Eliminar asignación
+    await db.formularioUAFEAsignacion.delete({
+      where: { id }
+    })
+
+    res.json({
+      success: true,
+      message: 'Asignación eliminada exitosamente'
+    })
+  } catch (error) {
+    console.error('❌ Error al eliminar asignación:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Error al eliminar asignación',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    })
+  }
+})
+
 // ============================================================================
 // ENDPOINTS PÚBLICOS (con autenticación PIN)
 // ============================================================================

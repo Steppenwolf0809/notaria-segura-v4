@@ -40,7 +40,8 @@ import {
   Cancel as ExpiredIcon,
   Search as SearchIcon,
   Link as LinkIcon,
-  Edit
+  Edit,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import { API_BASE } from '../utils/apiConfig';
 
@@ -287,6 +288,39 @@ const FormulariosUAFE = () => {
   };
 
   /**
+   * Eliminar asignación
+   */
+  const eliminarAsignacion = async (asignacion) => {
+    if (!window.confirm(`¿Estás seguro de eliminar la asignación para ${asignacion.persona.nombre}?`)) {
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE}/formulario-uafe/asignacion/${asignacion.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        mostrarSnackbar('Asignación eliminada exitosamente', 'success');
+        cargarAsignaciones();
+      } else {
+        mostrarSnackbar(data.error || 'Error al eliminar asignación', 'error');
+      }
+    } catch (error) {
+      console.error('Error al eliminar asignación:', error);
+      mostrarSnackbar('Error al eliminar asignación', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
    * Resetear formulario
    */
   const resetForm = () => {
@@ -476,6 +510,15 @@ const FormulariosUAFE = () => {
                           onClick={() => abrirEdicion(asignacion)}
                         >
                           <Edit fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Eliminar Asignación">
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => eliminarAsignacion(asignacion)}
+                        >
+                          <DeleteIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
                       {asignacion.completado && (
