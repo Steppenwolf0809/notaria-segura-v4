@@ -31,7 +31,8 @@ import {
   Settings as SettingsIcon,
   Article as ArticleIcon,
   MoreVert as MoreVertIcon,
-  QrCode as QrCodeIcon
+  QrCode as QrCodeIcon,
+  Description as DescriptionIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import useThemeStore from '../store/theme-store';
@@ -103,11 +104,12 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
     Dashboard: <DashboardIcon />,
     Assignment: <DocumentsIcon />,
     History: <HistoryIcon />,
+    Description: <DescriptionIcon />,
     Article: <ArticleIcon />,
     QrCode: <QrCodeIcon />
   };
   const navigationItems = useMemo(() => {
-    const allowed = ['dashboard', 'documents', 'history', 'concuerdos', 'generador-qr'];
+    const allowed = ['dashboard', 'documents', 'history', 'formularios-uafe', 'concuerdos', 'generador-qr'];
     const source = (navItemsByRole[role] || []).filter(i => allowed.includes(i.id));
     return source.map(i => ({
       text: i.label,

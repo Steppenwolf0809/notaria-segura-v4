@@ -28,10 +28,10 @@ router.post('/asignar', authenticateToken, async (req, res) => {
     }
 
     // Validar campos requeridos
-    if (!numeroIdentificacion || !numeroMatriz || !actoContrato || !calidadPersona || !actuaPor) {
+    if (!numeroIdentificacion || !actoContrato || !calidadPersona || !actuaPor) {
       return res.status(400).json({
         success: false,
-        error: 'Faltan campos requeridos: numeroIdentificacion, numeroMatriz, actoContrato, calidadPersona, actuaPor'
+        error: 'Faltan campos requeridos: numeroIdentificacion, actoContrato, calidadPersona, actuaPor'
       })
     }
 
@@ -54,7 +54,7 @@ router.post('/asignar', authenticateToken, async (req, res) => {
     const asignacion = await db.formularioUAFEAsignacion.create({
       data: {
         personaId: persona.id,
-        numeroMatriz,
+        numeroMatriz: numeroMatriz || `TEMP-${Date.now()}`, // Temporal si no se proporciona
         actoContrato,
         calidadPersona,
         actuaPor,

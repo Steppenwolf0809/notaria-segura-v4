@@ -154,8 +154,8 @@ const FormulariosUAFE = () => {
       return;
     }
 
-    if (!formData.numeroMatriz || !formData.actoContrato) {
-      mostrarSnackbar('Completa todos los campos', 'warning');
+    if (!formData.actoContrato) {
+      mostrarSnackbar('Completa el campo Acto/Contrato', 'warning');
       return;
     }
 
@@ -481,11 +481,11 @@ const FormulariosUAFE = () => {
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
-                    label="No. Matriz"
+                    label="No. Matriz (opcional)"
                     value={formData.numeroMatriz}
                     onChange={(e) => setFormData({ ...formData, numeroMatriz: e.target.value })}
                     placeholder="Ej: 2024-1234"
-                    required
+                    helperText="Puedes dejarlo vacío si aún no tienes el número"
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>

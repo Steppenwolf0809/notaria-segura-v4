@@ -6,6 +6,7 @@ import ConcuerdoGenerator from './matrizador/concuerdos/ConcuerdoGenerator.jsx';
 import GeneradorQR from './matrizador/GeneradorQR';
 import GestionDocumentos from './GestionDocumentos';
 import NotificationsHistory from './Documents/NotificationsHistory';
+import FormulariosUAFE from './FormulariosUAFE';
 import useDocumentStore from '../store/document-store';
 
 /**
@@ -81,13 +82,16 @@ const MatrizadorCenter = () => {
       
       case 'history':
         return <NotificationsHistory />;
-      
+
+      case 'formularios-uafe':
+        return <FormulariosUAFE />;
+
       case 'concuerdos':
         return <ConcuerdoGenerator />;
-      
+
       case 'generador-qr':
         return <GeneradorQR />;
-      
+
       default:
         return <MatrizadorDashboard />;
     }
