@@ -65,6 +65,7 @@ const ReceptionCenter = () => {
     tab,
     query,
     clientId,
+    matrizadorId,
     page,
     pageSize,
     documents,
@@ -80,6 +81,8 @@ const ReceptionCenter = () => {
     setQuery,
     setClientId,
     clearClientId,
+    setMatrizadorId,
+    clearMatrizadorId,
     setPage,
     setPageSize,
     fetchDocuments,
@@ -493,7 +496,7 @@ const ReceptionCenter = () => {
           </Typography>
         </TableCell>
         <TableCell>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
             <Tooltip title="Click para filtrar por este cliente">
               <Typography
                 variant="body2"
@@ -528,6 +531,11 @@ const ReceptionCenter = () => {
               {doc.groupSize} documentos
             </Typography>
           )}
+        </TableCell>
+        <TableCell>
+          <Typography variant="body2" color="text.secondary">
+            {doc.matrizador || 'Sin asignar'}
+          </Typography>
         </TableCell>
         <TableCell>
           <Chip
@@ -751,6 +759,17 @@ const ReceptionCenter = () => {
             </IconButton>
           </Box>
         )}
+        {matrizadorId && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+            <AssignmentIndIcon color="primary" />
+            <Typography variant="body2">
+              Filtrando por matrizador
+            </Typography>
+            <IconButton onClick={clearMatrizadorId} size="small">
+              <ClearIcon />
+            </IconButton>
+          </Box>
+        )}
       </Box>
 
       {/* Pestañas con badges */}
@@ -796,6 +815,7 @@ const ReceptionCenter = () => {
               <TableCell><strong>Cliente</strong></TableCell>
               <TableCell><strong>Tipo</strong></TableCell>
               <TableCell><strong>Acto principal</strong></TableCell>
+              <TableCell><strong>Matrizador</strong></TableCell>
               <TableCell><strong>Estado</strong></TableCell>
               <TableCell><strong>Fecha</strong></TableCell>
               <TableCell align="right"><strong>Valor</strong></TableCell>
@@ -806,7 +826,7 @@ const ReceptionCenter = () => {
             <TableBody>
               {hasResults() ? documents.map(renderReceptionRow) : (
                 <TableRow>
-                  <TableCell colSpan={9}>
+                  <TableCell colSpan={10}>
                     {renderEmptyState()}
                   </TableCell>
                 </TableRow>

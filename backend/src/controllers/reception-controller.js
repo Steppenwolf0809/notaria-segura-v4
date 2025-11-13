@@ -1121,10 +1121,10 @@ async function getNotificationHistoryReception(req, res) {
  */
 async function getReceptionsUnified(req, res) {
   try {
-    const { tab, query, clientId, page = 1, pageSize = 25 } = req.query;
+    const { tab, query, clientId, matrizadorId, page = 1, pageSize = 25 } = req.query;
 
     // Logs de diagnóstico solicitados
-    console.info('[RECEPTION][QUERY]', { tab, query: query || '', page: Number(page), pageSize: Number(pageSize) });
+    console.info('[RECEPTION][QUERY]', { tab, query: query || '', clientId, matrizadorId, page: Number(page), pageSize: Number(pageSize) });
 
     // Validación de pestaña
     if (!tab || !['ACTIVOS', 'ENTREGADOS'].includes(tab)) {
@@ -1142,12 +1142,13 @@ async function getReceptionsUnified(req, res) {
     const statusFilter = tab === 'ENTREGADOS' ? ['ENTREGADO'] : ['EN_PROCESO', 'LISTO'];
 
     // Construir where
-    const whereClause = { 
+    const whereClause = {
       status: { in: statusFilter },
       // 🔥 EXCLUIR Notas de Crédito
       NOT: { status: 'ANULADO_NOTA_CREDITO' }
     };
     if (clientId) whereClause.clientId = clientId;
+    if (matrizadorId) whereClause.assignedToId = parseInt(matrizadorId);
     if (query && query.trim()) {
       const searchTerm = query.trim();
       whereClause.OR = [
@@ -1176,7 +1177,15 @@ async function getReceptionsUnified(req, res) {
         actoPrincipalValor: true,
         totalFactura: true,
         verificationCode: true,
-        codigoRetiro: true
+        codigoRetiro: true,
+        assignedToId: true,
+        assignedTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        }
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -1244,13 +1253,21 @@ async function getReceptionsUnified(req, res) {
         statusLabel: computeGroupStatus(arr),
         receivedAtFmt: leader.createdAt ? new Date(leader.createdAt).toLocaleDateString('es-EC') : '-',
         amountFmt: toCurrency(sumAmount),
+        matrizador: leader.assignedTo
+          ? `${leader.assignedTo.firstName} ${leader.assignedTo.lastName}`
+          : 'Sin asignar',
+        matrizadorId: leader.assignedToId,
         documents: arr.map(x => ({
           id: x.id,
           code: x.protocolNumber,
           status: x.status,
           verificationCode: x.verificationCode || x.codigoRetiro || null,
           act: x.actoPrincipalDescripcion || null,
-          amount: Number(x.totalFactura ?? x.actoPrincipalValor ?? 0) || 0
+          amount: Number(x.totalFactura ?? x.actoPrincipalValor ?? 0) || 0,
+          matrizador: x.assignedTo
+            ? `${x.assignedTo.firstName} ${x.assignedTo.lastName}`
+            : 'Sin asignar',
+          documentType: x.documentType
         }))
       };
     });
