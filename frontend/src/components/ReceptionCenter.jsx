@@ -34,7 +34,8 @@ import {
   Person as PersonIcon,
   Description as DocumentIcon,
   CalendarToday as CalendarIcon,
-  AttachMoney as MoneyIcon
+  AttachMoney as MoneyIcon,
+  AssignmentInd as AssignmentIndIcon
 } from '@mui/icons-material';
 import { useHotkeys } from 'react-hotkeys-hook';
 import useReceptionsStore from '../store/receptions-store';
@@ -42,6 +43,7 @@ import DocumentDetailModal from './Documents/DocumentDetailModal.jsx';
 // Toolbar y modal de acciones masivas (reutilizados)
 import BulkActionToolbar from './bulk/BulkActionToolbar.jsx';
 import BulkStatusChangeModal from './bulk/BulkStatusChangeModal.jsx';
+import BulkDeliveryModal from './bulk/BulkDeliveryModal.jsx';
 import receptionService from '../services/reception-service.js';
 import documentService from '../services/document-service.js';
 import { readFlag } from '../config/featureFlags.js';
@@ -64,6 +66,7 @@ const ReceptionCenter = () => {
     tab,
     query,
     clientId,
+    matrizadorId,
     page,
     pageSize,
     documents,
@@ -79,6 +82,8 @@ const ReceptionCenter = () => {
     setQuery,
     setClientId,
     clearClientId,
+    setMatrizadorId,
+    clearMatrizadorId,
     setPage,
     setPageSize,
     fetchDocuments,
@@ -206,6 +211,13 @@ const ReceptionCenter = () => {
     }));
   }, [setClientId]);
 
+  // Manejar clic en nombre de matrizador
+  const handleMatrizadorClick = useCallback((matrizadorId, matrizadorName) => {
+    if (!matrizadorId) return; // No filtrar si es "Sin asignar"
+    console.info('[RECEPTION] Filtrar por matrizador:', matrizadorId, matrizadorName);
+    setMatrizadorId(matrizadorId);
+  }, [setMatrizadorId]);
+
   // Manejar cambio de página
   const handlePageChange = useCallback((event, value) => {
     setPage(value);
@@ -219,6 +231,7 @@ const ReceptionCenter = () => {
   // ===== Selección múltiple y acciones masivas =====
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [bulkDeliveryModalOpen, setBulkDeliveryModalOpen] = useState(false);
   const [pendingBulkAction, setPendingBulkAction] = useState(null);
 
   const clearSelection = () => setSelectedIds(new Set());
@@ -279,10 +292,16 @@ const ReceptionCenter = () => {
   const onBulkAction = (targetStatus, options = {}) => {
     if (!targetStatus) return;
     setPendingBulkAction({ toStatus: targetStatus, documents: selectedItems, options });
-    setBulkModalOpen(true);
+
+    // Si es ENTREGADO, abrir modal específico de entrega
+    if (targetStatus === 'ENTREGADO') {
+      setBulkDeliveryModalOpen(true);
+    } else {
+      setBulkModalOpen(true);
+    }
   };
 
-  const executeBulk = async ({ toStatus, sendNotifications }) => {
+  const executeBulk = async ({ toStatus, sendNotifications, deliveryData }) => {
     try {
       if (toStatus === 'LISTO') {
         // Expandir selección por grupos a IDs de documentos EN_PROCESO
@@ -307,7 +326,7 @@ const ReceptionCenter = () => {
       }
 
       if (toStatus === 'ENTREGADO') {
-        // Entrega masiva simplificada: entregar todos los documentos LISTO de los grupos seleccionados
+        // Entrega masiva con datos capturados del modal
         const deliverIds = [];
         selectedItems.forEach(item => {
           (item.documents || []).forEach(d => {
@@ -316,23 +335,24 @@ const ReceptionCenter = () => {
         });
         if (deliverIds.length === 0) {
           console.info('[RECEPTION][BULK][ENTREGADO] No hay documentos LISTO para entregar');
-          setBulkModalOpen(false);
+          setBulkDeliveryModalOpen(false);
           return;
         }
-        // Entrega mínima: verificación manual sin código
+        // Construir payload con los datos del modal
         const payload = {
-          entregadoA: 'Entrega masiva',
+          entregadoA: deliveryData?.entregadoA || 'Entrega masiva',
           relacionTitular: 'titular',
           verificacionManual: true,
           codigoVerificacion: '',
           facturaPresenta: false,
-          observacionesEntrega: 'Entrega masiva desde Recepción'
+          observacionesEntrega: deliveryData?.observacionesEntrega || 'Entrega masiva desde Recepción'
         };
+        console.info('[RECEPTION][BULK][ENTREGADO] Entregando', deliverIds.length, 'documentos con datos:', payload);
         await Promise.allSettled(deliverIds.map(id => documentService.deliverDocument(id, payload)));
         await fetchDocuments();
         await fetchCounts();
         clearSelection();
-        setBulkModalOpen(false);
+        setBulkDeliveryModalOpen(false);
         return;
       }
 
@@ -389,89 +409,212 @@ const ReceptionCenter = () => {
   // Renderizar fila de recepción
   const [detailOpen, setDetailOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
+  const [individualDeliveryModalOpen, setIndividualDeliveryModalOpen] = useState(false);
+  const [selectedGroupForDelivery, setSelectedGroupForDelivery] = useState(null);
 
-  const renderReceptionRow = (doc) => (
-    <TableRow
-      key={doc.id}
-      hover
-      sx={{ cursor: 'pointer' }}
-      onClick={() => {
-        setSelectedDocument(doc);
-        setDetailOpen(true);
-      }}
-    >
-      <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
-        <Checkbox
-          checked={selectedIds.has(doc.id)}
-          onChange={(e) => toggleRow(e, doc.id)}
-          color="primary"
-        />
-      </TableCell>
-      <TableCell>
-        <Typography variant="body2" fontFamily="monospace">
-          {doc.code}
-        </Typography>
-      </TableCell>
-      <TableCell>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Tooltip title="Click para filtrar por este cliente">
-            <Typography
-              variant="body2"
-              sx={{
-                cursor: 'pointer',
-                '&:hover': { textDecoration: 'underline', color: 'primary.main' }
-              }}
-              onClick={(e) => { e.stopPropagation(); handleClientClick(doc.clientId, doc.clientName); }}
-            >
-              {doc.clientName}
+  // Manejar acción individual de marcar como listo
+  const handleMarkReadyIndividual = async (group) => {
+    try {
+      const ids = (group.documents || [])
+        .filter(d => d.status === 'EN_PROCESO')
+        .map(d => d.id);
+
+      if (ids.length === 0) {
+        alert('No hay documentos en proceso para marcar como listo');
+        return;
+      }
+
+      const resp = await receptionService.bulkMarkReady(ids, true);
+      if (resp.success) {
+        await fetchDocuments();
+        await fetchCounts();
+      } else {
+        alert(`Error: ${resp.error || 'No se pudo marcar como listo'}`);
+      }
+    } catch (error) {
+      console.error('[RECEPTION][MARK_READY_INDIVIDUAL]', error);
+      alert('Error al marcar documentos como listo');
+    }
+  };
+
+  // Manejar acción individual de entregar
+  const handleDeliverIndividual = (group) => {
+    setSelectedGroupForDelivery(group);
+    setIndividualDeliveryModalOpen(true);
+  };
+
+  // Ejecutar entrega individual
+  const executeIndividualDelivery = async (deliveryData) => {
+    try {
+      const deliverIds = (selectedGroupForDelivery.documents || [])
+        .filter(d => d.status === 'LISTO')
+        .map(d => d.id);
+
+      if (deliverIds.length === 0) {
+        alert('No hay documentos listos para entregar');
+        setIndividualDeliveryModalOpen(false);
+        return;
+      }
+
+      const payload = {
+        entregadoA: deliveryData.entregadoA,
+        relacionTitular: 'titular',
+        verificacionManual: true,
+        codigoVerificacion: '',
+        facturaPresenta: false,
+        observacionesEntrega: deliveryData.observacionesEntrega || ''
+      };
+
+      await Promise.allSettled(deliverIds.map(id => documentService.deliverDocument(id, payload)));
+      await fetchDocuments();
+      await fetchCounts();
+      setIndividualDeliveryModalOpen(false);
+      setSelectedGroupForDelivery(null);
+    } catch (error) {
+      console.error('[RECEPTION][DELIVER_INDIVIDUAL]', error);
+      alert('Error al entregar documentos');
+    }
+  };
+
+  const renderReceptionRow = (doc) => {
+    // Determinar qué acciones mostrar según el estado de los documentos
+    const hasEnProceso = (doc.documents || []).some(d => d.status === 'EN_PROCESO');
+    const hasListo = (doc.documents || []).some(d => d.status === 'LISTO');
+
+    return (
+      <TableRow
+        key={doc.id}
+        hover
+        sx={{ cursor: 'pointer' }}
+        onClick={() => {
+          setSelectedDocument(doc);
+          setDetailOpen(true);
+        }}
+      >
+        <TableCell padding="checkbox" onClick={(e) => e.stopPropagation()}>
+          <Checkbox
+            checked={selectedIds.has(doc.id)}
+            onChange={(e) => toggleRow(e, doc.id)}
+            color="primary"
+          />
+        </TableCell>
+        <TableCell>
+          <Typography variant="body2" fontFamily="monospace">
+            {doc.code}
+          </Typography>
+        </TableCell>
+        <TableCell>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <Tooltip title="Click para filtrar por este cliente">
+              <Typography
+                variant="body2"
+                sx={{
+                  cursor: 'pointer',
+                  '&:hover': { textDecoration: 'underline', color: 'primary.main' }
+                }}
+                onClick={(e) => { e.stopPropagation(); handleClientClick(doc.clientId, doc.clientName); }}
+              >
+                {doc.clientName}
+              </Typography>
+            </Tooltip>
+            <Typography variant="caption" color="text.secondary">
+              ({doc.clientIdentification})
             </Typography>
-          </Tooltip>
-          <Typography variant="caption" color="text.secondary">
-            ({doc.clientIdentification})
-          </Typography>
-        </Box>
-      </TableCell>
-      <TableCell>
-        <Chip
-          label={doc.typeLabel}
-          size="small"
-          variant="outlined"
-          icon={<DocumentIcon />}
-        />
-      </TableCell>
-      <TableCell>
-        <Typography variant="body2">
-          {doc.mainAct || '—'}
-        </Typography>
-        {!!doc.groupSize && doc.groupSize > 1 && (
-          <Typography variant="caption" color="text.secondary">
-            {doc.groupSize} documentos
-          </Typography>
-        )}
-      </TableCell>
-      <TableCell>
-        <Chip
-          label={doc.statusLabel}
-          size="small"
-          color={tab === 'ACTIVOS' ? 'warning' : 'success'}
-          variant="filled"
-        />
-      </TableCell>
-      <TableCell>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-          <CalendarIcon fontSize="small" color="action" />
+          </Box>
+        </TableCell>
+        <TableCell>
+          <Chip
+            label={doc.typeLabel}
+            size="small"
+            variant="outlined"
+            icon={<DocumentIcon />}
+          />
+        </TableCell>
+        <TableCell>
           <Typography variant="body2">
-            {doc.receivedAtFmt}
+            {doc.mainAct || '—'}
           </Typography>
-        </Box>
-      </TableCell>
-      <TableCell align="right">
-        <Typography variant="body2" fontWeight="medium">
-          {doc.amountFmt}
-        </Typography>
-      </TableCell>
-    </TableRow>
-  );
+          {!!doc.groupSize && doc.groupSize > 1 && (
+            <Typography variant="caption" color="text.secondary">
+              {doc.groupSize} documentos
+            </Typography>
+          )}
+        </TableCell>
+        <TableCell>
+          {doc.matrizadorId ? (
+            <Tooltip title="Click para filtrar por este matrizador">
+              <Typography
+                variant="body2"
+                sx={{
+                  cursor: 'pointer',
+                  color: 'text.secondary',
+                  '&:hover': { textDecoration: 'underline', color: 'primary.main' }
+                }}
+                onClick={(e) => { e.stopPropagation(); handleMatrizadorClick(doc.matrizadorId, doc.matrizador); }}
+              >
+                {doc.matrizador}
+              </Typography>
+            </Tooltip>
+          ) : (
+            <Typography variant="body2" color="text.disabled">
+              Sin asignar
+            </Typography>
+          )}
+        </TableCell>
+        <TableCell>
+          <Chip
+            label={doc.statusLabel}
+            size="small"
+            color={tab === 'ACTIVOS' ? 'warning' : 'success'}
+            variant="filled"
+          />
+        </TableCell>
+        <TableCell>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <CalendarIcon fontSize="small" color="action" />
+            <Typography variant="body2">
+              {doc.receivedAtFmt}
+            </Typography>
+          </Box>
+        </TableCell>
+        <TableCell align="right">
+          <Typography variant="body2" fontWeight="medium">
+            {doc.amountFmt}
+          </Typography>
+        </TableCell>
+        <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+          <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+            {hasEnProceso && (
+              <Tooltip title="Marcar como Listo">
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="warning"
+                  onClick={() => handleMarkReadyIndividual(doc)}
+                  sx={{ minWidth: 'auto', px: 1 }}
+                >
+                  Listo
+                </Button>
+              </Tooltip>
+            )}
+            {hasListo && (
+              <Tooltip title="Marcar como Entregado">
+                <Button
+                  size="small"
+                  variant="contained"
+                  color="success"
+                  onClick={() => handleDeliverIndividual(doc)}
+                  sx={{ minWidth: 'auto', px: 1 }}
+                >
+                  Entregar
+                </Button>
+              </Tooltip>
+            )}
+          </Box>
+        </TableCell>
+      </TableRow>
+    );
+  };
 
   // Renderizar estado vacío
   const renderEmptyState = () => (
@@ -496,13 +639,14 @@ const ReceptionCenter = () => {
           : 'Las recepciones aparecerán aquí cuando estén disponibles'
         }
       </Typography>
-      {(query || clientId) && (
+      {(query || clientId || matrizadorId) && (
         <Typography
           variant="body2"
           sx={{ mt: 1, cursor: 'pointer', color: 'primary.main' }}
           onClick={() => {
             setQuery('');
             clearClientId();
+            clearMatrizadorId();
           }}
         >
           Limpiar filtros
@@ -640,6 +784,17 @@ const ReceptionCenter = () => {
             </IconButton>
           </Box>
         )}
+        {matrizadorId && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+            <AssignmentIndIcon color="primary" />
+            <Typography variant="body2">
+              Filtrando por matrizador: {documents[0]?.matrizador || `ID ${matrizadorId}`}
+            </Typography>
+            <IconButton onClick={clearMatrizadorId} size="small">
+              <ClearIcon />
+            </IconButton>
+          </Box>
+        )}
       </Box>
 
       {/* Pestañas con badges */}
@@ -685,16 +840,18 @@ const ReceptionCenter = () => {
               <TableCell><strong>Cliente</strong></TableCell>
               <TableCell><strong>Tipo</strong></TableCell>
               <TableCell><strong>Acto principal</strong></TableCell>
+              <TableCell><strong>Matrizador</strong></TableCell>
               <TableCell><strong>Estado</strong></TableCell>
               <TableCell><strong>Fecha</strong></TableCell>
               <TableCell align="right"><strong>Valor</strong></TableCell>
+              <TableCell align="center"><strong>Acciones</strong></TableCell>
             </TableRow>
           </TableHead>
           {loading ? renderSkeletons() : (
             <TableBody>
               {hasResults() ? documents.map(renderReceptionRow) : (
                 <TableRow>
-                  <TableCell colSpan={8}>
+                  <TableCell colSpan={10}>
                     {renderEmptyState()}
                   </TableCell>
                 </TableRow>
@@ -757,6 +914,25 @@ const ReceptionCenter = () => {
         onConfirm={(actionData) => executeBulk({ toStatus: actionData.toStatus })}
         loading={false}
       />
+
+      {/* Modal de entrega masiva */}
+      <BulkDeliveryModal
+        open={bulkDeliveryModalOpen}
+        onClose={() => { setBulkDeliveryModalOpen(false); setPendingBulkAction(null); }}
+        documents={pendingBulkAction?.documents || []}
+        onConfirm={(deliveryData) => executeBulk({ toStatus: 'ENTREGADO', deliveryData })}
+        loading={false}
+      />
+
+      {/* Modal de entrega individual */}
+      <BulkDeliveryModal
+        open={individualDeliveryModalOpen}
+        onClose={() => { setIndividualDeliveryModalOpen(false); setSelectedGroupForDelivery(null); }}
+        documents={selectedGroupForDelivery ? [selectedGroupForDelivery] : []}
+        onConfirm={executeIndividualDelivery}
+        loading={false}
+      />
+
       {/* Drawer/Modal de detalle */}
       <DocumentDetailModal
         open={detailOpen}
