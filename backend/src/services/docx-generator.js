@@ -33,12 +33,18 @@ export async function generateDocxFromText({ title = 'Documento', bodyText = '' 
 
   const lines = String(bodyText || '').split(/\r?\n/)
   const paragraphs = []
-  
+
   // Cuerpo Arial 14, justificado, 1.5
-  lines.forEach((line) => {
-    // Detectar si es la línea de la firma del notario (contiene espacios de centrado)
-    const isSignatureLine = line.trim().length > 0 && line.startsWith('                    ')
-    
+  lines.forEach((line, idx) => {
+    const trimmed = line.trim()
+
+    // Detectar si es línea de firma (nombre del notario o notaría)
+    // Buscar patrones: NOTARIO, NOTARIA, o última línea con texto en mayúsculas
+    const isNotarioName = /^[A-ZÁÉÍÓÚÑ\s]+$/.test(trimmed) && trimmed.length > 10 && trimmed.length < 60
+    const hasNotaria = /NOTAR[ÍI]A/i.test(trimmed)
+    const hasSpaces = line.startsWith('                    ')
+    const isSignatureLine = isNotarioName || hasNotaria || hasSpaces
+
     paragraphs.push(
       new Paragraph({
         children: parseRuns(line),
@@ -93,12 +99,18 @@ export async function generateDocxFromCopies({ copies = [] } = {}) {
     if (!isFirst) {
       paragraphs.push(new Paragraph({ children: [new PageBreak()] }))
     }
-    
+
     const lines = String(entry.text || '').split(/\r?\n/)
     lines.forEach((line, lineIdx) => {
-      // Detectar si es la línea de la firma del notario (contiene espacios de centrado)
-      const isSignatureLine = line.trim().length > 0 && line.startsWith('                    ')
-      
+      const trimmed = line.trim()
+
+      // Detectar si es línea de firma (nombre del notario o notaría)
+      // Buscar patrones: NOTARIO, NOTARIA, o última línea con texto en mayúsculas
+      const isNotarioName = /^[A-ZÁÉÍÓÚÑ\s]+$/.test(trimmed) && trimmed.length > 10 && trimmed.length < 60
+      const hasNotaria = /NOTAR[ÍI]A/i.test(trimmed)
+      const hasSpaces = line.startsWith('                    ')
+      const isSignatureLine = isNotarioName || hasNotaria || hasSpaces
+
       paragraphs.push(
         new Paragraph({
           children: parseRuns(line),

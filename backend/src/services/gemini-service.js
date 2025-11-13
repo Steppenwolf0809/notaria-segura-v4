@@ -3,9 +3,14 @@ import { generarConcuerdos } from './concuerdo-service.js'
 import { getConfig } from '../config/environment.js'
 import { logConcuerdoAudit } from './audit-service.js'
 import crypto from 'crypto'
+import { ENHANCED_PROMPT } from './gemini-prompt-enhanced.js'
 
-// Template de prompt optimizado para nombres separados (Ecuador)
-const PROMPT_TEMPLATE = `Eres un experto en documentos notariales ecuatorianos.
+// Usar prompt mejorado con few-shot learning
+// Para volver al prompt básico, establecer USE_ENHANCED_PROMPT=false en .env
+const USE_ENHANCED = process.env.USE_ENHANCED_PROMPT !== 'false'
+
+// Template de prompt básico (legacy - mantener por compatibilidad)
+const BASIC_PROMPT_TEMPLATE = `Eres un experto en documentos notariales ecuatorianos.
 
 TAREA: Extraer información del extracto notarial y devolver JSON con formato específico para nombres.
 
@@ -15,7 +20,7 @@ FORMATO EXACTO REQUERIDO (SOLO JSON):
   "otorgantes": [
     {
       "apellidos": "APELLIDO1 APELLIDO2",
-      "nombres": "NOMBRE1 NOMBRE2", 
+      "nombres": "NOMBRE1 NOMBRE2",
       "genero": "M",
       "calidad": "MANDANTE",
       "tipo_persona": "Natural"
@@ -25,7 +30,7 @@ FORMATO EXACTO REQUERIDO (SOLO JSON):
     {
       "apellidos": "APELLIDO1 APELLIDO2",
       "nombres": "NOMBRE1 NOMBRE2",
-      "genero": "F", 
+      "genero": "F",
       "calidad": "MANDATARIO",
       "tipo_persona": "Natural"
     }
@@ -48,6 +53,9 @@ REGLAS GENERALES:
 
 EXTRACTO A PROCESAR:
 {texto_del_pdf}`
+
+// Seleccionar prompt según configuración
+const PROMPT_TEMPLATE = USE_ENHANCED ? ENHANCED_PROMPT : BASIC_PROMPT_TEMPLATE
 
 const enabled = () => String(process.env.GEMINI_ENABLED || '').toLowerCase() === 'true'
 
@@ -157,7 +165,8 @@ export async function extractDataWithGemini(pdfText) {
   }
 
   const debugExtraction = String(process.env.DEBUG_EXTRACTION_METHOD || '').toLowerCase() === 'true'
-  const modelName = process.env.GEMINI_MODEL || 'gemini-1.5-flash'
+  // NOTA: Gemini 1.5 fue deprecado en Abril 2025. Usar Gemini 2.x
+  const modelName = process.env.GEMINI_MODEL || 'gemini-2.5-flash'
 
   for (let attempt = 0; attempt <= CONFIG.maxRetries; attempt++) {
     try {
