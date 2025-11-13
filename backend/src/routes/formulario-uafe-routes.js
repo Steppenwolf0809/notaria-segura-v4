@@ -259,6 +259,80 @@ router.get('/asignacion/:id', authenticateToken, async (req, res) => {
   }
 })
 
+/**
+ * PUT /api/formulario-uafe/asignacion/:id
+ * Editar asignación de formulario (numeroMatriz, actoContrato, etc.)
+ */
+router.put('/asignacion/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params
+    const { numeroMatriz, actoContrato, calidadPersona, actuaPor, expiraEn } = req.body
+
+    // Validar que el usuario sea matrizador
+    if (req.user.role !== 'MATRIZADOR' && req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        error: 'Solo los matrizadores pueden editar asignaciones'
+      })
+    }
+
+    // Verificar que la asignación existe
+    const asignacion = await db.formularioUAFEAsignacion.findUnique({
+      where: { id }
+    })
+
+    if (!asignacion) {
+      return res.status(404).json({
+        success: false,
+        error: 'Asignación no encontrada'
+      })
+    }
+
+    // Verificar que la asignación pertenece al matrizador
+    if (asignacion.matrizadorId !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        error: 'No tienes permiso para editar esta asignación'
+      })
+    }
+
+    // Actualizar asignación
+    const asignacionActualizada = await db.formularioUAFEAsignacion.update({
+      where: { id },
+      data: {
+        ...(numeroMatriz !== undefined && { numeroMatriz }),
+        ...(actoContrato !== undefined && { actoContrato }),
+        ...(calidadPersona !== undefined && { calidadPersona }),
+        ...(actuaPor !== undefined && { actuaPor }),
+        ...(expiraEn !== undefined && { expiraEn: expiraEn ? new Date(expiraEn) : null })
+      },
+      include: {
+        persona: {
+          select: {
+            numeroIdentificacion: true,
+            tipoPersona: true,
+            datosPersonaNatural: true,
+            datosPersonaJuridica: true
+          }
+        }
+      }
+    })
+
+    res.json({
+      success: true,
+      message: 'Asignación actualizada exitosamente',
+      asignacion: asignacionActualizada
+    })
+  } catch (error) {
+    console.error('❌ Error al actualizar asignación:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Error al actualizar asignación',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    })
+  }
+})
+
 // ============================================================================
 // ENDPOINTS PÚBLICOS (con autenticación PIN)
 // ============================================================================

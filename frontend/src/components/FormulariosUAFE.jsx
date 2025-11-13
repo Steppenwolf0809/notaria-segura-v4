@@ -39,7 +39,8 @@ import {
   HourglassEmpty as PendingIcon,
   Cancel as ExpiredIcon,
   Search as SearchIcon,
-  Link as LinkIcon
+  Link as LinkIcon,
+  Edit
 } from '@mui/icons-material';
 import { API_BASE } from '../utils/apiConfig';
 
@@ -57,6 +58,7 @@ const FormulariosUAFE = () => {
   const [loading, setLoading] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
   const [openDetallesDialog, setOpenDetallesDialog] = useState(false);
+  const [openEditDialog, setOpenEditDialog] = useState(false);
   const [asignacionSeleccionada, setAsignacionSeleccionada] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
@@ -74,6 +76,14 @@ const FormulariosUAFE = () => {
   });
   const [buscandoPersona, setBuscandoPersona] = useState(false);
   const [personaEncontrada, setPersonaEncontrada] = useState(null);
+
+  // Formulario de edición
+  const [editFormData, setEditFormData] = useState({
+    numeroMatriz: '',
+    actoContrato: '',
+    calidadPersona: '',
+    actuaPor: ''
+  });
 
   // Cargar asignaciones al montar
   useEffect(() => {
@@ -223,6 +233,54 @@ const FormulariosUAFE = () => {
     } catch (error) {
       console.error('Error al cargar detalles:', error);
       mostrarSnackbar('Error al cargar detalles', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Abrir modal de edición
+   */
+  const abrirEdicion = (asignacion) => {
+    setAsignacionSeleccionada(asignacion);
+    setEditFormData({
+      numeroMatriz: asignacion.numeroMatriz || '',
+      actoContrato: asignacion.actoContrato || '',
+      calidadPersona: asignacion.calidadPersona || '',
+      actuaPor: asignacion.actuaPor || ''
+    });
+    setOpenEditDialog(true);
+  };
+
+  /**
+   * Guardar cambios de edición
+   */
+  const guardarEdicion = async () => {
+    if (!asignacionSeleccionada) return;
+
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE}/formulario-uafe/asignacion/${asignacionSeleccionada.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(editFormData)
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        mostrarSnackbar('Asignación actualizada exitosamente', 'success');
+        setOpenEditDialog(false);
+        cargarAsignaciones();
+      } else {
+        mostrarSnackbar(data.error || 'Error al actualizar asignación', 'error');
+      }
+    } catch (error) {
+      console.error('Error al actualizar asignación:', error);
+      mostrarSnackbar('Error al actualizar asignación', 'error');
     } finally {
       setLoading(false);
     }
@@ -411,6 +469,15 @@ const FormulariosUAFE = () => {
                           <CopyIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
+                      <Tooltip title="Editar Asignación">
+                        <IconButton
+                          size="small"
+                          color="secondary"
+                          onClick={() => abrirEdicion(asignacion)}
+                        >
+                          <Edit fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                       {asignacion.completado && (
                         <Tooltip title="Ver Respuesta">
                           <IconButton
@@ -577,6 +644,80 @@ const FormulariosUAFE = () => {
               Exportar PDF
             </Button>
           )}
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog: Editar Asignación */}
+      <Dialog
+        open={openEditDialog}
+        onClose={() => setOpenEditDialog(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle sx={{ backgroundColor: 'secondary.main', color: 'white' }}>
+          Editar Asignación
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          <Grid container spacing={3}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="No. Matriz"
+                value={editFormData.numeroMatriz}
+                onChange={(e) => setEditFormData({ ...editFormData, numeroMatriz: e.target.value })}
+                placeholder="Ej: 2024-1234"
+                helperText="Número de protocolo (opcional)"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                required
+                label="Acto / Contrato"
+                value={editFormData.actoContrato}
+                onChange={(e) => setEditFormData({ ...editFormData, actoContrato: e.target.value })}
+                placeholder="Ej: Compraventa"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth required>
+                <InputLabel>Calidad de la Persona</InputLabel>
+                <Select
+                  value={editFormData.calidadPersona}
+                  label="Calidad de la Persona"
+                  onChange={(e) => setEditFormData({ ...editFormData, calidadPersona: e.target.value })}
+                >
+                  <MenuItem value="COMPRADOR">Comprador</MenuItem>
+                  <MenuItem value="VENDEDOR">Vendedor</MenuItem>
+                  <MenuItem value="OTRO">Otro</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth required>
+                <InputLabel>Actúa Por</InputLabel>
+                <Select
+                  value={editFormData.actuaPor}
+                  label="Actúa Por"
+                  onChange={(e) => setEditFormData({ ...editFormData, actuaPor: e.target.value })}
+                >
+                  <MenuItem value="PROPIOS_DERECHOS">Propios Derechos</MenuItem>
+                  <MenuItem value="REPRESENTANDO_A">Representando a</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenEditDialog(false)}>Cancelar</Button>
+          <Button
+            variant="contained"
+            color="secondary"
+            onClick={guardarEdicion}
+            disabled={loading || !editFormData.actoContrato}
+          >
+            {loading ? <CircularProgress size={24} /> : 'Guardar Cambios'}
+          </Button>
         </DialogActions>
       </Dialog>
 
