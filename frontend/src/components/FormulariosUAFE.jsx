@@ -41,7 +41,7 @@ import {
   Search as SearchIcon,
   Link as LinkIcon
 } from '@mui/icons-material';
-import { API_URL } from '../config/api-config';
+import { API_BASE } from '../utils/apiConfig';
 
 /**
  * Componente para gestionar formularios UAFE
@@ -91,7 +91,7 @@ const FormulariosUAFE = () => {
       if (filtroEstado) params.append('estado', filtroEstado);
       if (filtroMatriz) params.append('numeroMatriz', filtroMatriz);
 
-      const response = await fetch(`${API_URL}/formulario-uafe/mis-asignaciones?${params}`, {
+      const response = await fetch(`${API_BASE}/formulario-uafe/mis-asignaciones?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -123,7 +123,7 @@ const FormulariosUAFE = () => {
     setBuscandoPersona(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/personal/verificar-cedula/${formData.numeroIdentificacion}`, {
+      const response = await fetch(`${API_BASE}/personal/verificar-cedula/${formData.numeroIdentificacion}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -162,7 +162,7 @@ const FormulariosUAFE = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/formulario-uafe/asignar`, {
+      const response = await fetch(`${API_BASE}/formulario-uafe/asignar`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -207,7 +207,7 @@ const FormulariosUAFE = () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_URL}/formulario-uafe/asignacion/${asignacionId}`, {
+      const response = await fetch(`${API_BASE}/formulario-uafe/asignacion/${asignacionId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
