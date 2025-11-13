@@ -1,7 +1,7 @@
 import express from 'express'
 import { db } from '../db.js'
 import { authenticateToken } from '../middleware/auth-middleware.js'
-import { validatePersonalSession } from '../middleware/personal-auth-middleware.js'
+import { verifyPersonalSession } from '../middleware/verify-personal-session.js'
 import crypto from 'crypto'
 
 const router = express.Router()
@@ -267,7 +267,7 @@ router.get('/asignacion/:id', authenticateToken, async (req, res) => {
  * GET /api/formulario-uafe/public/:token
  * Obtener formulario asignado por token (requiere sesión activa de persona)
  */
-router.get('/public/:token', validatePersonalSession, async (req, res) => {
+router.get('/public/:token', verifyPersonalSession, async (req, res) => {
   try {
     const { token } = req.params
 
@@ -294,7 +294,7 @@ router.get('/public/:token', validatePersonalSession, async (req, res) => {
     }
 
     // Verificar que el formulario pertenece a la persona logueada
-    if (asignacion.personaId !== req.persona.id) {
+    if (asignacion.personaId !== req.personaVerificada.id) {
       return res.status(403).json({
         success: false,
         error: 'Este formulario no está asignado a tu cuenta'
@@ -358,7 +358,7 @@ router.get('/public/:token', validatePersonalSession, async (req, res) => {
  * POST /api/formulario-uafe/public/:token/responder
  * Enviar respuesta al formulario UAFE (requiere sesión activa de persona)
  */
-router.post('/public/:token/responder', validatePersonalSession, async (req, res) => {
+router.post('/public/:token/responder', verifyPersonalSession, async (req, res) => {
   try {
     const { token } = req.params
     const respuestaData = req.body
@@ -375,7 +375,7 @@ router.post('/public/:token/responder', validatePersonalSession, async (req, res
     }
 
     // Verificar que el formulario pertenece a la persona logueada
-    if (asignacion.personaId !== req.persona.id) {
+    if (asignacion.personaId !== req.personaVerificada.id) {
       return res.status(403).json({
         success: false,
         error: 'Este formulario no está asignado a tu cuenta'
