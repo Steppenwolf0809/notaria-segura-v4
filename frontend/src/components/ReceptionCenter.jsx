@@ -210,6 +210,13 @@ const ReceptionCenter = () => {
     }));
   }, [setClientId]);
 
+  // Manejar clic en nombre de matrizador
+  const handleMatrizadorClick = useCallback((matrizadorId, matrizadorName) => {
+    if (!matrizadorId) return; // No filtrar si es "Sin asignar"
+    console.info('[RECEPTION] Filtrar por matrizador:', matrizadorId, matrizadorName);
+    setMatrizadorId(matrizadorId);
+  }, [setMatrizadorId]);
+
   // Manejar cambio de página
   const handlePageChange = useCallback((event, value) => {
     setPage(value);
@@ -533,9 +540,25 @@ const ReceptionCenter = () => {
           )}
         </TableCell>
         <TableCell>
-          <Typography variant="body2" color="text.secondary">
-            {doc.matrizador || 'Sin asignar'}
-          </Typography>
+          {doc.matrizadorId ? (
+            <Tooltip title="Click para filtrar por este matrizador">
+              <Typography
+                variant="body2"
+                sx={{
+                  cursor: 'pointer',
+                  color: 'text.secondary',
+                  '&:hover': { textDecoration: 'underline', color: 'primary.main' }
+                }}
+                onClick={(e) => { e.stopPropagation(); handleMatrizadorClick(doc.matrizadorId, doc.matrizador); }}
+              >
+                {doc.matrizador}
+              </Typography>
+            </Tooltip>
+          ) : (
+            <Typography variant="body2" color="text.disabled">
+              Sin asignar
+            </Typography>
+          )}
         </TableCell>
         <TableCell>
           <Chip
@@ -615,13 +638,14 @@ const ReceptionCenter = () => {
           : 'Las recepciones aparecerán aquí cuando estén disponibles'
         }
       </Typography>
-      {(query || clientId) && (
+      {(query || clientId || matrizadorId) && (
         <Typography
           variant="body2"
           sx={{ mt: 1, cursor: 'pointer', color: 'primary.main' }}
           onClick={() => {
             setQuery('');
             clearClientId();
+            clearMatrizadorId();
           }}
         >
           Limpiar filtros
@@ -763,7 +787,7 @@ const ReceptionCenter = () => {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
             <AssignmentIndIcon color="primary" />
             <Typography variant="body2">
-              Filtrando por matrizador
+              Filtrando por matrizador: {documents[0]?.matrizador || `ID ${matrizadorId}`}
             </Typography>
             <IconButton onClick={clearMatrizadorId} size="small">
               <ClearIcon />
