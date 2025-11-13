@@ -102,7 +102,7 @@ async function uploadXmlDocument(req, res) {
           userId: req.user.id,
           eventType: 'DOCUMENT_CREATED',
           description: `Documento creado desde XML por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
-          details: {
+          details: JSON.stringify({
             protocolNumber: parsedData.protocolNumber,
             documentType: parsedData.documentType,
             clientName: parsedData.clientName,
@@ -111,7 +111,7 @@ async function uploadXmlDocument(req, res) {
             fileSize: req.file.size,
             totalFactura: parsedData.totalFactura,
             timestamp: new Date().toISOString()
-          },
+          }),
           ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
           userAgent: req.get('User-Agent') || 'unknown'
         }
@@ -152,14 +152,14 @@ async function uploadXmlDocument(req, res) {
             userId: req.user.id,
             eventType: 'EXTRACTION_SNAPSHOT',
             description: `Snapshot extracción avanzada (auto) al crear desde XML` ,
-            details: {
+            details: JSON.stringify({
               acts: actos.acts,
               parties,
               signals: base.fields.filter(f => ['valor_operacion','forma_pago','articulo_29'].includes(f.fieldName)),
               confidence: base.confidence,
               meta: base.metadata,
               extractor: 'advanced-actos-v1'
-            },
+            }),
             ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
             userAgent: req.get('User-Agent') || 'unknown'
           }
@@ -270,14 +270,14 @@ async function extractDocumentActs(req, res) {
             userId: req.user.id,
             eventType: 'EXTRACTION_SNAPSHOT',
             description: `Snapshot de extracción avanzada guardado por ${req.user.firstName} ${req.user.lastName}`,
-            details: {
+            details: JSON.stringify({
               acts: actos.acts,
               parties,
               signals: base.fields.filter(f => ['valor_operacion','forma_pago','articulo_29'].includes(f.fieldName)),
               confidence: base.confidence,
               meta: base.metadata,
               extractor: 'advanced-actos-v1'
-            },
+            }),
             ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
             userAgent: req.get('User-Agent') || 'unknown'
           }
@@ -360,12 +360,12 @@ async function applyExtractionSuggestions(req, res) {
           userId: req.user.id,
           eventType: 'EXTRACTION_APPLIED',
           description: `Sugerencias de extracción aplicadas por ${req.user.firstName} ${req.user.lastName}`,
-          details: {
+          details: JSON.stringify({
             applied,
             snapshotId: snapshot.id,
             confidence,
             threshold: minConfidence
-          },
+          }),
           ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
           userAgent: req.get('User-Agent') || 'unknown'
         }
@@ -532,7 +532,7 @@ async function assignDocument(req, res) {
           userId: req.user.id,
           eventType: 'DOCUMENT_ASSIGNED',
           description: `Documento asignado a ${matrizador.firstName} ${matrizador.lastName} por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
-          details: {
+          details: JSON.stringify({
             assignedFrom: document.assignedToId,
             assignedTo: parseInt(matrizadorId),
             matrizadorName: `${matrizador.firstName} ${matrizador.lastName}`,
@@ -541,7 +541,7 @@ async function assignDocument(req, res) {
             newStatus: 'EN_PROCESO',
             assignmentType: 'MANUAL',
             timestamp: new Date().toISOString()
-          },
+          }),
           ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
           userAgent: req.get('User-Agent') || 'unknown'
         }
@@ -791,12 +791,12 @@ async function updateDocumentStatus(req, res) {
             userId: req.user.id,
             eventType: 'VERIFICATION_GENERATED',
             description: `Código de verificación generado automáticamente: ${updateData.verificationCode}`,
-            details: {
+            details: JSON.stringify({
               verificationCode: updateData.verificationCode,
               generatedBy: `${req.user.firstName} ${req.user.lastName}`,
               userRole: req.user.role,
               timestamp: new Date().toISOString()
-            },
+            }),
             ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
             userAgent: req.get('User-Agent') || 'unknown'
           }
@@ -905,7 +905,7 @@ async function updateDocumentStatus(req, res) {
                 userId: req.user.id,
                 eventType: 'STATUS_CHANGED',
                 description: `Estado cambiado de ${originalStatus} a ${status} por propagación grupal - ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
-                details: {
+                details: JSON.stringify({
                   previousStatus: originalStatus,
                   newStatus: status,
                   verificationCodeGenerated: status === 'LISTO' && doc.verificationCode,
@@ -914,7 +914,7 @@ async function updateDocumentStatus(req, res) {
                   triggerDocumentId: id,
                   userRole: req.user.role,
                   timestamp: new Date().toISOString()
-                },
+                }),
                 ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
                 userAgent: req.get('User-Agent') || 'unknown'
               }
@@ -1059,14 +1059,14 @@ async function updateDocumentStatus(req, res) {
                   userId: req.user.id,
                   eventType: 'WHATSAPP_SENT',
                   description: `Notificación WhatsApp de documento listo enviada a ${updatedDocument.clientPhone}`,
-                  details: {
+                  details: JSON.stringify({
                     phoneNumber: updatedDocument.clientPhone,
                     messageType: 'DOCUMENT_READY',
                     verificationCode: updatedDocument.verificationCode,
                     sentBy: `${req.user.firstName} ${req.user.lastName}`,
                     userRole: req.user.role,
                     timestamp: new Date().toISOString()
-                  },
+                  }),
                   ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
                   userAgent: req.get('User-Agent') || 'unknown'
                 }
@@ -1129,7 +1129,7 @@ async function updateDocumentStatus(req, res) {
                 userId: req.user.id,
                 eventType: 'WHATSAPP_SENT',
                 description: `Notificación WhatsApp de entrega directa enviada a ${updatedDocument.clientPhone}`,
-                details: {
+                details: JSON.stringify({
                   phoneNumber: updatedDocument.clientPhone,
                   messageType: 'DOCUMENT_DELIVERED',
                   deliveredTo: updateData.entregadoA,
@@ -1137,7 +1137,7 @@ async function updateDocumentStatus(req, res) {
                   deliveredByRole: req.user.role,
                   deliveryType: 'DIRECT_DELIVERY',
                   timestamp: new Date().toISOString()
-                },
+                }),
                 ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
                 userAgent: req.get('User-Agent') || 'unknown'
               }
@@ -1160,7 +1160,7 @@ async function updateDocumentStatus(req, res) {
           userId: req.user.id,
           eventType: 'STATUS_CHANGED',
           description: `Estado cambiado de ${document.status} a ${status} por ${req.user.firstName} ${req.user.lastName} (${req.user.role})${status === 'ENTREGADO' && ['MATRIZADOR', 'ARCHIVO'].includes(req.user.role) ? ' - Entrega directa' : ''}${isReversion && req.body.reversionReason ? ` - Razón: ${req.body.reversionReason}` : ''}`,
-          details: {
+          details: JSON.stringify({
             previousStatus: document.status,
             newStatus: status,
             verificationCodeGenerated: status === 'LISTO' && updateData.verificationCode,
@@ -1173,7 +1173,7 @@ async function updateDocumentStatus(req, res) {
             isReversion,
             reason: req.body.reversionReason || null,
             timestamp: new Date().toISOString()
-          },
+          }),
           personaRetiro: status === 'ENTREGADO' ? (updateData.entregadoA || undefined) : undefined,
           metodoVerificacion: status === 'ENTREGADO' && ['MATRIZADOR', 'ARCHIVO'].includes(req.user.role) ? 'manual' : undefined,
           ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
@@ -2014,7 +2014,7 @@ async function updateDocumentInfo(req, res) {
           userId: req.user.id,
           eventType: 'INFO_EDITED',
           description: `Información del documento editada por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
-          details: {
+          details: JSON.stringify({
             previousData: {
               clientName: document.clientName,
               clientPhone: document.clientPhone,
@@ -2034,7 +2034,7 @@ async function updateDocumentInfo(req, res) {
             },
             editedBy: `${req.user.firstName} ${req.user.lastName}`,
             editedByRole: req.user.role
-          },
+          }),
           ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
           userAgent: req.get('User-Agent') || 'unknown'
         }
@@ -2299,14 +2299,14 @@ async function updateDocumentGroupStatus(req, res) {
             userId: req.user.id,
             eventType: 'STATUS_CHANGED',
             description: `Estado cambiado de ${previousStatus} a ${newStatus} por ${req.user.firstName} ${req.user.lastName} (${req.user.role})${(idx(newStatus) < idx(previousStatus) && reversionReason) ? ` - Razón: ${reversionReason.trim()}` : ''}`,
-            details: {
+            details: JSON.stringify({
               previousStatus,
               newStatus,
               groupOperation: true,
               groupId: documentGroupId,
               reason: (idx(newStatus) < idx(previousStatus) && reversionReason) ? reversionReason.trim() : null,
               timestamp: new Date().toISOString()
-            },
+            }),
             ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
             userAgent: req.get('User-Agent') || 'unknown'
           }
@@ -2479,7 +2479,7 @@ async function updateDocumentGroupStatus(req, res) {
                 userId: req.user.id,
                 eventType: 'WHATSAPP_SENT',
                 description: `Notificación WhatsApp de entrega grupal enviada a ${updatedDocsOnly[0].clientPhone}`,
-                details: {
+                details: JSON.stringify({
                   phoneNumber: updatedDocsOnly[0].clientPhone,
                   messageType: 'GROUP_DELIVERY',
                   deliveredTo: deliveredTo || `Entrega grupal por ${req.user.role.toLowerCase()}`,
@@ -2489,7 +2489,7 @@ async function updateDocumentGroupStatus(req, res) {
                   groupSize: updateResult.count,
                   messageId: whatsappResult.messageId || 'simulado',
                   timestamp: new Date().toISOString()
-                },
+                }),
                 ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
                 userAgent: req.get('User-Agent') || 'unknown'
               }
@@ -2744,12 +2744,12 @@ async function ungroupDocument(req, res) {
             userId: req.user.id,
             eventType: 'STATUS_CHANGED',
             description: `Documento desagrupado del grupo por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
-            details: {
+            details: JSON.stringify({
               action: 'UNGROUP_DOCUMENT',
               previousGroupId: groupId,
               groupRemoved: remaining.length < 2,
               timestamp: new Date().toISOString()
-            },
+            }),
             ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
             userAgent: req.get('User-Agent') || 'unknown'
           }
@@ -2933,7 +2933,7 @@ async function deliverDocument(req, res) {
               userId: req.user.id,
               eventType: 'STATUS_CHANGED',
               description: `Documento entregado grupalmente a ${entregadoA}`,
-              details: {
+              details: JSON.stringify({
                 previousStatus: 'LISTO',
                 newStatus: 'ENTREGADO',
                 entregadoA,
@@ -2946,7 +2946,7 @@ async function deliverDocument(req, res) {
                 deliveredWith: document.protocolNumber,
                 groupDelivery: true,
                 timestamp: new Date().toISOString()
-              },
+              }),
               personaRetiro: entregadoA,
               cedulaRetiro: cedulaReceptor || undefined,
               metodoVerificacion: computedVerificationMethod,
@@ -3086,7 +3086,7 @@ async function deliverDocument(req, res) {
                 userId: req.user.id,
                 eventType: 'WHATSAPP_SENT',
                 description: `Notificación WhatsApp de entrega enviada a ${updatedDocument.clientPhone}`,
-                details: {
+                details: JSON.stringify({
                   phoneNumber: updatedDocument.clientPhone,
                   messageType: 'DOCUMENT_DELIVERED',
                   deliveredTo: entregadoA,
@@ -3097,7 +3097,7 @@ async function deliverDocument(req, res) {
                   relacionTitular,
                   messageId: whatsappResult.messageId || 'simulado',
                   timestamp: new Date().toISOString()
-                },
+                }),
                 ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
                 userAgent: req.get('User-Agent') || 'unknown'
               }
@@ -3124,7 +3124,7 @@ async function deliverDocument(req, res) {
           userId: req.user.id,
           eventType: 'STATUS_CHANGED',
           description: eventDescription,
-          details: {
+          details: JSON.stringify({
             previousStatus: immediateDelivery ? document.status : 'LISTO',
             newStatus: 'ENTREGADO',
             immediateDelivery: immediateDelivery || false,
@@ -3139,7 +3139,7 @@ async function deliverDocument(req, res) {
             whatsappSent,
             whatsappError,
             timestamp: new Date().toISOString()
-          },
+          }),
           personaRetiro: entregadoA,
           cedulaRetiro: cedulaReceptor || undefined,
           metodoVerificacion: computedVerificationMethod,
@@ -3374,7 +3374,7 @@ async function undoDocumentStatusChange(req, res) {
           userId: req.user.id,
           eventType: 'STATUS_UNDO',
           description: `Cambio deshecho: ${eventDetails.newStatus} → ${previousStatus} por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
-          details: {
+          details: JSON.stringify({
             originalEventId: lastChangeEvent.id,
             revertedFrom: eventDetails.newStatus,
             revertedTo: previousStatus,
@@ -3392,7 +3392,7 @@ async function undoDocumentStatusChange(req, res) {
             },
             whatsappWasSent: eventDetails.whatsappSent || false,
             verificationCodeCleared: eventDetails.newStatus === 'LISTO' && eventDetails.verificationCodeGenerated
-          },
+          }),
           ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
           userAgent: req.get('User-Agent') || 'unknown'
         }
@@ -3874,14 +3874,14 @@ async function revertDocumentStatus(req, res) {
               userId: req.user.id,
               eventType: 'STATUS_CHANGED',
               description: `Estado revertido grupalmente de ${doc.status} a ${newStatus} por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
-              details: {
+              details: JSON.stringify({
                 previousStatus: doc.status,
                 newStatus,
                 reversionReason: reversionReason.trim(),
                 groupReversion: true,
                 documentGroupId: document.documentGroupId,
                 timestamp: new Date().toISOString()
-              },
+              }),
               ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
               userAgent: req.get('User-Agent') || 'unknown'
             }
@@ -3925,13 +3925,13 @@ async function revertDocumentStatus(req, res) {
           userId: req.user.id,
           eventType: 'STATUS_CHANGED',
           description: `Estado revertido de ${document.status} a ${newStatus} por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
-          details: {
+          details: JSON.stringify({
             previousStatus: document.status,
             newStatus,
             reversionReason: reversionReason.trim(),
             groupReversion: false,
             timestamp: new Date().toISOString()
-          },
+          }),
           ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
           userAgent: req.get('User-Agent') || 'unknown'
         }
