@@ -938,7 +938,7 @@ cion()">Siguiente →</button>
     </div>
 
     <script>
-        // Configuración
+        // Configuracion
         const API_URL = 'https://notaria-segura-v4-production.up.railway.app/api';
 
         // Variables globales
@@ -1046,7 +1046,7 @@ cion()">Siguiente →</button>
             document.getElementById('numeroIdentificacion').value = asignacionData.persona.numeroIdentificacion;
         }
 
-        // Navegación entre secciones
+        // Navegacion entre secciones
         function siguienteSeccion() {
             if (!validarSeccionActual()) return;
 
@@ -1074,7 +1074,7 @@ cion()">Siguiente →</button>
             document.getElementById('progressBar').style.width = `${progreso}%`;
         }
 
-        // Validar sección actual
+        // Validar seccion actual
         function validarSeccionActual() {
             const seccion = document.getElementById(`seccion${seccionActual}`);
             const required = seccion.querySelectorAll('[required]');
@@ -1137,7 +1137,7 @@ cion()">Siguiente →</button>
             const tieneBeneficiario = document.querySelector('input[name="tieneBeneficiario"]:checked').value === 'true';
 
             const respuestaData = {
-                // Sección 1
+                // Seccion 1
                 fecha: document.getElementById('fecha').value,
                 numeroMatriz: document.getElementById('numeroMatriz').value,
                 actoContrato: document.getElementById('actoContrato').value,
@@ -1155,7 +1155,7 @@ cion()">Siguiente →</button>
                 bancoTransferencia: document.getElementById('bancoTransferencia').value || null,
                 bancoTarjeta: document.getElementById('bancoTarjeta').value || null,
 
-                // Sección 2
+                // Seccion 2
                 calidad: document.getElementById('calidad').value,
                 actuaPor: asignacionData.actuaPor,
                 tipoIdentificacion: document.getElementById('tipoIdentificacion').value,
@@ -1168,7 +1168,7 @@ cion()">Siguiente →</button>
                 numeroDomicilio: document.getElementById('numeroDomicilio').value || null,
                 calleSecundaria: document.getElementById('calleSecundaria').value || null,
 
-                // Sección 3
+                // Seccion 3
                 situacionLaboral: document.getElementById('situacionLaboral').value,
                 relacionDependencia: document.querySelector('input[name="relacionDependencia"]:checked')?.value === 'true' || null,
                 nombreEntidad: document.getElementById('nombreEntidad').value || null,
@@ -1180,7 +1180,7 @@ cion()">Siguiente →</button>
                 cargo: document.getElementById('cargo').value || null,
                 ingresoMensual: parseFloat(document.getElementById('ingresoMensual').value) || null,
 
-                // Sección 4
+                // Seccion 4
                 tieneConyugue: tieneConyugue,
                 conyugeApellidos: tieneConyugue ? document.getElementById('conyugeApellidos').value : null,
                 conyugeNombres: tieneConyugue ? document.getElementById('conyugeNombres').value : null,
@@ -1203,7 +1203,7 @@ cion()">Siguiente →</button>
                 conyugeProvinciaLaboral: tieneConyugue ? document.getElementById('conyugeProvinciaLaboral').value : null,
                 conyugeCantonLaboral: tieneConyugue ? document.getElementById('conyugeCantonLaboral').value : null,
 
-                // Sección 5
+                // Seccion 5
                 tieneBeneficiario: tieneBeneficiario,
                 beneficiarioApellidos: tieneBeneficiario ? document.getElementById('beneficiarioApellidos').value : null,
                 beneficiarioNombres: tieneBeneficiario ? document.getElementById('beneficiarioNombres').value : null,
@@ -1219,7 +1219,7 @@ cion()">Siguiente →</button>
                 beneficiarioTelefono: tieneBeneficiario ? document.getElementById('beneficiarioTelefono').value : null,
                 beneficiarioCelular: tieneBeneficiario ? document.getElementById('beneficiarioCelular').value : null,
 
-                // Sección 6
+                // Seccion 6
                 esPEP: document.querySelector('input[name="esPEP"]:checked').value === 'true',
                 esFamiliarPEP: document.querySelector('input[name="esFamiliarPEP"]:checked').value === 'true',
                 relacionPEP: document.getElementById('relacionPEP').value || null,
