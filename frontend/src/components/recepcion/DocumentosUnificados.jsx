@@ -393,6 +393,12 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
         setSnackbar({ open: true, message: result.message || 'Documento(s) marcado(s) como listo(s) exitosamente', severity: 'success' });
         console.log('🔄 Recargando documentos...');
         await cargarDocumentos();
+
+        // Forzar re-render para asegurar actualización visual
+        setTimeout(async () => {
+          await cargarDocumentos();
+        }, 100);
+
         console.log('📊 Actualizando estadísticas...');
         onEstadisticasChange?.();
         setSelectedDocuments([]);
