@@ -254,14 +254,14 @@ async function cambiarEstadoDocumento(req, res) {
               userId: req.user.id,
               eventType: 'VERIFICATION_GENERATED',
               description: `Código de retiro generado por archivo: ${codigoGenerado}`,
-              details: {
+              details: JSON.stringify({
                 codigoRetiro: codigoGenerado,
                 previousStatus: documento.status,
                 newStatus: nuevoEstado,
                 generatedBy: `${req.user.firstName} ${req.user.lastName}`,
                 userRole: 'ARCHIVO',
                 timestamp: new Date().toISOString()
-              },
+              }),
               ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
               userAgent: req.get('User-Agent') || 'unknown'
             }
@@ -619,7 +619,7 @@ async function procesarEntregaDocumento(req, res) {
               userId: userId,
               eventType: 'STATUS_CHANGED',
               description: `Documento entregado grupalmente por ARCHIVO a ${entregadoA}`,
-              details: {
+              details: JSON.stringify({
                 entregadoA,
                 cedulaReceptor,
                 relacionTitular,
@@ -628,7 +628,7 @@ async function procesarEntregaDocumento(req, res) {
                 deliveredWith: documento.protocolNumber,
                 groupDelivery: true,
                 deliveredBy: 'ARCHIVO'
-              },
+              }),
               personaRetiro: entregadoA,
               cedulaRetiro: cedulaReceptor || undefined,
               metodoVerificacion: computedVerificationMethod,
