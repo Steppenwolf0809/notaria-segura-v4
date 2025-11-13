@@ -131,13 +131,13 @@ export async function bulkMarkReady({ documentIds, actor, sendNotifications = tr
           userId: actor.id,
           eventType: 'STATUS_CHANGED',
           description: `Cambio masivo de EN_PROCESO a LISTO (${actor.firstName || ''} ${actor.lastName || ''} - ${actor.role})`,
-          details: {
+          details: JSON.stringify({
             fromStatus: 'EN_PROCESO',
             toStatus: 'LISTO',
             bulk: true,
             groupByClient: byClient.get(key).length,
             codigoRetiro: code
-          },
+          }),
           createdAt: new Date()
         }
       });

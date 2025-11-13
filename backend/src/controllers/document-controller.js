@@ -3591,16 +3591,33 @@ async function getDocumentHistory(req, res) {
 
     // Formatear eventos para respuesta con descripciones mejoradas
     const formattedEvents = events.map(event => {
+      // Parsear el campo details si es un string JSON
+      let parsedDetails = event.details;
+      if (typeof event.details === 'string') {
+        try {
+          parsedDetails = JSON.parse(event.details);
+        } catch (e) {
+          console.warn(`⚠️ No se pudo parsear details para evento ${event.id}:`, e);
+          parsedDetails = {};
+        }
+      }
+
+      // Crear evento con details parseado para las funciones de formateo
+      const eventWithParsedDetails = {
+        ...event,
+        details: parsedDetails
+      };
+
       // Usar el formateo mejorado de descripción
-      const formattedDescription = formatEventDescription(event);
-      
+      const formattedDescription = formatEventDescription(eventWithParsedDetails);
+
       // Obtener información contextual adicional
-      const contextInfo = getEventContextInfo(event);
+      const contextInfo = getEventContextInfo(eventWithParsedDetails);
       
       return {
         id: event.id,
         type: event.eventType,
-        title: getEventTitle(event.eventType, event.details),
+        title: getEventTitle(event.eventType, parsedDetails),
         description: formattedDescription,
         timestamp: event.createdAt,
         user: {
@@ -3608,10 +3625,10 @@ async function getDocumentHistory(req, res) {
           name: `${event.user.firstName} ${event.user.lastName}`,
           role: event.user.role
         },
-        icon: getEventIcon(event.eventType, event.details),
-        color: getEventColor(event.eventType, event.details),
+        icon: getEventIcon(event.eventType, parsedDetails),
+        color: getEventColor(event.eventType, parsedDetails),
         contextInfo: contextInfo, // Información adicional para mostrar
-        details: event.details, // Detalles técnicos (solo para debug si es necesario)
+        details: parsedDetails, // Detalles técnicos parseados (solo para debug si es necesario)
         // Campos enriquecidos para UI si existen
         ...(event.personaRetiro && { personaRetiro: event.personaRetiro }),
         ...(event.cedulaRetiro && { cedulaRetiro: event.cedulaRetiro }),
