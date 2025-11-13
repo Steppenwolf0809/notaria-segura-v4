@@ -15,6 +15,7 @@ const useReceptionsStore = create((set, get) => ({
   tab: 'ACTIVOS', // 'ACTIVOS' | 'ENTREGADOS'
   query: '',
   clientId: null,
+  matrizadorId: null,
   page: 1,
   pageSize: parseInt(localStorage.getItem('receptionsPageSize')) || 25,
 
@@ -41,7 +42,8 @@ const useReceptionsStore = create((set, get) => ({
       tab,
       page: 1, // Resetear página al cambiar de pestaña
       query: '', // Limpiar búsqueda al cambiar de pestaña
-      clientId: null // Limpiar filtro de cliente
+      clientId: null, // Limpiar filtro de cliente
+      matrizadorId: null // Limpiar filtro de matrizador
     });
 
     // Recargar datos con nueva pestaña
@@ -92,6 +94,29 @@ const useReceptionsStore = create((set, get) => ({
   },
 
   /**
+   * Establecer filtro de matrizador
+   * @param {number} matrizadorId - ID del matrizador para filtrar
+   */
+  setMatrizadorId: (matrizadorId) => {
+    set({ matrizadorId, page: 1 }); // Resetear página al filtrar
+
+    // Recargar datos inmediatamente
+    get().fetchDocuments();
+    get().fetchCounts();
+  },
+
+  /**
+   * Limpiar filtro de matrizador
+   */
+  clearMatrizadorId: () => {
+    set({ matrizadorId: null, page: 1 });
+
+    // Recargar datos
+    get().fetchDocuments();
+    get().fetchCounts();
+  },
+
+  /**
    * Establecer página actual
    * @param {number} page - Nueva página
    */
@@ -120,7 +145,7 @@ const useReceptionsStore = create((set, get) => ({
    * Cargar recepciones desde API (cliente HTTP unificado)
    */
   fetchDocuments: async () => {
-    const { tab, query, clientId, page, pageSize } = get();
+    const { tab, query, clientId, matrizadorId, page, pageSize } = get();
     set({ loading: true, error: null });
     try {
       const params = {
@@ -129,6 +154,7 @@ const useReceptionsStore = create((set, get) => ({
         pageSize,
         ...(query?.trim() ? { query: query.trim() } : {}),
         ...(clientId ? { clientId } : {}),
+        ...(matrizadorId ? { matrizadorId } : {}),
       };
       const result = await receptionService.getUnifiedReceptions(params);
       if (result.success) {
@@ -158,12 +184,13 @@ const useReceptionsStore = create((set, get) => ({
    * Cargar conteos para badges (cliente HTTP unificado)
    */
   fetchCounts: async () => {
-    const { query, clientId } = get();
+    const { query, clientId, matrizadorId } = get();
     set({ loadingCounts: true });
     try {
       const params = {
         ...(query?.trim() ? { query: query.trim() } : {}),
         ...(clientId ? { clientId } : {}),
+        ...(matrizadorId ? { matrizadorId } : {}),
       };
       const result = await receptionService.getUnifiedCounts(params);
       if (result.success) {
@@ -195,6 +222,7 @@ const useReceptionsStore = create((set, get) => ({
     set({
       query: '',
       clientId: null,
+      matrizadorId: null,
       page: 1
     });
 
