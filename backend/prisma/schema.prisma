@@ -46,6 +46,7 @@ model User {
   concuerdoAudits   ConcuerdoAuditLog[]                        // Auditoría de generación de concuerdos
   escriturasQR      EscrituraQR[]                              // Escrituras QR creadas por el usuario
   auditoriaPersonas AuditoriaPersona[]                         // Auditoría de reseteos de PIN de personas
+  formularioUAFEAsignaciones FormularioUAFEAsignacion[]        // Formularios UAFE asignados por el matrizador
 
   @@map("users")
 }
@@ -360,6 +361,8 @@ model PersonaRegistrada {
   // 🔗 RELACIONES
   sesiones              SesionPersonal[]
   auditoria             AuditoriaPersona[]
+  formularioAsignaciones FormularioUAFEAsignacion[]
+  formularioRespuestas  FormularioUAFERespuesta[]
 
   @@map("personas_registradas")
   @@index([numeroIdentificacion])  // Búsqueda rápida por cédula
@@ -417,4 +420,183 @@ model AuditoriaPersona {
   @@index([personaId])    // Historial de una persona
   @@index([tipo])         // Filtrar por tipo de evento
   @@index([createdAt])    // Orden cronológico
+}
+
+// ============================================================================
+// SISTEMA DE FORMULARIOS UAFE - MATRIZADOR (SUBSISTEMA 2)
+// ============================================================================
+
+// Asignación de formulario UAFE a una persona específica
+model FormularioUAFEAsignacion {
+  id                String   @id @default(uuid())
+
+  // 🎯 ASIGNACIÓN
+  personaId         String
+  persona           PersonaRegistrada @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  // 📋 INFORMACIÓN DEL TRÁMITE
+  numeroMatriz      String   // No. Matriz
+  actoContrato      String   // Acto / Contrato Diligencia
+
+  // 👤 CALIDAD EN EL ACTO
+  calidadPersona    String   // "COMPRADOR" | "VENDEDOR" | "OTRO"
+  actuaPor          String   // "PROPIOS_DERECHOS" | "REPRESENTANDO_A"
+
+  // 🔗 LINK ÚNICO Y ESTADO
+  token             String   @unique  // Token único para acceder al formulario
+  estado            String   @default("PENDIENTE")  // "PENDIENTE" | "COMPLETADO" | "EXPIRADO"
+  expiraEn          DateTime?  // Opcional: fecha de expiración
+
+  // 👤 MATRIZADOR RESPONSABLE
+  matrizadorId      Int
+  matrizador        User     @relation(fields: [matrizadorId], references: [id])
+
+  // 📝 RESPUESTA (cuando se complete)
+  respuestaId       String?  @unique
+  respuesta         FormularioUAFERespuesta? @relation(fields: [respuestaId], references: [id])
+
+  // 📅 METADATA
+  createdAt         DateTime @default(now())
+  completadoEn      DateTime?
+
+  @@map("formulario_uafe_asignaciones")
+  @@index([token])
+  @@index([personaId])
+  @@index([matrizadorId])
+  @@index([estado])
+  @@index([numeroMatriz])
+}
+
+// Respuesta completa de un formulario UAFE
+model FormularioUAFERespuesta {
+  id                String   @id @default(uuid())
+
+  asignacionId      String   @unique
+  asignacion        FormularioUAFEAsignacion?
+
+  personaId         String
+  persona           PersonaRegistrada @relation(fields: [personaId], references: [id], onDelete: Cascade)
+
+  // =====================================================
+  // SECCIÓN 1: INFORMACIÓN DEL TRÁMITE
+  // =====================================================
+  fecha             DateTime
+  numeroMatriz      String
+  actoContrato      String
+  avaluoMunicipal   Float?
+  valorContrato     Float?
+
+  // Forma de Pago
+  formaPagoCheque   Boolean  @default(false)
+  formaPagoEfectivo Boolean  @default(false)
+  formaPagoTransferencia Boolean @default(false)
+  formaPagoTarjeta  Boolean  @default(false)
+  montoCheque       Float?
+  montoEfectivo     Float?
+  montoTransferencia Float?
+  montoTarjeta      Float?
+  bancoCheque       String?
+  bancoTransferencia String?
+  bancoTarjeta      String?
+
+  // =====================================================
+  // SECCIÓN 2: PERSONA QUE REALIZA EL ACTO
+  // =====================================================
+  calidad           String   // "COMPRADOR" | "VENDEDOR"
+  actuaPor          String   // "PROPIOS_DERECHOS" | "REPRESENTANDO_A"
+
+  // Tipo de Identificación (usa los datos de PersonaRegistrada)
+  tipoIdentificacion String  // "CEDULA" | "RUC" | "PASAPORTE"
+  numeroIdentificacion String
+  nacionalidad      String
+  estadoCivil       String   // "SOLTERO" | "CASADO" | "UNION_LIBRE" | "DIVORCIADO" | "VIUDO" | "DISOLUCION_SOCIEDAD"
+  genero            String   // "MASCULINO" | "FEMENINO"
+  nivelEstudio      String   // "BACHILLER" | "UNIVERSITARIO" | "MAESTRIA" | "POSTGRADO"
+
+  // Dirección
+  callePrincipal    String
+  numeroDomicilio   String?
+  calleSecundaria   String?
+
+  // =====================================================
+  // SECCIÓN 3: INFORMACIÓN LABORAL
+  // =====================================================
+  situacionLaboral  String   // "PUBLICO" | "PRIVADO" | "JUBILADO" | "NO_APLICA"
+  relacionDependencia Boolean?
+  nombreEntidad     String?
+  fechaIngreso      DateTime?
+  direccionLaboral  String?
+  provinciaLaboral  String?
+  cantonLaboral     String?
+  profesionOcupacion String?
+  cargo             String?
+  ingresoMensual    Float?
+
+  // =====================================================
+  // SECCIÓN 4: DATOS DEL CÓNYUGE (si aplica)
+  // =====================================================
+  tieneConyugue     Boolean  @default(false)
+  conyugeApellidos  String?
+  conyugeNombres    String?
+  conyugeTipoId     String?  // "CEDULA" | "RUC" | "PASAPORTE"
+  conyugeNumeroId   String?
+  conyugeNacionalidad String?
+  conyugeEstadoCivil String?
+  conyugeGenero     String?
+  conyugeNivelEstudio String?
+  conyugeCorreo     String?
+  conyugeCelular    String?
+  conyugeCallePrincipal String?
+  conyugeNumero     String?
+  conyugeCalleSecundaria String?
+  conyugeProfesion  String?
+
+  // Información laboral del cónyuge
+  conyugeSituacionLaboral String?
+  conyugeRelacionDependencia Boolean?
+  conyugeNombreEntidad String?
+  conyugeFechaIngreso DateTime?
+  conyugeDireccionLaboral String?
+  conyugeProvinciaLaboral String?
+  conyugeCantonLaboral String?
+
+  // =====================================================
+  // SECCIÓN 5: BENEFICIARIO FINAL / APODERADO (si aplica)
+  // =====================================================
+  tieneBeneficiario Boolean  @default(false)
+  beneficiarioApellidos String?
+  beneficiarioNombres String?
+  beneficiarioTipoId String?
+  beneficiarioNumeroId String?
+  beneficiarioNacionalidad String?
+  beneficiarioEstadoCivil String?
+  beneficiarioGenero String?
+  beneficiarioNivelEstudio String?
+  beneficiarioProfesion String?
+  beneficiarioDireccion String?
+  beneficiarioCorreo String?
+  beneficiarioTelefono String?
+  beneficiarioCelular String?
+
+  // =====================================================
+  // SECCIÓN 6: PERSONAS EXPUESTAS POLÍTICAMENTE (PEP)
+  // =====================================================
+  esPEP             Boolean  @default(false)
+  esFamiliarPEP     Boolean  @default(false)
+  relacionPEP       String?  // "CONYUGE" | "PADRE_MADRE" | "HIJO" | "ABUELO" | "HERMANO" | "NIETO" | "SUEGRO" | "CUÑADO"
+  esColaboradorPEP  Boolean  @default(false)
+  tipoColaborador   String?  // "ASISTENTE" | "ASESOR" | "OTRA_PERSONA_CONFIANZA"
+
+  // =====================================================
+  // METADATA
+  // =====================================================
+  completadoEn      DateTime @default(now())
+  ipAddress         String?
+  userAgent         String?
+
+  @@map("formulario_uafe_respuestas")
+  @@index([personaId])
+  @@index([asignacionId])
+  @@index([numeroMatriz])
+  @@index([completadoEn])
 }
