@@ -35,10 +35,12 @@ import {
   Warning as WarningIcon,
   Notifications as NotificationsIcon,
   History as HistoryIcon,
-  Speed as SpeedIcon
+  Speed as SpeedIcon,
+  Description as DescriptionIcon
 } from '@mui/icons-material';
 // import DocumentCard from './DocumentCard';
 import NotificationsHistory from './Documents/NotificationsHistory';
+import FormulariosUAFE from './FormulariosUAFE';
 import useDocumentStore from '../store/document-store';
 import useStats from '../hooks/useStats';
 import useDocuments from '../hooks/useDocuments';
@@ -207,7 +209,10 @@ const MatrizadorDashboard = ({ onDocumentClick }) => {
       
       case 1: // Historial de Notificaciones
         return <NotificationsHistory />;
-      
+
+      case 2: // Formularios UAFE
+        return <FormulariosUAFE />;
+
       default:
         return null;
     }
@@ -261,14 +266,19 @@ const MatrizadorDashboard = ({ onDocumentClick }) => {
           variant="fullWidth"
           sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
-          <Tab 
-            icon={<SpeedIcon />} 
-            label="Dashboard" 
+          <Tab
+            icon={<SpeedIcon />}
+            label="Dashboard"
             sx={{ fontWeight: 'bold' }}
           />
-          <Tab 
-            icon={<HistoryIcon />} 
+          <Tab
+            icon={<HistoryIcon />}
             label="Historial"
+            sx={{ fontWeight: 'bold' }}
+          />
+          <Tab
+            icon={<DescriptionIcon />}
+            label="Formularios UAFE"
             sx={{ fontWeight: 'bold' }}
           />
         </Tabs>
