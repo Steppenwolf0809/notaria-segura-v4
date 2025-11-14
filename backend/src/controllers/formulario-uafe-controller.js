@@ -328,24 +328,61 @@ export async function loginFormularioUAFE(req, res) {
  */
 export async function responderFormulario(req, res) {
   try {
-    const respuestaData = req.body;
+    const { datosPersonaNatural, datosPersonaJuridica } = req.body;
 
-    // Actualizar PersonaProtocolo con la respuesta
-    const personaProtocolo = await prisma.personaProtocolo.update({
-      where: { id: req.personaProtocoloVerificada.id },
-      data: {
-        completado: true,
-        completadoAt: new Date(),
-        respuestaFormulario: respuestaData
-      }
+    const personaProtocolo = req.personaProtocoloVerificada;
+    const tipoPersona = personaProtocolo.persona.tipoPersona;
+
+    // Validar que se envíen los datos correctos según el tipo de persona
+    if (tipoPersona === 'NATURAL' && !datosPersonaNatural) {
+      return res.status(400).json({
+        success: false,
+        message: 'Se requieren datosPersonaNatural para persona natural'
+      });
+    }
+
+    if (tipoPersona === 'JURIDICA' && !datosPersonaJuridica) {
+      return res.status(400).json({
+        success: false,
+        message: 'Se requieren datosPersonaJuridica para persona jurídica'
+      });
+    }
+
+    // Usar transacción para actualizar ambas tablas
+    const resultado = await prisma.$transaction(async (tx) => {
+      // 1. Actualizar PersonaRegistrada con los nuevos datos
+      const updateData = tipoPersona === 'NATURAL'
+        ? { datosPersonaNatural: datosPersonaNatural }
+        : { datosPersonaJuridica: datosPersonaJuridica };
+
+      await tx.personaRegistrada.update({
+        where: { id: personaProtocolo.persona.id },
+        data: updateData
+      });
+
+      // 2. Marcar PersonaProtocolo como completado y guardar respuesta
+      const personaProtocoloActualizado = await tx.personaProtocolo.update({
+        where: { id: personaProtocolo.id },
+        data: {
+          completado: true,
+          completadoAt: new Date(),
+          respuestaFormulario: {
+            datosActualizados: tipoPersona === 'NATURAL' ? datosPersonaNatural : datosPersonaJuridica,
+            fechaRespuesta: new Date().toISOString(),
+            ipAddress: req.ip
+          }
+        }
+      });
+
+      return personaProtocoloActualizado;
     });
 
     res.json({
       success: true,
-      message: 'Formulario enviado exitosamente',
+      message: 'Formulario enviado exitosamente. Tus datos han sido actualizados.',
       data: {
         completado: true,
-        completadoAt: personaProtocolo.completadoAt
+        completadoAt: resultado.completadoAt
       }
     });
   } catch (error) {
@@ -570,6 +607,149 @@ export async function obtenerProtocolo(req, res) {
     res.status(500).json({
       success: false,
       message: 'Error al obtener protocolo'
+    });
+  }
+}
+
+/**
+ * Actualizar datos del protocolo UAFE
+ * PUT /api/formulario-uafe/protocolo/:protocoloId
+ * Requiere: authenticateToken + role MATRIZADOR o ADMIN
+ */
+export async function actualizarProtocolo(req, res) {
+  try {
+    const { protocoloId } = req.params;
+    const {
+      numeroProtocolo,
+      fecha,
+      actoContrato,
+      avaluoMunicipal,
+      valorContrato,
+      formaPago
+    } = req.body;
+
+    // Verificar que el protocolo existe
+    const protocoloExistente = await prisma.protocoloUAFE.findUnique({
+      where: { id: protocoloId }
+    });
+
+    if (!protocoloExistente) {
+      return res.status(404).json({
+        success: false,
+        message: 'Protocolo no encontrado'
+      });
+    }
+
+    // Verificar permisos
+    if (protocoloExistente.createdBy !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permiso para editar este protocolo'
+      });
+    }
+
+    // Si se está cambiando el número de protocolo, verificar que no exista otro con ese número
+    if (numeroProtocolo && numeroProtocolo !== protocoloExistente.numeroProtocolo) {
+      const duplicado = await prisma.protocoloUAFE.findUnique({
+        where: { numeroProtocolo }
+      });
+
+      if (duplicado) {
+        return res.status(409).json({
+          success: false,
+          message: 'Ya existe un protocolo con ese número'
+        });
+      }
+    }
+
+    // Actualizar protocolo
+    const protocoloActualizado = await prisma.protocoloUAFE.update({
+      where: { id: protocoloId },
+      data: {
+        ...(numeroProtocolo && { numeroProtocolo }),
+        ...(fecha && { fecha: new Date(fecha) }),
+        ...(actoContrato && { actoContrato }),
+        ...(avaluoMunicipal !== undefined && { avaluoMunicipal: parseFloat(avaluoMunicipal) }),
+        ...(valorContrato !== undefined && { valorContrato: parseFloat(valorContrato) }),
+        ...(formaPago && { formaPago })
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Protocolo actualizado exitosamente',
+      data: protocoloActualizado
+    });
+  } catch (error) {
+    console.error('Error actualizando protocolo:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al actualizar protocolo'
+    });
+  }
+}
+
+/**
+ * Eliminar persona de un protocolo
+ * DELETE /api/formulario-uafe/protocolo/:protocoloId/persona/:personaProtocoloId
+ * Requiere: authenticateToken + role MATRIZADOR o ADMIN
+ */
+export async function eliminarPersonaDeProtocolo(req, res) {
+  try {
+    const { protocoloId, personaProtocoloId } = req.params;
+
+    // Verificar que el protocolo existe y pertenece al usuario
+    const protocolo = await prisma.protocoloUAFE.findUnique({
+      where: { id: protocoloId }
+    });
+
+    if (!protocolo) {
+      return res.status(404).json({
+        success: false,
+        message: 'Protocolo no encontrado'
+      });
+    }
+
+    if (protocolo.createdBy !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permiso para modificar este protocolo'
+      });
+    }
+
+    // Verificar que la relación persona-protocolo existe
+    const personaProtocolo = await prisma.personaProtocolo.findUnique({
+      where: { id: personaProtocoloId }
+    });
+
+    if (!personaProtocolo) {
+      return res.status(404).json({
+        success: false,
+        message: 'Persona no encontrada en el protocolo'
+      });
+    }
+
+    if (personaProtocolo.protocoloId !== protocoloId) {
+      return res.status(400).json({
+        success: false,
+        message: 'La persona no pertenece a este protocolo'
+      });
+    }
+
+    // Eliminar la relación
+    await prisma.personaProtocolo.delete({
+      where: { id: personaProtocoloId }
+    });
+
+    res.json({
+      success: true,
+      message: 'Persona eliminada del protocolo exitosamente'
+    });
+  } catch (error) {
+    console.error('Error eliminando persona del protocolo:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al eliminar persona del protocolo'
     });
   }
 }
