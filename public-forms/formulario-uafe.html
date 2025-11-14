@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulario UAFE - Notaría 18 Quito</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .section {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .section-title {
+            font-size: 22px;
+            color: #667eea;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="date"],
+        input[type="email"],
+        input[type="password"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+        }
+
+        .btn {
+            padding: 14px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #d0d0d0;
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .button-group {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+            gap: 15px;
+        }
+
+        .progress-bar {
+            background: #e0e0e0;
+            height: 8px;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 30px;
+        }
+
+        .progress-bar-fill {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .alert-error {
+            background: #fee;
+            color: #c00;
+            border: 1px solid #fcc;
+        }
+
+        .alert-success {
+            background: #efe;
+            color: #060;
+            border: 1px solid #cfc;
+        }
+
+        .alert-info {
+            background: #eef;
+            color: #006;
+            border: 1px solid #ccf;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .subsection {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        .subsection-title {
+            font-size: 18px;
+            color: #764ba2;
+            margin-bottom: 15px;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .radio-option input[type="radio"] {
+            width: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 Formulario UAFE</h1>
+            <p>Notaría Décima Octava del Cantón Quito</p>
+        </div>
+
+        <div class="content">
+            <!-- Login Section -->
+            <div id="loginSection" class="section active">
+                <h2 class="section-title">Iniciar Sesión</h2>
+                <div id="loginAlert"></div>
+
+                <div class="form-group">
+                    <label for="loginCedula">Número de Identificación</label>
+                    <input type="text" id="loginCedula" placeholder="Ej: 1234567890">
+                </div>
+
+                <div class="form-group">
+                    <label for="loginPin">PIN (6 dígitos)</label>
+                    <input type="password" id="loginPin" maxlength="6" placeholder="******">
+                </div>
+
+                <button class="btn btn-primary" onclick="login()" style="width: 100%;">
+                    Ingresar
+                </button>
+            </div>
+
+            <!-- Formulario Principal -->
+            <div id="formularioSection" class="section">
+                <div class="progress-bar">
+                    <div class="progress-bar-fill" id="progressBar"></div>
+                </div>
+
+                <div id="formularioAlert"></div>
+
+                <!-- Sección 1: Información del Trámite -->
+                <div id="seccion1" class="form-section active">
+                    <h2 class="section-title">1. Información del Trámite</h2>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Fecha</label>
+                            <input type="date" id="fecha" required>
+                        </div>
+                        <div class="form-group">
+                            <label>No. Matriz (pre-llenado)</label>
+                            <input type="text" id="numeroMatriz" readonly style="background: #f5f5f5;">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Acto / Contrato Diligencia (pre-llenado)</label>
+                        <input type="text" id="actoContrato" readonly style="background: #f5f5f5;">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Avalúo Municipal ($)</label>
+                            <input type="number" id="avaluoMunicipal" step="0.01" placeholder="0.00">
+                        </div>
+                        <div class="form-group">
+                            <label>Valor del Contrato ($)</label>
+                            <input type="number" id="valorContrato" step="0.01" placeholder="0.00">
+                        </div>
+                    </div>
+
+                    <div class="subsection">
+                        <div class="subsection-title">Forma de Pago</div>
+
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="formaPagoCheque" onchange="togglePagoDetalle('Cheque')">
+                            <label for="formaPagoCheque">Cheque</label>
+                        </div>
+                        <div id="detalleCheque" class="hidden form-row" style="margin-left: 30px; margin-bottom: 15px;">
+                            <div class="form-group">
+                                <input type="number" id="montoCheque" placeholder="Monto" step="0.01">
+                            </div>
+                            <div class="form-group">
+                                <input type="text" id="bancoCheque" placeholder="Banco">
+                            </div>
+                        </div>
+
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="formaPagoEfectivo" onchange="togglePagoDetalle('Efectivo')">
+                            <label for="formaPagoEfectivo">Efectivo</label>
+                        </div>
+                        <div id="detalleEfectivo" class="hidden" style="margin-left: 30px; margin-bottom: 15px;">
+                            <input type="number" id="montoEfectivo" placeholder="Monto" step="0.01">
+                        </div>
+
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="formaPagoTransferencia" onchange="togglePagoDetalle('Transferencia')">
+                            <label for="formaPagoTransferencia">Transferencia</label>
+                        </div>
+                        <div id="detalleTransferencia" class="hidden form-row" style="margin-left: 30px; margin-bottom: 15px;">
+                            <div class="form-group">
+                                <input type="number" id="montoTransferencia" placeholder="Monto" step="0.01">
+                            </div>
+                            <div class="form-group">
+                                <input type="text" id="bancoTransferencia" placeholder="Banco">
+                            </div>
+                        </div>
+
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="formaPagoTarjeta" onchange="togglePagoDetalle('Tarjeta')">
+                            <label for="formaPagoTarjeta">Tarjeta</label>
+                        </div>
+                        <div id="detalleTarjeta" class="hidden form-row" style="margin-left: 30px; margin-bottom: 15px;">
+                            <div class="form-group">
+                                <input type="number" id="montoTarjeta" placeholder="Monto" step="0.01">
+                            </div>
+                            <div class="form-group">
+                                <input type="text" id="bancoTarjeta" placeholder="Banco">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button class="btn btn-secondary" onclick="logout()">Salir</button>
+                        <button class="btn btn-primary" onclick="siguienteSec
+
+cion()">Siguiente →</button>
+                    </div>
+                </div>
+
+                <!-- Sección 2: Persona que Realiza el Acto -->
+                <div id="seccion2" class="form-section hidden">
+                    <h2 class="section-title">2. Persona que Realiza el Acto</h2>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Calidad (pre-llenado)</label>
+                            <input type="text" id="calidad" readonly style="background: #f5f5f5;">
+                        </div>
+                        <div class="form-group">
+                            <label>Actúa por (pre-llenado)</label>
+                            <input type="text" id="actuaPor" readonly style="background: #f5f5f5;">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Tipo de Identificación *</label>
+                            <select id="tipoIdentificacion" required>
+                                <option value="">Seleccione...</option>
+                                <option value="CEDULA">Cédula</option>
+                                <option value="RUC">RUC</option>
+                                <option value="PASAPORTE">Pasaporte</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Número de Identificación (pre-llenado)</label>
+                            <input type="text" id="numeroIdentificacion" readonly style="background: #f5f5f5;">
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Nacionalidad *</label>
+                            <input type="text" id="nacionalidad" required placeholder="Ej: Ecuatoriana">
+                        </div>
+                        <div class="form-group">
+                            <label>Estado Civil *</label>
+                            <select id="estadoCivil" required onchange="toggleConyugeSection()">
+                                <option value="">Seleccione...</option>
+                                <option value="SOLTERO">Soltero/a</option>
+                                <option value="CASADO">Casado/a</option>
+                                <option value="UNION_LIBRE">Unión Libre</option>
+                                <option value="DIVORCIADO">Divorciado/a</option>
+                                <option value="VIUDO">Viudo/a</option>
+                                <option value="DISOLUCION_SOCIEDAD">Disolución Sociedad Conyugal</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Género *</label>
+                            <select id="genero" required>
+                                <option value="">Seleccione...</option>
+                                <option value="MASCULINO">Masculino</option>
+                                <option value="FEMENINO">Femenino</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Nivel de Estudio *</label>
+                            <select id="nivelEstudio" required>
+                                <option value="">Seleccione...</option>
+                                <option value="BACHILLER">Bachiller</option>
+                                <option value="UNIVERSITARIO">Universitario</option>
+                                <option value="MAESTRIA">Maestría</option>
+                                <option value="POSTGRADO">Postgrado</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="subsection">
+                        <div class="subsection-title">Dirección Domiciliaria</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Calle Principal *</label>
+                                <input type="text" id="callePrincipal" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Número</label>
+                                <input type="text" id="numeroDomicilio">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Calle Secundaria</label>
+                            <input type="text" id="calleSecundaria">
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button class="btn btn-secondary" onclick="anteriorSeccion()">← Anterior</button>
+                        <button class="btn btn-primary" onclick="siguienteSeccion()">Siguiente →</button>
+                    </div>
+                </div>
+
+                <!-- Sección 3: Información Laboral -->
+                <div id="seccion3" class="form-section hidden">
+                    <h2 class="section-title">3. Información Laboral</h2>
+
+                    <div class="form-group">
+                        <label>Situación Laboral *</label>
+                        <select id="situacionLaboral" required onchange="toggleInfoLaboral()">
+                            <option value="">Seleccione...</option>
+                            <option value="PUBLICO">Público</option>
+                            <option value="PRIVADO">Privado</option>
+                            <option value="JUBILADO">Jubilado</option>
+                            <option value="NO_APLICA">No Aplica</option>
+                        </select>
+                    </div>
+
+                    <div id="detalleLaboral" class="hidden">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Relación de Dependencia</label>
+                                <div class="radio-group">
+                                    <div class="radio-option">
+                                        <input type="radio" name="relacionDependencia" id="relacionSi" value="true">
+                                        <label for="relacionSi">Sí</label>
+                                    </div>
+                                    <div class="radio-option">
+                                        <input type="radio" name="relacionDependencia" id="relacionNo" value="false">
+                                        <label for="relacionNo">No</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Fecha de Ingreso</label>
+                                <input type="date" id="fechaIngreso">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Nombre de la Entidad</label>
+                            <input type="text" id="nombreEntidad">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Dirección de la Entidad</label>
+                            <input type="text" id="direccionLaboral">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Provincia</label>
+                                <input type="text" id="provinciaLaboral">
+                            </div>
+                            <div class="form-group">
+                                <label>Cantón</label>
+                                <input type="text" id="cantonLaboral">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Profesión / Ocupación</label>
+                                <input type="text" id="profesionOcupacion">
+                            </div>
+                            <div class="form-group">
+                                <label>Cargo</label>
+                                <input type="text" id="cargo">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Ingreso Mensual ($)</label>
+                            <input type="number" id="ingresoMensual" step="0.01" placeholder="0.00">
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button class="btn btn-secondary" onclick="anteriorSeccion()">← Anterior</button>
+                        <button class="btn btn-primary" onclick="siguienteSeccion()">Siguiente →</button>
+                    </div>
+                </div>
+
+                <!-- Sección 4: Datos del Cónyuge -->
+                <div id="seccion4" class="form-section hidden">
+                    <h2 class="section-title">4. Datos del Cónyuge</h2>
+
+                    <div class="alert alert-info">
+                        Esta sección solo se completa si está casado o en unión libre
+                    </div>
+
+                    <div id="conyugeForm" class="hidden">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Apellidos *</label>
+                                <input type="text" id="conyugeApellidos">
+                            </div>
+                            <div class="form-group">
+                                <label>Nombres *</label>
+                                <input type="text" id="conyugeNombres">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Tipo de Identificación</label>
+                                <select id="conyugeTipoId">
+                                    <option value="">Seleccione...</option>
+                                    <option value="CEDULA">Cédula</option>
+                                    <option value="RUC">RUC</option>
+                                    <option value="PASAPORTE">Pasaporte</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Número de Identificación</label>
+                                <input type="text" id="conyugeNumeroId">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Nacionalidad</label>
+                                <input type="text" id="conyugeNacionalidad">
+                            </div>
+                            <div class="form-group">
+                                <label>Género</label>
+                                <select id="conyugeGenero">
+                                    <option value="">Seleccione...</option>
+                                    <option value="MASCULINO">Masculino</option>
+                                    <option value="FEMENINO">Femenino</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Nivel de Estudio</label>
+                                <select id="conyugeNivelEstudio">
+                                    <option value="">Seleccione...</option>
+                                    <option value="BACHILLER">Bachiller</option>
+                                    <option value="UNIVERSITARIO">Universitario</option>
+                                    <option value="MAESTRIA">Maestría</option>
+                                    <option value="POSTGRADO">Postgrado</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Profesión</label>
+                                <input type="text" id="conyugeProfesion">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Correo Electrónico</label>
+                                <input type="email" id="conyugeCorreo">
+                            </div>
+                            <div class="form-group">
+                                <label>Celular</label>
+                                <input type="text" id="conyugeCelular">
+                            </div>
+                        </div>
+
+                        <div class="subsection">
+                            <div class="subsection-title">Dirección del Cónyuge</div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Calle Principal</label>
+                                    <input type="text" id="conyugeCallePrincipal">
+                                </div>
+                                <div class="form-group">
+                                    <label>Número</label>
+                                    <input type="text" id="conyugeNumero">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Calle Secundaria</label>
+                                <input type="text" id="conyugeCalleSecundaria">
+                            </div>
+                        </div>
+
+                        <div class="subsection">
+                            <div class="subsection-title">Información Laboral del Cónyuge</div>
+                            <div class="form-group">
+                                <label>Situación Laboral</label>
+                                <select id="conyugeSituacionLaboral">
+                                    <option value="">Seleccione...</option>
+                                    <option value="PUBLICO">Público</option>
+                                    <option value="PRIVADO">Privado</option>
+                                    <option value="JUBILADO">Jubilado</option>
+                                    <option value="NO_APLICA">No Aplica</option>
+                                </select>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Relación de Dependencia</label>
+                                    <div class="radio-group">
+                                        <div class="radio-option">
+                                            <input type="radio" name="conyugeRelacionDependencia" id="conyugeRelacionSi" value="true">
+                                            <label for="conyugeRelacionSi">Sí</label>
+                                        </div>
+                                        <div class="radio-option">
+                                            <input type="radio" name="conyugeRelacionDependencia" id="conyugeRelacionNo" value="false">
+                                            <label for="conyugeRelacionNo">No</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="form-group">
+                                    <label>Fecha de Ingreso</label>
+                                    <input type="date" id="conyugeFechaIngreso">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Nombre de la Entidad</label>
+                                <input type="text" id="conyugeNombreEntidad">
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Dirección</label>
+                                    <input type="text" id="conyugeDireccionLaboral">
+                                </div>
+                                <div class="form-group">
+                                    <label>Provincia</label>
+                                    <input type="text" id="conyugeProvinciaLaboral">
+                                </div>
+                                <div class="form-group">
+                                    <label>Cantón</label>
+                                    <input type="text" id="conyugeCantonLaboral">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button class="btn btn-secondary" onclick="anteriorSeccion()">← Anterior</button>
+                        <button class="btn btn-primary" onclick="siguienteSeccion()">Siguiente →</button>
+                    </div>
+                </div>
+
+                <!-- Sección 5: Beneficiario Final / Apoderado -->
+                <div id="seccion5" class="form-section hidden">
+                    <h2 class="section-title">5. Información Adicional de Beneficiario Final / Apoderado</h2>
+
+                    <div class="form-group">
+                        <label>¿Hay un beneficiario final o apoderado?</label>
+                        <div class="radio-group">
+                            <div class="radio-option">
+                                <input type="radio" name="tieneBeneficiario" id="beneficiarioSi" value="true" onchange="toggleBeneficiarioForm()">
+                                <label for="beneficiarioSi">Sí</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" name="tieneBeneficiario" id="beneficiarioNo" value="false" onchange="toggleBeneficiarioForm()" checked>
+                                <label for="beneficiarioNo">No</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="beneficiarioForm" class="hidden">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Apellidos</label>
+                                <input type="text" id="beneficiarioApellidos">
+                            </div>
+                            <div class="form-group">
+                                <label>Nombres</label>
+                                <input type="text" id="beneficiarioNombres">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Tipo de Identificación</label>
+                                <select id="beneficiarioTipoId">
+                                    <option value="">Seleccione...</option>
+                                    <option value="CEDULA">Cédula</option>
+                                    <option value="RUC">RUC</option>
+                                    <option value="PASAPORTE">Pasaporte</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Número de Identificación</label>
+                                <input type="text" id="beneficiarioNumeroId">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Nacionalidad</label>
+                                <input type="text" id="beneficiarioNacionalidad">
+                            </div>
+                            <div class="form-group">
+                                <label>Estado Civil</label>
+                                <select id="beneficiarioEstadoCivil">
+                                    <option value="">Seleccione...</option>
+                                    <option value="SOLTERO">Soltero/a</option>
+                                    <option value="CASADO">Casado/a</option>
+                                    <option value="UNION_LIBRE">Unión Libre</option>
+                                    <option value="DIVORCIADO">Divorciado/a</option>
+                                    <option value="VIUDO">Viudo/a</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Género</label>
+                                <select id="beneficiarioGenero">
+                                    <option value="">Seleccione...</option>
+                                    <option value="MASCULINO">Masculino</option>
+                                    <option value="FEMENINO">Femenino</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Nivel de Estudio</label>
+                                <select id="beneficiarioNivelEstudio">
+                                    <option value="">Seleccione...</option>
+                                    <option value="BACHILLER">Bachiller</option>
+                                    <option value="UNIVERSITARIO">Universitario</option>
+                                    <option value="MAESTRIA">Maestría</option>
+                                    <option value="POSTGRADO">Postgrado</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Profesión / Ocupación</label>
+                            <input type="text" id="beneficiarioProfesion">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Dirección</label>
+                            <input type="text" id="beneficiarioDireccion">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Correo Electrónico</label>
+                                <input type="email" id="beneficiarioCorreo">
+                            </div>
+                            <div class="form-group">
+                                <label>Teléfono</label>
+                                <input type="text" id="beneficiarioTelefono">
+                            </div>
+                            <div class="form-group">
+                                <label>Celular</label>
+                                <input type="text" id="beneficiarioCelular">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button class="btn btn-secondary" onclick="anteriorSeccion()">← Anterior</button>
+                        <button class="btn btn-primary" onclick="siguienteSeccion()">Siguiente →</button>
+                    </div>
+                </div>
+
+                <!-- Sección 6: Personas Expuestas Políticamente (PEP) -->
+                <div id="seccion6" class="form-section hidden">
+                    <h2 class="section-title">6. Personas Expuestas Políticamente (PEP)</h2>
+
+                    <div class="alert alert-info">
+                        Por favor responda con veracidad las siguientes preguntas
+                    </div>
+
+                    <div class="form-group">
+                        <label>¿Se considera una persona expuesta políticamente (PEP)?</label>
+                        <div class="radio-group">
+                            <div class="radio-option">
+                                <input type="radio" name="esPEP" id="pepSi" value="true">
+                                <label for="pepSi">Sí</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" name="esPEP" id="pepNo" value="false" checked>
+                                <label for="pepNo">No</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>¿Es familiar de un PEP?</label>
+                        <div class="radio-group">
+                            <div class="radio-option">
+                                <input type="radio" name="esFamiliarPEP" id="familiarPepSi" value="true" onchange="toggleRelacionPEP()">
+                                <label for="familiarPepSi">Sí</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" name="esFamiliarPEP" id="familiarPepNo" value="false" onchange="toggleRelacionPEP()" checked>
+                                <label for="familiarPepNo">No</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="relacionPEPForm" class="form-group hidden">
+                        <label>Relación con el PEP</label>
+                        <select id="relacionPEP">
+                            <option value="">Seleccione...</option>
+                            <option value="CONYUGE">Cónyuge o Conviviente</option>
+                            <option value="PADRE_MADRE">Padre/Madre</option>
+                            <option value="HIJO">Hijo/a</option>
+                            <option value="ABUELO">Abuelo/a</option>
+                            <option value="HERMANO">Hermano/a</option>
+                            <option value="NIETO">Nieto/a</option>
+                            <option value="SUEGRO">Suegro/a</option>
+                            <option value="CUÑADO">Cuñado/a</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>¿Es colaborador cercano de un PEP?</label>
+                        <div class="radio-group">
+                            <div class="radio-option">
+                                <input type="radio" name="esColaboradorPEP" id="colaboradorPepSi" value="true" onchange="toggleTipoColaborador()">
+                                <label for="colaboradorPepSi">Sí</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" name="esColaboradorPEP" id="colaboradorPepNo" value="false" onchange="toggleTipoColaborador()" checked>
+                                <label for="colaboradorPepNo">No</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="tipoColaboradorForm" class="form-group hidden">
+                        <label>Tipo de Colaborador</label>
+                        <select id="tipoColaborador">
+                            <option value="">Seleccione...</option>
+                            <option value="ASISTENTE">Asistente</option>
+                            <option value="ASESOR">Asesor</option>
+                            <option value="OTRA_PERSONA_CONFIANZA">Otra persona de confianza</option>
+                        </select>
+                    </div>
+
+                    <div class="button-group">
+                        <button class="btn btn-secondary" onclick="anteriorSeccion()">← Anterior</button>
+                        <button class="btn btn-primary" onclick="enviarFormulario()">Enviar Formulario ✓</button>
+                    </div>
+                </div>
+
+                <!-- Sección de Confirmación -->
+                <div id="seccionConfirmacion" class="form-section hidden">
+                    <div style="text-align: center; padding: 40px 20px;">
+                        <div style="font-size: 80px; color: #4caf50;">✓</div>
+                        <h2 style="color: #4caf50; margin: 20px 0;">¡Formulario Enviado Exitosamente!</h2>
+                        <p style="font-size: 18px; color: #666; margin-bottom: 30px;">
+                            Gracias por completar el formulario UAFE. Los datos han sido registrados correctamente.
+                        </p>
+                        <button class="btn btn-primary" onclick="location.reload()">
+                            Cerrar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Loading -->
+            <div id="loadingSection" class="section">
+                <div class="loading">
+                    <div class="spinner"></div>
+                    <p>Cargando...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuracion
+        const API_URL = 'https://notaria-segura-v4-production.up.railway.app/api';
+
+        // Variables globales
+        let sessionToken = null;
+        let asignacionData = null;
+        let seccionActual = 1;
+        const totalSecciones = 6;
+
+        // Obtener token de URL
+        function getTokenFromURL() {
+            const path = window.location.pathname;
+            const match = path.match(/\/formulario-uafe\/([a-z0-9]+)/i);
+            return match ? match[1] : null;
+        }
+
+        // Inicializar
+        window.addEventListener('DOMContentLoaded', () => {
+            const token = getTokenFromURL();
+            if (!token) {
+                showAlert('loginAlert', 'Link inválido. Contacte con la notaría.', 'error');
+            }
+            // Set today's date as default
+            document.getElementById('fecha').valueAsDate = new Date();
+        });
+
+        // Login
+        async function login() {
+            const cedula = document.getElementById('loginCedula').value.trim();
+            const pin = document.getElementById('loginPin').value.trim();
+
+            if (!cedula || !pin) {
+                showAlert('loginAlert', 'Por favor complete todos los campos', 'error');
+                return;
+            }
+
+            if (pin.length !== 6) {
+                showAlert('loginAlert', 'El PIN debe tener 6 dígitos', 'error');
+                return;
+            }
+
+            showLoading(true);
+
+            try {
+                const response = await fetch(`${API_URL}/personal/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ numeroIdentificacion: cedula, pin })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    sessionToken = data.token;
+                    await cargarFormulario();
+                } else {
+                    showAlert('loginAlert', data.error || 'Error al iniciar sesión', 'error');
+                    showLoading(false);
+                }
+            } catch (error) {
+                console.error('Error login:', error);
+                showAlert('loginAlert', 'Error de conexión', 'error');
+                showLoading(false);
+            }
+        }
+
+        // Cargar datos del formulario
+        async function cargarFormulario() {
+            const token = getTokenFromURL();
+
+            try {
+                const response = await fetch(`${API_URL}/formulario-uafe/public/${token}`, {
+                    headers: { 'x-session-token': sessionToken }
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    if (data.completado) {
+                        showAlert('loginAlert', 'Este formulario ya fue completado', 'info');
+                        showLoading(false);
+                        return;
+                    }
+
+                    asignacionData = data.asignacion;
+                    prellenarDatos();
+                    mostrarSeccion('formularioSection');
+                    actualizarProgreso();
+                } else {
+                    showAlert('loginAlert', data.error || 'Error al cargar formulario', 'error');
+                    showLoading(false);
+                }
+            } catch (error) {
+                console.error('Error cargar formulario:', error);
+                showAlert('loginAlert', 'Error de conexión', 'error');
+                showLoading(false);
+            }
+        }
+
+        // Prellenar datos del formulario
+        function prellenarDatos() {
+            document.getElementById('numeroMatriz').value = asignacionData.numeroMatriz;
+            document.getElementById('actoContrato').value = asignacionData.actoContrato;
+            document.getElementById('calidad').value = asignacionData.calidadPersona;
+            document.getElementById('actuaPor').value = asignacionData.actuaPor.replace('_', ' ');
+            document.getElementById('numeroIdentificacion').value = asignacionData.persona.numeroIdentificacion;
+        }
+
+        // Navegacion entre secciones
+        function siguienteSeccion() {
+            if (!validarSeccionActual()) return;
+
+            if (seccionActual < totalSecciones) {
+                document.getElementById(`seccion${seccionActual}`).classList.add('hidden');
+                seccionActual++;
+                document.getElementById(`seccion${seccionActual}`).classList.remove('hidden');
+                actualizarProgreso();
+                window.scrollTo(0, 0);
+            }
+        }
+
+        function anteriorSeccion() {
+            if (seccionActual > 1) {
+                document.getElementById(`seccion${seccionActual}`).classList.add('hidden');
+                seccionActual--;
+                document.getElementById(`seccion${seccionActual}`).classList.remove('hidden');
+                actualizarProgreso();
+                window.scrollTo(0, 0);
+            }
+        }
+
+        function actualizarProgreso() {
+            const progreso = (seccionActual / totalSecciones) * 100;
+            document.getElementById('progressBar').style.width = `${progreso}%`;
+        }
+
+        // Validar seccion actual
+        function validarSeccionActual() {
+            const seccion = document.getElementById(`seccion${seccionActual}`);
+            const required = seccion.querySelectorAll('[required]');
+
+            for (let field of required) {
+                if (!field.value.trim()) {
+                    showAlert('formularioAlert', 'Por favor complete todos los campos obligatorios (*)', 'error');
+                    field.focus();
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        // Toggles
+        function togglePagoDetalle(tipo) {
+            const checkbox = document.getElementById(`formaPago${tipo}`);
+            const detalle = document.getElementById(`detalle${tipo}`);
+            detalle.classList.toggle('hidden', !checkbox.checked);
+        }
+
+        function toggleConyugeSection() {
+            const estadoCivil = document.getElementById('estadoCivil').value;
+            const conyugeForm = document.getElementById('conyugeForm');
+            const mostrar = estadoCivil === 'CASADO' || estadoCivil === 'UNION_LIBRE';
+            conyugeForm.classList.toggle('hidden', !mostrar);
+        }
+
+        function toggleInfoLaboral() {
+            const situacion = document.getElementById('situacionLaboral').value;
+            const detalle = document.getElementById('detalleLaboral');
+            detalle.classList.toggle('hidden', situacion === 'NO_APLICA' || !situacion);
+        }
+
+        function toggleBeneficiarioForm() {
+            const tieneBeneficiario = document.querySelector('input[name="tieneBeneficiario"]:checked').value === 'true';
+            document.getElementById('beneficiarioForm').classList.toggle('hidden', !tieneBeneficiario);
+        }
+
+        function toggleRelacionPEP() {
+            const esFamiliar = document.querySelector('input[name="esFamiliarPEP"]:checked').value === 'true';
+            document.getElementById('relacionPEPForm').classList.toggle('hidden', !esFamiliar);
+        }
+
+        function toggleTipoColaborador() {
+            const esColaborador = document.querySelector('input[name="esColaboradorPEP"]:checked').value === 'true';
+            document.getElementById('tipoColaboradorForm').classList.toggle('hidden', !esColaborador);
+        }
+
+        // Enviar formulario
+        async function enviarFormulario() {
+            if (!validarSeccionActual()) return;
+
+            showLoading(true);
+
+            const estadoCivil = document.getElementById('estadoCivil').value;
+            const tieneConyugue = estadoCivil === 'CASADO' || estadoCivil === 'UNION_LIBRE';
+
+            const tieneBeneficiario = document.querySelector('input[name="tieneBeneficiario"]:checked').value === 'true';
+
+            const respuestaData = {
+                // Seccion 1
+                fecha: document.getElementById('fecha').value,
+                numeroMatriz: document.getElementById('numeroMatriz').value,
+                actoContrato: document.getElementById('actoContrato').value,
+                avaluoMunicipal: parseFloat(document.getElementById('avaluoMunicipal').value) || null,
+                valorContrato: parseFloat(document.getElementById('valorContrato').value) || null,
+                formaPagoCheque: document.getElementById('formaPagoCheque').checked,
+                formaPagoEfectivo: document.getElementById('formaPagoEfectivo').checked,
+                formaPagoTransferencia: document.getElementById('formaPagoTransferencia').checked,
+                formaPagoTarjeta: document.getElementById('formaPagoTarjeta').checked,
+                montoCheque: parseFloat(document.getElementById('montoCheque').value) || null,
+                montoEfectivo: parseFloat(document.getElementById('montoEfectivo').value) || null,
+                montoTransferencia: parseFloat(document.getElementById('montoTransferencia').value) || null,
+                montoTarjeta: parseFloat(document.getElementById('montoTarjeta').value) || null,
+                bancoCheque: document.getElementById('bancoCheque').value || null,
+                bancoTransferencia: document.getElementById('bancoTransferencia').value || null,
+                bancoTarjeta: document.getElementById('bancoTarjeta').value || null,
+
+                // Seccion 2
+                calidad: document.getElementById('calidad').value,
+                actuaPor: asignacionData.actuaPor,
+                tipoIdentificacion: document.getElementById('tipoIdentificacion').value,
+                numeroIdentificacion: document.getElementById('numeroIdentificacion').value,
+                nacionalidad: document.getElementById('nacionalidad').value,
+                estadoCivil: estadoCivil,
+                genero: document.getElementById('genero').value,
+                nivelEstudio: document.getElementById('nivelEstudio').value,
+                callePrincipal: document.getElementById('callePrincipal').value,
+                numeroDomicilio: document.getElementById('numeroDomicilio').value || null,
+                calleSecundaria: document.getElementById('calleSecundaria').value || null,
+
+                // Seccion 3
+                situacionLaboral: document.getElementById('situacionLaboral').value,
+                relacionDependencia: document.querySelector('input[name="relacionDependencia"]:checked')?.value === 'true' || null,
+                nombreEntidad: document.getElementById('nombreEntidad').value || null,
+                fechaIngreso: document.getElementById('fechaIngreso').value || null,
+                direccionLaboral: document.getElementById('direccionLaboral').value || null,
+                provinciaLaboral: document.getElementById('provinciaLaboral').value || null,
+                cantonLaboral: document.getElementById('cantonLaboral').value || null,
+                profesionOcupacion: document.getElementById('profesionOcupacion').value || null,
+                cargo: document.getElementById('cargo').value || null,
+                ingresoMensual: parseFloat(document.getElementById('ingresoMensual').value) || null,
+
+                // Seccion 4
+                tieneConyugue: tieneConyugue,
+                conyugeApellidos: tieneConyugue ? document.getElementById('conyugeApellidos').value : null,
+                conyugeNombres: tieneConyugue ? document.getElementById('conyugeNombres').value : null,
+                conyugeTipoId: tieneConyugue ? document.getElementById('conyugeTipoId').value : null,
+                conyugeNumeroId: tieneConyugue ? document.getElementById('conyugeNumeroId').value : null,
+                conyugeNacionalidad: tieneConyugue ? document.getElementById('conyugeNacionalidad').value : null,
+                conyugeGenero: tieneConyugue ? document.getElementById('conyugeGenero').value : null,
+                conyugeNivelEstudio: tieneConyugue ? document.getElementById('conyugeNivelEstudio').value : null,
+                conyugeCorreo: tieneConyugue ? document.getElementById('conyugeCorreo').value : null,
+                conyugeCelular: tieneConyugue ? document.getElementById('conyugeCelular').value : null,
+                conyugeCallePrincipal: tieneConyugue ? document.getElementById('conyugeCallePrincipal').value : null,
+                conyugeNumero: tieneConyugue ? document.getElementById('conyugeNumero').value : null,
+                conyugeCalleSecundaria: tieneConyugue ? document.getElementById('conyugeCalleSecundaria').value : null,
+                conyugeProfesion: tieneConyugue ? document.getElementById('conyugeProfesion').value : null,
+                conyugeSituacionLaboral: tieneConyugue ? document.getElementById('conyugeSituacionLaboral').value : null,
+                conyugeRelacionDependencia: tieneConyugue ? (document.querySelector('input[name="conyugeRelacionDependencia"]:checked')?.value === 'true' || null) : null,
+                conyugeNombreEntidad: tieneConyugue ? document.getElementById('conyugeNombreEntidad').value : null,
+                conyugeFechaIngreso: tieneConyugue ? document.getElementById('conyugeFechaIngreso').value : null,
+                conyugeDireccionLaboral: tieneConyugue ? document.getElementById('conyugeDireccionLaboral').value : null,
+                conyugeProvinciaLaboral: tieneConyugue ? document.getElementById('conyugeProvinciaLaboral').value : null,
+                conyugeCantonLaboral: tieneConyugue ? document.getElementById('conyugeCantonLaboral').value : null,
+
+                // Seccion 5
+                tieneBeneficiario: tieneBeneficiario,
+                beneficiarioApellidos: tieneBeneficiario ? document.getElementById('beneficiarioApellidos').value : null,
+                beneficiarioNombres: tieneBeneficiario ? document.getElementById('beneficiarioNombres').value : null,
+                beneficiarioTipoId: tieneBeneficiario ? document.getElementById('beneficiarioTipoId').value : null,
+                beneficiarioNumeroId: tieneBeneficiario ? document.getElementById('beneficiarioNumeroId').value : null,
+                beneficiarioNacionalidad: tieneBeneficiario ? document.getElementById('beneficiarioNacionalidad').value : null,
+                beneficiarioEstadoCivil: tieneBeneficiario ? document.getElementById('beneficiarioEstadoCivil').value : null,
+                beneficiarioGenero: tieneBeneficiario ? document.getElementById('beneficiarioGenero').value : null,
+                beneficiarioNivelEstudio: tieneBeneficiario ? document.getElementById('beneficiarioNivelEstudio').value : null,
+                beneficiarioProfesion: tieneBeneficiario ? document.getElementById('beneficiarioProfesion').value : null,
+                beneficiarioDireccion: tieneBeneficiario ? document.getElementById('beneficiarioDireccion').value : null,
+                beneficiarioCorreo: tieneBeneficiario ? document.getElementById('beneficiarioCorreo').value : null,
+                beneficiarioTelefono: tieneBeneficiario ? document.getElementById('beneficiarioTelefono').value : null,
+                beneficiarioCelular: tieneBeneficiario ? document.getElementById('beneficiarioCelular').value : null,
+
+                // Seccion 6
+                esPEP: document.querySelector('input[name="esPEP"]:checked').value === 'true',
+                esFamiliarPEP: document.querySelector('input[name="esFamiliarPEP"]:checked').value === 'true',
+                relacionPEP: document.getElementById('relacionPEP').value || null,
+                esColaboradorPEP: document.querySelector('input[name="esColaboradorPEP"]:checked').value === 'true',
+                tipoColaborador: document.getElementById('tipoColaborador').value || null
+            };
+
+            try {
+                const token = getTokenFromURL();
+                const response = await fetch(`${API_URL}/formulario-uafe/public/${token}/responder`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-session-token': sessionToken
+                    },
+                    body: JSON.stringify(respuestaData)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('seccion6').classList.add('hidden');
+                    document.getElementById('seccionConfirmacion').classList.remove('hidden');
+                } else {
+                    showAlert('formularioAlert', data.error || 'Error al enviar formulario', 'error');
+                }
+            } catch (error) {
+                console.error('Error enviar formulario:', error);
+                showAlert('formularioAlert', 'Error de conexión al enviar', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // Helpers
+        function mostrarSeccion(seccionId) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById(seccionId).classList.add('active');
+        }
+
+        function showLoading(show) {
+            document.getElementById('loadingSection').classList.toggle('active', show);
+            if (!show) {
+                // Restore previous section
+                if (sessionToken) {
+                    mostrarSeccion('formularioSection');
+                } else {
+                    mostrarSeccion('loginSection');
+                }
+            } else {
+                mostrarSeccion('loadingSection');
+            }
+        }
+
+        function showAlert(containerId, message, type) {
+            const container = document.getElementById(containerId);
+            const alertClass = type === 'error' ? 'alert-error' : type === 'success' ? 'alert-success' : 'alert-info';
+            container.innerHTML = `<div class="alert ${alertClass}">${message}</div>`;
+            setTimeout(() => container.innerHTML = '', 5000);
+        }
+
+        function logout() {
+            if (confirm('¿Está seguro de salir? Los cambios no guardados se perderán.')) {
+                sessionToken = null;
+                asignacionData = null;
+                seccionActual = 1;
+                mostrarSeccion('loginSection');
+                document.getElementById('loginCedula').value = '';
+                document.getElementById('loginPin').value = '';
+            }
+        }
+    </script>
+</body>
+</html>

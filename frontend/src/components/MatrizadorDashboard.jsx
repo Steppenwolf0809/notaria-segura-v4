@@ -207,7 +207,7 @@ const MatrizadorDashboard = ({ onDocumentClick }) => {
       
       case 1: // Historial de Notificaciones
         return <NotificationsHistory />;
-      
+
       default:
         return null;
     }
@@ -261,13 +261,13 @@ const MatrizadorDashboard = ({ onDocumentClick }) => {
           variant="fullWidth"
           sx={{ borderBottom: 1, borderColor: 'divider' }}
         >
-          <Tab 
-            icon={<SpeedIcon />} 
-            label="Dashboard" 
+          <Tab
+            icon={<SpeedIcon />}
+            label="Dashboard"
             sx={{ fontWeight: 'bold' }}
           />
-          <Tab 
-            icon={<HistoryIcon />} 
+          <Tab
+            icon={<HistoryIcon />}
             label="Historial"
             sx={{ fontWeight: 'bold' }}
           />
