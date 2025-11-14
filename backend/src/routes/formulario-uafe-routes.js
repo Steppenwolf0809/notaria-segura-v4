@@ -9,7 +9,10 @@ import {
   listarProtocolos,
   obtenerProtocolo,
   actualizarProtocolo,
-  eliminarPersonaDeProtocolo
+  actualizarPersonaEnProtocolo,
+  eliminarPersonaDeProtocolo,
+  generarPDFsProtocolo,
+  descargarArchivo
 } from '../controllers/formulario-uafe-controller.js';
 
 const router = express.Router();
@@ -90,6 +93,18 @@ router.put(
 );
 
 /**
+ * Actualizar persona en protocolo (cambiar rol/calidad)
+ * PUT /api/formulario-uafe/protocolo/:protocoloId/persona/:personaProtocoloId
+ * Requiere: JWT + role MATRIZADOR o ADMIN
+ */
+router.put(
+  '/protocolo/:protocoloId/persona/:personaProtocoloId',
+  authenticateToken,
+  requireRoles(['MATRIZADOR', 'ADMIN']),
+  actualizarPersonaEnProtocolo
+);
+
+/**
  * Eliminar persona de un protocolo
  * DELETE /api/formulario-uafe/protocolo/:protocoloId/persona/:personaProtocoloId
  * Requiere: JWT + role MATRIZADOR o ADMIN
@@ -110,6 +125,27 @@ router.get(
   '/protocolos',
   authenticateToken,
   listarProtocolos
+);
+
+/**
+ * Generar PDFs de un protocolo
+ * POST /api/formulario-uafe/protocolo/:protocoloId/generar-pdfs
+ * Requiere: JWT + role MATRIZADOR o ADMIN
+ */
+router.post(
+  '/protocolo/:protocoloId/generar-pdfs',
+  authenticateToken,
+  requireRoles(['MATRIZADOR', 'ADMIN']),
+  generarPDFsProtocolo
+);
+
+/**
+ * Descargar archivo temporal (PDF o ZIP)
+ * GET /api/formulario-uafe/download/:folder/:filename
+ */
+router.get(
+  '/download/:folder/:filename',
+  descargarArchivo
 );
 
 // ========================================
