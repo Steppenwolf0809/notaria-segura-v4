@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulario UAFE - Notaría 18 Quito</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .section {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .section-title {
+            font-size: 22px;
+            color: #667eea;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        input[type="password"],
+        select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 14px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .alert {
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .alert.active {
+            display: block;
+            animation: slideDown 0.3s ease;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .info-box {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .info-box strong {
+            color: #667eea;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .grid-2 {
+                grid-template-columns: 1fr;
+            }
+
+            .content {
+                padding: 20px;
+            }
+
+            .header h1 {
+                font-size: 22px;
+            }
+        }
+
+        .success-icon {
+            text-align: center;
+            font-size: 60px;
+            color: #28a745;
+            margin-bottom: 20px;
+        }
+
+        .required {
+            color: red;
+        }
+
+        .helper-text {
+            font-size: 13px;
+            color: #666;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 Formulario UAFE</h1>
+            <p>Notaría 18 Quito - Sistema de Protocolos</p>
+        </div>
+
+        <div class="content">
+            <!-- SECCIÓN DE LOGIN -->
+            <div id="loginSection" class="section active">
+                <h2 class="section-title">Acceso al Formulario</h2>
+
+                <div class="info-box">
+                    <p><strong>Instrucciones:</strong></p>
+                    <p>Para acceder al formulario necesitas 3 datos:</p>
+                    <ol style="margin-left: 20px; margin-top: 10px;">
+                        <li>Número de Protocolo (proporcionado por la notaría)</li>
+                        <li>Tu número de cédula</li>
+                        <li>Tu PIN de 6 dígitos (configurado al registrarte)</li>
+                    </ol>
+                </div>
+
+                <div id="loginAlert" class="alert"></div>
+
+                <form onsubmit="event.preventDefault(); login();">
+                    <div class="form-group">
+                        <label for="loginProtocolo">Número de Protocolo <span class="required">*</span></label>
+                        <input
+                            type="text"
+                            id="loginProtocolo"
+                            placeholder="Ej: 2024-1234"
+                            required
+                        >
+                        <div class="helper-text">Número proporcionado por la notaría</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="loginCedula">Número de Cédula <span class="required">*</span></label>
+                        <input
+                            type="text"
+                            id="loginCedula"
+                            placeholder="Ej: 1234567890"
+                            maxlength="13"
+                            required
+                        >
+                    </div>
+
+                    <div class="form-group">
+                        <label for="loginPin">PIN <span class="required">*</span></label>
+                        <input
+                            type="password"
+                            id="loginPin"
+                            placeholder="6 dígitos"
+                            maxlength="6"
+                            required
+                        >
+                        <div class="helper-text">PIN de 6 dígitos configurado al registrarte</div>
+                    </div>
+
+                    <button type="submit" class="btn" id="loginBtn">
+                        Ingresar al Formulario
+                    </button>
+                </form>
+
+                <div id="loginLoading" class="loading">
+                    <div class="spinner"></div>
+                    <p style="margin-top: 10px; color: #666;">Verificando credenciales...</p>
+                </div>
+            </div>
+
+            <!-- SECCIÓN DE FORMULARIO -->
+            <div id="formularioSection" class="section">
+                <h2 class="section-title">Completar Formulario UAFE</h2>
+
+                <div id="protocoloInfo" class="info-box"></div>
+
+                <div id="formAlert" class="alert"></div>
+
+                <!-- Aquí iría el formulario completo -->
+                <div class="form-group">
+                    <label>Tu rol en este trámite:</label>
+                    <input type="text" id="rolPersona" readonly>
+                </div>
+
+                <p style="text-align: center; padding: 40px; color: #666;">
+                    <strong>Formulario en desarrollo</strong><br>
+                    Los campos del formulario UAFE se mostrarán aquí
+                </p>
+
+                <button class="btn" onclick="enviarFormulario()">
+                    Enviar Formulario
+                </button>
+            </div>
+
+            <!-- SECCIÓN DE ÉXITO -->
+            <div id="successSection" class="section">
+                <div class="success-icon">✅</div>
+                <h2 class="section-title" style="text-align: center;">¡Formulario Enviado!</h2>
+                <div class="alert alert-success active">
+                    Tu formulario ha sido enviado exitosamente. La notaría revisará la información proporcionada.
+                </div>
+                <p style="text-align: center; color: #666; margin-top: 20px;">
+                    Puedes cerrar esta ventana.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========================================
+        // CONFIGURACIÓN
+        // ========================================
+        const API_URL = window.location.hostname === 'localhost'
+            ? 'http://localhost:3000/api'
+            : 'https://notaria-segura-v4-production.up.railway.app/api';
+
+        let sessionToken = null;
+        let protocoloData = null;
+
+        // ========================================
+        // FUNCIONES DE UI
+        // ========================================
+        function showAlert(elementId, message, type) {
+            const alert = document.getElementById(elementId);
+            alert.className = `alert alert-${type} active`;
+            alert.textContent = message;
+
+            setTimeout(() => {
+                alert.classList.remove('active');
+            }, 5000);
+        }
+
+        function showLoading(show, loadingId = 'loginLoading') {
+            const loading = document.getElementById(loadingId);
+            if (show) {
+                loading.classList.add('active');
+            } else {
+                loading.classList.remove('active');
+            }
+        }
+
+        function mostrarSeccion(seccionId) {
+            document.querySelectorAll('.section').forEach(section => {
+                section.classList.remove('active');
+            });
+            document.getElementById(seccionId).classList.add('active');
+        }
+
+        // ========================================
+        // LOGIN
+        // ========================================
+        async function login() {
+            // Obtener valores de los inputs
+            const numeroProtocolo = document.getElementById('loginProtocolo').value.trim();
+            const cedula = document.getElementById('loginCedula').value.trim();
+            const pin = document.getElementById('loginPin').value.trim();
+
+            // Validaciones básicas
+            if (!numeroProtocolo || !cedula || !pin) {
+                showAlert('loginAlert', 'Por favor complete todos los campos', 'error');
+                return;
+            }
+
+            if (pin.length !== 6) {
+                showAlert('loginAlert', 'El PIN debe tener 6 dígitos', 'error');
+                return;
+            }
+
+            showLoading(true);
+
+            try {
+                // ⚠️ CRÍTICO: Enviar con los nombres EXACTOS que el backend espera
+                const response = await fetch(`${API_URL}/formulario-uafe/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        numeroProtocolo: numeroProtocolo,  // ← EXACTAMENTE como el backend espera
+                        cedula: cedula,                     // ← EXACTAMENTE como el backend espera
+                        pin: pin                            // ← EXACTAMENTE como el backend espera
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Guardar token de sesión
+                    sessionToken = data.sessionToken;  // ← El backend retorna "sessionToken"
+                    protocoloData = data.data;
+
+                    // Mostrar datos del protocolo
+                    mostrarDatosProtocolo();
+
+                    // Ir a la sección del formulario
+                    mostrarSeccion('formularioSection');
+                    showLoading(false);
+                } else {
+                    showAlert('loginAlert', data.message || 'Error al iniciar sesión', 'error');
+                    showLoading(false);
+                }
+            } catch (error) {
+                console.error('Error login:', error);
+                showAlert('loginAlert', 'Error de conexión. Verifica tu internet e intenta nuevamente.', 'error');
+                showLoading(false);
+            }
+        }
+
+        // ========================================
+        // MOSTRAR DATOS DEL PROTOCOLO
+        // ========================================
+        function mostrarDatosProtocolo() {
+            if (!protocoloData) return;
+
+            const infoBox = document.getElementById('protocoloInfo');
+            infoBox.innerHTML = `
+                <p><strong>Información del Trámite:</strong></p>
+                <p style="margin-top: 10px;">
+                    <strong>Protocolo:</strong> ${protocoloData.protocolo.numeroProtocolo}<br>
+                    <strong>Fecha:</strong> ${new Date(protocoloData.protocolo.fecha).toLocaleDateString('es-EC')}<br>
+                    <strong>Acto/Contrato:</strong> ${protocoloData.protocolo.actoContrato}<br>
+                    <strong>Valor:</strong> $${parseFloat(protocoloData.protocolo.valorContrato).toFixed(2)}
+                </p>
+                <p style="margin-top: 10px;">
+                    <strong>Tu Rol:</strong> ${protocoloData.tuRol.calidad} - ${protocoloData.tuRol.actuaPor}
+                </p>
+            `;
+
+            // Mostrar rol en el campo readonly
+            document.getElementById('rolPersona').value =
+                `${protocoloData.tuRol.calidad} - ${protocoloData.tuRol.actuaPor}`;
+        }
+
+        // ========================================
+        // ENVIAR FORMULARIO
+        // ========================================
+        async function enviarFormulario() {
+            if (!sessionToken) {
+                showAlert('formAlert', 'Sesión expirada. Por favor inicia sesión nuevamente.', 'error');
+                return;
+            }
+
+            showLoading(true, 'formLoading');
+
+            try {
+                // Aquí se construiría el objeto con todos los datos del formulario
+                const formData = {
+                    // TODO: Agregar todos los campos del formulario UAFE
+                    // Por ahora solo un placeholder
+                    completado: true
+                };
+
+                const response = await fetch(`${API_URL}/formulario-uafe/responder`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-session-token': sessionToken  // ← Token de sesión en el header
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    mostrarSeccion('successSection');
+                } else {
+                    showAlert('formAlert', data.message || 'Error al enviar formulario', 'error');
+                    showLoading(false, 'formLoading');
+                }
+            } catch (error) {
+                console.error('Error enviando formulario:', error);
+                showAlert('formAlert', 'Error de conexión', 'error');
+                showLoading(false, 'formLoading');
+            }
+        }
+
+        // ========================================
+        // INICIALIZACIÓN
+        // ========================================
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Formulario UAFE - Sistema de Protocolos');
+            console.log('API URL:', API_URL);
+        });
+    </script>
+</body>
+</html>
