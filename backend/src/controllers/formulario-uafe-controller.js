@@ -1,8 +1,6 @@
-import { PrismaClient } from '@prisma/client';
+import prisma from '../db.js';
 import bcrypt from 'bcrypt';
 import { generarTokenSesion } from '../utils/pin-validator.js';
-
-const prisma = new PrismaClient();
 
 /**
  * Crear nuevo protocolo UAFE
