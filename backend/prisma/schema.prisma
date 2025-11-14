@@ -47,6 +47,7 @@ model User {
   escriturasQR      EscrituraQR[]                              // Escrituras QR creadas por el usuario
   auditoriaPersonas AuditoriaPersona[]                         // Auditoría de reseteos de PIN de personas
   formularioUAFEAsignaciones FormularioUAFEAsignacion[]        // Formularios UAFE asignados por el matrizador
+  protocolosUAFE    ProtocoloUAFE[]                            // Protocolos UAFE creados por el matrizador
 
   @@map("users")
 }
@@ -363,6 +364,7 @@ model PersonaRegistrada {
   auditoria             AuditoriaPersona[]
   formularioAsignaciones FormularioUAFEAsignacion[]
   formularioRespuestas  FormularioUAFERespuesta[]
+  protocolos            PersonaProtocolo[]                     // Protocolos en los que participa esta persona
 
   @@map("personas_registradas")
   @@index([numeroIdentificacion])  // Búsqueda rápida por cédula
@@ -599,4 +601,91 @@ model FormularioUAFERespuesta {
   @@index([asignacionId])
   @@index([numeroMatriz])
   @@index([completadoEn])
+}
+
+// ============================================================================
+// SISTEMA DE PROTOCOLOS UAFE - NUEVO FLUJO (Protocolo + Cédula + PIN)
+// ============================================================================
+
+// Modelo de Protocolo UAFE (información del trámite)
+model ProtocoloUAFE {
+  id                    String   @id @default(uuid())
+  numeroProtocolo       String   @unique
+
+  // DATOS DEL TRÁMITE (llenados por matrizador UNA SOLA VEZ)
+  fecha                 DateTime
+  actoContrato          String
+  avaluoMunicipal       Decimal? @db.Decimal(12, 2)
+  valorContrato         Decimal  @db.Decimal(12, 2)
+
+  // FORMA DE PAGO (JSON para flexibilidad)
+  formaPago             Json     // { cheque: { monto, banco }, efectivo: { monto }, ... }
+
+  // METADATA
+  createdBy             Int
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // RELACIONES
+  creador               User     @relation(fields: [createdBy], references: [id])
+  personas              PersonaProtocolo[]
+
+  @@map("protocolos_uafe")
+  @@index([numeroProtocolo])
+  @@index([createdBy])
+  @@index([createdAt])
+}
+
+// Modelo de PersonaProtocolo (relación N:N entre personas y protocolos)
+model PersonaProtocolo {
+  id                    String   @id @default(uuid())
+  protocoloId           String
+  personaCedula         String
+
+  // ROL EN ESTE TRÁMITE
+  calidad               String   // "COMPRADOR", "VENDEDOR", "TESTIGO"
+  actuaPor              String   // "PROPIOS_DERECHOS", "REPRESENTANDO"
+
+  // ESTADO
+  completado            Boolean  @default(false)
+  completadoAt          DateTime?
+
+  // RESPUESTA DEL FORMULARIO (cuando completa)
+  respuestaFormulario   Json?
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // RELACIONES
+  protocolo             ProtocoloUAFE      @relation(fields: [protocoloId], references: [id], onDelete: Cascade)
+  persona               PersonaRegistrada  @relation(fields: [personaCedula], references: [numeroIdentificacion])
+  sesiones              SesionFormularioUAFE[]
+
+  @@unique([protocoloId, personaCedula])
+  @@map("personas_protocolo")
+  @@index([protocoloId])
+  @@index([personaCedula])
+  @@index([completado])
+}
+
+// Modelo de Sesión de Formulario UAFE (sesiones temporales)
+model SesionFormularioUAFE {
+  id                    String   @id @default(uuid())
+  personaProtocoloId    String
+  token                 String   @unique
+
+  expiraEn              DateTime
+  ultimaActividad       DateTime @default(now())
+
+  ipAddress             String?
+  userAgent             String?
+
+  createdAt             DateTime @default(now())
+
+  personaProtocolo      PersonaProtocolo @relation(fields: [personaProtocoloId], references: [id], onDelete: Cascade)
+
+  @@map("sesiones_formulario_uafe")
+  @@index([token])
+  @@index([personaProtocoloId])
+  @@index([expiraEn])
 }
