@@ -1039,11 +1039,169 @@ cion()">Siguiente →</button>
 
         // Prellenar datos del formulario
         function prellenarDatos() {
+            // Seccion 1: Datos del tramite (pre-llenado)
             document.getElementById('numeroMatriz').value = asignacionData.numeroMatriz;
             document.getElementById('actoContrato').value = asignacionData.actoContrato;
             document.getElementById('calidad').value = asignacionData.calidadPersona;
             document.getElementById('actuaPor').value = asignacionData.actuaPor.replace('_', ' ');
             document.getElementById('numeroIdentificacion').value = asignacionData.persona.numeroIdentificacion;
+
+            // Obtener datos personales segun tipo de persona
+            const datosPersonales = asignacionData.persona.tipoPersona === 'NATURAL'
+                ? asignacionData.persona.datosPersonaNatural
+                : asignacionData.persona.datosPersonaJuridica;
+
+            // Si no hay datos personales guardados, salir
+            if (!datosPersonales) {
+                console.log('No hay datos personales previos para pre-llenar');
+                return;
+            }
+
+            console.log('Pre-llenando datos personales:', datosPersonales);
+
+            // Seccion 2: Datos de la persona
+            if (datosPersonales.identificacion) {
+                if (datosPersonales.identificacion.tipo) {
+                    document.getElementById('tipoIdentificacion').value = datosPersonales.identificacion.tipo;
+                }
+                if (datosPersonales.identificacion.nacionalidad) {
+                    document.getElementById('nacionalidad').value = datosPersonales.identificacion.nacionalidad;
+                }
+            }
+
+            if (datosPersonales.datosPersonales) {
+                if (datosPersonales.datosPersonales.estadoCivil) {
+                    document.getElementById('estadoCivil').value = datosPersonales.datosPersonales.estadoCivil;
+                    toggleConyugeSection(); // Activar seccion de conyuge si aplica
+                }
+                if (datosPersonales.datosPersonales.genero) {
+                    document.getElementById('genero').value = datosPersonales.datosPersonales.genero;
+                }
+                if (datosPersonales.datosPersonales.nivelEstudio) {
+                    document.getElementById('nivelEstudio').value = datosPersonales.datosPersonales.nivelEstudio;
+                }
+            }
+
+            // Direccion domiciliaria
+            if (datosPersonales.direccion) {
+                if (datosPersonales.direccion.callePrincipal) {
+                    document.getElementById('callePrincipal').value = datosPersonales.direccion.callePrincipal;
+                }
+                if (datosPersonales.direccion.numero) {
+                    document.getElementById('numeroDomicilio').value = datosPersonales.direccion.numero;
+                }
+                if (datosPersonales.direccion.calleSecundaria) {
+                    document.getElementById('calleSecundaria').value = datosPersonales.direccion.calleSecundaria;
+                }
+            }
+
+            // Seccion 3: Informacion Laboral
+            if (datosPersonales.informacionLaboral) {
+                if (datosPersonales.informacionLaboral.situacion) {
+                    document.getElementById('situacionLaboral').value = datosPersonales.informacionLaboral.situacion;
+                    toggleInfoLaboral(); // Mostrar campos laborales si aplica
+                }
+
+                if (datosPersonales.informacionLaboral.relacionDependencia !== undefined) {
+                    const relacionVal = datosPersonales.informacionLaboral.relacionDependencia;
+                    if (relacionVal === true || relacionVal === 'true') {
+                        document.getElementById('relacionSi').checked = true;
+                    } else {
+                        document.getElementById('relacionNo').checked = true;
+                    }
+                }
+
+                if (datosPersonales.informacionLaboral.fechaIngreso) {
+                    document.getElementById('fechaIngreso').value = datosPersonales.informacionLaboral.fechaIngreso;
+                }
+                if (datosPersonales.informacionLaboral.nombreEntidad) {
+                    document.getElementById('nombreEntidad').value = datosPersonales.informacionLaboral.nombreEntidad;
+                }
+                if (datosPersonales.informacionLaboral.direccion) {
+                    document.getElementById('direccionLaboral').value = datosPersonales.informacionLaboral.direccion;
+                }
+                if (datosPersonales.informacionLaboral.provincia) {
+                    document.getElementById('provinciaLaboral').value = datosPersonales.informacionLaboral.provincia;
+                }
+                if (datosPersonales.informacionLaboral.canton) {
+                    document.getElementById('cantonLaboral').value = datosPersonales.informacionLaboral.canton;
+                }
+                if (datosPersonales.informacionLaboral.profesion) {
+                    document.getElementById('profesionOcupacion').value = datosPersonales.informacionLaboral.profesion;
+                }
+                if (datosPersonales.informacionLaboral.cargo) {
+                    document.getElementById('cargo').value = datosPersonales.informacionLaboral.cargo;
+                }
+                if (datosPersonales.informacionLaboral.ingresoMensual) {
+                    document.getElementById('ingresoMensual').value = datosPersonales.informacionLaboral.ingresoMensual;
+                }
+            }
+
+            // Seccion 4: Datos del conyuge (si aplica)
+            if (datosPersonales.conyuge && datosPersonales.conyuge.apellidos) {
+                if (datosPersonales.conyuge.apellidos) {
+                    document.getElementById('apellidosConyuge').value = datosPersonales.conyuge.apellidos;
+                }
+                if (datosPersonales.conyuge.nombres) {
+                    document.getElementById('nombresConyuge').value = datosPersonales.conyuge.nombres;
+                }
+                if (datosPersonales.conyuge.nacionalidad) {
+                    document.getElementById('nacionalidadConyuge').value = datosPersonales.conyuge.nacionalidad;
+                }
+                if (datosPersonales.conyuge.profesion) {
+                    document.getElementById('profesionConyuge').value = datosPersonales.conyuge.profesion;
+                }
+                if (datosPersonales.conyuge.lugarTrabajo) {
+                    document.getElementById('lugarTrabajoConyuge').value = datosPersonales.conyuge.lugarTrabajo;
+                }
+            }
+
+            // Seccion 6: Informacion PEP
+            if (datosPersonales.pep) {
+                // PEP (Persona Expuesta Políticamente)
+                if (datosPersonales.pep.esPEP !== undefined) {
+                    const pepVal = datosPersonales.pep.esPEP;
+                    if (pepVal === true || pepVal === 'true' || pepVal === 'SI') {
+                        document.getElementById('pepSi').checked = true;
+                        togglePEPSection(); // Mostrar campos PEP
+                    } else {
+                        document.getElementById('pepNo').checked = true;
+                    }
+                }
+
+                if (datosPersonales.pep.cargo) {
+                    document.getElementById('cargoPEP').value = datosPersonales.pep.cargo;
+                }
+                if (datosPersonales.pep.institucion) {
+                    document.getElementById('institucionPEP').value = datosPersonales.pep.institucion;
+                }
+                if (datosPersonales.pep.fechaInicio) {
+                    document.getElementById('fechaInicioPEP').value = datosPersonales.pep.fechaInicio;
+                }
+                if (datosPersonales.pep.fechaFin) {
+                    document.getElementById('fechaFinPEP').value = datosPersonales.pep.fechaFin;
+                }
+
+                // Relacion con PEP
+                if (datosPersonales.pep.relacionPEP !== undefined) {
+                    const relacionPEPVal = datosPersonales.pep.relacionPEP;
+                    if (relacionPEPVal === true || relacionPEPVal === 'true' || relacionPEPVal === 'SI') {
+                        document.getElementById('relacionPEPSi').checked = true;
+                        toggleRelacionPEPSection(); // Mostrar campos de relacion PEP
+                    } else {
+                        document.getElementById('relacionPEPNo').checked = true;
+                    }
+                }
+
+                if (datosPersonales.pep.nombrePEP) {
+                    document.getElementById('nombrePEP').value = datosPersonales.pep.nombrePEP;
+                }
+                if (datosPersonales.pep.parentesco) {
+                    document.getElementById('parentescoPEP').value = datosPersonales.pep.parentesco;
+                }
+            }
+
+            console.log('Datos pre-llenados exitosamente');
         }
 
         // Navegacion entre secciones
