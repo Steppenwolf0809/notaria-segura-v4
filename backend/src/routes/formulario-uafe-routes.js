@@ -160,7 +160,8 @@ router.get('/mis-asignaciones', authenticateToken, async (req, res) => {
             numeroIdentificacion: true,
             tipoPersona: true,
             datosPersonaNatural: true,
-            datosPersonaJuridica: true
+            datosPersonaJuridica: true,
+            completado: true
           }
         },
         respuesta: {
@@ -232,7 +233,8 @@ router.get('/asignacion/:id', authenticateToken, async (req, res) => {
             numeroIdentificacion: true,
             tipoPersona: true,
             datosPersonaNatural: true,
-            datosPersonaJuridica: true
+            datosPersonaJuridica: true,
+            completado: true
           }
         },
         respuesta: true,
@@ -436,7 +438,8 @@ router.get('/public/:token', verifyPersonalSession, async (req, res) => {
             numeroIdentificacion: true,
             tipoPersona: true,
             datosPersonaNatural: true,
-            datosPersonaJuridica: true
+            datosPersonaJuridica: true,
+            completado: true
           }
         },
         respuesta: true
