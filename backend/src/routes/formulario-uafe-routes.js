@@ -7,7 +7,9 @@ import {
   loginFormularioUAFE,
   responderFormulario,
   listarProtocolos,
-  obtenerProtocolo
+  obtenerProtocolo,
+  actualizarProtocolo,
+  eliminarPersonaDeProtocolo
 } from '../controllers/formulario-uafe-controller.js';
 
 const router = express.Router();
@@ -73,6 +75,30 @@ router.get(
   authenticateToken,
   requireRoles(['MATRIZADOR', 'ADMIN']),
   obtenerProtocolo
+);
+
+/**
+ * Actualizar protocolo
+ * PUT /api/formulario-uafe/protocolo/:protocoloId
+ * Requiere: JWT + role MATRIZADOR o ADMIN
+ */
+router.put(
+  '/protocolo/:protocoloId',
+  authenticateToken,
+  requireRoles(['MATRIZADOR', 'ADMIN']),
+  actualizarProtocolo
+);
+
+/**
+ * Eliminar persona de un protocolo
+ * DELETE /api/formulario-uafe/protocolo/:protocoloId/persona/:personaProtocoloId
+ * Requiere: JWT + role MATRIZADOR o ADMIN
+ */
+router.delete(
+  '/protocolo/:protocoloId/persona/:personaProtocoloId',
+  authenticateToken,
+  requireRoles(['MATRIZADOR', 'ADMIN']),
+  eliminarPersonaDeProtocolo
 );
 
 /**
