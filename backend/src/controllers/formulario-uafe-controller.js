@@ -146,10 +146,34 @@ export async function agregarPersonaAProtocolo(req, res) {
       }
     });
 
+    // Extraer nombre de la persona
+    let nombre = 'Sin nombre';
+    if (personaProtocolo.persona.tipoPersona === 'NATURAL' && personaProtocolo.persona.datosPersonaNatural) {
+      const datos = personaProtocolo.persona.datosPersonaNatural;
+      if (datos.datosPersonales?.nombres && datos.datosPersonales?.apellidos) {
+        nombre = `${datos.datosPersonales.nombres} ${datos.datosPersonales.apellidos}`.trim();
+      }
+    } else if (personaProtocolo.persona.tipoPersona === 'JURIDICA' && personaProtocolo.persona.datosPersonaJuridica) {
+      const datos = personaProtocolo.persona.datosPersonaJuridica;
+      if (datos.compania?.razonSocial) {
+        nombre = datos.compania.razonSocial.trim();
+      }
+    }
+
     res.status(201).json({
       success: true,
       message: 'Persona agregada al protocolo exitosamente',
-      data: personaProtocolo
+      data: {
+        id: personaProtocolo.id,
+        cedula: personaProtocolo.persona.numeroIdentificacion,
+        nombre: nombre,
+        tipoPersona: personaProtocolo.persona.tipoPersona,
+        calidad: personaProtocolo.calidad,
+        actuaPor: personaProtocolo.actuaPor,
+        completado: personaProtocolo.completado,
+        completadoAt: personaProtocolo.completadoAt,
+        createdAt: personaProtocolo.createdAt
+      }
     });
   } catch (error) {
     console.error('Error agregando persona al protocolo:', error);
@@ -363,7 +387,8 @@ export async function listarProtocolos(req, res) {
                   numeroIdentificacion: true,
                   tipoPersona: true,
                   datosPersonaNatural: true,
-                  datosPersonaJuridica: true
+                  datosPersonaJuridica: true,
+                  completado: true
                 }
               }
             }
@@ -379,9 +404,61 @@ export async function listarProtocolos(req, res) {
       prisma.protocoloUAFE.count({ where })
     ]);
 
+    // Formatear protocolos con nombres extraídos
+    const protocolosFormateados = protocolos.map(protocolo => {
+      const personasFormateadas = protocolo.personas.map(pp => {
+        let nombre = 'Sin nombre';
+
+        // Extraer nombre según tipo de persona
+        if (pp.persona.tipoPersona === 'NATURAL' && pp.persona.datosPersonaNatural) {
+          const datos = pp.persona.datosPersonaNatural;
+          if (datos.datosPersonales?.nombres && datos.datosPersonales?.apellidos) {
+            nombre = `${datos.datosPersonales.nombres} ${datos.datosPersonales.apellidos}`.trim();
+          }
+        } else if (pp.persona.tipoPersona === 'JURIDICA' && pp.persona.datosPersonaJuridica) {
+          const datos = pp.persona.datosPersonaJuridica;
+          if (datos.compania?.razonSocial) {
+            nombre = datos.compania.razonSocial.trim();
+          }
+        }
+
+        return {
+          id: pp.id,
+          cedula: pp.persona.numeroIdentificacion,
+          nombre: nombre,
+          tipoPersona: pp.persona.tipoPersona,
+          calidad: pp.calidad,
+          actuaPor: pp.actuaPor,
+          completado: pp.completado,
+          completadoAt: pp.completadoAt,
+          createdAt: pp.createdAt
+        };
+      });
+
+      // Calcular progreso
+      const personasCompletadas = personasFormateadas.filter(p => p.completado).length;
+      const totalPersonas = personasFormateadas.length;
+      const progreso = totalPersonas > 0 ? Math.round((personasCompletadas / totalPersonas) * 100) : 0;
+
+      return {
+        id: protocolo.id,
+        numeroProtocolo: protocolo.numeroProtocolo,
+        fecha: protocolo.fecha,
+        actoContrato: protocolo.actoContrato,
+        valorContrato: protocolo.valorContrato,
+        avaluoMunicipal: protocolo.avaluoMunicipal,
+        formaPago: protocolo.formaPago,
+        createdAt: protocolo.createdAt,
+        updatedAt: protocolo.updatedAt,
+        personas: personasFormateadas,
+        _count: protocolo._count,
+        progreso
+      };
+    });
+
     res.json({
       success: true,
-      data: protocolos,
+      data: protocolosFormateados,
       pagination: {
         page: parseInt(page),
         limit: parseInt(limit),
@@ -449,9 +526,44 @@ export async function obtenerProtocolo(req, res) {
       });
     }
 
+    // Formatear personas con nombres extraídos
+    const personasFormateadas = protocolo.personas.map(pp => {
+      let nombre = 'Sin nombre';
+
+      // Extraer nombre según tipo de persona
+      if (pp.persona.tipoPersona === 'NATURAL' && pp.persona.datosPersonaNatural) {
+        const datos = pp.persona.datosPersonaNatural;
+        if (datos.datosPersonales?.nombres && datos.datosPersonales?.apellidos) {
+          nombre = `${datos.datosPersonales.nombres} ${datos.datosPersonales.apellidos}`.trim();
+        }
+      } else if (pp.persona.tipoPersona === 'JURIDICA' && pp.persona.datosPersonaJuridica) {
+        const datos = pp.persona.datosPersonaJuridica;
+        if (datos.compania?.razonSocial) {
+          nombre = datos.compania.razonSocial.trim();
+        }
+      }
+
+      return {
+        id: pp.id,
+        cedula: pp.persona.numeroIdentificacion,
+        nombre: nombre,
+        tipoPersona: pp.persona.tipoPersona,
+        calidad: pp.calidad,
+        actuaPor: pp.actuaPor,
+        completado: pp.completado,
+        completadoAt: pp.completadoAt,
+        respuestaFormulario: pp.respuestaFormulario,
+        createdAt: pp.createdAt,
+        updatedAt: pp.updatedAt
+      };
+    });
+
     res.json({
       success: true,
-      data: protocolo
+      data: {
+        ...protocolo,
+        personas: personasFormateadas
+      }
     });
   } catch (error) {
     console.error('Error obteniendo protocolo:', error);

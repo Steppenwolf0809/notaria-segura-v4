@@ -46,7 +46,9 @@ import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
   Delete as DeleteIcon,
-  Description as DescriptionIcon
+  Description as DescriptionIcon,
+  ContentCopy as CopyIcon,
+  Link as LinkIcon
 } from '@mui/icons-material';
 import { API_BASE } from '../utils/apiConfig';
 
@@ -368,15 +370,35 @@ const FormulariosUAFE = () => {
   };
 
   /**
-   * Obtener nombre de persona
+   * Copiar link del formulario al portapapeles
    */
-  const getNombrePersona = (persona) => {
-    if (persona.tipoPersona === 'NATURAL') {
+  const copiarLinkFormulario = () => {
+    const link = `${window.location.origin}/formulario-uafe-protocolo.html`;
+    navigator.clipboard.writeText(link).then(() => {
+      mostrarSnackbar('Link copiado al portapapeles', 'success');
+    }).catch(err => {
+      console.error('Error al copiar:', err);
+      mostrarSnackbar('Error al copiar el link', 'error');
+    });
+  };
+
+  /**
+   * Obtener nombre de persona al buscar (endpoint verificar-cedula)
+   */
+  const obtenerNombreBusqueda = (persona) => {
+    if (!persona) return 'Sin nombre';
+    if (persona.tipoPersona === 'NATURAL' && persona.datosPersonaNatural) {
       const datos = persona.datosPersonaNatural;
-      return `${datos?.nombres || ''} ${datos?.apellidos || ''}`.trim() || 'Sin nombre';
-    } else {
-      return persona.datosPersonaJuridica?.razonSocial || 'Sin razón social';
+      if (datos.datosPersonales?.nombres && datos.datosPersonales?.apellidos) {
+        return `${datos.datosPersonales.nombres} ${datos.datosPersonales.apellidos}`.trim();
+      }
+    } else if (persona.tipoPersona === 'JURIDICA' && persona.datosPersonaJuridica) {
+      const datos = persona.datosPersonaJuridica;
+      if (datos.compania?.razonSocial) {
+        return datos.compania.razonSocial.trim();
+      }
     }
+    return 'Sin nombre';
   };
 
   /**
@@ -400,14 +422,24 @@ const FormulariosUAFE = () => {
             Crea protocolos y agrega personas. Acceso con: Protocolo + Cédula + PIN
           </Typography>
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setOpenNuevoProtocolo(true)}
-          sx={{ borderRadius: 2 }}
-        >
-          Nuevo Protocolo
-        </Button>
+        <Stack direction="row" spacing={2}>
+          <Button
+            variant="outlined"
+            startIcon={<LinkIcon />}
+            onClick={copiarLinkFormulario}
+            sx={{ borderRadius: 2 }}
+          >
+            Copiar Link
+          </Button>
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => setOpenNuevoProtocolo(true)}
+            sx={{ borderRadius: 2 }}
+          >
+            Nuevo Protocolo
+          </Button>
+        </Stack>
       </Box>
 
       {/* Filtros */}
@@ -551,11 +583,11 @@ const FormulariosUAFE = () => {
                               {protocolo.personas.map((persona) => (
                                 <ListItem key={persona.id}>
                                   <ListItemText
-                                    primary={getNombrePersona(persona.persona)}
+                                    primary={persona.nombre}
                                     secondary={
                                       <>
                                         <Typography component="span" variant="body2">
-                                          {persona.persona.numeroIdentificacion} - {persona.calidad} ({persona.actuaPor})
+                                          {persona.cedula} - {persona.calidad} ({persona.actuaPor})
                                         </Typography>
                                       </>
                                     }
@@ -874,7 +906,7 @@ const FormulariosUAFE = () => {
               </Stack>
               {personaEncontrada && (
                 <Alert severity="success" sx={{ mt: 2 }}>
-                  Persona encontrada: <strong>{getNombrePersona(personaEncontrada)}</strong>
+                  Persona encontrada: <strong>{obtenerNombreBusqueda(personaEncontrada)}</strong>
                 </Alert>
               )}
             </Box>
@@ -991,10 +1023,10 @@ const FormulariosUAFE = () => {
                     {protocoloSeleccionado.personas.map((persona) => (
                       <ListItem key={persona.id}>
                         <ListItemText
-                          primary={getNombrePersona(persona.persona)}
+                          primary={persona.nombre}
                           secondary={
                             <>
-                              {persona.persona.numeroIdentificacion} - {persona.calidad}
+                              {persona.cedula} - {persona.calidad}
                               <br />
                               {persona.actuaPor}
                             </>
