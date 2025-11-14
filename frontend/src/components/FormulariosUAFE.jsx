@@ -29,80 +29,100 @@ import {
   FormControl,
   InputLabel,
   Stack,
-  Divider
+  Divider,
+  Collapse,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction
 } from '@mui/material';
 import {
   Add as AddIcon,
-  ContentCopy as CopyIcon,
+  PersonAdd as PersonAddIcon,
   Visibility as VisibilityIcon,
   CheckCircle as CheckCircleIcon,
   HourglassEmpty as PendingIcon,
-  Cancel as ExpiredIcon,
   Search as SearchIcon,
-  Link as LinkIcon,
-  Edit,
-  Delete as DeleteIcon
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon,
+  Delete as DeleteIcon,
+  Description as DescriptionIcon
 } from '@mui/icons-material';
 import { API_BASE } from '../utils/apiConfig';
 
 /**
- * Componente para gestionar formularios UAFE
- * Permite al matrizador:
- * - Asignar formularios a personas por cédula
- * - Ver lista de asignaciones
- * - Copiar links únicos
- * - Ver respuestas completadas
+ * Componente para gestionar formularios UAFE con sistema de Protocolos
+ * Nuevo flujo: 1 Protocolo → N Personas
+ *
+ * Flujo:
+ * 1. Crear Protocolo (datos del trámite)
+ * 2. Agregar personas al protocolo
+ * 3. Cada persona puede acceder con: Protocolo + Cédula + PIN
  */
 const FormulariosUAFE = () => {
-  // Estados
-  const [asignaciones, setAsignaciones] = useState([]);
+  // Estados principales
+  const [protocolos, setProtocolos] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [openDialog, setOpenDialog] = useState(false);
-  const [openDetallesDialog, setOpenDetallesDialog] = useState(false);
-  const [openEditDialog, setOpenEditDialog] = useState(false);
-  const [asignacionSeleccionada, setAsignacionSeleccionada] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
-  // Filtros
-  const [filtroEstado, setFiltroEstado] = useState('');
-  const [filtroMatriz, setFiltroMatriz] = useState('');
+  // Estados de diálogos
+  const [openNuevoProtocolo, setOpenNuevoProtocolo] = useState(false);
+  const [openAgregarPersona, setOpenAgregarPersona] = useState(false);
+  const [openVerProtocolo, setOpenVerProtocolo] = useState(false);
+  const [protocoloSeleccionado, setProtocoloSeleccionado] = useState(null);
 
-  // Formulario de nueva asignación
-  const [formData, setFormData] = useState({
-    numeroIdentificacion: '',
-    numeroMatriz: '',
+  // Estados de expansión de tabla
+  const [expandedProtocol, setExpandedProtocol] = useState(null);
+
+  // Formulario de nuevo protocolo
+  const [formProtocolo, setFormProtocolo] = useState({
+    numeroProtocolo: '',
+    fecha: new Date().toISOString().split('T')[0],
     actoContrato: '',
-    calidadPersona: 'COMPRADOR',
+    avaluoMunicipal: '',
+    valorContrato: '',
+    // Forma de pago
+    formaPagoCheque: false,
+    formaPagoEfectivo: false,
+    formaPagoTransferencia: false,
+    formaPagoTarjeta: false,
+    montoCheque: '',
+    montoEfectivo: '',
+    montoTransferencia: '',
+    montoTarjeta: '',
+    bancoCheque: '',
+    bancoTransferencia: '',
+    bancoTarjeta: ''
+  });
+
+  // Formulario de agregar persona
+  const [formPersona, setFormPersona] = useState({
+    cedula: '',
+    calidad: 'COMPRADOR',
     actuaPor: 'PROPIOS_DERECHOS'
   });
   const [buscandoPersona, setBuscandoPersona] = useState(false);
   const [personaEncontrada, setPersonaEncontrada] = useState(null);
 
-  // Formulario de edición
-  const [editFormData, setEditFormData] = useState({
-    numeroMatriz: '',
-    actoContrato: '',
-    calidadPersona: '',
-    actuaPor: ''
-  });
+  // Filtros
+  const [filtroProtocolo, setFiltroProtocolo] = useState('');
 
-  // Cargar asignaciones al montar
+  // Cargar protocolos al montar
   useEffect(() => {
-    cargarAsignaciones();
-  }, [filtroEstado, filtroMatriz]);
+    cargarProtocolos();
+  }, []);
 
   /**
-   * Cargar lista de asignaciones del matrizador
+   * Cargar lista de protocolos del matrizador
    */
-  const cargarAsignaciones = async () => {
+  const cargarProtocolos = async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
       const params = new URLSearchParams();
-      if (filtroEstado) params.append('estado', filtroEstado);
-      if (filtroMatriz) params.append('numeroMatriz', filtroMatriz);
+      if (filtroProtocolo) params.append('search', filtroProtocolo);
 
-      const response = await fetch(`${API_BASE}/formulario-uafe/mis-asignaciones?${params}`, {
+      const response = await fetch(`${API_BASE}/formulario-uafe/protocolos?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -110,13 +130,75 @@ const FormulariosUAFE = () => {
 
       const data = await response.json();
       if (data.success) {
-        setAsignaciones(data.asignaciones);
+        setProtocolos(data.data);
       } else {
-        mostrarSnackbar('Error al cargar asignaciones', 'error');
+        mostrarSnackbar('Error al cargar protocolos', 'error');
       }
     } catch (error) {
-      console.error('Error al cargar asignaciones:', error);
-      mostrarSnackbar('Error al cargar asignaciones', 'error');
+      console.error('Error al cargar protocolos:', error);
+      mostrarSnackbar('Error al cargar protocolos', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Crear nuevo protocolo
+   */
+  const crearProtocolo = async () => {
+    // Validaciones
+    if (!formProtocolo.numeroProtocolo || !formProtocolo.actoContrato || !formProtocolo.valorContrato) {
+      mostrarSnackbar('Completa los campos obligatorios: Número de Protocolo, Acto/Contrato y Valor del Contrato', 'warning');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+
+      // Construir objeto formaPago
+      const formaPago = {};
+      if (formProtocolo.formaPagoCheque && formProtocolo.montoCheque) {
+        formaPago.cheque = { monto: parseFloat(formProtocolo.montoCheque), banco: formProtocolo.bancoCheque };
+      }
+      if (formProtocolo.formaPagoEfectivo && formProtocolo.montoEfectivo) {
+        formaPago.efectivo = { monto: parseFloat(formProtocolo.montoEfectivo) };
+      }
+      if (formProtocolo.formaPagoTransferencia && formProtocolo.montoTransferencia) {
+        formaPago.transferencia = { monto: parseFloat(formProtocolo.montoTransferencia), banco: formProtocolo.bancoTransferencia };
+      }
+      if (formProtocolo.formaPagoTarjeta && formProtocolo.montoTarjeta) {
+        formaPago.tarjeta = { monto: parseFloat(formProtocolo.montoTarjeta), banco: formProtocolo.bancoTarjeta };
+      }
+
+      const response = await fetch(`${API_BASE}/formulario-uafe/protocolo`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          numeroProtocolo: formProtocolo.numeroProtocolo,
+          fecha: formProtocolo.fecha,
+          actoContrato: formProtocolo.actoContrato,
+          avaluoMunicipal: formProtocolo.avaluoMunicipal || null,
+          valorContrato: formProtocolo.valorContrato,
+          formaPago
+        })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        mostrarSnackbar('Protocolo creado exitosamente', 'success');
+        setOpenNuevoProtocolo(false);
+        resetFormProtocolo();
+        cargarProtocolos();
+      } else {
+        mostrarSnackbar(data.message || 'Error al crear protocolo', 'error');
+      }
+    } catch (error) {
+      console.error('Error al crear protocolo:', error);
+      mostrarSnackbar('Error al crear protocolo', 'error');
     } finally {
       setLoading(false);
     }
@@ -126,15 +208,15 @@ const FormulariosUAFE = () => {
    * Buscar persona por cédula
    */
   const buscarPersona = async () => {
-    if (!formData.numeroIdentificacion) {
-      mostrarSnackbar('Ingresa un número de identificación', 'warning');
+    if (!formPersona.cedula) {
+      mostrarSnackbar('Ingresa un número de cédula', 'warning');
       return;
     }
 
     setBuscandoPersona(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/personal/verificar-cedula/${formData.numeroIdentificacion}`, {
+      const response = await fetch(`${API_BASE}/personal/verificar-cedula/${formPersona.cedula}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -146,7 +228,7 @@ const FormulariosUAFE = () => {
         mostrarSnackbar('Persona encontrada', 'success');
       } else {
         setPersonaEncontrada(null);
-        mostrarSnackbar('Persona no encontrada. Debe registrarse primero en el sistema.', 'warning');
+        mostrarSnackbar('Persona no encontrada. Debe registrarse primero en /registro-personal', 'warning');
       }
     } catch (error) {
       console.error('Error al buscar persona:', error);
@@ -157,68 +239,63 @@ const FormulariosUAFE = () => {
   };
 
   /**
-   * Crear nueva asignación
+   * Agregar persona al protocolo
    */
-  const crearAsignacion = async () => {
+  const agregarPersonaAProtocolo = async () => {
     if (!personaEncontrada) {
       mostrarSnackbar('Primero busca a la persona', 'warning');
       return;
     }
 
-    if (!formData.actoContrato) {
-      mostrarSnackbar('Completa el campo Acto/Contrato', 'warning');
+    if (!protocoloSeleccionado) {
+      mostrarSnackbar('No hay protocolo seleccionado', 'error');
       return;
     }
 
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/formulario-uafe/asignar`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(formData)
-      });
+      const response = await fetch(
+        `${API_BASE}/formulario-uafe/protocolo/${protocoloSeleccionado.id}/persona`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            cedula: formPersona.cedula,
+            calidad: formPersona.calidad,
+            actuaPor: formPersona.actuaPor
+          })
+        }
+      );
 
       const data = await response.json();
       if (data.success) {
-        mostrarSnackbar('Formulario asignado exitosamente', 'success');
-        setOpenDialog(false);
-        resetForm();
-        cargarAsignaciones();
-
-        // Copiar link automáticamente
-        navigator.clipboard.writeText(data.asignacion.linkPublico);
-        mostrarSnackbar('Link copiado al portapapeles', 'info');
+        mostrarSnackbar('Persona agregada al protocolo exitosamente', 'success');
+        setOpenAgregarPersona(false);
+        resetFormPersona();
+        cargarProtocolos();
       } else {
-        mostrarSnackbar(data.error || 'Error al asignar formulario', 'error');
+        mostrarSnackbar(data.message || 'Error al agregar persona', 'error');
       }
     } catch (error) {
-      console.error('Error al crear asignación:', error);
-      mostrarSnackbar('Error al crear asignación', 'error');
+      console.error('Error al agregar persona:', error);
+      mostrarSnackbar('Error al agregar persona', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   /**
-   * Copiar link al portapapeles
+   * Ver detalles de un protocolo
    */
-  const copiarLink = (link) => {
-    navigator.clipboard.writeText(link);
-    mostrarSnackbar('Link copiado al portapapeles', 'success');
-  };
-
-  /**
-   * Ver detalles de asignación
-   */
-  const verDetalles = async (asignacionId) => {
+  const verDetallesProtocolo = async (protocoloId) => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/formulario-uafe/asignacion/${asignacionId}`, {
+      const response = await fetch(`${API_BASE}/formulario-uafe/protocolo/${protocoloId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -226,8 +303,8 @@ const FormulariosUAFE = () => {
 
       const data = await response.json();
       if (data.success) {
-        setAsignacionSeleccionada(data.asignacion);
-        setOpenDetallesDialog(true);
+        setProtocoloSeleccionado(data.data);
+        setOpenVerProtocolo(true);
       } else {
         mostrarSnackbar('Error al cargar detalles', 'error');
       }
@@ -240,95 +317,44 @@ const FormulariosUAFE = () => {
   };
 
   /**
-   * Abrir modal de edición
+   * Abrir modal para agregar persona
    */
-  const abrirEdicion = (asignacion) => {
-    setAsignacionSeleccionada(asignacion);
-    setEditFormData({
-      numeroMatriz: asignacion.numeroMatriz || '',
-      actoContrato: asignacion.actoContrato || '',
-      calidadPersona: asignacion.calidadPersona || '',
-      actuaPor: asignacion.actuaPor || ''
-    });
-    setOpenEditDialog(true);
+  const abrirAgregarPersona = (protocolo) => {
+    setProtocoloSeleccionado(protocolo);
+    setOpenAgregarPersona(true);
   };
 
   /**
-   * Guardar cambios de edición
+   * Resetear formulario de protocolo
    */
-  const guardarEdicion = async () => {
-    if (!asignacionSeleccionada) return;
-
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/formulario-uafe/asignacion/${asignacionSeleccionada.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(editFormData)
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        mostrarSnackbar('Asignación actualizada exitosamente', 'success');
-        setOpenEditDialog(false);
-        cargarAsignaciones();
-      } else {
-        mostrarSnackbar(data.error || 'Error al actualizar asignación', 'error');
-      }
-    } catch (error) {
-      console.error('Error al actualizar asignación:', error);
-      mostrarSnackbar('Error al actualizar asignación', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
-   * Eliminar asignación
-   */
-  const eliminarAsignacion = async (asignacion) => {
-    if (!window.confirm(`¿Estás seguro de eliminar la asignación para ${asignacion.persona.nombre}?`)) {
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/formulario-uafe/asignacion/${asignacion.id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        mostrarSnackbar('Asignación eliminada exitosamente', 'success');
-        cargarAsignaciones();
-      } else {
-        mostrarSnackbar(data.error || 'Error al eliminar asignación', 'error');
-      }
-    } catch (error) {
-      console.error('Error al eliminar asignación:', error);
-      mostrarSnackbar('Error al eliminar asignación', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
-   * Resetear formulario
-   */
-  const resetForm = () => {
-    setFormData({
-      numeroIdentificacion: '',
-      numeroMatriz: '',
+  const resetFormProtocolo = () => {
+    setFormProtocolo({
+      numeroProtocolo: '',
+      fecha: new Date().toISOString().split('T')[0],
       actoContrato: '',
-      calidadPersona: 'COMPRADOR',
+      avaluoMunicipal: '',
+      valorContrato: '',
+      formaPagoCheque: false,
+      formaPagoEfectivo: false,
+      formaPagoTransferencia: false,
+      formaPagoTarjeta: false,
+      montoCheque: '',
+      montoEfectivo: '',
+      montoTransferencia: '',
+      montoTarjeta: '',
+      bancoCheque: '',
+      bancoTransferencia: '',
+      bancoTarjeta: ''
+    });
+  };
+
+  /**
+   * Resetear formulario de persona
+   */
+  const resetFormPersona = () => {
+    setFormPersona({
+      cedula: '',
+      calidad: 'COMPRADOR',
       actuaPor: 'PROPIOS_DERECHOS'
     });
     setPersonaEncontrada(null);
@@ -342,35 +368,24 @@ const FormulariosUAFE = () => {
   };
 
   /**
-   * Obtener color del chip según estado
+   * Obtener nombre de persona
    */
-  const getEstadoColor = (estado) => {
-    switch (estado) {
-      case 'COMPLETADO':
-        return 'success';
-      case 'PENDIENTE':
-        return 'warning';
-      case 'EXPIRADO':
-        return 'error';
-      default:
-        return 'default';
+  const getNombrePersona = (persona) => {
+    if (persona.tipoPersona === 'NATURAL') {
+      const datos = persona.datosPersonaNatural;
+      return `${datos?.nombres || ''} ${datos?.apellidos || ''}`.trim() || 'Sin nombre';
+    } else {
+      return persona.datosPersonaJuridica?.razonSocial || 'Sin razón social';
     }
   };
 
   /**
-   * Obtener icono según estado
+   * Calcular progreso de personas completadas
    */
-  const getEstadoIcon = (estado) => {
-    switch (estado) {
-      case 'COMPLETADO':
-        return <CheckCircleIcon />;
-      case 'PENDIENTE':
-        return <PendingIcon />;
-      case 'EXPIRADO':
-        return <ExpiredIcon />;
-      default:
-        return null;
-    }
+  const calcularProgreso = (protocolo) => {
+    if (!protocolo.personas || protocolo.personas.length === 0) return 0;
+    const completadas = protocolo.personas.filter(p => p.completado).length;
+    return Math.round((completadas / protocolo.personas.length) * 100);
   };
 
   return (
@@ -379,19 +394,19 @@ const FormulariosUAFE = () => {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-            Formularios UAFE
+            Formularios UAFE - Sistema de Protocolos
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Gestiona los formularios UAFE asignados a clientes
+            Crea protocolos y agrega personas. Acceso con: Protocolo + Cédula + PIN
           </Typography>
         </Box>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
-          onClick={() => setOpenDialog(true)}
+          onClick={() => setOpenNuevoProtocolo(true)}
           sx={{ borderRadius: 2 }}
         >
-          Nueva Asignación
+          Nuevo Protocolo
         </Button>
       </Box>
 
@@ -399,36 +414,21 @@ const FormulariosUAFE = () => {
       <Card sx={{ mb: 3 }}>
         <CardContent>
           <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} sm={4}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Estado</InputLabel>
-                <Select
-                  value={filtroEstado}
-                  label="Estado"
-                  onChange={(e) => setFiltroEstado(e.target.value)}
-                >
-                  <MenuItem value="">Todos</MenuItem>
-                  <MenuItem value="PENDIENTE">Pendiente</MenuItem>
-                  <MenuItem value="COMPLETADO">Completado</MenuItem>
-                  <MenuItem value="EXPIRADO">Expirado</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={6}>
+            <Grid item xs={12} sm={8}>
               <TextField
                 fullWidth
                 size="small"
-                label="Buscar por No. Matriz"
-                value={filtroMatriz}
-                onChange={(e) => setFiltroMatriz(e.target.value)}
+                label="Buscar por No. Protocolo o Acto/Contrato"
+                value={filtroProtocolo}
+                onChange={(e) => setFiltroProtocolo(e.target.value)}
                 placeholder="Ej: 2024-1234"
               />
             </Grid>
-            <Grid item xs={12} sm={2}>
+            <Grid item xs={12} sm={4}>
               <Button
                 fullWidth
                 variant="outlined"
-                onClick={cargarAsignaciones}
+                onClick={cargarProtocolos}
                 disabled={loading}
               >
                 Buscar
@@ -438,127 +438,428 @@ const FormulariosUAFE = () => {
         </CardContent>
       </Card>
 
-      {/* Tabla de Asignaciones */}
+      {/* Tabla de Protocolos */}
       <TableContainer component={Paper} elevation={2}>
         <Table>
           <TableHead>
             <TableRow sx={{ backgroundColor: 'primary.main' }}>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>No. Matriz</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Acto/Contrato</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Persona</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Calidad</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Estado</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold', width: 50 }}></TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>No. Protocolo</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Fecha</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Acto/Contrato</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Valor</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Personas</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Progreso</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="center">Acciones</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
                   <CircularProgress />
                 </TableCell>
               </TableRow>
-            ) : asignaciones.length === 0 ? (
+            ) : protocolos.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} align="center" sx={{ py: 4 }}>
+                <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
                   <Typography variant="body2" color="text.secondary">
-                    No hay asignaciones. Crea tu primera asignación.
+                    No hay protocolos. Crea tu primer protocolo.
                   </Typography>
                 </TableCell>
               </TableRow>
             ) : (
-              asignaciones.map((asignacion) => (
-                <TableRow key={asignacion.id} hover>
-                  <TableCell>{asignacion.numeroMatriz}</TableCell>
-                  <TableCell>{asignacion.actoContrato}</TableCell>
-                  <TableCell>
-                    <Typography variant="body2" fontWeight="bold">
-                      {asignacion.persona.nombre}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {asignacion.persona.numeroIdentificacion}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>{asignacion.calidadPersona}</TableCell>
-                  <TableCell>
-                    <Chip
-                      icon={getEstadoIcon(asignacion.estado)}
-                      label={asignacion.estado}
-                      color={getEstadoColor(asignacion.estado)}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    {new Date(asignacion.createdAt).toLocaleDateString('es-EC')}
-                  </TableCell>
-                  <TableCell align="center">
-                    <Stack direction="row" spacing={1} justifyContent="center">
-                      <Tooltip title="Copiar Link">
-                        <IconButton
+              protocolos.map((protocolo) => (
+                <React.Fragment key={protocolo.id}>
+                  <TableRow hover>
+                    <TableCell>
+                      <IconButton
+                        size="small"
+                        onClick={() => setExpandedProtocol(
+                          expandedProtocol === protocolo.id ? null : protocolo.id
+                        )}
+                      >
+                        {expandedProtocol === protocolo.id ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                      </IconButton>
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" fontWeight="bold">
+                        {protocolo.numeroProtocolo}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      {new Date(protocolo.fecha).toLocaleDateString('es-EC')}
+                    </TableCell>
+                    <TableCell>{protocolo.actoContrato}</TableCell>
+                    <TableCell>${parseFloat(protocolo.valorContrato).toFixed(2)}</TableCell>
+                    <TableCell>
+                      <Chip
+                        label={`${protocolo.personas?.length || 0} persona(s)`}
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Box sx={{ flexGrow: 1 }}>
+                          <Typography variant="caption">
+                            {calcularProgreso(protocolo)}%
+                          </Typography>
+                        </Box>
+                        <Chip
                           size="small"
-                          color="primary"
-                          onClick={() => copiarLink(asignacion.linkPublico)}
-                        >
-                          <CopyIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Editar Asignación">
-                        <IconButton
-                          size="small"
-                          color="secondary"
-                          onClick={() => abrirEdicion(asignacion)}
-                        >
-                          <Edit fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Eliminar Asignación">
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => eliminarAsignacion(asignacion)}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      {asignacion.completado && (
-                        <Tooltip title="Ver Respuesta">
+                          label={`${protocolo.personas?.filter(p => p.completado).length || 0}/${protocolo.personas?.length || 0}`}
+                          color={calcularProgreso(protocolo) === 100 ? 'success' : 'warning'}
+                        />
+                      </Stack>
+                    </TableCell>
+                    <TableCell align="center">
+                      <Stack direction="row" spacing={1} justifyContent="center">
+                        <Tooltip title="Agregar Persona">
                           <IconButton
                             size="small"
-                            color="success"
-                            onClick={() => verDetalles(asignacion.id)}
+                            color="primary"
+                            onClick={() => abrirAgregarPersona(protocolo)}
+                          >
+                            <PersonAddIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Ver Detalles">
+                          <IconButton
+                            size="small"
+                            color="info"
+                            onClick={() => verDetallesProtocolo(protocolo.id)}
                           >
                             <VisibilityIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                      )}
-                    </Stack>
-                  </TableCell>
-                </TableRow>
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
+
+                  {/* Fila expandible con lista de personas */}
+                  <TableRow>
+                    <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={8}>
+                      <Collapse in={expandedProtocol === protocolo.id} timeout="auto" unmountOnExit>
+                        <Box sx={{ margin: 2 }}>
+                          <Typography variant="h6" gutterBottom component="div">
+                            Personas en este protocolo
+                          </Typography>
+                          {protocolo.personas && protocolo.personas.length > 0 ? (
+                            <List dense>
+                              {protocolo.personas.map((persona) => (
+                                <ListItem key={persona.id}>
+                                  <ListItemText
+                                    primary={getNombrePersona(persona.persona)}
+                                    secondary={
+                                      <>
+                                        <Typography component="span" variant="body2">
+                                          {persona.persona.numeroIdentificacion} - {persona.calidad} ({persona.actuaPor})
+                                        </Typography>
+                                      </>
+                                    }
+                                  />
+                                  <ListItemSecondaryAction>
+                                    <Chip
+                                      icon={persona.completado ? <CheckCircleIcon /> : <PendingIcon />}
+                                      label={persona.completado ? 'Completado' : 'Pendiente'}
+                                      color={persona.completado ? 'success' : 'warning'}
+                                      size="small"
+                                    />
+                                  </ListItemSecondaryAction>
+                                </ListItem>
+                              ))}
+                            </List>
+                          ) : (
+                            <Alert severity="info">
+                              No hay personas agregadas. Haz clic en "Agregar Persona" para añadir la primera.
+                            </Alert>
+                          )}
+                        </Box>
+                      </Collapse>
+                    </TableCell>
+                  </TableRow>
+                </React.Fragment>
               ))
             )}
           </TableBody>
         </Table>
       </TableContainer>
 
-      {/* Dialog: Nueva Asignación */}
-      <Dialog open={openDialog} onClose={() => setOpenDialog(false)} maxWidth="md" fullWidth>
+      {/* Dialog: Nuevo Protocolo */}
+      <Dialog
+        open={openNuevoProtocolo}
+        onClose={() => setOpenNuevoProtocolo(false)}
+        maxWidth="md"
+        fullWidth
+      >
         <DialogTitle sx={{ backgroundColor: 'primary.main', color: 'white' }}>
-          Asignar Nuevo Formulario UAFE
+          Crear Nuevo Protocolo UAFE
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
           <Stack spacing={3}>
-            {/* Buscar Persona */}
+            {/* Datos básicos del protocolo */}
             <Box>
               <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                1. Buscar Persona
+                Información del Protocolo
+              </Typography>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    required
+                    label="Número de Protocolo"
+                    value={formProtocolo.numeroProtocolo}
+                    onChange={(e) => setFormProtocolo({ ...formProtocolo, numeroProtocolo: e.target.value })}
+                    placeholder="Ej: 2024-1234"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    required
+                    type="date"
+                    label="Fecha"
+                    value={formProtocolo.fecha}
+                    onChange={(e) => setFormProtocolo({ ...formProtocolo, fecha: e.target.value })}
+                    InputLabelProps={{ shrink: true }}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    required
+                    label="Acto / Contrato"
+                    value={formProtocolo.actoContrato}
+                    onChange={(e) => setFormProtocolo({ ...formProtocolo, actoContrato: e.target.value })}
+                    placeholder="Ej: Compraventa de Inmueble"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    label="Avalúo Municipal (opcional)"
+                    value={formProtocolo.avaluoMunicipal}
+                    onChange={(e) => setFormProtocolo({ ...formProtocolo, avaluoMunicipal: e.target.value })}
+                    placeholder="0.00"
+                    InputProps={{ startAdornment: '$' }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    required
+                    type="number"
+                    label="Valor del Contrato"
+                    value={formProtocolo.valorContrato}
+                    onChange={(e) => setFormProtocolo({ ...formProtocolo, valorContrato: e.target.value })}
+                    placeholder="0.00"
+                    InputProps={{ startAdornment: '$' }}
+                  />
+                </Grid>
+              </Grid>
+            </Box>
+
+            <Divider />
+
+            {/* Forma de Pago */}
+            <Box>
+              <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                Forma de Pago
+              </Typography>
+              <Stack spacing={2}>
+                {/* Cheque */}
+                <Box>
+                  <FormControl component="fieldset">
+                    <Stack direction="row" spacing={2} alignItems="center">
+                      <input
+                        type="checkbox"
+                        checked={formProtocolo.formaPagoCheque}
+                        onChange={(e) => setFormProtocolo({ ...formProtocolo, formaPagoCheque: e.target.checked })}
+                      />
+                      <Typography>Cheque</Typography>
+                    </Stack>
+                  </FormControl>
+                  {formProtocolo.formaPagoCheque && (
+                    <Grid container spacing={2} sx={{ mt: 1 }}>
+                      <Grid item xs={6}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          type="number"
+                          label="Monto"
+                          value={formProtocolo.montoCheque}
+                          onChange={(e) => setFormProtocolo({ ...formProtocolo, montoCheque: e.target.value })}
+                          InputProps={{ startAdornment: '$' }}
+                        />
+                      </Grid>
+                      <Grid item xs={6}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="Banco"
+                          value={formProtocolo.bancoCheque}
+                          onChange={(e) => setFormProtocolo({ ...formProtocolo, bancoCheque: e.target.value })}
+                        />
+                      </Grid>
+                    </Grid>
+                  )}
+                </Box>
+
+                {/* Efectivo */}
+                <Box>
+                  <FormControl component="fieldset">
+                    <Stack direction="row" spacing={2} alignItems="center">
+                      <input
+                        type="checkbox"
+                        checked={formProtocolo.formaPagoEfectivo}
+                        onChange={(e) => setFormProtocolo({ ...formProtocolo, formaPagoEfectivo: e.target.checked })}
+                      />
+                      <Typography>Efectivo</Typography>
+                    </Stack>
+                  </FormControl>
+                  {formProtocolo.formaPagoEfectivo && (
+                    <Grid container spacing={2} sx={{ mt: 1 }}>
+                      <Grid item xs={6}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          type="number"
+                          label="Monto"
+                          value={formProtocolo.montoEfectivo}
+                          onChange={(e) => setFormProtocolo({ ...formProtocolo, montoEfectivo: e.target.value })}
+                          InputProps={{ startAdornment: '$' }}
+                        />
+                      </Grid>
+                    </Grid>
+                  )}
+                </Box>
+
+                {/* Transferencia */}
+                <Box>
+                  <FormControl component="fieldset">
+                    <Stack direction="row" spacing={2} alignItems="center">
+                      <input
+                        type="checkbox"
+                        checked={formProtocolo.formaPagoTransferencia}
+                        onChange={(e) => setFormProtocolo({ ...formProtocolo, formaPagoTransferencia: e.target.checked })}
+                      />
+                      <Typography>Transferencia</Typography>
+                    </Stack>
+                  </FormControl>
+                  {formProtocolo.formaPagoTransferencia && (
+                    <Grid container spacing={2} sx={{ mt: 1 }}>
+                      <Grid item xs={6}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          type="number"
+                          label="Monto"
+                          value={formProtocolo.montoTransferencia}
+                          onChange={(e) => setFormProtocolo({ ...formProtocolo, montoTransferencia: e.target.value })}
+                          InputProps={{ startAdornment: '$' }}
+                        />
+                      </Grid>
+                      <Grid item xs={6}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="Banco"
+                          value={formProtocolo.bancoTransferencia}
+                          onChange={(e) => setFormProtocolo({ ...formProtocolo, bancoTransferencia: e.target.value })}
+                        />
+                      </Grid>
+                    </Grid>
+                  )}
+                </Box>
+
+                {/* Tarjeta */}
+                <Box>
+                  <FormControl component="fieldset">
+                    <Stack direction="row" spacing={2} alignItems="center">
+                      <input
+                        type="checkbox"
+                        checked={formProtocolo.formaPagoTarjeta}
+                        onChange={(e) => setFormProtocolo({ ...formProtocolo, formaPagoTarjeta: e.target.checked })}
+                      />
+                      <Typography>Tarjeta</Typography>
+                    </Stack>
+                  </FormControl>
+                  {formProtocolo.formaPagoTarjeta && (
+                    <Grid container spacing={2} sx={{ mt: 1 }}>
+                      <Grid item xs={6}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          type="number"
+                          label="Monto"
+                          value={formProtocolo.montoTarjeta}
+                          onChange={(e) => setFormProtocolo({ ...formProtocolo, montoTarjeta: e.target.value })}
+                          InputProps={{ startAdornment: '$' }}
+                        />
+                      </Grid>
+                      <Grid item xs={6}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="Banco"
+                          value={formProtocolo.bancoTarjeta}
+                          onChange={(e) => setFormProtocolo({ ...formProtocolo, bancoTarjeta: e.target.value })}
+                        />
+                      </Grid>
+                    </Grid>
+                  )}
+                </Box>
+              </Stack>
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => { setOpenNuevoProtocolo(false); resetFormProtocolo(); }}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={crearProtocolo}
+            disabled={loading}
+            startIcon={<DescriptionIcon />}
+          >
+            {loading ? 'Creando...' : 'Crear Protocolo'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog: Agregar Persona al Protocolo */}
+      <Dialog
+        open={openAgregarPersona}
+        onClose={() => { setOpenAgregarPersona(false); resetFormPersona(); }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ backgroundColor: 'success.main', color: 'white' }}>
+          Agregar Persona al Protocolo
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          <Stack spacing={3}>
+            {protocoloSeleccionado && (
+              <Alert severity="info">
+                Protocolo: <strong>{protocoloSeleccionado.numeroProtocolo}</strong>
+              </Alert>
+            )}
+
+            {/* Buscar Persona */}
+            <Box>
+              <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                Buscar Persona por Cédula
               </Typography>
               <Stack direction="row" spacing={2}>
                 <TextField
                   fullWidth
-                  label="Número de Identificación"
-                  value={formData.numeroIdentificacion}
-                  onChange={(e) => setFormData({ ...formData, numeroIdentificacion: e.target.value })}
+                  label="Número de Cédula"
+                  value={formPersona.cedula}
+                  onChange={(e) => setFormPersona({ ...formPersona, cedula: e.target.value })}
                   placeholder="Ej: 1234567890"
                 />
                 <Button
@@ -573,194 +874,169 @@ const FormulariosUAFE = () => {
               </Stack>
               {personaEncontrada && (
                 <Alert severity="success" sx={{ mt: 2 }}>
-                  Persona encontrada: <strong>{personaEncontrada.tipoPersona === 'NATURAL' ?
-                    `${personaEncontrada.datosPersonaNatural?.nombres || ''} ${personaEncontrada.datosPersonaNatural?.apellidos || ''}` :
-                    personaEncontrada.datosPersonaJuridica?.razonSocial || 'N/A'}</strong>
+                  Persona encontrada: <strong>{getNombrePersona(personaEncontrada)}</strong>
                 </Alert>
               )}
             </Box>
 
-            <Divider />
-
-            {/* Datos del Trámite */}
-            <Box>
-              <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                2. Información del Trámite
-              </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="No. Matriz (opcional)"
-                    value={formData.numeroMatriz}
-                    onChange={(e) => setFormData({ ...formData, numeroMatriz: e.target.value })}
-                    placeholder="Ej: 2024-1234"
-                    helperText="Puedes dejarlo vacío si aún no tienes el número"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Acto / Contrato"
-                    value={formData.actoContrato}
-                    onChange={(e) => setFormData({ ...formData, actoContrato: e.target.value })}
-                    placeholder="Ej: Compraventa de Inmueble"
-                    required
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <FormControl fullWidth>
-                    <InputLabel>Calidad en el Acto</InputLabel>
-                    <Select
-                      value={formData.calidadPersona}
-                      label="Calidad en el Acto"
-                      onChange={(e) => setFormData({ ...formData, calidadPersona: e.target.value })}
-                    >
-                      <MenuItem value="COMPRADOR">Comprador</MenuItem>
-                      <MenuItem value="VENDEDOR">Vendedor</MenuItem>
-                      <MenuItem value="OTRO">Otro</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <FormControl fullWidth>
-                    <InputLabel>Actúa Por</InputLabel>
-                    <Select
-                      value={formData.actuaPor}
-                      label="Actúa Por"
-                      onChange={(e) => setFormData({ ...formData, actuaPor: e.target.value })}
-                    >
-                      <MenuItem value="PROPIOS_DERECHOS">Por sus propios derechos</MenuItem>
-                      <MenuItem value="REPRESENTANDO_A">Representando a</MenuItem>
-                    </Select>
-                  </FormControl>
-                </Grid>
-              </Grid>
-            </Box>
+            {/* Datos del rol en el trámite */}
+            {personaEncontrada && (
+              <>
+                <Divider />
+                <Box>
+                  <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                    Rol en el Trámite
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12}>
+                      <FormControl fullWidth>
+                        <InputLabel>Calidad</InputLabel>
+                        <Select
+                          value={formPersona.calidad}
+                          label="Calidad"
+                          onChange={(e) => setFormPersona({ ...formPersona, calidad: e.target.value })}
+                        >
+                          <MenuItem value="COMPRADOR">Comprador</MenuItem>
+                          <MenuItem value="VENDEDOR">Vendedor</MenuItem>
+                          <MenuItem value="TESTIGO">Testigo</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <FormControl fullWidth>
+                        <InputLabel>Actúa Por</InputLabel>
+                        <Select
+                          value={formPersona.actuaPor}
+                          label="Actúa Por"
+                          onChange={(e) => setFormPersona({ ...formPersona, actuaPor: e.target.value })}
+                        >
+                          <MenuItem value="PROPIOS_DERECHOS">Por sus propios derechos</MenuItem>
+                          <MenuItem value="REPRESENTANDO">Representando</MenuItem>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                  </Grid>
+                </Box>
+              </>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => { setOpenDialog(false); resetForm(); }}>
+          <Button onClick={() => { setOpenAgregarPersona(false); resetFormPersona(); }}>
             Cancelar
           </Button>
           <Button
             variant="contained"
-            onClick={crearAsignacion}
+            color="success"
+            onClick={agregarPersonaAProtocolo}
             disabled={loading || !personaEncontrada}
-            startIcon={<LinkIcon />}
+            startIcon={<PersonAddIcon />}
           >
-            {loading ? 'Creando...' : 'Crear y Copiar Link'}
+            {loading ? 'Agregando...' : 'Agregar Persona'}
           </Button>
         </DialogActions>
       </Dialog>
 
-      {/* Dialog: Ver Detalles */}
+      {/* Dialog: Ver Detalles del Protocolo */}
       <Dialog
-        open={openDetallesDialog}
-        onClose={() => setOpenDetallesDialog(false)}
-        maxWidth="lg"
-        fullWidth
-      >
-        <DialogTitle sx={{ backgroundColor: 'success.main', color: 'white' }}>
-          Detalles de la Respuesta - Formulario UAFE
-        </DialogTitle>
-        <DialogContent sx={{ mt: 2 }}>
-          {asignacionSeleccionada && asignacionSeleccionada.respuesta ? (
-            <Box>
-              <Alert severity="info" sx={{ mb: 3 }}>
-                Formulario completado el {new Date(asignacionSeleccionada.respuesta.completadoEn).toLocaleString('es-EC')}
-              </Alert>
-
-              {/* Aquí irían los detalles completos de la respuesta */}
-              <Typography variant="body2" color="text.secondary">
-                Visualización completa de respuestas - Por implementar en siguiente fase
-              </Typography>
-            </Box>
-          ) : (
-            <Typography>No hay respuesta disponible</Typography>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenDetallesDialog(false)}>Cerrar</Button>
-          {asignacionSeleccionada?.respuesta && (
-            <Button variant="contained" disabled>
-              Exportar PDF
-            </Button>
-          )}
-        </DialogActions>
-      </Dialog>
-
-      {/* Dialog: Editar Asignación */}
-      <Dialog
-        open={openEditDialog}
-        onClose={() => setOpenEditDialog(false)}
+        open={openVerProtocolo}
+        onClose={() => setOpenVerProtocolo(false)}
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle sx={{ backgroundColor: 'secondary.main', color: 'white' }}>
-          Editar Asignación
+        <DialogTitle sx={{ backgroundColor: 'info.main', color: 'white' }}>
+          Detalles del Protocolo
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
-          <Grid container spacing={3}>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="No. Matriz"
-                value={editFormData.numeroMatriz}
-                onChange={(e) => setEditFormData({ ...editFormData, numeroMatriz: e.target.value })}
-                placeholder="Ej: 2024-1234"
-                helperText="Número de protocolo (opcional)"
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                required
-                label="Acto / Contrato"
-                value={editFormData.actoContrato}
-                onChange={(e) => setEditFormData({ ...editFormData, actoContrato: e.target.value })}
-                placeholder="Ej: Compraventa"
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth required>
-                <InputLabel>Calidad de la Persona</InputLabel>
-                <Select
-                  value={editFormData.calidadPersona}
-                  label="Calidad de la Persona"
-                  onChange={(e) => setEditFormData({ ...editFormData, calidadPersona: e.target.value })}
-                >
-                  <MenuItem value="COMPRADOR">Comprador</MenuItem>
-                  <MenuItem value="VENDEDOR">Vendedor</MenuItem>
-                  <MenuItem value="OTRO">Otro</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth required>
-                <InputLabel>Actúa Por</InputLabel>
-                <Select
-                  value={editFormData.actuaPor}
-                  label="Actúa Por"
-                  onChange={(e) => setEditFormData({ ...editFormData, actuaPor: e.target.value })}
-                >
-                  <MenuItem value="PROPIOS_DERECHOS">Propios Derechos</MenuItem>
-                  <MenuItem value="REPRESENTANDO_A">Representando a</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
+          {protocoloSeleccionado && (
+            <Stack spacing={3}>
+              {/* Información básica */}
+              <Box>
+                <Typography variant="h6" gutterBottom>Información del Protocolo</Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <Typography variant="body2" color="text.secondary">Número:</Typography>
+                    <Typography variant="body1" fontWeight="bold">{protocoloSeleccionado.numeroProtocolo}</Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="body2" color="text.secondary">Fecha:</Typography>
+                    <Typography variant="body1">{new Date(protocoloSeleccionado.fecha).toLocaleDateString('es-EC')}</Typography>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography variant="body2" color="text.secondary">Acto/Contrato:</Typography>
+                    <Typography variant="body1">{protocoloSeleccionado.actoContrato}</Typography>
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Typography variant="body2" color="text.secondary">Valor del Contrato:</Typography>
+                    <Typography variant="body1" fontWeight="bold">${parseFloat(protocoloSeleccionado.valorContrato).toFixed(2)}</Typography>
+                  </Grid>
+                  {protocoloSeleccionado.avaluoMunicipal && (
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">Avalúo Municipal:</Typography>
+                      <Typography variant="body1">${parseFloat(protocoloSeleccionado.avaluoMunicipal).toFixed(2)}</Typography>
+                    </Grid>
+                  )}
+                </Grid>
+              </Box>
+
+              <Divider />
+
+              {/* Personas */}
+              <Box>
+                <Typography variant="h6" gutterBottom>
+                  Personas ({protocoloSeleccionado.personas?.length || 0})
+                </Typography>
+                {protocoloSeleccionado.personas && protocoloSeleccionado.personas.length > 0 ? (
+                  <List>
+                    {protocoloSeleccionado.personas.map((persona) => (
+                      <ListItem key={persona.id}>
+                        <ListItemText
+                          primary={getNombrePersona(persona.persona)}
+                          secondary={
+                            <>
+                              {persona.persona.numeroIdentificacion} - {persona.calidad}
+                              <br />
+                              {persona.actuaPor}
+                            </>
+                          }
+                        />
+                        <ListItemSecondaryAction>
+                          <Chip
+                            icon={persona.completado ? <CheckCircleIcon /> : <PendingIcon />}
+                            label={persona.completado ? 'Completado' : 'Pendiente'}
+                            color={persona.completado ? 'success' : 'warning'}
+                            size="small"
+                          />
+                        </ListItemSecondaryAction>
+                      </ListItem>
+                    ))}
+                  </List>
+                ) : (
+                  <Alert severity="info">No hay personas agregadas a este protocolo.</Alert>
+                )}
+              </Box>
+
+              <Divider />
+
+              {/* Instrucciones de acceso */}
+              <Box>
+                <Typography variant="h6" gutterBottom>Instrucciones de Acceso</Typography>
+                <Alert severity="success">
+                  <Typography variant="body2">
+                    <strong>Las personas pueden acceder al formulario con:</strong>
+                  </Typography>
+                  <ol style={{ margin: '8px 0', paddingLeft: '20px' }}>
+                    <li>Número de Protocolo: <strong>{protocoloSeleccionado.numeroProtocolo}</strong></li>
+                    <li>Su Cédula</li>
+                    <li>Su PIN personal (configurado al registrarse)</li>
+                  </ol>
+                </Alert>
+              </Box>
+            </Stack>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenEditDialog(false)}>Cancelar</Button>
-          <Button
-            variant="contained"
-            color="secondary"
-            onClick={guardarEdicion}
-            disabled={loading || !editFormData.actoContrato}
-          >
-            {loading ? <CircularProgress size={24} /> : 'Guardar Cambios'}
-          </Button>
+          <Button onClick={() => setOpenVerProtocolo(false)}>Cerrar</Button>
         </DialogActions>
       </Dialog>
 
