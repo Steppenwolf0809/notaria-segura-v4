@@ -68,7 +68,7 @@ export function formatTimestamp() {
 /**
  * Dibujar header del PDF
  */
-export function drawHeader(doc) {
+export function drawHeader(doc, logoPath = null) {
   const headerHeight = 120;
 
   // Borde principal del header
@@ -80,14 +80,31 @@ export function drawHeader(doc) {
   const leftX = 60;
   const topY = 60;
 
-  // Logo placeholder - Círculo azul con "N18"
-  doc.circle(leftX + 30, topY + 30, 25)
-     .fillAndStroke(COLORS.primary, COLORS.primary);
+  // Logo - Intentar cargar imagen o usar placeholder
+  try {
+    if (logoPath && require('fs').existsSync(logoPath)) {
+      // Cargar logo real (60x60px)
+      doc.image(logoPath, leftX, topY, { width: 60, height: 60 });
+    } else {
+      // Logo placeholder - Círculo azul con "N18"
+      doc.circle(leftX + 30, topY + 30, 25)
+         .fillAndStroke(COLORS.primary, COLORS.primary);
 
-  doc.fillColor(COLORS.white)
-     .fontSize(16)
-     .font(FONTS.title)
-     .text('N18', leftX + 17, topY + 22);
+      doc.fillColor(COLORS.white)
+         .fontSize(16)
+         .font(FONTS.title)
+         .text('N18', leftX + 17, topY + 22);
+    }
+  } catch (error) {
+    // Fallback a placeholder si hay error
+    doc.circle(leftX + 30, topY + 30, 25)
+       .fillAndStroke(COLORS.primary, COLORS.primary);
+
+    doc.fillColor(COLORS.white)
+       .fontSize(16)
+       .font(FONTS.title)
+       .text('N18', leftX + 17, topY + 22);
+  }
 
   // Texto "NOTARÍA 18"
   doc.fillColor(COLORS.primary)
