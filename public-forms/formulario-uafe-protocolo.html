@@ -342,6 +342,9 @@
                             id="loginCedula"
                             placeholder="Ej: 1234567890"
                             maxlength="13"
+                            inputmode="numeric"
+                            pattern="[0-9]*"
+                            autocomplete="off"
                             required
                         >
                     </div>
@@ -353,6 +356,9 @@
                             id="loginPin"
                             placeholder="6 dígitos"
                             maxlength="6"
+                            inputmode="numeric"
+                            pattern="[0-9]*"
+                            autocomplete="off"
                             required
                         >
                         <div class="helper-text">PIN de 6 dígitos configurado al registrarte</div>
@@ -628,7 +634,7 @@
                             </div>
                             <div class="form-group">
                                 <label>Número de Identificación</label>
-                                <input type="text" id="conyugeNumeroId">
+                                <input type="text" id="conyugeNumeroId" inputmode="numeric" pattern="[0-9]*">
                             </div>
                         </div>
 
@@ -640,6 +646,24 @@
                             <div class="form-group">
                                 <label>Profesión</label>
                                 <input type="text" id="conyugeProfesion">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Situación Laboral</label>
+                                <select id="conyugeSituacionLaboral">
+                                    <option value="">Seleccione...</option>
+                                    <option value="EMPLEADO_PUBLICO">Empleado Público</option>
+                                    <option value="EMPLEADO_PRIVADO">Empleado Privado</option>
+                                    <option value="INDEPENDIENTE">Independiente/Profesional</option>
+                                    <option value="COMERCIANTE">Comerciante</option>
+                                    <option value="JUBILADO">Jubilado/Pensionado</option>
+                                    <option value="AMA_DE_CASA">Ama de Casa</option>
+                                    <option value="ESTUDIANTE">Estudiante</option>
+                                    <option value="DESEMPLEADO">Desempleado</option>
+                                    <option value="OTRO">Otro</option>
+                                </select>
                             </div>
                         </div>
 
@@ -957,6 +981,7 @@
                 setValue('conyugeNumeroId', datos.conyuge.numeroIdentificacion);
                 setValue('conyugeNacionalidad', datos.conyuge.nacionalidad);
                 setValue('conyugeProfesion', datos.conyuge.profesion);
+                setValue('conyugeSituacionLaboral', datos.conyuge.situacionLaboral);
                 setValue('conyugeEmail', datos.conyuge.email);
                 setValue('conyugeCelular', datos.conyuge.celular);
             }
@@ -1113,6 +1138,7 @@
                         numeroIdentificacion: document.getElementById('conyugeNumeroId').value || null,
                         nacionalidad: document.getElementById('conyugeNacionalidad').value || null,
                         profesion: document.getElementById('conyugeProfesion').value || null,
+                        situacionLaboral: document.getElementById('conyugeSituacionLaboral').value || null,
                         email: document.getElementById('conyugeEmail').value || null,
                         celular: document.getElementById('conyugeCelular').value || null
                     } : null,
