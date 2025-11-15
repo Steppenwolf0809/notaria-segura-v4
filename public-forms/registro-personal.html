@@ -924,12 +924,41 @@
 
                         <div class="row">
                             <div class="col-md-6 mb-3">
+                                <label class="form-label">Nacionalidad</label>
+                                <input type="text" class="form-control" id="conyugeNacionalidad">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Correo Electrónico</label>
+                                <input type="email" class="form-control" id="conyugeEmail">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
                                 <label class="form-label">Profesión / Ocupación</label>
                                 <input type="text" class="form-control" id="conyugeProfesion">
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Celular</label>
                                 <input type="tel" class="form-control" id="conyugeCelular">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <label class="form-label">Situación Laboral</label>
+                                <select class="form-select" id="conyugeSituacionLaboral">
+                                    <option value="">Seleccionar...</option>
+                                    <option value="EMPLEADO_PUBLICO">Empleado Público</option>
+                                    <option value="EMPLEADO_PRIVADO">Empleado Privado</option>
+                                    <option value="INDEPENDIENTE">Independiente/Profesional</option>
+                                    <option value="COMERCIANTE">Comerciante</option>
+                                    <option value="JUBILADO">Jubilado/Pensionado</option>
+                                    <option value="AMA_DE_CASA">Ama de Casa</option>
+                                    <option value="ESTUDIANTE">Estudiante</option>
+                                    <option value="DESEMPLEADO">Desempleado</option>
+                                    <option value="OTRO">Otro</option>
+                                </select>
                             </div>
                         </div>
 
@@ -1667,8 +1696,11 @@
                 document.getElementById('conyugeNombres').value = datos.conyuge.nombres || '';
                 document.getElementById('conyugeTipoId').value = datos.conyuge.tipoIdentificacion || '';
                 document.getElementById('conyugeNumeroId').value = datos.conyuge.numeroIdentificacion || '';
+                document.getElementById('conyugeNacionalidad').value = datos.conyuge.nacionalidad || '';
+                document.getElementById('conyugeEmail').value = datos.conyuge.email || '';
                 document.getElementById('conyugeProfesion').value = datos.conyuge.profesionOcupacion || '';
                 document.getElementById('conyugeCelular').value = datos.conyuge.celular || '';
+                document.getElementById('conyugeSituacionLaboral').value = datos.conyuge.situacionLaboral || '';
             }
 
             // PEP
@@ -1734,8 +1766,11 @@
                     nombres: document.getElementById('conyugeNombres').value,
                     tipoIdentificacion: document.getElementById('conyugeTipoId').value,
                     numeroIdentificacion: document.getElementById('conyugeNumeroId').value,
+                    nacionalidad: document.getElementById('conyugeNacionalidad').value,
+                    email: document.getElementById('conyugeEmail').value,
                     profesionOcupacion: document.getElementById('conyugeProfesion').value,
-                    celular: document.getElementById('conyugeCelular').value
+                    celular: document.getElementById('conyugeCelular').value,
+                    situacionLaboral: document.getElementById('conyugeSituacionLaboral').value
                 },
                 pep: {
                     esPersonaExpuesta: document.querySelector('input[name="esPEP"]:checked').value === 'SI',
