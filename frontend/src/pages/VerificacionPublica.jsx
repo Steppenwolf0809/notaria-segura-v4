@@ -400,7 +400,7 @@ const VerificacionPublica = () => {
                 </CardContent>
               </Card>
 
-              {/* Fotografía del menor (si existe) */}
+              {/* Fotografía de verificacion (si existe) */}
               {escritura.fotoURL && (
                 <Card sx={{ mb: 3 }}>
                   <CardContent>

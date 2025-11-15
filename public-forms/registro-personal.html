@@ -1,0 +1,1812 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro Personal - Notaría 18 Quito</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --azul-notaria: #1A5799;
+            --azul-oscuro: #0d3a66;
+            --gris-claro: #f8f9fa;
+            --gris-medio: #6c757d;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px 0;
+        }
+
+        .main-container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .header-notaria {
+            background: white;
+            padding: 20px;
+            border-radius: 15px 15px 0 0;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .header-notaria h1 {
+            color: var(--azul-notaria);
+            font-size: 1.5rem;
+            margin: 0;
+            font-weight: bold;
+        }
+
+        .header-notaria p {
+            color: var(--gris-medio);
+            margin: 5px 0 0 0;
+            font-size: 0.9rem;
+        }
+
+        .card-content {
+            background: white;
+            padding: 30px;
+            border-radius: 0 0 15px 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .step {
+            display: none;
+        }
+
+        .step.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* PIN Input Styles */
+        .pin-wrapper {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .pin-container {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .pin-digit {
+            width: 50px;
+            height: 60px;
+            font-size: 2rem;
+            text-align: center;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+
+        .pin-digit:focus {
+            border-color: var(--azul-notaria);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(26, 87, 153, 0.1);
+        }
+
+        .pin-digit.filled {
+            background: var(--azul-notaria);
+            color: white;
+            border-color: var(--azul-notaria);
+        }
+
+        .toggle-pin-btn {
+            background: none;
+            border: none;
+            color: var(--azul-notaria);
+            cursor: pointer;
+            padding: 5px 10px;
+            font-size: 0.9rem;
+            margin-top: 5px;
+            transition: all 0.3s;
+        }
+
+        .toggle-pin-btn:hover {
+            color: var(--azul-oscuro);
+            transform: scale(1.05);
+        }
+
+        .toggle-pin-btn i {
+            margin-right: 5px;
+        }
+
+        /* Validation Messages */
+        .validation-list {
+            list-style: none;
+            padding: 0;
+            margin: 15px 0;
+        }
+
+        .validation-list li {
+            padding: 5px 0;
+            color: var(--gris-medio);
+        }
+
+        .validation-list li.valid {
+            color: #28a745;
+        }
+
+        .validation-list li i {
+            margin-right: 8px;
+        }
+
+        /* Buttons */
+        .btn-notaria {
+            background: var(--azul-notaria);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .btn-notaria:hover:not(:disabled) {
+            background: var(--azul-oscuro);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(26, 87, 153, 0.3);
+        }
+
+        .btn-notaria:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary-notaria {
+            background: white;
+            color: var(--azul-notaria);
+            border: 2px solid var(--azul-notaria);
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .btn-secondary-notaria:hover {
+            background: var(--azul-notaria);
+            color: white;
+        }
+
+        /* Alert Messages */
+        .alert {
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        /* Session Timer */
+        .session-timer {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .session-timer.warning {
+            background: #f8d7da;
+            border-color: #dc3545;
+            color: #721c24;
+        }
+
+        /* Tabs */
+        .nav-tabs {
+            border-bottom: 2px solid #dee2e6;
+        }
+
+        .nav-tabs .nav-link {
+            border: none;
+            color: var(--gris-medio);
+            padding: 12px 20px;
+        }
+
+        .nav-tabs .nav-link.active {
+            color: var(--azul-notaria);
+            border-bottom: 3px solid var(--azul-notaria);
+            font-weight: 600;
+        }
+
+        /* Form Styles */
+        .form-label {
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .form-control, .form-select {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 10px 15px;
+            transition: border-color 0.3s;
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--azul-notaria);
+            box-shadow: 0 0 0 3px rgba(26, 87, 153, 0.1);
+        }
+
+        /* Footer */
+        .footer-notaria {
+            text-align: center;
+            color: white;
+            margin-top: 30px;
+            padding: 20px;
+        }
+
+        .footer-notaria h6 {
+            color: white;
+            font-weight: bold;
+        }
+
+        .footer-notaria a {
+            color: white;
+            text-decoration: underline;
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            margin-bottom: 30px;
+        }
+
+        .progress {
+            height: 8px;
+            border-radius: 10px;
+            background: #e9ecef;
+            overflow: visible;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, var(--azul-notaria) 0%, var(--azul-oscuro) 100%);
+            transition: width 0.4s ease;
+            border-radius: 10px;
+        }
+
+        .progress-label {
+            text-align: center;
+            color: var(--gris-medio);
+            font-size: 0.85rem;
+            margin-top: 8px;
+            font-weight: 500;
+        }
+
+        /* Navigation Buttons */
+        .tab-navigation {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+            gap: 10px;
+        }
+
+        .btn-nav {
+            flex: 1;
+            max-width: 180px;
+        }
+
+        .tab-navigation .btn-nav:only-child {
+            margin: 0 auto;
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Radio Buttons */
+        .radio-group {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .radio-option {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: center;
+        }
+
+        .radio-option:hover {
+            border-color: var(--azul-notaria);
+            background: rgba(26, 87, 153, 0.05);
+        }
+
+        .radio-option input[type="radio"] {
+            display: none;
+        }
+
+        .radio-option input[type="radio"]:checked + label {
+            color: var(--azul-notaria);
+            font-weight: 600;
+        }
+
+        .radio-option.selected {
+            border-color: var(--azul-notaria);
+            background: rgba(26, 87, 153, 0.1);
+        }
+
+        /* Política de Datos */
+        .policy-acceptance {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            margin-bottom: 15px;
+        }
+
+        .policy-acceptance .form-check-input {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            margin-top: 2px;
+        }
+
+        .policy-acceptance .form-check-label {
+            margin-left: 10px;
+            cursor: pointer;
+            line-height: 1.6;
+        }
+
+        .policy-acceptance a {
+            color: var(--azul-notaria);
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .policy-acceptance a:hover {
+            text-decoration: underline;
+        }
+
+        /* Modal de confirmación */
+        .modal-content {
+            border: none;
+            border-radius: 15px;
+        }
+
+        .success-icon {
+            font-size: 5rem;
+            color: #28a745;
+            animation: scaleIn 0.5s ease-out;
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 576px) {
+            .pin-digit {
+                width: 40px;
+                height: 50px;
+                font-size: 1.5rem;
+                gap: 8px;
+            }
+
+            .pin-container {
+                gap: 8px;
+            }
+
+            .header-notaria h1 {
+                font-size: 1.2rem;
+            }
+
+            .card-content {
+                padding: 20px 15px;
+            }
+
+            .nav-tabs .nav-link {
+                padding: 10px 8px;
+                font-size: 0.85rem;
+            }
+
+            .nav-tabs .nav-link i {
+                display: block;
+                margin-bottom: 5px;
+            }
+
+            .btn-notaria, .btn-secondary-notaria {
+                padding: 10px 20px;
+                font-size: 0.9rem;
+            }
+
+            .tab-navigation {
+                flex-direction: column;
+            }
+
+            .btn-nav {
+                max-width: 100%;
+            }
+
+            .radio-group {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .toggle-pin-btn {
+                font-size: 0.85rem;
+            }
+
+            .footer-notaria {
+                font-size: 0.85rem;
+                padding: 15px;
+            }
+
+            .footer-notaria h6 {
+                font-size: 1rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-container {
+                padding: 0 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Header -->
+        <div class="header-notaria">
+            <h1><i class="fas fa-landmark"></i> NOTARÍA 18 QUITO</h1>
+            <p>Registro Personal - Formularios UAFE</p>
+        </div>
+
+        <!-- Main Card -->
+        <div class="card-content">
+            <!-- Alert Container -->
+            <div id="alertContainer"></div>
+
+            <!-- STEP 1: Verificar Cédula -->
+            <div id="step1" class="step active">
+                <h4 class="text-center mb-4">Verificación de Identidad</h4>
+                
+                <div class="mb-3">
+                    <label for="cedula" class="form-label">
+                        <i class="fas fa-id-card"></i> Número de Cédula o RUC
+                    </label>
+                    <input 
+                        type="text" 
+                        class="form-control" 
+                        id="cedula" 
+                        placeholder="Ej: 1234567890"
+                        maxlength="13"
+                    >
+                    <small class="text-muted">Ingrese su número de identificación sin espacios ni guiones</small>
+                </div>
+
+                <div class="radio-group">
+                    <div class="radio-option" id="radioNatural">
+                        <input type="radio" name="tipoPersona" id="tipoNatural" value="NATURAL" checked>
+                        <label for="tipoNatural">
+                            <i class="fas fa-user fa-2x mb-2"></i><br>
+                            Persona Natural
+                        </label>
+                    </div>
+                    <div class="radio-option" id="radioJuridica">
+                        <input type="radio" name="tipoPersona" id="tipoJuridica" value="JURIDICA">
+                        <label for="tipoJuridica">
+                            <i class="fas fa-building fa-2x mb-2"></i><br>
+                            Persona Jurídica
+                        </label>
+                    </div>
+                </div>
+
+                <div class="text-center">
+                    <button class="btn btn-notaria" onclick="verificarCedula()">
+                        Continuar <i class="fas fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- STEP 2A: Crear Cuenta -->
+            <div id="step2a" class="step">
+                <h4 class="text-center mb-4">Crear Cuenta Nueva</h4>
+                
+                <div class="alert alert-info">
+                    <strong><i class="fas fa-info-circle"></i> Cédula:</strong> <span id="cedulaDisplay2a"></span>
+                </div>
+
+                <p class="text-center">Cree un PIN de 6 dígitos para proteger su información:</p>
+
+                <div class="pin-wrapper">
+                    <div class="pin-container" id="pinCreateContainer">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="0">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="1">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="2">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="3">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="4">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="5">
+                    </div>
+                    <button class="toggle-pin-btn" onclick="togglePinVisibility('pinCreateContainer')" type="button">
+                        <i class="fas fa-eye" id="iconCreate"></i>
+                        <span id="textCreate">Mostrar PIN</span>
+                    </button>
+                </div>
+
+                <ul class="validation-list">
+                    <li id="validLength"><i class="fas fa-circle"></i> 6 dígitos numéricos</li>
+                    <li id="validNoSequential"><i class="fas fa-circle"></i> No usar secuencias (123456, 654321)</li>
+                    <li id="validNoRepeated"><i class="fas fa-circle"></i> No usar repeticiones (111111)</li>
+                </ul>
+
+                <p class="text-center mt-4">Confirme su PIN:</p>
+
+                <div class="pin-wrapper">
+                    <div class="pin-container" id="pinConfirmContainer">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="0">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="1">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="2">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="3">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="4">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="5">
+                    </div>
+                    <button class="toggle-pin-btn" onclick="togglePinVisibility('pinConfirmContainer')" type="button">
+                        <i class="fas fa-eye" id="iconConfirm"></i>
+                        <span id="textConfirm">Mostrar PIN</span>
+                    </button>
+                </div>
+
+                <div id="pinMatchMessage" class="text-center mt-2"></div>
+
+                <div class="text-center mt-4">
+                    <button class="btn btn-secondary-notaria me-2" onclick="volverStep1()">
+                        <i class="fas fa-arrow-left"></i> Volver
+                    </button>
+                    <button class="btn btn-notaria" id="btnCrearCuenta" onclick="crearCuenta()" disabled>
+                        Crear Cuenta <i class="fas fa-check"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- STEP 2B: Login -->
+            <div id="step2b" class="step">
+                <h4 class="text-center mb-4">Iniciar Sesión</h4>
+                
+                <div class="alert alert-info">
+                    <strong><i class="fas fa-info-circle"></i> Cédula:</strong> <span id="cedulaDisplay2b"></span>
+                </div>
+
+                <p class="text-center">Ingrese su PIN de 6 dígitos:</p>
+
+                <div class="pin-wrapper">
+                    <div class="pin-container" id="pinLoginContainer">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="0">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="1">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="2">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="3">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="4">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="5">
+                    </div>
+                    <button class="toggle-pin-btn" onclick="togglePinVisibility('pinLoginContainer')" type="button">
+                        <i class="fas fa-eye" id="iconLogin"></i>
+                        <span id="textLogin">Mostrar PIN</span>
+                    </button>
+                </div>
+
+                <div id="intentosRestantes" class="text-center text-muted mt-3"></div>
+
+                <div class="text-center mt-4">
+                    <button class="btn btn-secondary-notaria me-2" onclick="volverStep1()">
+                        <i class="fas fa-arrow-left"></i> Volver
+                    </button>
+                    <button class="btn btn-notaria" id="btnLogin" onclick="login()" disabled>
+                        Ingresar <i class="fas fa-sign-in-alt"></i>
+                    </button>
+                </div>
+
+                <hr class="my-4">
+
+                <div class="alert alert-warning">
+                    <h6><i class="fas fa-lock"></i> ¿Olvidó su PIN?</h6>
+                    <p class="mb-0 small">
+                        Por seguridad, debe acercarse a la <strong>Notaría 18</strong> 
+                        con su cédula física para resetear su PIN.
+                    </p>
+                </div>
+            </div>
+
+            <!-- STEP 3: Formulario -->
+            <div id="step3" class="step">
+                <!-- Session Timer -->
+                <div class="session-timer" id="sessionTimer">
+                    <i class="fas fa-clock"></i> Sesión activa: <span id="timerDisplay">30:00</span>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h4 class="mb-0">Mi Información</h4>
+                    <button class="btn btn-sm btn-outline-danger" onclick="cerrarSesion()">
+                        <i class="fas fa-sign-out-alt"></i> Cerrar Sesión
+                    </button>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="progress-container">
+                    <div class="progress">
+                        <div class="progress-bar" id="progressBar" role="progressbar" style="width: 20%"></div>
+                    </div>
+                    <div class="progress-label" id="progressLabel">Paso 1 de 5: Datos Personales</div>
+                </div>
+
+                <!-- Tabs -->
+                <ul class="nav nav-tabs mb-4" id="formTabs" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link active" id="tab-personales" data-bs-toggle="tab" href="#personales" onclick="updateProgress(0)">
+                            <i class="fas fa-user"></i> <span class="d-none d-md-inline">Personales</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="tab-direccion" data-bs-toggle="tab" href="#direccion" onclick="updateProgress(1)">
+                            <i class="fas fa-map-marker-alt"></i> <span class="d-none d-md-inline">Dirección</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="tab-laboral" data-bs-toggle="tab" href="#laboral" onclick="updateProgress(2)">
+                            <i class="fas fa-briefcase"></i> <span class="d-none d-md-inline">Laboral</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="tab-conyuge" data-bs-toggle="tab" href="#conyuge" onclick="updateProgress(3)">
+                            <i class="fas fa-ring"></i> <span class="d-none d-md-inline">Cónyuge</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" id="tab-pep" data-bs-toggle="tab" href="#pep" onclick="updateProgress(4)">
+                            <i class="fas fa-shield-alt"></i> <span class="d-none d-md-inline">PEP</span>
+                        </a>
+                    </li>
+                </ul>
+
+                <!-- Tab Content -->
+                <div class="tab-content" id="formTabsContent">
+                    <!-- Tab Datos Personales -->
+                    <div class="tab-pane fade show active" id="personales">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Apellidos</label>
+                                <input type="text" class="form-control" id="apellidos">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Nombres</label>
+                                <input type="text" class="form-control" id="nombres">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Género</label>
+                                <select class="form-select" id="genero">
+                                    <option value="">Seleccionar...</option>
+                                    <option value="MASCULINO">Masculino</option>
+                                    <option value="FEMENINO">Femenino</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Estado Civil</label>
+                                <select class="form-select" id="estadoCivil">
+                                    <option value="">Seleccionar...</option>
+                                    <option value="SOLTERO">Soltero/a</option>
+                                    <option value="CASADO">Casado/a</option>
+                                    <option value="DIVORCIADO">Divorciado/a</option>
+                                    <option value="VIUDO">Viudo/a</option>
+                                    <option value="UNION_LIBRE">Unión Libre</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Nivel de Estudio</label>
+                                <select class="form-select" id="nivelEstudio">
+                                    <option value="">Seleccionar...</option>
+                                    <option value="BACHILLER">Bachiller</option>
+                                    <option value="UNIVERSITARIO">Universitario</option>
+                                    <option value="MAESTRIA">Maestría</option>
+                                    <option value="POSTGRADO">Post Grado</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" class="form-control" id="email">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Teléfono</label>
+                                <input type="tel" class="form-control" id="telefono">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Celular</label>
+                                <input type="tel" class="form-control" id="celular">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Nacionalidad</label>
+                            <input type="text" class="form-control" id="nacionalidad" value="ECUATORIANA">
+                        </div>
+
+                        <!-- Navigation -->
+                        <div class="tab-navigation">
+                            <button class="btn btn-notaria btn-nav" onclick="nextTab()">
+                                Siguiente <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tab Dirección -->
+                    <div class="tab-pane fade" id="direccion">
+                        <div class="row">
+                            <div class="col-md-8 mb-3">
+                                <label class="form-label">Calle Principal</label>
+                                <input type="text" class="form-control" id="callePrincipal">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Número</label>
+                                <input type="text" class="form-control" id="numeroCasa">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Calle Secundaria</label>
+                            <input type="text" class="form-control" id="calleSecundaria">
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Provincia</label>
+                                <input type="text" class="form-control" id="provincia">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Cantón</label>
+                                <input type="text" class="form-control" id="canton">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Parroquia</label>
+                                <input type="text" class="form-control" id="parroquia">
+                            </div>
+                        </div>
+
+                        <!-- Navigation -->
+                        <div class="tab-navigation">
+                            <button class="btn btn-secondary-notaria btn-nav" onclick="prevTab()">
+                                <i class="fas fa-arrow-left"></i> Anterior
+                            </button>
+                            <button class="btn btn-notaria btn-nav" onclick="nextTab()">
+                                Siguiente <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tab Información Laboral -->
+                    <div class="tab-pane fade" id="laboral">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Situación Laboral</label>
+                                <select class="form-select" id="situacionLaboral">
+                                    <option value="">Seleccionar...</option>
+                                    <option value="PUBLICO">Público</option>
+                                    <option value="PRIVADO">Privado</option>
+                                    <option value="JUBILADO">Jubilado</option>
+                                    <option value="NO_APLICA">No Aplica</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Relación de Dependencia</label>
+                                <select class="form-select" id="relacionDependencia">
+                                    <option value="">Seleccionar...</option>
+                                    <option value="SI">Sí</option>
+                                    <option value="NO">No</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Nombre de la Entidad</label>
+                            <input type="text" class="form-control" id="nombreEntidad">
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Dirección de la Empresa</label>
+                            <input type="text" class="form-control" id="direccionEmpresa">
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Provincia / Cantón</label>
+                                <input type="text" class="form-control" id="provinciaCantonEmpresa">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Profesión / Ocupación</label>
+                                <input type="text" class="form-control" id="profesion">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Cargo</label>
+                                <input type="text" class="form-control" id="cargo">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Ingreso Mensual</label>
+                                <input type="number" class="form-control" id="ingresoMensual" step="0.01">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Fecha de Ingreso</label>
+                                <input type="date" class="form-control" id="fechaIngreso">
+                            </div>
+                        </div>
+
+                        <!-- Navigation -->
+                        <div class="tab-navigation">
+                            <button class="btn btn-secondary-notaria btn-nav" onclick="prevTab()">
+                                <i class="fas fa-arrow-left"></i> Anterior
+                            </button>
+                            <button class="btn btn-notaria btn-nav" onclick="nextTab()">
+                                Siguiente <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tab Cónyuge -->
+                    <div class="tab-pane fade" id="conyuge">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> Complete esta sección solo si su estado civil es Casado/a o Unión Libre
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Apellidos</label>
+                                <input type="text" class="form-control" id="conyugeApellidos">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Nombres</label>
+                                <input type="text" class="form-control" id="conyugeNombres">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Tipo de Identificación</label>
+                                <select class="form-select" id="conyugeTipoId">
+                                    <option value="">Seleccionar...</option>
+                                    <option value="CEDULA">Cédula</option>
+                                    <option value="PASAPORTE">Pasaporte</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Número de Identificación</label>
+                                <input type="text" class="form-control" id="conyugeNumeroId">
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Profesión / Ocupación</label>
+                                <input type="text" class="form-control" id="conyugeProfesion">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Celular</label>
+                                <input type="tel" class="form-control" id="conyugeCelular">
+                            </div>
+                        </div>
+
+                        <!-- Navigation -->
+                        <div class="tab-navigation">
+                            <button class="btn btn-secondary-notaria btn-nav" onclick="prevTab()">
+                                <i class="fas fa-arrow-left"></i> Anterior
+                            </button>
+                            <button class="btn btn-notaria btn-nav" onclick="nextTab()">
+                                Siguiente <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tab PEP -->
+                    <div class="tab-pane fade" id="pep">
+                        <div class="alert alert-warning">
+                            <h6><i class="fas fa-shield-alt"></i> Persona Expuesta Políticamente (PEP)</h6>
+                            <p class="mb-0 small">
+                                Se considera PEP a quienes desempeñan o han desempeñado funciones públicas destacadas.
+                            </p>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label d-block">
+                                ¿Se considera una Persona Expuesta Políticamente?
+                            </label>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="esPEP" id="esPEPSi" value="SI">
+                                <label class="form-check-label" for="esPEPSi">Sí</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="esPEP" id="esPEPNo" value="NO" checked>
+                                <label class="form-check-label" for="esPEPNo">No</label>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label d-block">
+                                ¿Es familiar de un PEP? (1er y 2do grado de consanguinidad)
+                            </label>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="esFamiliarPEP" id="esFamiliarPEPSi" value="SI">
+                                <label class="form-check-label" for="esFamiliarPEPSi">Sí</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="esFamiliarPEP" id="esFamiliarPEPNo" value="NO" checked>
+                                <label class="form-check-label" for="esFamiliarPEPNo">No</label>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label d-block">
+                                ¿Es colaborador cercano de un PEP?
+                            </label>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="esColaboradorPEP" id="esColaboradorPEPSi" value="SI">
+                                <label class="form-check-label" for="esColaboradorPEPSi">Sí</label>
+                            </div>
+                            <div class="form-check form-check-inline">
+                                <input class="form-check-input" type="radio" name="esColaboradorPEP" id="esColaboradorPEPNo" value="NO" checked>
+                                <label class="form-check-label" for="esColaboradorPEPNo">No</label>
+                            </div>
+                        </div>
+
+                        <!-- Navigation -->
+                        <div class="tab-navigation">
+                            <button class="btn btn-secondary-notaria btn-nav" onclick="prevTab()">
+                                <i class="fas fa-arrow-left"></i> Anterior
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Aceptación de Política de Datos -->
+                <div class="policy-acceptance">
+                    <div class="form-check">
+                        <input 
+                            class="form-check-input" 
+                            type="checkbox" 
+                            id="aceptoPolitica" 
+                            onchange="validarAceptacionPolitica()"
+                        >
+                        <label class="form-check-label" for="aceptoPolitica">
+                            He leído y acepto la 
+                            <a href="/politica-datos-personales.pdf" target="_blank">
+                                Política de Tratamiento de Datos Personales
+                            </a> 
+                            de la Notaría 18 Quito
+                        </label>
+                    </div>
+                    <small class="text-muted d-block mt-2">
+                        <i class="fas fa-info-circle"></i> 
+                        Es necesario aceptar la política para poder guardar su información
+                    </small>
+                </div>
+
+                <!-- Botón Guardar -->
+                <div class="text-center mt-4">
+                    <button class="btn btn-notaria btn-lg" id="btnGuardarInfo" onclick="guardarInformacion()" disabled style="opacity: 0.6; cursor: not-allowed;">
+                        <i class="fas fa-save"></i> Guardar Cambios
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer-notaria">
+            <h6 class="mb-3"><strong>Contacto</strong></h6>
+            <p class="mb-2">
+                <i class="fas fa-phone"></i> (02) 224-7787 / 099-695-1682
+            </p>
+            <p class="mb-2">
+                <i class="fas fa-envelope"></i> notaria18uio@gmail.com / jzapata@notaria18quito.com.ec
+            </p>
+            <p class="mb-3">
+                <i class="fas fa-map-marker-alt"></i> Calle Azuay E2-231 entre Av. Amazonas y Av. Azuay, Quito, Ecuador
+            </p>
+            <p class="small mb-0">Notaría Décima Octava del Cantón Quito</p>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmación -->
+    <div class="modal fade" id="modalConfirmacion" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-body text-center p-5">
+                    <div class="mb-4">
+                        <i class="fas fa-check-circle success-icon"></i>
+                    </div>
+                    <h4 class="mb-3" style="color: #1A5799; font-weight: bold;">
+                        ¡Información Guardada!
+                    </h4>
+                    <p class="text-muted mb-4">
+                        Sus datos han sido actualizados correctamente
+                    </p>
+                    <button 
+                        type="button" 
+                        class="btn btn-success btn-lg" 
+                        data-bs-dismiss="modal"
+                        style="min-width: 150px;"
+                    >
+                        Aceptar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // ===================================
+        // CONFIGURACIÓN
+        // ===================================
+        const API_BASE_URL = 'https://notaria-segura-v4-staging.up.railway.app/api';
+        let sessionToken = null;
+        let sessionTimer = null;
+        let tiempoRestante = 1800; // 30 minutos en segundos
+        let currentCedula = '';
+        let currentTipoPersona = 'NATURAL';
+
+        // ===================================
+        // UTILIDADES
+        // ===================================
+        function showAlert(message, type = 'info') {
+            const alertContainer = document.getElementById('alertContainer');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            alertContainer.innerHTML = '';
+            alertContainer.appendChild(alertDiv);
+
+            // Auto-dismiss después de 5 segundos
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 5000);
+        }
+
+        function showStep(stepId) {
+            document.querySelectorAll('.step').forEach(step => {
+                step.classList.remove('active');
+            });
+            document.getElementById(stepId).classList.add('active');
+        }
+
+        function setLoading(buttonId, loading) {
+            const button = document.getElementById(buttonId);
+            if (loading) {
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner"></span> Procesando...';
+            } else {
+                button.disabled = false;
+            }
+        }
+
+        // ===================================
+        // VALIDACIÓN DE POLÍTICA DE DATOS
+        // ===================================
+        function validarAceptacionPolitica() {
+            const checkbox = document.getElementById('aceptoPolitica');
+            const btnGuardar = document.getElementById('btnGuardarInfo');
+            
+            // Habilitar/deshabilitar botón según estado del checkbox
+            btnGuardar.disabled = !checkbox.checked;
+            
+            // Efecto visual
+            if (checkbox.checked) {
+                btnGuardar.style.opacity = '1';
+                btnGuardar.style.cursor = 'pointer';
+            } else {
+                btnGuardar.style.opacity = '0.6';
+                btnGuardar.style.cursor = 'not-allowed';
+            }
+        }
+
+        // Mostrar modal de confirmación
+        function mostrarModalConfirmacion() {
+            const modalElement = document.getElementById('modalConfirmacion');
+            const modal = new bootstrap.Modal(modalElement);
+            modal.show();
+            
+            // Auto-cerrar después de 3 segundos
+            setTimeout(() => {
+                modal.hide();
+            }, 3000);
+        }
+
+        // ===================================
+        // MANEJO DE PIN INPUT
+        // ===================================
+        function setupPinInputs(containerId, onComplete) {
+            const container = document.getElementById(containerId);
+            const inputs = container.querySelectorAll('.pin-digit');
+            
+            inputs.forEach((input, index) => {
+                input.addEventListener('input', (e) => {
+                    const value = e.target.value;
+                    
+                    // Solo permitir números
+                    if (!/^\d$/.test(value)) {
+                        e.target.value = '';
+                        return;
+                    }
+
+                    // Marcar como lleno
+                    e.target.classList.add('filled');
+
+                    // Mover al siguiente input
+                    if (index < inputs.length - 1) {
+                        inputs[index + 1].focus();
+                    }
+
+                    // Verificar si todos están llenos
+                    const allFilled = Array.from(inputs).every(inp => inp.value !== '');
+                    if (allFilled && onComplete) {
+                        const pin = Array.from(inputs).map(inp => inp.value).join('');
+                        onComplete(pin);
+                    }
+                });
+
+                input.addEventListener('keydown', (e) => {
+                    if (e.key === 'Backspace') {
+                        if (e.target.value === '' && index > 0) {
+                            inputs[index - 1].focus();
+                            inputs[index - 1].value = '';
+                            inputs[index - 1].classList.remove('filled');
+                        } else {
+                            e.target.value = '';
+                            e.target.classList.remove('filled');
+                        }
+                    }
+                });
+
+                input.addEventListener('focus', (e) => {
+                    e.target.select();
+                });
+            });
+
+            // Focus en el primer input
+            inputs[0].focus();
+        }
+
+        function togglePinVisibility(containerId) {
+            const container = document.getElementById(containerId);
+            const inputs = container.querySelectorAll('.pin-digit');
+            
+            // Determinar el ID correcto para los elementos de texto e icono
+            let iconId, textId;
+            if (containerId === 'pinCreateContainer') {
+                iconId = 'iconCreate';
+                textId = 'textCreate';
+            } else if (containerId === 'pinConfirmContainer') {
+                iconId = 'iconConfirm';
+                textId = 'textConfirm';
+            } else if (containerId === 'pinLoginContainer') {
+                iconId = 'iconLogin';
+                textId = 'textLogin';
+            }
+
+            const icon = document.getElementById(iconId);
+            const text = document.getElementById(textId);
+            const isPassword = inputs[0].type === 'password';
+            
+            inputs.forEach(input => {
+                input.type = isPassword ? 'text' : 'password';
+            });
+
+            // Cambiar icono y texto
+            if (isPassword) {
+                icon.className = 'fas fa-eye-slash';
+                text.textContent = 'Ocultar PIN';
+            } else {
+                icon.className = 'fas fa-eye';
+                text.textContent = 'Mostrar PIN';
+            }
+        }
+
+        function getPinValue(containerId) {
+            const container = document.getElementById(containerId);
+            const inputs = container.querySelectorAll('.pin-digit');
+            return Array.from(inputs).map(inp => inp.value).join('');
+        }
+
+        function clearPinInputs(containerId) {
+            const container = document.getElementById(containerId);
+            const inputs = container.querySelectorAll('.pin-digit');
+            inputs.forEach(input => {
+                input.value = '';
+                input.classList.remove('filled');
+            });
+            inputs[0].focus();
+        }
+
+        // ===================================
+        // VALIDACIÓN DE PIN
+        // ===================================
+        function validarPIN(pin) {
+            const errores = [];
+            
+            // Longitud correcta
+            if (pin.length !== 6) {
+                errores.push('Debe tener 6 dígitos');
+            }
+
+            // Solo números
+            if (!/^\d{6}$/.test(pin)) {
+                errores.push('Solo debe contener números');
+            }
+
+            // No secuencial
+            const secuencias = ['123456', '234567', '345678', '456789', '654321', '765432', '876543', '987654'];
+            if (secuencias.includes(pin)) {
+                errores.push('No use secuencias como 123456');
+            }
+
+            // No repetido
+            if (/^(\d)\1{5}$/.test(pin)) {
+                errores.push('No use dígitos repetidos como 111111');
+            }
+
+            return errores;
+        }
+
+        function actualizarValidacionPIN() {
+            const pin = getPinValue('pinCreateContainer');
+            
+            document.getElementById('validLength').className = pin.length === 6 ? 'valid' : '';
+            document.getElementById('validLength').innerHTML = 
+                `<i class="fas ${pin.length === 6 ? 'fa-check-circle' : 'fa-circle'}"></i> 6 dígitos numéricos`;
+
+            const noSecuencial = !['123456', '234567', '345678', '456789', '654321', '765432', '876543', '987654'].includes(pin);
+            document.getElementById('validNoSequential').className = noSecuencial && pin.length === 6 ? 'valid' : '';
+            document.getElementById('validNoSequential').innerHTML = 
+                `<i class="fas ${noSecuencial && pin.length === 6 ? 'fa-check-circle' : 'fa-circle'}"></i> No usar secuencias`;
+
+            const noRepetido = !/^(\d)\1{5}$/.test(pin);
+            document.getElementById('validNoRepeated').className = noRepetido && pin.length === 6 ? 'valid' : '';
+            document.getElementById('validNoRepeated').innerHTML = 
+                `<i class="fas ${noRepetido && pin.length === 6 ? 'fa-check-circle' : 'fa-circle'}"></i> No usar repeticiones`;
+
+            verificarCoincidenciaPINs();
+        }
+
+        function verificarCoincidenciaPINs() {
+            const pin = getPinValue('pinCreateContainer');
+            const pinConfirm = getPinValue('pinConfirmContainer');
+            const mensaje = document.getElementById('pinMatchMessage');
+            const btnCrear = document.getElementById('btnCrearCuenta');
+
+            if (pinConfirm.length === 6) {
+                if (pin === pinConfirm) {
+                    mensaje.innerHTML = '<span class="text-success"><i class="fas fa-check-circle"></i> Los PINs coinciden</span>';
+                    
+                    const errores = validarPIN(pin);
+                    btnCrear.disabled = errores.length > 0;
+                } else {
+                    mensaje.innerHTML = '<span class="text-danger"><i class="fas fa-times-circle"></i> Los PINs no coinciden</span>';
+                    btnCrear.disabled = true;
+                }
+            } else {
+                mensaje.innerHTML = '';
+                btnCrear.disabled = true;
+            }
+        }
+
+        // ===================================
+        // STEP 1: VERIFICAR CÉDULA
+        // ===================================
+        async function verificarCedula() {
+            const cedula = document.getElementById('cedula').value.trim();
+            const tipoPersona = document.querySelector('input[name="tipoPersona"]:checked').value;
+
+            if (!cedula) {
+                showAlert('Por favor ingrese su número de cédula o RUC', 'warning');
+                return;
+            }
+
+            if (cedula.length < 10) {
+                showAlert('Número de identificación inválido', 'danger');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/personal/verificar-cedula/${cedula}`);
+                const data = await response.json();
+
+                currentCedula = cedula;
+                currentTipoPersona = tipoPersona;
+
+                if (data.existe) {
+                    // Usuario existe - ir a login
+                    document.getElementById('cedulaDisplay2b').textContent = cedula;
+                    showStep('step2b');
+                    
+                    // Setup PIN login
+                    setTimeout(() => {
+                        setupPinInputs('pinLoginContainer', (pin) => {
+                            document.getElementById('btnLogin').disabled = false;
+                        });
+                    }, 100);
+                } else {
+                    // Usuario nuevo - crear cuenta
+                    document.getElementById('cedulaDisplay2a').textContent = cedula;
+                    showStep('step2a');
+                    
+                    // Setup PIN inputs para crear cuenta
+                    setTimeout(() => {
+                        setupPinInputs('pinCreateContainer', actualizarValidacionPIN);
+                        setupPinInputs('pinConfirmContainer', verificarCoincidenciaPINs);
+                    }, 100);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showAlert('Error al verificar la cédula. Por favor intente nuevamente.', 'danger');
+            }
+        }
+
+        function volverStep1() {
+            showStep('step1');
+            document.getElementById('cedula').value = '';
+            document.getElementById('cedula').focus();
+        }
+
+        // ===================================
+        // STEP 2A: CREAR CUENTA
+        // ===================================
+        async function crearCuenta() {
+            const pin = getPinValue('pinCreateContainer');
+            const pinConfirm = getPinValue('pinConfirmContainer');
+
+            if (pin !== pinConfirm) {
+                showAlert('Los PINs no coinciden', 'danger');
+                return;
+            }
+
+            const errores = validarPIN(pin);
+            if (errores.length > 0) {
+                showAlert('PIN inválido: ' + errores.join(', '), 'danger');
+                return;
+            }
+
+            setLoading('btnCrearCuenta', true);
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/personal/registrar`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        cedula: currentCedula,
+                        tipoPersona: currentTipoPersona,
+                        pin: pin,
+                        pinConfirmacion: pinConfirm
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    sessionToken = data.sessionToken;
+                    showAlert('Cuenta creada exitosamente', 'success');
+                    
+                    // Ir al formulario
+                    showStep('step3');
+                    iniciarTimerSesion();
+                    cargarInformacion();
+                } else {
+                    showAlert(data.message || 'Error al crear la cuenta', 'danger');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showAlert('Error al crear la cuenta. Por favor intente nuevamente.', 'danger');
+            } finally {
+                setLoading('btnCrearCuenta', false);
+            }
+        }
+
+        // ===================================
+        // STEP 2B: LOGIN
+        // ===================================
+        async function login() {
+            const pin = getPinValue('pinLoginContainer');
+
+            if (pin.length !== 6) {
+                showAlert('Ingrese los 6 dígitos del PIN', 'warning');
+                return;
+            }
+
+            setLoading('btnLogin', true);
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/personal/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        cedula: currentCedula,
+                        pin: pin
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    sessionToken = data.sessionToken;
+                    showAlert('Sesión iniciada correctamente', 'success');
+                    
+                    // Ir al formulario
+                    showStep('step3');
+                    iniciarTimerSesion();
+                    cargarInformacion();
+                } else {
+                    showAlert(data.message || 'PIN incorrecto', 'danger');
+                    
+                    if (data.intentosRestantes !== undefined) {
+                        document.getElementById('intentosRestantes').innerHTML = 
+                            `<span class="text-danger">Intentos restantes: ${data.intentosRestantes}</span>`;
+                    }
+
+                    clearPinInputs('pinLoginContainer');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showAlert('Error al iniciar sesión. Por favor intente nuevamente.', 'danger');
+            } finally {
+                setLoading('btnLogin', false);
+            }
+        }
+
+        // ===================================
+        // STEP 3: FORMULARIO Y SESIÓN
+        // ===================================
+        const tabs = ['personales', 'direccion', 'laboral', 'conyuge', 'pep'];
+        let currentTabIndex = 0;
+
+        function updateProgress(tabIndex) {
+            currentTabIndex = tabIndex;
+            const progress = ((tabIndex + 1) / tabs.length) * 100;
+            const progressBar = document.getElementById('progressBar');
+            const progressLabel = document.getElementById('progressLabel');
+            
+            progressBar.style.width = progress + '%';
+            
+            const tabNames = ['Datos Personales', 'Dirección', 'Información Laboral', 'Cónyuge', 'PEP'];
+            progressLabel.textContent = `Paso ${tabIndex + 1} de ${tabs.length}: ${tabNames[tabIndex]}`;
+        }
+
+        function nextTab() {
+            if (currentTabIndex < tabs.length - 1) {
+                const nextIndex = currentTabIndex + 1;
+                const nextTabId = tabs[nextIndex];
+                
+                // Activar siguiente tab usando Bootstrap
+                const nextTabElement = document.getElementById('tab-' + nextTabId);
+                const tab = new bootstrap.Tab(nextTabElement);
+                tab.show();
+                
+                updateProgress(nextIndex);
+                
+                // Scroll suave al inicio
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        function prevTab() {
+            if (currentTabIndex > 0) {
+                const prevIndex = currentTabIndex - 1;
+                const prevTabId = tabs[prevIndex];
+                
+                // Activar tab anterior usando Bootstrap
+                const prevTabElement = document.getElementById('tab-' + prevTabId);
+                const tab = new bootstrap.Tab(prevTabElement);
+                tab.show();
+                
+                updateProgress(prevIndex);
+                
+                // Scroll suave al inicio
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        function iniciarTimerSesion() {
+            tiempoRestante = 1800; // 30 minutos
+
+            if (sessionTimer) {
+                clearInterval(sessionTimer);
+            }
+
+            sessionTimer = setInterval(() => {
+                tiempoRestante--;
+
+                const minutos = Math.floor(tiempoRestante / 60);
+                const segundos = tiempoRestante % 60;
+                const display = `${minutos}:${segundos.toString().padStart(2, '0')}`;
+                
+                document.getElementById('timerDisplay').textContent = display;
+
+                // Advertencia en los últimos 5 minutos
+                const timerElement = document.getElementById('sessionTimer');
+                if (tiempoRestante <= 300) {
+                    timerElement.classList.add('warning');
+                }
+
+                // Sesión expirada
+                if (tiempoRestante <= 0) {
+                    clearInterval(sessionTimer);
+                    showAlert('Su sesión ha expirado. Por favor inicie sesión nuevamente.', 'warning');
+                    cerrarSesion();
+                }
+            }, 1000);
+        }
+
+        async function cargarInformacion() {
+            if (!sessionToken) return;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/personal/mi-informacion`, {
+                    headers: {
+                        'x-session-token': sessionToken
+                    }
+                });
+
+                const data = await response.json();
+
+                if (data.success && data.data) {
+                    const persona = data.data;
+                    
+                    if (persona.tipoPersona === 'NATURAL' && persona.datosPersonaNatural) {
+                        cargarDatosPersonaNatural(persona.datosPersonaNatural);
+                    }
+                    // TODO: Implementar carga para Persona Jurídica
+                }
+            } catch (error) {
+                console.error('Error al cargar información:', error);
+            }
+        }
+
+        function cargarDatosPersonaNatural(datos) {
+            if (!datos) return;
+
+            // Datos personales
+            if (datos.datosPersonales) {
+                document.getElementById('apellidos').value = datos.datosPersonales.apellidos || '';
+                document.getElementById('nombres').value = datos.datosPersonales.nombres || '';
+                document.getElementById('genero').value = datos.datosPersonales.genero || '';
+                document.getElementById('estadoCivil').value = datos.datosPersonales.estadoCivil || '';
+                document.getElementById('nivelEstudio').value = datos.datosPersonales.nivelEstudio || '';
+            }
+
+            // Contacto
+            if (datos.contacto) {
+                document.getElementById('email').value = datos.contacto.email || '';
+                document.getElementById('telefono').value = datos.contacto.telefono || '';
+                document.getElementById('celular').value = datos.contacto.celular || '';
+            }
+
+            // Identificación
+            if (datos.identificacion) {
+                document.getElementById('nacionalidad').value = datos.identificacion.nacionalidad || 'ECUATORIANA';
+            }
+
+            // Dirección
+            if (datos.direccion) {
+                document.getElementById('callePrincipal').value = datos.direccion.callePrincipal || '';
+                document.getElementById('numeroCasa').value = datos.direccion.numero || '';
+                document.getElementById('calleSecundaria').value = datos.direccion.calleSecundaria || '';
+                document.getElementById('provincia').value = datos.direccion.provincia || '';
+                document.getElementById('canton').value = datos.direccion.canton || '';
+                document.getElementById('parroquia').value = datos.direccion.parroquia || '';
+            }
+
+            // Información laboral
+            if (datos.informacionLaboral) {
+                document.getElementById('situacionLaboral').value = datos.informacionLaboral.situacion || '';
+                document.getElementById('relacionDependencia').value = datos.informacionLaboral.relacionDependencia ? 'SI' : 'NO';
+                document.getElementById('nombreEntidad').value = datos.informacionLaboral.nombreEntidad || '';
+                document.getElementById('direccionEmpresa').value = datos.informacionLaboral.direccionEmpresa || '';
+                document.getElementById('provinciaCantonEmpresa').value = datos.informacionLaboral.provinciaCanton || '';
+                document.getElementById('profesion').value = datos.informacionLaboral.profesionOcupacion || '';
+                document.getElementById('cargo').value = datos.informacionLaboral.cargo || '';
+                document.getElementById('ingresoMensual').value = datos.informacionLaboral.ingresoMensual || '';
+                document.getElementById('fechaIngreso').value = datos.informacionLaboral.fechaIngreso || '';
+            }
+
+            // Cónyuge
+            if (datos.conyuge) {
+                document.getElementById('conyugeApellidos').value = datos.conyuge.apellidos || '';
+                document.getElementById('conyugeNombres').value = datos.conyuge.nombres || '';
+                document.getElementById('conyugeTipoId').value = datos.conyuge.tipoIdentificacion || '';
+                document.getElementById('conyugeNumeroId').value = datos.conyuge.numeroIdentificacion || '';
+                document.getElementById('conyugeProfesion').value = datos.conyuge.profesionOcupacion || '';
+                document.getElementById('conyugeCelular').value = datos.conyuge.celular || '';
+            }
+
+            // PEP
+            if (datos.pep) {
+                if (datos.pep.esPersonaExpuesta) {
+                    document.getElementById('esPEPSi').checked = true;
+                }
+                if (datos.pep.esFamiliarPEP) {
+                    document.getElementById('esFamiliarPEPSi').checked = true;
+                }
+                if (datos.pep.esColaboradorPEP) {
+                    document.getElementById('esColaboradorPEPSi').checked = true;
+                }
+            }
+        }
+
+        async function guardarInformacion() {
+            if (!sessionToken) {
+                showAlert('Sesión expirada. Por favor inicie sesión nuevamente.', 'danger');
+                return;
+            }
+
+            // Recopilar datos del formulario
+            const datosPersonaNatural = {
+                identificacion: {
+                    tipo: currentTipoPersona === 'NATURAL' ? 'CEDULA' : 'RUC',
+                    numero: currentCedula,
+                    nacionalidad: document.getElementById('nacionalidad').value
+                },
+                datosPersonales: {
+                    apellidos: document.getElementById('apellidos').value,
+                    nombres: document.getElementById('nombres').value,
+                    genero: document.getElementById('genero').value,
+                    estadoCivil: document.getElementById('estadoCivil').value,
+                    nivelEstudio: document.getElementById('nivelEstudio').value
+                },
+                contacto: {
+                    email: document.getElementById('email').value,
+                    telefono: document.getElementById('telefono').value,
+                    celular: document.getElementById('celular').value
+                },
+                direccion: {
+                    callePrincipal: document.getElementById('callePrincipal').value,
+                    numero: document.getElementById('numeroCasa').value,
+                    calleSecundaria: document.getElementById('calleSecundaria').value,
+                    provincia: document.getElementById('provincia').value,
+                    canton: document.getElementById('canton').value,
+                    parroquia: document.getElementById('parroquia').value
+                },
+                informacionLaboral: {
+                    situacion: document.getElementById('situacionLaboral').value,
+                    relacionDependencia: document.getElementById('relacionDependencia').value === 'SI',
+                    nombreEntidad: document.getElementById('nombreEntidad').value,
+                    direccionEmpresa: document.getElementById('direccionEmpresa').value,
+                    provinciaCanton: document.getElementById('provinciaCantonEmpresa').value,
+                    profesionOcupacion: document.getElementById('profesion').value,
+                    cargo: document.getElementById('cargo').value,
+                    ingresoMensual: parseFloat(document.getElementById('ingresoMensual').value) || 0,
+                    fechaIngreso: document.getElementById('fechaIngreso').value
+                },
+                conyuge: {
+                    apellidos: document.getElementById('conyugeApellidos').value,
+                    nombres: document.getElementById('conyugeNombres').value,
+                    tipoIdentificacion: document.getElementById('conyugeTipoId').value,
+                    numeroIdentificacion: document.getElementById('conyugeNumeroId').value,
+                    profesionOcupacion: document.getElementById('conyugeProfesion').value,
+                    celular: document.getElementById('conyugeCelular').value
+                },
+                pep: {
+                    esPersonaExpuesta: document.querySelector('input[name="esPEP"]:checked').value === 'SI',
+                    esFamiliarPEP: document.querySelector('input[name="esFamiliarPEP"]:checked').value === 'SI',
+                    esColaboradorPEP: document.querySelector('input[name="esColaboradorPEP"]:checked').value === 'SI'
+                }
+            };
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/personal/mi-informacion`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-session-token': sessionToken
+                    },
+                    body: JSON.stringify({ datosPersonaNatural })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Ocultar cualquier alert anterior
+                    document.getElementById('alertContainer').innerHTML = '';
+                    
+                    // Mostrar modal de confirmación
+                    mostrarModalConfirmacion();
+                } else {
+                    showAlert(data.message || 'Error al guardar la información', 'danger');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showAlert('Error al guardar la información. Por favor intente nuevamente.', 'danger');
+            }
+        }
+
+        function cerrarSesion() {
+            if (sessionTimer) {
+                clearInterval(sessionTimer);
+            }
+            sessionToken = null;
+            showStep('step1');
+            document.getElementById('cedula').value = '';
+            showAlert('Sesión cerrada correctamente', 'info');
+        }
+
+        // ===================================
+        // EVENT LISTENERS
+        // ===================================
+        document.addEventListener('DOMContentLoaded', () => {
+            // Radio buttons para tipo de persona
+            document.getElementById('radioNatural').addEventListener('click', () => {
+                document.getElementById('tipoNatural').checked = true;
+                document.getElementById('radioNatural').classList.add('selected');
+                document.getElementById('radioJuridica').classList.remove('selected');
+            });
+
+            document.getElementById('radioJuridica').addEventListener('click', () => {
+                document.getElementById('tipoJuridica').checked = true;
+                document.getElementById('radioJuridica').classList.add('selected');
+                document.getElementById('radioNatural').classList.remove('selected');
+            });
+
+            // Enter key en input de cédula
+            document.getElementById('cedula').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    verificarCedula();
+                }
+            });
+
+            // Solo números en cédula
+            document.getElementById('cedula').addEventListener('input', (e) => {
+                e.target.value = e.target.value.replace(/\D/g, '');
+            });
+        });
+    </script>
+</body>
+</html>
