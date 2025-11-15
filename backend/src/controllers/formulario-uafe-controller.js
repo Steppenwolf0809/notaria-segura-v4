@@ -1074,7 +1074,8 @@ function generateNaturalPersonPDF(doc, startY, datos, persona) {
 
   y += 50;
   drawField(doc, 60, y, 'Correo Electrónico', datos.contacto?.email, 240);
-  drawField(doc, 320, y, 'Teléfono/Celular', datos.contacto?.celular || datos.contacto?.telefono, 220);
+  drawField(doc, 320, y, 'Teléfono', datos.contacto?.telefono, 110);
+  drawField(doc, 450, y, 'Celular', datos.contacto?.celular, 90);
 
   y += 70;
 
@@ -1111,8 +1112,8 @@ function generateNaturalPersonPDF(doc, startY, datos, persona) {
   y += 50;
 
   // Dirección laboral completa
-  const direccionLaboral = datos.informacionLaboral?.direccionLaboral
-    ? `${datos.informacionLaboral.direccionLaboral}, ${datos.informacionLaboral.cantonLaboral || ''}, ${datos.informacionLaboral.provinciaLaboral || ''}`.replace(/,\s*,/g, ',').trim()
+  const direccionLaboral = datos.informacionLaboral?.direccionEmpresa
+    ? `${datos.informacionLaboral.direccionEmpresa}, ${datos.informacionLaboral.canton || ''}, ${datos.informacionLaboral.provincia || ''}`.replace(/,\s*,/g, ',').trim()
     : null;
   drawTextAreaField(doc, 60, y, 'Dirección Laboral', direccionLaboral, 480, 40);
 
@@ -1137,8 +1138,8 @@ function generateNaturalPersonPDF(doc, startY, datos, persona) {
     drawField(doc, 320, y, 'Celular', datos.conyuge?.celular, 220);
 
     y += 50;
-    drawField(doc, 60, y, 'Profesión', datos.conyuge?.profesion, 200);
-    drawField(doc, 280, y, 'Situación Laboral', datos.conyuge?.situacionLaboral, 260);
+    drawField(doc, 60, y, 'Profesión', datos.conyuge?.profesion, 240);
+    drawField(doc, 320, y, 'Situación Laboral', datos.conyuge?.situacionLaboral, 220);
 
     y += 70;
   }

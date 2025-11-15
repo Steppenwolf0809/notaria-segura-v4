@@ -645,6 +645,24 @@
 
                         <div class="form-row">
                             <div class="form-group">
+                                <label>Situación Laboral</label>
+                                <select id="conyugeSituacionLaboral">
+                                    <option value="">Seleccione...</option>
+                                    <option value="EMPLEADO_PUBLICO">Empleado Público</option>
+                                    <option value="EMPLEADO_PRIVADO">Empleado Privado</option>
+                                    <option value="INDEPENDIENTE">Independiente/Profesional</option>
+                                    <option value="COMERCIANTE">Comerciante</option>
+                                    <option value="JUBILADO">Jubilado/Pensionado</option>
+                                    <option value="AMA_DE_CASA">Ama de Casa</option>
+                                    <option value="ESTUDIANTE">Estudiante</option>
+                                    <option value="DESEMPLEADO">Desempleado</option>
+                                    <option value="OTRO">Otro</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
                                 <label>Correo Electrónico</label>
                                 <input type="email" id="conyugeEmail">
                             </div>
@@ -957,6 +975,7 @@
                 setValue('conyugeNumeroId', datos.conyuge.numeroIdentificacion);
                 setValue('conyugeNacionalidad', datos.conyuge.nacionalidad);
                 setValue('conyugeProfesion', datos.conyuge.profesion);
+                setValue('conyugeSituacionLaboral', datos.conyuge.situacionLaboral);
                 setValue('conyugeEmail', datos.conyuge.email);
                 setValue('conyugeCelular', datos.conyuge.celular);
             }
@@ -1113,6 +1132,7 @@
                         numeroIdentificacion: document.getElementById('conyugeNumeroId').value || null,
                         nacionalidad: document.getElementById('conyugeNacionalidad').value || null,
                         profesion: document.getElementById('conyugeProfesion').value || null,
+                        situacionLaboral: document.getElementById('conyugeSituacionLaboral').value || null,
                         email: document.getElementById('conyugeEmail').value || null,
                         celular: document.getElementById('conyugeCelular').value || null
                     } : null,
