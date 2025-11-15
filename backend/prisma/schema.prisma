@@ -364,7 +364,8 @@ model PersonaRegistrada {
   auditoria             AuditoriaPersona[]
   formularioAsignaciones FormularioUAFEAsignacion[]
   formularioRespuestas  FormularioUAFERespuesta[]
-  protocolos            PersonaProtocolo[]                     // Protocolos en los que participa esta persona
+  protocolos            PersonaProtocolo[]         @relation("Compareciente") // Protocolos donde esta persona es compareciente
+  protocolosComoRepresentado PersonaProtocolo[]    @relation("Representado")  // Protocolos donde esta persona es representada
 
   @@map("personas_registradas")
   @@index([numeroIdentificacion])  // Búsqueda rápida por cédula
@@ -644,7 +645,11 @@ model PersonaProtocolo {
 
   // ROL EN ESTE TRÁMITE
   calidad               String   // "COMPRADOR", "VENDEDOR", "TESTIGO"
-  actuaPor              String   // "PROPIOS_DERECHOS", "REPRESENTANDO"
+  actuaPor              String   // "PROPIOS_DERECHOS", "REPRESENTANDO_A"
+
+  // REPRESENTADO (si actuaPor = "REPRESENTANDO_A")
+  representadoId        String?  // FK a PersonaRegistrada (si existe en BD)
+  datosRepresentado     Json?    // Datos manuales del representado (si no existe en BD)
 
   // ESTADO
   completado            Boolean  @default(false)
@@ -658,7 +663,8 @@ model PersonaProtocolo {
 
   // RELACIONES
   protocolo             ProtocoloUAFE      @relation(fields: [protocoloId], references: [id], onDelete: Cascade)
-  persona               PersonaRegistrada  @relation(fields: [personaCedula], references: [numeroIdentificacion])
+  persona               PersonaRegistrada  @relation("Compareciente", fields: [personaCedula], references: [numeroIdentificacion])
+  representado          PersonaRegistrada? @relation("Representado", fields: [representadoId], references: [numeroIdentificacion])
   sesiones              SesionFormularioUAFE[]
 
   @@unique([protocoloId, personaCedula])
@@ -666,6 +672,7 @@ model PersonaProtocolo {
   @@index([protocoloId])
   @@index([personaCedula])
   @@index([completado])
+  @@index([representadoId])
 }
 
 // Modelo de Sesión de Formulario UAFE (sesiones temporales)

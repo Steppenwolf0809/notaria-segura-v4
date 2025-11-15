@@ -207,6 +207,85 @@ export async function agregarPersonaAProtocolo(req, res) {
 }
 
 /**
+ * Buscar persona para ser representado
+ * GET /api/formulario-uafe/buscar-representado/:identificacion
+ * Público - no requiere autenticación
+ */
+export async function buscarRepresentado(req, res) {
+  try {
+    const { identificacion } = req.params;
+
+    // Validar que se proporcionó identificación
+    if (!identificacion || identificacion.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Número de identificación requerido'
+      });
+    }
+
+    // Buscar persona en la base de datos
+    const persona = await prisma.personaRegistrada.findUnique({
+      where: { numeroIdentificacion: identificacion.trim() },
+      select: {
+        id: true,
+        numeroIdentificacion: true,
+        tipoPersona: true,
+        datosPersonaNatural: true,
+        datosPersonaJuridica: true,
+        completado: true
+      }
+    });
+
+    // Si no existe, retornar que no fue encontrado
+    if (!persona) {
+      return res.json({
+        success: true,
+        encontrado: false,
+        message: 'Persona no encontrada en el sistema'
+      });
+    }
+
+    // Extraer datos según el tipo de persona
+    const datos = persona.tipoPersona === 'NATURAL'
+      ? persona.datosPersonaNatural
+      : persona.datosPersonaJuridica;
+
+    // Determinar nombre completo
+    let nombreCompleto = 'Sin nombre';
+    if (persona.tipoPersona === 'NATURAL' && datos?.datosPersonales) {
+      const { nombres, apellidos } = datos.datosPersonales;
+      if (nombres && apellidos) {
+        nombreCompleto = `${nombres} ${apellidos}`.trim();
+      }
+    } else if (persona.tipoPersona === 'JURIDICA' && datos?.compania?.razonSocial) {
+      nombreCompleto = datos.compania.razonSocial.trim();
+    }
+
+    // Retornar datos básicos para pre-llenado
+    res.json({
+      success: true,
+      encontrado: true,
+      data: {
+        id: persona.numeroIdentificacion, // Usamos numeroIdentificacion como id para la FK
+        numeroIdentificacion: persona.numeroIdentificacion,
+        tipoPersona: persona.tipoPersona,
+        nombreCompleto: nombreCompleto,
+        // Retornar datos completos solo si el formulario está completado
+        datosCompletos: persona.completado ? datos : null,
+        completado: persona.completado
+      }
+    });
+  } catch (error) {
+    console.error('Error buscando representado:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al buscar representado',
+      error: error.message
+    });
+  }
+}
+
+/**
  * Login al formulario UAFE con Protocolo + Cédula + PIN
  * POST /api/formulario-uafe/login
  * Público (sin autenticación previa)
@@ -350,16 +429,28 @@ export async function loginFormularioUAFE(req, res) {
  */
 export async function responderFormulario(req, res) {
   try {
-    const respuestaData = req.body;
+    const { representadoId, datosRepresentado, ...respuestaData } = req.body;
+
+    // Preparar datos para actualizar
+    const dataToUpdate = {
+      completado: true,
+      completadoAt: new Date(),
+      respuestaFormulario: respuestaData
+    };
+
+    // Si hay datos de representado, agregarlos
+    if (representadoId) {
+      dataToUpdate.representadoId = representadoId;
+    }
+
+    if (datosRepresentado) {
+      dataToUpdate.datosRepresentado = datosRepresentado;
+    }
 
     // Actualizar PersonaProtocolo con la respuesta
     const personaProtocolo = await prisma.personaProtocolo.update({
       where: { id: req.personaProtocoloVerificada.id },
-      data: {
-        completado: true,
-        completadoAt: new Date(),
-        respuestaFormulario: respuestaData
-      }
+      data: dataToUpdate
     });
 
     res.json({
@@ -374,7 +465,8 @@ export async function responderFormulario(req, res) {
     console.error('Error enviando formulario:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al enviar formulario'
+      message: 'Error al enviar formulario',
+      error: error.message
     });
   }
 }
@@ -934,7 +1026,7 @@ export async function generarPDFs(req, res) {
       if (!datos) continue;
 
       // Crear PDF buffer
-      const pdfBuffer = await new Promise((resolve, reject) => {
+      const pdfBuffer = await new Promise(async (resolve, reject) => {
         try {
           const doc = new PDFDocument({
             size: 'A4',
@@ -965,6 +1057,11 @@ export async function generarPDFs(req, res) {
             personaProtocolo.calidad,
             personaProtocolo.actuaPor
           );
+
+          // SECCIÓN DE REPRESENTADO (si aplica)
+          if (personaProtocolo.actuaPor === 'REPRESENTANDO_A') {
+            currentY = await generateRepresentadoSection(doc, currentY, personaProtocolo);
+          }
 
           // SOLO PARA PERSONAS NATURALES
           if (persona.tipoPersona === 'NATURAL') {
@@ -1042,6 +1139,74 @@ export async function generarPDFs(req, res) {
       error: error.message
     });
   }
+}
+
+/**
+ * Generar sección de representado en el PDF
+ */
+async function generateRepresentadoSection(doc, startY, personaProtocolo) {
+  let y = checkAndAddPage(doc, startY, 120);
+  y = drawSection(doc, y, 'REPRESENTADO', 100);
+
+  try {
+    if (personaProtocolo.representadoId) {
+      // Representado existe en BD - buscar sus datos
+      const representado = await prisma.personaRegistrada.findUnique({
+        where: { numeroIdentificacion: personaProtocolo.representadoId },
+        select: {
+          numeroIdentificacion: true,
+          tipoPersona: true,
+          datosPersonaNatural: true,
+          datosPersonaJuridica: true
+        }
+      });
+
+      if (representado) {
+        const datosRep = representado.tipoPersona === 'NATURAL'
+          ? representado.datosPersonaNatural
+          : representado.datosPersonaJuridica;
+
+        let nombreCompleto = 'Sin nombre';
+        if (representado.tipoPersona === 'NATURAL' && datosRep?.datosPersonales) {
+          const { nombres, apellidos } = datosRep.datosPersonales;
+          if (nombres && apellidos) {
+            nombreCompleto = `${nombres} ${apellidos}`.trim();
+          }
+        } else if (representado.tipoPersona === 'JURIDICA' && datosRep?.compania?.razonSocial) {
+          nombreCompleto = datosRep.compania.razonSocial.trim();
+        }
+
+        drawField(doc, 60, y, 'Representa a', nombreCompleto, 280);
+        drawField(doc, 360, y, 'Identificación', representado.numeroIdentificacion, 180);
+
+        y += 50;
+        drawField(doc, 60, y, 'Tipo de Persona',
+          representado.tipoPersona === 'NATURAL' ? 'Persona Natural' : 'Persona Jurídica', 480);
+      }
+    } else if (personaProtocolo.datosRepresentado) {
+      // Datos manuales del representado
+      const datosRep = personaProtocolo.datosRepresentado;
+
+      drawField(doc, 60, y, 'Representa a', datosRep.nombreCompleto || 'Sin nombre', 280);
+      drawField(doc, 360, y, 'Identificación', datosRep.identificacion || 'N/A', 180);
+
+      y += 50;
+      drawField(doc, 60, y, 'Tipo de Persona',
+        datosRep.tipoPersona === 'NATURAL' ? 'Persona Natural' : 'Persona Jurídica', 240);
+
+      if (datosRep.nacionalidad) {
+        drawField(doc, 320, y, 'Nacionalidad', datosRep.nacionalidad, 220);
+      }
+    }
+
+    y += 70;
+  } catch (error) {
+    console.error('Error generando sección de representado:', error);
+    drawTextAreaField(doc, 60, y, 'Error', 'No se pudieron cargar los datos del representado', 480, 40);
+    y += 70;
+  }
+
+  return y;
 }
 
 /**
