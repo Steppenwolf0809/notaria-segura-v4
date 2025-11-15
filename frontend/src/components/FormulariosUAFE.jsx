@@ -49,9 +49,7 @@ import {
   Description as DescriptionIcon,
   ContentCopy as CopyIcon,
   Link as LinkIcon,
-  Edit as EditIcon,
-  PictureAsPdf as PdfIcon,
-  Download as DownloadIcon
+  PictureAsPdf as PictureAsPdfIcon
 } from '@mui/icons-material';
 import { API_BASE } from '../utils/apiConfig';
 
@@ -74,12 +72,7 @@ const FormulariosUAFE = () => {
   const [openNuevoProtocolo, setOpenNuevoProtocolo] = useState(false);
   const [openAgregarPersona, setOpenAgregarPersona] = useState(false);
   const [openVerProtocolo, setOpenVerProtocolo] = useState(false);
-  const [openEditarProtocolo, setOpenEditarProtocolo] = useState(false);
-  const [openEditarPersona, setOpenEditarPersona] = useState(false);
-  const [openPDFsGenerados, setOpenPDFsGenerados] = useState(false);
   const [protocoloSeleccionado, setProtocoloSeleccionado] = useState(null);
-  const [personaSeleccionada, setPersonaSeleccionada] = useState(null);
-  const [pdfsGenerados, setPdfsGenerados] = useState(null);
 
   // Estados de expansión de tabla
   const [expandedProtocol, setExpandedProtocol] = useState(null);
@@ -410,186 +403,60 @@ const FormulariosUAFE = () => {
   };
 
   /**
-   * Calcular progreso de personas completadas
+   * Descargar PDFs profesionales de formularios UAFE
    */
-  const calcularProgreso = (protocolo) => {
-    if (!protocolo.personas || protocolo.personas.length === 0) return 0;
-    const completadas = protocolo.personas.filter(p => p.completado).length;
-    return Math.round((completadas / protocolo.personas.length) * 100);
-  };
-
-  /**
-   * Abrir modal de edición de protocolo
-   */
-  const abrirEditarProtocolo = async (protocoloId) => {
-    await verDetallesProtocolo(protocoloId);
-    setOpenEditarProtocolo(true);
-  };
-
-  /**
-   * Actualizar protocolo
-   */
-  const actualizarProtocolo = async () => {
-    if (!protocoloSeleccionado) return;
-
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/formulario-uafe/protocolo/${protocoloSeleccionado.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          numeroProtocolo: protocoloSeleccionado.numeroProtocolo,
-          fecha: protocoloSeleccionado.fecha,
-          actoContrato: protocoloSeleccionado.actoContrato,
-          valorContrato: protocoloSeleccionado.valorContrato,
-          avaluoMunicipal: protocoloSeleccionado.avaluoMunicipal
-        })
-      });
-
-      const data = await response.json();
-      if (data.success) {
-        mostrarSnackbar('Protocolo actualizado exitosamente', 'success');
-        setOpenEditarProtocolo(false);
-        cargarProtocolos();
-      } else {
-        mostrarSnackbar(data.message || 'Error al actualizar', 'error');
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      mostrarSnackbar('Error al actualizar protocolo', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
-   * Abrir modal de edición de persona
-   */
-  const abrirEditarPersona = (persona) => {
-    setPersonaSeleccionada(persona);
-    setOpenEditarPersona(true);
-  };
-
-  /**
-   * Actualizar persona en protocolo
-   */
-  const actualizarPersonaEnProtocolo = async () => {
-    if (!personaSeleccionada || !protocoloSeleccionado) return;
-
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(
-        `${API_BASE}/formulario-uafe/protocolo/${protocoloSeleccionado.id}/persona/${personaSeleccionada.id}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            calidad: personaSeleccionada.calidad,
-            actuaPor: personaSeleccionada.actuaPor
-          })
-        }
-      );
-
-      const data = await response.json();
-      if (data.success) {
-        mostrarSnackbar('Persona actualizada exitosamente', 'success');
-        setOpenEditarPersona(false);
-        verDetallesProtocolo(protocoloSeleccionado.id);
-        cargarProtocolos();
-      } else {
-        mostrarSnackbar(data.message || 'Error al actualizar', 'error');
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      mostrarSnackbar('Error al actualizar persona', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
-   * Eliminar persona del protocolo
-   */
-  const eliminarPersonaDeProtocolo = async (personaId) => {
-    if (!window.confirm('¿Eliminar a esta persona del protocolo?\n\nEsto solo quitará a la persona de este trámite. Sus datos personales NO serán eliminados.')) {
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(
-        `${API_BASE}/formulario-uafe/protocolo/${protocoloSeleccionado.id}/persona/${personaId}`,
-        {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      );
-
-      const data = await response.json();
-      if (data.success) {
-        mostrarSnackbar('Persona eliminada del protocolo', 'success');
-        verDetallesProtocolo(protocoloSeleccionado.id);
-        cargarProtocolos();
-      } else {
-        mostrarSnackbar(data.message || 'Error al eliminar', 'error');
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      mostrarSnackbar('Error al eliminar persona', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  /**
-   * Generar PDFs del protocolo
-   */
-  const generarPDFs = async (protocoloId) => {
+  const descargarPDFs = async (protocoloId) => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
         `${API_BASE}/formulario-uafe/protocolo/${protocoloId}/generar-pdfs`,
         {
-          method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`
           }
         }
       );
 
-      const data = await response.json();
-      if (data.success) {
-        setPdfsGenerados(data.data);
-        setOpenPDFsGenerados(true);
-        mostrarSnackbar('PDFs generados exitosamente', 'success');
-      } else {
-        mostrarSnackbar(data.message || 'Error al generar PDFs', 'error');
+      if (!response.ok) {
+        const errorData = await response.json();
+        mostrarSnackbar(errorData.message || 'Error al generar PDFs', 'error');
+        return;
       }
+
+      // Obtener filename del header Content-Disposition
+      const contentDisposition = response.headers.get('Content-Disposition');
+      const filename = contentDisposition
+        ? contentDisposition.split('filename=')[1].replace(/"/g, '')
+        : 'formularios_uafe.pdf';
+
+      // Descargar archivo
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      mostrarSnackbar('PDFs descargados exitosamente', 'success');
     } catch (error) {
-      console.error('Error:', error);
-      mostrarSnackbar('Error al generar PDFs', 'error');
+      console.error('Error descargando PDFs:', error);
+      mostrarSnackbar('Error al descargar PDFs', 'error');
     } finally {
       setLoading(false);
     }
   };
 
   /**
-   * Descargar archivo
+   * Calcular progreso de personas completadas
    */
-  const descargarArchivo = (url) => {
-    window.open(`${API_BASE}${url}`, '_blank');
+  const calcularProgreso = (protocolo) => {
+    if (!protocolo.personas || protocolo.personas.length === 0) return 0;
+    const completadas = protocolo.personas.filter(p => p.completado).length;
+    return Math.round((completadas / protocolo.personas.length) * 100);
   };
 
   return (
@@ -748,26 +615,16 @@ const FormulariosUAFE = () => {
                             <VisibilityIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        <Tooltip title="Editar Protocolo">
+                        <Tooltip title="Descargar PDFs">
                           <IconButton
                             size="small"
-                            color="warning"
-                            onClick={() => abrirEditarProtocolo(protocolo.id)}
+                            color="success"
+                            onClick={() => descargarPDFs(protocolo.id)}
+                            disabled={!protocolo.personas || protocolo.personas.filter(p => p.completado).length === 0}
                           >
-                            <EditIcon fontSize="small" />
+                            <PictureAsPdfIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
-                        {calcularProgreso(protocolo) === 100 && (
-                          <Tooltip title="Generar PDFs">
-                            <IconButton
-                              size="small"
-                              color="success"
-                              onClick={() => generarPDFs(protocolo.id)}
-                            >
-                              <PdfIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        )}
                       </Stack>
                     </TableCell>
                   </TableRow>
@@ -795,37 +652,12 @@ const FormulariosUAFE = () => {
                                     }
                                   />
                                   <ListItemSecondaryAction>
-                                    <Stack direction="row" spacing={1} alignItems="center">
-                                      <Chip
-                                        icon={persona.completado ? <CheckCircleIcon /> : <PendingIcon />}
-                                        label={persona.completado ? 'Completado' : 'Pendiente'}
-                                        color={persona.completado ? 'success' : 'warning'}
-                                        size="small"
-                                      />
-                                      <Tooltip title="Editar">
-                                        <IconButton
-                                          size="small"
-                                          onClick={() => {
-                                            setProtocoloSeleccionado(protocolo);
-                                            abrirEditarPersona(persona);
-                                          }}
-                                        >
-                                          <EditIcon fontSize="small" />
-                                        </IconButton>
-                                      </Tooltip>
-                                      <Tooltip title="Eliminar">
-                                        <IconButton
-                                          size="small"
-                                          color="error"
-                                          onClick={() => {
-                                            setProtocoloSeleccionado(protocolo);
-                                            eliminarPersonaDeProtocolo(persona.id);
-                                          }}
-                                        >
-                                          <DeleteIcon fontSize="small" />
-                                        </IconButton>
-                                      </Tooltip>
-                                    </Stack>
+                                    <Chip
+                                      icon={persona.completado ? <CheckCircleIcon /> : <PendingIcon />}
+                                      label={persona.completado ? 'Completado' : 'Pendiente'}
+                                      color={persona.completado ? 'success' : 'warning'}
+                                      size="small"
+                                    />
                                   </ListItemSecondaryAction>
                                 </ListItem>
                               ))}
@@ -1260,24 +1092,12 @@ const FormulariosUAFE = () => {
                           }
                         />
                         <ListItemSecondaryAction>
-                          <Stack direction="row" spacing={1}>
-                            <Chip
-                              icon={persona.completado ? <CheckCircleIcon /> : <PendingIcon />}
-                              label={persona.completado ? 'Completado' : 'Pendiente'}
-                              color={persona.completado ? 'success' : 'warning'}
-                              size="small"
-                            />
-                            <Tooltip title="Editar">
-                              <IconButton size="small" onClick={() => abrirEditarPersona(persona)}>
-                                <EditIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Eliminar">
-                              <IconButton size="small" color="error" onClick={() => eliminarPersonaDeProtocolo(persona.id)}>
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </Stack>
+                          <Chip
+                            icon={persona.completado ? <CheckCircleIcon /> : <PendingIcon />}
+                            label={persona.completado ? 'Completado' : 'Pendiente'}
+                            color={persona.completado ? 'success' : 'warning'}
+                            size="small"
+                          />
                         </ListItemSecondaryAction>
                       </ListItem>
                     ))}
@@ -1308,211 +1128,6 @@ const FormulariosUAFE = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenVerProtocolo(false)}>Cerrar</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Dialog: Editar Protocolo */}
-      <Dialog
-        open={openEditarProtocolo}
-        onClose={() => setOpenEditarProtocolo(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle sx={{ backgroundColor: 'warning.main', color: 'white' }}>
-          Editar Protocolo
-        </DialogTitle>
-        <DialogContent sx={{ mt: 2 }}>
-          {protocoloSeleccionado && (
-            <Stack spacing={2}>
-              <TextField
-                fullWidth
-                label="Número de Protocolo"
-                value={protocoloSeleccionado.numeroProtocolo}
-                onChange={(e) => setProtocoloSeleccionado({
-                  ...protocoloSeleccionado,
-                  numeroProtocolo: e.target.value
-                })}
-              />
-              <TextField
-                fullWidth
-                type="date"
-                label="Fecha"
-                value={protocoloSeleccionado.fecha.split('T')[0]}
-                onChange={(e) => setProtocoloSeleccionado({
-                  ...protocoloSeleccionado,
-                  fecha: e.target.value
-                })}
-                InputLabelProps={{ shrink: true }}
-              />
-              <TextField
-                fullWidth
-                label="Acto/Contrato"
-                value={protocoloSeleccionado.actoContrato}
-                onChange={(e) => setProtocoloSeleccionado({
-                  ...protocoloSeleccionado,
-                  actoContrato: e.target.value
-                })}
-              />
-              <TextField
-                fullWidth
-                type="number"
-                label="Valor del Contrato"
-                value={protocoloSeleccionado.valorContrato}
-                onChange={(e) => setProtocoloSeleccionado({
-                  ...protocoloSeleccionado,
-                  valorContrato: e.target.value
-                })}
-                InputProps={{ startAdornment: '$' }}
-              />
-              <TextField
-                fullWidth
-                type="number"
-                label="Avalúo Municipal (opcional)"
-                value={protocoloSeleccionado.avaluoMunicipal || ''}
-                onChange={(e) => setProtocoloSeleccionado({
-                  ...protocoloSeleccionado,
-                  avaluoMunicipal: e.target.value
-                })}
-                InputProps={{ startAdornment: '$' }}
-              />
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenEditarProtocolo(false)}>Cancelar</Button>
-          <Button
-            variant="contained"
-            color="warning"
-            onClick={actualizarProtocolo}
-            disabled={loading}
-          >
-            {loading ? 'Guardando...' : 'Guardar Cambios'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Dialog: Editar Persona */}
-      <Dialog
-        open={openEditarPersona}
-        onClose={() => setOpenEditarPersona(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle sx={{ backgroundColor: 'warning.main', color: 'white' }}>
-          Editar Persona en Protocolo
-        </DialogTitle>
-        <DialogContent sx={{ mt: 2 }}>
-          {personaSeleccionada && (
-            <Stack spacing={2}>
-              <Alert severity="info">
-                Editando: <strong>{personaSeleccionada.nombre}</strong> ({personaSeleccionada.cedula})
-              </Alert>
-              <FormControl fullWidth>
-                <InputLabel>Calidad</InputLabel>
-                <Select
-                  value={personaSeleccionada.calidad}
-                  label="Calidad"
-                  onChange={(e) => setPersonaSeleccionada({
-                    ...personaSeleccionada,
-                    calidad: e.target.value
-                  })}
-                >
-                  <MenuItem value="COMPRADOR">Comprador</MenuItem>
-                  <MenuItem value="VENDEDOR">Vendedor</MenuItem>
-                  <MenuItem value="COMPARECIENTE">Compareciente</MenuItem>
-                  <MenuItem value="BENEFICIARIO">Beneficiario</MenuItem>
-                  <MenuItem value="TESTIGO">Testigo</MenuItem>
-                </Select>
-              </FormControl>
-              <FormControl fullWidth>
-                <InputLabel>Actúa Por</InputLabel>
-                <Select
-                  value={personaSeleccionada.actuaPor}
-                  label="Actúa Por"
-                  onChange={(e) => setPersonaSeleccionada({
-                    ...personaSeleccionada,
-                    actuaPor: e.target.value
-                  })}
-                >
-                  <MenuItem value="PROPIOS_DERECHOS">Por sus propios derechos</MenuItem>
-                  <MenuItem value="REPRESENTANDO_A">Representando a</MenuItem>
-                </Select>
-              </FormControl>
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenEditarPersona(false)}>Cancelar</Button>
-          <Button
-            variant="contained"
-            color="warning"
-            onClick={actualizarPersonaEnProtocolo}
-            disabled={loading}
-          >
-            {loading ? 'Guardando...' : 'Guardar Cambios'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Dialog: PDFs Generados */}
-      <Dialog
-        open={openPDFsGenerados}
-        onClose={() => setOpenPDFsGenerados(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle sx={{ backgroundColor: 'success.main', color: 'white' }}>
-          PDFs Generados Exitosamente
-        </DialogTitle>
-        <DialogContent sx={{ mt: 2 }}>
-          {pdfsGenerados && (
-            <Stack spacing={3}>
-              <Alert severity="success">
-                Se generaron {pdfsGenerados.totalPDFs} PDF(s) para el protocolo <strong>{pdfsGenerados.protocolo}</strong>
-              </Alert>
-
-              <Box>
-                <Typography variant="h6" gutterBottom>PDFs Individuales:</Typography>
-                <List>
-                  {pdfsGenerados.pdfs.map((pdf, index) => (
-                    <ListItem key={index}>
-                      <ListItemText
-                        primary={pdf.nombre}
-                        secondary={`Cédula: ${pdf.cedula} - ${pdf.archivo}`}
-                      />
-                      <ListItemSecondaryAction>
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          startIcon={<DownloadIcon />}
-                          onClick={() => descargarArchivo(`/formulario-uafe/download/${pdfsGenerados.carpetaTemporal}/${pdf.archivo}`)}
-                        >
-                          Descargar
-                        </Button>
-                      </ListItemSecondaryAction>
-                    </ListItem>
-                  ))}
-                </List>
-              </Box>
-
-              <Divider />
-
-              <Box sx={{ textAlign: 'center' }}>
-                <Button
-                  variant="contained"
-                  color="success"
-                  size="large"
-                  startIcon={<DownloadIcon />}
-                  onClick={() => descargarArchivo(pdfsGenerados.zipUrl)}
-                >
-                  Descargar Todo (ZIP)
-                </Button>
-              </Box>
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenPDFsGenerados(false)}>Cerrar</Button>
         </DialogActions>
       </Dialog>
 
