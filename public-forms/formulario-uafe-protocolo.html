@@ -456,6 +456,84 @@
                         </div>
                     </div>
 
+                    <!-- Sección condicional: Representado (solo si actuaPor = "REPRESENTANDO_A") -->
+                    <div id="seccionRepresentado" class="subsection hidden" style="margin-top: 30px;">
+                        <div class="subsection-title">Datos del Representado</div>
+
+                        <div class="alert alert-info active">
+                            Como actúas representando a otra persona, por favor completa los datos del representado
+                        </div>
+
+                        <div class="form-group">
+                            <label for="representadoIdentificacion">Cédula/RUC del Representado <span class="required">*</span></label>
+                            <div class="form-row" style="align-items: center;">
+                                <input
+                                    type="text"
+                                    id="representadoIdentificacion"
+                                    placeholder="Ej: 1791234567001"
+                                    maxlength="13"
+                                    inputmode="numeric"
+                                    pattern="[0-9]*"
+                                    style="flex: 1;"
+                                >
+                                <button
+                                    type="button"
+                                    id="btnBuscarRepresentado"
+                                    class="btn btn-secondary"
+                                    onclick="buscarRepresentado()"
+                                    style="width: auto; margin-left: 10px;"
+                                >
+                                    Buscar
+                                </button>
+                            </div>
+                            <small id="representadoStatus" style="display: none; margin-top: 5px; color: #666;"></small>
+                        </div>
+
+                        <!-- Datos encontrados (si existe en BD) -->
+                        <div id="datosRepresentadoEncontrado" class="hidden">
+                            <div class="alert alert-success active">
+                                ✅ Persona encontrada en el sistema
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Nombre/Razón Social</label>
+                                    <input type="text" id="representadoNombre" readonly>
+                                </div>
+                                <div class="form-group">
+                                    <label>Tipo de Persona</label>
+                                    <input type="text" id="representadoTipo" readonly>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Formulario manual (si NO existe en BD) -->
+                        <div id="datosRepresentadoManual" class="hidden">
+                            <div class="alert" style="background: #fff3cd; color: #856404; border: 1px solid #ffeeba;">
+                                ⚠️ No encontrado en el sistema. Complete los datos manualmente.
+                            </div>
+
+                            <div class="form-group">
+                                <label for="representadoTipoPersona">Tipo de Persona <span class="required">*</span></label>
+                                <select id="representadoTipoPersona">
+                                    <option value="">Seleccione...</option>
+                                    <option value="NATURAL">Persona Natural</option>
+                                    <option value="JURIDICA">Persona Jurídica</option>
+                                </select>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="representadoNombres">Nombres/Razón Social <span class="required">*</span></label>
+                                    <input type="text" id="representadoNombres" placeholder="Nombre completo o razón social">
+                                </div>
+                                <div class="form-group">
+                                    <label for="representadoNacionalidad">Nacionalidad</label>
+                                    <input type="text" id="representadoNacionalidad" placeholder="Ej: Ecuatoriana">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="button-group">
                         <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
                         <button class="btn btn-primary" onclick="siguienteSeccion()">Siguiente →</button>
@@ -893,6 +971,24 @@
                     <strong>Tu Rol:</strong> ${rol.calidad} - ${rol.actuaPor}
                 </p>
             `;
+
+            // Mostrar sección de representado si actúa representando a otro
+            mostrarSeccionRepresentado(rol.actuaPor === 'REPRESENTANDO_A');
+        }
+
+        // ========================================
+        // MOSTRAR/OCULTAR SECCIÓN DE REPRESENTADO
+        // ========================================
+        function mostrarSeccionRepresentado(mostrar) {
+            const seccion = document.getElementById('seccionRepresentado');
+            if (!seccion) return;
+
+            if (mostrar) {
+                seccion.classList.remove('hidden');
+            } else {
+                seccion.classList.add('hidden');
+                limpiarDatosRepresentado();
+            }
         }
 
         // ========================================
@@ -1017,6 +1113,127 @@
             }
 
             console.log('Datos pre-llenados exitosamente');
+        }
+
+        // ========================================
+        // FUNCIONES PARA REPRESENTADO
+        // ========================================
+        let representadoIdGlobal = null; // Para almacenar el ID del representado si existe en BD
+        let datosRepresentadoGlobal = null; // Para almacenar datos manuales si no existe
+
+        async function buscarRepresentado() {
+            const identificacion = document.getElementById('representadoIdentificacion').value.trim();
+            const statusEl = document.getElementById('representadoStatus');
+            const btnBuscar = document.getElementById('btnBuscarRepresentado');
+
+            if (!identificacion) {
+                alert('Por favor ingrese una cédula o RUC');
+                return;
+            }
+
+            // Mostrar estado de carga
+            statusEl.textContent = 'Buscando...';
+            statusEl.style.display = 'block';
+            statusEl.style.color = '#667eea';
+            btnBuscar.disabled = true;
+
+            try {
+                const response = await fetch(`${API_URL}/buscar-representado/${identificacion}`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.message || 'Error en la búsqueda');
+                }
+
+                if (data.encontrado) {
+                    // Mostrar datos encontrados
+                    document.getElementById('datosRepresentadoEncontrado').classList.remove('hidden');
+                    document.getElementById('datosRepresentadoManual').classList.add('hidden');
+
+                    document.getElementById('representadoNombre').value = data.data.nombreCompleto;
+                    document.getElementById('representadoTipo').value =
+                        data.data.tipoPersona === 'NATURAL' ? 'Persona Natural' : 'Persona Jurídica';
+
+                    // Guardar ID para envío posterior
+                    representadoIdGlobal = data.data.id;
+                    datosRepresentadoGlobal = null;
+
+                    statusEl.textContent = '✅ Encontrado en el sistema';
+                    statusEl.style.color = '#060';
+                } else {
+                    // Mostrar formulario manual
+                    document.getElementById('datosRepresentadoEncontrado').classList.add('hidden');
+                    document.getElementById('datosRepresentadoManual').classList.remove('hidden');
+
+                    statusEl.textContent = 'No encontrado - Complete manualmente';
+                    statusEl.style.color = '#856404';
+
+                    representadoIdGlobal = null;
+                    datosRepresentadoGlobal = null;
+                }
+            } catch (error) {
+                console.error('Error buscando representado:', error);
+                statusEl.textContent = 'Error en la búsqueda. Intente nuevamente.';
+                statusEl.style.color = '#c00';
+
+                representadoIdGlobal = null;
+                datosRepresentadoGlobal = null;
+            } finally {
+                btnBuscar.disabled = false;
+            }
+        }
+
+        function limpiarDatosRepresentado() {
+            // Limpiar campos
+            document.getElementById('representadoIdentificacion').value = '';
+            document.getElementById('representadoStatus').style.display = 'none';
+            document.getElementById('datosRepresentadoEncontrado').classList.add('hidden');
+            document.getElementById('datosRepresentadoManual').classList.add('hidden');
+
+            // Limpiar campos del formulario manual
+            document.getElementById('representadoTipoPersona').value = '';
+            document.getElementById('representadoNombres').value = '';
+            document.getElementById('representadoNacionalidad').value = '';
+
+            // Limpiar variables globales
+            representadoIdGlobal = null;
+            datosRepresentadoGlobal = null;
+        }
+
+        function prepararDatosRepresentado() {
+            // Si la sección de representado está oculta, no enviar datos
+            const seccion = document.getElementById('seccionRepresentado');
+            if (seccion && seccion.classList.contains('hidden')) {
+                return { representadoId: null, datosRepresentado: null };
+            }
+
+            // Si ya existe en BD
+            if (representadoIdGlobal) {
+                return {
+                    representadoId: representadoIdGlobal,
+                    datosRepresentado: null
+                };
+            }
+
+            // Si no existe, preparar datos manuales
+            const identificacion = document.getElementById('representadoIdentificacion').value.trim();
+            const tipoPersona = document.getElementById('representadoTipoPersona').value;
+            const nombres = document.getElementById('representadoNombres').value.trim();
+            const nacionalidad = document.getElementById('representadoNacionalidad').value.trim();
+
+            if (!identificacion || !tipoPersona || !nombres) {
+                throw new Error('Complete todos los campos obligatorios del representado');
+            }
+
+            return {
+                representadoId: null,
+                datosRepresentado: {
+                    identificacion,
+                    tipoPersona,
+                    nombreCompleto: nombres,
+                    nacionalidad: nacionalidad || null
+                }
+            };
         }
 
         // ========================================
@@ -1149,13 +1366,29 @@
                     }
                 };
 
+                // Preparar datos del representado si aplica
+                let representadoDatos = {};
+                try {
+                    const datosRep = prepararDatosRepresentado();
+                    if (datosRep.representadoId || datosRep.datosRepresentado) {
+                        representadoDatos = datosRep;
+                    }
+                } catch (error) {
+                    showAlert('formAlert', error.message, 'error');
+                    showLoading(false);
+                    return;
+                }
+
                 const response = await fetch(`${API_URL}/formulario-uafe/responder`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'x-session-token': sessionToken
                     },
-                    body: JSON.stringify({ datosPersonaNatural: datosActualizados })
+                    body: JSON.stringify({
+                        datosPersonaNatural: datosActualizados,
+                        ...representadoDatos
+                    })
                 });
 
                 const data = await response.json();
