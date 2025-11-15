@@ -1,6 +1,22 @@
 import prisma from '../db.js';
 import bcrypt from 'bcrypt';
 import { generarTokenSesion } from '../utils/pin-validator.js';
+import PDFDocument from 'pdfkit';
+import archiver from 'archiver';
+import {
+  drawHeader,
+  drawDisclaimer,
+  drawProtocolBox,
+  drawSection,
+  drawField,
+  drawTextAreaField,
+  drawSignature,
+  drawFooter,
+  getNombreCompleto,
+  formatCurrency,
+  formatDate,
+  checkAndAddPage
+} from '../utils/pdf-uafe-helpers.js';
 
 /**
  * Crear nuevo protocolo UAFE
@@ -572,4 +588,319 @@ export async function obtenerProtocolo(req, res) {
       message: 'Error al obtener protocolo'
     });
   }
+}
+
+/**
+ * Generar PDFs profesionales de formularios UAFE
+ * GET /api/formulario-uafe/protocolo/:protocoloId/generar-pdfs
+ * Requiere: authenticateToken + role MATRIZADOR o ADMIN
+ */
+export async function generarPDFs(req, res) {
+  try {
+    const { protocoloId } = req.params;
+
+    // 1. Obtener protocolo con todas las personas
+    const protocolo = await prisma.protocoloUAFE.findUnique({
+      where: { id: protocoloId },
+      include: {
+        personas: {
+          include: {
+            persona: {
+              select: {
+                id: true,
+                numeroIdentificacion: true,
+                tipoPersona: true,
+                datosPersonaNatural: true,
+                datosPersonaJuridica: true,
+                completado: true
+              }
+            }
+          }
+        },
+        creador: {
+          select: {
+            firstName: true,
+            lastName: true
+          }
+        }
+      }
+    });
+
+    if (!protocolo) {
+      return res.status(404).json({
+        success: false,
+        message: 'Protocolo no encontrado'
+      });
+    }
+
+    // Verificar permisos
+    if (protocolo.createdBy !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permiso para generar PDFs de este protocolo'
+      });
+    }
+
+    // Verificar que haya personas completadas
+    const personasCompletadas = protocolo.personas.filter(pp => pp.completado);
+    if (personasCompletadas.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No hay personas con formularios completados en este protocolo'
+      });
+    }
+
+    const pdfsGenerados = [];
+
+    // 2. Generar PDF para cada persona completada
+    for (const personaProtocolo of personasCompletadas) {
+      const persona = personaProtocolo.persona;
+      const datos = persona.tipoPersona === 'NATURAL'
+        ? persona.datosPersonaNatural
+        : persona.datosPersonaJuridica;
+
+      if (!datos) continue;
+
+      // Crear PDF buffer
+      const pdfBuffer = await new Promise((resolve, reject) => {
+        try {
+          const doc = new PDFDocument({
+            size: 'A4',
+            margins: { top: 50, bottom: 50, left: 50, right: 50 }
+          });
+
+          const chunks = [];
+          doc.on('data', chunk => chunks.push(chunk));
+          doc.on('end', () => resolve(Buffer.concat(chunks)));
+          doc.on('error', reject);
+
+          // === GENERAR CONTENIDO DEL PDF ===
+
+          // HEADER
+          let currentY = drawHeader(doc);
+
+          // DISCLAIMER
+          currentY = drawDisclaimer(doc, currentY);
+
+          // BOX DE PROTOCOLO
+          currentY = drawProtocolBox(
+            doc,
+            currentY,
+            protocolo,
+            personaProtocolo.calidad,
+            personaProtocolo.actuaPor
+          );
+
+          // SOLO PARA PERSONAS NATURALES
+          if (persona.tipoPersona === 'NATURAL') {
+            currentY = generateNaturalPersonPDF(doc, currentY, datos, persona);
+          } else {
+            // TODO: Implementar para personas jurídicas
+            currentY = generateJuridicalPersonPDF(doc, currentY, datos, persona);
+          }
+
+          // FIRMA
+          const nombreCompleto = getNombreCompleto(datos);
+          drawSignature(doc, 650, nombreCompleto, persona.numeroIdentificacion);
+
+          // FOOTER
+          drawFooter(doc);
+
+          // Finalizar documento
+          doc.end();
+        } catch (error) {
+          reject(error);
+        }
+      });
+
+      // Crear filename
+      const apellidos = datos.datosPersonales?.apellidos || datos.compania?.razonSocial || 'SinNombre';
+      const filename = `UAFE_${persona.numeroIdentificacion}_${apellidos.replace(/\s+/g, '_')}.pdf`;
+
+      pdfsGenerados.push({
+        filename,
+        buffer: pdfBuffer,
+        persona: {
+          nombres: getNombreCompleto(datos),
+          cedula: persona.numeroIdentificacion
+        }
+      });
+    }
+
+    // 3. Enviar respuesta
+    if (pdfsGenerados.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No se pudo generar ningún PDF'
+      });
+    }
+
+    if (pdfsGenerados.length === 1) {
+      // Un solo PDF - enviar directamente
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${pdfsGenerados[0].filename}"`);
+      return res.send(pdfsGenerados[0].buffer);
+    }
+
+    // Múltiples PDFs - crear ZIP
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="UAFE_Protocolo_${protocolo.numeroProtocolo}.zip"`);
+
+    const archive = archiver('zip', {
+      zlib: { level: 9 } // Máxima compresión
+    });
+
+    archive.pipe(res);
+
+    // Agregar cada PDF al ZIP
+    pdfsGenerados.forEach(pdf => {
+      archive.append(pdf.buffer, { name: pdf.filename });
+    });
+
+    archive.finalize();
+
+  } catch (error) {
+    console.error('Error generando PDFs:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al generar PDFs',
+      error: error.message
+    });
+  }
+}
+
+/**
+ * Generar contenido del PDF para persona natural
+ */
+function generateNaturalPersonPDF(doc, startY, datos, persona) {
+  let y = startY;
+
+  // === SECCIÓN 1: IDENTIFICACIÓN ===
+  y = checkAndAddPage(doc, y, 120);
+  y = drawSection(doc, y, '1. Identificación', 90);
+
+  drawField(doc, 60, y, 'Tipo de Identificación', datos.identificacion?.tipo, 140);
+  drawField(doc, 220, y, 'Número de Identificación', datos.identificacion?.numero, 160);
+  drawField(doc, 400, y, 'Nacionalidad', datos.identificacion?.nacionalidad, 140);
+
+  y += 60;
+
+  // === SECCIÓN 2: DATOS PERSONALES ===
+  y = checkAndAddPage(doc, y, 150);
+  y = drawSection(doc, y, '2. Datos Personales', 140);
+
+  drawField(doc, 60, y, 'Apellidos', datos.datosPersonales?.apellidos, 230);
+  drawField(doc, 310, y, 'Nombres', datos.datosPersonales?.nombres, 230);
+
+  y += 50;
+  drawField(doc, 60, y, 'Género', datos.datosPersonales?.genero, 140);
+  drawField(doc, 220, y, 'Estado Civil', datos.datosPersonales?.estadoCivil, 160);
+  drawField(doc, 400, y, 'Nivel de Estudio', datos.datosPersonales?.nivelEstudio, 140);
+
+  y += 50;
+  drawField(doc, 60, y, 'Correo Electrónico', datos.contacto?.email, 240);
+  drawField(doc, 320, y, 'Teléfono/Celular', datos.contacto?.celular || datos.contacto?.telefono, 220);
+
+  y += 70;
+
+  // === SECCIÓN 3: DIRECCIÓN ===
+  y = checkAndAddPage(doc, y, 150);
+  y = drawSection(doc, y, '3. Dirección de Domicilio', 140);
+
+  drawField(doc, 60, y, 'Calle Principal', datos.direccion?.callePrincipal, 200);
+  drawField(doc, 280, y, 'Número', datos.direccion?.numero, 100);
+  drawField(doc, 400, y, 'Calle Secundaria', datos.direccion?.calleSecundaria, 140);
+
+  y += 50;
+  drawField(doc, 60, y, 'Provincia', datos.direccion?.provincia, 150);
+  drawField(doc, 230, y, 'Cantón', datos.direccion?.canton, 150);
+  drawField(doc, 400, y, 'Parroquia', datos.direccion?.parroquia, 140);
+
+  y += 70;
+
+  // === SECCIÓN 4: INFORMACIÓN LABORAL ===
+  y = checkAndAddPage(doc, y, 200);
+  y = drawSection(doc, y, '4. Información Laboral', 190);
+
+  drawField(doc, 60, y, 'Situación Laboral', datos.informacionLaboral?.situacion, 200);
+  drawField(doc, 280, y, 'Relación de Dependencia', datos.informacionLaboral?.relacionDependencia ? 'SÍ' : 'NO', 100);
+  drawField(doc, 400, y, 'Ingreso Mensual', formatCurrency(datos.informacionLaboral?.ingresoMensual), 140);
+
+  y += 50;
+  drawField(doc, 60, y, 'Nombre de la Entidad', datos.informacionLaboral?.nombreEntidad, 240);
+  drawField(doc, 320, y, 'Cargo', datos.informacionLaboral?.cargo, 220);
+
+  y += 50;
+  drawField(doc, 60, y, 'Profesión/Ocupación', datos.informacionLaboral?.profesionOcupacion, 480);
+
+  y += 50;
+
+  // Dirección laboral completa
+  const direccionLaboral = datos.informacionLaboral?.direccionLaboral
+    ? `${datos.informacionLaboral.direccionLaboral}, ${datos.informacionLaboral.cantonLaboral || ''}, ${datos.informacionLaboral.provinciaLaboral || ''}`.replace(/,\s*,/g, ',').trim()
+    : null;
+  drawTextAreaField(doc, 60, y, 'Dirección Laboral', direccionLaboral, 480, 40);
+
+  y += 80;
+
+  // === SECCIÓN 5: INFORMACIÓN DEL CÓNYUGE (si aplica) ===
+  const tieneConyuge = datos.conyuge?.nombres && datos.conyuge?.apellidos;
+  if (tieneConyuge) {
+    y = checkAndAddPage(doc, y, 180);
+    y = drawSection(doc, y, '5. Información del Cónyuge', 170);
+
+    drawField(doc, 60, y, 'Apellidos', datos.conyuge?.apellidos, 230);
+    drawField(doc, 310, y, 'Nombres', datos.conyuge?.nombres, 230);
+
+    y += 50;
+    drawField(doc, 60, y, 'Tipo ID', datos.conyuge?.tipoId, 100);
+    drawField(doc, 180, y, 'Número de Identificación', datos.conyuge?.numeroId, 180);
+    drawField(doc, 380, y, 'Nacionalidad', datos.conyuge?.nacionalidad, 160);
+
+    y += 50;
+    drawField(doc, 60, y, 'Correo Electrónico', datos.conyuge?.correo, 240);
+    drawField(doc, 320, y, 'Celular', datos.conyuge?.celular, 220);
+
+    y += 50;
+    drawField(doc, 60, y, 'Profesión', datos.conyuge?.profesion, 200);
+    drawField(doc, 280, y, 'Situación Laboral', datos.conyuge?.situacionLaboral, 260);
+
+    y += 70;
+  }
+
+  // === SECCIÓN 6: PERSONA POLÍTICAMENTE EXPUESTA (PEP) ===
+  y = checkAndAddPage(doc, y, 120);
+  y = drawSection(doc, y, '6. Persona Políticamente Expuesta (PEP)', 110);
+
+  drawField(doc, 60, y, '¿Es Persona Expuesta Políticamente?', datos.pep?.esPersonaExpuesta ? 'SÍ' : 'NO', 200);
+  drawField(doc, 280, y, '¿Es Familiar de PEP?', datos.pep?.esFamiliarPEP ? 'SÍ' : 'NO', 130);
+  drawField(doc, 430, y, '¿Es Colaborador de PEP?', datos.pep?.esColaboradorPEP ? 'SÍ' : 'NO', 110);
+
+  y += 50;
+  if (datos.pep?.esFamiliarPEP && datos.pep?.relacionPEP) {
+    drawField(doc, 60, y, 'Relación con PEP', datos.pep.relacionPEP, 240);
+  }
+  if (datos.pep?.esColaboradorPEP && datos.pep?.tipoColaborador) {
+    drawField(doc, 320, y, 'Tipo de Colaborador', datos.pep.tipoColaborador, 220);
+  }
+
+  return y + 100;
+}
+
+/**
+ * Generar contenido del PDF para persona jurídica
+ * TODO: Implementar cuando se agregue soporte para personas jurídicas
+ */
+function generateJuridicalPersonPDF(doc, startY, datos, persona) {
+  let y = startY;
+
+  y = checkAndAddPage(doc, y, 100);
+  y = drawSection(doc, y, 'Información de Persona Jurídica', 80);
+
+  drawField(doc, 60, y, 'Razón Social', datos.compania?.razonSocial, 480);
+
+  y += 50;
+  drawTextAreaField(doc, 60, y, 'Nota', 'El formulario completo para personas jurídicas estará disponible próximamente.', 480, 40);
+
+  return y + 100;
 }
