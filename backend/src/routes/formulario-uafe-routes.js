@@ -12,7 +12,6 @@ import {
   actualizarPersonaEnProtocolo,
   eliminarPersonaDeProtocolo,
   generarPDFs,
-  generarPDFsProtocolo,
   descargarArchivo
 } from '../controllers/formulario-uafe-controller.js';
 
@@ -129,7 +128,7 @@ router.get(
 );
 
 /**
- * Generar PDFs profesionales de formularios UAFE (versión con helpers)
+ * Generar PDFs profesionales de formularios UAFE
  * GET /api/formulario-uafe/protocolo/:protocoloId/generar-pdfs
  * Requiere: JWT + role MATRIZADOR o ADMIN
  * Retorna: PDF individual o ZIP con múltiples PDFs
@@ -139,18 +138,6 @@ router.get(
   authenticateToken,
   requireRoles(['MATRIZADOR', 'ADMIN']),
   generarPDFs
-);
-
-/**
- * Generar PDFs de un protocolo (versión alternativa con archivos temporales)
- * POST /api/formulario-uafe/protocolo/:protocoloId/generar-pdfs-alt
- * Requiere: JWT + role MATRIZADOR o ADMIN
- */
-router.post(
-  '/protocolo/:protocoloId/generar-pdfs-alt',
-  authenticateToken,
-  requireRoles(['MATRIZADOR', 'ADMIN']),
-  generarPDFsProtocolo
 );
 
 /**
