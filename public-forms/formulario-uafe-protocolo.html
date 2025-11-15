@@ -342,6 +342,9 @@
                             id="loginCedula"
                             placeholder="Ej: 1234567890"
                             maxlength="13"
+                            inputmode="numeric"
+                            pattern="[0-9]*"
+                            autocomplete="off"
                             required
                         >
                     </div>
@@ -353,6 +356,9 @@
                             id="loginPin"
                             placeholder="6 dígitos"
                             maxlength="6"
+                            inputmode="numeric"
+                            pattern="[0-9]*"
+                            autocomplete="off"
                             required
                         >
                         <div class="helper-text">PIN de 6 dígitos configurado al registrarte</div>
@@ -628,7 +634,7 @@
                             </div>
                             <div class="form-group">
                                 <label>Número de Identificación</label>
-                                <input type="text" id="conyugeNumeroId">
+                                <input type="text" id="conyugeNumeroId" inputmode="numeric" pattern="[0-9]*">
                             </div>
                         </div>
 
