@@ -2,6 +2,9 @@ import prisma from '../db.js';
 import bcrypt from 'bcrypt';
 import { generarTokenSesion } from '../utils/pin-validator.js';
 import PDFDocument from 'pdfkit';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import archiver from 'archiver';
 import {
   drawHeader,
@@ -17,6 +20,9 @@ import {
   formatDate,
   checkAndAddPage
 } from '../utils/pdf-uafe-helpers.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /**
  * Crear nuevo protocolo UAFE
@@ -590,6 +596,272 @@ export async function obtenerProtocolo(req, res) {
   }
 }
 
+export async function actualizarProtocolo(req, res) {
+  try {
+    const { protocoloId } = req.params;
+    const {
+      numeroProtocolo,
+      fecha,
+      actoContrato,
+      avaluoMunicipal,
+      valorContrato,
+      formaPago
+    } = req.body;
+
+    // Verificar que el protocolo existe
+    const protocoloExistente = await prisma.protocoloUAFE.findUnique({
+      where: { id: protocoloId }
+    });
+
+    if (!protocoloExistente) {
+      return res.status(404).json({
+        success: false,
+        message: 'Protocolo no encontrado'
+      });
+    }
+
+    // Verificar permisos
+    if (protocoloExistente.createdBy !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permiso para editar este protocolo'
+      });
+    }
+
+    // Si se está cambiando el número de protocolo, verificar que no exista otro con ese número
+    if (numeroProtocolo && numeroProtocolo !== protocoloExistente.numeroProtocolo) {
+      const duplicado = await prisma.protocoloUAFE.findUnique({
+        where: { numeroProtocolo }
+      });
+
+      if (duplicado) {
+        return res.status(409).json({
+          success: false,
+          message: 'Ya existe un protocolo con ese número'
+        });
+      }
+    }
+
+    // Actualizar protocolo
+    const protocoloActualizado = await prisma.protocoloUAFE.update({
+      where: { id: protocoloId },
+      data: {
+        ...(numeroProtocolo && { numeroProtocolo }),
+        ...(fecha && { fecha: new Date(fecha) }),
+        ...(actoContrato && { actoContrato }),
+        ...(avaluoMunicipal !== undefined && { avaluoMunicipal: parseFloat(avaluoMunicipal) }),
+        ...(valorContrato !== undefined && { valorContrato: parseFloat(valorContrato) }),
+        ...(formaPago && { formaPago })
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Protocolo actualizado exitosamente',
+      data: protocoloActualizado
+    });
+  } catch (error) {
+    console.error('Error actualizando protocolo:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al actualizar protocolo'
+    });
+  }
+}
+
+/**
+ * Actualizar datos de persona en protocolo (rol y calidad)
+ * PUT /api/formulario-uafe/protocolo/:protocoloId/persona/:personaProtocoloId
+ * Requiere: authenticateToken + role MATRIZADOR o ADMIN
+ */
+export async function actualizarPersonaEnProtocolo(req, res) {
+  try {
+    const { protocoloId, personaProtocoloId } = req.params;
+    const { calidad, actuaPor } = req.body;
+
+    // Verificar que el protocolo existe y pertenece al usuario
+    const protocolo = await prisma.protocoloUAFE.findUnique({
+      where: { id: protocoloId }
+    });
+
+    if (!protocolo) {
+      return res.status(404).json({
+        success: false,
+        message: 'Protocolo no encontrado'
+      });
+    }
+
+    if (protocolo.createdBy !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permiso para modificar este protocolo'
+      });
+    }
+
+    // Verificar que la relación persona-protocolo existe
+    const personaProtocolo = await prisma.personaProtocolo.findUnique({
+      where: { id: personaProtocoloId }
+    });
+
+    if (!personaProtocolo) {
+      return res.status(404).json({
+        success: false,
+        message: 'Persona no encontrada en el protocolo'
+      });
+    }
+
+    if (personaProtocolo.protocoloId !== protocoloId) {
+      return res.status(400).json({
+        success: false,
+        message: 'La persona no pertenece a este protocolo'
+      });
+    }
+
+    // Validar valores permitidos
+    const calidadesPermitidas = ['COMPRADOR', 'VENDEDOR', 'COMPARECIENTE', 'BENEFICIARIO', 'TESTIGO'];
+    const actuaPorPermitidos = ['PROPIOS_DERECHOS', 'REPRESENTANDO_A'];
+
+    if (calidad && !calidadesPermitidas.includes(calidad)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Calidad no válida'
+      });
+    }
+
+    if (actuaPor && !actuaPorPermitidos.includes(actuaPor)) {
+      return res.status(400).json({
+        success: false,
+        message: 'ActuaPor no válido'
+      });
+    }
+
+    // Actualizar persona en protocolo
+    const personaActualizada = await prisma.personaProtocolo.update({
+      where: { id: personaProtocoloId },
+      data: {
+        ...(calidad && { calidad }),
+        ...(actuaPor && { actuaPor })
+      },
+      include: {
+        persona: {
+          select: {
+            numeroIdentificacion: true,
+            tipoPersona: true,
+            datosPersonaNatural: true,
+            datosPersonaJuridica: true
+          }
+        }
+      }
+    });
+
+    // Extraer nombre
+    let nombre = 'Sin nombre';
+    if (personaActualizada.persona.tipoPersona === 'NATURAL' && personaActualizada.persona.datosPersonaNatural) {
+      const datos = personaActualizada.persona.datosPersonaNatural;
+      if (datos.datosPersonales?.nombres && datos.datosPersonales?.apellidos) {
+        nombre = `${datos.datosPersonales.nombres} ${datos.datosPersonales.apellidos}`.trim();
+      }
+    } else if (personaActualizada.persona.tipoPersona === 'JURIDICA' && personaActualizada.persona.datosPersonaJuridica) {
+      const datos = personaActualizada.persona.datosPersonaJuridica;
+      if (datos.compania?.razonSocial) {
+        nombre = datos.compania.razonSocial.trim();
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Datos de la persona actualizados exitosamente',
+      data: {
+        id: personaActualizada.id,
+        cedula: personaActualizada.persona.numeroIdentificacion,
+        nombre: nombre,
+        tipoPersona: personaActualizada.persona.tipoPersona,
+        calidad: personaActualizada.calidad,
+        actuaPor: personaActualizada.actuaPor,
+        completado: personaActualizada.completado,
+        completadoAt: personaActualizada.completadoAt
+      }
+    });
+  } catch (error) {
+    console.error('Error actualizando persona en protocolo:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al actualizar persona en protocolo'
+    });
+  }
+}
+
+/**
+ * Eliminar persona de un protocolo
+ * DELETE /api/formulario-uafe/protocolo/:protocoloId/persona/:personaProtocoloId
+ * Requiere: authenticateToken + role MATRIZADOR o ADMIN
+ */
+export async function eliminarPersonaDeProtocolo(req, res) {
+  try {
+    const { protocoloId, personaProtocoloId } = req.params;
+
+    // Verificar que el protocolo existe y pertenece al usuario
+    const protocolo = await prisma.protocoloUAFE.findUnique({
+      where: { id: protocoloId }
+    });
+
+    if (!protocolo) {
+      return res.status(404).json({
+        success: false,
+        message: 'Protocolo no encontrado'
+      });
+    }
+
+    if (protocolo.createdBy !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permiso para modificar este protocolo'
+      });
+    }
+
+    // Verificar que la relación persona-protocolo existe
+    const personaProtocolo = await prisma.personaProtocolo.findUnique({
+      where: { id: personaProtocoloId }
+    });
+
+    if (!personaProtocolo) {
+      return res.status(404).json({
+        success: false,
+        message: 'Persona no encontrada en el protocolo'
+      });
+    }
+
+    if (personaProtocolo.protocoloId !== protocoloId) {
+      return res.status(400).json({
+        success: false,
+        message: 'La persona no pertenece a este protocolo'
+      });
+    }
+
+    // Eliminar la relación
+    await prisma.personaProtocolo.delete({
+      where: { id: personaProtocoloId }
+    });
+
+    res.json({
+      success: true,
+      message: 'Persona eliminada del protocolo exitosamente'
+    });
+  } catch (error) {
+    console.error('Error eliminando persona del protocolo:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al eliminar persona del protocolo'
+    });
+  }
+}
+
+/**
+ * Generar PDFs de formularios UAFE
+ * POST /api/formulario-uafe/protocolo/:protocoloId/generar-pdfs
+ * Requiere: authenticateToken + role MATRIZADOR o ADMIN
+ */
+
 /**
  * Generar PDFs profesionales de formularios UAFE
  * GET /api/formulario-uafe/protocolo/:protocoloId/generar-pdfs
@@ -903,4 +1175,26 @@ function generateJuridicalPersonPDF(doc, startY, datos, persona) {
   drawTextAreaField(doc, 60, y, 'Nota', 'El formulario completo para personas jurídicas estará disponible próximamente.', 480, 40);
 
   return y + 100;
+}
+export async function descargarArchivo(req, res) {
+  try {
+    const { folder, filename } = req.params;
+
+    const filePath = path.join(__dirname, '../../temp', folder, filename);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        success: false,
+        message: 'Archivo no encontrado'
+      });
+    }
+
+    res.download(filePath);
+  } catch (error) {
+    console.error('Error descargando archivo:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al descargar archivo'
+    });
+  }
 }
