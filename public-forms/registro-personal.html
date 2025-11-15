@@ -506,12 +506,15 @@
                     <label for="cedula" class="form-label">
                         <i class="fas fa-id-card"></i> Número de Cédula o RUC
                     </label>
-                    <input 
-                        type="text" 
-                        class="form-control" 
-                        id="cedula" 
+                    <input
+                        type="text"
+                        class="form-control"
+                        id="cedula"
                         placeholder="Ej: 1234567890"
                         maxlength="13"
+                        inputmode="numeric"
+                        pattern="[0-9]*"
+                        autocomplete="off"
                     >
                     <small class="text-muted">Ingrese su número de identificación sin espacios ni guiones</small>
                 </div>
@@ -552,12 +555,12 @@
 
                 <div class="pin-wrapper">
                     <div class="pin-container" id="pinCreateContainer">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="0">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="1">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="2">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="3">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="4">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="5">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="0" inputmode="numeric" pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="1" inputmode="numeric" pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="2" inputmode="numeric" pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="3" inputmode="numeric" pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="4" inputmode="numeric" pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="5" inputmode="numeric" pattern="[0-9]*">
                     </div>
                     <button class="toggle-pin-btn" onclick="togglePinVisibility('pinCreateContainer')" type="button">
                         <i class="fas fa-eye" id="iconCreate"></i>
@@ -575,12 +578,12 @@
 
                 <div class="pin-wrapper">
                     <div class="pin-container" id="pinConfirmContainer">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="0">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="1">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="2">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="3">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="4">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="5">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="0" inputmode="numeric" pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="1" inputmode="numeric" pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="2" inputmode="numeric" pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="3" inputmode="numeric" pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="4" inputmode="numeric" pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="5" inputmode="numeric" pattern="[0-9]*">
                     </div>
                     <button class="toggle-pin-btn" onclick="togglePinVisibility('pinConfirmContainer')" type="button">
                         <i class="fas fa-eye" id="iconConfirm"></i>
@@ -612,12 +615,12 @@
 
                 <div class="pin-wrapper">
                     <div class="pin-container" id="pinLoginContainer">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="0">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="1">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="2">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="3">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="4">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="5">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="0" inputmode="numeric" pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="1" inputmode="numeric" pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="2" inputmode="numeric" pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="3" inputmode="numeric" pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="4" inputmode="numeric" pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="5" inputmode="numeric" pattern="[0-9]*">
                     </div>
                     <button class="toggle-pin-btn" onclick="togglePinVisibility('pinLoginContainer')" type="button">
                         <i class="fas fa-eye" id="iconLogin"></i>
@@ -868,7 +871,7 @@
                             </div>
                             <div class="col-md-4 mb-3">
                                 <label class="form-label">Ingreso Mensual</label>
-                                <input type="number" class="form-control" id="ingresoMensual" step="0.01">
+                                <input type="number" class="form-control" id="ingresoMensual" step="0.01" inputmode="decimal">
                             </div>
                             <div class="col-md-4 mb-3">
                                 <label class="form-label">Fecha de Ingreso</label>
@@ -915,7 +918,7 @@
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Número de Identificación</label>
-                                <input type="text" class="form-control" id="conyugeNumeroId">
+                                <input type="text" class="form-control" id="conyugeNumeroId" inputmode="numeric" pattern="[0-9]*">
                             </div>
                         </div>
 
