@@ -12,7 +12,8 @@ import {
   actualizarPersonaEnProtocolo,
   eliminarPersonaDeProtocolo,
   generarPDFs,
-  descargarArchivo
+  descargarArchivo,
+  buscarRepresentado
 } from '../controllers/formulario-uafe-controller.js';
 
 const router = express.Router();
@@ -28,6 +29,13 @@ console.log('✅ Formulario UAFE routes loaded successfully (Sistema de Protocol
  * POST /api/formulario-uafe/login
  */
 router.post('/login', loginFormularioUAFE);
+
+/**
+ * Buscar persona para ser representado (por cédula/RUC)
+ * GET /api/formulario-uafe/buscar-representado/:identificacion
+ * Público - no requiere autenticación (para pre-llenar datos)
+ */
+router.get('/buscar-representado/:identificacion', buscarRepresentado);
 
 // ========================================
 // RUTAS PROTEGIDAS - Usuario con sesión de formulario
