@@ -8,7 +8,12 @@ import {
   responderFormulario,
   listarProtocolos,
   obtenerProtocolo,
-  generarPDFs
+  actualizarProtocolo,
+  actualizarPersonaEnProtocolo,
+  eliminarPersonaDeProtocolo,
+  generarPDFs,
+  generarPDFsProtocolo,
+  descargarArchivo
 } from '../controllers/formulario-uafe-controller.js';
 
 const router = express.Router();
@@ -77,7 +82,54 @@ router.get(
 );
 
 /**
- * Generar PDFs profesionales de formularios UAFE
+ * Actualizar protocolo
+ * PUT /api/formulario-uafe/protocolo/:protocoloId
+ * Requiere: JWT + role MATRIZADOR o ADMIN
+ */
+router.put(
+  '/protocolo/:protocoloId',
+  authenticateToken,
+  requireRoles(['MATRIZADOR', 'ADMIN']),
+  actualizarProtocolo
+);
+
+/**
+ * Actualizar persona en protocolo (cambiar rol/calidad)
+ * PUT /api/formulario-uafe/protocolo/:protocoloId/persona/:personaProtocoloId
+ * Requiere: JWT + role MATRIZADOR o ADMIN
+ */
+router.put(
+  '/protocolo/:protocoloId/persona/:personaProtocoloId',
+  authenticateToken,
+  requireRoles(['MATRIZADOR', 'ADMIN']),
+  actualizarPersonaEnProtocolo
+);
+
+/**
+ * Eliminar persona de un protocolo
+ * DELETE /api/formulario-uafe/protocolo/:protocoloId/persona/:personaProtocoloId
+ * Requiere: JWT + role MATRIZADOR o ADMIN
+ */
+router.delete(
+  '/protocolo/:protocoloId/persona/:personaProtocoloId',
+  authenticateToken,
+  requireRoles(['MATRIZADOR', 'ADMIN']),
+  eliminarPersonaDeProtocolo
+);
+
+/**
+ * Listar protocolos del matrizador
+ * GET /api/formulario-uafe/protocolos
+ * Requiere: JWT
+ */
+router.get(
+  '/protocolos',
+  authenticateToken,
+  listarProtocolos
+);
+
+/**
+ * Generar PDFs profesionales de formularios UAFE (versión con helpers)
  * GET /api/formulario-uafe/protocolo/:protocoloId/generar-pdfs
  * Requiere: JWT + role MATRIZADOR o ADMIN
  * Retorna: PDF individual o ZIP con múltiples PDFs
@@ -90,14 +142,24 @@ router.get(
 );
 
 /**
- * Listar protocolos del matrizador
- * GET /api/formulario-uafe/protocolos
- * Requiere: JWT
+ * Generar PDFs de un protocolo (versión alternativa con archivos temporales)
+ * POST /api/formulario-uafe/protocolo/:protocoloId/generar-pdfs-alt
+ * Requiere: JWT + role MATRIZADOR o ADMIN
+ */
+router.post(
+  '/protocolo/:protocoloId/generar-pdfs-alt',
+  authenticateToken,
+  requireRoles(['MATRIZADOR', 'ADMIN']),
+  generarPDFsProtocolo
+);
+
+/**
+ * Descargar archivo temporal (PDF o ZIP)
+ * GET /api/formulario-uafe/download/:folder/:filename
  */
 router.get(
-  '/protocolos',
-  authenticateToken,
-  listarProtocolos
+  '/download/:folder/:filename',
+  descargarArchivo
 );
 
 // ========================================

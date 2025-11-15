@@ -83,8 +83,12 @@
 
         input[type="text"],
         input[type="number"],
+        input[type="date"],
+        input[type="email"],
+        input[type="tel"],
         input[type="password"],
-        select {
+        select,
+        textarea {
             width: 100%;
             padding: 12px;
             border: 2px solid #e0e0e0;
@@ -94,78 +98,113 @@
         }
 
         input:focus,
-        select:focus {
+        select:focus,
+        textarea:focus {
             outline: none;
             border-color: #667eea;
         }
 
+        input:readonly {
+            background-color: #f5f5f5;
+            color: #666;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
         .btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
             padding: 14px 30px;
             border: none;
             border-radius: 8px;
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
             width: 100%;
-            transition: transform 0.2s, box-shadow 0.2s;
         }
 
-        .btn:hover {
+        .btn-primary:hover:not(:disabled) {
             transform: translateY(-2px);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
         }
 
-        .btn:active {
-            transform: translateY(0);
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #d0d0d0;
         }
 
         .btn:disabled {
-            background: #ccc;
+            opacity: 0.6;
             cursor: not-allowed;
-            transform: none;
+        }
+
+        .button-group {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+            gap: 15px;
+        }
+
+        .progress-bar {
+            background: #e0e0e0;
+            height: 8px;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 30px;
+        }
+
+        .progress-bar-fill {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
         }
 
         .alert {
             padding: 15px;
-            margin-bottom: 20px;
             border-radius: 8px;
+            margin-bottom: 20px;
             display: none;
         }
 
         .alert.active {
             display: block;
-            animation: slideDown 0.3s ease;
-        }
-
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .alert-success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
         }
 
         .alert-error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+            background: #fee;
+            color: #c00;
+            border: 1px solid #fcc;
+        }
+
+        .alert-success {
+            background: #efe;
+            color: #060;
+            border: 1px solid #cfc;
         }
 
         .alert-info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
+            background: #eef;
+            color: #006;
+            border: 1px solid #ccf;
         }
 
         .loading {
-            display: none;
             text-align: center;
             padding: 20px;
+            display: none;
         }
 
         .loading.active {
@@ -176,10 +215,10 @@
             border: 4px solid #f3f3f3;
             border-top: 4px solid #667eea;
             border-radius: 50%;
-            width: 40px;
-            height: 40px;
+            width: 50px;
+            height: 50px;
             animation: spin 1s linear infinite;
-            margin: 0 auto;
+            margin: 0 auto 20px;
         }
 
         @keyframes spin {
@@ -187,11 +226,28 @@
             100% { transform: rotate(360deg); }
         }
 
-        .info-box {
-            background: #f8f9fa;
-            padding: 15px;
+        .hidden {
+            display: none !important;
+        }
+
+        .subsection {
+            background: #f9f9f9;
+            padding: 20px;
             border-radius: 8px;
-            margin-bottom: 20px;
+            margin-top: 20px;
+        }
+
+        .subsection-title {
+            font-size: 18px;
+            color: #764ba2;
+            margin-bottom: 15px;
+        }
+
+        .info-box {
+            background: #f0f7ff;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
             border-left: 4px solid #667eea;
         }
 
@@ -199,31 +255,12 @@
             color: #667eea;
         }
 
-        .grid-2 {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
+        .form-section {
+            display: none;
         }
 
-        @media (max-width: 768px) {
-            .grid-2 {
-                grid-template-columns: 1fr;
-            }
-
-            .content {
-                padding: 20px;
-            }
-
-            .header h1 {
-                font-size: 22px;
-            }
-        }
-
-        .success-icon {
-            text-align: center;
-            font-size: 60px;
-            color: #28a745;
-            margin-bottom: 20px;
+        .form-section.active {
+            display: block;
         }
 
         .required {
@@ -235,13 +272,38 @@
             color: #666;
             margin-top: 5px;
         }
+
+        .radio-group {
+            display: flex;
+            gap: 20px;
+            margin-top: 10px;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .radio-option input[type="radio"] {
+            width: auto;
+        }
+
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            .content {
+                padding: 20px;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>📋 Formulario UAFE</h1>
-            <p>Notaría 18 Quito - Sistema de Protocolos</p>
+            <p>Notaría Décima Octava del Cantón Quito</p>
         </div>
 
         <div class="content">
@@ -296,51 +358,384 @@
                         <div class="helper-text">PIN de 6 dígitos configurado al registrarte</div>
                     </div>
 
-                    <button type="submit" class="btn" id="loginBtn">
+                    <button type="submit" class="btn btn-primary" id="loginBtn">
                         Ingresar al Formulario
                     </button>
                 </form>
 
                 <div id="loginLoading" class="loading">
                     <div class="spinner"></div>
-                    <p style="margin-top: 10px; color: #666;">Verificando credenciales...</p>
+                    <p style="color: #666;">Verificando credenciales...</p>
                 </div>
             </div>
 
             <!-- SECCIÓN DE FORMULARIO -->
             <div id="formularioSection" class="section">
-                <h2 class="section-title">Completar Formulario UAFE</h2>
-
-                <div id="protocoloInfo" class="info-box"></div>
+                <div class="progress-bar">
+                    <div class="progress-bar-fill" id="progressBar"></div>
+                </div>
 
                 <div id="formAlert" class="alert"></div>
 
-                <!-- Aquí iría el formulario completo -->
-                <div class="form-group">
-                    <label>Tu rol en este trámite:</label>
-                    <input type="text" id="rolPersona" readonly>
+                <!-- Información del Protocolo -->
+                <div id="protocoloInfo" class="info-box"></div>
+
+                <!-- Sección 1: Datos Personales -->
+                <div id="seccion1" class="form-section active">
+                    <h2 class="section-title">1. Datos de Identificación</h2>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Tipo de Identificación <span class="required">*</span></label>
+                            <select id="tipoIdentificacion" required>
+                                <option value="">Seleccione...</option>
+                                <option value="CEDULA">Cédula</option>
+                                <option value="RUC">RUC</option>
+                                <option value="PASAPORTE">Pasaporte</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Número de Identificación</label>
+                            <input type="text" id="numeroIdentificacion" readonly>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Apellidos <span class="required">*</span></label>
+                            <input type="text" id="apellidos" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Nombres <span class="required">*</span></label>
+                            <input type="text" id="nombres" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Nacionalidad <span class="required">*</span></label>
+                            <input type="text" id="nacionalidad" required placeholder="Ej: Ecuatoriana">
+                        </div>
+                        <div class="form-group">
+                            <label>Género <span class="required">*</span></label>
+                            <select id="genero" required>
+                                <option value="">Seleccione...</option>
+                                <option value="MASCULINO">Masculino</option>
+                                <option value="FEMENINO">Femenino</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Estado Civil <span class="required">*</span></label>
+                            <select id="estadoCivil" required onchange="toggleConyugeSection()">
+                                <option value="">Seleccione...</option>
+                                <option value="SOLTERO">Soltero/a</option>
+                                <option value="CASADO">Casado/a</option>
+                                <option value="UNION_LIBRE">Unión Libre</option>
+                                <option value="DIVORCIADO">Divorciado/a</option>
+                                <option value="VIUDO">Viudo/a</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Nivel de Estudio <span class="required">*</span></label>
+                            <select id="nivelEstudio" required>
+                                <option value="">Seleccione...</option>
+                                <option value="BACHILLER">Bachiller</option>
+                                <option value="UNIVERSITARIO">Universitario</option>
+                                <option value="MAESTRIA">Maestría</option>
+                                <option value="POSTGRADO">Postgrado</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button class="btn btn-secondary" onclick="cerrarSesion()">Salir</button>
+                        <button class="btn btn-primary" onclick="siguienteSeccion()">Siguiente →</button>
+                    </div>
                 </div>
 
-                <p style="text-align: center; padding: 40px; color: #666;">
-                    <strong>Formulario en desarrollo</strong><br>
-                    Los campos del formulario UAFE se mostrarán aquí
-                </p>
+                <!-- Sección 2: Contacto y Dirección -->
+                <div id="seccion2" class="form-section">
+                    <h2 class="section-title">2. Datos de Contacto y Dirección</h2>
 
-                <button class="btn" onclick="enviarFormulario()">
-                    Enviar Formulario
-                </button>
+                    <div class="subsection">
+                        <div class="subsection-title">Contacto</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Correo Electrónico <span class="required">*</span></label>
+                                <input type="email" id="email" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Teléfono</label>
+                                <input type="tel" id="telefono">
+                            </div>
+                            <div class="form-group">
+                                <label>Celular <span class="required">*</span></label>
+                                <input type="tel" id="celular" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="subsection">
+                        <div class="subsection-title">Dirección Domiciliaria</div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Calle Principal <span class="required">*</span></label>
+                                <input type="text" id="callePrincipal" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Número</label>
+                                <input type="text" id="numeroDomicilio">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Calle Secundaria</label>
+                            <input type="text" id="calleSecundaria">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Provincia <span class="required">*</span></label>
+                                <input type="text" id="provincia" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Cantón <span class="required">*</span></label>
+                                <input type="text" id="canton" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Parroquia <span class="required">*</span></label>
+                                <input type="text" id="parroquia" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button class="btn btn-secondary" onclick="anteriorSeccion()">← Anterior</button>
+                        <button class="btn btn-primary" onclick="siguienteSeccion()">Siguiente →</button>
+                    </div>
+                </div>
+
+                <!-- Sección 3: Información Laboral -->
+                <div id="seccion3" class="form-section">
+                    <h2 class="section-title">3. Información Laboral</h2>
+
+                    <div class="form-group">
+                        <label>Situación Laboral <span class="required">*</span></label>
+                        <select id="situacionLaboral" required onchange="toggleInfoLaboral()">
+                            <option value="">Seleccione...</option>
+                            <option value="PUBLICO">Público</option>
+                            <option value="PRIVADO">Privado</option>
+                            <option value="JUBILADO">Jubilado</option>
+                            <option value="NO_APLICA">No Aplica</option>
+                        </select>
+                    </div>
+
+                    <div id="detalleLaboral" class="hidden">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Relación de Dependencia</label>
+                                <div class="radio-group">
+                                    <div class="radio-option">
+                                        <input type="radio" name="relacionDependencia" id="relacionSi" value="true">
+                                        <label for="relacionSi">Sí</label>
+                                    </div>
+                                    <div class="radio-option">
+                                        <input type="radio" name="relacionDependencia" id="relacionNo" value="false">
+                                        <label for="relacionNo">No</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Fecha de Ingreso</label>
+                                <input type="date" id="fechaIngreso">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Nombre de la Entidad</label>
+                            <input type="text" id="nombreEntidad">
+                        </div>
+
+                        <div class="form-group">
+                            <label>Dirección de la Entidad</label>
+                            <input type="text" id="direccionEntidad">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Provincia</label>
+                                <input type="text" id="provinciaEntidad">
+                            </div>
+                            <div class="form-group">
+                                <label>Cantón</label>
+                                <input type="text" id="cantonEntidad">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Profesión / Ocupación <span class="required">*</span></label>
+                                <input type="text" id="profesionOcupacion" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Cargo</label>
+                                <input type="text" id="cargo">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Ingreso Mensual ($) <span class="required">*</span></label>
+                            <input type="number" id="ingresoMensual" step="0.01" placeholder="0.00" required>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button class="btn btn-secondary" onclick="anteriorSeccion()">← Anterior</button>
+                        <button class="btn btn-primary" onclick="siguienteSeccion()">Siguiente →</button>
+                    </div>
+                </div>
+
+                <!-- Sección 4: Datos del Cónyuge (condicional) -->
+                <div id="seccion4" class="form-section">
+                    <h2 class="section-title">4. Datos del Cónyuge</h2>
+
+                    <div class="alert alert-info active">
+                        Esta sección solo se completa si está casado o en unión libre
+                    </div>
+
+                    <div id="conyugeForm" class="hidden">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Apellidos</label>
+                                <input type="text" id="conyugeApellidos">
+                            </div>
+                            <div class="form-group">
+                                <label>Nombres</label>
+                                <input type="text" id="conyugeNombres">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Tipo de Identificación</label>
+                                <select id="conyugeTipoId">
+                                    <option value="">Seleccione...</option>
+                                    <option value="CEDULA">Cédula</option>
+                                    <option value="RUC">RUC</option>
+                                    <option value="PASAPORTE">Pasaporte</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Número de Identificación</label>
+                                <input type="text" id="conyugeNumeroId">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Nacionalidad</label>
+                                <input type="text" id="conyugeNacionalidad">
+                            </div>
+                            <div class="form-group">
+                                <label>Profesión</label>
+                                <input type="text" id="conyugeProfesion">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Correo Electrónico</label>
+                                <input type="email" id="conyugeEmail">
+                            </div>
+                            <div class="form-group">
+                                <label>Celular</label>
+                                <input type="tel" id="conyugeCelular">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button class="btn btn-secondary" onclick="anteriorSeccion()">← Anterior</button>
+                        <button class="btn btn-primary" onclick="siguienteSeccion()">Siguiente →</button>
+                    </div>
+                </div>
+
+                <!-- Sección 5: PEP (Personas Expuestas Políticamente) -->
+                <div id="seccion5" class="form-section">
+                    <h2 class="section-title">5. Personas Expuestas Políticamente (PEP)</h2>
+
+                    <div class="alert alert-info active">
+                        Por favor responda con veracidad las siguientes preguntas
+                    </div>
+
+                    <div class="form-group">
+                        <label>¿Se considera una persona expuesta políticamente (PEP)?</label>
+                        <div class="radio-group">
+                            <div class="radio-option">
+                                <input type="radio" name="esPersonaExpuesta" id="pepSi" value="true">
+                                <label for="pepSi">Sí</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" name="esPersonaExpuesta" id="pepNo" value="false" checked>
+                                <label for="pepNo">No</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>¿Es familiar de un PEP?</label>
+                        <div class="radio-group">
+                            <div class="radio-option">
+                                <input type="radio" name="esFamiliarPEP" id="familiarPepSi" value="true">
+                                <label for="familiarPepSi">Sí</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" name="esFamiliarPEP" id="familiarPepNo" value="false" checked>
+                                <label for="familiarPepNo">No</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>¿Es colaborador cercano de un PEP?</label>
+                        <div class="radio-group">
+                            <div class="radio-option">
+                                <input type="radio" name="esColaboradorPEP" id="colaboradorPepSi" value="true">
+                                <label for="colaboradorPepSi">Sí</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" name="esColaboradorPEP" id="colaboradorPepNo" value="false" checked>
+                                <label for="colaboradorPepNo">No</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button class="btn btn-secondary" onclick="anteriorSeccion()">← Anterior</button>
+                        <button class="btn btn-primary" onclick="enviarFormulario()">Enviar Formulario ✓</button>
+                    </div>
+                </div>
+
+                <!-- Sección de Confirmación -->
+                <div id="seccionConfirmacion" class="form-section">
+                    <div style="text-align: center; padding: 40px 20px;">
+                        <div style="font-size: 80px; color: #4caf50;">✓</div>
+                        <h2 style="color: #4caf50; margin: 20px 0;">¡Formulario Enviado Exitosamente!</h2>
+                        <p style="font-size: 18px; color: #666; margin-bottom: 30px;">
+                            Gracias por completar el formulario UAFE. Los datos han sido registrados correctamente.
+                        </p>
+                        <button class="btn btn-primary" onclick="location.reload()">
+                            Cerrar
+                        </button>
+                    </div>
+                </div>
             </div>
 
-            <!-- SECCIÓN DE ÉXITO -->
-            <div id="successSection" class="section">
-                <div class="success-icon">✅</div>
-                <h2 class="section-title" style="text-align: center;">¡Formulario Enviado!</h2>
-                <div class="alert alert-success active">
-                    Tu formulario ha sido enviado exitosamente. La notaría revisará la información proporcionada.
-                </div>
-                <p style="text-align: center; color: #666; margin-top: 20px;">
-                    Puedes cerrar esta ventana.
-                </p>
+            <!-- Loading -->
+            <div id="loadingSection" class="loading">
+                <div class="spinner"></div>
+                <p style="color: #666;">Procesando...</p>
             </div>
         </div>
     </div>
@@ -354,7 +749,9 @@
             : 'https://notaria-segura-v4-production.up.railway.app/api';
 
         let sessionToken = null;
-        let protocoloData = null;
+        let sessionData = null;
+        let seccionActual = 1;
+        const totalSecciones = 5;
 
         // ========================================
         // FUNCIONES DE UI
@@ -369,11 +766,15 @@
             }, 5000);
         }
 
-        function showLoading(show, loadingId = 'loginLoading') {
-            const loading = document.getElementById(loadingId);
+        function showLoading(show) {
+            const loading = document.getElementById('loadingSection');
+            const loginLoading = document.getElementById('loginLoading');
+
             if (show) {
+                if (loginLoading) loginLoading.classList.add('active');
                 loading.classList.add('active');
             } else {
+                if (loginLoading) loginLoading.classList.remove('active');
                 loading.classList.remove('active');
             }
         }
@@ -385,16 +786,19 @@
             document.getElementById(seccionId).classList.add('active');
         }
 
+        function actualizarProgreso() {
+            const progreso = (seccionActual / totalSecciones) * 100;
+            document.getElementById('progressBar').style.width = `${progreso}%`;
+        }
+
         // ========================================
         // LOGIN
         // ========================================
         async function login() {
-            // Obtener valores de los inputs
             const numeroProtocolo = document.getElementById('loginProtocolo').value.trim();
             const cedula = document.getElementById('loginCedula').value.trim();
             const pin = document.getElementById('loginPin').value.trim();
 
-            // Validaciones básicas
             if (!numeroProtocolo || !cedula || !pin) {
                 showAlert('loginAlert', 'Por favor complete todos los campos', 'error');
                 return;
@@ -408,37 +812,37 @@
             showLoading(true);
 
             try {
-                // ⚠️ CRÍTICO: Enviar con los nombres EXACTOS que el backend espera
                 const response = await fetch(`${API_URL}/formulario-uafe/login`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        numeroProtocolo: numeroProtocolo,  // ← EXACTAMENTE como el backend espera
-                        cedula: cedula,                     // ← EXACTAMENTE como el backend espera
-                        pin: pin                            // ← EXACTAMENTE como el backend espera
+                        numeroProtocolo: numeroProtocolo,
+                        cedula: cedula,
+                        pin: pin
                     })
                 });
 
                 const data = await response.json();
 
                 if (data.success) {
-                    // Guardar token de sesión
-                    sessionToken = data.sessionToken;  // ← El backend retorna "sessionToken"
-                    protocoloData = data.data;
+                    sessionToken = data.sessionToken;
+                    sessionData = data.data;
 
-                    // Mostrar datos del protocolo
+                    // Guardar en sessionStorage
+                    sessionStorage.setItem('uafe-session-token', sessionToken);
+                    sessionStorage.setItem('uafe-session-data', JSON.stringify(sessionData));
+
                     mostrarDatosProtocolo();
-
-                    // Ir a la sección del formulario
+                    precargarDatos();
                     mostrarSeccion('formularioSection');
-                    showLoading(false);
+                    actualizarProgreso();
                 } else {
                     showAlert('loginAlert', data.message || 'Error al iniciar sesión', 'error');
-                    showLoading(false);
                 }
             } catch (error) {
                 console.error('Error login:', error);
                 showAlert('loginAlert', 'Error de conexión. Verifica tu internet e intenta nuevamente.', 'error');
+            } finally {
                 showLoading(false);
             }
         }
@@ -447,67 +851,314 @@
         // MOSTRAR DATOS DEL PROTOCOLO
         // ========================================
         function mostrarDatosProtocolo() {
-            if (!protocoloData) return;
+            if (!sessionData) return;
 
             const infoBox = document.getElementById('protocoloInfo');
+            const protocolo = sessionData.protocolo;
+            const rol = sessionData.tuRol;
+
             infoBox.innerHTML = `
                 <p><strong>Información del Trámite:</strong></p>
                 <p style="margin-top: 10px;">
-                    <strong>Protocolo:</strong> ${protocoloData.protocolo.numeroProtocolo}<br>
-                    <strong>Fecha:</strong> ${new Date(protocoloData.protocolo.fecha).toLocaleDateString('es-EC')}<br>
-                    <strong>Acto/Contrato:</strong> ${protocoloData.protocolo.actoContrato}<br>
-                    <strong>Valor:</strong> $${parseFloat(protocoloData.protocolo.valorContrato).toFixed(2)}
+                    <strong>Protocolo:</strong> ${protocolo.numeroProtocolo}<br>
+                    <strong>Fecha:</strong> ${new Date(protocolo.fecha).toLocaleDateString('es-EC')}<br>
+                    <strong>Acto/Contrato:</strong> ${protocolo.actoContrato}<br>
+                    <strong>Valor:</strong> $${parseFloat(protocolo.valorContrato).toFixed(2)}
                 </p>
                 <p style="margin-top: 10px;">
-                    <strong>Tu Rol:</strong> ${protocoloData.tuRol.calidad} - ${protocoloData.tuRol.actuaPor}
+                    <strong>Tu Rol:</strong> ${rol.calidad} - ${rol.actuaPor}
                 </p>
             `;
+        }
 
-            // Mostrar rol en el campo readonly
-            document.getElementById('rolPersona').value =
-                `${protocoloData.tuRol.calidad} - ${protocoloData.tuRol.actuaPor}`;
+        // ========================================
+        // PRE-CARGAR DATOS
+        // ========================================
+        function precargarDatos() {
+            if (!sessionData || !sessionData.tusDatos) {
+                console.log('No hay datos previos para pre-llenar');
+                return;
+            }
+
+            const datos = sessionData.tusDatos;
+            console.log('Pre-llenando datos:', datos);
+
+            // Helper para setear valores
+            function setValue(fieldId, value) {
+                const field = document.getElementById(fieldId);
+                if (field && value !== null && value !== undefined) {
+                    field.value = value;
+                }
+            }
+
+            // 1. Identificación
+            if (datos.identificacion) {
+                setValue('tipoIdentificacion', datos.identificacion.tipo);
+                setValue('numeroIdentificacion', datos.identificacion.numero);
+                setValue('nacionalidad', datos.identificacion.nacionalidad);
+            }
+
+            // 2. Datos Personales
+            if (datos.datosPersonales) {
+                setValue('apellidos', datos.datosPersonales.apellidos);
+                setValue('nombres', datos.datosPersonales.nombres);
+                setValue('genero', datos.datosPersonales.genero);
+                setValue('estadoCivil', datos.datosPersonales.estadoCivil);
+                setValue('nivelEstudio', datos.datosPersonales.nivelEstudio);
+                toggleConyugeSection(); // Activar sección de cónyuge si aplica
+            }
+
+            // 3. Contacto
+            if (datos.contacto) {
+                setValue('email', datos.contacto.email);
+                setValue('telefono', datos.contacto.telefono);
+                setValue('celular', datos.contacto.celular);
+            }
+
+            // 4. Dirección
+            if (datos.direccion) {
+                setValue('callePrincipal', datos.direccion.callePrincipal);
+                setValue('numeroDomicilio', datos.direccion.numero);
+                setValue('calleSecundaria', datos.direccion.calleSecundaria);
+                setValue('provincia', datos.direccion.provincia);
+                setValue('canton', datos.direccion.canton);
+                setValue('parroquia', datos.direccion.parroquia);
+            }
+
+            // 5. Información Laboral
+            if (datos.informacionLaboral) {
+                setValue('situacionLaboral', datos.informacionLaboral.situacion);
+                toggleInfoLaboral(); // Mostrar campos laborales si aplica
+
+                if (datos.informacionLaboral.relacionDependencia !== undefined) {
+                    const relacionVal = datos.informacionLaboral.relacionDependencia;
+                    if (relacionVal === true || relacionVal === 'true') {
+                        document.getElementById('relacionSi').checked = true;
+                    } else {
+                        document.getElementById('relacionNo').checked = true;
+                    }
+                }
+
+                setValue('fechaIngreso', datos.informacionLaboral.fechaIngreso);
+                setValue('nombreEntidad', datos.informacionLaboral.nombreEntidad);
+                setValue('direccionEntidad', datos.informacionLaboral.direccionEmpresa);
+                setValue('provinciaEntidad', datos.informacionLaboral.provincia);
+                setValue('cantonEntidad', datos.informacionLaboral.canton);
+                setValue('profesionOcupacion', datos.informacionLaboral.profesionOcupacion);
+                setValue('cargo', datos.informacionLaboral.cargo);
+                setValue('ingresoMensual', datos.informacionLaboral.ingresoMensual);
+            }
+
+            // 6. Cónyuge (si aplica)
+            if (datos.conyuge) {
+                setValue('conyugeApellidos', datos.conyuge.apellidos);
+                setValue('conyugeNombres', datos.conyuge.nombres);
+                setValue('conyugeTipoId', datos.conyuge.tipoIdentificacion);
+                setValue('conyugeNumeroId', datos.conyuge.numeroIdentificacion);
+                setValue('conyugeNacionalidad', datos.conyuge.nacionalidad);
+                setValue('conyugeProfesion', datos.conyuge.profesion);
+                setValue('conyugeEmail', datos.conyuge.email);
+                setValue('conyugeCelular', datos.conyuge.celular);
+            }
+
+            // 7. PEP
+            if (datos.pep) {
+                if (datos.pep.esPersonaExpuesta !== undefined) {
+                    const pepVal = datos.pep.esPersonaExpuesta;
+                    if (pepVal === true || pepVal === 'true') {
+                        document.getElementById('pepSi').checked = true;
+                    } else {
+                        document.getElementById('pepNo').checked = true;
+                    }
+                }
+
+                if (datos.pep.esFamiliarPEP !== undefined) {
+                    const familiarVal = datos.pep.esFamiliarPEP;
+                    if (familiarVal === true || familiarVal === 'true') {
+                        document.getElementById('familiarPepSi').checked = true;
+                    } else {
+                        document.getElementById('familiarPepNo').checked = true;
+                    }
+                }
+
+                if (datos.pep.esColaboradorPEP !== undefined) {
+                    const colaboradorVal = datos.pep.esColaboradorPEP;
+                    if (colaboradorVal === true || colaboradorVal === 'true') {
+                        document.getElementById('colaboradorPepSi').checked = true;
+                    } else {
+                        document.getElementById('colaboradorPepNo').checked = true;
+                    }
+                }
+            }
+
+            console.log('Datos pre-llenados exitosamente');
+        }
+
+        // ========================================
+        // NAVEGACIÓN ENTRE SECCIONES
+        // ========================================
+        function siguienteSeccion() {
+            if (!validarSeccionActual()) return;
+
+            if (seccionActual < totalSecciones) {
+                document.getElementById(`seccion${seccionActual}`).classList.remove('active');
+                seccionActual++;
+                document.getElementById(`seccion${seccionActual}`).classList.add('active');
+                actualizarProgreso();
+                window.scrollTo(0, 0);
+            }
+        }
+
+        function anteriorSeccion() {
+            if (seccionActual > 1) {
+                document.getElementById(`seccion${seccionActual}`).classList.remove('active');
+                seccionActual--;
+                document.getElementById(`seccion${seccionActual}`).classList.add('active');
+                actualizarProgreso();
+                window.scrollTo(0, 0);
+            }
+        }
+
+        function validarSeccionActual() {
+            const seccion = document.getElementById(`seccion${seccionActual}`);
+            const required = seccion.querySelectorAll('[required]');
+
+            for (let field of required) {
+                if (!field.value.trim()) {
+                    showAlert('formAlert', 'Por favor complete todos los campos obligatorios (*)', 'error');
+                    field.focus();
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        // ========================================
+        // TOGGLES
+        // ========================================
+        function toggleConyugeSection() {
+            const estadoCivil = document.getElementById('estadoCivil').value;
+            const conyugeForm = document.getElementById('conyugeForm');
+            const mostrar = estadoCivil === 'CASADO' || estadoCivil === 'UNION_LIBRE';
+            conyugeForm.classList.toggle('hidden', !mostrar);
+        }
+
+        function toggleInfoLaboral() {
+            const situacion = document.getElementById('situacionLaboral').value;
+            const detalle = document.getElementById('detalleLaboral');
+            detalle.classList.toggle('hidden', situacion === 'NO_APLICA' || !situacion);
         }
 
         // ========================================
         // ENVIAR FORMULARIO
         // ========================================
         async function enviarFormulario() {
+            if (!validarSeccionActual()) return;
+
             if (!sessionToken) {
                 showAlert('formAlert', 'Sesión expirada. Por favor inicia sesión nuevamente.', 'error');
                 return;
             }
 
-            showLoading(true, 'formLoading');
+            showLoading(true);
 
             try {
-                // Aquí se construiría el objeto con todos los datos del formulario
-                const formData = {
-                    // TODO: Agregar todos los campos del formulario UAFE
-                    // Por ahora solo un placeholder
-                    completado: true
+                const estadoCivil = document.getElementById('estadoCivil').value;
+                const tieneConyugue = estadoCivil === 'CASADO' || estadoCivil === 'UNION_LIBRE';
+
+                // Construir objeto de datos actualizado
+                const datosActualizados = {
+                    identificacion: {
+                        tipo: document.getElementById('tipoIdentificacion').value,
+                        numero: document.getElementById('numeroIdentificacion').value,
+                        nacionalidad: document.getElementById('nacionalidad').value
+                    },
+                    datosPersonales: {
+                        apellidos: document.getElementById('apellidos').value,
+                        nombres: document.getElementById('nombres').value,
+                        genero: document.getElementById('genero').value,
+                        estadoCivil: estadoCivil,
+                        nivelEstudio: document.getElementById('nivelEstudio').value
+                    },
+                    contacto: {
+                        email: document.getElementById('email').value,
+                        telefono: document.getElementById('telefono').value || null,
+                        celular: document.getElementById('celular').value
+                    },
+                    direccion: {
+                        callePrincipal: document.getElementById('callePrincipal').value,
+                        numero: document.getElementById('numeroDomicilio').value || null,
+                        calleSecundaria: document.getElementById('calleSecundaria').value || null,
+                        provincia: document.getElementById('provincia').value,
+                        canton: document.getElementById('canton').value,
+                        parroquia: document.getElementById('parroquia').value
+                    },
+                    informacionLaboral: {
+                        situacion: document.getElementById('situacionLaboral').value,
+                        relacionDependencia: document.querySelector('input[name="relacionDependencia"]:checked')?.value === 'true' || false,
+                        fechaIngreso: document.getElementById('fechaIngreso').value || null,
+                        nombreEntidad: document.getElementById('nombreEntidad').value || null,
+                        direccionEmpresa: document.getElementById('direccionEntidad').value || null,
+                        provincia: document.getElementById('provinciaEntidad').value || null,
+                        canton: document.getElementById('cantonEntidad').value || null,
+                        profesionOcupacion: document.getElementById('profesionOcupacion').value,
+                        cargo: document.getElementById('cargo').value || null,
+                        ingresoMensual: parseFloat(document.getElementById('ingresoMensual').value) || null
+                    },
+                    conyuge: tieneConyugue ? {
+                        apellidos: document.getElementById('conyugeApellidos').value || null,
+                        nombres: document.getElementById('conyugeNombres').value || null,
+                        tipoIdentificacion: document.getElementById('conyugeTipoId').value || null,
+                        numeroIdentificacion: document.getElementById('conyugeNumeroId').value || null,
+                        nacionalidad: document.getElementById('conyugeNacionalidad').value || null,
+                        profesion: document.getElementById('conyugeProfesion').value || null,
+                        email: document.getElementById('conyugeEmail').value || null,
+                        celular: document.getElementById('conyugeCelular').value || null
+                    } : null,
+                    pep: {
+                        esPersonaExpuesta: document.querySelector('input[name="esPersonaExpuesta"]:checked').value === 'true',
+                        esFamiliarPEP: document.querySelector('input[name="esFamiliarPEP"]:checked').value === 'true',
+                        esColaboradorPEP: document.querySelector('input[name="esColaboradorPEP"]:checked').value === 'true'
+                    }
                 };
 
                 const response = await fetch(`${API_URL}/formulario-uafe/responder`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'x-session-token': sessionToken  // ← Token de sesión en el header
+                        'x-session-token': sessionToken
                     },
-                    body: JSON.stringify(formData)
+                    body: JSON.stringify({ datosPersonaNatural: datosActualizados })
                 });
 
                 const data = await response.json();
 
                 if (data.success) {
-                    mostrarSeccion('successSection');
+                    document.getElementById('seccion5').classList.remove('active');
+                    document.getElementById('seccionConfirmacion').classList.add('active');
                 } else {
                     showAlert('formAlert', data.message || 'Error al enviar formulario', 'error');
-                    showLoading(false, 'formLoading');
                 }
             } catch (error) {
                 console.error('Error enviando formulario:', error);
-                showAlert('formAlert', 'Error de conexión', 'error');
-                showLoading(false, 'formLoading');
+                showAlert('formAlert', 'Error de conexión al enviar', 'error');
+            } finally {
+                showLoading(false);
+            }
+        }
+
+        // ========================================
+        // CERRAR SESIÓN
+        // ========================================
+        function cerrarSesion() {
+            if (confirm('¿Está seguro de salir? Los cambios no guardados se perderán.')) {
+                sessionToken = null;
+                sessionData = null;
+                seccionActual = 1;
+                sessionStorage.removeItem('uafe-session-token');
+                sessionStorage.removeItem('uafe-session-data');
+                location.reload();
             }
         }
 
@@ -517,6 +1168,19 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('Formulario UAFE - Sistema de Protocolos');
             console.log('API URL:', API_URL);
+
+            // Restaurar sesión si existe
+            const savedToken = sessionStorage.getItem('uafe-session-token');
+            const savedData = sessionStorage.getItem('uafe-session-data');
+
+            if (savedToken && savedData) {
+                sessionToken = savedToken;
+                sessionData = JSON.parse(savedData);
+                mostrarDatosProtocolo();
+                precargarDatos();
+                mostrarSeccion('formularioSection');
+                actualizarProgreso();
+            }
         });
     </script>
 </body>
