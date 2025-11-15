@@ -358,20 +358,16 @@ export function drawFooter(doc) {
        align: 'center'
      });
 
-  // Número de página
-  const pages = doc.bufferedPageRange();
-  for (let i = 0; i < pages.count; i++) {
-    doc.switchToPage(i);
-    doc.fillColor(COLORS.textLight)
-       .fontSize(8)
-       .font(FONTS.normal)
-       .text(
-         `Página ${i + 1} de ${pages.count}`,
-         50,
-         footerY + 24,
-         { width: 500, align: 'center' }
-       );
-  }
+  // Texto simple de página (sin numerar porque es PDF de una sola página por persona)
+  doc.fillColor(COLORS.textLight)
+     .fontSize(8)
+     .font(FONTS.normal)
+     .text(
+       'Formulario UAFE - Notaría 18',
+       50,
+       footerY + 24,
+       { width: 500, align: 'center' }
+     );
 }
 
 /**
