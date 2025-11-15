@@ -948,8 +948,11 @@ export async function generarPDFs(req, res) {
 
           // === GENERAR CONTENIDO DEL PDF ===
 
+          // Ruta del logo (si existe)
+          const logoPath = path.join(__dirname, '../../assets/images/logo-notaria.png');
+
           // HEADER
-          let currentY = drawHeader(doc);
+          let currentY = drawHeader(doc, logoPath);
 
           // DISCLAIMER
           currentY = drawDisclaimer(doc, currentY);
@@ -1125,12 +1128,12 @@ function generateNaturalPersonPDF(doc, startY, datos, persona) {
     drawField(doc, 310, y, 'Nombres', datos.conyuge?.nombres, 230);
 
     y += 50;
-    drawField(doc, 60, y, 'Tipo ID', datos.conyuge?.tipoId, 100);
-    drawField(doc, 180, y, 'Número de Identificación', datos.conyuge?.numeroId, 180);
+    drawField(doc, 60, y, 'Tipo ID', datos.conyuge?.tipoIdentificacion, 100);
+    drawField(doc, 180, y, 'Número de Identificación', datos.conyuge?.numeroIdentificacion, 180);
     drawField(doc, 380, y, 'Nacionalidad', datos.conyuge?.nacionalidad, 160);
 
     y += 50;
-    drawField(doc, 60, y, 'Correo Electrónico', datos.conyuge?.correo, 240);
+    drawField(doc, 60, y, 'Correo Electrónico', datos.conyuge?.email, 240);
     drawField(doc, 320, y, 'Celular', datos.conyuge?.celular, 220);
 
     y += 50;
