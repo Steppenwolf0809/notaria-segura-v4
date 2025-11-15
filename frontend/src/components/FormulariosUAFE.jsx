@@ -48,7 +48,8 @@ import {
   Delete as DeleteIcon,
   Description as DescriptionIcon,
   ContentCopy as CopyIcon,
-  Link as LinkIcon
+  Link as LinkIcon,
+  PictureAsPdf as PictureAsPdfIcon
 } from '@mui/icons-material';
 import { API_BASE } from '../utils/apiConfig';
 
@@ -402,6 +403,54 @@ const FormulariosUAFE = () => {
   };
 
   /**
+   * Descargar PDFs profesionales de formularios UAFE
+   */
+  const descargarPDFs = async (protocoloId) => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(
+        `${API_BASE}/formulario-uafe/protocolo/${protocoloId}/generar-pdfs`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        mostrarSnackbar(errorData.message || 'Error al generar PDFs', 'error');
+        return;
+      }
+
+      // Obtener filename del header Content-Disposition
+      const contentDisposition = response.headers.get('Content-Disposition');
+      const filename = contentDisposition
+        ? contentDisposition.split('filename=')[1].replace(/"/g, '')
+        : 'formularios_uafe.pdf';
+
+      // Descargar archivo
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      mostrarSnackbar('PDFs descargados exitosamente', 'success');
+    } catch (error) {
+      console.error('Error descargando PDFs:', error);
+      mostrarSnackbar('Error al descargar PDFs', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
    * Calcular progreso de personas completadas
    */
   const calcularProgreso = (protocolo) => {
@@ -564,6 +613,16 @@ const FormulariosUAFE = () => {
                             onClick={() => verDetallesProtocolo(protocolo.id)}
                           >
                             <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Descargar PDFs">
+                          <IconButton
+                            size="small"
+                            color="success"
+                            onClick={() => descargarPDFs(protocolo.id)}
+                            disabled={!protocolo.personas || protocolo.personas.filter(p => p.completado).length === 0}
+                          >
+                            <PictureAsPdfIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                       </Stack>
