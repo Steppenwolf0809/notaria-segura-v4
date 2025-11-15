@@ -6,6 +6,20 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import archiver from 'archiver';
+import {
+  drawHeader,
+  drawDisclaimer,
+  drawProtocolBox,
+  drawSection,
+  drawField,
+  drawTextAreaField,
+  drawSignature,
+  drawFooter,
+  getNombreCompleto,
+  formatCurrency,
+  formatDate,
+  checkAndAddPage
+} from '../utils/pdf-uafe-helpers.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -336,61 +350,24 @@ export async function loginFormularioUAFE(req, res) {
  */
 export async function responderFormulario(req, res) {
   try {
-    const { datosPersonaNatural, datosPersonaJuridica } = req.body;
+    const respuestaData = req.body;
 
-    const personaProtocolo = req.personaProtocoloVerificada;
-    const tipoPersona = personaProtocolo.persona.tipoPersona;
-
-    // Validar que se envíen los datos correctos según el tipo de persona
-    if (tipoPersona === 'NATURAL' && !datosPersonaNatural) {
-      return res.status(400).json({
-        success: false,
-        message: 'Se requieren datosPersonaNatural para persona natural'
-      });
-    }
-
-    if (tipoPersona === 'JURIDICA' && !datosPersonaJuridica) {
-      return res.status(400).json({
-        success: false,
-        message: 'Se requieren datosPersonaJuridica para persona jurídica'
-      });
-    }
-
-    // Usar transacción para actualizar ambas tablas
-    const resultado = await prisma.$transaction(async (tx) => {
-      // 1. Actualizar PersonaRegistrada con los nuevos datos
-      const updateData = tipoPersona === 'NATURAL'
-        ? { datosPersonaNatural: datosPersonaNatural }
-        : { datosPersonaJuridica: datosPersonaJuridica };
-
-      await tx.personaRegistrada.update({
-        where: { id: personaProtocolo.persona.id },
-        data: updateData
-      });
-
-      // 2. Marcar PersonaProtocolo como completado y guardar respuesta
-      const personaProtocoloActualizado = await tx.personaProtocolo.update({
-        where: { id: personaProtocolo.id },
-        data: {
-          completado: true,
-          completadoAt: new Date(),
-          respuestaFormulario: {
-            datosActualizados: tipoPersona === 'NATURAL' ? datosPersonaNatural : datosPersonaJuridica,
-            fechaRespuesta: new Date().toISOString(),
-            ipAddress: req.ip
-          }
-        }
-      });
-
-      return personaProtocoloActualizado;
+    // Actualizar PersonaProtocolo con la respuesta
+    const personaProtocolo = await prisma.personaProtocolo.update({
+      where: { id: req.personaProtocoloVerificada.id },
+      data: {
+        completado: true,
+        completadoAt: new Date(),
+        respuestaFormulario: respuestaData
+      }
     });
 
     res.json({
       success: true,
-      message: 'Formulario enviado exitosamente. Tus datos han sido actualizados.',
+      message: 'Formulario enviado exitosamente',
       data: {
         completado: true,
-        completadoAt: resultado.completadoAt
+        completadoAt: personaProtocolo.completadoAt
       }
     });
   } catch (error) {
@@ -619,11 +596,6 @@ export async function obtenerProtocolo(req, res) {
   }
 }
 
-/**
- * Actualizar datos del protocolo UAFE
- * PUT /api/formulario-uafe/protocolo/:protocoloId
- * Requiere: authenticateToken + role MATRIZADOR o ADMIN
- */
 export async function actualizarProtocolo(req, res) {
   try {
     const { protocoloId } = req.params;
@@ -889,11 +861,17 @@ export async function eliminarPersonaDeProtocolo(req, res) {
  * POST /api/formulario-uafe/protocolo/:protocoloId/generar-pdfs
  * Requiere: authenticateToken + role MATRIZADOR o ADMIN
  */
-export async function generarPDFsProtocolo(req, res) {
+
+/**
+ * Generar PDFs profesionales de formularios UAFE
+ * GET /api/formulario-uafe/protocolo/:protocoloId/generar-pdfs
+ * Requiere: authenticateToken + role MATRIZADOR o ADMIN
+ */
+export async function generarPDFs(req, res) {
   try {
     const { protocoloId } = req.params;
 
-    // Verificar que el protocolo existe y pertenece al usuario
+    // 1. Obtener protocolo con todas las personas
     const protocolo = await prisma.protocoloUAFE.findUnique({
       where: { id: protocoloId },
       include: {
@@ -901,12 +879,20 @@ export async function generarPDFsProtocolo(req, res) {
           include: {
             persona: {
               select: {
+                id: true,
                 numeroIdentificacion: true,
                 tipoPersona: true,
                 datosPersonaNatural: true,
-                datosPersonaJuridica: true
+                datosPersonaJuridica: true,
+                completado: true
               }
             }
+          }
+        },
+        creador: {
+          select: {
+            firstName: true,
+            lastName: true
           }
         }
       }
@@ -919,87 +905,132 @@ export async function generarPDFsProtocolo(req, res) {
       });
     }
 
+    // Verificar permisos
     if (protocolo.createdBy !== req.user.id && req.user.role !== 'ADMIN') {
       return res.status(403).json({
         success: false,
-        message: 'No tienes permiso para este protocolo'
+        message: 'No tienes permiso para generar PDFs de este protocolo'
       });
     }
 
-    // Verificar que todas las personas completaron el formulario
-    const personasIncompletas = protocolo.personas.filter(p => !p.completado);
-    if (personasIncompletas.length > 0) {
+    // Verificar que haya personas completadas
+    const personasCompletadas = protocolo.personas.filter(pp => pp.completado);
+    if (personasCompletadas.length === 0) {
       return res.status(400).json({
         success: false,
-        message: `${personasIncompletas.length} persona(s) aún no ha(n) completado el formulario`,
-        personasIncompletas: personasIncompletas.map(p => ({
-          cedula: p.persona.numeroIdentificacion,
-          calidad: p.calidad
-        }))
+        message: 'No hay personas con formularios completados en este protocolo'
       });
-    }
-
-    // Crear carpeta temporal para PDFs
-    const timestamp = Date.now();
-    const tempDir = path.join(__dirname, '../../temp', `protocolo_${protocolo.numeroProtocolo}_${timestamp}`);
-
-    if (!fs.existsSync(tempDir)) {
-      fs.mkdirSync(tempDir, { recursive: true });
     }
 
     const pdfsGenerados = [];
 
-    // Generar PDF por cada persona
-    for (const personaProtocolo of protocolo.personas) {
+    // 2. Generar PDF para cada persona completada
+    for (const personaProtocolo of personasCompletadas) {
       const persona = personaProtocolo.persona;
       const datos = persona.tipoPersona === 'NATURAL'
         ? persona.datosPersonaNatural
         : persona.datosPersonaJuridica;
 
-      // Extraer nombre
-      let nombre = 'Sin_nombre';
-      if (persona.tipoPersona === 'NATURAL' && datos?.datosPersonales) {
-        nombre = `${datos.datosPersonales.apellidos || ''}_${datos.datosPersonales.nombres || ''}`.replace(/\s+/g, '_');
-      } else if (persona.tipoPersona === 'JURIDICA' && datos?.compania) {
-        nombre = (datos.compania.razonSocial || 'Sin_nombre').replace(/\s+/g, '_');
-      }
+      if (!datos) continue;
 
-      const pdfFileName = `UAFE_${persona.numeroIdentificacion}_${nombre}_${timestamp}.pdf`;
-      const pdfPath = path.join(tempDir, pdfFileName);
+      // Crear PDF buffer
+      const pdfBuffer = await new Promise((resolve, reject) => {
+        try {
+          const doc = new PDFDocument({
+            size: 'A4',
+            margins: { top: 50, bottom: 50, left: 50, right: 50 }
+          });
 
-      // Generar PDF
-      await generarPDFFormulario(protocolo, personaProtocolo, persona, datos, pdfPath);
+          const chunks = [];
+          doc.on('data', chunk => chunks.push(chunk));
+          doc.on('end', () => resolve(Buffer.concat(chunks)));
+          doc.on('error', reject);
+
+          // === GENERAR CONTENIDO DEL PDF ===
+
+          // HEADER
+          let currentY = drawHeader(doc);
+
+          // DISCLAIMER
+          currentY = drawDisclaimer(doc, currentY);
+
+          // BOX DE PROTOCOLO
+          currentY = drawProtocolBox(
+            doc,
+            currentY,
+            protocolo,
+            personaProtocolo.calidad,
+            personaProtocolo.actuaPor
+          );
+
+          // SOLO PARA PERSONAS NATURALES
+          if (persona.tipoPersona === 'NATURAL') {
+            currentY = generateNaturalPersonPDF(doc, currentY, datos, persona);
+          } else {
+            // TODO: Implementar para personas jurídicas
+            currentY = generateJuridicalPersonPDF(doc, currentY, datos, persona);
+          }
+
+          // FIRMA
+          const nombreCompleto = getNombreCompleto(datos);
+          drawSignature(doc, 650, nombreCompleto, persona.numeroIdentificacion);
+
+          // FOOTER
+          drawFooter(doc);
+
+          // Finalizar documento
+          doc.end();
+        } catch (error) {
+          reject(error);
+        }
+      });
+
+      // Crear filename
+      const apellidos = datos.datosPersonales?.apellidos || datos.compania?.razonSocial || 'SinNombre';
+      const filename = `UAFE_${persona.numeroIdentificacion}_${apellidos.replace(/\s+/g, '_')}.pdf`;
 
       pdfsGenerados.push({
-        personaId: persona.numeroIdentificacion,
-        nombre: nombre.replace(/_/g, ' '),
-        cedula: persona.numeroIdentificacion,
-        archivo: pdfFileName,
-        rutaCompleta: pdfPath
+        filename,
+        buffer: pdfBuffer,
+        persona: {
+          nombres: getNombreCompleto(datos),
+          cedula: persona.numeroIdentificacion
+        }
       });
     }
 
-    // Crear ZIP con todos los PDFs
-    const zipFileName = `Protocolo_${protocolo.numeroProtocolo}_UAFE_${timestamp}.zip`;
-    const zipPath = path.join(tempDir, zipFileName);
+    // 3. Enviar respuesta
+    if (pdfsGenerados.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'No se pudo generar ningún PDF'
+      });
+    }
 
-    await crearZIP(tempDir, zipPath, pdfsGenerados.map(p => p.rutaCompleta));
+    if (pdfsGenerados.length === 1) {
+      // Un solo PDF - enviar directamente
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${pdfsGenerados[0].filename}"`);
+      return res.send(pdfsGenerados[0].buffer);
+    }
 
-    res.json({
-      success: true,
-      message: `Se generaron ${pdfsGenerados.length} PDF(s) exitosamente`,
-      data: {
-        protocolo: protocolo.numeroProtocolo,
-        totalPDFs: pdfsGenerados.length,
-        pdfs: pdfsGenerados.map(p => ({
-          nombre: p.nombre,
-          cedula: p.cedula,
-          archivo: p.archivo
-        })),
-        zipUrl: `/api/formulario-uafe/download/${path.basename(tempDir)}/${zipFileName}`,
-        carpetaTemporal: path.basename(tempDir)
-      }
+    // Múltiples PDFs - crear ZIP
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="UAFE_Protocolo_${protocolo.numeroProtocolo}.zip"`);
+
+    const archive = archiver('zip', {
+      zlib: { level: 9 } // Máxima compresión
     });
+
+    archive.pipe(res);
+
+    // Agregar cada PDF al ZIP
+    pdfsGenerados.forEach(pdf => {
+      archive.append(pdf.buffer, { name: pdf.filename });
+    });
+
+    archive.finalize();
+
   } catch (error) {
     console.error('Error generando PDFs:', error);
     res.status(500).json({
@@ -1011,190 +1042,140 @@ export async function generarPDFsProtocolo(req, res) {
 }
 
 /**
- * Función helper para generar un PDF individual
+ * Generar contenido del PDF para persona natural
  */
-async function generarPDFFormulario(protocolo, personaProtocolo, persona, datos, pdfPath) {
-  return new Promise((resolve, reject) => {
-    try {
-      const doc = new PDFDocument({
-        size: 'A4',
-        margins: { top: 50, bottom: 50, left: 50, right: 50 }
-      });
-      const stream = fs.createWriteStream(pdfPath);
+function generateNaturalPersonPDF(doc, startY, datos, persona) {
+  let y = startY;
 
-      doc.pipe(stream);
+  // === SECCIÓN 1: IDENTIFICACIÓN ===
+  y = checkAndAddPage(doc, y, 120);
+  y = drawSection(doc, y, '1. Identificación', 90);
 
-      // ENCABEZADO
-      doc.fontSize(18).font('Helvetica-Bold').text('FORMULARIO DE DEBIDA DILIGENCIA', { align: 'center' });
-      doc.fontSize(14).text('CONOZCA A SU USUARIO - UAFE', { align: 'center' });
-      doc.moveDown();
-      doc.fontSize(12).font('Helvetica').text('Notaría Décima Octava del Cantón Quito', { align: 'center' });
-      doc.moveDown(2);
+  drawField(doc, 60, y, 'Tipo de Identificación', datos.identificacion?.tipo, 140);
+  drawField(doc, 220, y, 'Número de Identificación', datos.identificacion?.numero, 160);
+  drawField(doc, 400, y, 'Nacionalidad', datos.identificacion?.nacionalidad, 140);
 
-      // INFORMACIÓN DEL TRÁMITE
-      doc.fontSize(14).font('Helvetica-Bold').text('INFORMACIÓN DEL TRÁMITE');
-      doc.moveDown(0.5);
-      doc.fontSize(10).font('Helvetica');
-      doc.text(`Nº Protocolo: ${protocolo.numeroProtocolo}`);
-      doc.text(`Fecha: ${new Date(protocolo.fecha).toLocaleDateString('es-EC')}`);
-      doc.text(`Acto/Contrato: ${protocolo.actoContrato}`);
-      doc.text(`Valor del Contrato: $${protocolo.valorContrato.toFixed(2)}`);
-      if (protocolo.avaluoMunicipal) {
-        doc.text(`Avalúo Municipal: $${protocolo.avaluoMunicipal.toFixed(2)}`);
-      }
-      doc.text(`Rol: ${personaProtocolo.calidad} - ${personaProtocolo.actuaPor.replace('_', ' ')}`);
-      doc.moveDown(1.5);
+  y += 60;
 
-      if (persona.tipoPersona === 'NATURAL' && datos) {
-        // DATOS DE PERSONA NATURAL
+  // === SECCIÓN 2: DATOS PERSONALES ===
+  y = checkAndAddPage(doc, y, 150);
+  y = drawSection(doc, y, '2. Datos Personales', 140);
 
-        // 1. IDENTIFICACIÓN
-        doc.fontSize(12).font('Helvetica-Bold').text('1. IDENTIFICACIÓN');
-        doc.moveDown(0.3);
-        doc.fontSize(10).font('Helvetica');
-        if (datos.identificacion) {
-          doc.text(`Tipo: ${datos.identificacion.tipo || 'N/A'}`);
-          doc.text(`Número: ${datos.identificacion.numero || persona.numeroIdentificacion}`);
-          doc.text(`Nacionalidad: ${datos.identificacion.nacionalidad || 'N/A'}`);
-        }
-        doc.moveDown();
+  drawField(doc, 60, y, 'Apellidos', datos.datosPersonales?.apellidos, 230);
+  drawField(doc, 310, y, 'Nombres', datos.datosPersonales?.nombres, 230);
 
-        // 2. DATOS PERSONALES
-        doc.fontSize(12).font('Helvetica-Bold').text('2. DATOS PERSONALES');
-        doc.moveDown(0.3);
-        doc.fontSize(10).font('Helvetica');
-        if (datos.datosPersonales) {
-          doc.text(`Apellidos: ${datos.datosPersonales.apellidos || 'N/A'}`);
-          doc.text(`Nombres: ${datos.datosPersonales.nombres || 'N/A'}`);
-          doc.text(`Género: ${datos.datosPersonales.genero || 'N/A'}`);
-          doc.text(`Estado Civil: ${datos.datosPersonales.estadoCivil || 'N/A'}`);
-          doc.text(`Nivel de Estudio: ${datos.datosPersonales.nivelEstudio || 'N/A'}`);
-        }
-        doc.moveDown();
+  y += 50;
+  drawField(doc, 60, y, 'Género', datos.datosPersonales?.genero, 140);
+  drawField(doc, 220, y, 'Estado Civil', datos.datosPersonales?.estadoCivil, 160);
+  drawField(doc, 400, y, 'Nivel de Estudio', datos.datosPersonales?.nivelEstudio, 140);
 
-        // 3. CONTACTO
-        doc.fontSize(12).font('Helvetica-Bold').text('3. CONTACTO');
-        doc.moveDown(0.3);
-        doc.fontSize(10).font('Helvetica');
-        if (datos.contacto) {
-          doc.text(`Email: ${datos.contacto.email || 'N/A'}`);
-          doc.text(`Teléfono: ${datos.contacto.telefono || 'N/A'}`);
-          doc.text(`Celular: ${datos.contacto.celular || 'N/A'}`);
-        }
-        doc.moveDown();
+  y += 50;
+  drawField(doc, 60, y, 'Correo Electrónico', datos.contacto?.email, 240);
+  drawField(doc, 320, y, 'Teléfono/Celular', datos.contacto?.celular || datos.contacto?.telefono, 220);
 
-        // 4. DIRECCIÓN
-        doc.fontSize(12).font('Helvetica-Bold').text('4. DIRECCIÓN DOMICILIARIA');
-        doc.moveDown(0.3);
-        doc.fontSize(10).font('Helvetica');
-        if (datos.direccion) {
-          doc.text(`Calle Principal: ${datos.direccion.callePrincipal || 'N/A'}`);
-          doc.text(`Número: ${datos.direccion.numero || 'N/A'}`);
-          doc.text(`Calle Secundaria: ${datos.direccion.calleSecundaria || 'N/A'}`);
-          doc.text(`Provincia: ${datos.direccion.provincia || 'N/A'}`);
-          doc.text(`Cantón: ${datos.direccion.canton || 'N/A'}`);
-          doc.text(`Parroquia: ${datos.direccion.parroquia || 'N/A'}`);
-        }
-        doc.moveDown();
+  y += 70;
 
-        // 5. INFORMACIÓN LABORAL
-        doc.fontSize(12).font('Helvetica-Bold').text('5. INFORMACIÓN LABORAL');
-        doc.moveDown(0.3);
-        doc.fontSize(10).font('Helvetica');
-        if (datos.informacionLaboral) {
-          doc.text(`Situación Laboral: ${datos.informacionLaboral.situacion || 'N/A'}`);
-          doc.text(`Relación de Dependencia: ${datos.informacionLaboral.relacionDependencia ? 'Sí' : 'No'}`);
-          doc.text(`Entidad: ${datos.informacionLaboral.nombreEntidad || 'N/A'}`);
-          doc.text(`Profesión/Ocupación: ${datos.informacionLaboral.profesionOcupacion || 'N/A'}`);
-          doc.text(`Cargo: ${datos.informacionLaboral.cargo || 'N/A'}`);
-          doc.text(`Ingreso Mensual: $${datos.informacionLaboral.ingresoMensual || '0.00'}`);
-        }
-        doc.moveDown();
+  // === SECCIÓN 3: DIRECCIÓN ===
+  y = checkAndAddPage(doc, y, 150);
+  y = drawSection(doc, y, '3. Dirección de Domicilio', 140);
 
-        // 6. CÓNYUGE (si aplica)
-        if (datos.conyuge && (datos.datosPersonales?.estadoCivil === 'CASADO' || datos.datosPersonales?.estadoCivil === 'UNION_LIBRE')) {
-          doc.fontSize(12).font('Helvetica-Bold').text('6. DATOS DEL CÓNYUGE');
-          doc.moveDown(0.3);
-          doc.fontSize(10).font('Helvetica');
-          doc.text(`Apellidos: ${datos.conyuge.apellidos || 'N/A'}`);
-          doc.text(`Nombres: ${datos.conyuge.nombres || 'N/A'}`);
-          doc.text(`Identificación: ${datos.conyuge.numeroIdentificacion || 'N/A'}`);
-          doc.text(`Nacionalidad: ${datos.conyuge.nacionalidad || 'N/A'}`);
-          doc.text(`Profesión: ${datos.conyuge.profesion || 'N/A'}`);
-          doc.moveDown();
-        }
+  drawField(doc, 60, y, 'Calle Principal', datos.direccion?.callePrincipal, 200);
+  drawField(doc, 280, y, 'Número', datos.direccion?.numero, 100);
+  drawField(doc, 400, y, 'Calle Secundaria', datos.direccion?.calleSecundaria, 140);
 
-        // 7. PEP
-        doc.fontSize(12).font('Helvetica-Bold').text('7. PERSONAS EXPUESTAS POLÍTICAMENTE (PEP)');
-        doc.moveDown(0.3);
-        doc.fontSize(10).font('Helvetica');
-        if (datos.pep) {
-          doc.text(`¿Es PEP?: ${datos.pep.esPersonaExpuesta ? 'Sí' : 'No'}`);
-          doc.text(`¿Es familiar de PEP?: ${datos.pep.esFamiliarPEP ? 'Sí' : 'No'}`);
-          doc.text(`¿Es colaborador de PEP?: ${datos.pep.esColaboradorPEP ? 'Sí' : 'No'}`);
-        }
-        doc.moveDown(2);
+  y += 50;
+  drawField(doc, 60, y, 'Provincia', datos.direccion?.provincia, 150);
+  drawField(doc, 230, y, 'Cantón', datos.direccion?.canton, 150);
+  drawField(doc, 400, y, 'Parroquia', datos.direccion?.parroquia, 140);
 
-      } else if (persona.tipoPersona === 'JURIDICA' && datos) {
-        // DATOS DE PERSONA JURÍDICA
-        doc.fontSize(12).font('Helvetica-Bold').text('DATOS DE LA COMPAÑÍA');
-        doc.moveDown(0.3);
-        doc.fontSize(10).font('Helvetica');
-        if (datos.compania) {
-          doc.text(`RUC: ${datos.compania.ruc || persona.numeroIdentificacion}`);
-          doc.text(`Razón Social: ${datos.compania.razonSocial || 'N/A'}`);
-          doc.text(`Nombre Comercial: ${datos.compania.nombreComercial || 'N/A'}`);
-          doc.text(`Tipo de Sociedad: ${datos.compania.tipoSociedad || 'N/A'}`);
-        }
-        doc.moveDown(2);
-      }
+  y += 70;
 
-      // FIRMA
-      doc.moveDown(3);
-      doc.fontSize(10).font('Helvetica');
-      doc.text('_______________________________', { align: 'center' });
-      doc.text('Firma del Compareciente', { align: 'center' });
-      doc.moveDown(2);
-      doc.text('_______________________________', { align: 'center' });
-      doc.text('Firma del Notario', { align: 'center' });
-      doc.moveDown();
-      doc.fontSize(8).text(`Generado el: ${new Date().toLocaleString('es-EC')}`, { align: 'right' });
+  // === SECCIÓN 4: INFORMACIÓN LABORAL ===
+  y = checkAndAddPage(doc, y, 200);
+  y = drawSection(doc, y, '4. Información Laboral', 190);
 
-      doc.end();
-      stream.on('finish', resolve);
-      stream.on('error', reject);
-    } catch (error) {
-      reject(error);
-    }
-  });
+  drawField(doc, 60, y, 'Situación Laboral', datos.informacionLaboral?.situacion, 200);
+  drawField(doc, 280, y, 'Relación de Dependencia', datos.informacionLaboral?.relacionDependencia ? 'SÍ' : 'NO', 100);
+  drawField(doc, 400, y, 'Ingreso Mensual', formatCurrency(datos.informacionLaboral?.ingresoMensual), 140);
+
+  y += 50;
+  drawField(doc, 60, y, 'Nombre de la Entidad', datos.informacionLaboral?.nombreEntidad, 240);
+  drawField(doc, 320, y, 'Cargo', datos.informacionLaboral?.cargo, 220);
+
+  y += 50;
+  drawField(doc, 60, y, 'Profesión/Ocupación', datos.informacionLaboral?.profesionOcupacion, 480);
+
+  y += 50;
+
+  // Dirección laboral completa
+  const direccionLaboral = datos.informacionLaboral?.direccionLaboral
+    ? `${datos.informacionLaboral.direccionLaboral}, ${datos.informacionLaboral.cantonLaboral || ''}, ${datos.informacionLaboral.provinciaLaboral || ''}`.replace(/,\s*,/g, ',').trim()
+    : null;
+  drawTextAreaField(doc, 60, y, 'Dirección Laboral', direccionLaboral, 480, 40);
+
+  y += 80;
+
+  // === SECCIÓN 5: INFORMACIÓN DEL CÓNYUGE (si aplica) ===
+  const tieneConyuge = datos.conyuge?.nombres && datos.conyuge?.apellidos;
+  if (tieneConyuge) {
+    y = checkAndAddPage(doc, y, 180);
+    y = drawSection(doc, y, '5. Información del Cónyuge', 170);
+
+    drawField(doc, 60, y, 'Apellidos', datos.conyuge?.apellidos, 230);
+    drawField(doc, 310, y, 'Nombres', datos.conyuge?.nombres, 230);
+
+    y += 50;
+    drawField(doc, 60, y, 'Tipo ID', datos.conyuge?.tipoId, 100);
+    drawField(doc, 180, y, 'Número de Identificación', datos.conyuge?.numeroId, 180);
+    drawField(doc, 380, y, 'Nacionalidad', datos.conyuge?.nacionalidad, 160);
+
+    y += 50;
+    drawField(doc, 60, y, 'Correo Electrónico', datos.conyuge?.correo, 240);
+    drawField(doc, 320, y, 'Celular', datos.conyuge?.celular, 220);
+
+    y += 50;
+    drawField(doc, 60, y, 'Profesión', datos.conyuge?.profesion, 200);
+    drawField(doc, 280, y, 'Situación Laboral', datos.conyuge?.situacionLaboral, 260);
+
+    y += 70;
+  }
+
+  // === SECCIÓN 6: PERSONA POLÍTICAMENTE EXPUESTA (PEP) ===
+  y = checkAndAddPage(doc, y, 120);
+  y = drawSection(doc, y, '6. Persona Políticamente Expuesta (PEP)', 110);
+
+  drawField(doc, 60, y, '¿Es Persona Expuesta Políticamente?', datos.pep?.esPersonaExpuesta ? 'SÍ' : 'NO', 200);
+  drawField(doc, 280, y, '¿Es Familiar de PEP?', datos.pep?.esFamiliarPEP ? 'SÍ' : 'NO', 130);
+  drawField(doc, 430, y, '¿Es Colaborador de PEP?', datos.pep?.esColaboradorPEP ? 'SÍ' : 'NO', 110);
+
+  y += 50;
+  if (datos.pep?.esFamiliarPEP && datos.pep?.relacionPEP) {
+    drawField(doc, 60, y, 'Relación con PEP', datos.pep.relacionPEP, 240);
+  }
+  if (datos.pep?.esColaboradorPEP && datos.pep?.tipoColaborador) {
+    drawField(doc, 320, y, 'Tipo de Colaborador', datos.pep.tipoColaborador, 220);
+  }
+
+  return y + 100;
 }
 
 /**
- * Función helper para crear ZIP
+ * Generar contenido del PDF para persona jurídica
+ * TODO: Implementar cuando se agregue soporte para personas jurídicas
  */
-async function crearZIP(tempDir, zipPath, pdfPaths) {
-  return new Promise((resolve, reject) => {
-    const output = fs.createWriteStream(zipPath);
-    const archive = archiver('zip', { zlib: { level: 9 } });
+function generateJuridicalPersonPDF(doc, startY, datos, persona) {
+  let y = startY;
 
-    output.on('close', () => resolve(zipPath));
-    archive.on('error', (err) => reject(err));
+  y = checkAndAddPage(doc, y, 100);
+  y = drawSection(doc, y, 'Información de Persona Jurídica', 80);
 
-    archive.pipe(output);
+  drawField(doc, 60, y, 'Razón Social', datos.compania?.razonSocial, 480);
 
-    // Agregar cada PDF al ZIP
-    pdfPaths.forEach(pdfPath => {
-      archive.file(pdfPath, { name: path.basename(pdfPath) });
-    });
+  y += 50;
+  drawTextAreaField(doc, 60, y, 'Nota', 'El formulario completo para personas jurídicas estará disponible próximamente.', 480, 40);
 
-    archive.finalize();
-  });
+  return y + 100;
 }
-
-/**
- * Descargar archivo temporal (PDF o ZIP)
- * GET /api/formulario-uafe/download/:folder/:filename
- */
 export async function descargarArchivo(req, res) {
   try {
     const { folder, filename } = req.params;
