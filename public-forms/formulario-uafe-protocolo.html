@@ -289,12 +289,87 @@
             width: auto;
         }
 
+        /* Stepper styles */
+        .stepper {
+            display: flex;
+            justify-content: space-between;
+            margin: 30px 0;
+            position: relative;
+        }
+
+        .stepper::before {
+            content: '';
+            position: absolute;
+            top: 20px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #e0e0e0;
+            z-index: 0;
+        }
+
+        .stepper-item {
+            flex: 1;
+            text-align: center;
+            position: relative;
+            z-index: 1;
+        }
+
+        .stepper-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #e0e0e0;
+            color: #999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 10px;
+            font-weight: 600;
+            transition: all 0.3s;
+            border: 3px solid white;
+        }
+
+        .stepper-item.active .stepper-circle {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            transform: scale(1.1);
+        }
+
+        .stepper-item.completed .stepper-circle {
+            background: #4caf50;
+            color: white;
+        }
+
+        .stepper-label {
+            font-size: 12px;
+            color: #999;
+            font-weight: 500;
+        }
+
+        .stepper-item.active .stepper-label {
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .stepper-item.completed .stepper-label {
+            color: #4caf50;
+        }
+
         @media (max-width: 768px) {
             .form-row {
                 grid-template-columns: 1fr;
             }
             .content {
                 padding: 20px;
+            }
+            .stepper-label {
+                font-size: 10px;
+            }
+            .stepper-circle {
+                width: 30px;
+                height: 30px;
+                font-size: 12px;
             }
         }
     </style>
@@ -379,6 +454,30 @@
             <div id="formularioSection" class="section">
                 <div class="progress-bar">
                     <div class="progress-bar-fill" id="progressBar"></div>
+                </div>
+
+                <!-- Stepper de Secciones -->
+                <div class="stepper" id="stepper">
+                    <div class="stepper-item active" data-step="1">
+                        <div class="stepper-circle">1</div>
+                        <div class="stepper-label">Identificación</div>
+                    </div>
+                    <div class="stepper-item" data-step="2">
+                        <div class="stepper-circle">2</div>
+                        <div class="stepper-label">Contacto</div>
+                    </div>
+                    <div class="stepper-item" data-step="3">
+                        <div class="stepper-circle">3</div>
+                        <div class="stepper-label">Información Laboral</div>
+                    </div>
+                    <div class="stepper-item" data-step="4">
+                        <div class="stepper-circle">4</div>
+                        <div class="stepper-label">Cónyuge</div>
+                    </div>
+                    <div class="stepper-item" data-step="5">
+                        <div class="stepper-circle">5</div>
+                        <div class="stepper-label">PEP</div>
+                    </div>
                 </div>
 
                 <div id="formAlert" class="alert"></div>
@@ -891,6 +990,19 @@
         function actualizarProgreso() {
             const progreso = (seccionActual / totalSecciones) * 100;
             document.getElementById('progressBar').style.width = `${progreso}%`;
+
+            // Actualizar stepper
+            const stepperItems = document.querySelectorAll('.stepper-item');
+            stepperItems.forEach((item, index) => {
+                const stepNumber = index + 1;
+                item.classList.remove('active', 'completed');
+
+                if (stepNumber < seccionActual) {
+                    item.classList.add('completed');
+                } else if (stepNumber === seccionActual) {
+                    item.classList.add('active');
+                }
+            });
         }
 
         // ========================================
@@ -953,11 +1065,18 @@
         // MOSTRAR DATOS DEL PROTOCOLO
         // ========================================
         function mostrarDatosProtocolo() {
-            if (!sessionData) return;
+            if (!sessionData) {
+                console.log('❌ No hay sessionData');
+                return;
+            }
 
             const infoBox = document.getElementById('protocoloInfo');
             const protocolo = sessionData.protocolo;
             const rol = sessionData.tuRol;
+
+            console.log('📋 Datos del protocolo:', protocolo);
+            console.log('👤 Tu rol:', rol);
+            console.log('🎭 Actúa por:', rol.actuaPor);
 
             infoBox.innerHTML = `
                 <p><strong>Información del Trámite:</strong></p>
@@ -968,12 +1087,14 @@
                     <strong>Valor:</strong> $${parseFloat(protocolo.valorContrato).toFixed(2)}
                 </p>
                 <p style="margin-top: 10px;">
-                    <strong>Tu Rol:</strong> ${rol.calidad} - ${rol.actuaPor}
+                    <strong>Tu Rol:</strong> ${rol.calidad} - ${rol.actuaPor === 'REPRESENTANDO_A' ? 'Representando a otra persona' : 'Por sus propios derechos'}
                 </p>
             `;
 
             // Mostrar sección de representado si actúa representando a otro
-            mostrarSeccionRepresentado(rol.actuaPor === 'REPRESENTANDO_A');
+            const debesMostrarRepresentado = rol.actuaPor === 'REPRESENTANDO_A';
+            console.log('🔍 ¿Debe mostrar sección de representado?', debesMostrarRepresentado);
+            mostrarSeccionRepresentado(debesMostrarRepresentado);
         }
 
         // ========================================
@@ -981,12 +1102,22 @@
         // ========================================
         function mostrarSeccionRepresentado(mostrar) {
             const seccion = document.getElementById('seccionRepresentado');
-            if (!seccion) return;
+            console.log('🎯 mostrarSeccionRepresentado llamado con:', mostrar);
+            console.log('📦 Elemento seccionRepresentado:', seccion);
+
+            if (!seccion) {
+                console.error('❌ No se encontró el elemento seccionRepresentado');
+                return;
+            }
 
             if (mostrar) {
+                console.log('✅ Mostrando sección de representado');
                 seccion.classList.remove('hidden');
+                seccion.style.display = 'block';
             } else {
+                console.log('❌ Ocultando sección de representado');
                 seccion.classList.add('hidden');
+                seccion.style.display = 'none';
                 limpiarDatosRepresentado();
             }
         }
