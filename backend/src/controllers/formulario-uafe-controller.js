@@ -1315,11 +1315,11 @@ export async function generarPDFIndividual(req, res) {
  */
 async function generateRepresentadoSection(doc, startY, personaProtocolo) {
   let y = checkAndAddPage(doc, startY, 120);
-  y = drawSection(doc, y, 'REPRESENTADO', 100);
+  y = drawSection(doc, y, 'DATOS DEL REPRESENTADO', 100);
 
   try {
     if (personaProtocolo.representadoId) {
-      // Representado existe en BD - buscar sus datos
+      // Representado existe en BD - buscar sus datos completos
       const representado = await prisma.personaRegistrada.findUnique({
         where: { numeroIdentificacion: personaProtocolo.representadoId },
         select: {
@@ -1331,40 +1331,113 @@ async function generateRepresentadoSection(doc, startY, personaProtocolo) {
       });
 
       if (representado) {
-        const datosRep = representado.tipoPersona === 'NATURAL'
-          ? representado.datosPersonaNatural
-          : representado.datosPersonaJuridica;
+        if (representado.tipoPersona === 'NATURAL') {
+          const datosRep = representado.datosPersonaNatural;
 
-        let nombreCompleto = 'Sin nombre';
-        if (representado.tipoPersona === 'NATURAL' && datosRep?.datosPersonales) {
-          const { nombres, apellidos } = datosRep.datosPersonales;
-          if (nombres && apellidos) {
-            nombreCompleto = `${nombres} ${apellidos}`.trim();
-          }
-        } else if (representado.tipoPersona === 'JURIDICA' && datosRep?.compania?.razonSocial) {
-          nombreCompleto = datosRep.compania.razonSocial.trim();
+          // Información Personal
+          drawField(doc, 60, y, 'Apellidos', datosRep?.datosPersonales?.apellidos || 'N/A', 240);
+          drawField(doc, 320, y, 'Nombres', datosRep?.datosPersonales?.nombres || 'N/A', 220);
+
+          y += 50;
+          drawField(doc, 60, y, 'Tipo Identificación', datosRep?.identificacion?.tipo || 'N/A', 140);
+          drawField(doc, 220, y, 'Identificación', representado.numeroIdentificacion, 160);
+          drawField(doc, 400, y, 'Nacionalidad', datosRep?.identificacion?.nacionalidad || 'N/A', 140);
+
+          y += 50;
+          drawField(doc, 60, y, 'Género', datosRep?.datosPersonales?.genero || 'N/A', 140);
+          drawField(doc, 220, y, 'Estado Civil', datosRep?.datosPersonales?.estadoCivil || 'N/A', 160);
+          drawField(doc, 400, y, 'Nivel Estudio', datosRep?.datosPersonales?.nivelEstudio || 'N/A', 140);
+
+          y += 50;
+          drawField(doc, 60, y, 'Profesión', datosRep?.informacionLaboral?.profesionOcupacion || 'N/A', 480);
+
+          // Información de Contacto
+          y += 60;
+          y = checkAndAddPage(doc, y, 100);
+          drawField(doc, 60, y, 'Email', datosRep?.contacto?.email || 'N/A', 200);
+          drawField(doc, 280, y, 'Teléfono', datosRep?.contacto?.telefono || 'N/A', 130);
+          drawField(doc, 430, y, 'Celular', datosRep?.contacto?.celular || 'N/A', 110);
+
+          // Dirección
+          y += 50;
+          const direccionCompleta = datosRep?.direccion
+            ? `${datosRep.direccion.callePrincipal || ''} ${datosRep.direccion.numero || ''} y ${datosRep.direccion.calleSecundaria || ''}`.trim()
+            : 'N/A';
+          drawTextAreaField(doc, 60, y, 'Dirección', direccionCompleta, 480, 40);
+
+          y += 50;
+          drawField(doc, 60, y, 'Provincia', datosRep?.direccion?.provincia || 'N/A', 160);
+          drawField(doc, 240, y, 'Cantón', datosRep?.direccion?.canton || 'N/A', 160);
+          drawField(doc, 420, y, 'Parroquia', datosRep?.direccion?.parroquia || 'N/A', 120);
+
+        } else if (representado.tipoPersona === 'JURIDICA') {
+          const datosRep = representado.datosPersonaJuridica;
+
+          drawField(doc, 60, y, 'Razón Social', datosRep?.compania?.razonSocial || 'N/A', 300);
+          drawField(doc, 380, y, 'RUC', representado.numeroIdentificacion, 160);
+
+          y += 50;
+          drawField(doc, 60, y, 'País Constitución', datosRep?.compania?.paisConstitucion || 'N/A', 480);
+
+          y += 50;
+          drawField(doc, 60, y, 'Email', datosRep?.contacto?.email || 'N/A', 240);
+          drawField(doc, 320, y, 'Teléfono', datosRep?.contacto?.telefono || 'N/A', 220);
+
+          y += 50;
+          drawTextAreaField(doc, 60, y, 'Dirección', datosRep?.direccion?.direccionCompleta || 'N/A', 480, 40);
         }
-
-        drawField(doc, 60, y, 'Representa a', nombreCompleto, 280);
-        drawField(doc, 360, y, 'Identificación', representado.numeroIdentificacion, 180);
-
-        y += 50;
-        drawField(doc, 60, y, 'Tipo de Persona',
-          representado.tipoPersona === 'NATURAL' ? 'Persona Natural' : 'Persona Jurídica', 480);
       }
     } else if (personaProtocolo.datosRepresentado) {
       // Datos manuales del representado
       const datosRep = personaProtocolo.datosRepresentado;
 
-      drawField(doc, 60, y, 'Representa a', datosRep.nombreCompleto || 'Sin nombre', 280);
-      drawField(doc, 360, y, 'Identificación', datosRep.identificacion || 'N/A', 180);
+      if (datosRep.tipoPersona === 'NATURAL') {
+        // Información Personal
+        drawField(doc, 60, y, 'Apellidos', datosRep.apellidos || 'N/A', 240);
+        drawField(doc, 320, y, 'Nombres', datosRep.nombres || 'N/A', 220);
 
-      y += 50;
-      drawField(doc, 60, y, 'Tipo de Persona',
-        datosRep.tipoPersona === 'NATURAL' ? 'Persona Natural' : 'Persona Jurídica', 240);
+        y += 50;
+        drawField(doc, 60, y, 'Tipo Identificación', datosRep.tipoIdentificacion || 'N/A', 140);
+        drawField(doc, 220, y, 'Identificación', datosRep.identificacion || 'N/A', 160);
+        drawField(doc, 400, y, 'Nacionalidad', datosRep.nacionalidad || 'N/A', 140);
 
-      if (datosRep.nacionalidad) {
-        drawField(doc, 320, y, 'Nacionalidad', datosRep.nacionalidad, 220);
+        y += 50;
+        drawField(doc, 60, y, 'Género', datosRep.genero || 'N/A', 140);
+        drawField(doc, 220, y, 'Estado Civil', datosRep.estadoCivil || 'N/A', 160);
+        drawField(doc, 400, y, 'Nivel Estudio', datosRep.nivelEstudio || 'N/A', 140);
+
+        y += 50;
+        drawField(doc, 60, y, 'Profesión', datosRep.profesion || 'N/A', 480);
+
+        // Información de Contacto
+        y += 60;
+        y = checkAndAddPage(doc, y, 100);
+        drawField(doc, 60, y, 'Email', datosRep.email || 'N/A', 200);
+        drawField(doc, 280, y, 'Teléfono', datosRep.telefono || 'N/A', 130);
+        drawField(doc, 430, y, 'Celular', datosRep.celular || 'N/A', 110);
+
+        // Dirección
+        y += 50;
+        drawTextAreaField(doc, 60, y, 'Dirección', datosRep.direccion || 'N/A', 480, 40);
+
+        y += 50;
+        drawField(doc, 60, y, 'Provincia', datosRep.provincia || 'N/A', 160);
+        drawField(doc, 240, y, 'Cantón', datosRep.canton || 'N/A', 160);
+        drawField(doc, 420, y, 'Parroquia', datosRep.parroquia || 'N/A', 120);
+
+      } else if (datosRep.tipoPersona === 'JURIDICA') {
+        drawField(doc, 60, y, 'Razón Social', datosRep.razonSocial || 'N/A', 300);
+        drawField(doc, 380, y, 'RUC', datosRep.ruc || 'N/A', 160);
+
+        y += 50;
+        drawField(doc, 60, y, 'País Constitución', datosRep.paisConstitucion || 'N/A', 480);
+
+        y += 50;
+        drawField(doc, 60, y, 'Email', datosRep.email || 'N/A', 240);
+        drawField(doc, 320, y, 'Teléfono', datosRep.telefono || 'N/A', 220);
+
+        y += 50;
+        drawTextAreaField(doc, 60, y, 'Dirección', datosRep.direccion || 'N/A', 480, 40);
       }
     }
 
