@@ -214,7 +214,7 @@ async function extractData(req, res) {
             tipo_persona: e?.tipo_persona || 'Natural'
           })
           const toNombre = (s) => String(s || '').trim()
-          const toFullName = (e) => toNombre(`${e.apellidos || ''} ${e.nombres || ''}`)
+          const toFullName = (e) => toNombre(`${e.nombres || ''} ${e.apellidos || ''}`)
 
           const otorgantesSplit = Array.isArray(gemini.otorgantes) ? gemini.otorgantes.map(mapSplit) : []
           const beneficiariosSplit = Array.isArray(gemini.beneficiarios) ? gemini.beneficiarios.map(mapSplit) : []
@@ -514,7 +514,7 @@ function processGeminiData(geminiResult) {
   const mapPersona = (p) => {
     const apellidos = String(p?.apellidos || '').trim()
     const nombres = String(p?.nombres || '').trim()
-    const nombre_completo = `${apellidos} ${nombres}`.trim()
+    const nombre_completo = `${nombres} ${apellidos}`.trim()
     return {
       apellidos,
       nombres,
