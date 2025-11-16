@@ -548,14 +548,15 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
                           variant="filled"
                         />
                         {/* 🔗 ALERTA DE AGRUPACIÓN COMPACTA */}
+                        {/* 🚫 AGRUPACIÓN TEMPORALMENTE DESHABILITADA (sin notificaciones WhatsApp) */}
                         {/* Mostrar chip de agrupación si aplica; si ya está agrupado, mostrar texto sutil */}
-                        {!document.isGrouped ? (
+                        {false && !document.isGrouped ? (
                           <GroupingAlert
                             document={document}
                             variant="chip"
                             onGroupAction={handleGroupDocuments}
                           />
-                        ) : (
+                        ) : document.isGrouped ? (
                           <Chip 
                             label="⚡ Parte de un grupo"
                             size="small"
