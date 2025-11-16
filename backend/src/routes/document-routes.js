@@ -32,6 +32,7 @@ import {
   getGroupDocuments,
   // 🔓 Desagrupar documento
   ungroupDocument,
+  ungroupAllDocuments,
   // 🔄 Reversión de estado
   revertDocumentStatus,
   // 🔔 Políticas de notificación
@@ -128,6 +129,9 @@ router.post('/:id/revert', authenticateToken, revertDocumentStatus);
 
 // 🔓 PUT /api/documents/:id/ungroup - Desagrupar documento del grupo
 router.put('/:id/ungroup', authenticateToken, ungroupDocument);
+
+// 🔓 POST /api/documents/ungroup-all - ADMIN ONLY: Desagrupar TODOS los documentos
+router.post('/ungroup-all', authenticateToken, ungroupAllDocuments);
 
 // POST /api/documents/:id/deliver - RECEPCION: Entregar documento con información completa
 router.post('/:id/deliver', authenticateToken, deliverDocument);

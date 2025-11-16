@@ -1201,9 +1201,27 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                   </TableCell>
                   
                   <TableCell>
-                    <Typography variant="body2">
-                      {documento.clientName}
-                    </Typography>
+                    <Tooltip title="Click para buscar todos los documentos de este cliente" arrow>
+                      <Typography
+                        variant="body2"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleFilterChange('search', documento.clientName);
+                          // Scroll suave al inicio para ver los resultados
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        sx={{
+                          cursor: 'pointer',
+                          fontWeight: 500,
+                          '&:hover': {
+                            color: 'primary.main',
+                            textDecoration: 'underline'
+                          }
+                        }}
+                      >
+                        {documento.clientName}
+                      </Typography>
+                    </Tooltip>
                   </TableCell>
                   
                   <TableCell>
@@ -1254,8 +1272,8 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                           />
                         </Tooltip>
                       ) : (
-                        // Mostrar botón de agrupación solo si hay documentos agrupables disponibles
-                        ['EN_PROCESO', 'LISTO'].includes(documento.status) && hasMoreThanOneForClient(documento) && (
+                        // 🚫 AGRUPACIÓN TEMPORALMENTE DESHABILITADA (sin notificaciones WhatsApp)
+                        false && ['EN_PROCESO', 'LISTO'].includes(documento.status) && hasMoreThanOneForClient(documento) && (
                           <Button
                             size="small"
                             variant="outlined"
