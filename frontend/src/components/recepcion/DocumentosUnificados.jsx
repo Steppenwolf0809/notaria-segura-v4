@@ -1017,7 +1017,28 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                     </TableCell>
                     <TableCell sx={{ py: 1.5 }}>
                       <Box>
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>{documento.clientName}</Typography>
+                        <Tooltip title="Click para buscar todos los documentos de este cliente" arrow>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontWeight: 500,
+                              cursor: 'pointer',
+                              '&:hover': {
+                                color: 'primary.main',
+                                textDecoration: 'underline'
+                              }
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSearchQuery(documento.clientName);
+                              setFilters(prev => ({ ...prev, search: documento.clientName }));
+                              // Scroll suave al inicio para ver los resultados
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                          >
+                            {documento.clientName}
+                          </Typography>
+                        </Tooltip>
                         <Typography 
                           variant="caption" 
                           component="div" 

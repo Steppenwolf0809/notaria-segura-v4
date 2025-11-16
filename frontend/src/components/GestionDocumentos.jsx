@@ -44,6 +44,15 @@ const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
     setMostrarEntregados(e.target.checked);
   }, []);
 
+  /**
+   * 🆕 Manejar búsqueda por nombre de cliente (desde click en tabla)
+   */
+  const handleSearchByClient = useCallback((clientName) => {
+    setInputValue(clientName);
+    // Scroll suave al inicio para ver los resultados
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
   // Efecto para manejar navegación específica desde alertas
   useEffect(() => {
     if (documentoEspecifico && documentoEspecifico.autoSearch) {
@@ -89,6 +98,7 @@ const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
           documentoEspecifico={documentoEspecifico}
           onDocumentoFound={onDocumentoFound}
           mostrarEntregados={mostrarEntregados}
+          onSearchByClient={handleSearchByClient}
         />
       </Box>
     </Box>
