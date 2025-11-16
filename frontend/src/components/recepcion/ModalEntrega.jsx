@@ -92,9 +92,12 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
       return;
     }
 
-    if (!formData.verificacionManual && !formData.codigoVerificacion.trim()) {
-      setError('Código de verificación es obligatorio (o marcar verificación manual)');
-      return;
+    // 🆕 Solo validar código de verificación para RECEPCIÓN, NO para ARCHIVO
+    if (serviceType !== 'archivo') {
+      if (!formData.verificacionManual && !formData.codigoVerificacion.trim()) {
+        setError('Código de verificación es obligatorio (o marcar verificación manual)');
+        return;
+      }
     }
 
     try {
@@ -189,29 +192,34 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
 
         <form onSubmit={handleSubmit}>
           <Grid container spacing={3}>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Código de Verificación"
-                name="codigoVerificacion"
-                value={formData.codigoVerificacion}
-                onChange={handleChange}
-                disabled={formData.verificacionManual}
-                helperText="Código de 4 dígitos enviado al cliente"
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    name="verificacionManual"
-                    checked={formData.verificacionManual}
+            {/* 🆕 Solo mostrar código de verificación para RECEPCIÓN, NO para ARCHIVO */}
+            {serviceType !== 'archivo' && (
+              <>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Código de Verificación"
+                    name="codigoVerificacion"
+                    value={formData.codigoVerificacion}
                     onChange={handleChange}
+                    disabled={formData.verificacionManual}
+                    helperText="Código de 4 dígitos enviado al cliente"
                   />
-                }
-                label="Verificación Manual (cliente no tiene código)"
-              />
-            </Grid>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        name="verificacionManual"
+                        checked={formData.verificacionManual}
+                        onChange={handleChange}
+                      />
+                    }
+                    label="Verificación Manual (cliente no tiene código)"
+                  />
+                </Grid>
+              </>
+            )}
 
             <Grid item xs={12} sm={6}>
               <TextField

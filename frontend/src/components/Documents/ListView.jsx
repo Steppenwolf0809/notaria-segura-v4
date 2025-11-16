@@ -48,7 +48,7 @@ import { toast } from 'react-toastify';
  * Vista Lista - EXACTA AL PROTOTIPO + SELECCIÓN MÚLTIPLE
  * Tabla completa con todas las funcionalidades + checkboxes para cambios masivos
  */
-const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
+const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = false }) => {
   const { documents, updateDocumentStatus, updateDocument, createDocumentGroup, detectGroupableDocuments, fetchMyDocuments } = useDocumentStore();
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -80,32 +80,53 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
   const filteredAndSortedDocuments = useMemo(() => {
     let filtered = documents.filter(doc => {
       // CORRECCIÓN: Solo buscar si el término tiene al menos 2 caracteres
-      const matchesSearch = !searchTerm || searchTerm.length < 2 || 
+      const matchesSearch = !searchTerm || searchTerm.length < 2 ||
         doc.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         doc.protocolNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         doc.documentType?.toLowerCase().includes(searchTerm.toLowerCase());
-      
+
       const matchesStatus = !statusFilter || doc.status === statusFilter;
       const matchesType = !typeFilter || doc.documentType === typeFilter;
-      
-      return matchesSearch && matchesStatus && matchesType;
+
+      // 🆕 Filtro para ocultar ENTREGADOS si el toggle está desactivado
+      const matchesEntregados = mostrarEntregados || doc.status !== 'ENTREGADO';
+
+      return matchesSearch && matchesStatus && matchesType && matchesEntregados;
     });
 
     // Ordenar
     filtered.sort((a, b) => {
+      // 🆕 PRIORIDAD POR ESTADO: EN_PROCESO > LISTO > OTROS > ENTREGADO
+      const prioridad = {
+        'EN_PROCESO': 1,
+        'LISTO': 2,
+        'PENDIENTE': 3,
+        'CANCELADO': 4,
+        'ENTREGADO': 5
+      };
+
+      const prioA = prioridad[a.status] || 99;
+      const prioB = prioridad[b.status] || 99;
+
+      // Si tienen diferente prioridad, ordenar por prioridad (menor número = mayor prioridad)
+      if (prioA !== prioB) {
+        return prioA - prioB;
+      }
+
+      // Si tienen misma prioridad, aplicar ordenamiento dinámico
       let aValue = a[orderBy];
       let bValue = b[orderBy];
-      
+
       if (orderBy === 'createdAt') {
         aValue = new Date(aValue).getTime();
         bValue = new Date(bValue).getTime();
       }
-      
+
       if (typeof aValue === 'string') {
         aValue = aValue.toLowerCase();
         bValue = bValue.toLowerCase();
       }
-      
+
       if (order === 'desc') {
         return bValue > aValue ? 1 : -1;
       }
@@ -113,7 +134,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter }) => {
     });
 
     return filtered;
-  }, [documents, searchTerm, statusFilter, typeFilter, orderBy, order]);
+  }, [documents, searchTerm, statusFilter, typeFilter, orderBy, order, mostrarEntregados]);
 
   /**
    * Obtener color del estado

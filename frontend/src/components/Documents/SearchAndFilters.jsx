@@ -12,10 +12,14 @@ import {
   Chip,
   ToggleButtonGroup,
   ToggleButton,
-  Typography
+  Typography,
+  Switch,
+  FormControlLabel
 } from '@mui/material';
 import {
-  Search as SearchIcon
+  Search as SearchIcon,
+  Visibility as VisibilityIcon,
+  VisibilityOff as VisibilityOffIcon
 } from '@mui/icons-material';
 
 /**
@@ -30,7 +34,9 @@ const SearchAndFilters = memo(({
   onStatusFilterChange,
   typeFilter,
   onTypeFilterChange,
-  debouncedSearchTerm
+  debouncedSearchTerm,
+  mostrarEntregados,
+  onMostrarEntregadosChange
 }) => {
   const statusLabelMap = {
     'EN_PROCESO': 'En Proceso',
@@ -141,6 +147,27 @@ const SearchAndFilters = memo(({
               <MenuItem value="COMPRAVENTA">Compraventa</MenuItem>
             </Select>
           </FormControl>
+
+          {/* 🆕 Toggle para mostrar/ocultar ENTREGADOS */}
+          <FormControlLabel
+            control={
+              <Switch
+                checked={mostrarEntregados}
+                onChange={onMostrarEntregadosChange}
+                color="primary"
+                size="small"
+              />
+            }
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                {mostrarEntregados ? <VisibilityIcon fontSize="small" /> : <VisibilityOffIcon fontSize="small" />}
+                <Typography variant="body2">
+                  Mostrar entregados
+                </Typography>
+              </Box>
+            }
+            sx={{ ml: { md: 'auto' } }}
+          />
         </Box>
 
         {/* Filtros activos */}
