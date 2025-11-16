@@ -50,26 +50,43 @@ const GroupInfoModal = ({ open, onClose, document, onUngrouped }) => {
   // Cargar documentos del grupo cuando se abre el modal
   useEffect(() => {
     const loadGroup = async () => {
-      if (open && document?.documentGroupId) {
+      if (open && document) {
+        console.log('🔍 GroupInfoModal: Intentando cargar grupo', {
+          documentId: document.id,
+          isGrouped: document.isGrouped,
+          documentGroupId: document.documentGroupId,
+          groupVerificationCode: document.groupVerificationCode
+        });
+
+        if (!document.documentGroupId) {
+          console.warn('⚠️ GroupInfoModal: Documento no tiene documentGroupId');
+          setGroupDocuments([]);
+          return;
+        }
+
         setLoading(true);
         try {
           // 1) Intentar desde el store (rápido)
-          const fromStore = documents.filter(doc => 
+          const fromStore = documents.filter(doc =>
             doc.documentGroupId === document.documentGroupId && doc.isGrouped
           );
           if (fromStore.length > 0) {
+            console.log('✅ GroupInfoModal: Documentos encontrados en store:', fromStore.length);
             setGroupDocuments(fromStore);
             return;
           }
           // 2) Fallback desde el backend (Recepción/Archivo no siempre tienen el store cargado)
+          console.log('📡 GroupInfoModal: Buscando en backend...');
           const resp = await documentService.getGroupDocuments(document.documentGroupId);
           if (resp.success) {
+            console.log('✅ GroupInfoModal: Documentos encontrados en backend:', resp.data?.length || 0);
             setGroupDocuments(resp.data || []);
           } else {
+            console.error('❌ GroupInfoModal: Error del backend:', resp.error);
             setGroupDocuments([]);
           }
         } catch (error) {
-          console.error('Error cargando documentos del grupo:', error);
+          console.error('❌ GroupInfoModal: Error cargando documentos del grupo:', error);
           setGroupDocuments([]);
         } finally {
           setLoading(false);
@@ -124,7 +141,8 @@ const GroupInfoModal = ({ open, onClose, document, onUngrouped }) => {
     return texts[status] || status;
   };
 
-  if (!document || !document.isGrouped) {
+  // Permitir abrir el modal si tiene documentGroupId O si isGrouped es true
+  if (!document || (!document.isGrouped && !document.documentGroupId)) {
     return null;
   }
 
@@ -344,7 +362,19 @@ const GroupInfoModal = ({ open, onClose, document, onUngrouped }) => {
           </>
         ) : (
           <Alert severity="warning">
-            No se pudo cargar la información del grupo.
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+              No se pudo cargar la información del grupo
+            </Typography>
+            <Typography variant="body2">
+              {!document?.documentGroupId ? (
+                <>El documento no tiene ID de grupo asociado. Esto puede suceder si el documento fue creado antes de implementar la agrupación o si no está correctamente marcado como parte de un grupo.</>
+              ) : (
+                <>No se encontraron documentos en este grupo. El grupo puede haber sido eliminado o los documentos pueden haber sido desagrupados.</>
+              )}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+              Detalles técnicos: ID de grupo: {document?.documentGroupId || 'N/A'} | isGrouped: {document?.isGrouped ? 'Sí' : 'No'}
+            </Typography>
           </Alert>
         )}
       </DialogContent>
