@@ -48,7 +48,7 @@ import { toast } from 'react-toastify';
  * Vista Lista - EXACTA AL PROTOTIPO + SELECCIÓN MÚLTIPLE
  * Tabla completa con todas las funcionalidades + checkboxes para cambios masivos
  */
-const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = false }) => {
+const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = false, onSearchByClient }) => {
   const { documents, updateDocumentStatus, updateDocument, createDocumentGroup, detectGroupableDocuments, fetchMyDocuments } = useDocumentStore();
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -236,6 +236,8 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
       } else {
         toast.success('Documento marcado como LISTO.');
       }
+      // 🔄 Refrescar lista para ver cambios inmediatamente
+      await fetchMyDocuments();
     } else {
       toast.error(result.error || 'Error al marcar como LISTO');
     }
@@ -256,6 +258,8 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
       } else {
         toast.success('Documento marcado como ENTREGADO.');
       }
+      // 🔄 Refrescar lista para ver cambios inmediatamente
+      await fetchMyDocuments();
     } else {
       toast.error(result.error || 'Error al marcar como ENTREGADO');
     }
@@ -481,11 +485,11 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
                         {document.protocolNumber}
                       </Typography>
                     </TableCell>
-                    <TableCell onClick={() => openDetailModal(document)}>
+                    <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Avatar sx={{ 
-                          width: 32, 
-                          height: 32, 
+                        <Avatar sx={{
+                          width: 32,
+                          height: 32,
                           mr: 1.5,
                           bgcolor: 'primary.main',
                           fontSize: '0.875rem'
@@ -493,9 +497,27 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
                           {document.clientName?.charAt(0) || 'C'}
                         </Avatar>
                         <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                            {document.clientName}
-                          </Typography>
+                          <Tooltip title="Click para buscar todos los documentos de este cliente" arrow>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight: 'medium',
+                                cursor: 'pointer',
+                                '&:hover': {
+                                  color: 'primary.main',
+                                  textDecoration: 'underline'
+                                }
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onSearchByClient) {
+                                  onSearchByClient(document.clientName);
+                                }
+                              }}
+                            >
+                              {document.clientName}
+                            </Typography>
+                          </Tooltip>
                           {document.clientPhone && (
                             <Typography variant="caption" color="text.secondary">
                               <PhoneIcon sx={{ fontSize: 12, mr: 0.5 }} />
@@ -530,15 +552,10 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
                           variant="filled"
                         />
                         {/* 🔗 ALERTA DE AGRUPACIÓN COMPACTA */}
+                        {/* 🚫 AGRUPACIÓN TEMPORALMENTE DESHABILITADA (sin notificaciones WhatsApp) */}
                         {/* Mostrar chip de agrupación si aplica; si ya está agrupado, mostrar texto sutil */}
-                        {!document.isGrouped ? (
-                          <GroupingAlert
-                            document={document}
-                            variant="chip"
-                            onGroupAction={handleGroupDocuments}
-                          />
-                        ) : (
-                          <Chip 
+                        {document.isGrouped && (
+                          <Chip
                             label="⚡ Parte de un grupo"
                             size="small"
                             variant="outlined"
@@ -682,6 +699,8 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
           loading={false}
           onConfirm={async ({ documentId, newStatus, reversionReason }) => {
             await updateDocumentStatus(documentId, newStatus, { reversionReason });
+            // 🔄 Refrescar lista para ver cambios inmediatamente
+            await fetchMyDocuments();
             closeReversion();
           }}
         />

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -21,6 +21,13 @@ import {
 const ModalEntregaMatrizador = ({ open, onClose, documento, onConfirm, loading = false }) => {
   const [entregadoA, setEntregadoA] = useState('');
   const [error, setError] = useState('');
+
+  // 🆕 Pre-llenar con nombre del titular cuando se abre el modal
+  useEffect(() => {
+    if (open && documento?.clientName) {
+      setEntregadoA(documento.clientName);
+    }
+  }, [open, documento]);
 
   const handleSubmit = async (e) => {
     e?.preventDefault?.();
@@ -64,6 +71,7 @@ const ModalEntregaMatrizador = ({ open, onClose, documento, onConfirm, loading =
             label="Nombre de quien retira"
             value={entregadoA}
             onChange={(e) => setEntregadoA(e.target.value)}
+            helperText="Por defecto: titular del documento (editable)"
           />
         </form>
       </DialogContent>

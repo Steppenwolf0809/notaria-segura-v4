@@ -45,6 +45,17 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
     cargarRelacionesOptions();
   }, []);
 
+  // 🆕 Pre-llenar formulario con datos del documento
+  useEffect(() => {
+    if (documento) {
+      setFormData(prev => ({
+        ...prev,
+        entregadoA: documento.clientName || '', // Nombre del titular por defecto
+        relacionTitular: 'titular' // Relación por defecto: titular
+      }));
+    }
+  }, [documento]);
+
   const cargarRelacionesOptions = async () => {
     try {
       // Opciones por defecto ya que no existe la función en el servicio
@@ -229,6 +240,7 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
                 name="entregadoA"
                 value={formData.entregadoA}
                 onChange={handleChange}
+                helperText="Por defecto: titular del documento (editable)"
               />
             </Grid>
             <Grid item xs={12} sm={6}>
