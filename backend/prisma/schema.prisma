@@ -644,7 +644,7 @@ model PersonaProtocolo {
   personaCedula         String
 
   // ROL EN ESTE TRÁMITE
-  calidad               String   // "COMPRADOR", "VENDEDOR", "TESTIGO"
+  calidad               String   // "COMPRADOR", "VENDEDOR"
   actuaPor              String   // "PROPIOS_DERECHOS", "REPRESENTANDO_A"
 
   // REPRESENTADO (si actuaPor = "REPRESENTANDO_A")

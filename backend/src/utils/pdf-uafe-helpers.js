@@ -36,33 +36,59 @@ export function formatCurrency(amount) {
 }
 
 /**
- * Formatear fecha en formato largo español
+ * Formatear fecha en formato largo español con timezone Ecuador
  */
 export function formatDate(dateString) {
   if (!dateString) return 'No aplica';
   const date = new Date(dateString);
-  const months = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-                  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-  return `${date.getDate()} de ${months[date.getMonth()]} de ${date.getFullYear()}`;
+
+  // Obtener componentes de fecha en timezone Ecuador
+  const options = {
+    timeZone: 'America/Guayaquil',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  };
+
+  const formatter = new Intl.DateTimeFormat('es-EC', options);
+  const parts = formatter.formatToParts(date);
+
+  const day = parts.find(p => p.type === 'day')?.value || '';
+  const month = parts.find(p => p.type === 'month')?.value || '';
+  const year = parts.find(p => p.type === 'year')?.value || '';
+
+  return `${day} de ${month} de ${year}`;
 }
 
 /**
- * Formatear timestamp para footer
+ * Formatear timestamp para footer con timezone Ecuador
  */
 export function formatTimestamp() {
   const now = new Date();
-  const date = now.toLocaleDateString('es-EC', {
+
+  // Formatear fecha y hora en timezone Ecuador
+  const options = {
+    timeZone: 'America/Guayaquil',
     year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  });
-  const time = now.toLocaleTimeString('es-EC', {
+    month: 'long',
+    day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
     hour12: false
-  });
-  return `Generado el ${date} a las ${time}`;
+  };
+
+  const formatter = new Intl.DateTimeFormat('es-EC', options);
+  const parts = formatter.formatToParts(now);
+
+  const day = parts.find(p => p.type === 'day')?.value || '';
+  const month = parts.find(p => p.type === 'month')?.value || '';
+  const year = parts.find(p => p.type === 'year')?.value || '';
+  const hour = parts.find(p => p.type === 'hour')?.value || '';
+  const minute = parts.find(p => p.type === 'minute')?.value || '';
+  const second = parts.find(p => p.type === 'second')?.value || '';
+
+  return `Generado el ${day} de ${month} de ${year}, ${hour}:${minute}:${second}`;
 }
 
 /**
