@@ -12,6 +12,7 @@ import {
   actualizarPersonaEnProtocolo,
   eliminarPersonaDeProtocolo,
   generarPDFs,
+  generarPDFIndividual,
   descargarArchivo,
   buscarRepresentado
 } from '../controllers/formulario-uafe-controller.js';
@@ -155,6 +156,43 @@ router.get(
 router.get(
   '/download/:folder/:filename',
   descargarArchivo
+);
+
+/**
+ * Actualizar persona en protocolo (PATCH - alternativa path)
+ * PATCH /api/formulario-uafe/protocolos/:protocoloId/personas/:personaId
+ * Requiere: JWT + role MATRIZADOR o ADMIN
+ */
+router.patch(
+  '/protocolos/:protocoloId/personas/:personaId',
+  authenticateToken,
+  requireRoles(['MATRIZADOR', 'ADMIN']),
+  actualizarPersonaEnProtocolo
+);
+
+/**
+ * Eliminar persona de protocolo (DELETE - alternativa path)
+ * DELETE /api/formulario-uafe/protocolos/:protocoloId/personas/:personaId
+ * Requiere: JWT + role MATRIZADOR o ADMIN
+ */
+router.delete(
+  '/protocolos/:protocoloId/personas/:personaId',
+  authenticateToken,
+  requireRoles(['MATRIZADOR', 'ADMIN']),
+  eliminarPersonaDeProtocolo
+);
+
+/**
+ * Generar PDF individual de una persona
+ * GET /api/formulario-uafe/protocolos/:protocoloId/personas/:personaId/pdf
+ * Requiere: JWT + role MATRIZADOR o ADMIN
+ * Retorna: PDF individual de la persona
+ */
+router.get(
+  '/protocolos/:protocoloId/personas/:personaId/pdf',
+  authenticateToken,
+  requireRoles(['MATRIZADOR', 'ADMIN']),
+  generarPDFIndividual
 );
 
 // ========================================
