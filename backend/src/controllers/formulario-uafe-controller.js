@@ -811,7 +811,7 @@ export async function actualizarPersonaEnProtocolo(req, res) {
     }
 
     // Validar valores permitidos
-    const calidadesPermitidas = ['COMPRADOR', 'VENDEDOR', 'COMPARECIENTE', 'BENEFICIARIO', 'TESTIGO'];
+    const calidadesPermitidas = ['COMPRADOR', 'VENDEDOR'];
     const actuaPorPermitidos = ['PROPIOS_DERECHOS', 'REPRESENTANDO_A'];
 
     if (calidad && !calidadesPermitidas.includes(calidad)) {
