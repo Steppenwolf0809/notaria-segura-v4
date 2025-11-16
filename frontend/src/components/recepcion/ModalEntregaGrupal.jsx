@@ -50,6 +50,15 @@ function ModalEntregaGrupal({ documentos, onClose, onEntregaExitosa }) {
     if (codigosUnicos.length === 1) {
       setFormData(prev => ({ ...prev, codigoVerificacion: codigosUnicos[0] }));
     }
+
+    // 🆕 Pre-llenar nombre del titular y relación por defecto
+    if (documentos.length > 0 && documentos[0].clientName) {
+      setFormData(prev => ({
+        ...prev,
+        entregadoA: documentos[0].clientName,
+        relacionTitular: 'titular'
+      }));
+    }
   }, [documentos]);
 
   const cargarRelacionesOptions = async () => {
@@ -147,7 +156,7 @@ function ModalEntregaGrupal({ documentos, onClose, onEntregaExitosa }) {
                 </Grid>
 
                 <Grid item xs={12} sm={6}>
-                  <TextField fullWidth required label="Nombre de quien retira" name="entregadoA" value={formData.entregadoA} onChange={handleChange} />
+                  <TextField fullWidth required label="Nombre de quien retira" name="entregadoA" value={formData.entregadoA} onChange={handleChange} helperText="Por defecto: titular del documento (editable)" />
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <TextField fullWidth label="Cédula/ID (opcional)" name="cedulaReceptor" value={formData.cedulaReceptor} onChange={handleChange} />
