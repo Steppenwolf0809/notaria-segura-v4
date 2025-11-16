@@ -518,8 +518,11 @@ async function procesarEntregaDocumento(req, res) {
       });
     }
 
+    // 🆕 MEJORA: Determinar si es verificación manual (explícita o por ausencia de código)
+    const isManualVerification = verificacionManual || !codigoVerificacion;
+
     // Determinar método de verificación para auditoría enriquecida
-    const computedVerificationMethod = verificacionManual
+    const computedVerificationMethod = isManualVerification
       ? (req.body.metodoVerificacion || (cedulaReceptor ? 'cedula' : 'manual'))
       : 'codigo_whatsapp';
 
@@ -557,15 +560,9 @@ async function procesarEntregaDocumento(req, res) {
       });
     }
 
-    // Validar código de verificación (si no es manual)
-    if (!verificacionManual) {
-      if (!codigoVerificacion) {
-        return res.status(400).json({
-          success: false,
-          message: 'Código de verificación es obligatorio'
-        });
-      }
-      
+    // 🆕 MEJORA: Código de verificación es OPCIONAL para archivo
+    // Si se proporciona un código, se valida; si no, se acepta como verificación manual
+    if (codigoVerificacion && !isManualVerification) {
       const expectedCode = documento.codigoRetiro || documento.verificationCode || documento.groupVerificationCode;
       if (!expectedCode || expectedCode !== codigoVerificacion) {
         return res.status(400).json({
@@ -603,7 +600,7 @@ async function procesarEntregaDocumento(req, res) {
             entregadoA,
             cedulaReceptor,
             relacionTitular,
-            verificacionManual: verificacionManual || false,
+            verificacionManual: isManualVerification,
             facturaPresenta: facturaPresenta || false,
             fechaEntrega: new Date(),
             usuarioEntregaId: userId,
@@ -623,7 +620,7 @@ async function procesarEntregaDocumento(req, res) {
                 entregadoA,
                 cedulaReceptor,
                 relacionTitular,
-                verificacionManual: verificacionManual || false,
+                verificacionManual: isManualVerification,
                 facturaPresenta: facturaPresenta || false,
                 deliveredWith: documento.protocolNumber,
                 groupDelivery: true,
@@ -649,7 +646,7 @@ async function procesarEntregaDocumento(req, res) {
         entregadoA,
         cedulaReceptor,
         relacionTitular,
-        verificacionManual: verificacionManual || false,
+        verificacionManual: isManualVerification,
         facturaPresenta: facturaPresenta || false,
         fechaEntrega: new Date(),
         usuarioEntregaId: userId,
