@@ -16,7 +16,8 @@ const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
   const [inputValue, setInputValue] = useState(''); // Estado local del input
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
-  
+  const [mostrarEntregados, setMostrarEntregados] = useState(false); // 🆕 Por defecto NO mostrar entregados
+
   // DEBOUNCING: Solo buscar después de que el usuario pause por 400ms
   const debouncedSearchTerm = useDebounce(inputValue, 400);
 
@@ -37,6 +38,10 @@ const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
 
   const handleTypeFilterChange = useCallback((e) => {
     setTypeFilter(e.target.value);
+  }, []);
+
+  const handleMostrarEntregadosChange = useCallback((e) => {
+    setMostrarEntregados(e.target.checked);
   }, []);
 
   // Efecto para manejar navegación específica desde alertas
@@ -70,17 +75,20 @@ const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
           typeFilter={typeFilter}
           onTypeFilterChange={handleTypeFilterChange}
           debouncedSearchTerm={debouncedSearchTerm}
+          mostrarEntregados={mostrarEntregados}
+          onMostrarEntregadosChange={handleMostrarEntregadosChange}
         />
       </Box>
 
       {/* Vista Lista única */}
       <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
-        <ListView 
+        <ListView
           searchTerm={debouncedSearchTerm}
           statusFilter={statusFilter}
           typeFilter={typeFilter}
           documentoEspecifico={documentoEspecifico}
           onDocumentoFound={onDocumentoFound}
+          mostrarEntregados={mostrarEntregados}
         />
       </Box>
     </Box>

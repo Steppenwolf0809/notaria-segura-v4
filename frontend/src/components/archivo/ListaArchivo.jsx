@@ -28,7 +28,9 @@ import {
   Badge,
   Tooltip,
   ToggleButtonGroup,
-  ToggleButton
+  ToggleButton,
+  Switch,
+  FormControlLabel
 } from '@mui/material';
 import {
   MoreVert as MoreIcon,
@@ -42,7 +44,8 @@ import {
   Link as LinkIcon,
   Info as InfoIcon,
   Undo as UndoIcon,
-  Visibility as ViewIcon
+  Visibility as ViewIcon,
+  VisibilityOff as VisibilityOffIcon
 } from '@mui/icons-material';
 import archivoService from '../../services/archivo-service';
 import documentService from '../../services/document-service';
@@ -82,11 +85,12 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
         return {
           search: parsed.search ?? '',
           estado: parsed.estado ?? 'TODOS',
-          tipo: parsed.tipo ?? 'TODOS'
+          tipo: parsed.tipo ?? 'TODOS',
+          mostrarEntregados: parsed.mostrarEntregados ?? false // 🆕 Por defecto NO mostrar entregados
         };
       }
     } catch (_) {}
-    return { search: '', estado: 'TODOS', tipo: 'TODOS' };
+    return { search: '', estado: 'TODOS', tipo: 'TODOS', mostrarEntregados: false };
   });
   const [orderBy, setOrderBy] = useState('createdAt');
   const [order, setOrder] = useState('desc');
@@ -139,22 +143,42 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
     // Filtro de tipo
     const matchesTipo = filtros.tipo === 'TODOS' || doc.documentType === filtros.tipo;
 
-    return matchesSearch && matchesEstado && matchesTipo;
+    // 🆕 Filtro para ocultar ENTREGADOS si el toggle está desactivado
+    const matchesEntregados = filtros.mostrarEntregados || doc.status !== 'ENTREGADO';
+
+    return matchesSearch && matchesEstado && matchesTipo && matchesEntregados;
   }).sort((a, b) => {
-    // Ordenamiento dinámico
+    // 🆕 PRIORIDAD POR ESTADO: EN_PROCESO > LISTO > OTROS > ENTREGADO
+    const prioridad = {
+      'EN_PROCESO': 1,
+      'LISTO': 2,
+      'PENDIENTE': 3,
+      'CANCELADO': 4,
+      'ENTREGADO': 5
+    };
+
+    const prioA = prioridad[a.status] || 99;
+    const prioB = prioridad[b.status] || 99;
+
+    // Si tienen diferente prioridad, ordenar por prioridad (menor número = mayor prioridad)
+    if (prioA !== prioB) {
+      return prioA - prioB;
+    }
+
+    // Si tienen misma prioridad, aplicar ordenamiento dinámico
     let aValue = a[orderBy];
     let bValue = b[orderBy];
-    
+
     if (orderBy === 'createdAt') {
       aValue = new Date(aValue).getTime();
       bValue = new Date(bValue).getTime();
     }
-    
+
     if (typeof aValue === 'string') {
       aValue = aValue.toLowerCase();
       bValue = bValue.toLowerCase();
     }
-    
+
     if (order === 'desc') {
       return bValue > aValue ? 1 : -1;
     }
@@ -985,13 +1009,45 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
           >
             Refrescar
           </Button>
+
+          {/* 🆕 Toggle para mostrar/ocultar ENTREGADOS */}
+          <FormControlLabel
+            control={
+              <Switch
+                checked={filtros.mostrarEntregados}
+                onChange={(e) => handleFilterChange('mostrarEntregados', e.target.checked)}
+                color="primary"
+                size="small"
+              />
+            }
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                {filtros.mostrarEntregados ? <ViewIcon fontSize="small" /> : <VisibilityOffIcon fontSize="small" />}
+                <Typography variant="body2">
+                  Mostrar entregados
+                </Typography>
+              </Box>
+            }
+            sx={{ ml: 'auto' }}
+          />
         </Box>
 
         {/* Resumen de resultados */}
-        <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
           <Typography variant="body2" color="text.secondary">
             Mostrando {documentosPagina.length} de {documentosFiltrados.length} documentos
           </Typography>
+
+          {/* 🆕 Contador de entregados ocultos */}
+          {!filtros.mostrarEntregados && (
+            <Chip
+              label={`${documentos.filter(d => d.status === 'ENTREGADO').length} entregados ocultos`}
+              size="small"
+              variant="outlined"
+              color="default"
+              icon={<VisibilityOffIcon />}
+            />
+          )}
           
           {filtros.search && (
             <Chip 
