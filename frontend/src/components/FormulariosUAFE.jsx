@@ -54,6 +54,7 @@ import {
   PictureAsPdf as PictureAsPdfIcon
 } from '@mui/icons-material';
 import { API_BASE } from '../utils/apiConfig';
+import { formatDateES, formatDateTimeES } from '../utils/dateUtils';
 
 /**
  * Componente para gestionar formularios UAFE con sistema de Protocolos
@@ -731,7 +732,7 @@ const FormulariosUAFE = () => {
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      {new Date(protocolo.fecha).toLocaleDateString('es-EC')}
+                      {formatDateES(protocolo.fecha)}
                     </TableCell>
                     <TableCell>{protocolo.actoContrato}</TableCell>
                     <TableCell>${parseFloat(protocolo.valorContrato).toFixed(2)}</TableCell>
@@ -1151,7 +1152,6 @@ const FormulariosUAFE = () => {
                         >
                           <MenuItem value="COMPRADOR">Comprador</MenuItem>
                           <MenuItem value="VENDEDOR">Vendedor</MenuItem>
-                          <MenuItem value="TESTIGO">Testigo</MenuItem>
                         </Select>
                       </FormControl>
                     </Grid>
@@ -1213,7 +1213,7 @@ const FormulariosUAFE = () => {
                   </Grid>
                   <Grid item xs={6}>
                     <Typography variant="body2" color="text.secondary">Fecha:</Typography>
-                    <Typography variant="body1">{new Date(protocoloSeleccionado.fecha).toLocaleDateString('es-EC')}</Typography>
+                    <Typography variant="body1">{formatDateES(protocoloSeleccionado.fecha)}</Typography>
                   </Grid>
                   <Grid item xs={12}>
                     <Typography variant="body2" color="text.secondary">Acto/Contrato:</Typography>
@@ -1279,7 +1279,7 @@ const FormulariosUAFE = () => {
                           </Typography>
                           {persona.completadoAt && (
                             <Typography variant="body2" color="text.secondary">
-                              <strong>Fecha completado:</strong> {new Date(persona.completadoAt).toLocaleString('es-EC')}
+                              <strong>Fecha completado:</strong> {formatDateTimeES(persona.completadoAt)}
                             </Typography>
                           )}
                         </Box>
@@ -1373,7 +1373,6 @@ const FormulariosUAFE = () => {
                 >
                   <MenuItem value="COMPRADOR">Comprador</MenuItem>
                   <MenuItem value="VENDEDOR">Vendedor</MenuItem>
-                  <MenuItem value="TESTIGO">Testigo</MenuItem>
                 </Select>
               </FormControl>
 

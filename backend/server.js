@@ -1,3 +1,6 @@
+// Configurar timezone de Ecuador (GMT-5) ANTES de cualquier otra cosa
+process.env.TZ = 'America/Guayaquil';
+
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
