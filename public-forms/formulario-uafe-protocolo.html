@@ -1272,8 +1272,10 @@
             btnBuscar.disabled = true;
 
             try {
-                const response = await fetch(`${API_URL}/buscar-representado/${identificacion}`);
+                const response = await fetch(`${API_URL}/formulario-uafe/buscar-representado/${identificacion}`);
                 const data = await response.json();
+
+                console.log('📡 Respuesta de búsqueda:', data);
 
                 if (!data.success) {
                     throw new Error(data.message || 'Error en la búsqueda');
