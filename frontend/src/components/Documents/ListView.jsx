@@ -550,14 +550,8 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
                         {/* 🔗 ALERTA DE AGRUPACIÓN COMPACTA */}
                         {/* 🚫 AGRUPACIÓN TEMPORALMENTE DESHABILITADA (sin notificaciones WhatsApp) */}
                         {/* Mostrar chip de agrupación si aplica; si ya está agrupado, mostrar texto sutil */}
-                        {false && !document.isGrouped ? (
-                          <GroupingAlert
-                            document={document}
-                            variant="chip"
-                            onGroupAction={handleGroupDocuments}
-                          />
-                        ) : document.isGrouped ? (
-                          <Chip 
+                        {document.isGrouped && (
+                          <Chip
                             label="⚡ Parte de un grupo"
                             size="small"
                             variant="outlined"
