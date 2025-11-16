@@ -543,6 +543,24 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
     const defaultDateKey = documentos[0]?.fechaCreacion ? 'fechaCreacion' : 'createdAt';
     const field = sortBy || defaultDateKey;
     const sorted = [...documentos].sort((a, b) => {
+      // 🆕 PRIORIDAD POR ESTADO: LISTO > EN_PROCESO > OTROS (para Recepción)
+      const prioridad = {
+        'LISTO': 1,           // Mayor prioridad: listos para entregar
+        'EN_PROCESO': 2,      // Segunda prioridad: en proceso
+        'PENDIENTE': 3,
+        'CANCELADO': 4,
+        'ENTREGADO': 5        // Menor prioridad
+      };
+
+      const prioA = prioridad[a.status] || 99;
+      const prioB = prioridad[b.status] || 99;
+
+      // Si tienen diferente prioridad, ordenar por prioridad
+      if (prioA !== prioB) {
+        return prioA - prioB;
+      }
+
+      // Si tienen misma prioridad, aplicar ordenamiento por campo seleccionado
       let aVal = a[field] ?? a[defaultDateKey] ?? a.createdAt ?? a.fechaCreacion;
       let bVal = b[field] ?? b[defaultDateKey] ?? b.createdAt ?? b.fechaCreacion;
 
