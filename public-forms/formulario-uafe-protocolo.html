@@ -1087,12 +1087,15 @@
                     <strong>Valor:</strong> $${parseFloat(protocolo.valorContrato).toFixed(2)}
                 </p>
                 <p style="margin-top: 10px;">
-                    <strong>Tu Rol:</strong> ${rol.calidad} - ${rol.actuaPor === 'REPRESENTANDO_A' ? 'Representando a otra persona' : 'Por sus propios derechos'}
+                    <strong>Tu Rol:</strong> ${rol.calidad} - ${(rol.actuaPor === 'REPRESENTANDO_A' || rol.actuaPor === 'REPRESENTANDO') ? 'Representando a otra persona' : 'Por sus propios derechos'}
                 </p>
             `;
 
             // Mostrar sección de representado si actúa representando a otro
-            const debesMostrarRepresentado = rol.actuaPor === 'REPRESENTANDO_A';
+            // Soporta tanto "REPRESENTANDO_A" como "REPRESENTANDO" (legacy/compatibilidad)
+            const debesMostrarRepresentado =
+                rol.actuaPor === 'REPRESENTANDO_A' ||
+                rol.actuaPor === 'REPRESENTANDO';
             console.log('🔍 ¿Debe mostrar sección de representado?', debesMostrarRepresentado);
             mostrarSeccionRepresentado(debesMostrarRepresentado);
         }
