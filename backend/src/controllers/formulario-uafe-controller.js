@@ -1059,7 +1059,8 @@ export async function generarPDFs(req, res) {
           );
 
           // SECCIÓN DE REPRESENTADO (si aplica)
-          if (personaProtocolo.actuaPor === 'REPRESENTANDO_A') {
+          // Soporta tanto "REPRESENTANDO_A" como "REPRESENTANDO" (legacy)
+          if (personaProtocolo.actuaPor === 'REPRESENTANDO_A' || personaProtocolo.actuaPor === 'REPRESENTANDO') {
             currentY = await generateRepresentadoSection(doc, currentY, personaProtocolo);
           }
 
