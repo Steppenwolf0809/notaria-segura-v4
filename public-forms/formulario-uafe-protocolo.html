@@ -538,6 +538,7 @@
                                 <option value="">Seleccione...</option>
                                 <option value="SOLTERO">Soltero/a</option>
                                 <option value="CASADO">Casado/a</option>
+                                <option value="CASADO_DISOLUCION">Casado/a con Disolución de Sociedad Conyugal</option>
                                 <option value="UNION_LIBRE">Unión Libre</option>
                                 <option value="DIVORCIADO">Divorciado/a</option>
                                 <option value="VIUDO">Viudo/a</option>
@@ -609,14 +610,93 @@
                                     Cambiar a ingreso manual
                                 </button>
                             </div>
+
+                            <!-- Datos Personales -->
+                            <div class="subsection-title" style="margin-top: 20px;">Datos Personales</div>
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label>Nombre/Razón Social</label>
-                                    <input type="text" id="representadoNombre" readonly>
+                                    <label>Apellidos</label>
+                                    <input type="text" id="repApellidos" readonly style="background: #f5f5f5;">
                                 </div>
                                 <div class="form-group">
-                                    <label>Tipo de Persona</label>
-                                    <input type="text" id="representadoTipo" readonly>
+                                    <label>Nombres</label>
+                                    <input type="text" id="repNombres" readonly style="background: #f5f5f5;">
+                                </div>
+                            </div>
+
+                            <!-- Identificación -->
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Tipo de Identificación</label>
+                                    <input type="text" id="repTipoId" readonly style="background: #f5f5f5;">
+                                </div>
+                                <div class="form-group">
+                                    <label>No. de Identificación</label>
+                                    <input type="text" id="repNumeroId" readonly style="background: #f5f5f5;">
+                                </div>
+                                <div class="form-group">
+                                    <label>Nacionalidad</label>
+                                    <input type="text" id="repNacionalidad" readonly style="background: #f5f5f5;">
+                                </div>
+                            </div>
+
+                            <!-- Género, Estado Civil, Nivel Estudio -->
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Género</label>
+                                    <input type="text" id="repGenero" readonly style="background: #f5f5f5;">
+                                </div>
+                                <div class="form-group">
+                                    <label>Estado Civil</label>
+                                    <input type="text" id="repEstadoCivil" readonly style="background: #f5f5f5;">
+                                </div>
+                                <div class="form-group">
+                                    <label>Nivel de Estudio</label>
+                                    <input type="text" id="repNivelEstudio" readonly style="background: #f5f5f5;">
+                                </div>
+                            </div>
+
+                            <!-- Profesión -->
+                            <div class="form-group">
+                                <label>Profesión u Ocupación</label>
+                                <input type="text" id="repProfesion" readonly style="background: #f5f5f5;">
+                            </div>
+
+                            <!-- Contacto -->
+                            <div class="subsection-title" style="margin-top: 20px;">Contacto</div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Correo Electrónico</label>
+                                    <input type="text" id="repEmail" readonly style="background: #f5f5f5;">
+                                </div>
+                                <div class="form-group">
+                                    <label>Teléfono</label>
+                                    <input type="text" id="repTelefono" readonly style="background: #f5f5f5;">
+                                </div>
+                                <div class="form-group">
+                                    <label>Celular</label>
+                                    <input type="text" id="repCelular" readonly style="background: #f5f5f5;">
+                                </div>
+                            </div>
+
+                            <!-- Dirección -->
+                            <div class="subsection-title" style="margin-top: 20px;">Dirección</div>
+                            <div class="form-group">
+                                <label>Dirección Completa</label>
+                                <input type="text" id="repDireccion" readonly style="background: #f5f5f5;">
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Provincia</label>
+                                    <input type="text" id="repProvincia" readonly style="background: #f5f5f5;">
+                                </div>
+                                <div class="form-group">
+                                    <label>Cantón</label>
+                                    <input type="text" id="repCanton" readonly style="background: #f5f5f5;">
+                                </div>
+                                <div class="form-group">
+                                    <label>Parroquia</label>
+                                    <input type="text" id="repParroquia" readonly style="background: #f5f5f5;">
                                 </div>
                             </div>
                         </div>
@@ -1302,16 +1382,67 @@
                     document.getElementById('datosRepresentadoEncontrado').classList.remove('hidden');
                     document.getElementById('datosRepresentadoManual').classList.add('hidden');
 
-                    document.getElementById('representadoNombre').value = data.data.nombreCompleto;
-                    document.getElementById('representadoTipo').value =
-                        data.data.tipoPersona === 'NATURAL' ? 'Persona Natural' : 'Persona Jurídica';
-
                     // Guardar ID para envío posterior
                     representadoIdGlobal = data.data.id;
                     datosRepresentadoGlobal = null;
 
-                    statusEl.textContent = '✅ Encontrado en el sistema';
+                    // Llenar todos los campos con los datos completos
+                    const datos = data.data.datosCompletos;
+                    if (datos) {
+                        // Datos Personales (Persona Natural)
+                        if (data.data.tipoPersona === 'NATURAL' && datos.datosPersonales) {
+                            document.getElementById('repApellidos').value = datos.datosPersonales.apellidos || '';
+                            document.getElementById('repNombres').value = datos.datosPersonales.nombres || '';
+                            document.getElementById('repGenero').value = datos.datosPersonales.genero || '';
+                            document.getElementById('repEstadoCivil').value = datos.datosPersonales.estadoCivil || '';
+                            document.getElementById('repNivelEstudio').value = datos.datosPersonales.nivelEstudio || '';
+                        } else if (data.data.tipoPersona === 'JURIDICA' && datos.compania) {
+                            // Para persona jurídica
+                            document.getElementById('repApellidos').value = datos.compania.razonSocial || '';
+                            document.getElementById('repNombres').value = 'N/A';
+                            document.getElementById('repGenero').value = 'N/A';
+                            document.getElementById('repEstadoCivil').value = 'N/A';
+                            document.getElementById('repNivelEstudio').value = 'N/A';
+                        }
+
+                        // Identificación
+                        if (datos.identificacion) {
+                            document.getElementById('repTipoId').value = datos.identificacion.tipo || '';
+                            document.getElementById('repNumeroId').value = datos.identificacion.numero || '';
+                            document.getElementById('repNacionalidad').value = datos.identificacion.nacionalidad || '';
+                        }
+
+                        // Profesión (de información laboral)
+                        if (datos.informacionLaboral) {
+                            document.getElementById('repProfesion').value = datos.informacionLaboral.profesionOcupacion || '';
+                        }
+
+                        // Contacto
+                        if (datos.contacto) {
+                            document.getElementById('repEmail').value = datos.contacto.email || '';
+                            document.getElementById('repTelefono').value = datos.contacto.telefono || '';
+                            document.getElementById('repCelular').value = datos.contacto.celular || '';
+                        }
+
+                        // Dirección
+                        if (datos.direccion) {
+                            const direccionCompleta = `${datos.direccion.callePrincipal || ''} ${datos.direccion.numero || ''} ${datos.direccion.calleSecundaria || ''}`.trim();
+                            document.getElementById('repDireccion').value = direccionCompleta;
+                            document.getElementById('repProvincia').value = datos.direccion.provincia || '';
+                            document.getElementById('repCanton').value = datos.direccion.canton || '';
+                            document.getElementById('repParroquia').value = datos.direccion.parroquia || '';
+                        }
+                    } else {
+                        // Si no hay datos completos, solo mostrar lo básico
+                        document.getElementById('repApellidos').value = 'Datos no disponibles';
+                        document.getElementById('repNombres').value = data.data.nombreCompleto || '';
+                        document.getElementById('repNumeroId').value = data.data.numeroIdentificacion || '';
+                    }
+
+                    statusEl.textContent = '✅ Encontrado en el sistema - Datos cargados';
                     statusEl.style.color = '#060';
+
+                    console.log('✅ Datos del representado cargados:', data.data);
                 } else {
                     // Mostrar formulario manual
                     document.getElementById('datosRepresentadoEncontrado').classList.add('hidden');
@@ -1462,7 +1593,9 @@
         function toggleConyugeSection() {
             const estadoCivil = document.getElementById('estadoCivil').value;
             const conyugeForm = document.getElementById('conyugeForm');
-            const mostrar = estadoCivil === 'CASADO' || estadoCivil === 'UNION_LIBRE';
+            const mostrar = estadoCivil === 'CASADO' ||
+                           estadoCivil === 'CASADO_DISOLUCION' ||
+                           estadoCivil === 'UNION_LIBRE';
             conyugeForm.classList.toggle('hidden', !mostrar);
         }
 
@@ -1487,7 +1620,9 @@
 
             try {
                 const estadoCivil = document.getElementById('estadoCivil').value;
-                const tieneConyugue = estadoCivil === 'CASADO' || estadoCivil === 'UNION_LIBRE';
+                const tieneConyugue = estadoCivil === 'CASADO' ||
+                                     estadoCivil === 'CASADO_DISOLUCION' ||
+                                     estadoCivil === 'UNION_LIBRE';
 
                 // Construir objeto de datos actualizado
                 const datosActualizados = {
