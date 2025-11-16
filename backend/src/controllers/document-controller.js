@@ -2773,6 +2773,105 @@ async function ungroupDocument(req, res) {
 }
 
 /**
+ * 🔓 DESAGRUPAR TODOS LOS DOCUMENTOS (Función administrativa)
+ * Solo accesible por ADMIN - Útil para deshabilitar agrupación temporalmente
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+async function ungroupAllDocuments(req, res) {
+  try {
+    // Solo ADMIN puede ejecutar esta función
+    if (req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo ADMIN puede desagrupar todos los documentos'
+      });
+    }
+
+    console.log('🔓 ADMIN: Iniciando desagrupación masiva de documentos...');
+    console.log('👤 Usuario:', `${req.user.firstName} ${req.user.lastName} (${req.user.email})`);
+
+    // Transacción para consistencia
+    const result = await prisma.$transaction(async (tx) => {
+      // Contar documentos agrupados antes de desagrupar
+      const groupedCountBefore = await tx.document.count({
+        where: { isGrouped: true }
+      });
+
+      // Contar grupos existentes
+      const groupsCount = await tx.documentGroup.count();
+
+      console.log(`📊 Estado actual: ${groupedCountBefore} documentos agrupados en ${groupsCount} grupos`);
+
+      // Desagrupar TODOS los documentos
+      const ungroupedDocs = await tx.document.updateMany({
+        where: { isGrouped: true },
+        data: {
+          isGrouped: false,
+          documentGroupId: null,
+          groupLeaderId: null,
+          groupPosition: null,
+          groupVerificationCode: null
+        }
+      });
+
+      // Eliminar todos los grupos
+      const deletedGroups = await tx.documentGroup.deleteMany({});
+
+      // Registrar evento de auditoría global
+      try {
+        await tx.documentEvent.create({
+          data: {
+            documentId: null, // Evento global, no específico de un documento
+            userId: req.user.id,
+            eventType: 'SYSTEM_ADMIN',
+            description: `ADMIN desagrupó TODOS los documentos del sistema (${groupedCountBefore} docs, ${groupsCount} grupos)`,
+            details: JSON.stringify({
+              action: 'UNGROUP_ALL_DOCUMENTS',
+              documentsUngrouped: groupedCountBefore,
+              groupsDeleted: groupsCount,
+              reason: 'Deshabilitación temporal de agrupación',
+              timestamp: new Date().toISOString(),
+              adminUser: {
+                id: req.user.id,
+                name: `${req.user.firstName} ${req.user.lastName}`,
+                email: req.user.email
+              }
+            }),
+            ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+            userAgent: req.get('User-Agent') || 'unknown'
+          }
+        });
+      } catch (auditError) {
+        console.warn('⚠️ No se pudo registrar evento de auditoría:', auditError.message);
+      }
+
+      return {
+        documentsUngrouped: ungroupedDocs.count,
+        groupsDeleted: deletedGroups.count,
+        documentCountBefore: groupedCountBefore,
+        groupCountBefore: groupsCount
+      };
+    });
+
+    console.log('✅ Desagrupación masiva completada:', result);
+
+    return res.json({
+      success: true,
+      message: `Se desagruparon ${result.documentsUngrouped} documentos y se eliminaron ${result.groupsDeleted} grupos`,
+      data: result
+    });
+  } catch (error) {
+    console.error('❌ Error en desagrupación masiva:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor al desagrupar documentos',
+      error: error.message
+    });
+  }
+}
+
+/**
  * Entregar documento con información completa de recepción
  * Función para RECEPCION: Marcar documento como entregado con detalles
  * @param {Object} req - Request object
@@ -4758,6 +4857,7 @@ export {
   getGroupDocuments,
   // 🔓 Desagrupación
   ungroupDocument,
+  ungroupAllDocuments,
   // 🔄 Reversión de estado
   revertDocumentStatus,
   // 🔔 Políticas de notificación
