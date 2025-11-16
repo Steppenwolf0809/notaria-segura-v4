@@ -481,11 +481,11 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
                         {document.protocolNumber}
                       </Typography>
                     </TableCell>
-                    <TableCell onClick={() => openDetailModal(document)}>
+                    <TableCell>
                       <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Avatar sx={{ 
-                          width: 32, 
-                          height: 32, 
+                        <Avatar sx={{
+                          width: 32,
+                          height: 32,
                           mr: 1.5,
                           bgcolor: 'primary.main',
                           fontSize: '0.875rem'
@@ -493,9 +493,27 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
                           {document.clientName?.charAt(0) || 'C'}
                         </Avatar>
                         <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                            {document.clientName}
-                          </Typography>
+                          <Tooltip title="Click para buscar todos los documentos de este cliente" arrow>
+                            <Typography
+                              variant="body2"
+                              sx={{
+                                fontWeight: 'medium',
+                                cursor: 'pointer',
+                                '&:hover': {
+                                  color: 'primary.main',
+                                  textDecoration: 'underline'
+                                }
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (onSearchByClient) {
+                                  onSearchByClient(document.clientName);
+                                }
+                              }}
+                            >
+                              {document.clientName}
+                            </Typography>
+                          </Tooltip>
                           {document.clientPhone && (
                             <Typography variant="caption" color="text.secondary">
                               <PhoneIcon sx={{ fontSize: 12, mr: 0.5 }} />
