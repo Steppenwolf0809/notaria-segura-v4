@@ -1272,8 +1272,8 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                           />
                         </Tooltip>
                       ) : (
-                        // Mostrar botón de agrupación solo si hay documentos agrupables disponibles
-                        ['EN_PROCESO', 'LISTO'].includes(documento.status) && hasMoreThanOneForClient(documento) && (
+                        // 🚫 AGRUPACIÓN TEMPORALMENTE DESHABILITADA (sin notificaciones WhatsApp)
+                        false && ['EN_PROCESO', 'LISTO'].includes(documento.status) && hasMoreThanOneForClient(documento) && (
                           <Button
                             size="small"
                             variant="outlined"

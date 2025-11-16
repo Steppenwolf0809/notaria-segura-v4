@@ -1168,8 +1168,8 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                             />
                           </Tooltip>
                         ) : (
-                          // Mostrar botón solo si hay más de un documento del mismo cliente
-                          ['EN_PROCESO', 'LISTO'].includes(documento.status) && hasMoreThanOneForClient(documento) && (
+                          // 🚫 AGRUPACIÓN TEMPORALMENTE DESHABILITADA (sin notificaciones WhatsApp)
+                          false && ['EN_PROCESO', 'LISTO'].includes(documento.status) && hasMoreThanOneForClient(documento) && (
                             <Button
                               size="small"
                               variant="outlined"
