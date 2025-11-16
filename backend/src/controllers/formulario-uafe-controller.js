@@ -768,7 +768,8 @@ export async function actualizarProtocolo(req, res) {
  */
 export async function actualizarPersonaEnProtocolo(req, res) {
   try {
-    const { protocoloId, personaProtocoloId } = req.params;
+    const { protocoloId, personaProtocoloId, personaId } = req.params;
+    const personaIdFinal = personaProtocoloId || personaId; // Soportar ambos nombres
     const { calidad, actuaPor } = req.body;
 
     // Verificar que el protocolo existe y pertenece al usuario
@@ -792,7 +793,7 @@ export async function actualizarPersonaEnProtocolo(req, res) {
 
     // Verificar que la relación persona-protocolo existe
     const personaProtocolo = await prisma.personaProtocolo.findUnique({
-      where: { id: personaProtocoloId }
+      where: { id: personaIdFinal }
     });
 
     if (!personaProtocolo) {
@@ -829,7 +830,7 @@ export async function actualizarPersonaEnProtocolo(req, res) {
 
     // Actualizar persona en protocolo
     const personaActualizada = await prisma.personaProtocolo.update({
-      where: { id: personaProtocoloId },
+      where: { id: personaIdFinal },
       data: {
         ...(calidad && { calidad }),
         ...(actuaPor && { actuaPor })
@@ -890,7 +891,8 @@ export async function actualizarPersonaEnProtocolo(req, res) {
  */
 export async function eliminarPersonaDeProtocolo(req, res) {
   try {
-    const { protocoloId, personaProtocoloId } = req.params;
+    const { protocoloId, personaProtocoloId, personaId } = req.params;
+    const personaIdFinal = personaProtocoloId || personaId; // Soportar ambos nombres
 
     // Verificar que el protocolo existe y pertenece al usuario
     const protocolo = await prisma.protocoloUAFE.findUnique({
@@ -913,7 +915,7 @@ export async function eliminarPersonaDeProtocolo(req, res) {
 
     // Verificar que la relación persona-protocolo existe
     const personaProtocolo = await prisma.personaProtocolo.findUnique({
-      where: { id: personaProtocoloId }
+      where: { id: personaIdFinal }
     });
 
     if (!personaProtocolo) {
@@ -932,7 +934,7 @@ export async function eliminarPersonaDeProtocolo(req, res) {
 
     // Eliminar la relación
     await prisma.personaProtocolo.delete({
-      where: { id: personaProtocoloId }
+      where: { id: personaIdFinal }
     });
 
     res.json({
@@ -1137,6 +1139,172 @@ export async function generarPDFs(req, res) {
     res.status(500).json({
       success: false,
       message: 'Error al generar PDFs',
+      error: error.message
+    });
+  }
+}
+
+/**
+ * Generar PDF individual de una persona
+ * GET /api/formulario-uafe/protocolos/:protocoloId/personas/:personaId/pdf
+ * Requiere: authenticateToken + role MATRIZADOR o ADMIN
+ */
+export async function generarPDFIndividual(req, res) {
+  try {
+    const { protocoloId, personaId } = req.params;
+
+    // 1. Obtener protocolo con la persona específica
+    const protocolo = await prisma.protocoloUAFE.findUnique({
+      where: { id: protocoloId },
+      include: {
+        creador: {
+          select: {
+            firstName: true,
+            lastName: true
+          }
+        }
+      }
+    });
+
+    if (!protocolo) {
+      return res.status(404).json({
+        success: false,
+        message: 'Protocolo no encontrado'
+      });
+    }
+
+    // Verificar permisos
+    if (protocolo.createdBy !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permiso para generar PDFs de este protocolo'
+      });
+    }
+
+    // 2. Obtener la persona específica del protocolo
+    const personaProtocolo = await prisma.personaProtocolo.findUnique({
+      where: { id: personaId },
+      include: {
+        persona: {
+          select: {
+            id: true,
+            numeroIdentificacion: true,
+            tipoPersona: true,
+            datosPersonaNatural: true,
+            datosPersonaJuridica: true,
+            completado: true
+          }
+        }
+      }
+    });
+
+    if (!personaProtocolo) {
+      return res.status(404).json({
+        success: false,
+        message: 'Persona no encontrada en el protocolo'
+      });
+    }
+
+    // Verificar que la persona pertenece al protocolo
+    if (personaProtocolo.protocoloId !== protocoloId) {
+      return res.status(400).json({
+        success: false,
+        message: 'La persona no pertenece a este protocolo'
+      });
+    }
+
+    // Verificar que el formulario está completado
+    if (!personaProtocolo.completado) {
+      return res.status(400).json({
+        success: false,
+        message: 'El formulario de esta persona no ha sido completado'
+      });
+    }
+
+    const persona = personaProtocolo.persona;
+    const datos = persona.tipoPersona === 'NATURAL'
+      ? persona.datosPersonaNatural
+      : persona.datosPersonaJuridica;
+
+    if (!datos) {
+      return res.status(400).json({
+        success: false,
+        message: 'No hay datos disponibles para esta persona'
+      });
+    }
+
+    // 3. Generar PDF
+    const pdfBuffer = await new Promise(async (resolve, reject) => {
+      try {
+        const doc = new PDFDocument({
+          size: 'A4',
+          margins: { top: 50, bottom: 50, left: 50, right: 50 }
+        });
+
+        const chunks = [];
+        doc.on('data', chunk => chunks.push(chunk));
+        doc.on('end', () => resolve(Buffer.concat(chunks)));
+        doc.on('error', reject);
+
+        // === GENERAR CONTENIDO DEL PDF ===
+
+        // Ruta del logo (si existe)
+        const logoPath = path.join(__dirname, '../../assets/images/logo-notaria.png');
+
+        // HEADER
+        let currentY = drawHeader(doc, logoPath);
+
+        // DISCLAIMER
+        currentY = drawDisclaimer(doc, currentY);
+
+        // BOX DE PROTOCOLO
+        currentY = drawProtocolBox(
+          doc,
+          currentY,
+          protocolo,
+          personaProtocolo.calidad,
+          personaProtocolo.actuaPor
+        );
+
+        // SECCIÓN DE REPRESENTADO (si aplica)
+        if (personaProtocolo.actuaPor === 'REPRESENTANDO_A' || personaProtocolo.actuaPor === 'REPRESENTANDO') {
+          currentY = await generateRepresentadoSection(doc, currentY, personaProtocolo);
+        }
+
+        // GENERAR PDF SEGÚN TIPO DE PERSONA
+        if (persona.tipoPersona === 'NATURAL') {
+          currentY = generateNaturalPersonPDF(doc, currentY, datos, persona);
+        } else {
+          currentY = generateJuridicalPersonPDF(doc, currentY, datos, persona);
+        }
+
+        // FIRMA
+        const nombreCompleto = getNombreCompleto(datos);
+        drawSignature(doc, 650, nombreCompleto, persona.numeroIdentificacion);
+
+        // FOOTER
+        drawFooter(doc);
+
+        // Finalizar documento
+        doc.end();
+      } catch (error) {
+        reject(error);
+      }
+    });
+
+    // 4. Crear filename y enviar PDF
+    const apellidos = datos.datosPersonales?.apellidos || datos.compania?.razonSocial || 'SinNombre';
+    const filename = `UAFE_${persona.numeroIdentificacion}_${apellidos.replace(/\s+/g, '_')}.pdf`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.send(pdfBuffer);
+
+  } catch (error) {
+    console.error('Error generando PDF individual:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al generar PDF individual',
       error: error.message
     });
   }
