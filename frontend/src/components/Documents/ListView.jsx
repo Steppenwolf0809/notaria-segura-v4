@@ -236,6 +236,8 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
       } else {
         toast.success('Documento marcado como LISTO.');
       }
+      // 🔄 Refrescar lista para ver cambios inmediatamente
+      await fetchMyDocuments();
     } else {
       toast.error(result.error || 'Error al marcar como LISTO');
     }
@@ -256,6 +258,8 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
       } else {
         toast.success('Documento marcado como ENTREGADO.');
       }
+      // 🔄 Refrescar lista para ver cambios inmediatamente
+      await fetchMyDocuments();
     } else {
       toast.error(result.error || 'Error al marcar como ENTREGADO');
     }
@@ -695,6 +699,8 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
           loading={false}
           onConfirm={async ({ documentId, newStatus, reversionReason }) => {
             await updateDocumentStatus(documentId, newStatus, { reversionReason });
+            // 🔄 Refrescar lista para ver cambios inmediatamente
+            await fetchMyDocuments();
             closeReversion();
           }}
         />

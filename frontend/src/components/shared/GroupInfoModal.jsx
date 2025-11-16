@@ -152,24 +152,27 @@ const GroupInfoModal = ({ open, onClose, document, onUngrouped }) => {
     if (!document?.id) return;
     setUngroupLoading(true);
     try {
-      // Cerrar primero para evitar updates durante render de otros componentes
-      onClose?.();
       const result = await ungroupDocument(document.id);
       if (result.success) {
+        // 🔄 Refrescar ANTES de cerrar para asegurar que el cambio se vea
+        console.log('✅ Documento desagrupado, refrescando lista...');
+        if (['MATRIZADOR', 'ARCHIVO'].includes(user?.role)) {
+          await fetchMyDocuments();
+        } else {
+          await fetchAllDocuments();
+        }
+        console.log('✅ Lista refrescada');
+
+        // Callback opcional para componente padre
         try { onUngrouped?.(result); } catch {}
-        // Refrescar según rol (en siguiente tick)
-        setTimeout(async () => {
-          if (['MATRIZADOR', 'ARCHIVO'].includes(user?.role)) {
-            await fetchMyDocuments();
-          } else {
-            await fetchAllDocuments();
-          }
-        }, 0);
+
+        // Cerrar modal DESPUÉS del refresh
+        onClose?.();
       } else {
         alert(result.error || 'No se pudo desagrupar el documento');
       }
     } catch (e) {
-      console.error(e);
+      console.error('❌ Error desagrupando:', e);
       alert('Error inesperado al desagrupar');
     } finally {
       setUngroupLoading(false);
