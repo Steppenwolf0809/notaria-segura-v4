@@ -46,6 +46,8 @@ import {
   ExpandMore as ExpandMoreIcon,
   ExpandLess as ExpandLessIcon,
   Delete as DeleteIcon,
+  Edit as EditIcon,
+  Download as DownloadIcon,
   Description as DescriptionIcon,
   ContentCopy as CopyIcon,
   Link as LinkIcon,
@@ -73,6 +75,10 @@ const FormulariosUAFE = () => {
   const [openAgregarPersona, setOpenAgregarPersona] = useState(false);
   const [openVerProtocolo, setOpenVerProtocolo] = useState(false);
   const [protocoloSeleccionado, setProtocoloSeleccionado] = useState(null);
+  const [openEditarPersona, setOpenEditarPersona] = useState(false);
+  const [personaEditar, setPersonaEditar] = useState(null);
+  const [openConfirmarEliminar, setOpenConfirmarEliminar] = useState(false);
+  const [personaEliminar, setPersonaEliminar] = useState(null);
 
   // Estados de expansión de tabla
   const [expandedProtocol, setExpandedProtocol] = useState(null);
@@ -381,6 +387,162 @@ const FormulariosUAFE = () => {
       console.error('Error al copiar:', err);
       mostrarSnackbar('Error al copiar el link', 'error');
     });
+  };
+
+  /**
+   * Abrir dialog para editar persona
+   */
+  const abrirEditarPersona = (persona) => {
+    setPersonaEditar({
+      id: persona.id,
+      cedula: persona.cedula,
+      calidad: persona.calidad,
+      actuaPor: persona.actuaPor
+    });
+    setOpenEditarPersona(true);
+  };
+
+  /**
+   * Actualizar datos de persona (calidad y actuaPor)
+   */
+  const actualizarPersona = async () => {
+    if (!personaEditar || !protocoloSeleccionado) {
+      mostrarSnackbar('Error: datos incompletos', 'error');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(
+        `${API_BASE}/formulario-uafe/protocolos/${protocoloSeleccionado.id}/personas/${personaEditar.id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            calidad: personaEditar.calidad,
+            actuaPor: personaEditar.actuaPor
+          })
+        }
+      );
+
+      const data = await response.json();
+      if (data.success) {
+        mostrarSnackbar('Persona actualizada exitosamente', 'success');
+        setOpenEditarPersona(false);
+        setPersonaEditar(null);
+        // Recargar detalles del protocolo
+        verDetallesProtocolo(protocoloSeleccionado.id);
+        cargarProtocolos();
+      } else {
+        mostrarSnackbar(data.message || 'Error al actualizar persona', 'error');
+      }
+    } catch (error) {
+      console.error('Error al actualizar persona:', error);
+      mostrarSnackbar('Error al actualizar persona', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Abrir dialog de confirmación para eliminar persona
+   */
+  const confirmarEliminarPersona = (persona) => {
+    setPersonaEliminar(persona);
+    setOpenConfirmarEliminar(true);
+  };
+
+  /**
+   * Eliminar persona del protocolo
+   */
+  const eliminarPersona = async () => {
+    if (!personaEliminar || !protocoloSeleccionado) {
+      mostrarSnackbar('Error: datos incompletos', 'error');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(
+        `${API_BASE}/formulario-uafe/protocolos/${protocoloSeleccionado.id}/personas/${personaEliminar.id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      const data = await response.json();
+      if (data.success) {
+        mostrarSnackbar('Persona eliminada exitosamente', 'success');
+        setOpenConfirmarEliminar(false);
+        setPersonaEliminar(null);
+        // Recargar detalles del protocolo
+        verDetallesProtocolo(protocoloSeleccionado.id);
+        cargarProtocolos();
+      } else {
+        mostrarSnackbar(data.message || 'Error al eliminar persona', 'error');
+      }
+    } catch (error) {
+      console.error('Error al eliminar persona:', error);
+      mostrarSnackbar('Error al eliminar persona', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Descargar PDF individual de una persona
+   */
+  const descargarPDFIndividual = async (protocoloId, personaId) => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(
+        `${API_BASE}/formulario-uafe/protocolos/${protocoloId}/personas/${personaId}/pdf`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        mostrarSnackbar(errorData.message || 'Error al generar PDF', 'error');
+        return;
+      }
+
+      // Obtener filename del header Content-Disposition
+      const contentDisposition = response.headers.get('Content-Disposition');
+      const filename = contentDisposition
+        ? contentDisposition.split('filename=')[1].replace(/"/g, '')
+        : 'formulario_uafe.pdf';
+
+      // Descargar archivo
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      mostrarSnackbar('PDF descargado exitosamente', 'success');
+    } catch (error) {
+      console.error('Error descargando PDF:', error);
+      mostrarSnackbar('Error al descargar PDF', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   /**
@@ -1080,25 +1242,79 @@ const FormulariosUAFE = () => {
                 {protocoloSeleccionado.personas && protocoloSeleccionado.personas.length > 0 ? (
                   <List>
                     {protocoloSeleccionado.personas.map((persona) => (
-                      <ListItem key={persona.id}>
-                        <ListItemText
-                          primary={persona.nombre}
-                          secondary={
-                            <>
-                              {persona.cedula} - {persona.calidad}
-                              <br />
-                              {persona.actuaPor}
-                            </>
-                          }
-                        />
-                        <ListItemSecondaryAction>
+                      <ListItem
+                        key={persona.id}
+                        sx={{
+                          border: '1px solid #e0e0e0',
+                          borderRadius: '8px',
+                          mb: 2,
+                          flexDirection: 'column',
+                          alignItems: 'flex-start',
+                          padding: '16px'
+                        }}
+                      >
+                        {/* Header con nombre y estado */}
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', mb: 1 }}>
+                          <Typography variant="subtitle1" fontWeight="bold">
+                            {persona.nombre}
+                          </Typography>
                           <Chip
                             icon={persona.completado ? <CheckCircleIcon /> : <PendingIcon />}
                             label={persona.completado ? 'Completado' : 'Pendiente'}
                             color={persona.completado ? 'success' : 'warning'}
                             size="small"
                           />
-                        </ListItemSecondaryAction>
+                        </Box>
+
+                        {/* Información detallada */}
+                        <Box sx={{ width: '100%', mb: 2 }}>
+                          <Typography variant="body2" color="text.secondary">
+                            <strong>Cédula:</strong> {persona.cedula}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            <strong>Calidad:</strong> {persona.calidad}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            <strong>Actúa por:</strong> {persona.actuaPor === 'REPRESENTANDO_A' || persona.actuaPor === 'REPRESENTANDO' ? 'Representando a otra persona' : 'Sus propios derechos'}
+                          </Typography>
+                          {persona.completadoAt && (
+                            <Typography variant="body2" color="text.secondary">
+                              <strong>Fecha completado:</strong> {new Date(persona.completadoAt).toLocaleString('es-EC')}
+                            </Typography>
+                          )}
+                        </Box>
+
+                        {/* Botones de acción */}
+                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<EditIcon />}
+                            onClick={() => abrirEditarPersona(persona)}
+                          >
+                            Editar
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="error"
+                            startIcon={<DeleteIcon />}
+                            onClick={() => confirmarEliminarPersona(persona)}
+                          >
+                            Eliminar
+                          </Button>
+                          {persona.completado && (
+                            <Button
+                              size="small"
+                              variant="outlined"
+                              color="primary"
+                              startIcon={<DownloadIcon />}
+                              onClick={() => descargarPDFIndividual(protocoloSeleccionado.id, persona.id)}
+                            >
+                              Descargar PDF
+                            </Button>
+                          )}
+                        </Box>
                       </ListItem>
                     ))}
                   </List>
@@ -1128,6 +1344,109 @@ const FormulariosUAFE = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenVerProtocolo(false)}>Cerrar</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog: Editar Persona */}
+      <Dialog
+        open={openEditarPersona}
+        onClose={() => { setOpenEditarPersona(false); setPersonaEditar(null); }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ backgroundColor: 'warning.main', color: 'white' }}>
+          Editar Persona
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          {personaEditar && (
+            <Stack spacing={3}>
+              <Alert severity="info">
+                Editando: <strong>{personaEditar.cedula}</strong>
+              </Alert>
+
+              <FormControl fullWidth>
+                <InputLabel>Calidad</InputLabel>
+                <Select
+                  value={personaEditar.calidad}
+                  label="Calidad"
+                  onChange={(e) => setPersonaEditar({ ...personaEditar, calidad: e.target.value })}
+                >
+                  <MenuItem value="COMPRADOR">Comprador</MenuItem>
+                  <MenuItem value="VENDEDOR">Vendedor</MenuItem>
+                  <MenuItem value="TESTIGO">Testigo</MenuItem>
+                </Select>
+              </FormControl>
+
+              <FormControl fullWidth>
+                <InputLabel>Actúa Por</InputLabel>
+                <Select
+                  value={personaEditar.actuaPor}
+                  label="Actúa Por"
+                  onChange={(e) => setPersonaEditar({ ...personaEditar, actuaPor: e.target.value })}
+                >
+                  <MenuItem value="PROPIOS_DERECHOS">Por sus propios derechos</MenuItem>
+                  <MenuItem value="REPRESENTANDO_A">Representando a otra persona</MenuItem>
+                </Select>
+              </FormControl>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => { setOpenEditarPersona(false); setPersonaEditar(null); }}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            color="warning"
+            onClick={actualizarPersona}
+            disabled={loading}
+            startIcon={<EditIcon />}
+          >
+            {loading ? 'Actualizando...' : 'Actualizar'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog: Confirmar Eliminación */}
+      <Dialog
+        open={openConfirmarEliminar}
+        onClose={() => { setOpenConfirmarEliminar(false); setPersonaEliminar(null); }}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ backgroundColor: 'error.main', color: 'white' }}>
+          Confirmar Eliminación
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          {personaEliminar && (
+            <Stack spacing={2}>
+              <Alert severity="warning">
+                ¿Estás seguro de que deseas eliminar esta persona del protocolo?
+              </Alert>
+              <Box>
+                <Typography variant="body2"><strong>Nombre:</strong> {personaEliminar.nombre}</Typography>
+                <Typography variant="body2"><strong>Cédula:</strong> {personaEliminar.cedula}</Typography>
+                <Typography variant="body2"><strong>Calidad:</strong> {personaEliminar.calidad}</Typography>
+              </Box>
+              <Alert severity="error">
+                Esta acción no se puede deshacer. Los datos del formulario completado se perderán.
+              </Alert>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => { setOpenConfirmarEliminar(false); setPersonaEliminar(null); }}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={eliminarPersona}
+            disabled={loading}
+            startIcon={<DeleteIcon />}
+          >
+            {loading ? 'Eliminando...' : 'Eliminar'}
+          </Button>
         </DialogActions>
       </Dialog>
 

@@ -709,21 +709,152 @@
 
                             <div class="form-group">
                                 <label for="representadoTipoPersona">Tipo de Persona <span class="required">*</span></label>
-                                <select id="representadoTipoPersona">
+                                <select id="representadoTipoPersona" onchange="toggleCamposRepresentado()">
                                     <option value="">Seleccione...</option>
                                     <option value="NATURAL">Persona Natural</option>
                                     <option value="JURIDICA">Persona Jurídica</option>
                                 </select>
                             </div>
 
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="representadoNombres">Nombres/Razón Social <span class="required">*</span></label>
-                                    <input type="text" id="representadoNombres" placeholder="Nombre completo o razón social">
+                            <!-- Campos para Persona Natural -->
+                            <div id="repManualNatural" class="hidden">
+                                <div class="subsection-title" style="margin-top: 15px;">Datos Personales</div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="repManApellidos">Apellidos <span class="required">*</span></label>
+                                        <input type="text" id="repManApellidos" placeholder="Apellidos completos">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="repManNombres">Nombres <span class="required">*</span></label>
+                                        <input type="text" id="repManNombres" placeholder="Nombres completos">
+                                    </div>
                                 </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="repManTipoId">Tipo de Identificación <span class="required">*</span></label>
+                                        <select id="repManTipoId">
+                                            <option value="">Seleccione...</option>
+                                            <option value="CEDULA">Cédula</option>
+                                            <option value="PASAPORTE">Pasaporte</option>
+                                            <option value="RUC">RUC</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="repManNacionalidad">Nacionalidad</label>
+                                        <input type="text" id="repManNacionalidad" placeholder="Ej: Ecuatoriana">
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="repManGenero">Género</label>
+                                        <select id="repManGenero">
+                                            <option value="">Seleccione...</option>
+                                            <option value="MASCULINO">Masculino</option>
+                                            <option value="FEMENINO">Femenino</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="repManEstadoCivil">Estado Civil</label>
+                                        <select id="repManEstadoCivil">
+                                            <option value="">Seleccione...</option>
+                                            <option value="SOLTERO">Soltero/a</option>
+                                            <option value="CASADO">Casado/a</option>
+                                            <option value="CASADO_DISOLUCION">Casado/a con Disolución</option>
+                                            <option value="UNION_LIBRE">Unión Libre</option>
+                                            <option value="DIVORCIADO">Divorciado/a</option>
+                                            <option value="VIUDO">Viudo/a</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="repManNivelEstudio">Nivel de Estudio</label>
+                                        <select id="repManNivelEstudio">
+                                            <option value="">Seleccione...</option>
+                                            <option value="BACHILLER">Bachiller</option>
+                                            <option value="UNIVERSITARIO">Universitario</option>
+                                            <option value="MAESTRIA">Maestría</option>
+                                            <option value="POSTGRADO">Postgrado</option>
+                                        </select>
+                                    </div>
+                                </div>
+
                                 <div class="form-group">
-                                    <label for="representadoNacionalidad">Nacionalidad</label>
-                                    <input type="text" id="representadoNacionalidad" placeholder="Ej: Ecuatoriana">
+                                    <label for="repManProfesion">Profesión u Ocupación</label>
+                                    <input type="text" id="repManProfesion" placeholder="Ej: Ingeniero Civil">
+                                </div>
+
+                                <div class="subsection-title" style="margin-top: 15px;">Contacto</div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="repManEmail">Correo Electrónico</label>
+                                        <input type="email" id="repManEmail" placeholder="ejemplo@correo.com">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="repManTelefono">Teléfono</label>
+                                        <input type="tel" id="repManTelefono" placeholder="02-2345678">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="repManCelular">Celular</label>
+                                        <input type="tel" id="repManCelular" placeholder="0987654321">
+                                    </div>
+                                </div>
+
+                                <div class="subsection-title" style="margin-top: 15px;">Dirección</div>
+                                <div class="form-group">
+                                    <label for="repManDireccion">Dirección Completa</label>
+                                    <input type="text" id="repManDireccion" placeholder="Calle Principal 123 y Secundaria">
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="repManProvincia">Provincia</label>
+                                        <input type="text" id="repManProvincia" placeholder="Ej: Pichincha">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="repManCanton">Cantón</label>
+                                        <input type="text" id="repManCanton" placeholder="Ej: Quito">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="repManParroquia">Parroquia</label>
+                                        <input type="text" id="repManParroquia" placeholder="Ej: Iñaquito">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Campos para Persona Jurídica -->
+                            <div id="repManualJuridica" class="hidden">
+                                <div class="subsection-title" style="margin-top: 15px;">Datos de la Empresa</div>
+                                <div class="form-group">
+                                    <label for="repManRazonSocial">Razón Social <span class="required">*</span></label>
+                                    <input type="text" id="repManRazonSocial" placeholder="Nombre de la empresa">
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="repManRuc">RUC <span class="required">*</span></label>
+                                        <input type="text" id="repManRuc" placeholder="1234567890001">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="repManPaisConstitucion">País de Constitución</label>
+                                        <input type="text" id="repManPaisConstitucion" placeholder="Ej: Ecuador">
+                                    </div>
+                                </div>
+
+                                <div class="subsection-title" style="margin-top: 15px;">Contacto</div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label for="repManEmailJur">Correo Electrónico</label>
+                                        <input type="email" id="repManEmailJur" placeholder="empresa@correo.com">
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="repManTelefonoJur">Teléfono</label>
+                                        <input type="tel" id="repManTelefonoJur" placeholder="02-2345678">
+                                    </div>
+                                </div>
+
+                                <div class="subsection-title" style="margin-top: 15px;">Dirección</div>
+                                <div class="form-group">
+                                    <label for="repManDireccionJur">Dirección Completa</label>
+                                    <input type="text" id="repManDireccionJur" placeholder="Dirección de la empresa">
                                 </div>
                             </div>
                         </div>
@@ -1494,6 +1625,23 @@
             console.log('✏️ Modo manual activado para identificación:', identificacion);
         }
 
+        function toggleCamposRepresentado() {
+            const tipoPersona = document.getElementById('representadoTipoPersona').value;
+            const camposNatural = document.getElementById('repManualNatural');
+            const camposJuridica = document.getElementById('repManualJuridica');
+
+            if (tipoPersona === 'NATURAL') {
+                camposNatural.classList.remove('hidden');
+                camposJuridica.classList.add('hidden');
+            } else if (tipoPersona === 'JURIDICA') {
+                camposNatural.classList.add('hidden');
+                camposJuridica.classList.remove('hidden');
+            } else {
+                camposNatural.classList.add('hidden');
+                camposJuridica.classList.add('hidden');
+            }
+        }
+
         function limpiarDatosRepresentado() {
             // Limpiar campos
             document.getElementById('representadoIdentificacion').value = '';
@@ -1529,21 +1677,67 @@
             // Si no existe, preparar datos manuales
             const identificacion = document.getElementById('representadoIdentificacion').value.trim();
             const tipoPersona = document.getElementById('representadoTipoPersona').value;
-            const nombres = document.getElementById('representadoNombres').value.trim();
-            const nacionalidad = document.getElementById('representadoNacionalidad').value.trim();
 
-            if (!identificacion || !tipoPersona || !nombres) {
-                throw new Error('Complete todos los campos obligatorios del representado');
+            if (!identificacion || !tipoPersona) {
+                throw new Error('Complete el tipo de persona del representado');
+            }
+
+            let datosRepresentado = {
+                identificacion,
+                tipoPersona
+            };
+
+            // Preparar datos según tipo de persona
+            if (tipoPersona === 'NATURAL') {
+                const apellidos = document.getElementById('repManApellidos').value.trim();
+                const nombres = document.getElementById('repManNombres').value.trim();
+
+                if (!apellidos || !nombres) {
+                    throw new Error('Complete apellidos y nombres del representado');
+                }
+
+                datosRepresentado = {
+                    ...datosRepresentado,
+                    apellidos,
+                    nombres,
+                    nombreCompleto: `${nombres} ${apellidos}`,
+                    tipoIdentificacion: document.getElementById('repManTipoId').value || null,
+                    nacionalidad: document.getElementById('repManNacionalidad').value.trim() || null,
+                    genero: document.getElementById('repManGenero').value || null,
+                    estadoCivil: document.getElementById('repManEstadoCivil').value || null,
+                    nivelEstudio: document.getElementById('repManNivelEstudio').value || null,
+                    profesion: document.getElementById('repManProfesion').value.trim() || null,
+                    email: document.getElementById('repManEmail').value.trim() || null,
+                    telefono: document.getElementById('repManTelefono').value.trim() || null,
+                    celular: document.getElementById('repManCelular').value.trim() || null,
+                    direccion: document.getElementById('repManDireccion').value.trim() || null,
+                    provincia: document.getElementById('repManProvincia').value.trim() || null,
+                    canton: document.getElementById('repManCanton').value.trim() || null,
+                    parroquia: document.getElementById('repManParroquia').value.trim() || null
+                };
+            } else if (tipoPersona === 'JURIDICA') {
+                const razonSocial = document.getElementById('repManRazonSocial').value.trim();
+                const ruc = document.getElementById('repManRuc').value.trim();
+
+                if (!razonSocial || !ruc) {
+                    throw new Error('Complete razón social y RUC del representado');
+                }
+
+                datosRepresentado = {
+                    ...datosRepresentado,
+                    razonSocial,
+                    ruc,
+                    nombreCompleto: razonSocial,
+                    paisConstitucion: document.getElementById('repManPaisConstitucion').value.trim() || null,
+                    email: document.getElementById('repManEmailJur').value.trim() || null,
+                    telefono: document.getElementById('repManTelefonoJur').value.trim() || null,
+                    direccion: document.getElementById('repManDireccionJur').value.trim() || null
+                };
             }
 
             return {
                 representadoId: null,
-                datosRepresentado: {
-                    identificacion,
-                    tipoPersona,
-                    nombreCompleto: nombres,
-                    nacionalidad: nacionalidad || null
-                }
+                datosRepresentado
             };
         }
 
