@@ -88,3 +88,116 @@ export const DELIVERY_FILTER_PERIODS = {
   TWO_WEEKS: 14,
   MONTH: 30
 };
+
+// ============================================================================
+// UTILIDADES DE TIMEZONE ECUADOR (GMT-5)
+// ============================================================================
+
+const ECUADOR_TIMEZONE = 'America/Guayaquil';
+const ECUADOR_LOCALE = 'es-EC';
+
+/**
+ * Formatea fecha a string legible en español (Ecuador)
+ * @param {Date|string} date - Fecha a formatear
+ * @returns {string} Fecha formateada: "14 de noviembre de 2025"
+ */
+export function formatDateES(date) {
+  if (!date) return 'No disponible';
+
+  const dateObj = new Date(date);
+
+  const options = {
+    timeZone: ECUADOR_TIMEZONE,
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  };
+
+  return new Intl.DateTimeFormat(ECUADOR_LOCALE, options).format(dateObj);
+}
+
+/**
+ * Formatea fecha y hora completa con segundos
+ * @param {Date|string} date - Fecha a formatear
+ * @returns {string} Fecha y hora formateada: "14 de noviembre de 2025, 15:30:45"
+ */
+export function formatDateTimeES(date) {
+  if (!date) return 'No disponible';
+
+  const dateObj = new Date(date);
+
+  const options = {
+    timeZone: ECUADOR_TIMEZONE,
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  };
+
+  return new Intl.DateTimeFormat(ECUADOR_LOCALE, options).format(dateObj);
+}
+
+/**
+ * Formatea solo la fecha en formato corto
+ * @param {Date|string} date - Fecha a formatear
+ * @returns {string} Fecha formateada: "14/11/2025"
+ */
+export function formatDateShort(date) {
+  if (!date) return 'No disponible';
+
+  const dateObj = new Date(date);
+
+  const options = {
+    timeZone: ECUADOR_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  };
+
+  return new Intl.DateTimeFormat(ECUADOR_LOCALE, options).format(dateObj);
+}
+
+/**
+ * Formatea fecha y hora en formato corto
+ * @param {Date|string} date - Fecha a formatear
+ * @returns {string} Fecha y hora formateada: "14/11/2025, 15:30"
+ */
+export function formatDateTimeShort(date) {
+  if (!date) return 'No disponible';
+
+  const dateObj = new Date(date);
+
+  const options = {
+    timeZone: ECUADOR_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  };
+
+  return new Intl.DateTimeFormat(ECUADOR_LOCALE, options).format(dateObj);
+}
+
+/**
+ * Obtiene la fecha/hora actual de Ecuador
+ * @returns {Date} Fecha actual
+ */
+export function nowEcuador() {
+  return new Date();
+}
+
+/**
+ * Convierte fecha a timezone de Ecuador
+ * @param {Date|string} date - Fecha a convertir
+ * @returns {Date} Fecha ajustada a timezone Ecuador
+ */
+export function toEcuadorTime(date) {
+  if (!date) return null;
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  return new Date(dateObj.toLocaleString('en-US', { timeZone: ECUADOR_TIMEZONE }));
+}
