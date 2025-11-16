@@ -565,7 +565,7 @@
 
                         <div class="form-group">
                             <label for="representadoIdentificacion">Cédula/RUC del Representado <span class="required">*</span></label>
-                            <div class="form-row" style="align-items: center;">
+                            <div class="form-row" style="align-items: center; gap: 10px;">
                                 <input
                                     type="text"
                                     id="representadoIdentificacion"
@@ -580,9 +580,18 @@
                                     id="btnBuscarRepresentado"
                                     class="btn btn-secondary"
                                     onclick="buscarRepresentado()"
-                                    style="width: auto; margin-left: 10px;"
+                                    style="width: auto;"
                                 >
-                                    Buscar
+                                    🔍 Buscar
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-secondary"
+                                    onclick="llenarManualmente()"
+                                    style="width: auto; background: #ff9800; color: white;"
+                                    title="Llenar datos manualmente sin buscar"
+                                >
+                                    ✏️ Manual
                                 </button>
                             </div>
                             <small id="representadoStatus" style="display: none; margin-top: 5px; color: #666;"></small>
@@ -592,6 +601,13 @@
                         <div id="datosRepresentadoEncontrado" class="hidden">
                             <div class="alert alert-success active">
                                 ✅ Persona encontrada en el sistema
+                                <button
+                                    type="button"
+                                    onclick="llenarManualmente()"
+                                    style="float: right; background: transparent; border: 1px solid #060; color: #060; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 12px;"
+                                >
+                                    Cambiar a ingreso manual
+                                </button>
                             </div>
                             <div class="form-row">
                                 <div class="form-group">
@@ -1272,8 +1288,10 @@
             btnBuscar.disabled = true;
 
             try {
-                const response = await fetch(`${API_URL}/buscar-representado/${identificacion}`);
+                const response = await fetch(`${API_URL}/formulario-uafe/buscar-representado/${identificacion}`);
                 const data = await response.json();
+
+                console.log('📡 Respuesta de búsqueda:', data);
 
                 if (!data.success) {
                     throw new Error(data.message || 'Error en la búsqueda');
@@ -1315,6 +1333,34 @@
             } finally {
                 btnBuscar.disabled = false;
             }
+        }
+
+        function llenarManualmente() {
+            const identificacion = document.getElementById('representadoIdentificacion').value.trim();
+            const statusEl = document.getElementById('representadoStatus');
+
+            // Validar que tenga identificación
+            if (!identificacion) {
+                alert('Por favor ingrese primero la cédula/RUC del representado');
+                document.getElementById('representadoIdentificacion').focus();
+                return;
+            }
+
+            // Ocultar sección de encontrado
+            document.getElementById('datosRepresentadoEncontrado').classList.add('hidden');
+
+            // Mostrar formulario manual
+            document.getElementById('datosRepresentadoManual').classList.remove('hidden');
+
+            // Actualizar status
+            statusEl.textContent = 'Modo manual - Complete los datos';
+            statusEl.style.display = 'block';
+            statusEl.style.color = '#ff9800';
+
+            // Limpiar ID de representado (usaremos datos manuales)
+            representadoIdGlobal = null;
+
+            console.log('✏️ Modo manual activado para identificación:', identificacion);
         }
 
         function limpiarDatosRepresentado() {
