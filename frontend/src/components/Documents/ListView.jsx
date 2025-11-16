@@ -48,7 +48,7 @@ import { toast } from 'react-toastify';
  * Vista Lista - EXACTA AL PROTOTIPO + SELECCIÓN MÚLTIPLE
  * Tabla completa con todas las funcionalidades + checkboxes para cambios masivos
  */
-const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = false }) => {
+const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = false, onSearchByClient }) => {
   const { documents, updateDocumentStatus, updateDocument, createDocumentGroup, detectGroupableDocuments, fetchMyDocuments } = useDocumentStore();
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
