@@ -209,8 +209,8 @@ export async function extractDataWithGemini(pdfText) {
           })
           try {
             const nombresExtract = {
-              otorgantes: (parsed.otorgantes || []).map(o => `${o?.apellidos || ''} ${o?.nombres || ''}`.trim()),
-              beneficiarios: (parsed.beneficiarios || []).map(b => `${b?.apellidos || ''} ${b?.nombres || ''}`.trim())
+              otorgantes: (parsed.otorgantes || []).map(o => `${o?.nombres || ''} ${o?.apellidos || ''}`.trim()),
+              beneficiarios: (parsed.beneficiarios || []).map(b => `${b?.nombres || ''} ${b?.apellidos || ''}`.trim())
             }
             console.log('👥 NOMBRES EXTRAÍDOS:', nombresExtract)
           } catch {}
