@@ -1,8 +1,8 @@
 {
   "name": "xml-watcher-service",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
-  "description": "Servicio standalone para monitorear carpeta y subir XMLs a Railway",
+  "description": "Servicio standalone mejorado para monitorear carpeta y subir XMLs con validación, notificaciones y reintentos automáticos",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
@@ -25,7 +25,9 @@
     "winston-daily-rotate-file": "^5.0.0",
     "yargs": "^17.7.2",
     "adm-zip": "^0.5.12",
-    "pretty-bytes": "^6.1.1"
+    "pretty-bytes": "^6.1.1",
+    "xml2js": "^0.6.2",
+    "nodemailer": "^6.9.7"
   },
   "devDependencies": {
     "nexe": "^3.3.7",

@@ -2,6 +2,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import axios from 'axios';
 import FormData from 'form-data';
+import { XmlValidator } from './xml-validator.js';
 
 export class XmlUploader {
   constructor({ apiUrl, auth, config, logger }) {
@@ -10,6 +11,7 @@ export class XmlUploader {
     this.config = config;
     this.logger = logger;
     this.http = axios.create({ baseURL: this.apiUrl, timeout: 60000 });
+    this.validator = new XmlValidator({ logger });
   }
 
   async uploadSingle(filePath) {
@@ -59,8 +61,41 @@ export class XmlUploader {
     await fs.ensureDir(processedDir);
     await fs.ensureDir(errorsDir);
 
+    // PASO 1: Validar archivos antes de procesarlos
+    const validFiles = [];
+    const invalidFiles = [];
+
+    for (const filePath of filePaths) {
+      const validation = await this.validator.validateFile(filePath);
+      if (validation.valid) {
+        this.logger.info(`✓ Validación exitosa: ${path.basename(filePath)}`);
+        validFiles.push(filePath);
+      } else {
+        this.logger.warn(`✗ Validación fallida: ${path.basename(filePath)} - ${validation.error}`);
+        invalidFiles.push({ filePath, error: validation.error });
+      }
+    }
+
+    // PASO 2: Mover archivos inválidos a carpeta de errores
+    for (const { filePath, error } of invalidFiles) {
+      const dest = path.join(errorsDir, path.basename(filePath));
+      try {
+        await fs.move(filePath, dest, { overwrite: true });
+        // Crear archivo de log con el error
+        await fs.writeFile(
+          dest + '.error.txt',
+          `Error de validación: ${error}\nFecha: ${new Date().toISOString()}\n`,
+          'utf-8'
+        );
+        this.logger.info(`Archivo inválido movido a errors: ${path.basename(filePath)}`);
+      } catch (moveErr) {
+        this.logger.error(`No se pudo mover archivo inválido: ${filePath} -> ${moveErr.message}`);
+      }
+    }
+
+    // PASO 3: Procesar solo archivos válidos
     const results = [];
-    const toProcess = [...filePaths];
+    const toProcess = [...validFiles];
     while (toProcess.length) {
       const chunk = toProcess.splice(0, this.config.settings.batchSize);
       try {
@@ -79,6 +114,12 @@ export class XmlUploader {
           const dest = path.join(errorsDir, path.basename(src));
           try {
             await fs.move(src, dest, { overwrite: true });
+            // Crear archivo de log con el error
+            await fs.writeFile(
+              dest + '.error.txt',
+              `Error de upload: ${err.message}\nFecha: ${new Date().toISOString()}\n`,
+              'utf-8'
+            );
           } catch (moveErr) {
             this.logger.error(`No se pudo mover a errors: ${src} -> ${dest}: ${moveErr.message}`);
           }
@@ -86,6 +127,12 @@ export class XmlUploader {
         results.push({ files: chunk, success: false, error: err.message });
       }
     }
+
+    // Agregar resultados de archivos inválidos
+    for (const { filePath, error } of invalidFiles) {
+      results.push({ files: [filePath], success: false, error: `Validación: ${error}` });
+    }
+
     return results;
   }
 

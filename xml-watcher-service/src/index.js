@@ -7,6 +7,8 @@ import { AuthClient } from './auth.js';
 import { XmlUploader } from './uploader.js';
 import { XmlWatcher } from './watcher.js';
 import { Organizer } from './organizer.js';
+import { Notifier } from './notifier.js';
+import { RetryManager } from './retry-manager.js';
 
 async function main() {
   const config = loadConfig();
@@ -21,6 +23,9 @@ async function main() {
   logger.info('XML Watcher Service - Notaría iniciado');
   logger.info(`API: ${config.apiUrl}`);
 
+  // Inicializar notificador
+  const notifier = new Notifier({ config, logger });
+
   const auth = new AuthClient({
     apiUrl: config.apiUrl,
     email: config.credentials.email,
@@ -33,10 +38,18 @@ async function main() {
     await auth.login();
   } catch (err) {
     logger.warn('No se pudo autenticar al inicio. Reintentos ocurrirán al subir.');
+    await notifier.notifyError(err, {
+      type: 'Autenticación inicial',
+      stack: err.stack
+    });
   }
 
   const uploader = new XmlUploader({ apiUrl: config.apiUrl, auth, config, logger });
   const organizer = new Organizer({ folders: config.folders, settings: config.settings, logger });
+
+  // Contador de errores para alertas críticas
+  let consecutiveErrors = 0;
+  const MAX_CONSECUTIVE_ERRORS = 5;
 
   const watcher = new XmlWatcher({
     watchDir: config.folders.watch,
@@ -46,14 +59,66 @@ async function main() {
       // Si llegan varias detecciones casi simultáneas, agrupar por ventana de tiempo
       try {
         logger.info(`Procesando ${files.length} archivo(s)...`);
-        await uploader.processAndMove(files);
+        const results = await uploader.processAndMove(files);
+
+        // Verificar si hubo errores
+        const hasErrors = results.some(r => !r.success);
+        if (hasErrors && config.notifications?.email?.sendOnError) {
+          consecutiveErrors++;
+          const errorFiles = results.filter(r => !r.success);
+          await notifier.notifyError(
+            new Error(`${errorFiles.length} archivo(s) con error`),
+            {
+              type: 'Error de procesamiento',
+              files: errorFiles.length,
+              details: errorFiles.map(f => ({
+                file: path.basename(f.files[0]),
+                error: f.error
+              }))
+            }
+          );
+
+          // Alerta crítica si hay muchos errores consecutivos
+          if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+            await notifier.notifyCritical(
+              `Se han detectado ${consecutiveErrors} errores consecutivos`,
+              {
+                'Errores consecutivos': consecutiveErrors,
+                'Archivos afectados': errorFiles.length,
+                'Última hora': new Date().toLocaleString('es-EC')
+              }
+            );
+          }
+        } else {
+          consecutiveErrors = 0; // Resetear contador si fue exitoso
+        }
       } catch (err) {
         logger.error(`Error en procesamiento: ${err.message}`);
+        consecutiveErrors++;
+        await notifier.notifyError(err, {
+          type: 'Error crítico de procesamiento',
+          files: files.length,
+          stack: err.stack
+        });
       }
     }
   });
 
   await watcher.start();
+
+  // Inicializar sistema de reintentos automáticos
+  const retryManager = new RetryManager({
+    folders: config.folders,
+    uploader,
+    logger,
+    config
+  });
+  retryManager.start();
+
+  // Notificar que el servicio inició
+  if (config.notifications?.email?.sendOnStartup) {
+    await notifier.notifyServiceStarted();
+  }
 
   // Programar limpieza diaria a la hora indicada
   if (config.settings.cleanup.enabled) {

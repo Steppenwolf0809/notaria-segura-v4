@@ -24,6 +24,32 @@
       "keepErrorsDays": 90,
       "compressOldFiles": true,
       "cleanupHour": 2
+    },
+    "autoRetry": {
+      "enabled": true,
+      "intervalHours": 6,
+      "maxAttempts": 3,
+      "deleteAfterMaxAttempts": false
+    }
+  },
+  "notifications": {
+    "email": {
+      "enabled": false,
+      "smtp": {
+        "host": "smtp.gmail.com",
+        "port": 587,
+        "secure": false,
+        "user": "tu-email@gmail.com",
+        "password": "tu-contraseña-de-aplicacion"
+      },
+      "from": "XML Watcher Service <tu-email@gmail.com>",
+      "recipients": [
+        "admin@notaria.local",
+        "it@notaria.local"
+      ],
+      "sendOnError": true,
+      "sendDailySummary": true,
+      "sendOnStartup": false
     }
   }
 }
