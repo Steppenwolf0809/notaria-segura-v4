@@ -1002,7 +1002,7 @@ const FormulariosUAFE = () => {
                           onChange={(e) => setFormPersona({ ...formPersona, actuaPor: e.target.value })}
                         >
                           <MenuItem value="PROPIOS_DERECHOS">Por sus propios derechos</MenuItem>
-                          <MenuItem value="REPRESENTANDO">Representando</MenuItem>
+                          <MenuItem value="REPRESENTANDO_A">Representando a otra persona</MenuItem>
                         </Select>
                       </FormControl>
                     </Grid>
