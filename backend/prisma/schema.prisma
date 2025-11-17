@@ -176,7 +176,7 @@ model DocumentGroup {
 // MODELO DE AUDITORÍA - Registro de eventos de documentos
 model DocumentEvent {
   id              String            @id @default(uuid())
-  documentId      String                          // FK al documento
+  documentId      String?                         // FK al documento (opcional para eventos globales del sistema)
   userId          Int                             // FK al usuario que realizó la acción
   eventType       String @default("UNKNOWN") // Tipo de evento (string)
   description     String                         // Descripción del evento
@@ -191,7 +191,7 @@ model DocumentEvent {
   createdAt       DateTime  @default(now())
 
   // Relaciones
-  document        Document  @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document        Document?  @relation(fields: [documentId], references: [id], onDelete: Cascade)
   user            User      @relation(fields: [userId], references: [id])
 
   @@map("document_events")
