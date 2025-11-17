@@ -18,7 +18,8 @@ import {
   getNombreCompleto,
   formatCurrency,
   formatDate,
-  checkAndAddPage
+  checkAndAddPage,
+  drawFormasPago
 } from '../utils/pdf-uafe-helpers.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -37,7 +38,7 @@ export async function crearProtocolo(req, res) {
       actoContrato,
       avaluoMunicipal,
       valorContrato,
-      formaPago
+      formasPago
     } = req.body;
 
     // Validaciones
@@ -46,6 +47,32 @@ export async function crearProtocolo(req, res) {
         success: false,
         message: 'Campos obligatorios: numeroProtocolo, fecha, actoContrato, valorContrato'
       });
+    }
+
+    // Validar formasPago si se proporciona
+    if (formasPago && !Array.isArray(formasPago)) {
+      return res.status(400).json({
+        success: false,
+        message: 'formasPago debe ser un array'
+      });
+    }
+
+    // Validar estructura de cada forma de pago
+    if (formasPago && formasPago.length > 0) {
+      for (const fp of formasPago) {
+        if (!fp.tipo || !fp.monto || fp.monto <= 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Cada forma de pago debe tener tipo y monto válido'
+          });
+        }
+        if (['CHEQUE', 'TRANSFERENCIA'].includes(fp.tipo) && !fp.banco) {
+          return res.status(400).json({
+            success: false,
+            message: `El tipo de pago ${fp.tipo} requiere especificar el banco`
+          });
+        }
+      }
     }
 
     // Verificar si ya existe
@@ -68,7 +95,7 @@ export async function crearProtocolo(req, res) {
         actoContrato,
         avaluoMunicipal: avaluoMunicipal ? parseFloat(avaluoMunicipal) : null,
         valorContrato: parseFloat(valorContrato),
-        formaPago: formaPago || {},
+        formasPago: formasPago || [],
         createdBy: req.user.id
       }
     });
@@ -402,7 +429,7 @@ export async function loginFormularioUAFE(req, res) {
           actoContrato: protocolo.actoContrato,
           avaluoMunicipal: protocolo.avaluoMunicipal,
           valorContrato: protocolo.valorContrato,
-          formaPago: protocolo.formaPago
+          formasPago: protocolo.formasPago || []
         },
         tuRol: {
           calidad: personaEnProtocolo.calidad,
@@ -561,7 +588,7 @@ export async function listarProtocolos(req, res) {
         actoContrato: protocolo.actoContrato,
         valorContrato: protocolo.valorContrato,
         avaluoMunicipal: protocolo.avaluoMunicipal,
-        formaPago: protocolo.formaPago,
+        formasPago: protocolo.formasPago || [],
         createdAt: protocolo.createdAt,
         updatedAt: protocolo.updatedAt,
         personas: personasFormateadas,
@@ -697,7 +724,7 @@ export async function actualizarProtocolo(req, res) {
       actoContrato,
       avaluoMunicipal,
       valorContrato,
-      formaPago
+      formasPago
     } = req.body;
 
     // Verificar que el protocolo existe
@@ -734,6 +761,32 @@ export async function actualizarProtocolo(req, res) {
       }
     }
 
+    // Validar formasPago si se proporciona
+    if (formasPago !== undefined) {
+      if (!Array.isArray(formasPago)) {
+        return res.status(400).json({
+          success: false,
+          message: 'formasPago debe ser un array'
+        });
+      }
+
+      // Validar estructura de cada forma de pago
+      for (const fp of formasPago) {
+        if (!fp.tipo || !fp.monto || fp.monto <= 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Cada forma de pago debe tener tipo y monto válido'
+          });
+        }
+        if (['CHEQUE', 'TRANSFERENCIA'].includes(fp.tipo) && !fp.banco) {
+          return res.status(400).json({
+            success: false,
+            message: `El tipo de pago ${fp.tipo} requiere especificar el banco`
+          });
+        }
+      }
+    }
+
     // Actualizar protocolo
     const protocoloActualizado = await prisma.protocoloUAFE.update({
       where: { id: protocoloId },
@@ -743,7 +796,7 @@ export async function actualizarProtocolo(req, res) {
         ...(actoContrato && { actoContrato }),
         ...(avaluoMunicipal !== undefined && { avaluoMunicipal: parseFloat(avaluoMunicipal) }),
         ...(valorContrato !== undefined && { valorContrato: parseFloat(valorContrato) }),
-        ...(formaPago && { formaPago })
+        ...(formasPago !== undefined && { formasPago })
       }
     });
 
@@ -1032,7 +1085,7 @@ export async function generarPDFs(req, res) {
         try {
           const doc = new PDFDocument({
             size: 'A4',
-            margins: { top: 50, bottom: 50, left: 50, right: 50 }
+            margins: { top: 30, bottom: 30, left: 40, right: 40 }
           });
 
           const chunks = [];
@@ -1059,6 +1112,12 @@ export async function generarPDFs(req, res) {
             personaProtocolo.calidad,
             personaProtocolo.actuaPor
           );
+
+          // FORMAS DE PAGO (si existen)
+          if (protocolo.formasPago && protocolo.formasPago.length > 0) {
+            currentY = checkAndAddPage(doc, currentY, 100);
+            currentY = drawFormasPago(doc, currentY, protocolo.formasPago);
+          }
 
           // SECCIÓN DE REPRESENTADO (si aplica)
           // Soporta tanto "REPRESENTANDO_A" como "REPRESENTANDO" (legacy)
@@ -1238,7 +1297,7 @@ export async function generarPDFIndividual(req, res) {
       try {
         const doc = new PDFDocument({
           size: 'A4',
-          margins: { top: 50, bottom: 50, left: 50, right: 50 }
+          margins: { top: 30, bottom: 30, left: 40, right: 40 }
         });
 
         const chunks = [];
@@ -1265,6 +1324,12 @@ export async function generarPDFIndividual(req, res) {
           personaProtocolo.calidad,
           personaProtocolo.actuaPor
         );
+
+        // FORMAS DE PAGO (si existen)
+        if (protocolo.formasPago && protocolo.formasPago.length > 0) {
+          currentY = checkAndAddPage(doc, currentY, 100);
+          currentY = drawFormasPago(doc, currentY, protocolo.formasPago);
+        }
 
         // SECCIÓN DE REPRESENTADO (si aplica)
         if (personaProtocolo.actuaPor === 'REPRESENTANDO_A' || personaProtocolo.actuaPor === 'REPRESENTANDO') {
@@ -1545,7 +1610,9 @@ function generateNaturalPersonPDF(doc, startY, datos, persona) {
     drawField(doc, 320, y, 'Celular', datos.conyuge?.celular, 220);
 
     y += 50;
-    drawField(doc, 60, y, 'Profesión', datos.conyuge?.profesion, 240);
+    // Soportar múltiples nombres del campo profesión (profesion, profesionOcupacion)
+    const profesionConyuge = datos.conyuge?.profesion || datos.conyuge?.profesionOcupacion || datos.informacionConyuge?.profesion || datos.informacionConyuge?.profesionOcupacion;
+    drawField(doc, 60, y, 'Profesión', profesionConyuge, 240);
     drawField(doc, 320, y, 'Situación Laboral', datos.conyuge?.situacionLaboral, 220);
 
     y += 70;
@@ -1700,7 +1767,7 @@ export async function listarTodosProtocolos(req, res) {
         actoContrato: protocolo.actoContrato,
         avaluoMunicipal: protocolo.avaluoMunicipal,
         valorContrato: protocolo.valorContrato,
-        formaPago: protocolo.formaPago,
+        formasPago: protocolo.formasPago || [],
         createdAt: protocolo.createdAt,
         updatedAt: protocolo.updatedAt,
         creador: {
