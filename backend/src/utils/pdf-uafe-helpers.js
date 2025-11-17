@@ -241,7 +241,7 @@ export function drawProtocolBox(doc, y, protocolo, rol, calidad) {
   // Rol de la persona
   drawInlineField(doc, col1, dataY + 42, 'Calidad:', `${rol} (${calidad})`, 420);
 
-  return y + boxHeight + 10; // Retorna posición Y después del box (reducido de 20 a 10)
+  return y + boxHeight + 15; // Retorna posición Y después del box (margen inferior aumentado para evitar overlap)
 }
 
 /**
