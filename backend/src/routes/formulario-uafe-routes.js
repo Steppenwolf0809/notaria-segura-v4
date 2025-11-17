@@ -14,7 +14,9 @@ import {
   generarPDFs,
   generarPDFIndividual,
   descargarArchivo,
-  buscarRepresentado
+  buscarRepresentado,
+  listarTodosProtocolos,
+  eliminarProtocolo
 } from '../controllers/formulario-uafe-controller.js';
 
 const router = express.Router();
@@ -193,6 +195,34 @@ router.get(
   authenticateToken,
   requireRoles(['MATRIZADOR', 'ADMIN']),
   generarPDFIndividual
+);
+
+// ========================================
+// RUTAS ADMIN - Gestión de todos los protocolos
+// ========================================
+
+/**
+ * Listar TODOS los protocolos (solo para ADMIN)
+ * GET /api/formulario-uafe/admin/protocolos
+ * Requiere: JWT + role ADMIN
+ */
+router.get(
+  '/admin/protocolos',
+  authenticateToken,
+  requireRoles(['ADMIN']),
+  listarTodosProtocolos
+);
+
+/**
+ * Eliminar un protocolo completo (solo para ADMIN)
+ * DELETE /api/formulario-uafe/admin/protocolo/:protocoloId
+ * Requiere: JWT + role ADMIN
+ */
+router.delete(
+  '/admin/protocolo/:protocoloId',
+  authenticateToken,
+  requireRoles(['ADMIN']),
+  eliminarProtocolo
 );
 
 // ========================================
