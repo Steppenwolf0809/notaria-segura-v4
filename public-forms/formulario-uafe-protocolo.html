@@ -1644,15 +1644,19 @@
 
         function limpiarDatosRepresentado() {
             // Limpiar campos
-            document.getElementById('representadoIdentificacion').value = '';
-            document.getElementById('representadoStatus').style.display = 'none';
-            document.getElementById('datosRepresentadoEncontrado').classList.add('hidden');
-            document.getElementById('datosRepresentadoManual').classList.add('hidden');
+            const repIdentificacion = document.getElementById('representadoIdentificacion');
+            const repStatus = document.getElementById('representadoStatus');
+            const datosEncontrado = document.getElementById('datosRepresentadoEncontrado');
+            const datosManual = document.getElementById('datosRepresentadoManual');
+            const tipoPersona = document.getElementById('representadoTipoPersona');
+
+            if (repIdentificacion) repIdentificacion.value = '';
+            if (repStatus) repStatus.style.display = 'none';
+            if (datosEncontrado) datosEncontrado.classList.add('hidden');
+            if (datosManual) datosManual.classList.add('hidden');
 
             // Limpiar campos del formulario manual
-            document.getElementById('representadoTipoPersona').value = '';
-            document.getElementById('representadoNombres').value = '';
-            document.getElementById('representadoNacionalidad').value = '';
+            if (tipoPersona) tipoPersona.value = '';
 
             // Limpiar variables globales
             representadoIdGlobal = null;
