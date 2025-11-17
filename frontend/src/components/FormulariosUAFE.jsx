@@ -51,7 +51,8 @@ import {
   Description as DescriptionIcon,
   ContentCopy as CopyIcon,
   Link as LinkIcon,
-  PictureAsPdf as PictureAsPdfIcon
+  PictureAsPdf as PictureAsPdfIcon,
+  Save as SaveIcon
 } from '@mui/icons-material';
 import { API_BASE } from '../utils/apiConfig';
 import { formatDateES, formatDateTimeES } from '../utils/dateUtils';
@@ -83,6 +84,10 @@ const FormulariosUAFE = () => {
 
   // Estados de expansión de tabla
   const [expandedProtocol, setExpandedProtocol] = useState(null);
+
+  // Estados de edición de protocolo
+  const [modoEditarProtocolo, setModoEditarProtocolo] = useState(false);
+  const [protocoloEditando, setProtocoloEditando] = useState(null);
 
   // Formulario de nuevo protocolo
   const [formProtocolo, setFormProtocolo] = useState({
@@ -314,6 +319,7 @@ const FormulariosUAFE = () => {
       const data = await response.json();
       if (data.success) {
         setProtocoloSeleccionado(data.data);
+        setModoEditarProtocolo(false);
         setOpenVerProtocolo(true);
       } else {
         mostrarSnackbar('Error al cargar detalles', 'error');
@@ -324,6 +330,88 @@ const FormulariosUAFE = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  /**
+   * Habilitar modo de edición de protocolo
+   */
+  const habilitarEdicionProtocolo = () => {
+    setProtocoloEditando({
+      numeroProtocolo: protocoloSeleccionado.numeroProtocolo,
+      fecha: protocoloSeleccionado.fecha.split('T')[0],
+      actoContrato: protocoloSeleccionado.actoContrato,
+      avaluoMunicipal: protocoloSeleccionado.avaluoMunicipal || '',
+      valorContrato: protocoloSeleccionado.valorContrato
+    });
+    setModoEditarProtocolo(true);
+  };
+
+  /**
+   * Cancelar edición de protocolo
+   */
+  const cancelarEdicionProtocolo = () => {
+    setModoEditarProtocolo(false);
+    setProtocoloEditando(null);
+  };
+
+  /**
+   * Guardar cambios del protocolo
+   */
+  const guardarCambiosProtocolo = async () => {
+    if (!protocoloEditando.numeroProtocolo || !protocoloEditando.fecha ||
+        !protocoloEditando.actoContrato || !protocoloEditando.valorContrato) {
+      mostrarSnackbar('Todos los campos son obligatorios', 'warning');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(
+        `${API_BASE}/formulario-uafe/protocolo/${protocoloSeleccionado.id}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            numeroProtocolo: protocoloEditando.numeroProtocolo,
+            fecha: protocoloEditando.fecha,
+            actoContrato: protocoloEditando.actoContrato,
+            avaluoMunicipal: protocoloEditando.avaluoMunicipal || null,
+            valorContrato: parseFloat(protocoloEditando.valorContrato)
+          })
+        }
+      );
+
+      const data = await response.json();
+      if (data.success) {
+        mostrarSnackbar('Protocolo actualizado exitosamente', 'success');
+        setModoEditarProtocolo(false);
+        setProtocoloEditando(null);
+        // Recargar detalles del protocolo
+        await verDetallesProtocolo(protocoloSeleccionado.id);
+        // Recargar lista de protocolos
+        cargarProtocolos();
+      } else {
+        mostrarSnackbar(data.message || 'Error al actualizar protocolo', 'error');
+      }
+    } catch (error) {
+      console.error('Error al actualizar protocolo:', error);
+      mostrarSnackbar('Error al actualizar protocolo', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Previsualizar formulario público
+   */
+  const previsualizarFormulario = () => {
+    // Abrir en nueva pestaña la URL del formulario público
+    const urlFormularioPublico = `${window.location.origin}/formulario-uafe-protocolo.html`;
+    window.open(urlFormularioPublico, '_blank');
   };
 
   /**
@@ -1193,12 +1281,34 @@ const FormulariosUAFE = () => {
       {/* Dialog: Ver Detalles del Protocolo */}
       <Dialog
         open={openVerProtocolo}
-        onClose={() => setOpenVerProtocolo(false)}
+        onClose={() => { setOpenVerProtocolo(false); cancelarEdicionProtocolo(); }}
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle sx={{ backgroundColor: 'info.main', color: 'white' }}>
-          Detalles del Protocolo
+        <DialogTitle sx={{ backgroundColor: 'info.main', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>Detalles del Protocolo</span>
+          {protocoloSeleccionado && !modoEditarProtocolo && (
+            <Box>
+              <Tooltip title="Previsualizar Formulario Público">
+                <IconButton
+                  size="small"
+                  onClick={previsualizarFormulario}
+                  sx={{ color: 'white', mr: 1 }}
+                >
+                  <VisibilityIcon />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Editar Protocolo">
+                <IconButton
+                  size="small"
+                  onClick={habilitarEdicionProtocolo}
+                  sx={{ color: 'white' }}
+                >
+                  <EditIcon />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          )}
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
           {protocoloSeleccionado && (
@@ -1206,30 +1316,114 @@ const FormulariosUAFE = () => {
               {/* Información básica */}
               <Box>
                 <Typography variant="h6" gutterBottom>Información del Protocolo</Typography>
-                <Grid container spacing={2}>
-                  <Grid item xs={6}>
-                    <Typography variant="body2" color="text.secondary">Número:</Typography>
-                    <Typography variant="body1" fontWeight="bold">{protocoloSeleccionado.numeroProtocolo}</Typography>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Typography variant="body2" color="text.secondary">Fecha:</Typography>
-                    <Typography variant="body1">{formatDateES(protocoloSeleccionado.fecha)}</Typography>
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Typography variant="body2" color="text.secondary">Acto/Contrato:</Typography>
-                    <Typography variant="body1">{protocoloSeleccionado.actoContrato}</Typography>
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Typography variant="body2" color="text.secondary">Valor del Contrato:</Typography>
-                    <Typography variant="body1" fontWeight="bold">${parseFloat(protocoloSeleccionado.valorContrato).toFixed(2)}</Typography>
-                  </Grid>
-                  {protocoloSeleccionado.avaluoMunicipal && (
+
+                {!modoEditarProtocolo ? (
+                  // Modo visualización
+                  <Grid container spacing={2}>
                     <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">Avalúo Municipal:</Typography>
-                      <Typography variant="body1">${parseFloat(protocoloSeleccionado.avaluoMunicipal).toFixed(2)}</Typography>
+                      <Typography variant="body2" color="text.secondary">Número:</Typography>
+                      <Typography variant="body1" fontWeight="bold">{protocoloSeleccionado.numeroProtocolo}</Typography>
                     </Grid>
-                  )}
-                </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">Fecha:</Typography>
+                      <Typography variant="body1">{formatDateES(protocoloSeleccionado.fecha)}</Typography>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Typography variant="body2" color="text.secondary">Acto/Contrato:</Typography>
+                      <Typography variant="body1">{protocoloSeleccionado.actoContrato}</Typography>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <Typography variant="body2" color="text.secondary">Valor del Contrato:</Typography>
+                      <Typography variant="body1" fontWeight="bold">${parseFloat(protocoloSeleccionado.valorContrato).toFixed(2)}</Typography>
+                    </Grid>
+                    {protocoloSeleccionado.avaluoMunicipal && (
+                      <Grid item xs={6}>
+                        <Typography variant="body2" color="text.secondary">Avalúo Municipal:</Typography>
+                        <Typography variant="body1">${parseFloat(protocoloSeleccionado.avaluoMunicipal).toFixed(2)}</Typography>
+                      </Grid>
+                    )}
+                  </Grid>
+                ) : (
+                  // Modo edición
+                  <Grid container spacing={2}>
+                    <Grid item xs={12}>
+                      <Alert severity="warning" sx={{ mb: 2 }}>
+                        Editando protocolo. Los cambios afectarán a todas las personas asociadas.
+                      </Alert>
+                    </Grid>
+                    <Grid item xs={6}>
+                      <TextField
+                        fullWidth
+                        label="Número de Protocolo"
+                        value={protocoloEditando?.numeroProtocolo || ''}
+                        onChange={(e) => setProtocoloEditando({ ...protocoloEditando, numeroProtocolo: e.target.value })}
+                        required
+                      />
+                    </Grid>
+                    <Grid item xs={6}>
+                      <TextField
+                        fullWidth
+                        type="date"
+                        label="Fecha"
+                        value={protocoloEditando?.fecha || ''}
+                        onChange={(e) => setProtocoloEditando({ ...protocoloEditando, fecha: e.target.value })}
+                        InputLabelProps={{ shrink: true }}
+                        required
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="Acto/Contrato"
+                        value={protocoloEditando?.actoContrato || ''}
+                        onChange={(e) => setProtocoloEditando({ ...protocoloEditando, actoContrato: e.target.value })}
+                        required
+                        multiline
+                        rows={2}
+                      />
+                    </Grid>
+                    <Grid item xs={6}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="Valor del Contrato"
+                        value={protocoloEditando?.valorContrato || ''}
+                        onChange={(e) => setProtocoloEditando({ ...protocoloEditando, valorContrato: e.target.value })}
+                        required
+                        inputProps={{ step: '0.01', min: '0' }}
+                      />
+                    </Grid>
+                    <Grid item xs={6}>
+                      <TextField
+                        fullWidth
+                        type="number"
+                        label="Avalúo Municipal (opcional)"
+                        value={protocoloEditando?.avaluoMunicipal || ''}
+                        onChange={(e) => setProtocoloEditando({ ...protocoloEditando, avaluoMunicipal: e.target.value })}
+                        inputProps={{ step: '0.01', min: '0' }}
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                        <Button
+                          variant="outlined"
+                          onClick={cancelarEdicionProtocolo}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          variant="contained"
+                          color="success"
+                          onClick={guardarCambiosProtocolo}
+                          disabled={loading}
+                          startIcon={<SaveIcon />}
+                        >
+                          {loading ? 'Guardando...' : 'Guardar Cambios'}
+                        </Button>
+                      </Box>
+                    </Grid>
+                  </Grid>
+                )}
               </Box>
 
               <Divider />
