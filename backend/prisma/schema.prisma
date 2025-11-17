@@ -619,8 +619,9 @@ model ProtocoloUAFE {
   avaluoMunicipal       Decimal? @db.Decimal(12, 2)
   valorContrato         Decimal  @db.Decimal(12, 2)
 
-  // FORMA DE PAGO (JSON para flexibilidad)
-  formaPago             Json     // { cheque: { monto, banco }, efectivo: { monto }, ... }
+  // FORMAS DE PAGO (JSON array para flexibilidad)
+  // Ejemplo: [{ tipo: "EFECTIVO", monto: 5000.00 }, { tipo: "CHEQUE", monto: 80000.00, banco: "PICHINCHA" }]
+  formasPago            Json?    // Array de objetos { tipo, monto, banco? }
 
   // METADATA
   createdBy             Int

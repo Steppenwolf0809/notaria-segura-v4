@@ -95,20 +95,13 @@ const FormulariosUAFE = () => {
     fecha: new Date().toISOString().split('T')[0],
     actoContrato: '',
     avaluoMunicipal: '',
-    valorContrato: '',
-    // Forma de pago
-    formaPagoCheque: false,
-    formaPagoEfectivo: false,
-    formaPagoTransferencia: false,
-    formaPagoTarjeta: false,
-    montoCheque: '',
-    montoEfectivo: '',
-    montoTransferencia: '',
-    montoTarjeta: '',
-    bancoCheque: '',
-    bancoTransferencia: '',
-    bancoTarjeta: ''
+    valorContrato: ''
   });
+
+  // Formas de pago (lista dinámica)
+  const [formasPago, setFormasPago] = useState([
+    { tipo: 'EFECTIVO', monto: '', banco: '' }
+  ]);
 
   // Formulario de agregar persona
   const [formPersona, setFormPersona] = useState({
@@ -167,24 +160,31 @@ const FormulariosUAFE = () => {
       return;
     }
 
+    // Validar formas de pago
+    const formasPagoValidas = formasPago.filter(fp => fp.monto && parseFloat(fp.monto) > 0);
+    if (formasPagoValidas.length === 0) {
+      mostrarSnackbar('Debes agregar al menos una forma de pago válida', 'warning');
+      return;
+    }
+
+    // Validar que CHEQUE y TRANSFERENCIA tengan banco
+    for (const fp of formasPagoValidas) {
+      if (['CHEQUE', 'TRANSFERENCIA'].includes(fp.tipo) && !fp.banco) {
+        mostrarSnackbar(`La forma de pago ${fp.tipo} requiere especificar el banco`, 'warning');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
 
-      // Construir objeto formaPago
-      const formaPago = {};
-      if (formProtocolo.formaPagoCheque && formProtocolo.montoCheque) {
-        formaPago.cheque = { monto: parseFloat(formProtocolo.montoCheque), banco: formProtocolo.bancoCheque };
-      }
-      if (formProtocolo.formaPagoEfectivo && formProtocolo.montoEfectivo) {
-        formaPago.efectivo = { monto: parseFloat(formProtocolo.montoEfectivo) };
-      }
-      if (formProtocolo.formaPagoTransferencia && formProtocolo.montoTransferencia) {
-        formaPago.transferencia = { monto: parseFloat(formProtocolo.montoTransferencia), banco: formProtocolo.bancoTransferencia };
-      }
-      if (formProtocolo.formaPagoTarjeta && formProtocolo.montoTarjeta) {
-        formaPago.tarjeta = { monto: parseFloat(formProtocolo.montoTarjeta), banco: formProtocolo.bancoTarjeta };
-      }
+      // Construir array de formasPago
+      const formasPagoFinal = formasPagoValidas.map(fp => ({
+        tipo: fp.tipo,
+        monto: parseFloat(fp.monto),
+        ...(fp.banco && { banco: fp.banco })
+      }));
 
       const response = await fetch(`${API_BASE}/formulario-uafe/protocolo`, {
         method: 'POST',
@@ -198,7 +198,7 @@ const FormulariosUAFE = () => {
           actoContrato: formProtocolo.actoContrato,
           avaluoMunicipal: formProtocolo.avaluoMunicipal || null,
           valorContrato: formProtocolo.valorContrato,
-          formaPago
+          formasPago: formasPagoFinal
         })
       });
 
@@ -431,19 +431,50 @@ const FormulariosUAFE = () => {
       fecha: new Date().toISOString().split('T')[0],
       actoContrato: '',
       avaluoMunicipal: '',
-      valorContrato: '',
-      formaPagoCheque: false,
-      formaPagoEfectivo: false,
-      formaPagoTransferencia: false,
-      formaPagoTarjeta: false,
-      montoCheque: '',
-      montoEfectivo: '',
-      montoTransferencia: '',
-      montoTarjeta: '',
-      bancoCheque: '',
-      bancoTransferencia: '',
-      bancoTarjeta: ''
+      valorContrato: ''
     });
+    setFormasPago([{ tipo: 'EFECTIVO', monto: '', banco: '' }]);
+  };
+
+  /**
+   * Agregar nueva forma de pago
+   */
+  const agregarFormaPago = () => {
+    setFormasPago([...formasPago, { tipo: 'EFECTIVO', monto: '', banco: '' }]);
+  };
+
+  /**
+   * Quitar forma de pago
+   */
+  const quitarFormaPago = (index) => {
+    if (formasPago.length > 1) {
+      setFormasPago(formasPago.filter((_, i) => i !== index));
+    }
+  };
+
+  /**
+   * Actualizar forma de pago
+   */
+  const actualizarFormaPago = (index, campo, valor) => {
+    const nuevas = [...formasPago];
+    nuevas[index][campo] = valor;
+
+    // Si cambia el tipo a EFECTIVO o TARJETA, limpiar el banco
+    if (campo === 'tipo' && valor === 'EFECTIVO') {
+      nuevas[index].banco = '';
+    }
+
+    setFormasPago(nuevas);
+  };
+
+  /**
+   * Calcular total de formas de pago
+   */
+  const calcularTotalFormasPago = () => {
+    return formasPago.reduce((sum, fp) => {
+      const monto = parseFloat(fp.monto) || 0;
+      return sum + monto;
+    }, 0);
   };
 
   /**
@@ -1006,154 +1037,98 @@ const FormulariosUAFE = () => {
 
             <Divider />
 
-            {/* Forma de Pago */}
+            {/* Formas de Pago (Lista Dinámica) */}
             <Box>
-              <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                Forma de Pago
-              </Typography>
+              <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="subtitle1" fontWeight="bold">
+                  💰 Formas de Pago
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Total: ${calcularTotalFormasPago().toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </Typography>
+              </Stack>
+
               <Stack spacing={2}>
-                {/* Cheque */}
-                <Box>
-                  <FormControl component="fieldset">
-                    <Stack direction="row" spacing={2} alignItems="center">
-                      <input
-                        type="checkbox"
-                        checked={formProtocolo.formaPagoCheque}
-                        onChange={(e) => setFormProtocolo({ ...formProtocolo, formaPagoCheque: e.target.checked })}
-                      />
-                      <Typography>Cheque</Typography>
-                    </Stack>
-                  </FormControl>
-                  {formProtocolo.formaPagoCheque && (
-                    <Grid container spacing={2} sx={{ mt: 1 }}>
-                      <Grid item xs={6}>
+                {formasPago.map((formaPago, index) => (
+                  <Card key={index} variant="outlined" sx={{ p: 2, backgroundColor: '#f9f9f9' }}>
+                    <Grid container spacing={2} alignItems="center">
+                      <Grid item xs={12} sm={3}>
+                        <FormControl fullWidth size="small">
+                          <InputLabel>Tipo</InputLabel>
+                          <Select
+                            value={formaPago.tipo}
+                            label="Tipo"
+                            onChange={(e) => actualizarFormaPago(index, 'tipo', e.target.value)}
+                          >
+                            <MenuItem value="EFECTIVO">Efectivo</MenuItem>
+                            <MenuItem value="CHEQUE">Cheque</MenuItem>
+                            <MenuItem value="TRANSFERENCIA">Transferencia</MenuItem>
+                            <MenuItem value="TARJETA">Tarjeta</MenuItem>
+                          </Select>
+                        </FormControl>
+                      </Grid>
+
+                      <Grid item xs={12} sm={3}>
                         <TextField
                           fullWidth
                           size="small"
                           type="number"
                           label="Monto"
-                          value={formProtocolo.montoCheque}
-                          onChange={(e) => setFormProtocolo({ ...formProtocolo, montoCheque: e.target.value })}
-                          InputProps={{ startAdornment: '$' }}
+                          value={formaPago.monto}
+                          onChange={(e) => actualizarFormaPago(index, 'monto', e.target.value)}
+                          InputProps={{
+                            startAdornment: <Typography sx={{ mr: 0.5 }}>$</Typography>
+                          }}
+                          placeholder="0.00"
                         />
                       </Grid>
-                      <Grid item xs={6}>
+
+                      <Grid item xs={12} sm={4}>
                         <TextField
                           fullWidth
                           size="small"
                           label="Banco"
-                          value={formProtocolo.bancoCheque}
-                          onChange={(e) => setFormProtocolo({ ...formProtocolo, bancoCheque: e.target.value })}
+                          value={formaPago.banco}
+                          onChange={(e) => actualizarFormaPago(index, 'banco', e.target.value)}
+                          disabled={formaPago.tipo === 'EFECTIVO'}
+                          placeholder={formaPago.tipo === 'EFECTIVO' ? '(no aplica)' : 'Nombre del banco'}
+                          helperText={['CHEQUE', 'TRANSFERENCIA'].includes(formaPago.tipo) ? 'Obligatorio' : ''}
                         />
                       </Grid>
-                    </Grid>
-                  )}
-                </Box>
 
-                {/* Efectivo */}
-                <Box>
-                  <FormControl component="fieldset">
-                    <Stack direction="row" spacing={2} alignItems="center">
-                      <input
-                        type="checkbox"
-                        checked={formProtocolo.formaPagoEfectivo}
-                        onChange={(e) => setFormProtocolo({ ...formProtocolo, formaPagoEfectivo: e.target.checked })}
-                      />
-                      <Typography>Efectivo</Typography>
-                    </Stack>
-                  </FormControl>
-                  {formProtocolo.formaPagoEfectivo && (
-                    <Grid container spacing={2} sx={{ mt: 1 }}>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          size="small"
-                          type="number"
-                          label="Monto"
-                          value={formProtocolo.montoEfectivo}
-                          onChange={(e) => setFormProtocolo({ ...formProtocolo, montoEfectivo: e.target.value })}
-                          InputProps={{ startAdornment: '$' }}
-                        />
+                      <Grid item xs={12} sm={2}>
+                        <Tooltip title="Quitar forma de pago">
+                          <span>
+                            <IconButton
+                              color="error"
+                              onClick={() => quitarFormaPago(index)}
+                              disabled={formasPago.length === 1}
+                            >
+                              <DeleteIcon />
+                            </IconButton>
+                          </span>
+                        </Tooltip>
                       </Grid>
                     </Grid>
-                  )}
-                </Box>
+                  </Card>
+                ))}
 
-                {/* Transferencia */}
-                <Box>
-                  <FormControl component="fieldset">
-                    <Stack direction="row" spacing={2} alignItems="center">
-                      <input
-                        type="checkbox"
-                        checked={formProtocolo.formaPagoTransferencia}
-                        onChange={(e) => setFormProtocolo({ ...formProtocolo, formaPagoTransferencia: e.target.checked })}
-                      />
-                      <Typography>Transferencia</Typography>
-                    </Stack>
-                  </FormControl>
-                  {formProtocolo.formaPagoTransferencia && (
-                    <Grid container spacing={2} sx={{ mt: 1 }}>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          size="small"
-                          type="number"
-                          label="Monto"
-                          value={formProtocolo.montoTransferencia}
-                          onChange={(e) => setFormProtocolo({ ...formProtocolo, montoTransferencia: e.target.value })}
-                          InputProps={{ startAdornment: '$' }}
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          size="small"
-                          label="Banco"
-                          value={formProtocolo.bancoTransferencia}
-                          onChange={(e) => setFormProtocolo({ ...formProtocolo, bancoTransferencia: e.target.value })}
-                        />
-                      </Grid>
-                    </Grid>
-                  )}
-                </Box>
+                <Button
+                  variant="outlined"
+                  startIcon={<AddIcon />}
+                  onClick={agregarFormaPago}
+                  sx={{ alignSelf: 'flex-start' }}
+                >
+                  Agregar otra forma de pago
+                </Button>
 
-                {/* Tarjeta */}
-                <Box>
-                  <FormControl component="fieldset">
-                    <Stack direction="row" spacing={2} alignItems="center">
-                      <input
-                        type="checkbox"
-                        checked={formProtocolo.formaPagoTarjeta}
-                        onChange={(e) => setFormProtocolo({ ...formProtocolo, formaPagoTarjeta: e.target.checked })}
-                      />
-                      <Typography>Tarjeta</Typography>
-                    </Stack>
-                  </FormControl>
-                  {formProtocolo.formaPagoTarjeta && (
-                    <Grid container spacing={2} sx={{ mt: 1 }}>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          size="small"
-                          type="number"
-                          label="Monto"
-                          value={formProtocolo.montoTarjeta}
-                          onChange={(e) => setFormProtocolo({ ...formProtocolo, montoTarjeta: e.target.value })}
-                          InputProps={{ startAdornment: '$' }}
-                        />
-                      </Grid>
-                      <Grid item xs={6}>
-                        <TextField
-                          fullWidth
-                          size="small"
-                          label="Banco"
-                          value={formProtocolo.bancoTarjeta}
-                          onChange={(e) => setFormProtocolo({ ...formProtocolo, bancoTarjeta: e.target.value })}
-                        />
-                      </Grid>
-                    </Grid>
-                  )}
-                </Box>
+                {/* Advertencia si el total no coincide */}
+                {formProtocolo.valorContrato && calcularTotalFormasPago() !== parseFloat(formProtocolo.valorContrato) && (
+                  <Alert severity="warning" sx={{ mt: 1 }}>
+                    ⚠️ El total de formas de pago (${calcularTotalFormasPago().toLocaleString('es-EC', { minimumFractionDigits: 2 })})
+                    no coincide con el valor del contrato (${parseFloat(formProtocolo.valorContrato).toLocaleString('es-EC', { minimumFractionDigits: 2 })})
+                  </Alert>
+                )}
               </Stack>
             </Box>
           </Stack>
