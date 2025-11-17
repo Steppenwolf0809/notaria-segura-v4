@@ -52,10 +52,12 @@ import {
   ContentCopy as CopyIcon,
   Link as LinkIcon,
   PictureAsPdf as PictureAsPdfIcon,
-  Save as SaveIcon
+  Save as SaveIcon,
+  LockReset as LockResetIcon
 } from '@mui/icons-material';
 import { API_BASE } from '../utils/apiConfig';
 import { formatDateES, formatDateTimeES } from '../utils/dateUtils';
+import ResetearPinDialog from './ResetearPinDialog';
 
 /**
  * Componente para gestionar formularios UAFE con sistema de Protocolos
@@ -81,6 +83,7 @@ const FormulariosUAFE = () => {
   const [personaEditar, setPersonaEditar] = useState(null);
   const [openConfirmarEliminar, setOpenConfirmarEliminar] = useState(false);
   const [personaEliminar, setPersonaEliminar] = useState(null);
+  const [openResetearPin, setOpenResetearPin] = useState(false);
 
   // Estados de expansión de tabla
   const [expandedProtocol, setExpandedProtocol] = useState(null);
@@ -816,6 +819,15 @@ const FormulariosUAFE = () => {
           </Typography>
         </Box>
         <Stack direction="row" spacing={2}>
+          <Button
+            variant="outlined"
+            startIcon={<LockResetIcon />}
+            onClick={() => setOpenResetearPin(true)}
+            sx={{ borderRadius: 2 }}
+            color="warning"
+          >
+            Resetear PIN
+          </Button>
           <Button
             variant="outlined"
             startIcon={<LinkIcon />}
@@ -1815,6 +1827,15 @@ const FormulariosUAFE = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Diálogo de resetear PIN */}
+      <ResetearPinDialog
+        open={openResetearPin}
+        onClose={() => setOpenResetearPin(false)}
+        onSuccess={(data) => {
+          mostrarSnackbar(`PIN reseteado para cédula ${data.data.cedula}`, 'success');
+        }}
+      />
 
       {/* Snackbar */}
       <Snackbar
