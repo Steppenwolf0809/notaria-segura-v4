@@ -88,6 +88,7 @@ const FormulariosUAFE = () => {
   // Estados de edición de protocolo
   const [modoEditarProtocolo, setModoEditarProtocolo] = useState(false);
   const [protocoloEditando, setProtocoloEditando] = useState(null);
+  const [formasPagoEditando, setFormasPagoEditando] = useState([]);
 
   // Formulario de nuevo protocolo
   const [formProtocolo, setFormProtocolo] = useState({
@@ -343,6 +344,12 @@ const FormulariosUAFE = () => {
       avaluoMunicipal: protocoloSeleccionado.avaluoMunicipal || '',
       valorContrato: protocoloSeleccionado.valorContrato
     });
+    // Cargar formas de pago existentes o inicializar con una vacía
+    setFormasPagoEditando(
+      protocoloSeleccionado.formasPago && protocoloSeleccionado.formasPago.length > 0
+        ? protocoloSeleccionado.formasPago.map(fp => ({ ...fp }))
+        : [{ tipo: 'EFECTIVO', monto: '', banco: '' }]
+    );
     setModoEditarProtocolo(true);
   };
 
@@ -352,6 +359,7 @@ const FormulariosUAFE = () => {
   const cancelarEdicionProtocolo = () => {
     setModoEditarProtocolo(false);
     setProtocoloEditando(null);
+    setFormasPagoEditando([]);
   };
 
   /**
@@ -364,9 +372,32 @@ const FormulariosUAFE = () => {
       return;
     }
 
+    // Validar formas de pago
+    const formasPagoValidas = formasPagoEditando.filter(fp => fp.monto && parseFloat(fp.monto) > 0);
+    if (formasPagoValidas.length === 0) {
+      mostrarSnackbar('Debes agregar al menos una forma de pago válida', 'warning');
+      return;
+    }
+
+    // Validar que CHEQUE y TRANSFERENCIA tengan banco
+    for (const fp of formasPagoValidas) {
+      if (['CHEQUE', 'TRANSFERENCIA'].includes(fp.tipo) && !fp.banco) {
+        mostrarSnackbar(`La forma de pago ${fp.tipo} requiere especificar el banco`, 'warning');
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
+
+      // Construir array de formasPago
+      const formasPagoFinal = formasPagoValidas.map(fp => ({
+        tipo: fp.tipo,
+        monto: parseFloat(fp.monto),
+        ...(fp.banco && { banco: fp.banco })
+      }));
+
       const response = await fetch(
         `${API_BASE}/formulario-uafe/protocolo/${protocoloSeleccionado.id}`,
         {
@@ -380,7 +411,8 @@ const FormulariosUAFE = () => {
             fecha: protocoloEditando.fecha,
             actoContrato: protocoloEditando.actoContrato,
             avaluoMunicipal: protocoloEditando.avaluoMunicipal || null,
-            valorContrato: parseFloat(protocoloEditando.valorContrato)
+            valorContrato: parseFloat(protocoloEditando.valorContrato),
+            formasPago: formasPagoFinal
           })
         }
       );
@@ -390,6 +422,7 @@ const FormulariosUAFE = () => {
         mostrarSnackbar('Protocolo actualizado exitosamente', 'success');
         setModoEditarProtocolo(false);
         setProtocoloEditando(null);
+        setFormasPagoEditando([]);
         // Recargar detalles del protocolo
         await verDetallesProtocolo(protocoloSeleccionado.id);
         // Recargar lista de protocolos
@@ -472,6 +505,35 @@ const FormulariosUAFE = () => {
    */
   const calcularTotalFormasPago = () => {
     return formasPago.reduce((sum, fp) => {
+      const monto = parseFloat(fp.monto) || 0;
+      return sum + monto;
+    }, 0);
+  };
+
+  /**
+   * Funciones para manejar formas de pago en modo edición
+   */
+  const agregarFormaPagoEdicion = () => {
+    setFormasPagoEditando([...formasPagoEditando, { tipo: 'EFECTIVO', monto: '', banco: '' }]);
+  };
+
+  const quitarFormaPagoEdicion = (index) => {
+    if (formasPagoEditando.length > 1) {
+      setFormasPagoEditando(formasPagoEditando.filter((_, i) => i !== index));
+    }
+  };
+
+  const actualizarFormaPagoEdicion = (index, campo, valor) => {
+    const nuevas = [...formasPagoEditando];
+    nuevas[index][campo] = valor;
+    if (campo === 'tipo' && valor === 'EFECTIVO') {
+      nuevas[index].banco = '';
+    }
+    setFormasPagoEditando(nuevas);
+  };
+
+  const calcularTotalFormasPagoEdicion = () => {
+    return formasPagoEditando.reduce((sum, fp) => {
       const monto = parseFloat(fp.monto) || 0;
       return sum + monto;
     }, 0);
@@ -1378,26 +1440,162 @@ const FormulariosUAFE = () => {
                         inputProps={{ step: '0.01', min: '0' }}
                       />
                     </Grid>
-                    <Grid item xs={12}>
-                      <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-                        <Button
-                          variant="outlined"
-                          onClick={cancelarEdicionProtocolo}
-                        >
-                          Cancelar
-                        </Button>
-                        <Button
-                          variant="contained"
-                          color="success"
-                          onClick={guardarCambiosProtocolo}
-                          disabled={loading}
-                          startIcon={<SaveIcon />}
-                        >
-                          {loading ? 'Guardando...' : 'Guardar Cambios'}
-                        </Button>
-                      </Box>
-                    </Grid>
                   </Grid>
+                )}
+              </Box>
+
+              <Divider />
+
+              {/* Formas de Pago */}
+              <Box>
+                <Typography variant="h6" gutterBottom>Formas de Pago</Typography>
+
+                {!modoEditarProtocolo ? (
+                  // Modo visualización
+                  protocoloSeleccionado.formasPago && protocoloSeleccionado.formasPago.length > 0 ? (
+                    <TableContainer component={Paper} variant="outlined">
+                      <Table size="small">
+                        <TableHead>
+                          <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                            <TableCell><strong>Tipo</strong></TableCell>
+                            <TableCell align="right"><strong>Monto</strong></TableCell>
+                            <TableCell><strong>Banco</strong></TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {protocoloSeleccionado.formasPago.map((fp, index) => (
+                            <TableRow key={index}>
+                              <TableCell>{fp.tipo}</TableCell>
+                              <TableCell align="right">${parseFloat(fp.monto).toFixed(2)}</TableCell>
+                              <TableCell>{fp.banco || '-'}</TableCell>
+                            </TableRow>
+                          ))}
+                          <TableRow>
+                            <TableCell><strong>TOTAL</strong></TableCell>
+                            <TableCell align="right">
+                              <strong>
+                                ${protocoloSeleccionado.formasPago.reduce((sum, fp) => sum + parseFloat(fp.monto), 0).toFixed(2)}
+                              </strong>
+                            </TableCell>
+                            <TableCell></TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                  ) : (
+                    <Alert severity="info">No hay formas de pago registradas</Alert>
+                  )
+                ) : (
+                  // Modo edición
+                  <Box>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" mb={2}>
+                      <Typography variant="body2" color="text.secondary">
+                        Total: ${calcularTotalFormasPagoEdicion().toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </Typography>
+                    </Stack>
+
+                    <Stack spacing={2}>
+                      {formasPagoEditando.map((formaPago, index) => (
+                        <Card key={index} variant="outlined" sx={{ p: 2, backgroundColor: '#f9f9f9' }}>
+                          <Grid container spacing={2} alignItems="center">
+                            <Grid item xs={12} sm={3}>
+                              <FormControl fullWidth size="small">
+                                <InputLabel>Tipo</InputLabel>
+                                <Select
+                                  value={formaPago.tipo}
+                                  label="Tipo"
+                                  onChange={(e) => actualizarFormaPagoEdicion(index, 'tipo', e.target.value)}
+                                >
+                                  <MenuItem value="EFECTIVO">Efectivo</MenuItem>
+                                  <MenuItem value="CHEQUE">Cheque</MenuItem>
+                                  <MenuItem value="TRANSFERENCIA">Transferencia</MenuItem>
+                                  <MenuItem value="TARJETA">Tarjeta</MenuItem>
+                                </Select>
+                              </FormControl>
+                            </Grid>
+
+                            <Grid item xs={12} sm={3}>
+                              <TextField
+                                fullWidth
+                                size="small"
+                                type="number"
+                                label="Monto"
+                                value={formaPago.monto}
+                                onChange={(e) => actualizarFormaPagoEdicion(index, 'monto', e.target.value)}
+                                InputProps={{
+                                  startAdornment: <Typography sx={{ mr: 0.5 }}>$</Typography>
+                                }}
+                                placeholder="0.00"
+                              />
+                            </Grid>
+
+                            <Grid item xs={12} sm={4}>
+                              <TextField
+                                fullWidth
+                                size="small"
+                                label="Banco"
+                                value={formaPago.banco}
+                                onChange={(e) => actualizarFormaPagoEdicion(index, 'banco', e.target.value)}
+                                disabled={formaPago.tipo === 'EFECTIVO'}
+                                placeholder={formaPago.tipo === 'EFECTIVO' ? '(no aplica)' : 'Nombre del banco'}
+                                helperText={['CHEQUE', 'TRANSFERENCIA'].includes(formaPago.tipo) ? 'Obligatorio' : ''}
+                              />
+                            </Grid>
+
+                            <Grid item xs={12} sm={2}>
+                              <Tooltip title="Quitar forma de pago">
+                                <span>
+                                  <IconButton
+                                    color="error"
+                                    onClick={() => quitarFormaPagoEdicion(index)}
+                                    disabled={formasPagoEditando.length === 1}
+                                  >
+                                    <DeleteIcon />
+                                  </IconButton>
+                                </span>
+                              </Tooltip>
+                            </Grid>
+                          </Grid>
+                        </Card>
+                      ))}
+
+                      <Button
+                        variant="outlined"
+                        startIcon={<AddIcon />}
+                        onClick={agregarFormaPagoEdicion}
+                        sx={{ alignSelf: 'flex-start' }}
+                      >
+                        Agregar otra forma de pago
+                      </Button>
+
+                      {/* Advertencia si el total no coincide */}
+                      {protocoloEditando?.valorContrato && calcularTotalFormasPagoEdicion() !== parseFloat(protocoloEditando.valorContrato) && (
+                        <Alert severity="warning" sx={{ mt: 1 }}>
+                          ⚠️ El total de formas de pago (${calcularTotalFormasPagoEdicion().toLocaleString('es-EC', { minimumFractionDigits: 2 })})
+                          no coincide con el valor del contrato (${parseFloat(protocoloEditando.valorContrato).toLocaleString('es-EC', { minimumFractionDigits: 2 })})
+                        </Alert>
+                      )}
+                    </Stack>
+
+                    {/* Botones de guardar/cancelar al final de formas de pago */}
+                    <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', mt: 3 }}>
+                      <Button
+                        variant="outlined"
+                        onClick={cancelarEdicionProtocolo}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        variant="contained"
+                        color="success"
+                        onClick={guardarCambiosProtocolo}
+                        disabled={loading}
+                        startIcon={<SaveIcon />}
+                      >
+                        {loading ? 'Guardando...' : 'Guardar Cambios'}
+                      </Button>
+                    </Box>
+                  </Box>
                 )}
               </Box>
 
