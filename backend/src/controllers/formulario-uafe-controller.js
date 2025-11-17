@@ -1523,118 +1523,151 @@ function generateNaturalPersonPDF(doc, startY, datos, persona) {
   let y = startY;
 
   // === SECCIÓN 1: IDENTIFICACIÓN ===
-  y = checkAndAddPage(doc, y, 120);
-  y = drawSection(doc, y, '1. Identificación', 90);
+  y = checkAndAddPage(doc, y, 100);
+  y = drawSection(doc, y, '1. Identificación', 75);
 
   drawField(doc, 60, y, 'Tipo de Identificación', datos.identificacion?.tipo, 140);
   drawField(doc, 220, y, 'Número de Identificación', datos.identificacion?.numero, 160);
   drawField(doc, 400, y, 'Nacionalidad', datos.identificacion?.nacionalidad, 140);
 
-  y += 60;
+  y += 45; // Reducido de 60 a 45
 
   // === SECCIÓN 2: DATOS PERSONALES ===
-  y = checkAndAddPage(doc, y, 150);
-  y = drawSection(doc, y, '2. Datos Personales', 140);
+  y = checkAndAddPage(doc, y, 130);
+  y = drawSection(doc, y, '2. Datos Personales', 120);
 
   drawField(doc, 60, y, 'Apellidos', datos.datosPersonales?.apellidos, 230);
   drawField(doc, 310, y, 'Nombres', datos.datosPersonales?.nombres, 230);
 
-  y += 50;
+  y += 40; // Reducido de 50 a 40
   drawField(doc, 60, y, 'Género', datos.datosPersonales?.genero, 140);
   drawField(doc, 220, y, 'Estado Civil', datos.datosPersonales?.estadoCivil, 160);
   drawField(doc, 400, y, 'Nivel de Estudio', datos.datosPersonales?.nivelEstudio, 140);
 
-  y += 50;
+  y += 40; // Reducido de 50 a 40
   drawField(doc, 60, y, 'Correo Electrónico', datos.contacto?.email, 240);
   drawField(doc, 320, y, 'Teléfono', datos.contacto?.telefono, 110);
   drawField(doc, 450, y, 'Celular', datos.contacto?.celular, 90);
 
-  y += 70;
+  y += 55; // Reducido de 70 a 55
 
   // === SECCIÓN 3: DIRECCIÓN ===
-  y = checkAndAddPage(doc, y, 150);
-  y = drawSection(doc, y, '3. Dirección de Domicilio', 140);
+  y = checkAndAddPage(doc, y, 120);
+  y = drawSection(doc, y, '3. Dirección de Domicilio', 110);
 
   drawField(doc, 60, y, 'Calle Principal', datos.direccion?.callePrincipal, 200);
   drawField(doc, 280, y, 'Número', datos.direccion?.numero, 100);
   drawField(doc, 400, y, 'Calle Secundaria', datos.direccion?.calleSecundaria, 140);
 
-  y += 50;
+  y += 40; // Reducido de 50 a 40
   drawField(doc, 60, y, 'Provincia', datos.direccion?.provincia, 150);
   drawField(doc, 230, y, 'Cantón', datos.direccion?.canton, 150);
   drawField(doc, 400, y, 'Parroquia', datos.direccion?.parroquia, 140);
 
-  y += 70;
+  y += 55; // Reducido de 70 a 55
 
   // === SECCIÓN 4: INFORMACIÓN LABORAL ===
-  y = checkAndAddPage(doc, y, 200);
-  y = drawSection(doc, y, '4. Información Laboral', 190);
+  y = checkAndAddPage(doc, y, 170);
+  y = drawSection(doc, y, '4. Información Laboral', 160);
 
   drawField(doc, 60, y, 'Situación Laboral', datos.informacionLaboral?.situacion, 200);
   drawField(doc, 280, y, 'Relación de Dependencia', datos.informacionLaboral?.relacionDependencia ? 'SÍ' : 'NO', 100);
   drawField(doc, 400, y, 'Ingreso Mensual', formatCurrency(datos.informacionLaboral?.ingresoMensual), 140);
 
-  y += 50;
+  y += 40; // Reducido de 50 a 40
   drawField(doc, 60, y, 'Nombre de la Entidad', datos.informacionLaboral?.nombreEntidad, 240);
   drawField(doc, 320, y, 'Cargo', datos.informacionLaboral?.cargo, 220);
 
-  y += 50;
+  y += 40; // Reducido de 50 a 40
   drawField(doc, 60, y, 'Profesión/Ocupación', datos.informacionLaboral?.profesionOcupacion, 480);
 
-  y += 50;
+  y += 40; // Reducido de 50 a 40
 
   // Dirección laboral completa
   const direccionLaboral = datos.informacionLaboral?.direccionEmpresa
     ? `${datos.informacionLaboral.direccionEmpresa}, ${datos.informacionLaboral.canton || ''}, ${datos.informacionLaboral.provincia || ''}`.replace(/,\s*,/g, ',').trim()
     : null;
-  drawTextAreaField(doc, 60, y, 'Dirección Laboral', direccionLaboral, 480, 40);
+  drawTextAreaField(doc, 60, y, 'Dirección Laboral', direccionLaboral, 480, 36);
 
-  y += 80;
+  y += 65; // Reducido de 80 a 65
 
   // === SECCIÓN 5: INFORMACIÓN DEL CÓNYUGE (si aplica) ===
   const tieneConyuge = datos.conyuge?.nombres && datos.conyuge?.apellidos;
   if (tieneConyuge) {
-    y = checkAndAddPage(doc, y, 180);
-    y = drawSection(doc, y, '5. Información del Cónyuge', 170);
+    y = checkAndAddPage(doc, y, 150);
+    y = drawSection(doc, y, '5. Información del Cónyuge', 140);
 
     drawField(doc, 60, y, 'Apellidos', datos.conyuge?.apellidos, 230);
     drawField(doc, 310, y, 'Nombres', datos.conyuge?.nombres, 230);
 
-    y += 50;
+    y += 40; // Reducido de 50 a 40
     drawField(doc, 60, y, 'Tipo ID', datos.conyuge?.tipoIdentificacion, 100);
     drawField(doc, 180, y, 'Número de Identificación', datos.conyuge?.numeroIdentificacion, 180);
     drawField(doc, 380, y, 'Nacionalidad', datos.conyuge?.nacionalidad, 160);
 
-    y += 50;
+    y += 40; // Reducido de 50 a 40
     drawField(doc, 60, y, 'Correo Electrónico', datos.conyuge?.email, 240);
     drawField(doc, 320, y, 'Celular', datos.conyuge?.celular, 220);
 
-    y += 50;
+    y += 40; // Reducido de 50 a 40
     // Soportar múltiples nombres del campo profesión (profesion, profesionOcupacion)
     const profesionConyuge = datos.conyuge?.profesion || datos.conyuge?.profesionOcupacion || datos.informacionConyuge?.profesion || datos.informacionConyuge?.profesionOcupacion;
     drawField(doc, 60, y, 'Profesión', profesionConyuge, 240);
     drawField(doc, 320, y, 'Situación Laboral', datos.conyuge?.situacionLaboral, 220);
 
-    y += 70;
+    y += 55; // Reducido de 70 a 55
   }
 
-  // === SECCIÓN 6: PERSONA POLÍTICAMENTE EXPUESTA (PEP) ===
-  y = checkAndAddPage(doc, y, 120);
-  y = drawSection(doc, y, '6. Persona Políticamente Expuesta (PEP)', 110);
+  // === SECCIÓN 6: PERSONA POLÍTICAMENTE EXPUESTA (PEP) - FORMATO INLINE COMPACTO ===
+  y = checkAndAddPage(doc, y, 60);
 
-  drawField(doc, 60, y, '¿Es Persona Expuesta Políticamente?', datos.pep?.esPersonaExpuesta ? 'SÍ' : 'NO', 200);
-  drawField(doc, 280, y, '¿Es Familiar de PEP?', datos.pep?.esFamiliarPEP ? 'SÍ' : 'NO', 130);
-  drawField(doc, 430, y, '¿Es Colaborador de PEP?', datos.pep?.esColaboradorPEP ? 'SÍ' : 'NO', 110);
+  // Título de sección PEP
+  doc.fillColor(COLORS.primary)
+     .fontSize(9)
+     .font(FONTS.title)
+     .text('6. PERSONA POLÍTICAMENTE EXPUESTA (PEP)', 60, y);
 
-  y += 50;
-  if (datos.pep?.esFamiliarPEP && datos.pep?.relacionPEP) {
-    drawField(doc, 60, y, 'Relación con PEP', datos.pep.relacionPEP, 240);
+  y += 16;
+
+  // Obtener valores PEP
+  const esPEP = datos.pep?.esPersonaExpuesta ? 'SÍ' : 'NO';
+  const esFamiliarPEP = datos.pep?.esFamiliarPEP ? 'SÍ' : 'NO';
+  const esColaboradorPEP = datos.pep?.esColaboradorPEP ? 'SÍ' : 'NO';
+
+  // Formato inline compacto - tres columnas
+  doc.fillColor(COLORS.textDark)
+     .fontSize(8)
+     .font(FONTS.normal);
+
+  // Columna 1: ¿Es PEP?
+  doc.font(FONTS.title).text('¿Es PEP?: ', 60, y, { continued: true })
+     .font(FONTS.normal).text(esPEP, { bold: esPEP === 'SÍ' });
+
+  // Columna 2: ¿Familiar PEP?
+  doc.font(FONTS.title).text('¿Familiar PEP?: ', 220, y, { continued: true })
+     .font(FONTS.normal).text(esFamiliarPEP, { bold: esFamiliarPEP === 'SÍ' });
+
+  // Columna 3: ¿Colaborador PEP?
+  doc.font(FONTS.title).text('¿Colaborador PEP?: ', 400, y, { continued: true })
+     .font(FONTS.normal).text(esColaboradorPEP, { bold: esColaboradorPEP === 'SÍ' });
+
+  y += 18;
+
+  // Si hay detalles adicionales (relación o tipo colaborador), mostrarlos en línea adicional
+  if ((datos.pep?.esFamiliarPEP && datos.pep?.relacionPEP) || (datos.pep?.esColaboradorPEP && datos.pep?.tipoColaborador)) {
+    doc.fontSize(7).font(FONTS.italic).fillColor(COLORS.textMedium);
+    let detalles = [];
+    if (datos.pep?.esFamiliarPEP && datos.pep?.relacionPEP) {
+      detalles.push(`Relación: ${datos.pep.relacionPEP}`);
+    }
+    if (datos.pep?.esColaboradorPEP && datos.pep?.tipoColaborador) {
+      detalles.push(`Tipo: ${datos.pep.tipoColaborador}`);
+    }
+    doc.text(detalles.join(' | '), 60, y, { width: 480 });
+    y += 15;
   }
-  if (datos.pep?.esColaboradorPEP && datos.pep?.tipoColaborador) {
-    drawField(doc, 320, y, 'Tipo de Colaborador', datos.pep.tipoColaborador, 220);
-  }
 
-  return y + 100;
+  return y + 20;
 }
 
 /**
