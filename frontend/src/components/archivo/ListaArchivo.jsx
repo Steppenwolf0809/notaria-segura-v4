@@ -144,7 +144,8 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
     const matchesTipo = filtros.tipo === 'TODOS' || doc.documentType === filtros.tipo;
 
     // 🆕 Filtro para ocultar ENTREGADOS si el toggle está desactivado
-    const matchesEntregados = filtros.mostrarEntregados || doc.status !== 'ENTREGADO';
+    // PERO: Si el usuario selecciona explícitamente ENTREGADO en el filtro, mostrarlos
+    const matchesEntregados = filtros.mostrarEntregados || filtros.estado === 'ENTREGADO' || doc.status !== 'ENTREGADO';
 
     return matchesSearch && matchesEstado && matchesTipo && matchesEntregados;
   }).sort((a, b) => {
