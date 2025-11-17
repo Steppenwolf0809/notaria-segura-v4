@@ -89,7 +89,8 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
       const matchesType = !typeFilter || doc.documentType === typeFilter;
 
       // 🆕 Filtro para ocultar ENTREGADOS si el toggle está desactivado
-      const matchesEntregados = mostrarEntregados || doc.status !== 'ENTREGADO';
+      // PERO: Si el usuario selecciona explícitamente ENTREGADO en el filtro, mostrarlos
+      const matchesEntregados = mostrarEntregados || statusFilter === 'ENTREGADO' || doc.status !== 'ENTREGADO';
 
       return matchesSearch && matchesStatus && matchesType && matchesEntregados;
     });

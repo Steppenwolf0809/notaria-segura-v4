@@ -114,6 +114,31 @@ const receptionService = {
   },
 
   /**
+   * Obtener documentos LISTO para entregar
+   * @param {Object} params - Parámetros de filtrado
+   * @returns {Promise<Object>} Lista de documentos listos
+   */
+  async getDocumentosListos(params = {}) {
+    try {
+      // Forzar filtro por estado LISTO
+      const filteredParams = {
+        ...params,
+        estado: 'LISTO'
+      };
+      const response = await api.get('/reception/documentos/todos', { params: filteredParams });
+      return {
+        success: true,
+        data: response.data.data
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: receptionService.handleError(error)
+      };
+    }
+  },
+
+  /**
    * Obtener documentos EN_PROCESO para marcar como listos
    * @param {Object} params - Parámetros de filtrado
    * @returns {Promise<Object>} Lista de documentos en proceso
