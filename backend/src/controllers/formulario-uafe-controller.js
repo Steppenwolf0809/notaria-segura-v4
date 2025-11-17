@@ -1609,3 +1609,184 @@ export async function descargarArchivo(req, res) {
     });
   }
 }
+
+/**
+ * Listar TODOS los protocolos (solo para ADMIN)
+ * GET /api/formulario-uafe/admin/protocolos
+ * Requiere: authenticateToken + role ADMIN
+ */
+export async function listarTodosProtocolos(req, res) {
+  try {
+    const { page = 1, limit = 20, search = '', matrizador = '' } = req.query;
+
+    const where = {
+      ...(search && {
+        OR: [
+          { numeroProtocolo: { contains: search, mode: 'insensitive' } },
+          { actoContrato: { contains: search, mode: 'insensitive' } }
+        ]
+      }),
+      ...(matrizador && {
+        createdBy: parseInt(matrizador)
+      })
+    };
+
+    const [protocolos, total] = await Promise.all([
+      prisma.protocoloUAFE.findMany({
+        where,
+        include: {
+          personas: {
+            include: {
+              persona: {
+                select: {
+                  numeroIdentificacion: true,
+                  tipoPersona: true,
+                  datosPersonaNatural: true,
+                  datosPersonaJuridica: true,
+                  completado: true
+                }
+              }
+            }
+          },
+          creador: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+              role: true
+            }
+          }
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: parseInt(limit)
+      }),
+      prisma.protocoloUAFE.count({ where })
+    ]);
+
+    // Formatear protocolos con nombres de personas
+    const protocolosFormateados = protocolos.map(protocolo => {
+      const personasFormateadas = protocolo.personas.map(pp => {
+        let nombre = 'Sin nombre';
+
+        if (pp.persona.tipoPersona === 'NATURAL' && pp.persona.datosPersonaNatural) {
+          const datos = pp.persona.datosPersonaNatural;
+          if (datos.datosPersonales?.nombres && datos.datosPersonales?.apellidos) {
+            nombre = `${datos.datosPersonales.nombres} ${datos.datosPersonales.apellidos}`.trim();
+          }
+        } else if (pp.persona.tipoPersona === 'JURIDICA' && pp.persona.datosPersonaJuridica) {
+          const datos = pp.persona.datosPersonaJuridica;
+          if (datos.compania?.razonSocial) {
+            nombre = datos.compania.razonSocial.trim();
+          }
+        }
+
+        return {
+          id: pp.id,
+          cedula: pp.personaCedula,
+          nombre,
+          calidad: pp.calidad,
+          actuaPor: pp.actuaPor,
+          completado: pp.completado,
+          completadoAt: pp.completadoAt
+        };
+      });
+
+      return {
+        id: protocolo.id,
+        numeroProtocolo: protocolo.numeroProtocolo,
+        fecha: protocolo.fecha,
+        actoContrato: protocolo.actoContrato,
+        avaluoMunicipal: protocolo.avaluoMunicipal,
+        valorContrato: protocolo.valorContrato,
+        formaPago: protocolo.formaPago,
+        createdAt: protocolo.createdAt,
+        updatedAt: protocolo.updatedAt,
+        creador: {
+          id: protocolo.creador.id,
+          nombre: `${protocolo.creador.firstName} ${protocolo.creador.lastName}`,
+          email: protocolo.creador.email,
+          role: protocolo.creador.role
+        },
+        personas: personasFormateadas,
+        totalPersonas: personasFormateadas.length,
+        personasCompletadas: personasFormateadas.filter(p => p.completado).length
+      };
+    });
+
+    res.json({
+      success: true,
+      data: protocolosFormateados,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
+
+  } catch (error) {
+    console.error('Error al listar todos los protocolos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al listar protocolos'
+    });
+  }
+}
+
+/**
+ * Eliminar un protocolo completo (solo para ADMIN)
+ * DELETE /api/formulario-uafe/admin/protocolo/:protocoloId
+ * Requiere: authenticateToken + role ADMIN
+ */
+export async function eliminarProtocolo(req, res) {
+  try {
+    const { protocoloId } = req.params;
+
+    // Verificar que el protocolo existe
+    const protocolo = await prisma.protocoloUAFE.findUnique({
+      where: { id: protocoloId },
+      include: {
+        personas: true,
+        creador: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    if (!protocolo) {
+      return res.status(404).json({
+        success: false,
+        message: 'Protocolo no encontrado'
+      });
+    }
+
+    // Eliminar protocolo (cascade eliminará las personas asociadas)
+    await prisma.protocoloUAFE.delete({
+      where: { id: protocoloId }
+    });
+
+    res.json({
+      success: true,
+      message: 'Protocolo eliminado exitosamente',
+      data: {
+        protocoloId,
+        numeroProtocolo: protocolo.numeroProtocolo,
+        personasEliminadas: protocolo.personas.length,
+        creador: `${protocolo.creador.firstName} ${protocolo.creador.lastName}`
+      }
+    });
+
+  } catch (error) {
+    console.error('Error al eliminar protocolo:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al eliminar protocolo'
+    });
+  }
+}
