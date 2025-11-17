@@ -19,7 +19,9 @@ import {
   formatCurrency,
   formatDate,
   checkAndAddPage,
-  drawFormasPago
+  drawFormasPago,
+  COLORS,
+  FONTS
 } from '../utils/pdf-uafe-helpers.js';
 
 const __filename = fileURLToPath(import.meta.url);
