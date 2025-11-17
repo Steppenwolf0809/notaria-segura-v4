@@ -5,9 +5,12 @@ import {
   loginPersona,
   obtenerMiInformacion,
   actualizarMiInformacion,
-  logoutPersona
+  logoutPersona,
+  buscarPersonaPorCedula,
+  resetearPIN
 } from '../controllers/personal-controller.js';
 import { verifyPersonalSession } from '../middleware/verify-personal-session.js';
+import { authenticateToken, requireRoles } from '../middleware/auth-middleware.js';
 
 const router = express.Router();
 
@@ -36,5 +39,23 @@ router.put('/mi-informacion', verifyPersonalSession, actualizarMiInformacion);
 
 // Cerrar sesión
 router.post('/logout', verifyPersonalSession, logoutPersona);
+
+// ========================================
+// RUTAS ADMINISTRATIVAS (MATRIZADOR/ADMIN)
+// ========================================
+
+// Buscar persona por cédula (requiere MATRIZADOR o ADMIN)
+router.get('/buscar/:cedula',
+  authenticateToken,
+  requireRoles(['ADMIN', 'MATRIZADOR']),
+  buscarPersonaPorCedula
+);
+
+// Resetear PIN de un usuario (requiere MATRIZADOR o ADMIN)
+router.post('/:personaId/resetear-pin',
+  authenticateToken,
+  requireRoles(['ADMIN', 'MATRIZADOR']),
+  resetearPIN
+);
 
 export default router;

@@ -448,3 +448,164 @@ export async function logoutPersona(req, res) {
     });
   }
 }
+
+/**
+ * Buscar persona por cédula (para matrizadores)
+ * GET /api/personal/buscar/:cedula
+ * Requiere: middleware verifyToken + rol MATRIZADOR o ADMIN
+ *
+ * Retorna información básica de la persona para permitir resetear PIN
+ */
+export async function buscarPersonaPorCedula(req, res) {
+  try {
+    const { cedula } = req.params;
+
+    const persona = await prisma.personaRegistrada.findUnique({
+      where: { numeroIdentificacion: cedula },
+      select: {
+        id: true,
+        numeroIdentificacion: true,
+        tipoPersona: true,
+        pinCreado: true,
+        intentosFallidos: true,
+        bloqueadoHasta: true,
+        ultimoAcceso: true,
+        pinResetCount: true,
+        completado: true,
+        createdAt: true,
+        datosPersonaNatural: true,
+        datosPersonaJuridica: true
+      }
+    });
+
+    if (!persona) {
+      return res.status(404).json({
+        success: false,
+        message: 'No se encontró ninguna persona con esta cédula'
+      });
+    }
+
+    // Determinar si está bloqueado actualmente
+    const bloqueado = persona.bloqueadoHasta && persona.bloqueadoHasta > new Date();
+
+    res.json({
+      success: true,
+      data: {
+        ...persona,
+        bloqueado,
+        nombreCompleto: persona.tipoPersona === 'NATURAL'
+          ? `${persona.datosPersonaNatural?.nombres || ''} ${persona.datosPersonaNatural?.apellidos || ''}`.trim()
+          : persona.datosPersonaJuridica?.razonSocial || 'N/A'
+      }
+    });
+  } catch (error) {
+    console.error('Error buscando persona:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al buscar persona'
+    });
+  }
+}
+
+/**
+ * Resetear PIN de un usuario
+ * POST /api/personal/:personaId/resetear-pin
+ * Requiere: middleware verifyToken + rol MATRIZADOR o ADMIN
+ * Body: { motivo }
+ *
+ * Funcionalidad:
+ * - Resetea el PIN del usuario (fuerza a crear uno nuevo)
+ * - Desbloquea la cuenta si estaba bloqueada
+ * - Cierra todas las sesiones activas del usuario
+ * - Registra auditoría con el matrizador que hizo el reset
+ *
+ * Caso de uso: Usuario olvidó su PIN y se presenta en notaría con cédula física
+ */
+export async function resetearPIN(req, res) {
+  try {
+    const { personaId } = req.params;
+    const { motivo } = req.body;
+
+    // Validar que se proporcione un motivo
+    if (!motivo || motivo.trim().length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Debe proporcionar un motivo para el reseteo de PIN'
+      });
+    }
+
+    // Verificar que la persona existe
+    const persona = await prisma.personaRegistrada.findUnique({
+      where: { id: personaId },
+      select: {
+        id: true,
+        numeroIdentificacion: true,
+        tipoPersona: true,
+        pinResetCount: true
+      }
+    });
+
+    if (!persona) {
+      return res.status(404).json({
+        success: false,
+        message: 'Persona no encontrada'
+      });
+    }
+
+    // Realizar el reseteo del PIN en una transacción
+    await prisma.$transaction(async (tx) => {
+      // 1. Resetear PIN y desbloquear cuenta
+      await tx.personaRegistrada.update({
+        where: { id: personaId },
+        data: {
+          pinCreado: false,              // Fuerza a crear nuevo PIN
+          pinHash: '',                    // Elimina el hash anterior
+          intentosFallidos: 0,            // Resetea intentos fallidos
+          bloqueadoHasta: null,           // Desbloquea la cuenta
+          pinResetCount: persona.pinResetCount + 1  // Incrementa contador
+        }
+      });
+
+      // 2. Cerrar todas las sesiones activas del usuario (seguridad)
+      await tx.sesionPersonal.deleteMany({
+        where: { personaId }
+      });
+
+      await tx.sesionFormularioUafe.deleteMany({
+        where: {
+          personaProtocolo: {
+            personaCedula: persona.numeroIdentificacion
+          }
+        }
+      });
+
+      // 3. Registrar en auditoría
+      await tx.auditoriaPersona.create({
+        data: {
+          personaId,
+          tipo: 'PIN_RESET',
+          descripcion: `PIN reseteado por ${req.user.firstName} ${req.user.lastName}. Motivo: ${motivo}`,
+          matrizadorId: req.user.id,
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent')
+        }
+      });
+    });
+
+    res.json({
+      success: true,
+      message: 'PIN reseteado exitosamente. El usuario debe crear un nuevo PIN en su próximo acceso.',
+      data: {
+        personaId,
+        cedula: persona.numeroIdentificacion,
+        resetCount: persona.pinResetCount + 1
+      }
+    });
+  } catch (error) {
+    console.error('Error reseteando PIN:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al resetear PIN'
+    });
+  }
+}
