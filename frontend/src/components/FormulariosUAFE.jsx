@@ -53,7 +53,8 @@ import {
   Link as LinkIcon,
   PictureAsPdf as PictureAsPdfIcon,
   Save as SaveIcon,
-  LockReset as LockResetIcon
+  LockReset as LockResetIcon,
+  HowToReg as HowToRegIcon
 } from '@mui/icons-material';
 import { API_BASE } from '../utils/apiConfig';
 import { formatDateES, formatDateTimeES } from '../utils/dateUtils';
@@ -562,12 +563,25 @@ const FormulariosUAFE = () => {
   };
 
   /**
-   * Copiar link del formulario al portapapeles
+   * Copiar link del formulario UAFE al portapapeles
    */
   const copiarLinkFormulario = () => {
-    const link = `${window.location.origin}/formulario-uafe-protocolo.html`;
+    const link = 'https://notaria18quito.com.ec/formulario-uafe/';
     navigator.clipboard.writeText(link).then(() => {
-      mostrarSnackbar('Link copiado al portapapeles', 'success');
+      mostrarSnackbar('Link del formulario UAFE copiado al portapapeles', 'success');
+    }).catch(err => {
+      console.error('Error al copiar:', err);
+      mostrarSnackbar('Error al copiar el link', 'error');
+    });
+  };
+
+  /**
+   * Copiar link del registro de usuarios al portapapeles
+   */
+  const copiarLinkRegistro = () => {
+    const link = 'https://notaria18quito.com.ec/registro-personal/';
+    navigator.clipboard.writeText(link).then(() => {
+      mostrarSnackbar('Link del registro de usuarios copiado al portapapeles', 'success');
     }).catch(err => {
       console.error('Error al copiar:', err);
       mostrarSnackbar('Error al copiar el link', 'error');
@@ -834,7 +848,16 @@ const FormulariosUAFE = () => {
             onClick={copiarLinkFormulario}
             sx={{ borderRadius: 2 }}
           >
-            Copiar Link
+            Link Formulario
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<HowToRegIcon />}
+            onClick={copiarLinkRegistro}
+            sx={{ borderRadius: 2 }}
+            color="info"
+          >
+            Link Registro
           </Button>
           <Button
             variant="contained"
