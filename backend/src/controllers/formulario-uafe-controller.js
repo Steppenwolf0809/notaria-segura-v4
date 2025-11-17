@@ -455,12 +455,16 @@ export async function loginFormularioUAFE(req, res) {
  * Enviar respuesta del formulario UAFE
  * POST /api/formulario-uafe/responder
  * Requiere: middleware verifyFormularioUAFESession
+ *
+ * IMPORTANTE: Esta función implementa BIDIRECCIONALIDAD
+ * - Actualiza PersonaProtocolo (respuesta específica del protocolo)
+ * - Actualiza PersonaRegistrada (BD maestra para pre-carga en futuros protocolos)
  */
 export async function responderFormulario(req, res) {
   try {
     const { representadoId, datosRepresentado, ...respuestaData } = req.body;
 
-    // Preparar datos para actualizar
+    // Preparar datos para actualizar PersonaProtocolo
     const dataToUpdate = {
       completado: true,
       completadoAt: new Date(),
@@ -476,18 +480,50 @@ export async function responderFormulario(req, res) {
       dataToUpdate.datosRepresentado = datosRepresentado;
     }
 
-    // Actualizar PersonaProtocolo con la respuesta
+    // PASO 1: Actualizar PersonaProtocolo con la respuesta
     const personaProtocolo = await prisma.personaProtocolo.update({
       where: { id: req.personaProtocoloVerificada.id },
-      data: dataToUpdate
+      data: dataToUpdate,
+      include: {
+        persona: {
+          select: {
+            tipoPersona: true,
+            numeroIdentificacion: true
+          }
+        }
+      }
     });
+
+    // PASO 2: BIDIRECCIONALIDAD - Actualizar PersonaRegistrada (BD maestra)
+    // Esto permite que los datos se pre-carguen en futuros protocolos
+    const actualizacionPersona = {
+      completado: true,
+      updatedAt: new Date()
+    };
+
+    // Actualizar según tipo de persona
+    if (personaProtocolo.persona.tipoPersona === 'NATURAL') {
+      actualizacionPersona.datosPersonaNatural = respuestaData;
+    } else if (personaProtocolo.persona.tipoPersona === 'JURIDICA') {
+      actualizacionPersona.datosPersonaJuridica = respuestaData;
+    }
+
+    await prisma.personaRegistrada.update({
+      where: {
+        numeroIdentificacion: personaProtocolo.persona.numeroIdentificacion
+      },
+      data: actualizacionPersona
+    });
+
+    console.log(`✅ [BIDIRECCIONALIDAD] Datos sincronizados: PersonaProtocolo + PersonaRegistrada (${personaProtocolo.persona.numeroIdentificacion})`);
 
     res.json({
       success: true,
-      message: 'Formulario enviado exitosamente',
+      message: 'Formulario enviado exitosamente. Datos actualizados en BD maestra.',
       data: {
         completado: true,
-        completadoAt: personaProtocolo.completadoAt
+        completadoAt: personaProtocolo.completadoAt,
+        sincronizadoConBDMaestra: true
       }
     });
   } catch (error) {
