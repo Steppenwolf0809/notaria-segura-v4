@@ -204,6 +204,17 @@ function DocumentosListos({ onEstadisticasChange }) {
     const defaultKey = documentos[0]?.createdAt ? 'createdAt' : (documentos[0]?.fechaCreacion ? 'fechaCreacion' : 'createdAt');
     const field = sortBy || defaultKey;
     const sorted = [...documentos].sort((a, b) => {
+      // En la pestaña "Todos", primero ordenar por estado (ENTREGADO al final)
+      if (currentTab === 1) {
+        const aIsEntregado = a.status === 'ENTREGADO';
+        const bIsEntregado = b.status === 'ENTREGADO';
+
+        // Si uno es ENTREGADO y el otro no, el ENTREGADO va al final
+        if (aIsEntregado && !bIsEntregado) return 1;
+        if (!aIsEntregado && bIsEntregado) return -1;
+      }
+
+      // Ordenar por el campo seleccionado
       let aVal = a[field] ?? a[defaultKey] ?? a.createdAt ?? a.fechaCreacion;
       let bVal = b[field] ?? b[defaultKey] ?? b.createdAt ?? b.fechaCreacion;
       if (keyCandidates.includes(field)) {
@@ -216,7 +227,7 @@ function DocumentosListos({ onEstadisticasChange }) {
       return sortOrder === 'asc' ? (aVal > bVal ? 1 : -1) : (aVal < bVal ? 1 : -1);
     });
     return sorted;
-  }, [documentos, sortBy, sortOrder]);
+  }, [documentos, sortBy, sortOrder, currentTab]);
 
   const handleTabChange = (event, newValue) => {
     setCurrentTab(newValue);
