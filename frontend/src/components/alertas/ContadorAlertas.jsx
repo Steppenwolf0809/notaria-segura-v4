@@ -46,7 +46,6 @@ function ContadorAlertas({ userRole, onClick, autoRefresh = 300000 }) { // 5 min
         setUltimaActualizacion(response.data.data.ultimaActualizacion);
       }
     } catch (error) {
-      console.error('Error obteniendo resumen de alertas:', error);
       // En caso de error, mantener los valores actuales o resetear
       if (error.response?.status === 401) {
         // Token expirado, no resetear para evitar parpadeos

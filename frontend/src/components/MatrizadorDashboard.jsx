@@ -100,7 +100,6 @@ const MatrizadorDashboard = ({ onDocumentClick }) => {
   const handleStatusChange = async (documentId, newStatus) => {
     const success = await updateDocumentStatus(documentId, newStatus);
     if (success) {
-      console.log('Estado actualizado exitosamente');
     }
     return success;
   };

@@ -30,7 +30,6 @@ export const isWithinLastDays = (dateToCheck, days = 7) => {
     
     return targetDate >= cutoffDate;
   } catch (error) {
-    console.warn('Error al verificar fecha:', error);
     return false;
   }
 };

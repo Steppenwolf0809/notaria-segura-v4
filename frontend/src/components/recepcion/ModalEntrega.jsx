@@ -71,7 +71,6 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
       ];
       setRelacionesOptions(relacionesDefault);
     } catch (error) {
-      console.error('Error cargando opciones:', error);
       // Fallback con opciones básicas
       setRelacionesOptions([
         { value: 'titular', label: 'Titular del documento' },
@@ -123,7 +122,6 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
         // 🔗 NUEVA FUNCIONALIDAD: Mostrar información de entrega grupal si aplica
         const groupInfo = result.data?.groupDelivery;
         if (groupInfo?.wasGroupDelivery) {
-          console.log(`✅ Entrega grupal exitosa: ${groupInfo.totalDocuments} documentos entregados`);
         }
         // Notificación global según WhatsApp
         const w = result.data?.whatsapp || {};
@@ -141,7 +139,6 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
         toast.error(err);
       }
     } catch (error) {
-      console.error('Error:', error);
       setError('Error de conexión');
       toast.error('Error de conexión');
     } finally {

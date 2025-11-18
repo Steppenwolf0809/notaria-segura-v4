@@ -187,7 +187,6 @@ export default function ConcuerdoGenerator() {
                       throw new Error(response.message || 'Error aplicando correcciones')
                     }
                   } catch (error) {
-                    console.error('Error aplicando correcciones:', error)
                     throw error
                   }
                 }}

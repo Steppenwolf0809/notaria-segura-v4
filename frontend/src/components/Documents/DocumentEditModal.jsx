@@ -89,7 +89,6 @@ const DocumentEditModal = ({
         setErrors([response.message || 'Error al cargar información editable']);
       }
     } catch (error) {
-      console.error('Error cargando información editable:', error);
       setErrors(['Error de conexión al cargar la información']);
     } finally {
       setLoading(false);
@@ -171,7 +170,6 @@ const DocumentEditModal = ({
         setErrors(Array.isArray(response.errors) ? response.errors : [response.message]);
       }
     } catch (error) {
-      console.error('Error guardando cambios:', error);
       setErrors(['Error de conexión al guardar los cambios']);
     } finally {
       setSaving(false);

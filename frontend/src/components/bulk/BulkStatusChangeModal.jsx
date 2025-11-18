@@ -101,7 +101,6 @@ const BulkStatusChangeModal = ({
       });
       onClose();
     } catch (error) {
-      console.error('Error en cambio masivo:', error);
     } finally {
       setExecuting(false);
     }

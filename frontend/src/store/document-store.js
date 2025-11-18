@@ -89,7 +89,6 @@ const useDocumentStore = create((set, get) => ({
         return result;
       }
     } catch (error) {
-      console.error('Error in uploadXmlDocument:', error);
       set({ 
         error: 'Error inesperado al subir XML', 
         loading: false,
@@ -140,7 +139,6 @@ const useDocumentStore = create((set, get) => ({
         return result;
       }
     } catch (error) {
-      console.error('Error in uploadXmlDocumentsBatch:', error);
       set({ 
         error: 'Error inesperado al subir archivos XML en lote', 
         loading: false,
@@ -172,7 +170,6 @@ const useDocumentStore = create((set, get) => ({
         return false;
       }
     } catch (error) {
-      console.error('Error in fetchAllDocuments:', error);
       set({ error: 'Error inesperado al cargar documentos', loading: false });
       return false;
     }
@@ -210,7 +207,6 @@ const useDocumentStore = create((set, get) => ({
         return false;
       }
     } catch (error) {
-      console.error('Error in assignDocument:', error);
       set({ 
         error: 'Error inesperado al asignar documento', 
         loading: false 
@@ -243,7 +239,6 @@ const useDocumentStore = create((set, get) => ({
         return false;
       }
     } catch (error) {
-      console.error('Error in fetchMyDocuments:', error);
       set({ 
         error: 'Error inesperado al cargar mis documentos', 
         loading: false 
@@ -315,7 +310,6 @@ const useDocumentStore = create((set, get) => ({
         return result;
       }
     } catch (error) {
-      console.error('Error in updateDocumentStatus:', error);
       set({ 
         error: 'Error inesperado al actualizar estado', 
         loading: false 
@@ -347,7 +341,6 @@ const useDocumentStore = create((set, get) => ({
         const hasSharedUpdate = sharedFields.some(field => documentData[field] !== undefined);
         
         if (hasSharedUpdate) {
-          console.log('🔗 Detectado cambio en campo compartido de grupo:', {
             documentId,
             groupId: targetDoc.documentGroupId,
             fields: Object.keys(documentData).filter(field => sharedFields.includes(field))
@@ -369,7 +362,6 @@ const useDocumentStore = create((set, get) => ({
             );
             
             if (result.success) {
-              console.log('✅ Información compartida actualizada en todo el grupo');
               
               // Actualizar todos los documentos del grupo en el store
               const updatedDocuments = currentDocuments.map(doc => {
@@ -382,11 +374,9 @@ const useDocumentStore = create((set, get) => ({
               set({ documents: updatedDocuments });
               return true;
             } else {
-              console.error('❌ Error actualizando información del grupo:', result.error);
               // Continuar con actualización local como fallback
             }
           } catch (error) {
-            console.error('💥 Error en actualización grupal, usando fallback:', error);
             // Continuar con actualización local como fallback
           }
         }
@@ -401,10 +391,8 @@ const useDocumentStore = create((set, get) => ({
         documents: updatedDocuments
       });
       
-      console.log('📝 Documento actualizado en store:', documentId, documentData);
       return true;
     } catch (error) {
-      console.error('Error updating document in store:', error);
       return false;
     }
   },
@@ -421,11 +409,9 @@ const useDocumentStore = create((set, get) => ({
         set({ matrizadores: result.data.matrizadores || [] });
         return true;
       } else {
-        console.error('Error fetching matrizadores:', result.error);
         return false;
       }
     } catch (error) {
-      console.error('Error in fetchMatrizadores:', error);
       return false;
     }
   },
@@ -489,7 +475,6 @@ const useDocumentStore = create((set, get) => ({
    * @returns {Promise<Object>} Resultado detallado de la operación
    */
   updateDocumentStatusWithConfirmation: async (documentId, newStatus, options = {}) => {
-    console.log('🏪 STORE: updateDocumentStatusWithConfirmation iniciado:', {
       documentId,
       newStatus,
       options
@@ -498,12 +483,9 @@ const useDocumentStore = create((set, get) => ({
     set({ loading: true, error: null });
     
     try {
-      console.log('🌐 STORE: Llamando documentService.updateDocumentStatus...');
       const result = await documentService.updateDocumentStatus(documentId, newStatus, options);
-      console.log('📊 STORE: Respuesta del service:', result);
       
       if (result.success) {
-        console.log('✅ STORE: Service respondió exitosamente');
         
         const currentDocuments = get().documents;
         let updatedDocuments = currentDocuments;
@@ -528,8 +510,6 @@ const useDocumentStore = create((set, get) => ({
           );
         }
 
-        console.log('📝 STORE: Actualizando documentos en el estado local');
-        console.log('📊 STORE: Documento actualizado:', result.data.document);
         set({ 
           documents: updatedDocuments,
           loading: false 
@@ -552,7 +532,6 @@ const useDocumentStore = create((set, get) => ({
           timestamp: new Date().toISOString()
         };
         
-        console.log('📄 STORE: ChangeInfo generado:', changeInfo);
         
         return {
           success: true,
@@ -560,7 +539,6 @@ const useDocumentStore = create((set, get) => ({
           changeInfo
         };
       } else {
-        console.error('❌ STORE: Service falló:', result.error);
         set({ 
           error: result.error, 
           loading: false 
@@ -568,7 +546,6 @@ const useDocumentStore = create((set, get) => ({
         return { success: false, error: result.error };
       }
     } catch (error) {
-      console.error('💥 STORE: Error en updateDocumentStatusWithConfirmation:', error);
       set({ 
         error: 'Error inesperado al actualizar estado', 
         loading: false 
@@ -616,7 +593,6 @@ const useDocumentStore = create((set, get) => ({
         return { success: false, error: result.error };
       }
     } catch (error) {
-      console.error('Error in undoDocumentStatusChange:', error);
       set({ 
         error: 'Error inesperado al deshacer cambio', 
         loading: false 
@@ -640,11 +616,9 @@ const useDocumentStore = create((set, get) => ({
           undoableChanges: result.data.undoableChanges || []
         };
       } else {
-        console.error('Error fetching undoable changes:', result.error);
         return { success: false, error: result.error };
       }
     } catch (error) {
-      console.error('Error in getUndoableChanges:', error);
       return { success: false, error: 'Error inesperado al obtener cambios deshacibles' };
     }
   },
@@ -722,7 +696,6 @@ const useDocumentStore = create((set, get) => ({
     set({ loading: true, error: null });
     
     try {
-      console.log('🔗 Creando grupo con documentos:', documentIds);
       
       const result = await documentService.createDocumentGroup({
         documentIds,
@@ -735,7 +708,6 @@ const useDocumentStore = create((set, get) => ({
         
         set({ loading: false });
         
-        console.log('✅ Grupo creado exitosamente:', result);
         
         return {
           success: true,
@@ -752,7 +724,6 @@ const useDocumentStore = create((set, get) => ({
         return { success: false, error: result.message };
       }
     } catch (error) {
-      console.error('Error creando grupo:', error);
       const errorMessage = error.message || 'Error inesperado al crear grupo';
       set({ 
         error: errorMessage, 
@@ -792,7 +763,6 @@ const useDocumentStore = create((set, get) => ({
       set({ loading: false, error: result.message || 'Error al desagrupar documento' });
       return { success: false, error: result.message };
     } catch (error) {
-      console.error('Error en ungroupDocument:', error);
       // Rollback
       const originalDocs = get().documents;
       set({ documents: originalDocs });
@@ -811,7 +781,6 @@ const useDocumentStore = create((set, get) => ({
       const result = await documentService.detectGroupableDocuments(clientData);
       return result;
     } catch (error) {
-      console.error('Error detectando documentos agrupables:', error);
       return { success: false, error: error.message };
     }
   },

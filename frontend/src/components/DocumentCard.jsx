@@ -69,7 +69,6 @@ const DocumentCard = ({ document, onStatusChange }) => {
       if(onStatusChange) onStatusChange(null, null, true); // Pasar un tercer argumento para indicar refresco
       await fetchDocuments(); // Para refrescar el store global
     } catch (error) {
-      console.error('Error creating group:', error);
       throw error; // Re-lanzar para que el modal muestre el error
     }
   };
@@ -81,7 +80,6 @@ const DocumentCard = ({ document, onStatusChange }) => {
   const handleCreateSmartGroup = async (documentIds) => {
     try {
       setLoading(true);
-      console.log('🔗 Creando grupo inteligente con documentos:', documentIds);
       
       const response = await documentService.createSmartGroup({
         documentIds,
@@ -89,7 +87,6 @@ const DocumentCard = ({ document, onStatusChange }) => {
       });
 
       if (response.success) {
-        console.log('✅ Grupo inteligente creado exitosamente:', response.data);
         // Actualizar documentos
         if(onStatusChange) onStatusChange(null, null, true);
         await fetchDocuments();
@@ -100,12 +97,10 @@ const DocumentCard = ({ document, onStatusChange }) => {
         // Notificación global de éxito
         toast.success(`Grupo creado (${documentIds.length}). WhatsApp enviado.`);
       } else {
-        console.error('❌ Error creando grupo:', response.message);
         toast.error(response.message || 'Error creando el grupo');
         throw new Error(response.message);
       }
     } catch (error) {
-      console.error('❌ Error creando grupo inteligente:', error);
       toast.error('Error creando grupo de documentos');
       throw error;
     } finally {
@@ -206,7 +201,6 @@ const DocumentCard = ({ document, onStatusChange }) => {
           }
         }
       } catch (error) {
-        console.error('Error checking group status:', error);
       } finally {
         setLoading(false);
       }
@@ -228,14 +222,12 @@ const DocumentCard = ({ document, onStatusChange }) => {
       
       // Mostrar información sobre la operación grupal si está disponible
       if (result && result.data && result.data.groupOperation && result.data.groupOperation.isGroupOperation) {
-        console.log('✅ Operación grupal completada:', {
           documentsAffected: result.data.groupOperation.documentsAffected,
           groupId: result.data.groupOperation.groupId
         });
       }
       
     } catch (error) {
-      console.error('Error updating status:', error);
     } finally {
       setLoading(false);
       setShowGroupStatusConfirmation(false);
@@ -294,14 +286,12 @@ const DocumentCard = ({ document, onStatusChange }) => {
             document={document}
             variant="standard"
             onGroupAction={(groupableDocuments, currentDocument) => {
-              console.log('🔗 Abriendo modal de confirmación de agrupación:', {
                 current: currentDocument.protocolNumber,
                 groupable: groupableDocuments.map(d => d.protocolNumber)
               });
               // Abrir modal de confirmación
               setPendingGroupDocuments(groupableDocuments);
               setShowQuickGroupingModal(true);
-              console.log('🔗 Estado del modal cambiado a: true');
             }}
             showAutoButton={true}
           />
