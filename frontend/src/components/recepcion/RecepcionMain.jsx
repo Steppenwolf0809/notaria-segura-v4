@@ -25,7 +25,10 @@ import {
   Grid,
   Avatar,
   InputAdornment,
-  Paper
+  Paper,
+  Tabs,
+  Tab,
+  Badge
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -55,6 +58,9 @@ function RecepcionMain() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [matrizadores, setMatrizadores] = useState([]);
+
+  // Estado de pestañas (0: Activos, 1: Entregados)
+  const [tabValue, setTabValue] = useState(0);
 
   // Estados de filtros
   const [filters, setFilters] = useState({
@@ -166,6 +172,15 @@ function RecepcionMain() {
    */
   const documentosFiltrados = useMemo(() => {
     return documentos.filter(doc => {
+      // Filtro por pestaña activa
+      if (tabValue === 0) {
+        // Pestaña Activos: solo EN_PROCESO, LISTO, PAGADO
+        if (doc.status === 'ENTREGADO') return false;
+      } else {
+        // Pestaña Entregados: solo ENTREGADO
+        if (doc.status !== 'ENTREGADO') return false;
+      }
+
       // Búsqueda general
       if (filters.search) {
         const search = filters.search.toLowerCase();
@@ -192,7 +207,7 @@ function RecepcionMain() {
 
       return true;
     });
-  }, [documentos, filters]);
+  }, [documentos, filters, tabValue]);
 
   /**
    * Obtener tipos de documento únicos para filtro
@@ -250,6 +265,34 @@ function RecepcionMain() {
       default:
         return '⚪';
     }
+  };
+
+  /**
+   * Obtener abreviación del tipo de documento
+   */
+  const getDocTypeAbbr = (type) => {
+    if (!type) return '?';
+    const abbr = {
+      'ESCRITURA': 'E',
+      'ESCRITURA PUBLICA': 'E',
+      'PODER': 'P',
+      'DILIGENCIA': 'D',
+      'DECLARACION': 'DC',
+      'ACTA': 'A',
+      'OTRO': 'O',
+      'MINUTA': 'M',
+      'RECONOCIMIENTO': 'R',
+      'AUTENTICACION': 'AU'
+    };
+
+    // Buscar coincidencia parcial
+    const upperType = type.toUpperCase();
+    for (const [key, value] of Object.entries(abbr)) {
+      if (upperType.includes(key)) return value;
+    }
+
+    // Si no hay coincidencia, usar primera letra
+    return type.substring(0, 1).toUpperCase();
   };
 
   /**
@@ -418,13 +461,33 @@ function RecepcionMain() {
   return (
     <Box sx={{ p: 3 }}>
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
+      <Box sx={{ mb: 3 }}>
         <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', mb: 1 }}>
           📋 Gestión de Recepción de Documentos
         </Typography>
         <Typography variant="body1" color="text.secondary">
           Vista unificada para marcar documentos listos y gestionar entregas
         </Typography>
+      </Box>
+
+      {/* Pestañas: Activos vs Entregados */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)}>
+          <Tab
+            label={
+              <Badge badgeContent={stats.enProceso + stats.listos} color="primary" max={999}>
+                Documentos Activos
+              </Badge>
+            }
+          />
+          <Tab
+            label={
+              <Badge badgeContent={stats.entregadosHoy} color="success" max={999}>
+                Entregados
+              </Badge>
+            }
+          />
+        </Tabs>
       </Box>
 
       {/* Panel de Estadísticas - Compacto */}
@@ -724,27 +787,35 @@ function RecepcionMain() {
                       </Box>
                     </TableCell>
 
-                    {/* Tipo */}
-                    <TableCell>
-                      <Chip
-                        icon={<DescriptionIcon />}
-                        label={documento.documentType}
-                        size="small"
-                        color="info"
-                        variant="outlined"
-                      />
+                    {/* Tipo - Abreviado */}
+                    <TableCell sx={{ textAlign: 'center' }}>
+                      <Tooltip title={documento.documentType} arrow>
+                        <Chip
+                          label={getDocTypeAbbr(documento.documentType)}
+                          size="small"
+                          color="info"
+                          sx={{
+                            minWidth: 32,
+                            fontSize: '0.75rem',
+                            fontWeight: 700
+                          }}
+                        />
+                      </Tooltip>
                     </TableCell>
 
-                    {/* Código */}
+                    {/* Código - Más prominente */}
                     <TableCell>
-                      <Chip
-                        label={documento.protocolNumber}
-                        size="small"
+                      <Typography
+                        variant="body1"
                         sx={{
                           fontFamily: 'monospace',
-                          fontWeight: 700
+                          fontWeight: 700,
+                          fontSize: '0.95rem',
+                          color: 'primary.main'
                         }}
-                      />
+                      >
+                        {documento.protocolNumber}
+                      </Typography>
                     </TableCell>
 
                     {/* Matrizador */}
@@ -767,20 +838,38 @@ function RecepcionMain() {
                       </Box>
                     </TableCell>
 
-                    {/* Estado */}
-                    <TableCell>
-                      <Chip
-                        label={documento.status}
-                        icon={<span>{getStatusIcon(documento.status)}</span>}
-                        size="small"
-                        sx={{
-                          bgcolor: getStatusColor(documento.status).bg,
-                          color: getStatusColor(documento.status).text,
-                          fontWeight: 600,
-                          textTransform: 'uppercase',
-                          fontSize: '0.75rem'
-                        }}
-                      />
+                    {/* Estado - Compacto */}
+                    <TableCell sx={{ textAlign: 'center' }}>
+                      <Tooltip title={documento.status} arrow>
+                        <Box
+                          sx={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 0.5,
+                            px: 1,
+                            py: 0.25,
+                            borderRadius: 1,
+                            bgcolor: getStatusColor(documento.status).bg,
+                            fontSize: '0.7rem'
+                          }}
+                        >
+                          <span>{getStatusIcon(documento.status)}</span>
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: getStatusColor(documento.status).text,
+                              fontWeight: 700,
+                              fontSize: '0.65rem'
+                            }}
+                          >
+                            {documento.status === 'EN_PROCESO' ? 'PROC' :
+                             documento.status === 'LISTO' ? 'LSTO' :
+                             documento.status === 'PAGADO' ? 'PAGD' :
+                             documento.status === 'ENTREGADO' ? 'ENTR' :
+                             documento.status}
+                          </Typography>
+                        </Box>
+                      </Tooltip>
                     </TableCell>
 
                     {/* Fecha */}
