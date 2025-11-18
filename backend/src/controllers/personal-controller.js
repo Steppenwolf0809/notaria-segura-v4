@@ -107,7 +107,12 @@ export async function registrarPersona(req, res) {
 
     if (existente) {
       // Si la persona existe pero su PIN fue reseteado, permitir re-creación de PIN
-      if (!existente.pinCreado || !existente.pinHash) {
+      // Verificar si NO tiene PIN creado O si el hash está vacío/nulo
+      const pinEstaReseteado = !existente.pinCreado ||
+                                !existente.pinHash ||
+                                existente.pinHash.trim().length === 0;
+
+      if (pinEstaReseteado) {
         // Hash del nuevo PIN
         const pinHash = await bcrypt.hash(pin, 10);
 
@@ -600,14 +605,16 @@ export async function resetearPIN(req, res) {
     // Realizar el reseteo del PIN en una transacción
     await prisma.$transaction(async (tx) => {
       // 1. Resetear PIN y desbloquear cuenta
+      // Establecemos pinHash como cadena vacía (no puede ser null por el schema)
+      // y pinCreado en false para forzar la creación de un nuevo PIN
       await tx.personaRegistrada.update({
         where: { id: personaId },
         data: {
-          pinCreado: false,              // Fuerza a crear nuevo PIN
-          pinHash: '',                    // Elimina el hash anterior
-          intentosFallidos: 0,            // Resetea intentos fallidos
-          bloqueadoHasta: null,           // Desbloquea la cuenta
-          pinResetCount: persona.pinResetCount + 1  // Incrementa contador
+          pinCreado: false,                            // Fuerza a crear nuevo PIN
+          pinHash: '',                                  // Elimina el hash anterior (cadena vacía)
+          intentosFallidos: 0,                          // Resetea intentos fallidos
+          bloqueadoHasta: null,                         // Desbloquea la cuenta
+          pinResetCount: persona.pinResetCount + 1     // Incrementa contador de resets
         }
       });
 
