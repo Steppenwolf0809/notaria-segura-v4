@@ -408,19 +408,30 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
             </Box>
 
             {/* Leyenda de verificación */}
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              align="center"
+            <Box
               sx={{
-                mt: 1.5,
-                maxWidth: 256,
-                margin: '12px auto 0',
-                lineHeight: 1.4
+                mt: 2,
+                p: 1.5,
+                borderRadius: 1,
+                bgcolor: 'grey.50',
+                border: '1px solid',
+                borderColor: 'grey.300',
+                maxWidth: 280,
+                mx: 'auto'
               }}
             >
-              Para verificar la autenticidad de esta escritura, escanee este código QR
-            </Typography>
+              <Typography
+                variant="body2"
+                color="text.primary"
+                align="center"
+                sx={{
+                  fontWeight: 500,
+                  lineHeight: 1.5
+                }}
+              >
+                Para verificar la autenticidad de esta escritura, escanee este código QR
+              </Typography>
+            </Box>
 
             <Box sx={{ mt: 2 }}>
               <Chip
