@@ -177,12 +177,6 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
       setProcessingRequest(true);
       let result;
 
-        actionType,
-        documentoIndividual: documentoIndividual?.id,
-        selectedDocuments: selectedDocuments.length,
-        timestamp: new Date().toISOString()
-      });
-
       // OPTIMISTIC UPDATE: Actualizar estado local inmediatamente
       if (actionType === 'individual' && documentoIndividual) {
 

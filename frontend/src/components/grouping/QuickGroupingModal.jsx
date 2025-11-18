@@ -69,11 +69,6 @@ const QuickGroupingModal = ({
   // Debug del modal
   React.useEffect(() => {
     if (open) {
-        open,
-        mainDocument: mainDocument?.protocolNumber,
-        relatedDocuments: relatedDocuments.map(d => d.protocolNumber),
-        totalDocuments: relatedDocuments.length + 1
-      });
       // Reset selección y documento actualizado cuando se abre
       setSelectedDocuments(new Set(relatedDocuments.map(doc => doc.id)));
       setUpdatedMainDocument(null);
