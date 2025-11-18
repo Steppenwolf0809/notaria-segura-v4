@@ -1,8 +1,9 @@
-// Cliente HTTP unificado (Axios) con manejo de auth y 401/403
+// Cliente HTTP unificado (Axios) con manejo de auth, CSRF y XSS protection
 
 import axios from 'axios';
 import { API_BASE } from '../utils/apiConfig';
 import csrfService from './csrf-service';
+import { sanitizeObject } from '../utils/sanitize';
 
 // Bandera local para evitar loops de refresh (si se habilita el flujo opcional)
 let isRefreshing = false;
@@ -97,9 +98,24 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Interceptor de respuesta: maneja 401 y trata 403 sin forzar logout
+// Interceptor de respuesta: sanitiza datos y maneja errores de autenticación
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // XSS Protection: Sanitizar datos de respuesta antes de llegar a componentes
+    if (response.data && typeof response.data === 'object') {
+      try {
+        // Sanitizar todo el objeto de respuesta
+        response.data = sanitizeObject(response.data);
+        // eslint-disable-next-line no-console
+        console.debug('[XSS] Respuesta sanitizada', { url: response.config.url });
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.warn('[XSS] Error sanitizando respuesta:', error);
+        // Continuar sin sanitización si falla (mejor que bloquear la app)
+      }
+    }
+    return response;
+  },
   async (error) => {
     const status = error?.response?.status;
     if (status === 401) {
