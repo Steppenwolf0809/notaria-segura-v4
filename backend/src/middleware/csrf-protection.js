@@ -34,9 +34,9 @@ const {
     return req.headers[HEADER_NAME] || req.body?._csrf;
   },
   getSessionIdentifier: (req) => {
-    // Usar el ID del usuario autenticado como identificador de sesión
-    // Si no hay usuario autenticado, usar la IP como fallback
-    return req.user?.id || req.ip || 'anonymous';
+    // Usar siempre la IP como identificador de sesión para mantener consistencia
+    // entre la generación del token (sin auth) y la validación (con auth)
+    return req.ip || 'anonymous';
   },
 });
 
