@@ -100,27 +100,69 @@ export async function registrarPersona(req, res) {
       where: { numeroIdentificacion: cedula }
     });
 
+    let persona;
+
     if (existente) {
-      return res.status(409).json({
-        success: false,
-        message: 'Esta cédula ya está registrada. Usa "Iniciar sesión" en su lugar.'
+      // Si la persona existe pero su PIN fue reseteado, permitir re-creación de PIN
+      if (!existente.pinCreado || !existente.pinHash) {
+        // Hash del nuevo PIN
+        const pinHash = await bcrypt.hash(pin, 10);
+
+        // Actualizar PIN y reactivar cuenta
+        persona = await prisma.personaRegistrada.update({
+          where: { id: existente.id },
+          data: {
+            pinHash,
+            pinCreado: true,
+            intentosFallidos: 0,      // Resetear intentos fallidos
+            bloqueadoHasta: null       // Desbloquear si estaba bloqueado
+          }
+        });
+
+        // Registrar en auditoría
+        await prisma.auditoriaPersona.create({
+          data: {
+            personaId: persona.id,
+            tipo: 'PIN_RECREADO',
+            descripcion: 'Usuario re-creó su PIN después de reseteo',
+            ipAddress: req.ip,
+            userAgent: req.get('User-Agent')
+          }
+        });
+      } else {
+        // PIN ya existe y está activo
+        return res.status(409).json({
+          success: false,
+          message: 'Esta cédula ya está registrada. Usa "Iniciar sesión" en su lugar.'
+        });
+      }
+    } else {
+      // Hash del PIN usando bcrypt (10 salt rounds = buen balance seguridad/performance)
+      const pinHash = await bcrypt.hash(pin, 10);
+
+      // Crear persona nueva en base de datos
+      persona = await prisma.personaRegistrada.create({
+        data: {
+          numeroIdentificacion: cedula,
+          tipoPersona,
+          pinHash,
+          pinCreado: true
+        }
+      });
+
+      // Registrar en auditoría
+      await prisma.auditoriaPersona.create({
+        data: {
+          personaId: persona.id,
+          tipo: 'REGISTRO',
+          descripcion: 'Usuario creó su cuenta',
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent')
+        }
       });
     }
 
-    // Hash del PIN usando bcrypt (10 salt rounds = buen balance seguridad/performance)
-    const pinHash = await bcrypt.hash(pin, 10);
-
-    // Crear persona en base de datos
-    const persona = await prisma.personaRegistrada.create({
-      data: {
-        numeroIdentificacion: cedula,
-        tipoPersona,
-        pinHash,
-        pinCreado: true
-      }
-    });
-
-    // Crear sesión automáticamente (auto-login después de registro)
+    // Crear sesión automáticamente (auto-login después de registro/re-creación)
     const tokenSesion = generarTokenSesion();
     const expiraEn = new Date(Date.now() + SECURITY_CONFIG.duracionSesion);
 
@@ -134,20 +176,11 @@ export async function registrarPersona(req, res) {
       }
     });
 
-    // Registrar en auditoría
-    await prisma.auditoriaPersona.create({
-      data: {
-        personaId: persona.id,
-        tipo: 'REGISTRO',
-        descripcion: 'Usuario creó su cuenta',
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent')
-      }
-    });
-
     res.status(201).json({
       success: true,
-      message: 'Cuenta creada exitosamente',
+      message: existente && !existente.pinCreado
+        ? 'PIN re-creado exitosamente'
+        : 'Cuenta creada exitosamente',
       sessionToken: tokenSesion,
       expiraEn: expiraEn.toISOString()
     });
@@ -204,6 +237,15 @@ export async function loginPersona(req, res) {
         success: false,
         message: `Cuenta bloqueada temporalmente. Intenta en ${minutosRestantes} minutos.`,
         bloqueadoHasta: persona.bloqueadoHasta.toISOString()
+      });
+    }
+
+    // Verificar si el PIN fue reseteado
+    if (!persona.pinCreado || !persona.pinHash) {
+      return res.status(403).json({
+        success: false,
+        message: 'Tu PIN ha sido reseteado. Por favor crea un nuevo PIN.',
+        pinReseteado: true
       });
     }
 
