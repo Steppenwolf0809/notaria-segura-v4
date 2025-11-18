@@ -2,6 +2,7 @@ import express from 'express';
 import multer from 'multer';
 import { authenticateToken } from '../middleware/auth-middleware.js';
 import { csrfProtection } from '../middleware/csrf-protection.js';
+import { documentsRateLimit } from '../middleware/rate-limiter.js';
 import {
   uploadXmlDocument,
   uploadXmlDocumentsBatch,
@@ -54,6 +55,9 @@ import {
 } from '../controllers/bulk-operations-controller.js';
 
 const router = express.Router();
+
+// Aplicar rate limiting a todas las rutas de documentos
+router.use(documentsRateLimit);
 
 // Configuración de multer para upload de archivos XML (individual)
 const upload = multer({
