@@ -99,6 +99,18 @@ REGLAS POR TIPO DE ACTO:
    - Otorgante calidad: "AUTORIZANTE"
    - Beneficiario calidad: "AUTORIZADO"
 
+🔹 REFORMA DE ESTATUTOS / CONSTITUCIÓN DE COMPAÑÍA:
+   - Otorgante calidad: "COMPARECIENTE"
+   - Beneficiarios: [] (array vacío, NO hay beneficiarios)
+
+🔹 AUMENTO DE CAPITAL / DISMINUCIÓN DE CAPITAL:
+   - Otorgante calidad: "COMPARECIENTE"
+   - Beneficiarios: [] (array vacío, NO hay beneficiarios)
+
+🔹 DISOLUCIÓN / LIQUIDACIÓN:
+   - Otorgante calidad: "COMPARECIENTE"
+   - Beneficiarios: [] (array vacío, NO hay beneficiarios)
+
 ═══════════════════════════════════════════════════════════════
 EJEMPLOS DE EXTRACCIÓN CORRECTA:
 ═══════════════════════════════════════════════════════════════
@@ -230,6 +242,31 @@ JSON CORRECTO:
   "notaria": ""
 }
 
+EJEMPLO 5 - REFORMA DE ESTATUTOS (SIN BENEFICIARIOS):
+─────────────────────────────────────────────────────────────
+TEXTO:
+"ESCRITURA PÚBLICA DE REFORMA DE ESTATUTOS que otorga la compañía
+AMADEUSGLOBAL ECUADOR S.A. ante Notaria GLENDA ELIZABETH ZAPATA SILVA,
+Notaria Décima Octava del Cantón Quito"
+
+JSON CORRECTO:
+{
+  "acto_o_contrato": "REFORMA DE ESTATUTOS",
+  "otorgantes": [{
+    "apellidos": "AMADEUSGLOBAL ECUADOR S.A.",
+    "nombres": "",
+    "genero": null,
+    "calidad": "COMPARECIENTE",
+    "tipo_persona": "Jurídica"
+  }],
+  "beneficiarios": [],
+  "notario": "GLENDA ELIZABETH ZAPATA SILVA",
+  "notaria": "DÉCIMA OCTAVA DEL CANTÓN QUITO"
+}
+
+NOTA: En REFORMA DE ESTATUTOS NO hay beneficiarios, solo comparecientes.
+      NO confundas datos de ubicación con beneficiarios.
+
 ═══════════════════════════════════════════════════════════════
 VALIDACIONES CRÍTICAS (DEBES CUMPLIRLAS):
 ═══════════════════════════════════════════════════════════════
@@ -252,9 +289,19 @@ CASOS ESPECIALES:
 
 🔸 Si hay palabras como "a favor de", "en beneficio de":
    → Lo que sigue es beneficiario
+   → NUNCA confundas ubicaciones con beneficiarios
 
 🔸 Si NO hay beneficiarios claros:
    → Dejar array vacío []
+   → Ejemplos sin beneficiarios: REFORMA DE ESTATUTOS, CONSTITUCIÓN, AUMENTO DE CAPITAL
+
+🔸 NUNCA incluyas como beneficiarios:
+   → Datos de ubicación (PROVINCIA, CANTÓN, PARROQUIA, QUITO, PICHINCHA)
+   → Cargos o títulos (GERENTE, PRESIDENTE, REPRESENTANTE LEGAL)
+   → Fechas, números, o códigos
+
+🔸 Si detectas texto sospechoso como beneficiario (ej: "QUITOQUITOPICHINCHA"):
+   → Ignóralo y deja beneficiarios vacío []
 
 🔸 Si aparecen múltiples actos en el mismo documento:
    → Extraer solo el PRIMER acto principal
