@@ -27,6 +27,7 @@ import DocumentCenter from './DocumentCenter';
 import MatrizadorCenter from './MatrizadorCenter';
 import RecepcionCenter from './RecepcionCenter';
 import ReceptionCenter from './ReceptionCenter';
+import RecepcionMain from './recepcion/RecepcionMain';
 import ArchivoCenter from './ArchivoCenter';
 import AdminCenter from './AdminCenter';
 import ChangePassword from './ChangePassword';
@@ -140,7 +141,7 @@ const Dashboard = () => {
     if (uiV2) {
       return (
         <RecepcionLayout currentView="documentos" onViewChange={() => {}}>
-          <ReceptionCenter />
+          <RecepcionMain />
         </RecepcionLayout>
       );
     } else {

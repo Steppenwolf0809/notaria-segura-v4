@@ -8,7 +8,7 @@ export const navItemsByRole = {
     { id: 'subir-xml', label: 'Subir XML', view: 'uploads', icon: 'CloudUpload' }
   ],
   RECEPCION: [
-    { id: 'dashboard', label: 'Dashboard', view: 'dashboard', icon: 'Dashboard' },
+    // Dashboard removido - Las estadísticas están integradas en la vista principal
     { id: 'documentos', label: 'Gestión de Documentos', view: 'documentos', icon: 'Assignment' },
     { id: 'notificaciones', label: 'Historial WhatsApp', view: 'notificaciones', icon: 'WhatsApp' }
   ],
