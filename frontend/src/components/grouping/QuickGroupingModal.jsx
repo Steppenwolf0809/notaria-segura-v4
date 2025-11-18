@@ -42,15 +42,18 @@ import {
  * 🎨 MODAL PROFESIONAL DE AGRUPACIÓN CON CHECKBOXES
  * Modal rediseñado con paleta corporativa y selección granular
  */
-const QuickGroupingModal = ({ 
-  open, 
-  onClose, 
+const QuickGroupingModal = ({
+  open,
+  onClose,
   mainDocument,
   relatedDocuments = [],
   onConfirm,
   onDocumentUpdated, // Nuevo prop para notificar actualizaciones
-  loading = false 
+  loading = false
 }) => {
+  // 🚫 DESHABILITADO: Modal de agrupación desactivado
+  return null;
+
   const [confirming, setConfirming] = useState(false);
   const [selectedDocuments, setSelectedDocuments] = useState(
     new Set(relatedDocuments.map(doc => doc.id))

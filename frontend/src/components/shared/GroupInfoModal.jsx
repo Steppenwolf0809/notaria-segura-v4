@@ -41,6 +41,9 @@ import documentService from '../../services/document-service';
  * Se activa al hacer click en "Parte de un grupo"
  */
 const GroupInfoModal = ({ open, onClose, document, onUngrouped }) => {
+  // 🚫 DESHABILITADO: Modal de información de grupo desactivado
+  return null;
+
   const [groupDocuments, setGroupDocuments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [ungroupLoading, setUngroupLoading] = useState(false);
