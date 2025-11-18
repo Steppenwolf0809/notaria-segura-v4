@@ -1,5 +1,6 @@
 import express from 'express';
 import { authenticateToken, requireRoles } from '../middleware/auth-middleware.js';
+import { csrfProtection } from '../middleware/csrf-protection.js';
 import {
   dashboardArchivo,
   listarMisDocumentos,
@@ -51,15 +52,17 @@ router.get('/mis-documentos', authenticateToken, requireArchivo, listarMisDocume
  * @param id - ID del documento a actualizar
  * @body nuevoEstado - Nuevo estado del documento
  * @access Private (ARCHIVO only)
+ * @csrf Protected - Requiere token CSRF
  */
-router.post('/documentos/:id/estado', authenticateToken, requireArchivo, cambiarEstadoDocumento);
+router.post('/documentos/:id/estado', authenticateToken, requireArchivo, csrfProtection, cambiarEstadoDocumento);
 
 /**
  * @route POST /api/archivo/documentos/marcar-listos
  * @desc Cambiar a LISTO varios documentos asignados (archivo) con WhatsApp por cliente
  * @access Private (ARCHIVO only)
+ * @csrf Protected - Requiere token CSRF
  */
-router.post('/documentos/marcar-listos', authenticateToken, requireArchivo, marcarVariosListosArchivo);
+router.post('/documentos/marcar-listos', authenticateToken, requireArchivo, csrfProtection, marcarVariosListosArchivo);
 
 /**
  * @route POST /api/archivo/documentos/:id/entregar
@@ -73,8 +76,9 @@ router.post('/documentos/marcar-listos', authenticateToken, requireArchivo, marc
  * @body facturaPresenta - Si presentó factura
  * @body observaciones - Observaciones adicionales
  * @access Private (ARCHIVO only)
+ * @csrf Protected - Requiere token CSRF
  */
-router.post('/documentos/:id/entregar', authenticateToken, requireArchivo, procesarEntregaDocumento);
+router.post('/documentos/:id/entregar', authenticateToken, requireArchivo, csrfProtection, procesarEntregaDocumento);
 
 /**
  * @route POST /api/archivo/documentos/:id/revertir-estado
