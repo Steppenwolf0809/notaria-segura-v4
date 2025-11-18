@@ -738,10 +738,6 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
    * Manejar agrupación inteligente detectada automáticamente
    */
   const handleGroupDocuments = async (groupableDocuments, mainDocument) => {
-      main: mainDocument.protocolNumber || mainDocument.id,
-      groupable: groupableDocuments.map(d => d.protocolNumber || d.id)
-    });
-    
     setPendingGroupData({
       main: mainDocument,
       related: groupableDocuments

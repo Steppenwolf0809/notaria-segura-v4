@@ -126,17 +126,10 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
             a_favor_de: sanitizePersonas(parsed.otorgantes.a_favor_de || [])
           };
           parsed.otorgantes = otorgantesLimpios;
-            otorgadoPor: otorgantesLimpios.otorgado_por.length,
-            aFavorDe: otorgantesLimpios.a_favor_de.length
-          });
         }
-        
+
         setFormData(parsed);
         setOriginalData(parsed);
-          acto: parsed.acto?.substring(0, 30) + '...',
-          numeroEscritura: parsed.escritura,
-          cuantia: parsed.cuantia
-        });
       } catch (e) {
         setError('Error al cargar los datos extraídos');
       }

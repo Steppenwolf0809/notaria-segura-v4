@@ -71,9 +71,6 @@ const useBulkActions = () => {
         
         if (currentCommonStatus && currentCommonStatus !== documentStatus) {
           // Si hay documentos seleccionados de diferente estado, limpiar selección
-            current: currentCommonStatus,
-            attempting: documentStatus
-          });
           newSelection.clear();
         }
         
@@ -85,12 +82,7 @@ const useBulkActions = () => {
           setBulkActionMode(true);
         }
       }
-      
-        count: newSelection.size,
-        documents: Array.from(newSelection),
-        bulkMode: newSelection.size > 0
-      });
-      
+
       return newSelection;
     });
   }, [bulkActionMode, getCommonStatus]);
@@ -112,12 +104,6 @@ const useBulkActions = () => {
       const newSelection = new Set(compatibleDocs.map(doc => doc.id));
       setSelectedDocuments(newSelection);
       setBulkActionMode(newSelection.size > 0);
-      
-        total: documents.length,
-        compatible: compatibleDocs.length,
-        selected: newSelection.size,
-        referenceStatus
-      });
     } else {
       // Deseleccionar todos
       setSelectedDocuments(new Set());

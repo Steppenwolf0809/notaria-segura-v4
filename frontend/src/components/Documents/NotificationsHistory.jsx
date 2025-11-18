@@ -124,10 +124,6 @@ const NotificationsHistory = () => {
         setNotifications(response.data.notifications || []);
         setTotalNotifications(response.data.pagination?.total || 0);
         setStats(response.data.stats || stats);
-          notificationsCount: response.data.notifications?.length || 0,
-          total: response.data.pagination?.total || 0,
-          stats: response.data.stats
-        });
       } else {
         setNotifications([]);
       }
