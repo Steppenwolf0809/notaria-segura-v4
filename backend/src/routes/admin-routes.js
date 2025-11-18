@@ -53,6 +53,7 @@ import {
   adminRateLimit,
   addRateLimitHeaders
 } from '../middleware/rate-limiter.js';
+import { csrfProtection } from '../middleware/csrf-protection.js';
 import cache from '../services/cache-service.js';
 
 const router = express.Router();
@@ -97,33 +98,37 @@ router.get('/users/:id', getUserById);
  * @route POST /api/admin/users
  * @desc Crear un nuevo usuario
  * @access Private (ADMIN only)
+ * @csrf Protected - Requiere token CSRF
  * @body email, password, firstName, lastName, role
  */
-router.post('/users', createUser);
+router.post('/users', csrfProtection, createUser);
 
 /**
  * @route PUT /api/admin/users/:id
  * @desc Actualizar un usuario existente
  * @access Private (ADMIN only)
+ * @csrf Protected - Requiere token CSRF
  * @body email?, firstName?, lastName?, role?, password?
  */
-router.put('/users/:id', updateUser);
+router.put('/users/:id', csrfProtection, updateUser);
 
 /**
  * @route PATCH /api/admin/users/:id/status
  * @desc Activar/desactivar un usuario
  * @access Private (ADMIN only)
+ * @csrf Protected - Requiere token CSRF
  * @body isActive (boolean)
  */
-router.patch('/users/:id/status', toggleUserStatus);
+router.patch('/users/:id/status', csrfProtection, toggleUserStatus);
 
 /**
  * @route DELETE /api/admin/users/:id
  * @desc Eliminar un usuario (hard delete)
  * @access Private (ADMIN only)
+ * @csrf Protected - Requiere token CSRF
  * @warning Esta acción es irreversible
  */
-router.delete('/users/:id', deleteUser);
+router.delete('/users/:id', csrfProtection, deleteUser);
 
 // ============================================================================
 // RUTAS DE SUPERVISIÓN DE DOCUMENTOS - ADMIN OVERSIGHT
@@ -184,18 +189,20 @@ router.get('/documents/export', exportDocuments);
  * @route DELETE /api/admin/documents/:id
  * @desc Eliminar un documento específico (hard delete)
  * @access Private (ADMIN only)
+ * @csrf Protected - Requiere token CSRF
  * @warning Esta acción es irreversible y eliminará el documento y todos sus eventos asociados
  */
-router.delete('/documents/:id', deleteDocument);
+router.delete('/documents/:id', csrfProtection, deleteDocument);
 
 /**
  * @route POST /api/admin/documents/bulk-delete
  * @desc Eliminar múltiples documentos en lote
  * @access Private (ADMIN only)
+ * @csrf Protected - Requiere token CSRF
  * @body documentIds - Array de IDs de documentos a eliminar
  * @warning Esta acción es irreversible
  */
-router.post('/documents/bulk-delete', bulkDeleteDocuments);
+router.post('/documents/bulk-delete', csrfProtection, bulkDeleteDocuments);
 
 // ============================================================================
 // RUTAS DE GESTIÓN DE NOTIFICACIONES - ADMIN
@@ -226,22 +233,25 @@ router.get('/notifications/templates', getNotificationTemplates);
  * @route POST /api/admin/notifications/templates
  * @desc Crear plantilla de notificación
  * @access Private (ADMIN only)
+ * @csrf Protected - Requiere token CSRF
  */
-router.post('/notifications/templates', createNotificationTemplate);
+router.post('/notifications/templates', csrfProtection, createNotificationTemplate);
 
 /**
  * @route PUT /api/admin/notifications/templates/:templateId
  * @desc Actualizar plantilla de notificación
  * @access Private (ADMIN only)
+ * @csrf Protected - Requiere token CSRF
  */
-router.put('/notifications/templates/:templateId', updateNotificationTemplate);
+router.put('/notifications/templates/:templateId', csrfProtection, updateNotificationTemplate);
 
 /**
  * @route DELETE /api/admin/notifications/templates/:templateId
  * @desc Eliminar plantilla de notificación
  * @access Private (ADMIN only)
+ * @csrf Protected - Requiere token CSRF
  */
-router.delete('/notifications/templates/:templateId', deleteNotificationTemplate);
+router.delete('/notifications/templates/:templateId', csrfProtection, deleteNotificationTemplate);
 
 /**
  * @route POST /api/admin/notifications/test
@@ -378,24 +388,27 @@ router.get('/whatsapp-templates/:id', getTemplate);
  * @route POST /api/admin/whatsapp-templates
  * @desc Crear nuevo template WhatsApp
  * @access Private (ADMIN only)
+ * @csrf Protected - Requiere token CSRF
  * @body tipo, titulo, mensaje, activo?
  */
-router.post('/whatsapp-templates', createTemplate);
+router.post('/whatsapp-templates', csrfProtection, createTemplate);
 
 /**
  * @route PUT /api/admin/whatsapp-templates/:id
  * @desc Actualizar template WhatsApp existente
  * @access Private (ADMIN only)
+ * @csrf Protected - Requiere token CSRF
  * @body titulo?, mensaje?, activo?
  */
-router.put('/whatsapp-templates/:id', updateTemplate);
+router.put('/whatsapp-templates/:id', csrfProtection, updateTemplate);
 
 /**
  * @route DELETE /api/admin/whatsapp-templates/:id
  * @desc Eliminar template WhatsApp
  * @access Private (ADMIN only)
+ * @csrf Protected - Requiere token CSRF
  */
-router.delete('/whatsapp-templates/:id', deleteTemplate);
+router.delete('/whatsapp-templates/:id', csrfProtection, deleteTemplate);
 
 /**
  * @route PATCH /api/admin/whatsapp-templates/:id/toggle

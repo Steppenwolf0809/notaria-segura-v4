@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticateToken, requireRoles } from '../middleware/auth-middleware.js';
 import { verifyFormularioUAFESession } from '../middleware/verify-formulario-uafe-session.js';
+import { csrfProtection } from '../middleware/csrf-protection.js';
 import {
   crearProtocolo,
   agregarPersonaAProtocolo,
@@ -48,8 +49,9 @@ router.get('/buscar-representado/:identificacion', buscarRepresentado);
  * Enviar respuesta del formulario
  * POST /api/formulario-uafe/responder
  * Requiere: x-session-token en headers
+ * CSRF Protected - Requiere token CSRF
  */
-router.post('/responder', verifyFormularioUAFESession, responderFormulario);
+router.post('/responder', verifyFormularioUAFESession, csrfProtection, responderFormulario);
 
 // ========================================
 // RUTAS PROTEGIDAS - Matrizador/Admin
@@ -59,11 +61,13 @@ router.post('/responder', verifyFormularioUAFESession, responderFormulario);
  * Crear nuevo protocolo
  * POST /api/formulario-uafe/protocolo
  * Requiere: JWT + role MATRIZADOR o ADMIN
+ * CSRF Protected - Requiere token CSRF
  */
 router.post(
   '/protocolo',
   authenticateToken,
   requireRoles(['MATRIZADOR', 'ADMIN']),
+  csrfProtection,
   crearProtocolo
 );
 
@@ -71,11 +75,13 @@ router.post(
  * Agregar persona a un protocolo
  * POST /api/formulario-uafe/protocolo/:protocoloId/persona
  * Requiere: JWT + role MATRIZADOR o ADMIN
+ * CSRF Protected - Requiere token CSRF
  */
 router.post(
   '/protocolo/:protocoloId/persona',
   authenticateToken,
   requireRoles(['MATRIZADOR', 'ADMIN']),
+  csrfProtection,
   agregarPersonaAProtocolo
 );
 
@@ -95,11 +101,13 @@ router.get(
  * Actualizar protocolo
  * PUT /api/formulario-uafe/protocolo/:protocoloId
  * Requiere: JWT + role MATRIZADOR o ADMIN
+ * CSRF Protected - Requiere token CSRF
  */
 router.put(
   '/protocolo/:protocoloId',
   authenticateToken,
   requireRoles(['MATRIZADOR', 'ADMIN']),
+  csrfProtection,
   actualizarProtocolo
 );
 
@@ -107,11 +115,13 @@ router.put(
  * Actualizar persona en protocolo (cambiar rol/calidad)
  * PUT /api/formulario-uafe/protocolo/:protocoloId/persona/:personaProtocoloId
  * Requiere: JWT + role MATRIZADOR o ADMIN
+ * CSRF Protected - Requiere token CSRF
  */
 router.put(
   '/protocolo/:protocoloId/persona/:personaProtocoloId',
   authenticateToken,
   requireRoles(['MATRIZADOR', 'ADMIN']),
+  csrfProtection,
   actualizarPersonaEnProtocolo
 );
 
@@ -119,11 +129,13 @@ router.put(
  * Eliminar persona de un protocolo
  * DELETE /api/formulario-uafe/protocolo/:protocoloId/persona/:personaProtocoloId
  * Requiere: JWT + role MATRIZADOR o ADMIN
+ * CSRF Protected - Requiere token CSRF
  */
 router.delete(
   '/protocolo/:protocoloId/persona/:personaProtocoloId',
   authenticateToken,
   requireRoles(['MATRIZADOR', 'ADMIN']),
+  csrfProtection,
   eliminarPersonaDeProtocolo
 );
 
@@ -217,11 +229,13 @@ router.get(
  * Eliminar un protocolo completo (solo para ADMIN)
  * DELETE /api/formulario-uafe/admin/protocolo/:protocoloId
  * Requiere: JWT + role ADMIN
+ * CSRF Protected - Requiere token CSRF
  */
 router.delete(
   '/admin/protocolo/:protocoloId',
   authenticateToken,
   requireRoles(['ADMIN']),
+  csrfProtection,
   eliminarProtocolo
 );
 

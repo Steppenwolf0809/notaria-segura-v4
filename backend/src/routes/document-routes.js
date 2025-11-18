@@ -1,6 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import { authenticateToken } from '../middleware/auth-middleware.js';
+import { csrfProtection } from '../middleware/csrf-protection.js';
 import {
   uploadXmlDocument,
   uploadXmlDocumentsBatch,
@@ -94,11 +95,11 @@ const uploadBatch = multer({
  * RUTAS PROTEGIDAS - Todas requieren autenticación
  */
 
-// POST /api/documents/upload-xml - CAJA: Subir y procesar XML automáticamente
-router.post('/upload-xml', authenticateToken, upload.single('xmlFile'), uploadXmlDocument);
+// POST /api/documents/upload-xml - CAJA: Subir y procesar XML automáticamente (CSRF Protected)
+router.post('/upload-xml', authenticateToken, csrfProtection, upload.single('xmlFile'), uploadXmlDocument);
 
-// POST /api/documents/upload-xml-batch - CAJA: Subir y procesar múltiples XML en lote
-router.post('/upload-xml-batch', authenticateToken, uploadBatch.array('xmlFiles', 20), uploadXmlDocumentsBatch);
+// POST /api/documents/upload-xml-batch - CAJA: Subir y procesar múltiples XML en lote (CSRF Protected)
+router.post('/upload-xml-batch', authenticateToken, csrfProtection, uploadBatch.array('xmlFiles', 20), uploadXmlDocumentsBatch);
 
 // GET /api/documents/all - CAJA/ADMIN: Ver todos los documentos
 router.get('/all', authenticateToken, getAllDocuments);
@@ -115,14 +116,14 @@ router.get('/my-documents', authenticateToken, getMyDocuments);
 // 💳 PUT /api/documents/:id/nota-credito - CAJA: Marcar como Nota de Crédito (ANTES DE /:id/assign)
 router.put('/:id/nota-credito', authenticateToken, markAsNotaCredito);
 
-// PUT /api/documents/:id/assign - CAJA: Asignar documento a matrizador
-router.put('/:id/assign', authenticateToken, assignDocument);
+// PUT /api/documents/:id/assign - CAJA: Asignar documento a matrizador (CSRF Protected)
+router.put('/:id/assign', authenticateToken, csrfProtection, assignDocument);
 
-// 🔗 PUT /api/documents/group/status - Actualizar estado de grupo de documentos (DEBE IR ANTES QUE /:id/status)
-router.put('/group/status', authenticateToken, updateDocumentGroupStatus);
+// 🔗 PUT /api/documents/group/status - Actualizar estado de grupo de documentos (CSRF Protected)
+router.put('/group/status', authenticateToken, csrfProtection, updateDocumentGroupStatus);
 
-// PUT /api/documents/:id/status - MATRIZADOR: Actualizar estado
-router.put('/:id/status', authenticateToken, updateDocumentStatus);
+// PUT /api/documents/:id/status - MATRIZADOR: Actualizar estado (CSRF Protected)
+router.put('/:id/status', authenticateToken, csrfProtection, updateDocumentStatus);
 
 // 🔄 POST /api/documents/:id/revert - Revertir estado de documento con razón
 router.post('/:id/revert', authenticateToken, revertDocumentStatus);
