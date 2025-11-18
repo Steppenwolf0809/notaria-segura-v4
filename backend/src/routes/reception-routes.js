@@ -1,5 +1,6 @@
 import express from 'express';
 import { authenticateToken, requireRoles } from '../middleware/auth-middleware.js';
+import { csrfProtection } from '../middleware/csrf-protection.js';
 import {
   getMatrizadores,
   listarTodosDocumentos,
@@ -69,16 +70,18 @@ router.get('/documentos/en-proceso', authenticateToken, requireRecepcion, getDoc
  * @desc Marcar documento individual como listo (EN_PROCESO → LISTO)
  * @param id - ID del documento a marcar como listo
  * @access Private (RECEPCION only)
+ * @csrf Protected - Requiere token CSRF
  */
-router.post('/documentos/:id/marcar-listo', authenticateToken, requireRecepcion, marcarComoListo);
+router.post('/documentos/:id/marcar-listo', authenticateToken, requireRecepcion, csrfProtection, marcarComoListo);
 
 /**
  * @route POST /api/reception/documentos/marcar-grupo-listo
  * @desc Marcar múltiples documentos del mismo cliente como listos con código compartido
  * @body documentIds - Array de IDs de documentos (obligatorio, mismo cliente)
  * @access Private (RECEPCION only)
+ * @csrf Protected - Requiere token CSRF
  */
-router.post('/documentos/marcar-grupo-listo', authenticateToken, requireRecepcion, marcarGrupoListo);
+router.post('/documentos/marcar-grupo-listo', authenticateToken, requireRecepcion, csrfProtection, marcarGrupoListo);
 
 /**
  * @route POST /api/reception/documentos/marcar-listos
@@ -86,16 +89,18 @@ router.post('/documentos/marcar-grupo-listo', authenticateToken, requireRecepcio
  *        Envío de WhatsApp: un mensaje por cada cliente.
  * @body { documentIds: string[], sendNotifications?: boolean }
  * @access Private (RECEPCION only)
+ * @csrf Protected - Requiere token CSRF
  */
-router.post('/documentos/marcar-listos', authenticateToken, requireRecepcion, marcarVariosListos);
+router.post('/documentos/marcar-listos', authenticateToken, requireRecepcion, csrfProtection, marcarVariosListos);
 
 /**
  * @route POST /api/reception/documentos/desagrupar
  * @desc Desagrupar documentos que están agrupados, asignando códigos individuales
  * @body documentIds - Array de IDs de documentos agrupados
  * @access Private (RECEPCION only)
+ * @csrf Protected - Requiere token CSRF
  */
-router.post('/documentos/desagrupar', authenticateToken, requireRecepcion, desagruparDocumentos);
+router.post('/documentos/desagrupar', authenticateToken, requireRecepcion, csrfProtection, desagruparDocumentos);
 
 /**
  * @route GET /api/reception/matrizadores
