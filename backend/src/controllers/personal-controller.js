@@ -1,6 +1,7 @@
 import { getPrismaClient } from '../db.js';
 import bcrypt from 'bcrypt';
 import { validarPIN, generarTokenSesion } from '../utils/pin-validator.js';
+import logger from '../utils/logger.js';
 
 const prisma = getPrismaClient();
 
@@ -35,7 +36,7 @@ export async function verificarCedula(req, res) {
       tipoPersona: persona?.tipoPersona || null
     });
   } catch (error) {
-    console.error('Error verificando cédula:', error);
+    logger.error('Error verificando cédula:', error);
     res.status(500).json({
       success: false,
       message: 'Error al verificar cédula'
@@ -185,7 +186,7 @@ export async function registrarPersona(req, res) {
       expiraEn: expiraEn.toISOString()
     });
   } catch (error) {
-    console.error('Error registrando persona:', error);
+    logger.error('Error registrando persona:', error);
     res.status(500).json({
       success: false,
       message: 'Error al crear cuenta'
@@ -341,7 +342,7 @@ export async function loginPersona(req, res) {
       expiraEn: expiraEn.toISOString()
     });
   } catch (error) {
-    console.error('Error en login:', error);
+    logger.error('Error en login:', error);
     res.status(500).json({
       success: false,
       message: 'Error al iniciar sesión'
@@ -385,7 +386,7 @@ export async function obtenerMiInformacion(req, res) {
       data: persona
     });
   } catch (error) {
-    console.error('Error obteniendo información:', error);
+    logger.error('Error obteniendo información:', error);
     res.status(500).json({
       success: false,
       message: 'Error al obtener información'
@@ -452,7 +453,7 @@ export async function actualizarMiInformacion(req, res) {
       }
     });
   } catch (error) {
-    console.error('Error actualizando información:', error);
+    logger.error('Error actualizando información:', error);
     res.status(500).json({
       success: false,
       message: 'Error al actualizar información'
@@ -483,7 +484,7 @@ export async function logoutPersona(req, res) {
       message: 'Sesión cerrada correctamente'
     });
   } catch (error) {
-    console.error('Error en logout:', error);
+    logger.error('Error en logout:', error);
     res.status(500).json({
       success: false,
       message: 'Error al cerrar sesión'
@@ -541,7 +542,7 @@ export async function buscarPersonaPorCedula(req, res) {
       }
     });
   } catch (error) {
-    console.error('Error buscando persona:', error);
+    logger.error('Error buscando persona:', error);
     res.status(500).json({
       success: false,
       message: 'Error al buscar persona'
@@ -652,7 +653,7 @@ export async function resetearPIN(req, res) {
       }
     });
   } catch (error) {
-    console.error('Error reseteando PIN:', error);
+    logger.error('Error reseteando PIN:', error);
     res.status(500).json({
       success: false,
       message: 'Error al resetear PIN'
