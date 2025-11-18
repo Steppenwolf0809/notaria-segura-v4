@@ -1,6 +1,7 @@
 import { getPrismaClient } from '../db.js';
 import { Prisma } from '@prisma/client';
 import { getReversionCleanupData, isValidStatus, isReversion as isReversionFn, STATUS_ORDER_LIST } from '../utils/status-transitions.js';
+import logger from '../utils/logger.js';
 
 const prisma = getPrismaClient();
 import whatsappService from '../services/whatsapp-service.js';
@@ -16,7 +17,7 @@ async function supportsUnaccentFn() {
     await prisma.$queryRaw`SELECT unaccent('áéíóúÁÉÍÓÚ')`;
     UNACCENT_SUPPORTED = true;
   } catch (e) {
-    console.warn('Extensión unaccent no disponible. Búsqueda acento-insensible desactivada.');
+    logger.warn('Extensión unaccent no disponible. Búsqueda acento-insensible desactivada.');
     UNACCENT_SUPPORTED = false;
   }
   return UNACCENT_SUPPORTED;
@@ -76,7 +77,7 @@ async function getDashboardStats(req, res) {
       }
     });
   } catch (error) {
-    console.error('Error obteniendo estadísticas del dashboard:', error);
+    logger.error('Error obteniendo estadísticas del dashboard:', error);
     res.status(500).json({ success: false, error: 'Error interno del servidor' });
   }
 }
@@ -96,7 +97,7 @@ async function getMatrizadores(req, res) {
       data: { matrizadores }
     });
   } catch (error) {
-    console.error('Error obteniendo matrizadores:', error);
+    logger.error('Error obteniendo matrizadores:', error);
     res.status(500).json({ success: false, error: 'Error interno del servidor' });
   }
 }
@@ -346,7 +347,7 @@ async function listarTodosDocumentos(req, res) {
     res.json({ success: true, data: payload });
 
   } catch (error) {
-    console.error('Error listando todos los documentos:', error);
+    logger.error('Error listando todos los documentos:', error);
     res.status(500).json({ success: false, error: 'Error interno del servidor' });
   }
 }
@@ -498,7 +499,7 @@ async function getDocumentosEnProceso(req, res) {
     res.json({ success: true, data: payload });
 
   } catch (error) {
-    console.error('Error obteniendo documentos en proceso:', error);
+    logger.error('Error obteniendo documentos en proceso:', error);
     res.status(500).json({ success: false, error: 'Error interno del servidor' });
   }
 }
@@ -506,13 +507,8 @@ async function getDocumentosEnProceso(req, res) {
 async function marcarComoListo(req, res) {
     try {
         const { id } = req.params;
-        
-        console.log('🎯 marcarComoListo iniciado:', {
-            documentId: id,
-            userId: req.user.id,
-            userRole: req.user.role,
-            timestamp: new Date().toISOString()
-        });
+
+        logger.debug('marcarComoListo iniciado para documento:', id);
         
         const document = await prisma.document.findUnique({ 
             where: { id },
@@ -524,24 +520,14 @@ async function marcarComoListo(req, res) {
         });
 
         if (!document) {
-            console.log('❌ Documento no encontrado:', id);
+            logger.warn('Documento no encontrado:', id);
             return res.status(404).json({ success: false, message: 'Documento no encontrado' });
         }
-        
-        console.log('📄 Documento encontrado:', {
-            id: document.id,
-            currentStatus: document.status,
-            protocolNumber: document.protocolNumber,
-            clientName: document.clientName,
-            documentGroupId: document.documentGroupId,
-            isGrouped: document.isGrouped
-        });
+
+        logger.debug('Documento encontrado con estado:', document.status);
         
         if (document.status !== 'EN_PROCESO') {
-            console.log('❌ Estado incorrecto:', {
-                expectedStatus: 'EN_PROCESO',
-                actualStatus: document.status
-            });
+            logger.warn('Estado incorrecto para marcar como listo:', document.status);
             return res.status(400).json({ success: false, message: `El documento no está en proceso. Estado actual: ${document.status}` });
         }
 
@@ -551,9 +537,7 @@ async function marcarComoListo(req, res) {
         
         // Verificar si el documento pertenece a un grupo y propagar el cambio
         if (document.documentGroupId) {
-            console.log('🔗 Documento agrupado detectado - Iniciando propagación de estado:', {
-                documentGroupId: document.documentGroupId
-            });
+            logger.debug('Documento agrupado - iniciando propagación de estado');
 
             try {
                 // Obtener todos los documentos del mismo grupo
@@ -569,7 +553,7 @@ async function marcarComoListo(req, res) {
                     }
                 });
 
-                console.log(`📋 Encontrados ${groupDocuments.length} documentos en el grupo para actualizar`);
+                logger.debug(`Encontrados ${groupDocuments.length} documentos en el grupo`);
 
                 // Generar códigos únicos para cada documento si no los tienen
                 const documentsToUpdate = [];
@@ -579,7 +563,6 @@ async function marcarComoListo(req, res) {
                         codigoRetiro = doc.verificationCode;
                     } else {
                         codigoRetiro = await CodigoRetiroService.generarUnico();
-                        console.log(`🎯 Código generado para ${doc.protocolNumber}: ${codigoRetiro}`);
                     }
                     
                     documentsToUpdate.push({
@@ -612,7 +595,7 @@ async function marcarComoListo(req, res) {
                 });
 
                 groupAffected = true;
-                console.log(`✅ ${updatedDocuments.length} documentos del grupo actualizados exitosamente`);
+                logger.debug(`${updatedDocuments.length} documentos del grupo actualizados`);
 
                 // Registrar eventos de auditoría para todos los documentos afectados
                 for (let i = 0; i < updatedDocuments.length; i++) {
@@ -641,12 +624,12 @@ async function marcarComoListo(req, res) {
                             }
                         });
                     } catch (auditError) {
-                        console.error(`Error registrando evento para documento ${doc.id}:`, auditError);
+                        logger.error('Error registrando evento de auditoría:', auditError);
                     }
                 }
 
             } catch (error) {
-                console.error('❌ Error en propagación grupal:', error);
+                logger.error('Error en propagación grupal:', error);
                 return res.status(500).json({
                     success: false,
                     message: 'Error propagando cambio de estado a documentos agrupados',
@@ -655,11 +638,8 @@ async function marcarComoListo(req, res) {
             }
         } else {
             // Documento individual - comportamiento original
-            console.log('🔐 Generando código de retiro...');
+            logger.debug('Generando código de retiro para documento individual');
             const nuevoCodigo = await CodigoRetiroService.generarUnico();
-            console.log('✅ Código generado:', nuevoCodigo);
-
-            console.log('💾 Actualizando documento en base de datos...');
             // Usar transacción para evitar condiciones de carrera
             const updatedDocument = await prisma.$transaction(async (tx) => {
                 // Verificar nuevamente el estado dentro de la transacción
@@ -674,19 +654,15 @@ async function marcarComoListo(req, res) {
                     data: { status: 'LISTO', codigoRetiro: nuevoCodigo, updatedAt: new Date() }
                 });
             });
-            
+
             updatedDocuments = [updatedDocument];
-            console.log('✅ Documento actualizado exitosamente:', {
-                id: updatedDocument.id,
-                newStatus: updatedDocument.status,
-                codigoRetiro: updatedDocument.codigoRetiro
-            });
+            logger.debug('Documento actualizado exitosamente');
         }
 
         // 📱 ENVIAR NOTIFICACIÓN WHATSAPP (respetar política no_notificar)
         try {
             if (document.notificationPolicy === 'no_notificar') {
-                console.log('🔕 RECEPCIÓN: Política no_notificar activa, se omite WhatsApp (LISTO)');
+                logger.debug('Política no_notificar activa, omitiendo WhatsApp');
             } else {
             const clienteData = {
                 clientName: document.clientName,
@@ -695,13 +671,13 @@ async function marcarComoListo(req, res) {
 
             if (groupAffected) {
                 // Notificación grupal - enviar información de todos los documentos
-                const whatsappResult = await whatsappService.enviarGrupoDocumentosListo(
+                await whatsappService.enviarGrupoDocumentosListo(
                     clienteData,
                     updatedDocuments,
                     updatedDocuments[0].codigoRetiro // Usar el código del primer documento como referencia
                 );
 
-                console.log('✅ Notificación WhatsApp grupal enviada:', whatsappResult.messageId || 'simulado');
+                logger.debug('Notificación WhatsApp grupal enviada');
             } else {
                 // Notificación individual
                 const documentoData = {
@@ -711,33 +687,26 @@ async function marcarComoListo(req, res) {
                     actoPrincipalValor: document.actoPrincipalValor
                 };
 
-                const whatsappResult = await whatsappService.enviarDocumentoListo(
-                    clienteData, 
-                    documentoData, 
+                await whatsappService.enviarDocumentoListo(
+                    clienteData,
+                    documentoData,
                     updatedDocuments[0].codigoRetiro
                 );
 
-                console.log('✅ Notificación WhatsApp enviada:', whatsappResult.messageId || 'simulado');
+                logger.debug('Notificación WhatsApp enviada');
             }
             }
         } catch (whatsappError) {
             // No fallar la operación principal si WhatsApp falla
-            console.error('⚠️ Error enviando WhatsApp (operación continúa):', whatsappError.message);
+            logger.warn('Error enviando WhatsApp (operación continúa):', whatsappError.message);
         }
 
         const mainDocument = updatedDocuments.find(doc => doc.id === id) || updatedDocuments[0];
-        const responseMessage = groupAffected 
+        const responseMessage = groupAffected
             ? `${updatedDocuments.length} documentos del grupo marcados como listos exitosamente`
             : `Documento ${mainDocument.protocolNumber} marcado como listo exitosamente`;
 
-        console.log('🎉 Proceso completado exitosamente:', {
-            documentId: mainDocument.id,
-            protocolNumber: mainDocument.protocolNumber,
-            codigoRetiro: mainDocument.codigoRetiro,
-            clientName: mainDocument.clientName,
-            groupAffected: groupAffected,
-            documentsUpdated: updatedDocuments.length
-        });
+        logger.debug('Proceso completado exitosamente');
 
         // Headers para evitar cache del navegador
         res.set({
@@ -759,7 +728,7 @@ async function marcarComoListo(req, res) {
             }
         });
     } catch (error) {
-        console.error('Error marcando como listo:', error);
+        logger.error('Error marcando como listo:', error);
         res.status(500).json({ success: false, error: 'Error interno del servidor' });
     }
 }
@@ -818,24 +787,24 @@ async function marcarGrupoListo(req, res) {
             // Tomar datos del primer documento (todos son del mismo cliente)
             const primerDocumento = documents[0];
             if (primerDocumento.notificationPolicy === 'no_notificar') {
-                console.log('🔕 RECEPCIÓN: Política no_notificar activa, omitimos WhatsApp grupal (LISTO)');
+                logger.debug('Política no_notificar activa, omitiendo WhatsApp grupal');
             } else {
             const clienteData = {
                 clientName: primerDocumento.clientName,
                 clientPhone: primerDocumento.clientPhone
             };
 
-            const whatsappResult = await whatsappService.enviarGrupoDocumentosListo(
+            await whatsappService.enviarGrupoDocumentosListo(
                 clienteData,
                 updatedDocuments, // Array de documentos actualizados
                 nuevoCodigo
             );
 
-            console.log('✅ Notificación WhatsApp grupal enviada:', whatsappResult.messageId || 'simulado');
+            logger.debug('Notificación WhatsApp grupal enviada');
             }
         } catch (whatsappError) {
             // No fallar la operación principal si WhatsApp falla
-            console.error('⚠️ Error enviando WhatsApp grupal (operación continúa):', whatsappError.message);
+            logger.warn('Error enviando WhatsApp grupal (operación continúa):', whatsappError.message);
         }
 
         // Headers para evitar cache del navegador
@@ -855,7 +824,7 @@ async function marcarGrupoListo(req, res) {
             }
         });
     } catch (error) {
-        console.error('Error marcando grupo como listo:', error);
+        logger.error('Error marcando grupo como listo:', error);
         res.status(500).json({ success: false, error: 'Error interno del servidor' });
     }
 }
@@ -870,7 +839,7 @@ async function getAlertasRecepcion(req, res) {
     const alertas = await AlertasService.getAlertasRecepcion();
     res.json(alertas);
   } catch (error) {
-    console.error('Error obteniendo alertas de recepción:', error);
+    logger.error('Error obteniendo alertas de recepción:', error);
     res.status(500).json({
       success: false,
       error: 'Error interno del servidor',
@@ -945,7 +914,7 @@ async function desagruparDocumentos(req, res) {
                 )
             );
         } catch (auditError) {
-            console.error('Error registrando eventos de desagrupación:', auditError);
+            logger.error('Error registrando eventos de desagrupación:', auditError);
         }
 
         // Enviar notificaciones WhatsApp individuales
@@ -965,15 +934,15 @@ async function desagruparDocumentos(req, res) {
                 };
 
                 await whatsappService.enviarDocumentoListo(
-                    clienteData, 
-                    documentoData, 
+                    clienteData,
+                    documentoData,
                     codigosIndividuales[i]
                 );
             }
 
-            console.log(`✅ ${updatedDocuments.length} notificaciones WhatsApp individuales enviadas`);
+            logger.debug(`${updatedDocuments.length} notificaciones WhatsApp individuales enviadas`);
         } catch (whatsappError) {
-            console.error('⚠️ Error enviando notificaciones WhatsApp de desagrupación:', whatsappError.message);
+            logger.warn('Error enviando notificaciones WhatsApp de desagrupación:', whatsappError.message);
         }
 
         res.json({ 
@@ -986,7 +955,7 @@ async function desagruparDocumentos(req, res) {
             } 
         });
     } catch (error) {
-        console.error('Error desagrupando documentos:', error);
+        logger.error('Error desagrupando documentos:', error);
         res.status(500).json({ success: false, error: 'Error interno del servidor' });
     }
 }
@@ -1006,7 +975,7 @@ async function revertirEstadoDocumento(req, res) {
         return await revertDocumentStatus(req, res);
         
     } catch (error) {
-        console.error('Error en revertirEstadoDocumento (recepción):', error);
+        logger.error('Error en revertirEstadoDocumento (recepción):', error);
         res.status(500).json({
             success: false,
             message: 'Error interno del servidor'
@@ -1085,11 +1054,7 @@ async function getNotificationHistoryReception(req, res) {
 
         const totalCount = await prisma.whatsAppNotification.count({ where });
 
-        console.log('📱 Historial de notificaciones obtenido:', {
-            count: notifications.length,
-            total: totalCount,
-            page: parseInt(page)
-        });
+        logger.debug('Historial de notificaciones obtenido:', totalCount);
 
         res.json({
             success: true,
@@ -1105,7 +1070,7 @@ async function getNotificationHistoryReception(req, res) {
         });
 
     } catch (error) {
-        console.error('Error obteniendo historial de notificaciones:', error);
+        logger.error('Error obteniendo historial de notificaciones:', error);
         res.status(500).json({
             success: false,
             error: 'Error interno del servidor'
@@ -1123,8 +1088,8 @@ async function getReceptionsUnified(req, res) {
   try {
     const { tab, query, clientId, matrizadorId, page = 1, pageSize = 25 } = req.query;
 
-    // Logs de diagnóstico solicitados
-    console.info('[RECEPTION][QUERY]', { tab, query: query || '', clientId, matrizadorId, page: Number(page), pageSize: Number(pageSize) });
+    // Logs de diagnóstico
+    logger.debug('[RECEPTION][QUERY]', tab, query || '');
 
     // Validación de pestaña
     if (!tab || !['ACTIVOS', 'ENTREGADOS'].includes(tab)) {
@@ -1272,7 +1237,7 @@ async function getReceptionsUnified(req, res) {
       };
     });
 
-    console.info('[RECEPTION][UNIFIED_RESULT]', { totalGroups, pages, currentPage, pageSize: limit });
+    logger.debug('[RECEPTION][UNIFIED_RESULT]', totalGroups, pages);
 
     return res.json({
       success: true,
@@ -1283,7 +1248,7 @@ async function getReceptionsUnified(req, res) {
       }
     });
   } catch (error) {
-    console.error('❌ Error en getReceptionsUnified:', error);
+    logger.error('Error en getReceptionsUnified:', error);
     return res.status(500).json({
       success: false,
       message: 'Error interno del servidor al obtener recepciones',
@@ -1358,14 +1323,14 @@ async function getReceptionsCounts(req, res) {
       else activos += 1; // Si no todos entregados, el grupo sigue activo
     }
 
-    console.info('[RECEPTION][COUNTS]', { ACTIVOS: activos, ENTREGADOS: entregados, groups: groups.size });
+    logger.debug('[RECEPTION][COUNTS]', activos, entregados);
 
     return res.json({
       success: true,
       data: { ACTIVOS: activos, ENTREGADOS: entregados }
     });
   } catch (error) {
-    console.error('❌ Error en getReceptionsCounts:', error);
+    logger.error('Error en getReceptionsCounts:', error);
     return res.status(500).json({
       success: false,
       message: 'Error interno del servidor al obtener conteos de recepción',
@@ -1450,18 +1415,150 @@ async function getReceptionSuggestions(req, res) {
     const clients = Array.from(clientMap.values()).slice(0, 10);
     const topCodes = codes.slice(0, 10);
 
-    console.info('[RECEPTION][SUGGEST]', { term, clients: clients.length, codes: topCodes.length });
+    logger.debug('[RECEPTION][SUGGEST]', clients.length, topCodes.length);
 
     return res.json({
       success: true,
       data: { clients, codes: topCodes }
     });
   } catch (error) {
-    console.error('❌ Error en getReceptionSuggestions:', error);
+    logger.error('Error en getReceptionSuggestions:', error);
     return res.status(500).json({
       success: false,
       message: 'Error interno del servidor en sugerencias',
       error: error?.message || 'Unknown error'
+    });
+  }
+}
+
+/**
+ * Entregar múltiples documentos en bloque (mismo cliente)
+ * POST /api/reception/bulk-delivery
+ */
+async function bulkDelivery(req, res) {
+  try {
+    const { documentIds, deliveryData } = req.body;
+
+    // Validaciones
+    if (!Array.isArray(documentIds) || documentIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Debe proporcionar al menos un documento'
+      });
+    }
+
+    if (documentIds.length > 50) {
+      return res.status(400).json({
+        success: false,
+        message: 'Máximo 50 documentos por entrega'
+      });
+    }
+
+    // Validar datos de entrega
+    const {
+      personaRetira,
+      cedulaRetira,
+      verificationType,
+      verificationCode
+    } = deliveryData;
+
+    if (!personaRetira || !cedulaRetira) {
+      return res.status(400).json({
+        success: false,
+        message: 'Debe proporcionar nombre y cédula de quien retira'
+      });
+    }
+
+    // Buscar todos los documentos
+    const documents = await prisma.document.findMany({
+      where: {
+        id: { in: documentIds },
+        status: 'LISTO' // Solo documentos listos
+      }
+    });
+
+    if (documents.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No se encontraron documentos listos para entrega'
+      });
+    }
+
+    if (documents.length !== documentIds.length) {
+      return res.status(400).json({
+        success: false,
+        message: `Solo ${documents.length} de ${documentIds.length} documentos están listos para entrega`
+      });
+    }
+
+    // Verificar que todos sean del mismo cliente
+    const uniqueClients = new Set(documents.map(d => d.clientId));
+    if (uniqueClients.size > 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Todos los documentos deben ser del mismo cliente'
+      });
+    }
+
+    // Actualizar todos los documentos en una transacción
+    const result = await prisma.$transaction(async (tx) => {
+      // Actualizar estado de todos
+      const updated = await tx.document.updateMany({
+        where: { id: { in: documentIds } },
+        data: {
+          status: 'ENTREGADO',
+          fechaEntrega: new Date(),
+          personaRetira,
+          cedulaRetira,
+          deliveryVerificationType: verificationType,
+          deliveryVerificationCode: verificationCode || null,
+          deliveredAt: new Date(),
+          deliveredBy: req.user.id
+        }
+      });
+
+      // Crear eventos de auditoría para cada documento
+      const events = documents.map(doc => ({
+        documentId: doc.id,
+        userId: req.user.id,
+        eventType: 'ENTREGA_BLOQUE',
+        description: `Entregado en bloque (${documents.length} docs) a ${personaRetira}`,
+        details: JSON.stringify({
+          personaRetira,
+          cedulaRetira,
+          verificationType,
+          totalDocuments: documents.length,
+          documentIds: documentIds,
+          deliveredBy: req.user.id,
+          timestamp: new Date().toISOString()
+        }),
+        ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+        userAgent: req.get('User-Agent') || 'unknown'
+      }));
+
+      await tx.documentEvent.createMany({
+        data: events
+      });
+
+      return { updated: updated.count };
+    });
+
+    return res.json({
+      success: true,
+      message: `${result.updated} documentos entregados exitosamente`,
+      data: {
+        deliveredCount: result.updated,
+        personaRetira,
+        cedulaRetira
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error en entrega en bloque:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al realizar entrega en bloque',
+      error: error.message
     });
   }
 }
@@ -1480,5 +1577,7 @@ export {
   // 🎯 NUEVA FUNCIONALIDAD: UI Activos/Entregados para Recepción
   getReceptionsUnified,
   getReceptionsCounts,
-  getReceptionSuggestions
+  getReceptionSuggestions,
+  // 🎯 NUEVA FUNCIONALIDAD: Entrega en bloque
+  bulkDelivery
 };

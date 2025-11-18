@@ -105,7 +105,6 @@ const UserManagement = () => {
         setTotalCount(response.meta.pagination.total);
       }
     } catch (error) {
-      console.error('Error cargando usuarios:', error);
       setError(error.message || 'Error al cargar los usuarios');
       toast.error('Error al cargar los usuarios');
     } finally {
@@ -123,7 +122,6 @@ const UserManagement = () => {
         setStats(response.data);
       }
     } catch (error) {
-      console.error('Error cargando estadísticas:', error);
     }
   }, [token]);
 
@@ -210,7 +208,6 @@ const UserManagement = () => {
             loadStats();
           }
         } catch (error) {
-          console.error(`Error al ${action} usuario:`, error);
           toast.error(error.message || `Error al ${action} el usuario`);
         }
       }
@@ -249,7 +246,6 @@ const UserManagement = () => {
             loadStats();
           }
         } catch (error) {
-          console.error('Error eliminando usuario:', error);
           toast.error(error.message || 'Error al eliminar el usuario');
         }
       }

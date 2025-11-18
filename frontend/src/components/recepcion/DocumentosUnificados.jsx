@@ -55,6 +55,7 @@ import QuickGroupingModal from '../grouping/QuickGroupingModal';
 import GroupInfoModal from '../shared/GroupInfoModal';
 import DocumentDetailModal from '../Documents/DocumentDetailModal';
 import GroupingDetector from '../grouping/GroupingDetector';
+import BulkDeliveryDialog from './BulkDeliveryDialog';
 import receptionService from '../../services/reception-service';
 import documentService from '../../services/document-service';
 import useDocumentStore from '../../store/document-store';
@@ -120,6 +121,11 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [matrizadores, setMatrizadores] = useState([]);
+
+  // 🎯 NUEVOS: Estados para entrega en bloque
+  const [bulkDeliveryMode, setBulkDeliveryMode] = useState(false);
+  const [bulkDeliverySelection, setBulkDeliverySelection] = useState(new Set());
+  const [showBulkDeliveryDialog, setShowBulkDeliveryDialog] = useState(false);
   
   const [filters, setFilters] = useState({
     search: '',
@@ -198,7 +204,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
         throw new Error(result.error);
       }
     } catch (err) {
-      console.error('Error:', err);
       setError('Error cargando documentos');
     } finally {
       setLoading(false);
@@ -217,7 +222,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
           setMatrizadores(result.data.matrizadores || []);
         }
       } catch (error) {
-        console.error('Error cargando matrizadores:', error);
       }
     };
     cargarMatrizadores();
@@ -226,7 +230,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   // Efecto para manejar navegación específica desde alertas
   useEffect(() => {
     if (documentoEspecifico && documentoEspecifico.autoSearch) {
-      console.log('🎯 Navegación específica a documento:', documentoEspecifico);
       
       // Aplicar filtro automático por código de protocolo
       setFilters(prev => ({
@@ -251,7 +254,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
       const foundDocument = documentos.find(doc => doc.id === scrollToDocument);
       
       if (foundDocument) {
-        console.log('✅ Documento encontrado en la lista actual:', foundDocument);
         
         // Hacer scroll al documento (con un pequeño delay para asegurar que el DOM esté actualizado)
         setTimeout(() => {
@@ -336,43 +338,22 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   const ejecutarMarcarListo = async () => {
     try {
       let result;
-      
-      console.log('🎯 Iniciando marcar como listo:', {
-        actionType,
-        documentoId: currentDocumento?.id,
-        selectedDocuments: selectedDocuments.length,
-        timestamp: new Date().toISOString()
-      });
-      
+
       if (actionType === 'individual' && currentDocumento) {
-        console.log('📄 Marcando documento individual:', currentDocumento.id);
         result = await receptionService.marcarComoListo(currentDocumento.id);
       } else if (actionType === 'grupal' && selectedDocuments.length > 0) {
-        console.log('📁 Marcando grupo de documentos:', selectedDocuments);
         result = await receptionService.marcarGrupoListo(selectedDocuments);
       } else {
         // Fallback conservador por si el estado actionType se perdió
         if (currentDocumento?.id) {
-          console.warn('⚠️ actionType no definido; aplicando fallback a individual');
           result = await receptionService.marcarComoListo(currentDocumento.id);
         } else if (selectedDocuments.length > 0) {
-          console.warn('⚠️ actionType no definido; aplicando fallback a grupal');
           result = await receptionService.marcarGrupoListo(selectedDocuments);
         }
       }
 
-      console.log('✅ Resultado completo del servicio:', {
-        result,
-        type: typeof result,
-        success: result?.success,
-        error: result?.error,
-        message: result?.message,
-        keys: result ? Object.keys(result) : 'null/undefined'
-      });
-
       // Verificar que result existe y es un objeto válido
       if (!result) {
-        console.error('❌ Resultado del servicio es null/undefined');
         throw new Error('El servicio no retornó una respuesta válida');
       }
 
@@ -391,7 +372,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
         }
         // Mantener snackbar local para compatibilidad visual existente
         setSnackbar({ open: true, message: result.message || 'Documento(s) marcado(s) como listo(s) exitosamente', severity: 'success' });
-        console.log('🔄 Recargando documentos...');
         await cargarDocumentos();
 
         // Forzar re-render para asegurar actualización visual
@@ -399,18 +379,9 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
           await cargarDocumentos();
         }, 100);
 
-        console.log('📊 Actualizando estadísticas...');
         onEstadisticasChange?.();
         setSelectedDocuments([]);
-        console.log('✅ Proceso completado exitosamente');
       } else {
-        console.error('❌ Error en resultado del servicio:', {
-          success: result?.success,
-          error: result?.error,
-          message: result?.message,
-          fullResult: result
-        });
-        
         // Crear mensaje de error más específico
         let errorMessage = 'Error inesperado al marcar como listo';
         if (result?.error) {
@@ -424,7 +395,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
         throw new Error(errorMessage);
       }
     } catch (error) {
-      console.error('Error marcando como listo:', error);
       const msg = error.message || 'Error al marcar documento(s) como listo(s)';
       setSnackbar({ open: true, message: msg, severity: 'error' });
       toast.error(msg);
@@ -450,17 +420,9 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   const ejecutarReversion = async ({ documentId, newStatus, reversionReason }) => {
     try {
       setReversionLoading(true);
-      
-      console.log('🔄 Iniciando reversión de documento:', {
-        documentId,
-        newStatus,
-        reversionReason,
-        timestamp: new Date().toISOString()
-      });
 
       const result = await receptionService.revertirEstadoDocumento(documentId, newStatus, reversionReason);
 
-      console.log('✅ Resultado de reversión:', result);
 
       if (result.success) {
         setSnackbar({ 
@@ -477,7 +439,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
         throw new Error(result.error || 'Error en la reversión del documento');
       }
     } catch (error) {
-      console.error('❌ Error en reversión:', error);
       setSnackbar({ 
         open: true, 
         message: error.message || 'Error al revertir el documento', 
@@ -627,11 +588,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
    * Manejar agrupación inteligente detectada automáticamente
    */
   const handleGroupDocuments = async (groupableDocuments, mainDocument) => {
-    console.log('🔗 RECEPCION: Activando agrupación inteligente:', {
-      main: mainDocument.protocolNumber || mainDocument.id,
-      groupable: groupableDocuments.map(d => d.protocolNumber || d.id)
-    });
-    
     setPendingGroupData({
       main: mainDocument,
       related: groupableDocuments
@@ -652,7 +608,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
     
     try {
       const documentIds = [pendingGroupData.main.id, ...selectedDocumentIds];
-      console.log('🔗 RECEPCION: Creando grupo con documentos:', documentIds);
       
       const result = await createDocumentGroup(documentIds);
       
@@ -677,14 +632,12 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
           severity: 'success'
         });
 
-        console.log('✅ RECEPCION: Agrupación exitosa:', result);
         
         // Auto-ocultar después de 5 segundos
         setTimeout(() => {
           setGroupingSuccess(null);
         }, 5000);
       } else {
-        console.error('❌ RECEPCION: Error en agrupación:', result.error);
         setSnackbar({
           open: true,
           message: result.error || 'Error al crear el grupo',
@@ -692,7 +645,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
         });
       }
     } catch (error) {
-      console.error('❌ RECEPCION: Error inesperado en agrupación:', error);
       setSnackbar({
         open: true,
         message: 'Error inesperado al crear el grupo',
@@ -749,6 +701,78 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
     }
   };
 
+  // 🎯 NUEVAS FUNCIONES PARA ENTREGA EN BLOQUE
+
+  /**
+   * Activar/desactivar modo de entrega en bloque
+   */
+  const handleToggleBulkDeliveryMode = () => {
+    setBulkDeliveryMode(!bulkDeliveryMode);
+    if (bulkDeliveryMode) {
+      // Si se desactiva, limpiar selección
+      setBulkDeliverySelection(new Set());
+    }
+  };
+
+  /**
+   * Seleccionar documento para entrega en bloque
+   */
+  const handleSelectForBulkDelivery = (documentId) => {
+    setBulkDeliverySelection(prev => {
+      const newSelection = new Set(prev);
+      if (newSelection.has(documentId)) {
+        newSelection.delete(documentId);
+      } else {
+        newSelection.add(documentId);
+      }
+      return newSelection;
+    });
+  };
+
+  /**
+   * Seleccionar todos los documentos LISTO del mismo cliente
+   */
+  const handleSelectAllByClient = (clientId, clientName) => {
+    const clientDocs = documentos
+      .filter(d =>
+        (d.clientId === clientId || d.clientName === clientName) &&
+        d.status === 'LISTO'
+      )
+      .map(d => d.id);
+    setBulkDeliverySelection(new Set(clientDocs));
+  };
+
+  /**
+   * Abrir modal de entrega en bloque
+   */
+  const handleOpenBulkDelivery = () => {
+    if (bulkDeliverySelection.size === 0) {
+      setSnackbar({
+        open: true,
+        message: 'Seleccione al menos un documento',
+        severity: 'warning'
+      });
+      return;
+    }
+    setShowBulkDeliveryDialog(true);
+  };
+
+  /**
+   * Completar entrega en bloque
+   */
+  const handleBulkDeliveryComplete = async () => {
+    setBulkDeliverySelection(new Set());
+    setBulkDeliveryMode(false);
+    setShowBulkDeliveryDialog(false);
+    await cargarDocumentos();
+    onEstadisticasChange?.();
+    setSnackbar({
+      open: true,
+      message: 'Entrega en bloque completada exitosamente',
+      severity: 'success'
+    });
+  };
+
   // Calcular documentos paginados
   const documentosPaginados = documentos.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
   
@@ -800,9 +824,45 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', mb: 1 }}>📋 Gestión de Documentos</Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 3 }}>Vista unificada para marcar, entregar y consultar documentos.</Typography>
-        
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Box>
+            <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', mb: 1 }}>📋 Gestión de Documentos</Typography>
+            <Typography variant="body1" color="text.secondary">Vista unificada para marcar, entregar y consultar documentos.</Typography>
+          </Box>
+
+          {/* 🎯 NUEVO: Botón de Entrega en Bloque */}
+          <Button
+            variant={bulkDeliveryMode ? "contained" : "outlined"}
+            color="primary"
+            onClick={handleToggleBulkDeliveryMode}
+            startIcon={<SendIcon />}
+          >
+            {bulkDeliveryMode ? 'Cancelar Entrega en Bloque' : 'Entrega en Bloque'}
+          </Button>
+        </Box>
+
+        {/* 🎯 NUEVO: Toolbar de entrega en bloque */}
+        {bulkDeliveryMode && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant="body2">
+                Modo Entrega en Bloque: {bulkDeliverySelection.size} documentos seleccionados
+              </Typography>
+              {bulkDeliverySelection.size > 0 && (
+                <Button
+                  variant="contained"
+                  color="success"
+                  size="small"
+                  onClick={handleOpenBulkDelivery}
+                  startIcon={<CheckCircleIcon />}
+                >
+                  Entregar {bulkDeliverySelection.size} Documentos
+                </Button>
+              )}
+            </Box>
+          </Alert>
+        )}
+
         <Card sx={{ mb: 3 }}>
           <CardContent>
             <Grid container spacing={2}>
@@ -1022,16 +1082,26 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                       })
                     }}
                   >
-                    <TableCell 
+                    <TableCell
                       padding="checkbox"
                       onClick={(e) => e.stopPropagation()} // Evitar que abra el modal
                     >
-                      <Checkbox
-                        checked={visualSelection.has(documento.id)}
-                        onChange={() => handleToggleVisualSelection(documento.id)}
-                        color="primary"
-                        // 🎯 Solo visual para Recepción (sin funcionalidad de cambio masivo)
-                      />
+                      {bulkDeliveryMode && documento.status === 'LISTO' ? (
+                        // 🎯 Checkbox funcional para entrega en bloque (solo documentos LISTO)
+                        <Checkbox
+                          checked={bulkDeliverySelection.has(documento.id)}
+                          onChange={() => handleSelectForBulkDelivery(documento.id)}
+                          color="primary"
+                        />
+                      ) : (
+                        // Checkbox visual sin funcionalidad
+                        <Checkbox
+                          checked={visualSelection.has(documento.id)}
+                          onChange={() => handleToggleVisualSelection(documento.id)}
+                          color="primary"
+                          disabled={bulkDeliveryMode}
+                        />
+                      )}
                     </TableCell>
                     <TableCell sx={{ py: 1.5 }}>
                       <Box>
@@ -1094,34 +1164,21 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                              </Typography>
                           </Box>
                         )}
-                        {/* Indicador de grupo */}
-                        {documento.isGrouped && (
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                            <Chip
-                              label="⚡ Parte de un grupo"
-                              size="small"
-                              variant="outlined"
-                              color="primary"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenGroupInfo(documento);
-                              }}
-                              sx={{ 
-                                cursor: 'pointer',
-                                fontSize: '0.65rem',
-                                height: '20px',
-                                '& .MuiChip-label': { px: 1 }
-                              }}
-                            />
-                            {documento.groupVerificationCode && (
-                              <Chip 
-                                label={`Código: ${documento.groupVerificationCode}`}
-                                size="small"
-                                variant="outlined"
-                                sx={{ fontFamily: 'monospace', height: '20px' }}
-                              />
-                            )}
-                          </Box>
+                        {/* 🚫 Indicador de grupo ELIMINADO */}
+
+                        {/* 🎯 NUEVO: Botón para seleccionar todos del cliente en modo entrega en bloque */}
+                        {bulkDeliveryMode && documento.status === 'LISTO' && (
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSelectAllByClient(documento.clientId, documento.clientName);
+                            }}
+                            sx={{ mt: 0.5 }}
+                          >
+                            Seleccionar todos de este cliente
+                          </Button>
                         )}
                       </Box>
                     </TableCell>
@@ -1146,100 +1203,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                     <TableCell>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                         <StatusIndicator status={documento.status} />
-                        
-                        {/* Indicador y botón de agrupación debajo del estado */}
-                        {documento.isGrouped ? (
-                          <Tooltip title="Ver información del grupo">
-                            <Chip
-                              label="🔗 Agrupado"
-                              size="small"
-                              variant="filled"
-                              color="primary"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenGroupInfo(documento);
-                              }}
-                              sx={{ 
-                                cursor: 'pointer',
-                                fontSize: '0.65rem',
-                                height: '20px',
-                                '& .MuiChip-label': { px: 1 }
-                              }}
-                            />
-                          </Tooltip>
-                        ) : (
-                          // 🚫 AGRUPACIÓN TEMPORALMENTE DESHABILITADA (sin notificaciones WhatsApp)
-                          false && ['EN_PROCESO', 'LISTO'].includes(documento.status) && hasMoreThanOneForClient(documento) && (
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              color="info"
-                              startIcon={<GroupWorkIcon />}
-                              onClick={async (e) => {
-                                e.stopPropagation();
-                                try {
-                                  const result = await detectGroupableDocuments({
-                                    clientName: documento.clientName,
-                                    clientId: documento.clientId || ''
-                                  });
-                                  
-                                  // ✅ Excluir el documento principal y deduplicar por protocolo
-                                  const related = (result.groupableDocuments || [])
-                                    .filter(d => d.id !== documento.id)
-                                    .reduce((acc, d) => {
-                                      const key = d.protocolNumber || d.id;
-                                      if (!acc.seen.has(key)) {
-                                        acc.seen.add(key);
-                                        acc.items.push(d);
-                                      }
-                                      return acc;
-                                    }, { seen: new Set(), items: [] }).items;
-
-                                  if (result.success && related.length > 0) {
-                                    handleGroupDocuments(related, documento);
-                                  } else {
-                                    setSnackbar({
-                                      open: true,
-                                      message: 'No se encontraron documentos agrupables para este cliente',
-                                      severity: 'info'
-                                    });
-                                  }
-                                } catch (error) {
-                                  console.error('Error detectando documentos agrupables:', error);
-                                  setSnackbar({
-                                    open: true,
-                                    message: 'Error al detectar documentos agrupables',
-                                    severity: 'error'
-                                  });
-                                }
-                              }}
-                              sx={{
-                                fontSize: '0.65rem',
-                                height: '22px',
-                                borderColor: 'info.main',
-                                color: 'info.main',
-                                backgroundColor: 'rgba(33, 150, 243, 0.04)',
-                                '&:hover': {
-                                  backgroundColor: 'rgba(33, 150, 243, 0.08)',
-                                  borderColor: 'info.dark'
-                                },
-                                textTransform: 'none',
-                                px: 1
-                              }}
-                            >
-                              {(() => {
-                                // Mostrar total devuelto por backend si está en caché (incluye principal)
-                                const key = `${documento.clientName}|${documento.clientId || ''}`;
-                                const count = groupableCountCache.get(key);
-                                if (count && count > 1) return `Agrupar (${count})`;
-                                // Fallback local (página actual)
-                                const same = documentos.filter(d => d.id !== documento.id && ['EN_PROCESO','LISTO'].includes(d.status) && d.clientName === documento.clientName && (documento.clientId ? d.clientId === documento.clientId : true) && !d.isGrouped);
-                                const uniqueCount = Array.from(new Set(same.map(d => d.protocolNumber || d.id))).length + 1;
-                                return uniqueCount > 1 ? `Agrupar (${uniqueCount})` : 'Agrupar';
-                              })()}
-                            </Button>
-                          )
-                        )}
+                        {/* 🚫 Botones de agrupación ELIMINADOS */}
                       </Box>
                     </TableCell>
                     <TableCell sx={{ textAlign: 'center' }}>
@@ -1335,23 +1299,14 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
           <ListItemIcon><VisibilityIcon fontSize="small" /></ListItemIcon>
           <ListItemText>Ver Detalles</ListItemText>
         </MenuItem>
-        
-        {/* Opción de ver información de grupo si está agrupado */}
-        {currentDocumento?.isGrouped && (
-          <MenuItem onClick={() => {
-            handleOpenGroupInfo(currentDocumento);
-            handleMenuClose();
-          }}>
-            <ListItemIcon><GroupWorkIcon fontSize="small" color="primary" /></ListItemIcon>
-            <ListItemText>Info del Grupo</ListItemText>
-          </MenuItem>
-        )}
-        
+
+        {/* 🚫 Opción de grupo ELIMINADA */}
+
         {/* Separador visual para opciones de reversión */}
         {currentDocumento && ['LISTO', 'ENTREGADO'].includes(currentDocumento.status) && (
           <Box sx={{ borderBottom: 1, borderColor: 'divider', my: 0.5 }} />
         )}
-        
+
       </Menu>
 
       <Dialog open={showConfirmDialog} onClose={cerrarConfirmacion} maxWidth="sm" fullWidth>
@@ -1435,15 +1390,24 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
         loading={reversionLoading}
       />
 
+      {/* 🎯 NUEVO: Modal de entrega en bloque */}
+      <BulkDeliveryDialog
+        open={showBulkDeliveryDialog}
+        onClose={() => setShowBulkDeliveryDialog(false)}
+        documentIds={Array.from(bulkDeliverySelection)}
+        documents={documentos.filter(d => bulkDeliverySelection.has(d.id))}
+        onDeliveryComplete={handleBulkDeliveryComplete}
+      />
+
       {/* 🎯 NOTA INFORMATIVA: Checkboxes solo visuales para Recepción */}
-      {visualSelection.size > 0 && (
-        <Alert 
-          severity="info" 
-          sx={{ 
-            position: 'fixed', 
-            bottom: 24, 
-            left: '50%', 
-            transform: 'translateX(-50%)', 
+      {visualSelection.size > 0 && !bulkDeliveryMode && (
+        <Alert
+          severity="info"
+          sx={{
+            position: 'fixed',
+            bottom: 24,
+            left: '50%',
+            transform: 'translateX(-50%)',
             zIndex: 1200,
             maxWidth: '90vw'
           }}
@@ -1451,9 +1415,9 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
           <Typography variant="body2">
             📋 Documentos seleccionados: {visualSelection.size} (solo visualización)
           </Typography>
-          <Typography 
-            variant="caption" 
-            sx={{ 
+          <Typography
+            variant="caption"
+            sx={{
               color: (theme) => theme.palette.mode === 'dark' ? '#cbd5e1' : '#4b5563'
             }}
           >

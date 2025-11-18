@@ -54,7 +54,6 @@ const EditDocumentModal = ({
   // Cargar datos del documento cuando se abre el modal
   useEffect(() => {
     if (open && document) {
-      console.log('📝 EditDocumentModal: Cargando datos del documento:', document.id);
       loadDocumentData();
     }
   }, [open, document]);
@@ -80,7 +79,6 @@ const EditDocumentModal = ({
           clientEmail: docData.clientEmail || '',
           clientId: docData.clientId || ''
         });
-        console.log('✅ Datos del documento cargados:', docData);
       } else {
         // Si no existe el endpoint, usar datos básicos del documento
         setFormData({
@@ -92,10 +90,8 @@ const EditDocumentModal = ({
           clientEmail: document.clientEmail || '',
           clientId: document.clientId || ''
         });
-        console.log('📋 Usando datos básicos del documento');
       }
     } catch (error) {
-      console.error('Error cargando datos del documento:', error);
       // Fallback: usar datos del prop document
       setFormData({
         detalle_documento: document.detalle_documento || '',
@@ -155,13 +151,11 @@ const EditDocumentModal = ({
     setErrors([]);
 
     try {
-      console.log('💾 Guardando cambios del documento:', document.id, formData);
       
       // Actualizar información del documento
       const response = await documentService.updateDocumentInfo(document.id, formData);
       
       if (response.success) {
-        console.log('✅ Documento actualizado exitosamente');
         
         // Notificar al componente padre
         if (onDocumentUpdated) {
@@ -177,7 +171,6 @@ const EditDocumentModal = ({
         setErrors([response.message || 'Error actualizando el documento']);
       }
     } catch (error) {
-      console.error('Error guardando documento:', error);
       setErrors(['Error de conexión al guardar el documento']);
     } finally {
       setSaving(false);

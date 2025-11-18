@@ -63,7 +63,6 @@ const useBulkActions = () => {
       } else {
         // Verificar límite máximo
         if (newSelection.size >= MAX_BULK_SELECTION) {
-          console.warn(`⚠️ Máximo ${MAX_BULK_SELECTION} documentos por selección múltiple`);
           return prev;
         }
 
@@ -72,10 +71,6 @@ const useBulkActions = () => {
         
         if (currentCommonStatus && currentCommonStatus !== documentStatus) {
           // Si hay documentos seleccionados de diferente estado, limpiar selección
-          console.log('🔄 Limpiando selección: estados diferentes', {
-            current: currentCommonStatus,
-            attempting: documentStatus
-          });
           newSelection.clear();
         }
         
@@ -87,13 +82,7 @@ const useBulkActions = () => {
           setBulkActionMode(true);
         }
       }
-      
-      console.log('📋 Selección actualizada:', {
-        count: newSelection.size,
-        documents: Array.from(newSelection),
-        bulkMode: newSelection.size > 0
-      });
-      
+
       return newSelection;
     });
   }, [bulkActionMode, getCommonStatus]);
@@ -115,19 +104,11 @@ const useBulkActions = () => {
       const newSelection = new Set(compatibleDocs.map(doc => doc.id));
       setSelectedDocuments(newSelection);
       setBulkActionMode(newSelection.size > 0);
-      
-      console.log('📋 Seleccionar todos:', {
-        total: documents.length,
-        compatible: compatibleDocs.length,
-        selected: newSelection.size,
-        referenceStatus
-      });
     } else {
       // Deseleccionar todos
       setSelectedDocuments(new Set());
       setBulkActionMode(false);
       
-      console.log('📋 Deseleccionar todos');
     }
   }, []);
 
@@ -137,7 +118,6 @@ const useBulkActions = () => {
   const clearSelection = useCallback(() => {
     setSelectedDocuments(new Set());
     setBulkActionMode(false);
-    console.log('🧹 Selección limpiada');
   }, []);
 
   /**
@@ -161,15 +141,8 @@ const useBulkActions = () => {
     }
 
     setIsExecuting(true);
-    
-    try {
-      console.log('🔄 Ejecutando cambio masivo:', {
-        count: selectedDocs.length,
-        from: commonStatus,
-        to: newStatus,
-        options
-      });
 
+    try {
       // Llamar al servicio backend para cambio masivo
       const response = await documentService.bulkStatusChange({
         documentIds: Array.from(selectedDocuments),
@@ -182,13 +155,11 @@ const useBulkActions = () => {
         // Limpiar selección después del éxito
         clearSelection();
         
-        console.log('✅ Cambio masivo completado:', response.data);
         return response;
       } else {
         throw new Error(response.message || 'Error en cambio masivo');
       }
     } catch (error) {
-      console.error('❌ Error en cambio masivo:', error);
       throw error;
     } finally {
       setIsExecuting(false);

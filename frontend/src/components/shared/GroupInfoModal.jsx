@@ -41,6 +41,9 @@ import documentService from '../../services/document-service';
  * Se activa al hacer click en "Parte de un grupo"
  */
 const GroupInfoModal = ({ open, onClose, document, onUngrouped }) => {
+  // 🚫 DESHABILITADO: Modal de información de grupo desactivado
+  return null;
+
   const [groupDocuments, setGroupDocuments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [ungroupLoading, setUngroupLoading] = useState(false);
@@ -51,15 +54,7 @@ const GroupInfoModal = ({ open, onClose, document, onUngrouped }) => {
   useEffect(() => {
     const loadGroup = async () => {
       if (open && document) {
-        console.log('🔍 GroupInfoModal: Intentando cargar grupo', {
-          documentId: document.id,
-          isGrouped: document.isGrouped,
-          documentGroupId: document.documentGroupId,
-          groupVerificationCode: document.groupVerificationCode
-        });
-
         if (!document.documentGroupId) {
-          console.warn('⚠️ GroupInfoModal: Documento no tiene documentGroupId');
           setGroupDocuments([]);
           return;
         }
@@ -71,22 +66,17 @@ const GroupInfoModal = ({ open, onClose, document, onUngrouped }) => {
             doc.documentGroupId === document.documentGroupId && doc.isGrouped
           );
           if (fromStore.length > 0) {
-            console.log('✅ GroupInfoModal: Documentos encontrados en store:', fromStore.length);
             setGroupDocuments(fromStore);
             return;
           }
           // 2) Fallback desde el backend (Recepción/Archivo no siempre tienen el store cargado)
-          console.log('📡 GroupInfoModal: Buscando en backend...');
           const resp = await documentService.getGroupDocuments(document.documentGroupId);
           if (resp.success) {
-            console.log('✅ GroupInfoModal: Documentos encontrados en backend:', resp.data?.length || 0);
             setGroupDocuments(resp.data || []);
           } else {
-            console.error('❌ GroupInfoModal: Error del backend:', resp.error);
             setGroupDocuments([]);
           }
         } catch (error) {
-          console.error('❌ GroupInfoModal: Error cargando documentos del grupo:', error);
           setGroupDocuments([]);
         } finally {
           setLoading(false);
@@ -155,13 +145,11 @@ const GroupInfoModal = ({ open, onClose, document, onUngrouped }) => {
       const result = await ungroupDocument(document.id);
       if (result.success) {
         // 🔄 Refrescar ANTES de cerrar para asegurar que el cambio se vea
-        console.log('✅ Documento desagrupado, refrescando lista...');
         if (['MATRIZADOR', 'ARCHIVO'].includes(user?.role)) {
           await fetchMyDocuments();
         } else {
           await fetchAllDocuments();
         }
-        console.log('✅ Lista refrescada');
 
         // Callback opcional para componente padre
         try { onUngrouped?.(result); } catch {}
@@ -172,7 +160,6 @@ const GroupInfoModal = ({ open, onClose, document, onUngrouped }) => {
         alert(result.error || 'No se pudo desagrupar el documento');
       }
     } catch (e) {
-      console.error('❌ Error desagrupando:', e);
       alert('Error inesperado al desagrupar');
     } finally {
       setUngroupLoading(false);

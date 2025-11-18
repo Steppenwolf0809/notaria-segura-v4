@@ -16,7 +16,7 @@ const HEADER_NAME = 'x-csrf-token';
 
 // Configurar doubleCsrf con opciones de seguridad
 const {
-  generateToken,     // Genera token CSRF para enviar al cliente
+  generateCsrfToken,     // Genera token CSRF para enviar al cliente
   doubleCsrfProtection, // Middleware para validar token
 } = doubleCsrf({
   getSecret: () => CSRF_SECRET,
@@ -33,6 +33,11 @@ const {
     // Buscar token en header personalizado o en body
     return req.headers[HEADER_NAME] || req.body?._csrf;
   },
+  getSessionIdentifier: (req) => {
+    // Usar siempre la IP como identificador de sesión para mantener consistencia
+    // entre la generación del token (sin auth) y la validación (con auth)
+    return req.ip || 'anonymous';
+  },
 });
 
 /**
@@ -41,7 +46,7 @@ const {
  */
 export const csrfTokenGenerator = (req, res, next) => {
   try {
-    const token = generateToken(req, res);
+    const token = generateCsrfToken(req, res);
 
     // Agregar token al objeto de request para acceso en controladores
     req.csrfToken = () => token;

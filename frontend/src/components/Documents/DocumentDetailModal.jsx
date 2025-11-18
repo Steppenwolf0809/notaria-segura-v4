@@ -115,7 +115,6 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
    * Manejar actualización de documento desde modal de edición
    */
   const handleDocumentUpdated = (updatedData) => {
-    console.log('Documento actualizado:', updatedData);
     
     // Actualizar documento local con los nuevos datos
     if (updatedData.data && updatedData.data.document) {
@@ -138,7 +137,6 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
    * Manejar entrega de documento desde modal de entrega
    */
   const handleDocumentDelivered = (deliveryData) => {
-    console.log('Documento entregado:', deliveryData);
     
     // Actualizar documento local
     if (deliveryData.document) {
@@ -163,7 +161,6 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
    * Manejar entrega de documento desde modal simplificado de matrizador
    */
   const handleMatrizadorDelivered = (deliveryData) => {
-    console.log('Documento entregado por matrizador:', deliveryData);
     
     // Actualizar documento local
     if (deliveryData.document) {
@@ -187,7 +184,6 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
    * Se ejecuta automáticamente al cambiar la política en el componente NotificationPolicySelector
    */
   const handleNotificationPolicyChange = (newPolicy, updatedData) => {
-    console.log('🔔 Política de notificación cambiada:', { newPolicy, updatedData });
     
     // Actualizar documento local
     setLocalDocument(prev => ({
@@ -335,7 +331,6 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
     setActionLoading(true);
     try {
       const result = await updateDocumentStatus(document.id, actionConfig.action);
-      console.log('🔍 Resultado completo de updateDocumentStatus:', result);
       
       if (result.success) {
         // Actualizar documento local
@@ -387,14 +382,11 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
           toast.success(baseMessage);
         }
         
-        console.log(`✅ Documento actualizado a: ${actionConfig.action}`, result);
       } else {
-        console.error('❌ Error en updateDocumentStatus:', result);
         const errorMsg = result.error || result.message || 'No se pudo actualizar el documento';
         toast.error(errorMsg);
       }
     } catch (error) {
-      console.error('Error al actualizar documento:', error);
       toast.error('Error al actualizar documento: ' + error.message);
     } finally {
       setActionLoading(false);
@@ -734,7 +726,6 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
               setShowEditModal(false);
             }
           } catch (error) {
-            console.error('Error actualizando documento:', error);
           }
         }}
         userRole="matrizador"
@@ -763,7 +754,6 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
         onClose={() => setShowImmediateDeliveryModal(false)}
         document={localDocument}
         onDocumentDelivered={(deliveryData) => {
-          console.log('Documento entregado inmediatamente:', deliveryData);
           
           // Actualizar documento local
           if (deliveryData.document) {
@@ -893,7 +883,6 @@ const DeliveryModal = ({ open, onClose, document, onDocumentDelivered, serviceTy
         toast.error(result.message || 'Error al entregar documento');
       }
     } catch (error) {
-      console.error('Error entregando documento:', error);
       setErrors(['Error de conexión al entregar el documento']);
     } finally {
       setSaving(false);
@@ -1138,7 +1127,6 @@ const MatrizadorDeliveryModal = ({ open, onClose, document, onDocumentDelivered 
         setErrors([result.message || 'Error al entregar documento']);
       }
     } catch (error) {
-      console.error('Error entregando documento:', error);
       setErrors(['Error de conexión al entregar el documento']);
     } finally {
       setSaving(false);

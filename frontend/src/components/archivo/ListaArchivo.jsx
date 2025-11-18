@@ -378,9 +378,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
       if (onRefresh) {
         onRefresh();
       }
-      console.log('✅ Cambio masivo completado en ListaArchivo');
     } catch (error) {
-      console.error('❌ Error en cambio masivo:', error);
     } finally {
       setBulkModalOpen(false);
       setPendingBulkAction(null);
@@ -434,13 +432,11 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
 
     if (!targetDoc) return;
 
-    console.log(`🚀 handleCambiarEstado: ${targetDoc.protocolNumber} → ${nuevoEstado}`);
 
     // Verificar si requiere confirmación sobre el documento objetivo (evitar estado desfasado)
     const confirmationInfo = requiresConfirmation(targetDoc.status, nuevoEstado);
 
     if (confirmationInfo.requiresConfirmation) {
-      console.log('🎯 Cambio requiere confirmación, abriendo modal...');
       setConfirmationData({
         document: targetDoc,
         currentStatus: targetDoc.status,
@@ -467,7 +463,6 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
           if (onRefresh) onRefresh();
         }
       } catch (error) {
-        console.error('Error al cambiar estado:', error);
         toast.error(error.message || 'Error al cambiar estado');
       }
     }
@@ -498,11 +493,9 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
         cerrarReversionModal();
         toast.success(result.message || 'Documento revertido exitosamente');
       } else {
-        console.error('Error en reversión (archivo):', result.error);
         toast.error(result.error || 'Error al revertir el documento');
       }
     } catch (error) {
-      console.error('Error en reversión (archivo):', error);
       toast.error('Error inesperado al revertir el documento');
     } finally {
       setReversionLoading(false);
@@ -522,7 +515,6 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
    * Confirmar cambio de estado
    */
   const handleConfirmStatusChange = async (data) => {
-    console.log('🎯 Confirmando cambio de estado:', data);
     setIsConfirmationLoading(true);
     
     try {
@@ -533,7 +525,6 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
       });
       
       if (response.success) {
-        console.log('✅ Cambio de estado confirmado exitosamente');
         handleCloseConfirmation();
 
         if (onRefresh) {
@@ -563,12 +554,10 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
           }
         }
       } else {
-        console.error('❌ Error al confirmar cambio:', response.message);
         setIsConfirmationLoading(false);
         toast.error(response.message || 'Error al confirmar cambio de estado');
       }
     } catch (error) {
-      console.error('❌ Error al confirmar cambio de estado:', error);
       setIsConfirmationLoading(false);
       toast.error(error.message || 'Error al confirmar cambio de estado');
     }
@@ -595,7 +584,6 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
         onRefresh();
       }
     } catch (error) {
-      console.error('Error al guardar edición:', error);
       throw error;
     }
   };
@@ -634,10 +622,8 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
     setGroupingLoading(true);
     try {
       const documentIds = Array.from(bulkActions.selectedDocuments);
-      console.log('🔗 Creando grupo desde lista archivo:', documentIds);
       
       const result = await createDocumentGroup(documentIds);
-      console.log('🔗 Resultado de createDocumentGroup:', result);
       
       if (result && result.success) {
         setGroupingSuccess({
@@ -663,11 +649,9 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
           setGroupingSuccess(null);
         }, 5000);
       } else {
-        console.error('❌ Error en resultado de agrupación:', result);
         toast.error(`Error al crear el grupo: ${result?.error || result?.message || 'Error desconocido'}`);
       }
     } catch (error) {
-      console.error('❌ Error creando grupo:', error);
       toast.error(`Error al crear el grupo: ${error.message}`);
     } finally {
       setGroupingLoading(false);
@@ -699,7 +683,6 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
       try {
         await onEstadoChange(docId, newStatus);
       } catch (error) {
-        console.error(`Error cambiando estado del documento ${docId}:`, error);
       }
     }
     
@@ -721,7 +704,6 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
 
     try {
       // TODO: Implementar desagrupación en el servicio
-      console.log('🔓 Desagrupando documentos:', Array.from(bulkActions.selectedDocuments));
       
       // Por ahora solo refrescamos
       bulkActions.clearSelection();
@@ -729,7 +711,6 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
         onRefresh();
       }
     } catch (error) {
-      console.error('Error desagrupando:', error);
     }
   };
 
@@ -757,11 +738,6 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
    * Manejar agrupación inteligente detectada automáticamente
    */
   const handleGroupDocuments = async (groupableDocuments, mainDocument) => {
-    console.log('🔗 ARCHIVO: Activando agrupación inteligente:', {
-      main: mainDocument.protocolNumber || mainDocument.id,
-      groupable: groupableDocuments.map(d => d.protocolNumber || d.id)
-    });
-    
     setPendingGroupData({
       main: mainDocument,
       related: groupableDocuments
@@ -782,7 +758,6 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
     
     try {
       const documentIds = [pendingGroupData.main.id, ...selectedDocumentIds];
-      console.log('🔗 ARCHIVO: Creando grupo con documentos:', documentIds);
       
       const result = await createDocumentGroup(documentIds);
       
@@ -802,17 +777,14 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
           onRefresh();
         }
 
-        console.log('✅ ARCHIVO: Agrupación exitosa:', result);
         
         // Auto-ocultar después de 5 segundos
         setTimeout(() => {
           setGroupingSuccess(null);
         }, 5000);
       } else {
-        console.error('❌ ARCHIVO: Error en agrupación:', result.error);
       }
     } catch (error) {
-      console.error('❌ ARCHIVO: Error inesperado en agrupación:', error);
     } finally {
       setGroupingLoading(false);
       setShowQuickGroupingModal(false);
@@ -1304,10 +1276,8 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
                                   handleGroupDocuments(related, documento);
                                 } else {
                                   // Silencioso para no ensuciar la vista
-                                  console.log('No hay documentos agrupables para:', documento.clientName);
                                 }
                               } catch (error) {
-                                console.error('Error detectando documentos agrupables:', error);
                               }
                             }}
                             sx={{

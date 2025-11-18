@@ -33,7 +33,6 @@ const RecepcionCenter = () => {
         throw new Error(result.error);
       }
     } catch (error) {
-      console.error('Error:', error);
       setError('Error cargando datos del dashboard');
     }
   };
@@ -60,7 +59,6 @@ const RecepcionCenter = () => {
    * Función para navegar a un documento desde alertas
    */
   const handleDocumentClick = (alerta) => {
-    console.log('Navegando a documento desde alerta:', alerta);
     
     // Preparar información del documento específico
     const documentoTarget = {

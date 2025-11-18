@@ -53,14 +53,6 @@ import { readFlag } from '../config/featureFlags.js';
  * Componente principal que maneja la nueva interfaz de recepción con pestañas y búsqueda global
  */
 const ReceptionCenter = () => {
-  // 🔍 DEBUG: Verificar feature flag y log inicial
-  const featureFlag = readFlag('VITE_UI_ACTIVOS_ENTREGADOS', true);
-  console.log('🎯 RECEPTION-CENTER v2 mounted - Feature flag:', featureFlag);
-  console.log('🎯 RECEPTION-CENTER v2 - Environment:', {
-    NODE_ENV: import.meta.env.MODE,
-    VITE_API_URL: import.meta.env.VITE_API_URL,
-    VITE_UI_ACTIVOS_ENTREGADOS: featureFlag
-  });
   const {
     // Estado
     tab,
@@ -147,7 +139,6 @@ const ReceptionCenter = () => {
             setSuggestOpen(false);
           }
         } catch (e) {
-          console.error('[RECEPTION][SUGGEST][ERR]', e);
           setSuggestions({ clients: [], codes: [] });
           setSuggestOpen(false);
         } finally {
@@ -214,7 +205,6 @@ const ReceptionCenter = () => {
   // Manejar clic en nombre de matrizador
   const handleMatrizadorClick = useCallback((matrizadorId, matrizadorName) => {
     if (!matrizadorId) return; // No filtrar si es "Sin asignar"
-    console.info('[RECEPTION] Filtrar por matrizador:', matrizadorId, matrizadorName);
     setMatrizadorId(matrizadorId);
   }, [setMatrizadorId]);
 
@@ -312,12 +302,10 @@ const ReceptionCenter = () => {
           });
         });
         if (ids.length === 0) {
-          console.info('[RECEPTION][BULK] Nada por actualizar (no hay EN_PROCESO)');
           setBulkModalOpen(false);
           return;
         }
         const resp = await receptionService.bulkMarkReady(ids, typeof sendNotifications === 'boolean' ? sendNotifications : true);
-        console.info('[RECEPTION][BULK][LISTO] resp:', resp);
         await fetchDocuments();
         await fetchCounts();
         clearSelection();
@@ -334,7 +322,6 @@ const ReceptionCenter = () => {
           });
         });
         if (deliverIds.length === 0) {
-          console.info('[RECEPTION][BULK][ENTREGADO] No hay documentos LISTO para entregar');
           setBulkDeliveryModalOpen(false);
           return;
         }
@@ -347,7 +334,6 @@ const ReceptionCenter = () => {
           facturaPresenta: false,
           observacionesEntrega: deliveryData?.observacionesEntrega || 'Entrega masiva desde Recepción'
         };
-        console.info('[RECEPTION][BULK][ENTREGADO] Entregando', deliverIds.length, 'documentos con datos:', payload);
         await Promise.allSettled(deliverIds.map(id => documentService.deliverDocument(id, payload)));
         await fetchDocuments();
         await fetchCounts();
@@ -362,7 +348,6 @@ const ReceptionCenter = () => {
         // - Si documento está ENTREGADO → revertir a LISTO
         let reason = window.prompt('Ingrese la razón para revertir estado (obligatoria):');
         if (!reason || !reason.trim()) {
-          console.info('[RECEPTION][BULK][REVERTIR] Operación cancelada por falta de razón');
           setBulkModalOpen(false);
           return;
         }
@@ -375,7 +360,6 @@ const ReceptionCenter = () => {
           operations.push(receptionService.revertirEstadoDocumento(cand.id, target, reason.trim()));
         });
         if (operations.length === 0) {
-          console.info('[RECEPTION][BULK][REVERTIR] No hay documentos revertibles en la selección');
           setBulkModalOpen(false);
           return;
         }
@@ -387,10 +371,8 @@ const ReceptionCenter = () => {
         return;
       }
 
-      console.info('[RECEPTION][BULK] Acción no implementada:', toStatus);
       setBulkModalOpen(false);
     } catch (e) {
-      console.error('[RECEPTION][BULK][ERR]', e);
       setBulkModalOpen(false);
     }
   };
@@ -432,7 +414,6 @@ const ReceptionCenter = () => {
         alert(`Error: ${resp.error || 'No se pudo marcar como listo'}`);
       }
     } catch (error) {
-      console.error('[RECEPTION][MARK_READY_INDIVIDUAL]', error);
       alert('Error al marcar documentos como listo');
     }
   };
@@ -471,7 +452,6 @@ const ReceptionCenter = () => {
       setIndividualDeliveryModalOpen(false);
       setSelectedGroupForDelivery(null);
     } catch (error) {
-      console.error('[RECEPTION][DELIVER_INDIVIDUAL]', error);
       alert('Error al entregar documentos');
     }
   };

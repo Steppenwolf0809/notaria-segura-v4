@@ -35,7 +35,6 @@ const getDashboard = async (token) => {
     );
     return response.data;
   } catch (error) {
-    console.error('Error obteniendo dashboard archivo:', error);
     return {
       success: false,
       message: error.response?.data?.message || 'Error de conexión'
@@ -61,7 +60,6 @@ const getMisDocumentos = async (token, params = {}) => {
     );
     return response.data;
   } catch (error) {
-    console.error('Error obteniendo mis documentos:', error);
     return {
       success: false,
       message: error.response?.data?.message || 'Error de conexión'
@@ -81,7 +79,6 @@ const cambiarEstadoDocumento = async (token, documentoId, nuevoEstado) => {
     );
     return response.data;
   } catch (error) {
-    console.error('Error cambiando estado:', error);
     return {
       success: false,
       message: error.response?.data?.message || 'Error de conexión'
@@ -105,7 +102,6 @@ const revertirEstadoDocumento = async (documentoId, newStatus, reversionReason) 
       message: response.data?.message
     };
   } catch (error) {
-    console.error('Error revirtiendo estado (archivo):', error);
     return {
       success: false,
       error: error.response?.data?.message || 'Error de conexión'
@@ -167,7 +163,6 @@ const procesarEntrega = async (documentoId, entregaData) => {
       message: response.data.message
     };
   } catch (error) {
-    console.error('Error procesando entrega:', error);
     return {
       success: false,
       error: error.response?.data?.message || 'Error de conexión'
@@ -204,7 +199,6 @@ const getSupervisionGeneral = async (token, params = {}) => {
     );
     return response.data;
   } catch (error) {
-    console.error('Error obteniendo supervisión general:', error);
     return {
       success: false,
       message: error.response?.data?.message || 'Error de conexión'
@@ -223,7 +217,6 @@ const getResumenGeneral = async (token) => {
     );
     return response.data;
   } catch (error) {
-    console.error('Error obteniendo resumen general:', error);
     return {
       success: false,
       message: error.response?.data?.message || 'Error de conexión'
@@ -242,7 +235,6 @@ const getMatrizadores = async (token) => {
     );
     return response.data;
   } catch (error) {
-    console.error('Error obteniendo matrizadores:', error);
     return {
       success: false,
       message: error.response?.data?.message || 'Error de conexión'
@@ -267,7 +259,6 @@ const getDetalleDocumento = async (token, documentoId) => {
     );
     return response.data;
   } catch (error) {
-    console.error('Error obteniendo detalle documento:', error);
     return {
       success: false,
       message: error.response?.data?.message || 'Error de conexión'

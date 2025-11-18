@@ -57,7 +57,6 @@ const CajaStatsDashboard = () => {
         setError(response.error || 'Error al cargar estadísticas');
       }
     } catch (err) {
-      console.error('Error cargando estadísticas:', err);
       setError('Error de conexión al cargar estadísticas');
     } finally {
       setLoading(false);

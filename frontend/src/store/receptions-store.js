@@ -8,7 +8,6 @@ import receptionService from '../services/reception-service';
 const useReceptionsStore = create((set, get) => ({
   // 🔍 DEBUG: Log de inicialización del store
   _initialized: (() => {
-    console.log('📦 RECEPTIONS-STORE initialized');
     return true;
   })(),
   // Estado inicial
@@ -172,7 +171,6 @@ const useReceptionsStore = create((set, get) => ({
         });
       }
     } catch (error) {
-      console.error('Error fetching receptions:', error);
       set({
         error: error.message || 'Error al cargar recepciones',
         loading: false
@@ -202,7 +200,6 @@ const useReceptionsStore = create((set, get) => ({
         set({ loadingCounts: false });
       }
     } catch (error) {
-      console.error('Error fetching reception counts:', error);
       set({ loadingCounts: false });
     }
   },

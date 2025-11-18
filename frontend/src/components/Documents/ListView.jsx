@@ -191,7 +191,6 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
    * Manejar actualización de documento desde modal de detalle
    */
   const handleDocumentUpdated = (updatedData) => {
-    console.log('📝 Documento actualizado desde modal (ListView):', updatedData);
     
     // Si tenemos la estructura { document: documentData }
     if (updatedData && updatedData.document) {
@@ -206,7 +205,6 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
       // Actualizar documento en el store para que se refleje en la vista
       updateDocument(updatedDocument.id, updatedDocument);
       
-      console.log('🔄 Documento actualizado en vista Lista:', updatedDocument);
     }
   };
 
@@ -286,7 +284,6 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
       }
     } catch (e) {
       // Silencioso para no ensuciar la vista lista
-      console.error('Error detectando agrupables (ListView):', e);
     } finally {
       // No menu to close; keep UX silent
     }
@@ -368,9 +365,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
       if (result && result.success && typeof fetchMyDocuments === 'function') {
         await fetchMyDocuments();
       }
-      console.log('✅ Cambio masivo completado en ListView');
     } catch (error) {
-      console.error('❌ Error en cambio masivo:', error);
       // TODO: Mostrar notificación de error
     } finally {
       setBulkModalOpen(false);
@@ -552,22 +547,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
                           color={statusInfo.color}
                           variant="filled"
                         />
-                        {/* 🔗 ALERTA DE AGRUPACIÓN COMPACTA */}
-                        {/* 🚫 AGRUPACIÓN TEMPORALMENTE DESHABILITADA (sin notificaciones WhatsApp) */}
-                        {/* Mostrar chip de agrupación si aplica; si ya está agrupado, mostrar texto sutil */}
-                        {document.isGrouped && (
-                          <Chip
-                            label="⚡ Parte de un grupo"
-                            size="small"
-                            variant="outlined"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedGroupDocument(document);
-                              setGroupInfoModalOpen(true);
-                            }}
-                            sx={{ mt: 0.5, height: '20px', '& .MuiChip-label': { px: 1 } }}
-                          />
-                        )}
+                        {/* 🚫 AGRUPACIÓN ELIMINADA */}
                       </Box>
                     </TableCell>
                     <TableCell onClick={() => openDetailModal(document)}>

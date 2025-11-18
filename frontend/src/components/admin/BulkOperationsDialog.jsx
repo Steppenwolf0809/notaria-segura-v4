@@ -76,7 +76,6 @@ const BulkOperationsDialog = ({ open, onClose, selectedDocuments, onOperationCom
         }
       }
     } catch (error) {
-      console.error('Error cargando información de documentos:', error);
     }
   };
 
@@ -100,7 +99,6 @@ const BulkOperationsDialog = ({ open, onClose, selectedDocuments, onOperationCom
         }
       }
     } catch (error) {
-      console.error('Error cargando matrizadores:', error);
     }
   };
 
@@ -175,7 +173,6 @@ const BulkOperationsDialog = ({ open, onClose, selectedDocuments, onOperationCom
         throw new Error(data.message || 'Error en la operación');
       }
     } catch (error) {
-      console.error('Error en operación masiva:', error);
       toast.error(error.message || 'Error al ejecutar la operación');
     } finally {
       setLoading(false);

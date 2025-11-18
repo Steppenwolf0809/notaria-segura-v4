@@ -73,7 +73,6 @@ const NotificationHistory = () => {
         setError(response.message || 'Error al cargar el historial de notificaciones');
       }
     } catch (error) {
-      console.error('Error cargando historial de notificaciones:', error);
       setError('Error al cargar el historial de notificaciones');
       setNotifications([]);
       setTotalNotifications(0);

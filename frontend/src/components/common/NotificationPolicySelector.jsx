@@ -80,7 +80,6 @@ const NotificationPolicySelector = ({
         return false;
       }
 
-      console.log('✅ Política de notificación guardada exitosamente');
       
       // Notificar al componente padre sobre el éxito
       if (onPolicyChange) {
@@ -89,7 +88,6 @@ const NotificationPolicySelector = ({
 
       return true;
     } catch (error) {
-      console.error('❌ Error guardando política de notificación:', error);
       setError('Error de conexión al guardar la política');
       // Revertir cambio si falló
       setPolicy(document.notificationPolicy || 'automatica');

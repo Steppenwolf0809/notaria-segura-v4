@@ -70,7 +70,6 @@ const NotificationHistory = () => {
         throw new Error('Error al cargar notificaciones');
       }
     } catch (error) {
-      console.error('Error:', error);
       setError('No se pudieron cargar las notificaciones. Verifique que el backend esté funcionando.');
       // Mostrar datos vacíos en lugar de error
       setNotifications([]);

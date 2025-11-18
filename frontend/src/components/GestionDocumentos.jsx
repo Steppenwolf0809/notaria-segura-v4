@@ -56,7 +56,6 @@ const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
   // Efecto para manejar navegación específica desde alertas
   useEffect(() => {
     if (documentoEspecifico && documentoEspecifico.autoSearch) {
-      console.log('🎯 Aplicando filtro automático en GestionDocumentos:', documentoEspecifico);
       setInputValue(documentoEspecifico.protocolNumber);
     }
   }, [documentoEspecifico]);

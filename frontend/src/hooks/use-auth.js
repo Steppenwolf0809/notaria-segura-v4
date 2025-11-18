@@ -96,7 +96,6 @@ const useAuth = () => {
   const logout = useCallback(() => {
     try {
       // eslint-disable-next-line no-console
-      console.info('[SESSION]', { event: 'logout' });
     } catch {}
     // Limpiar credenciales persistidas
     try {
