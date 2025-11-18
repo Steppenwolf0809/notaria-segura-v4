@@ -205,7 +205,7 @@ app.use(helmet({
       styleSrcElem: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
       scriptSrcElem: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
-      imgSrc: ["'self'", "data:", "https:"],
+      imgSrc: ["'self'", "data:", "blob:", "https:"], // blob: necesario para copiar QR al portapapeles
       connectSrc: ["'self'", "'unsafe-inline'", "http://localhost:3001", "https:"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
       objectSrc: ["'none'"],
