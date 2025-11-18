@@ -85,13 +85,7 @@ const NotificationsHistory = () => {
    */
   const loadNotifications = async () => {
     setLoading(true);
-      page,
-      rowsPerPage,
-      searchTerm,
-      statusFilter,
-      user: user?.firstName
-    });
-    
+
     try {
       // Calcular rango de fechas para el backend según dateFilter
       let dateFrom = '';
