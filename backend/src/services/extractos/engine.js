@@ -200,8 +200,13 @@ function fraseRepresentacion(otorgantes, reglasGenero) {
   for (const o of juridicos) {
     const r = o?.representante || o?.representantes || null
     if (!r) continue
-    if (Array.isArray(r)) reps.push(...r)
-    else reps.push(r)
+    if (Array.isArray(r)) {
+      // Filtrar representantes vacíos o inválidos
+      const validReps = r.filter(rep => rep && String(rep).trim().length > 0)
+      reps.push(...validReps)
+    } else if (String(r).trim().length > 0) {
+      reps.push(r)
+    }
   }
   if (reps.length === 0) return ''
 

@@ -39,11 +39,18 @@ export async function generateDocxFromText({ title = 'Documento', bodyText = '' 
     const trimmed = line.trim()
 
     // Detectar si es línea de firma (nombre del notario o notaría)
-    // Buscar patrones: NOTARIO, NOTARIA, o última línea con texto en mayúsculas
-    const isNotarioName = /^[A-ZÁÉÍÓÚÑ\s]+$/.test(trimmed) && trimmed.length > 10 && trimmed.length < 60
+    // Remover ** para detectar correctamente nombres en negrita
+    const trimmedClean = trimmed.replace(/\*\*/g, '')
+
+    // Verificar si la línea siguiente contiene NOTARIA para identificar el nombre del notario
+    const nextLine = idx + 1 < lines.length ? lines[idx + 1].trim() : ''
+    const isBeforeNotaria = /NOTAR[ÍI]A/i.test(nextLine)
+
+    // Detectar patrones de firma
+    const isNotarioName = /^[A-ZÁÉÍÓÚÑ\s\.,\-]+$/.test(trimmedClean) && trimmedClean.length > 10 && trimmedClean.length < 60
     const hasNotaria = /NOTAR[ÍI]A/i.test(trimmed)
     const hasSpaces = line.startsWith('                    ')
-    const isSignatureLine = isNotarioName || hasNotaria || hasSpaces
+    const isSignatureLine = (isNotarioName && isBeforeNotaria) || hasNotaria || hasSpaces
 
     paragraphs.push(
       new Paragraph({
@@ -105,11 +112,18 @@ export async function generateDocxFromCopies({ copies = [] } = {}) {
       const trimmed = line.trim()
 
       // Detectar si es línea de firma (nombre del notario o notaría)
-      // Buscar patrones: NOTARIO, NOTARIA, o última línea con texto en mayúsculas
-      const isNotarioName = /^[A-ZÁÉÍÓÚÑ\s]+$/.test(trimmed) && trimmed.length > 10 && trimmed.length < 60
+      // Remover ** para detectar correctamente nombres en negrita
+      const trimmedClean = trimmed.replace(/\*\*/g, '')
+
+      // Verificar si la línea siguiente contiene NOTARIA para identificar el nombre del notario
+      const nextLine = lineIdx + 1 < lines.length ? lines[lineIdx + 1].trim() : ''
+      const isBeforeNotaria = /NOTAR[ÍI]A/i.test(nextLine)
+
+      // Detectar patrones de firma
+      const isNotarioName = /^[A-ZÁÉÍÓÚÑ\s\.,\-]+$/.test(trimmedClean) && trimmedClean.length > 10 && trimmedClean.length < 60
       const hasNotaria = /NOTAR[ÍI]A/i.test(trimmed)
       const hasSpaces = line.startsWith('                    ')
-      const isSignatureLine = isNotarioName || hasNotaria || hasSpaces
+      const isSignatureLine = (isNotarioName && isBeforeNotaria) || hasNotaria || hasSpaces
 
       paragraphs.push(
         new Paragraph({
