@@ -141,14 +141,8 @@ const useBulkActions = () => {
     }
 
     setIsExecuting(true);
-    
-    try {
-        count: selectedDocs.length,
-        from: commonStatus,
-        to: newStatus,
-        options
-      });
 
+    try {
       // Llamar al servicio backend para cambio masivo
       const response = await documentService.bulkStatusChange({
         documentIds: Array.from(selectedDocuments),
