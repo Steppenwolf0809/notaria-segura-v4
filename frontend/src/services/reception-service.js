@@ -185,14 +185,6 @@ const receptionService = {
         };
       }
     } catch (error) {
-        name: error.name,
-        message: error.message,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        responseData: error.response?.data,
-        stack: error.stack
-      });
-      
       return {
         success: false,
         error: receptionService.handleError(error)

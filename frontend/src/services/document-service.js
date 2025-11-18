@@ -281,16 +281,10 @@ const documentService = {
         message: response.data.message
       };
     } catch (error) {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        message: error.message
-      });
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
                           'Error al actualizar estado del documento';
-      
+
       return {
         success: false,
         error: errorMessage,
@@ -617,16 +611,10 @@ const documentService = {
         message: response.data.message
       };
     } catch (error) {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        message: error.message
-      });
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
                           'Error al actualizar estado del grupo';
-      
+
       return {
         success: false,
         error: errorMessage,
@@ -672,16 +660,10 @@ const documentService = {
         message: response.data.message
       };
     } catch (error) {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        message: error.message
-      });
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
                           'Error al actualizar información del grupo';
-      
+
       return {
         success: false,
         error: errorMessage,
@@ -762,11 +744,7 @@ const documentService = {
   async getGroupDocuments(groupId) {
     try {
       const response = await api.get(`/documents/group/${groupId}`);
-      
-        groupId,
-        documentCount: response.data.data?.length || 0
-      });
-      
+
       return {
         success: true,
         data: response.data.data || [],
