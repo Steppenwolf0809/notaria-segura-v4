@@ -67,7 +67,9 @@ function RecepcionMain() {
     search: '',
     matrizadorId: '',
     estado: '',
-    tipoDocumento: ''
+    tipoDocumento: '',
+    fechaInicio: '',
+    fechaFin: ''
   });
 
   // Debounce para búsqueda
@@ -206,6 +208,23 @@ function RecepcionMain() {
       // Filtro por tipo de documento
       if (filters.tipoDocumento && doc.documentType !== filters.tipoDocumento) {
         return false;
+      }
+
+      // Filtro por fecha (solo para pestaña Entregados)
+      if (tabValue === 1) {
+        const fechaEntrega = new Date(doc.fechaEntrega || doc.updatedAt);
+
+        if (filters.fechaInicio) {
+          const fechaInicio = new Date(filters.fechaInicio);
+          fechaInicio.setHours(0, 0, 0, 0);
+          if (fechaEntrega < fechaInicio) return false;
+        }
+
+        if (filters.fechaFin) {
+          const fechaFin = new Date(filters.fechaFin);
+          fechaFin.setHours(23, 59, 59, 999);
+          if (fechaEntrega > fechaFin) return false;
+        }
       }
 
       return true;
@@ -349,7 +368,9 @@ function RecepcionMain() {
       search: '',
       matrizadorId: '',
       estado: '',
-      tipoDocumento: ''
+      tipoDocumento: '',
+      fechaInicio: '',
+      fechaFin: ''
     });
     setPage(0);
   };
@@ -682,6 +703,36 @@ function RecepcionMain() {
                 </Select>
               </FormControl>
             </Grid>
+
+            {/* Filtro Fecha Inicio - Solo visible en pestaña Entregados */}
+            {tabValue === 1 && (
+              <Grid item xs={12} sm={6} md={2}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  type="date"
+                  label="Desde"
+                  value={filters.fechaInicio}
+                  onChange={(e) => setFilters(prev => ({ ...prev, fechaInicio: e.target.value }))}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+            )}
+
+            {/* Filtro Fecha Fin - Solo visible en pestaña Entregados */}
+            {tabValue === 1 && (
+              <Grid item xs={12} sm={6} md={2}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  type="date"
+                  label="Hasta"
+                  value={filters.fechaFin}
+                  onChange={(e) => setFilters(prev => ({ ...prev, fechaFin: e.target.value }))}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+            )}
 
             {/* Botones de acción */}
             <Grid item xs={12} sm={6} md={2}>
