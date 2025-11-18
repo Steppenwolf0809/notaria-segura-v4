@@ -45,7 +45,6 @@ const MatrizadorCenter = () => {
    * Función para navegar a un documento desde alertas
    */
   const handleDocumentClick = (alerta) => {
-    console.log('Navegando a documento desde alerta (MATRIZADOR):', alerta);
     
     // Preparar información del documento específico
     const documentoTarget = {

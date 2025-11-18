@@ -9,7 +9,6 @@ import documentService from '../services/document-service';
 const useUnifiedDocumentsStore = create((set, get) => ({
   // 🔍 DEBUG: Log de inicialización del store
   _initialized: (() => {
-    console.log('📦 DOCUMENTS-STORE initialized');
     return true;
   })(),
 
@@ -148,7 +147,6 @@ const useUnifiedDocumentsStore = create((set, get) => ({
         });
       }
     } catch (error) {
-      console.error('Error fetching documents:', error);
       set({
         error: error.message || 'Error al cargar documentos',
         loading: false
@@ -178,7 +176,6 @@ const useUnifiedDocumentsStore = create((set, get) => ({
         set({ loadingCounts: false });
       }
     } catch (error) {
-      console.error('Error fetching counts:', error);
       set({ loadingCounts: false });
     }
   },

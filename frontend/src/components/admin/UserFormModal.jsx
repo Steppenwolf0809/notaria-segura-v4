@@ -254,7 +254,6 @@ const UserFormModal = ({ open, onClose, user = null, onUserSaved }) => {
         handleClose();
       }
     } catch (error) {
-      console.error('Error guardando usuario:', error);
       setError(error.message || 'Error al guardar el usuario');
 
       // Si hay errores específicos del servidor, mostrarlos

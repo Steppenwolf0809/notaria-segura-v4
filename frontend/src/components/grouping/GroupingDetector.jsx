@@ -21,7 +21,6 @@ const GroupingDetector = ({
   const detectGroupableDocuments = async () => {
     // Requiere al menos clientName
     if (!document?.clientName) {
-      console.log('🚫 GroupingDetector: Saltando detección - falta clientName:', {
         protocolo: document?.protocolNumber,
         clientName: document?.clientName,
         clientId: document?.clientId
@@ -31,7 +30,6 @@ const GroupingDetector = ({
 
     // Advertencia si no hay clientId (menos preciso)
     if (!document?.clientId) {
-      console.warn('⚠️ GroupingDetector: Detectando sin clientId (menos preciso):', {
         protocolo: document?.protocolNumber,
         clientName: document?.clientName
       });
@@ -47,7 +45,6 @@ const GroupingDetector = ({
       // Filtramos el documento actual de la lista de agrupables
       const otherGroupableDocs = response.groupableDocuments.filter(doc => doc.id !== document.id);
 
-      console.log(`🔍 GroupingDetector para ${document.clientName}:`, {
         documentoActual: document.protocolNumber,
         documentosEncontrados: response.groupableDocuments.map(d => ({
           protocolo: d.protocolNumber,
@@ -63,12 +60,10 @@ const GroupingDetector = ({
 
       if (response.canGroup && otherGroupableDocs.length > 0) {
         setGroupableDocuments(otherGroupableDocs);
-        console.log(`✅ GroupingDetector: Encontrados ${otherGroupableDocs.length} documentos agrupables para ${document.clientName}`);
       } else {
         setGroupableDocuments([]);
       }
     } catch (error) {
-      console.error('❌ Error detecting groupable documents:', error);
     } finally {
       setLoading(false);
     }

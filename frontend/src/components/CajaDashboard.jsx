@@ -150,7 +150,6 @@ const CajaDashboard = () => {
         toast.error('Error al asignar el documento');
       }
     } catch (error) {
-      console.error('Error in handleAssignDocument:', error);
       toast.error('Error inesperado al asignar el documento');
     }
   };
@@ -222,7 +221,6 @@ const CajaDashboard = () => {
         toast.error(result.error || 'Error al marcar documento como Nota de Crédito');
       }
     } catch (error) {
-      console.error('Error in handleMarkNotaCredito:', error);
       toast.error('Error inesperado al marcar documento como Nota de Crédito');
     }
   };

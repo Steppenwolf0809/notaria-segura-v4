@@ -76,7 +76,6 @@ const NotificationCenter = () => {
         throw new Error('Error al cargar estadísticas');
       }
     } catch (error) {
-      console.error('Error cargando estadísticas:', error);
       setError(error.message || 'Error al cargar las estadísticas');
     } finally {
       setLoading(false);
@@ -380,7 +379,6 @@ const NotificationCenter = () => {
         throw new Error('Error al reenviar notificación');
       }
     } catch (error) {
-      console.error('Error reenviando notificación:', error);
       toast.error('Error al reenviar la notificación');
     }
   };

@@ -17,7 +17,6 @@ let isRefreshing = false;
 function handleUnauthorized() {
   try {
     // eslint-disable-next-line no-console
-    console.warn('[AUTH]', '401/403 detectado → logout');
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('notaria-auth-storage'); // persist de Zustand
@@ -85,7 +84,6 @@ apiClient.interceptors.request.use(
         console.debug('[CSRF] Token agregado a request', { url: config.url, method });
       } catch (error) {
         // eslint-disable-next-line no-console
-        console.warn('[CSRF] Error obteniendo token, request continuará sin CSRF:', error);
         // Continuar sin CSRF - el servidor rechazará si es necesario
       }
     }
@@ -110,7 +108,6 @@ apiClient.interceptors.response.use(
         console.debug('[XSS] Respuesta sanitizada', { url: response.config.url });
       } catch (error) {
         // eslint-disable-next-line no-console
-        console.warn('[XSS] Error sanitizando respuesta:', error);
         // Continuar sin sanitización si falla (mejor que bloquear la app)
       }
     }
@@ -146,7 +143,6 @@ apiClient.interceptors.response.use(
     // Para 403 (forbidden), no forzar logout. Dejar que la UI maneje permisos.
     if (status === 403) {
       // eslint-disable-next-line no-console
-      console.warn('[AUTH]', '403 detectado → sin logout (permiso insuficiente)');
     }
     return Promise.reject(error);
   }

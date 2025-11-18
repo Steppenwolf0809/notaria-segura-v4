@@ -69,7 +69,6 @@ const QuickGroupingModal = ({
   // Debug del modal
   React.useEffect(() => {
     if (open) {
-      console.log('🔗 QuickGroupingModal abierto con datos:', {
         open,
         mainDocument: mainDocument?.protocolNumber,
         relatedDocuments: relatedDocuments.map(d => d.protocolNumber),
@@ -85,15 +84,12 @@ const QuickGroupingModal = ({
   const handleConfirm = async (markAsReady = false) => {
     setConfirming(true);
     try {
-      console.log('🔗 Ejecutando confirmación de agrupación...', { markAsReady });
       if (onConfirm) {
         const selectedIds = Array.from(selectedDocuments);
         await onConfirm(selectedIds, markAsReady);
       }
-      console.log('✅ Agrupación confirmada exitosamente');
       onClose();
     } catch (error) {
-      console.error('❌ Error confirmando agrupación:', error);
     } finally {
       setConfirming(false);
     }
@@ -111,13 +107,11 @@ const QuickGroupingModal = ({
 
   // Funciones para edición de documentos
   const handleEditDocument = (document) => {
-    console.log('📝 Abriendo edición para documento:', document.id);
     setDocumentToEdit(document);
     setEditModalOpen(true);
   };
 
   const handleDocumentUpdated = (updatedDocument) => {
-    console.log('📝 Documento actualizado:', updatedDocument.id);
     
     // Guardar los cambios en un mapa para referencia local
     const updates = new Map(documentUpdates);
@@ -127,7 +121,6 @@ const QuickGroupingModal = ({
     // Si es el documento principal, actualizar estado local para reflejar cambios inmediatamente
     if (updatedDocument.id === mainDocument?.id) {
       setUpdatedMainDocument(updatedDocument);
-      console.log('📝 Documento principal actualizado localmente');
     }
     // También actualizar la lista de relatedDocuments si coincide
     try {
@@ -140,7 +133,6 @@ const QuickGroupingModal = ({
     // 🎯 CORRECCIÓN: Notificar al componente padre para que actualice los datos
     if (onDocumentUpdated) {
       onDocumentUpdated(updatedDocument);
-      console.log('📤 Notificando actualización al componente padre');
     }
     
     setEditModalOpen(false);
@@ -159,7 +151,6 @@ const QuickGroupingModal = ({
   const currentMainDocument = updatedMainDocument || mainDocument;
 
   if (!open || !mainDocument) {
-    console.log('🔗 QuickGroupingModal NO mostrado - open:', open, 'mainDocument:', !!mainDocument);
     return null;
   }
 

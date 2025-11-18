@@ -148,7 +148,6 @@ const FormulariosUAFE = () => {
         mostrarSnackbar('Error al cargar protocolos', 'error');
       }
     } catch (error) {
-      console.error('Error al cargar protocolos:', error);
       mostrarSnackbar('Error al cargar protocolos', 'error');
     } finally {
       setLoading(false);
@@ -217,7 +216,6 @@ const FormulariosUAFE = () => {
         mostrarSnackbar(data.message || 'Error al crear protocolo', 'error');
       }
     } catch (error) {
-      console.error('Error al crear protocolo:', error);
       mostrarSnackbar('Error al crear protocolo', 'error');
     } finally {
       setLoading(false);
@@ -251,7 +249,6 @@ const FormulariosUAFE = () => {
         mostrarSnackbar('Persona no encontrada. Debe registrarse primero en /registro-personal', 'warning');
       }
     } catch (error) {
-      console.error('Error al buscar persona:', error);
       mostrarSnackbar('Error al buscar persona', 'error');
     } finally {
       setBuscandoPersona(false);
@@ -301,7 +298,6 @@ const FormulariosUAFE = () => {
         mostrarSnackbar(data.message || 'Error al agregar persona', 'error');
       }
     } catch (error) {
-      console.error('Error al agregar persona:', error);
       mostrarSnackbar('Error al agregar persona', 'error');
     } finally {
       setLoading(false);
@@ -330,7 +326,6 @@ const FormulariosUAFE = () => {
         mostrarSnackbar('Error al cargar detalles', 'error');
       }
     } catch (error) {
-      console.error('Error al cargar detalles:', error);
       mostrarSnackbar('Error al cargar detalles', 'error');
     } finally {
       setLoading(false);
@@ -435,7 +430,6 @@ const FormulariosUAFE = () => {
         mostrarSnackbar(data.message || 'Error al actualizar protocolo', 'error');
       }
     } catch (error) {
-      console.error('Error al actualizar protocolo:', error);
       mostrarSnackbar('Error al actualizar protocolo', 'error');
     } finally {
       setLoading(false);
@@ -570,7 +564,6 @@ const FormulariosUAFE = () => {
     navigator.clipboard.writeText(link).then(() => {
       mostrarSnackbar('Link del formulario UAFE copiado al portapapeles', 'success');
     }).catch(err => {
-      console.error('Error al copiar:', err);
       mostrarSnackbar('Error al copiar el link', 'error');
     });
   };
@@ -583,7 +576,6 @@ const FormulariosUAFE = () => {
     navigator.clipboard.writeText(link).then(() => {
       mostrarSnackbar('Link del registro de usuarios copiado al portapapeles', 'success');
     }).catch(err => {
-      console.error('Error al copiar:', err);
       mostrarSnackbar('Error al copiar el link', 'error');
     });
   };
@@ -640,7 +632,6 @@ const FormulariosUAFE = () => {
         mostrarSnackbar(data.message || 'Error al actualizar persona', 'error');
       }
     } catch (error) {
-      console.error('Error al actualizar persona:', error);
       mostrarSnackbar('Error al actualizar persona', 'error');
     } finally {
       setLoading(false);
@@ -689,7 +680,6 @@ const FormulariosUAFE = () => {
         mostrarSnackbar(data.message || 'Error al eliminar persona', 'error');
       }
     } catch (error) {
-      console.error('Error al eliminar persona:', error);
       mostrarSnackbar('Error al eliminar persona', 'error');
     } finally {
       setLoading(false);
@@ -737,7 +727,6 @@ const FormulariosUAFE = () => {
 
       mostrarSnackbar('PDF descargado exitosamente', 'success');
     } catch (error) {
-      console.error('Error descargando PDF:', error);
       mostrarSnackbar('Error al descargar PDF', 'error');
     } finally {
       setLoading(false);
@@ -804,7 +793,6 @@ const FormulariosUAFE = () => {
 
       mostrarSnackbar('PDFs descargados exitosamente', 'success');
     } catch (error) {
-      console.error('Error descargando PDFs:', error);
       mostrarSnackbar('Error al descargar PDFs', 'error');
     } finally {
       setLoading(false);

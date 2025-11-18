@@ -30,7 +30,6 @@ function ThemeToggle({ noSystem = false }) {
       // Alternar solo entre light y dark (sin pasar por system)
       setMode(resolvedIsDark ? 'light' : 'dark')
     } else {
-      // El contexto emite console.info('[THEME]', { nextTheme })
       cycleMode()
     }
   }

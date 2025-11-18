@@ -25,7 +25,6 @@ api.interceptors.request.use(
           config.headers.Authorization = `Bearer ${parsed.state.token}`;
         }
       } catch (error) {
-        console.error('Error parsing auth token:', error);
       }
     }
     return config;

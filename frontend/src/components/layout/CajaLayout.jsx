@@ -16,7 +16,6 @@ const CajaLayout = ({ children }) => {
   useEffect(() => {
     // Trazas solicitadas
     // eslint-disable-next-line no-console
-    console.info('[LAYOUT]', { role: user?.role, sidebar: 'mounted' });
   }, [user?.role]);
 
   return (

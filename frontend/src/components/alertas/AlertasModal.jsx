@@ -80,7 +80,6 @@ function AlertasModal({ open, onClose, userRole, onDocumentClick }) {
         setError(response.data.error || 'Error obteniendo alertas');
       }
     } catch (error) {
-      console.error('Error obteniendo alertas:', error);
       setError(error.response?.data?.error || 'Error de conexión');
     } finally {
       setLoading(false);

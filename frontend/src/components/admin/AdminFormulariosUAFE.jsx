@@ -100,7 +100,6 @@ const AdminFormulariosUAFE = () => {
         mostrarSnackbar('Error al cargar protocolos', 'error');
       }
     } catch (error) {
-      console.error('Error al cargar protocolos:', error);
       mostrarSnackbar('Error al cargar protocolos', 'error');
     } finally {
       setLoading(false);
@@ -152,7 +151,6 @@ const AdminFormulariosUAFE = () => {
         mostrarSnackbar(data.message || 'Error al eliminar protocolo', 'error');
       }
     } catch (error) {
-      console.error('Error al eliminar protocolo:', error);
       mostrarSnackbar('Error al eliminar protocolo', 'error');
     } finally {
       setLoading(false);

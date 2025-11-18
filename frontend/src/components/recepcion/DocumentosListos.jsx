@@ -114,7 +114,6 @@ function DocumentosListos({ onEstadisticasChange }) {
         throw new Error(result.error);
       }
     } catch (error) {
-      console.error('Error:', error);
       setError(currentTab === 0 ? 'Error cargando documentos listos' : 'Error cargando documentos');
     } finally {
       setLoading(false);
@@ -129,7 +128,6 @@ function DocumentosListos({ onEstadisticasChange }) {
         setMatrizadores(result.data.matrizadores || []);
       }
     } catch (error) {
-      console.error('Error cargando matrizadores:', error);
     }
   };
 
