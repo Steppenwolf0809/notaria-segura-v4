@@ -143,7 +143,9 @@ const LoginForm = () => {
                 <h1 className="gzs-initials gradient-logo-primary">GZS</h1>
                 <h2 className="notaria-title">NOTARÍA 18</h2>
                 <div className="decorative-line" />
-                <p className="doctor-name">Dra. Glenda Zapata Silva</p>
+                <p className="doctor-name" style={{ textAlign: 'center', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                  <strong>GLENDA ELIZABETH ZAPATA SILVA</strong>
+                </p>
                 <p className="system-description">Sistema de Trazabilidad<br/>Documental</p>
               </div>
 
