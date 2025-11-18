@@ -218,10 +218,11 @@ const documentsRateLimit = rateLimit({
 /**
  * Rate limiter para endpoints de recepción
  * Límite para operaciones de entrega
+ * Aumentado a 500 para permitir operaciones intensivas de recepción
  */
 const receptionRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 150, // 150 requests por 15 minutos
+  max: 500, // 500 requests por 15 minutos (aumentado para operaciones intensivas)
   message: {
     success: false,
     message: 'Demasiadas operaciones de recepción. Intente nuevamente en unos minutos.'
