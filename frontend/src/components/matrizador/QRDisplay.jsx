@@ -120,7 +120,7 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
 
   /**
    * Copia el QR como imagen PNG al portapapeles con leyenda incluida
-   * Tamaño optimizado para pegar en Word, Google Docs, etc.
+   * Tamaño optimizado para Word: 1.57" ancho x 2.06" alto (a 96 DPI)
    */
   const handleCopyQR = async () => {
     if (!qrRef.current) return;
@@ -134,12 +134,12 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
         throw new Error('No se encontró el elemento SVG del QR');
       }
 
-      // Configuración de dimensiones optimizadas para Word
-      const qrSize = 180; // Tamaño del QR (reducido para Word)
-      const padding = 20;
-      const legendHeight = 70; // Espacio para la leyenda
-      const totalWidth = qrSize + (padding * 2);
-      const totalHeight = qrSize + legendHeight + (padding * 2);
+      // Configuración de dimensiones para Word (1.57" x 2.06" a 96 DPI)
+      const qrSize = 111; // Tamaño del QR optimizado
+      const padding = 15; // Padding reducido
+      const legendHeight = 47; // Altura de la leyenda
+      const totalWidth = qrSize + (padding * 2); // ~141px
+      const totalHeight = qrSize + legendHeight + (padding * 2); // ~188px
 
       // Obtener las dimensiones del SVG
       const svgData = new XMLSerializer().serializeToString(svgElement);
@@ -155,9 +155,9 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
         img.src = svgUrl;
       });
 
-      // Crear un canvas con espacio para QR + leyenda
+      // Crear un canvas con espacio para QR + leyenda (sin escala para tamaño exacto)
       const canvas = document.createElement('canvas');
-      const scale = 1.5; // Factor de escala (reducido para tamaño más manejable en Word)
+      const scale = 1.0; // Sin escala para obtener tamaño exacto en Word
       canvas.width = totalWidth * scale;
       canvas.height = totalHeight * scale;
 
@@ -173,15 +173,15 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
       const qrY = padding;
       ctx.drawImage(img, qrX, qrY, qrSize, qrSize);
 
-      // Configurar estilo para la leyenda
-      ctx.fillStyle = '#f5f5f5'; // Gris claro de fondo
-      ctx.strokeStyle = '#e0e0e0'; // Borde gris
+      // Configurar estilo para la leyenda con fondo blanco
+      ctx.fillStyle = '#ffffff'; // Fondo blanco
+      ctx.strokeStyle = '#d0d0d0'; // Borde gris muy claro
       ctx.lineWidth = 1;
 
       // Dibujar fondo de la leyenda
-      const legendY = qrY + qrSize + 10;
+      const legendY = qrY + qrSize + 8;
       const legendBoxWidth = totalWidth - (padding * 2);
-      const legendBoxHeight = 55;
+      const legendBoxHeight = 38;
       const legendX = padding;
 
       ctx.fillRect(legendX, legendY, legendBoxWidth, legendBoxHeight);
@@ -193,7 +193,7 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
       ctx.textBaseline = 'middle';
 
       // Texto en dos líneas para mejor ajuste
-      const fontSize = 11;
+      const fontSize = 8.5;
       ctx.font = `${fontSize}px Arial, sans-serif`;
 
       const line1 = 'Para verificar la autenticidad de esta';
@@ -201,8 +201,8 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
       const textX = totalWidth / 2;
       const textY = legendY + (legendBoxHeight / 2);
 
-      ctx.fillText(line1, textX, textY - 8);
-      ctx.fillText(line2, textX, textY + 8);
+      ctx.fillText(line1, textX, textY - 6);
+      ctx.fillText(line2, textX, textY + 6);
 
       // Convertir canvas a blob PNG
       const blob = await new Promise((resolve) => {
