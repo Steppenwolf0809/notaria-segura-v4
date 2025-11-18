@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticateToken, requireRoles } from '../middleware/auth-middleware.js';
 import { csrfProtection } from '../middleware/csrf-protection.js';
+import { receptionRateLimit } from '../middleware/rate-limiter.js';
 import {
   getMatrizadores,
   listarTodosDocumentos,
@@ -21,9 +22,12 @@ import { marcarVariosListos } from '../controllers/reception-bulk-controller.js'
 
 const router = express.Router();
 
+// Aplicar rate limiting a todas las rutas de recepción
+router.use(receptionRateLimit);
+
 /**
  * MIDDLEWARE DE RECEPCIÓN
- * 
+ *
  * Todas las rutas requieren autenticación y rol RECEPCION o ADMIN
  */
 const requireRecepcion = requireRoles(['RECEPCION', 'ADMIN']);
