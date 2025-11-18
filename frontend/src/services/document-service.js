@@ -245,12 +245,6 @@ const documentService = {
    * @returns {Promise<Object>} Documento actualizado
    */
   async updateDocumentStatus(documentId, newStatus, options = {}) {
-      documentId,
-      newStatus,
-      options,
-      url: `/documents/${documentId}/status`
-    });
-    
     try {
       // Preparar el cuerpo de la petición
       const requestBody = { 
@@ -418,10 +412,6 @@ const documentService = {
    * @returns {Promise<Object>} Resultado de la operación
    */
   async markDocumentGroupAsReady(documentGroupId) {
-      documentGroupId,
-      url: '/documents/group/mark-ready'
-    });
-    
     try {
       const response = await api.post('/documents/group/mark-ready', { documentGroupId });
       return response.data;
@@ -437,10 +427,6 @@ const documentService = {
    * @returns {Promise<Object>} Información del documento
    */
   async getEditableDocumentInfo(documentId) {
-      documentId,
-      url: `/documents/${documentId}/editable-info`
-    });
-    
     try {
       const response = await api.get(`/documents/${documentId}/editable-info`);
       return response.data;
@@ -457,11 +443,6 @@ const documentService = {
    * @returns {Promise<Object>} Resultado de la operación
    */
   async updateDocumentInfo(documentId, updateData) {
-      documentId,
-      updateData,
-      url: `/documents/${documentId}/update-info`
-    });
-    
     try {
       const response = await api.put(`/documents/${documentId}/update-info`, updateData);
       return response.data;
@@ -611,12 +592,6 @@ const documentService = {
    * @returns {Promise<Object>} Resultado de la operación
    */
   async updateDocumentGroupStatus(documentGroupId, newStatus, options = {}) {
-      documentGroupId,
-      newStatus,
-      options,
-      url: '/documents/group/status'
-    });
-    
     try {
       // 🔧 CORRECCIÓN: Estructurar correctamente el body según lo que espera el backend
       const requestBody = { 
@@ -682,11 +657,6 @@ const documentService = {
    * @returns {Promise<Object>} Resultado de la operación
    */
   async updateDocumentGroupInfo(documentGroupId, sharedData) {
-      documentGroupId,
-      sharedData,
-      url: '/documents/group/info'
-    });
-    
     try {
       const requestBody = { 
         documentGroupId,
@@ -727,11 +697,6 @@ const documentService = {
    * @returns {Promise<Object>} Historial del documento
    */
   async getDocumentHistory(documentId, params = {}) {
-      documentId,
-      params,
-      url: `/documents/${documentId}/history`
-    });
-    
     try {
       const queryParams = new URLSearchParams();
       
@@ -750,16 +715,10 @@ const documentService = {
         message: response.data.message
       };
     } catch (error) {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        message: error.message
-      });
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
                           'Error al obtener historial del documento';
-      
+
       return {
         success: false,
         error: errorMessage,
@@ -774,10 +733,6 @@ const documentService = {
    * @returns {Promise<Object>} Resultado de la operación masiva
    */
   async bulkStatusChange(bulkData) {
-      bulkData,
-      url: '/documents/bulk-status-change'
-    });
-    
     try {
       const response = await api.post('/documents/bulk-status-change', bulkData);
       
@@ -787,16 +742,10 @@ const documentService = {
         message: response.data.message
       };
     } catch (error) {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        message: error.message
-      });
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
                           'Error al realizar cambio masivo de estado';
-      
+
       return {
         success: false,
         error: errorMessage,
@@ -955,11 +904,6 @@ const documentService = {
    */
   async markAsNotaCredito(documentId, motivo) {
     try {
-        documentId,
-        motivo,
-        url: `/documents/${documentId}/nota-credito`
-      });
-      
       const response = await api.put(`/documents/${documentId}/nota-credito`, {
         motivo
       });
