@@ -470,13 +470,8 @@ const useDocumentStore = create((set, get) => ({
    * @returns {Promise<Object>} Resultado detallado de la operación
    */
   updateDocumentStatusWithConfirmation: async (documentId, newStatus, options = {}) => {
-      documentId,
-      newStatus,
-      options
-    });
-    
     set({ loading: true, error: null });
-    
+
     try {
       const result = await documentService.updateDocumentStatus(documentId, newStatus, options);
       
