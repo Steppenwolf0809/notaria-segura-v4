@@ -26,14 +26,16 @@ export async function verificarCedula(req, res) {
       where: { numeroIdentificacion: cedula },
       select: {
         id: true,
-        tipoPersona: true
+        tipoPersona: true,
+        pinCreado: true
       }
     });
 
     res.json({
       success: true,
       existe: !!persona,  // Convierte a boolean
-      tipoPersona: persona?.tipoPersona || null
+      tipoPersona: persona?.tipoPersona || null,
+      pinCreado: persona?.pinCreado ?? false  // Indica si tiene PIN creado o si necesita crearlo
     });
   } catch (error) {
     logger.error('Error verificando cédula:', error);
