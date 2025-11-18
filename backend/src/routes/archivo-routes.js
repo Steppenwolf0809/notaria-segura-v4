@@ -1,6 +1,7 @@
 import express from 'express';
 import { authenticateToken, requireRoles } from '../middleware/auth-middleware.js';
 import { csrfProtection } from '../middleware/csrf-protection.js';
+import { archivoRateLimit } from '../middleware/rate-limiter.js';
 import {
   dashboardArchivo,
   listarMisDocumentos,
@@ -15,6 +16,9 @@ import {
 import { marcarVariosListosArchivo } from '../controllers/archivo-bulk-controller.js';
 
 const router = express.Router();
+
+// Aplicar rate limiting a todas las rutas de archivo
+router.use(archivoRateLimit);
 
 /**
  * MIDDLEWARE DE ARCHIVO

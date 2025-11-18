@@ -2,6 +2,12 @@ import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import { logSecurityViolation } from '../utils/audit-logger.js';
 
 /**
+ * Configuración base de trust proxy
+ * IMPORTANTE: Debe estar consistente en toda la aplicación
+ */
+const TRUST_PROXY = process.env.NODE_ENV === 'production';
+
+/**
  * Rate limiter para cambio de contraseñas
  * Límite más estricto para operaciones sensibles
  */
@@ -13,16 +19,14 @@ const passwordChangeRateLimit = rateLimit({
     message: 'Demasiados intentos de cambio de contraseña. Intente nuevamente en 15 minutos.',
     retryAfter: '15 minutos'
   },
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  trustProxy: process.env.NODE_ENV === 'production', // Solo confiar en proxy en producción
-  
-  // Handler actualizado para express-rate-limit v7+
+  standardHeaders: true,
+  legacyHeaders: false,
+  trustProxy: TRUST_PROXY,
+
   handler: (req, res) => {
     const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
     const userAgent = req.headers['user-agent'] || 'unknown';
-    
-    // Log de violación de seguridad
+
     logSecurityViolation({
       userId: req.user?.id || null,
       userEmail: req.user?.email || 'unknown',
@@ -31,9 +35,9 @@ const passwordChangeRateLimit = rateLimit({
       violation: 'Excedido límite de intentos de cambio de contraseña',
       severity: 'medium'
     });
-    
+
     console.warn(`Rate limit exceeded for password change - IP: ${clientIP}, User: ${req.user?.email || 'unknown'}`);
-    
+
     res.status(429).json({
       success: false,
       message: 'Demasiados intentos de cambio de contraseña. Intente nuevamente en 15 minutos.',
@@ -105,7 +109,7 @@ const authGeneralRateLimit = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  trustProxy: true // Confiar en headers de proxy para obtener IP real
+  trustProxy: TRUST_PROXY
 });
 
 /**
@@ -122,7 +126,7 @@ const registerRateLimit = rateLimit({
   },
   standardHeaders: true,
   legacyHeaders: false,
-  trustProxy: true // Confiar en headers de proxy para obtener IP real
+  trustProxy: TRUST_PROXY
 });
 
 /**
@@ -177,11 +181,116 @@ const adminRateLimit = rateLimit({
   }
 });
 
+/**
+ * Rate limiter para endpoints de documentos
+ * Límite razonable para operaciones de lectura/escritura
+ */
+const documentsRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 200, // 200 requests por 15 minutos
+  message: {
+    success: false,
+    message: 'Demasiadas operaciones de documentos. Intente nuevamente en unos minutos.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  trustProxy: TRUST_PROXY,
+
+  handler: (req, res) => {
+    const clientIP = req.ip || 'unknown';
+
+    logSecurityViolation({
+      userId: req.user?.id || null,
+      userEmail: req.user?.email || 'unknown',
+      ipAddress: clientIP,
+      userAgent: req.headers['user-agent'] || 'unknown',
+      violation: 'Excedido límite de operaciones de documentos',
+      severity: 'low'
+    });
+
+    res.status(429).json({
+      success: false,
+      message: 'Demasiadas operaciones de documentos. Intente nuevamente en unos minutos.'
+    });
+  }
+});
+
+/**
+ * Rate limiter para endpoints de recepción
+ * Límite para operaciones de entrega
+ */
+const receptionRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 150, // 150 requests por 15 minutos
+  message: {
+    success: false,
+    message: 'Demasiadas operaciones de recepción. Intente nuevamente en unos minutos.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  trustProxy: TRUST_PROXY,
+
+  handler: (req, res) => {
+    const clientIP = req.ip || 'unknown';
+
+    logSecurityViolation({
+      userId: req.user?.id || null,
+      userEmail: req.user?.email || 'unknown',
+      ipAddress: clientIP,
+      userAgent: req.headers['user-agent'] || 'unknown',
+      violation: 'Excedido límite de operaciones de recepción',
+      severity: 'low'
+    });
+
+    res.status(429).json({
+      success: false,
+      message: 'Demasiadas operaciones de recepción. Intente nuevamente en unos minutos.'
+    });
+  }
+});
+
+/**
+ * Rate limiter para endpoints de archivo
+ * Límite para operaciones de archivo
+ */
+const archivoRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 150, // 150 requests por 15 minutos
+  message: {
+    success: false,
+    message: 'Demasiadas operaciones de archivo. Intente nuevamente en unos minutos.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  trustProxy: TRUST_PROXY,
+
+  handler: (req, res) => {
+    const clientIP = req.ip || 'unknown';
+
+    logSecurityViolation({
+      userId: req.user?.id || null,
+      userEmail: req.user?.email || 'unknown',
+      ipAddress: clientIP,
+      userAgent: req.headers['user-agent'] || 'unknown',
+      violation: 'Excedido límite de operaciones de archivo',
+      severity: 'low'
+    });
+
+    res.status(429).json({
+      success: false,
+      message: 'Demasiadas operaciones de archivo. Intente nuevamente en unos minutos.'
+    });
+  }
+});
+
 export {
   passwordChangeRateLimit,
   loginRateLimit,
   authGeneralRateLimit,
   registerRateLimit,
   adminRateLimit,
+  documentsRateLimit,
+  receptionRateLimit,
+  archivoRateLimit,
   addRateLimitHeaders
 };
