@@ -33,6 +33,11 @@ const {
     // Buscar token en header personalizado o en body
     return req.headers[HEADER_NAME] || req.body?._csrf;
   },
+  getSessionIdentifier: (req) => {
+    // Usar el ID del usuario autenticado como identificador de sesión
+    // Si no hay usuario autenticado, usar la IP como fallback
+    return req.user?.id || req.ip || 'anonymous';
+  },
 });
 
 /**
