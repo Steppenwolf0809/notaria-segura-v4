@@ -3,7 +3,7 @@
 import axios from 'axios';
 import { API_BASE } from '../utils/apiConfig';
 import csrfService from './csrf-service';
-import { sanitizeObject } from '../utils/sanitize';
+import { sanitizeObject } from '../utils/sanitize.jsx';
 
 // Bandera local para evitar loops de refresh (si se habilita el flujo opcional)
 let isRefreshing = false;
