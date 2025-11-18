@@ -68,7 +68,6 @@ const Sidebar = ({
   // Trazas de verificación
   useEffect(() => {
     // eslint-disable-next-line no-console
-    console.info('[SIDEBAR]', { role, items: items.length });
   }, [role, items]);
 
   // Marcar activo por hash si no hay activeId

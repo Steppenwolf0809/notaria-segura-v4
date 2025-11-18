@@ -47,7 +47,6 @@ const ArchivoCenter = () => {
         setError(response.message || 'Error cargando dashboard');
       }
     } catch (error) {
-      console.error('Error:', error);
       setError('Error de conexión');
     } finally {
       setLoading(false);

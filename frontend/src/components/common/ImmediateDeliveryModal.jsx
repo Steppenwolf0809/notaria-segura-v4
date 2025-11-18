@@ -90,7 +90,6 @@ const ImmediateDeliveryModal = ({
         setError(result.error || 'Error al entregar documento inmediatamente');
       }
     } catch (error) {
-      console.error('❌ Error en entrega inmediata:', error);
       setError('Error de conexión al entregar el documento');
     } finally {
       setDelivering(false);

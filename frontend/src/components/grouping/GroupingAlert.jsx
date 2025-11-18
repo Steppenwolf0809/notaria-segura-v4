@@ -65,10 +65,8 @@ const GroupingAlert = ({
 
       if (response.canGroup && otherDocs.length > 0) {
         setGroupableDocuments(otherDocs);
-        console.log(`✨ GroupingAlert: Encontrados ${otherDocs.length} documentos agrupables para ${document.clientName}`);
       }
     } catch (error) {
-      console.error('❌ Error detectando documentos agrupables:', error);
     } finally {
       setLoading(false);
     }

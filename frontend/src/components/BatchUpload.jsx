@@ -154,12 +154,10 @@ const BatchUpload = () => {
 
         // ⭐ Recargar documentos con parámetros explícitos para asegurar actualización
         await fetchAllDocuments(1, 50);
-        console.log('📊 Store de documentos actualizado después de batch upload');
       } else {
         toast.error(`Error en procesamiento: ${result.error}`);
       }
     } catch (error) {
-      console.error('Error procesando lote:', error);
       toast.error('Error inesperado al procesar el lote');
     }
   };

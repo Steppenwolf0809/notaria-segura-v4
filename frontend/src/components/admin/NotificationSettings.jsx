@@ -54,7 +54,6 @@ const NotificationSettings = () => {
           }
         }
       } catch (apiError) {
-        console.warn('API no disponible, usando configuración por defecto');
       }
 
       // Configuración por defecto si la API no está disponible
@@ -67,7 +66,6 @@ const NotificationSettings = () => {
       });
       
     } catch (error) {
-      console.error('Error loading settings:', error);
     } finally {
       setLoading(false);
     }
@@ -93,7 +91,6 @@ const NotificationSettings = () => {
           }
         }
       } catch (apiError) {
-        console.warn('API no disponible para notificaciones fallidas');
       }
 
       // Datos simulados de notificaciones fallidas
@@ -115,7 +112,6 @@ const NotificationSettings = () => {
       ]);
       
     } catch (error) {
-      console.error('Error loading failed notifications:', error);
     }
   };
 
@@ -147,11 +143,9 @@ const NotificationSettings = () => {
         toast.success('Configuración guardada');
       } else {
         // Si la API no está disponible, simular guardado exitoso
-        console.warn('API no disponible, simulando guardado');
         toast.success('Configuración guardada (modo demo)');
       }
     } catch (error) {
-      console.error('Error saving settings:', error);
       toast.success('Configuración guardada (modo demo)');
     }
   };
@@ -177,7 +171,6 @@ const NotificationSettings = () => {
         setFailedNotifications(prev => prev.filter(n => n.id !== notificationId));
       }
     } catch (error) {
-      console.error('Error retrying notification:', error);
       toast.success('Notificación reenviada (modo demo)');
       setFailedNotifications(prev => prev.filter(n => n.id !== notificationId));
     }
@@ -203,7 +196,6 @@ const NotificationSettings = () => {
         setFailedNotifications([]);
       }
     } catch (error) {
-      console.error('Error retrying all notifications:', error);
       toast.success('Todas las notificaciones han sido reenviadas (modo demo)');
       setFailedNotifications([]);
     }

@@ -214,7 +214,6 @@ const ChangePassword = ({ open, onClose }) => {
         handleClose();
       }
     } catch (error) {
-      console.error('Error cambiando contraseña:', error);
       setError(error.message || 'Error al cambiar la contraseña');
       
       // Si hay errores específicos del servidor, mostrarlos

@@ -83,9 +83,7 @@ const UploadXML = () => {
         // ⭐ FIX: Actualizar el store de documentos para que el dashboard muestre el nuevo documento
         try {
           await fetchAllDocuments(1, 50);
-          console.log('📊 Store de documentos actualizado después de subir XML');
         } catch (fetchError) {
-          console.error('Error actualizando store después de subir XML:', fetchError);
           // No mostrar error al usuario ya que el documento se subió correctamente
         }
       } else {
@@ -96,7 +94,6 @@ const UploadXML = () => {
         }]);
       }
     } catch (error) {
-      console.error('Error uploading XML:', error);
       toast.error('Error inesperado al subir el XML');
       setResults([{
         success: false,

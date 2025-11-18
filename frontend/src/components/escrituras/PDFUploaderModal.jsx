@@ -112,7 +112,6 @@ export default function PDFUploaderModal({ open, onClose, escritura, onSuccess }
   // Manejar carga del documento en preview
   const onDocumentLoadSuccess = ({ numPages }) => {
     setNumPages(numPages);
-    console.log(`PDF cargado: ${numPages} páginas`);
   };
   
   // Toggle página oculta
@@ -169,7 +168,6 @@ export default function PDFUploaderModal({ open, onClose, escritura, onSuccess }
       }, 1500);
       
     } catch (err) {
-      console.error('Error uploading PDF:', err);
       setError(err.message || 'Error al subir el PDF');
       setUploading(false);
       setUploadProgress(0);

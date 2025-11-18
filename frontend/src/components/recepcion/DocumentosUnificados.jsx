@@ -204,7 +204,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
         throw new Error(result.error);
       }
     } catch (err) {
-      console.error('Error:', err);
       setError('Error cargando documentos');
     } finally {
       setLoading(false);
@@ -223,7 +222,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
           setMatrizadores(result.data.matrizadores || []);
         }
       } catch (error) {
-        console.error('Error cargando matrizadores:', error);
       }
     };
     cargarMatrizadores();
@@ -232,7 +230,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   // Efecto para manejar navegación específica desde alertas
   useEffect(() => {
     if (documentoEspecifico && documentoEspecifico.autoSearch) {
-      console.log('🎯 Navegación específica a documento:', documentoEspecifico);
       
       // Aplicar filtro automático por código de protocolo
       setFilters(prev => ({
@@ -257,7 +254,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
       const foundDocument = documentos.find(doc => doc.id === scrollToDocument);
       
       if (foundDocument) {
-        console.log('✅ Documento encontrado en la lista actual:', foundDocument);
         
         // Hacer scroll al documento (con un pequeño delay para asegurar que el DOM esté actualizado)
         setTimeout(() => {
@@ -343,7 +339,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
     try {
       let result;
       
-      console.log('🎯 Iniciando marcar como listo:', {
         actionType,
         documentoId: currentDocumento?.id,
         selectedDocuments: selectedDocuments.length,
@@ -351,23 +346,18 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
       });
       
       if (actionType === 'individual' && currentDocumento) {
-        console.log('📄 Marcando documento individual:', currentDocumento.id);
         result = await receptionService.marcarComoListo(currentDocumento.id);
       } else if (actionType === 'grupal' && selectedDocuments.length > 0) {
-        console.log('📁 Marcando grupo de documentos:', selectedDocuments);
         result = await receptionService.marcarGrupoListo(selectedDocuments);
       } else {
         // Fallback conservador por si el estado actionType se perdió
         if (currentDocumento?.id) {
-          console.warn('⚠️ actionType no definido; aplicando fallback a individual');
           result = await receptionService.marcarComoListo(currentDocumento.id);
         } else if (selectedDocuments.length > 0) {
-          console.warn('⚠️ actionType no definido; aplicando fallback a grupal');
           result = await receptionService.marcarGrupoListo(selectedDocuments);
         }
       }
 
-      console.log('✅ Resultado completo del servicio:', {
         result,
         type: typeof result,
         success: result?.success,
@@ -378,7 +368,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
 
       // Verificar que result existe y es un objeto válido
       if (!result) {
-        console.error('❌ Resultado del servicio es null/undefined');
         throw new Error('El servicio no retornó una respuesta válida');
       }
 
@@ -397,7 +386,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
         }
         // Mantener snackbar local para compatibilidad visual existente
         setSnackbar({ open: true, message: result.message || 'Documento(s) marcado(s) como listo(s) exitosamente', severity: 'success' });
-        console.log('🔄 Recargando documentos...');
         await cargarDocumentos();
 
         // Forzar re-render para asegurar actualización visual
@@ -405,12 +393,9 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
           await cargarDocumentos();
         }, 100);
 
-        console.log('📊 Actualizando estadísticas...');
         onEstadisticasChange?.();
         setSelectedDocuments([]);
-        console.log('✅ Proceso completado exitosamente');
       } else {
-        console.error('❌ Error en resultado del servicio:', {
           success: result?.success,
           error: result?.error,
           message: result?.message,
@@ -430,7 +415,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
         throw new Error(errorMessage);
       }
     } catch (error) {
-      console.error('Error marcando como listo:', error);
       const msg = error.message || 'Error al marcar documento(s) como listo(s)';
       setSnackbar({ open: true, message: msg, severity: 'error' });
       toast.error(msg);
@@ -457,7 +441,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
     try {
       setReversionLoading(true);
       
-      console.log('🔄 Iniciando reversión de documento:', {
         documentId,
         newStatus,
         reversionReason,
@@ -466,7 +449,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
 
       const result = await receptionService.revertirEstadoDocumento(documentId, newStatus, reversionReason);
 
-      console.log('✅ Resultado de reversión:', result);
 
       if (result.success) {
         setSnackbar({ 
@@ -483,7 +465,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
         throw new Error(result.error || 'Error en la reversión del documento');
       }
     } catch (error) {
-      console.error('❌ Error en reversión:', error);
       setSnackbar({ 
         open: true, 
         message: error.message || 'Error al revertir el documento', 
@@ -633,7 +614,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
    * Manejar agrupación inteligente detectada automáticamente
    */
   const handleGroupDocuments = async (groupableDocuments, mainDocument) => {
-    console.log('🔗 RECEPCION: Activando agrupación inteligente:', {
       main: mainDocument.protocolNumber || mainDocument.id,
       groupable: groupableDocuments.map(d => d.protocolNumber || d.id)
     });
@@ -658,7 +638,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
     
     try {
       const documentIds = [pendingGroupData.main.id, ...selectedDocumentIds];
-      console.log('🔗 RECEPCION: Creando grupo con documentos:', documentIds);
       
       const result = await createDocumentGroup(documentIds);
       
@@ -683,14 +662,12 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
           severity: 'success'
         });
 
-        console.log('✅ RECEPCION: Agrupación exitosa:', result);
         
         // Auto-ocultar después de 5 segundos
         setTimeout(() => {
           setGroupingSuccess(null);
         }, 5000);
       } else {
-        console.error('❌ RECEPCION: Error en agrupación:', result.error);
         setSnackbar({
           open: true,
           message: result.error || 'Error al crear el grupo',
@@ -698,7 +675,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
         });
       }
     } catch (error) {
-      console.error('❌ RECEPCION: Error inesperado en agrupación:', error);
       setSnackbar({
         open: true,
         message: 'Error inesperado al crear el grupo',

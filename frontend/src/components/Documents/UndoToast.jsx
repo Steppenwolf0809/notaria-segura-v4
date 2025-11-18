@@ -66,7 +66,6 @@ const UndoToast = ({
       await onUndo(changeInfo);
       onClose();
     } catch (error) {
-      console.error('Error deshaciendo cambio:', error);
       setIsUndoing(false);
     }
   };

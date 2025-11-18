@@ -141,7 +141,6 @@ const useDocuments = (options = {}) => {
       setRefreshCount(prev => prev + 1);
       return success;
     } catch (err) {
-      console.error('Error loading documents:', err);
       throw err;
     } finally {
       setLocalLoading(false);
@@ -258,7 +257,6 @@ const useDocuments = (options = {}) => {
       
       return result;
     } catch (error) {
-      console.error('Error fetching document:', error);
       throw error;
     }
   }, [enableCache, cache]);

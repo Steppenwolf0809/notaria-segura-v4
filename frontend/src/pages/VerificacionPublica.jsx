@@ -132,7 +132,6 @@ const VerificacionPublica = () => {
         });
       } catch (err) {
         // Usuario canceló o error
-        console.log('Share cancelled or failed:', err);
       }
     } else {
       // Fallback: copiar URL
@@ -140,7 +139,6 @@ const VerificacionPublica = () => {
         await navigator.clipboard.writeText(url);
         alert('URL copiada al portapapeles');
       } catch (err) {
-        console.error('Error copying URL:', err);
       }
     }
   };
