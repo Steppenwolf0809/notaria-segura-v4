@@ -25,7 +25,10 @@ import {
   Grid,
   Avatar,
   InputAdornment,
-  Paper
+  Paper,
+  Tabs,
+  Tab,
+  Badge
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -55,6 +58,9 @@ function RecepcionMain() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [matrizadores, setMatrizadores] = useState([]);
+
+  // Estado de pestañas (0: Activos, 1: Entregados)
+  const [tabValue, setTabValue] = useState(0);
 
   // Estados de filtros
   const [filters, setFilters] = useState({
@@ -166,6 +172,15 @@ function RecepcionMain() {
    */
   const documentosFiltrados = useMemo(() => {
     return documentos.filter(doc => {
+      // Filtro por pestaña activa
+      if (tabValue === 0) {
+        // Pestaña Activos: solo EN_PROCESO, LISTO, PAGADO
+        if (doc.status === 'ENTREGADO') return false;
+      } else {
+        // Pestaña Entregados: solo ENTREGADO
+        if (doc.status !== 'ENTREGADO') return false;
+      }
+
       // Búsqueda general
       if (filters.search) {
         const search = filters.search.toLowerCase();
@@ -192,7 +207,7 @@ function RecepcionMain() {
 
       return true;
     });
-  }, [documentos, filters]);
+  }, [documentos, filters, tabValue]);
 
   /**
    * Obtener tipos de documento únicos para filtro
@@ -250,6 +265,34 @@ function RecepcionMain() {
       default:
         return '⚪';
     }
+  };
+
+  /**
+   * Obtener abreviación del tipo de documento
+   */
+  const getDocTypeAbbr = (type) => {
+    if (!type) return '?';
+    const abbr = {
+      'ESCRITURA': 'E',
+      'ESCRITURA PUBLICA': 'E',
+      'PODER': 'P',
+      'DILIGENCIA': 'D',
+      'DECLARACION': 'DC',
+      'ACTA': 'A',
+      'OTRO': 'O',
+      'MINUTA': 'M',
+      'RECONOCIMIENTO': 'R',
+      'AUTENTICACION': 'AU'
+    };
+
+    // Buscar coincidencia parcial
+    const upperType = type.toUpperCase();
+    for (const [key, value] of Object.entries(abbr)) {
+      if (upperType.includes(key)) return value;
+    }
+
+    // Si no hay coincidencia, usar primera letra
+    return type.substring(0, 1).toUpperCase();
   };
 
   /**
@@ -418,7 +461,7 @@ function RecepcionMain() {
   return (
     <Box sx={{ p: 3 }}>
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
+      <Box sx={{ mb: 3 }}>
         <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', mb: 1 }}>
           📋 Gestión de Recepción de Documentos
         </Typography>
@@ -427,14 +470,34 @@ function RecepcionMain() {
         </Typography>
       </Box>
 
+      {/* Pestañas: Activos vs Entregados */}
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)}>
+          <Tab
+            label={
+              <Badge badgeContent={stats.enProceso + stats.listos} color="primary" max={999}>
+                Documentos Activos
+              </Badge>
+            }
+          />
+          <Tab
+            label={
+              <Badge badgeContent={stats.entregadosHoy} color="success" max={999}>
+                Entregados
+              </Badge>
+            }
+          />
+        </Tabs>
+      </Box>
+
       {/* Panel de Estadísticas - Compacto */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         {/* En Proceso */}
         <Grid item xs={6} sm={3}>
           <Card sx={{
-            bgcolor: '#fef3c7',
+            bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(245, 158, 11, 0.15)' : '#fef3c7',
             borderLeft: 3,
-            borderColor: '#f59e0b',
+            borderColor: 'warning.main',
             transition: 'all 0.2s',
             '&:hover': { transform: 'translateY(-2px)', boxShadow: 2 }
           }}>
@@ -444,11 +507,11 @@ function RecepcionMain() {
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>
                     EN PROCESO
                   </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#92400e' }}>
+                  <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'warning.dark' }}>
                     {stats.enProceso}
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: '#f59e0b', width: 40, height: 40 }}>
+                <Avatar sx={{ bgcolor: 'warning.main', width: 40, height: 40 }}>
                   <HourglassEmptyIcon sx={{ fontSize: 20 }} />
                 </Avatar>
               </Box>
@@ -459,9 +522,9 @@ function RecepcionMain() {
         {/* Listos */}
         <Grid item xs={6} sm={3}>
           <Card sx={{
-            bgcolor: '#d1fae5',
+            bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(16, 185, 129, 0.15)' : '#d1fae5',
             borderLeft: 3,
-            borderColor: '#10b981',
+            borderColor: 'success.main',
             transition: 'all 0.2s',
             '&:hover': { transform: 'translateY(-2px)', boxShadow: 2 }
           }}>
@@ -471,11 +534,11 @@ function RecepcionMain() {
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>
                     LISTOS
                   </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#065f46' }}>
+                  <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'success.dark' }}>
                     {stats.listos}
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: '#10b981', width: 40, height: 40 }}>
+                <Avatar sx={{ bgcolor: 'success.main', width: 40, height: 40 }}>
                   <DoneIcon sx={{ fontSize: 20 }} />
                 </Avatar>
               </Box>
@@ -486,9 +549,9 @@ function RecepcionMain() {
         {/* Entregados Hoy */}
         <Grid item xs={6} sm={3}>
           <Card sx={{
-            bgcolor: '#dbeafe',
+            bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(59, 130, 246, 0.15)' : '#dbeafe',
             borderLeft: 3,
-            borderColor: '#3b82f6',
+            borderColor: 'primary.main',
             transition: 'all 0.2s',
             '&:hover': { transform: 'translateY(-2px)', boxShadow: 2 }
           }}>
@@ -498,11 +561,11 @@ function RecepcionMain() {
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>
                     ENTREGADOS HOY
                   </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#1e40af' }}>
+                  <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'primary.dark' }}>
                     {stats.entregadosHoy}
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: '#3b82f6', width: 40, height: 40 }}>
+                <Avatar sx={{ bgcolor: 'primary.main', width: 40, height: 40 }}>
                   <LocalShippingIcon sx={{ fontSize: 20 }} />
                 </Avatar>
               </Box>
@@ -513,9 +576,9 @@ function RecepcionMain() {
         {/* Total */}
         <Grid item xs={6} sm={3}>
           <Card sx={{
-            bgcolor: '#e0e7ff',
+            bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(99, 102, 241, 0.15)' : '#e0e7ff',
             borderLeft: 3,
-            borderColor: '#6366f1',
+            borderColor: 'info.main',
             transition: 'all 0.2s',
             '&:hover': { transform: 'translateY(-2px)', boxShadow: 2 }
           }}>
@@ -525,11 +588,11 @@ function RecepcionMain() {
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>
                     TOTAL VISIBLES
                   </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#3730a3' }}>
+                  <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'info.dark' }}>
                     {stats.total}
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: '#6366f1', width: 40, height: 40 }}>
+                <Avatar sx={{ bgcolor: 'info.main', width: 40, height: 40 }}>
                   <AssignmentIcon sx={{ fontSize: 20 }} />
                 </Avatar>
               </Box>
@@ -724,27 +787,35 @@ function RecepcionMain() {
                       </Box>
                     </TableCell>
 
-                    {/* Tipo */}
-                    <TableCell>
-                      <Chip
-                        icon={<DescriptionIcon />}
-                        label={documento.documentType}
-                        size="small"
-                        color="info"
-                        variant="outlined"
-                      />
+                    {/* Tipo - Abreviado */}
+                    <TableCell sx={{ textAlign: 'center' }}>
+                      <Tooltip title={documento.documentType} arrow>
+                        <Chip
+                          label={getDocTypeAbbr(documento.documentType)}
+                          size="small"
+                          color="info"
+                          sx={{
+                            minWidth: 32,
+                            fontSize: '0.75rem',
+                            fontWeight: 700
+                          }}
+                        />
+                      </Tooltip>
                     </TableCell>
 
-                    {/* Código */}
+                    {/* Código - Más prominente */}
                     <TableCell>
-                      <Chip
-                        label={documento.protocolNumber}
-                        size="small"
+                      <Typography
+                        variant="body1"
                         sx={{
                           fontFamily: 'monospace',
-                          fontWeight: 700
+                          fontWeight: 700,
+                          fontSize: '0.95rem',
+                          color: 'primary.main'
                         }}
-                      />
+                      >
+                        {documento.protocolNumber}
+                      </Typography>
                     </TableCell>
 
                     {/* Matrizador */}
@@ -767,20 +838,38 @@ function RecepcionMain() {
                       </Box>
                     </TableCell>
 
-                    {/* Estado */}
-                    <TableCell>
-                      <Chip
-                        label={documento.status}
-                        icon={<span>{getStatusIcon(documento.status)}</span>}
-                        size="small"
-                        sx={{
-                          bgcolor: getStatusColor(documento.status).bg,
-                          color: getStatusColor(documento.status).text,
-                          fontWeight: 600,
-                          textTransform: 'uppercase',
-                          fontSize: '0.75rem'
-                        }}
-                      />
+                    {/* Estado - Compacto */}
+                    <TableCell sx={{ textAlign: 'center' }}>
+                      <Tooltip title={documento.status} arrow>
+                        <Box
+                          sx={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 0.5,
+                            px: 1,
+                            py: 0.25,
+                            borderRadius: 1,
+                            bgcolor: getStatusColor(documento.status).bg,
+                            fontSize: '0.7rem'
+                          }}
+                        >
+                          <span>{getStatusIcon(documento.status)}</span>
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: getStatusColor(documento.status).text,
+                              fontWeight: 700,
+                              fontSize: '0.65rem'
+                            }}
+                          >
+                            {documento.status === 'EN_PROCESO' ? 'PROC' :
+                             documento.status === 'LISTO' ? 'LSTO' :
+                             documento.status === 'PAGADO' ? 'PAGD' :
+                             documento.status === 'ENTREGADO' ? 'ENTR' :
+                             documento.status}
+                          </Typography>
+                        </Box>
+                      </Tooltip>
                     </TableCell>
 
                     {/* Fecha */}
