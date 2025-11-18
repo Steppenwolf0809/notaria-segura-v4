@@ -132,14 +132,16 @@ model Document {
   updatedAt               DateTime       @updatedAt
   
   @@map("documents")
-  // Índices para acelerar listados y filtros comunes
+  // Índices simples para filtros comunes
   @@index([status])
   @@index([createdAt])
   @@index([updatedAt])
-  @@index([assignedToId])
-  @@index([documentGroupId])
-  @@index([assignedToId, status])
-  @@index([documentGroupId, status])
+  @@index([clientPhone])  // Performance: búsqueda por teléfono del cliente
+  @@index([clientName])   // Performance: búsqueda por nombre del cliente
+  @@index([documentGroupId])  // Performance: búsqueda de documentos agrupados
+  // Índices compuestos para queries más complejas
+  @@index([assignedToId, status])  // Performance: documentos por matrizador y estado
+  @@index([documentGroupId, status])  // Performance: grupos de documentos por estado
 }
 
 // Modelo para gestionar grupos
