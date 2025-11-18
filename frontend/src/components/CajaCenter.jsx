@@ -20,7 +20,6 @@ const CajaCenter = () => {
   useEffect(() => {
     const updateView = () => {
       const hash = window.location.hash.replace(/^#\//, '') || 'dashboard';
-      console.log('[CAJA-CENTER] Hash changed:', hash);
       setCurrentView(hash);
     };
 
@@ -41,7 +40,6 @@ const CajaCenter = () => {
 
   // Renderizar vista según currentView
   const renderView = () => {
-    console.log('[CAJA-CENTER] Rendering view:', currentView);
 
     switch (currentView) {
       case 'dashboard':

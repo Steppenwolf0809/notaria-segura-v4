@@ -132,7 +132,6 @@ const NotificationTemplates = () => {
         throw new Error('Error al cargar plantillas');
       }
     } catch (error) {
-      console.error('Error cargando plantillas:', error);
       setError(error.message || 'Error al cargar las plantillas');
     } finally {
       setLoading(false);
@@ -219,7 +218,6 @@ const NotificationTemplates = () => {
         throw new Error(errorData.message || 'Error al guardar plantilla');
       }
     } catch (error) {
-      console.error('Error guardando plantilla:', error);
       toast.error(error.message || 'Error al guardar la plantilla');
     }
   };
@@ -249,7 +247,6 @@ const NotificationTemplates = () => {
         throw new Error('Error al eliminar plantilla');
       }
     } catch (error) {
-      console.error('Error eliminando plantilla:', error);
       toast.error('Error al eliminar la plantilla');
     }
   };
@@ -309,7 +306,6 @@ const NotificationTemplates = () => {
         throw new Error('Error al enviar notificación de prueba');
       }
     } catch (error) {
-      console.error('Error enviando prueba:', error);
       toast.error('Error al enviar la notificación de prueba');
     }
   };

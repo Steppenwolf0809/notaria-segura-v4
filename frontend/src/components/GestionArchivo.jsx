@@ -48,7 +48,6 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
         setError(response.message || 'Error cargando documentos');
       }
     } catch (error) {
-      console.error('Error:', error);
       setError('Error de conexión');
     } finally {
       setLoadingDocuments(false);
@@ -85,7 +84,6 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
         return { success: false, message: response.message };
       }
     } catch (error) {
-      console.error('Error:', error);
       setError('Error de conexión');
       return { success: false, message: 'Error de conexión' };
     }

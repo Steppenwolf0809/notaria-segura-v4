@@ -1,8 +1,9 @@
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../db.js';
 import bcrypt from 'bcrypt';
 import { validarPIN, generarTokenSesion } from '../utils/pin-validator.js';
+import logger from '../utils/logger.js';
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 
 // Configuración de seguridad centralizada
 const SECURITY_CONFIG = {
@@ -10,6 +11,79 @@ const SECURITY_CONFIG = {
   tiempoBloqueo: 15 * 60 * 1000,     // 15 minutos en milisegundos
   duracionSesion: 30 * 60 * 1000     // 30 minutos en milisegundos
 };
+
+/**
+ * ENDPOINT TEMPORAL DE DIAGNÓSTICO
+ * GET /api/personal/debug/:cedula
+ * Muestra información detallada de una persona para debugging
+ */
+export async function debugPersona(req, res) {
+  try {
+    const { cedula } = req.params;
+
+    const persona = await prisma.personaRegistrada.findUnique({
+      where: { numeroIdentificacion: cedula },
+      select: {
+        id: true,
+        numeroIdentificacion: true,
+        tipoPersona: true,
+        pinCreado: true,
+        pinHash: true,
+        pinResetCount: true,
+        intentosFallidos: true,
+        bloqueadoHasta: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    });
+
+    if (!persona) {
+      return res.json({
+        success: true,
+        encontrado: false,
+        message: 'Persona no existe en BD'
+      });
+    }
+
+    // Información de debugging
+    const debug = {
+      encontrado: true,
+      pinCreado: persona.pinCreado,
+      pinHashExiste: !!persona.pinHash,
+      pinHashLength: persona.pinHash ? persona.pinHash.length : 0,
+      pinHashType: typeof persona.pinHash,
+      pinHashValue: persona.pinHash || 'VACIO',
+      pinHashPrimeros10Chars: persona.pinHash ? persona.pinHash.substring(0, 10) : 'N/A',
+      pinResetCount: persona.pinResetCount,
+      verificaciones: {
+        check1_pinCreado: !persona.pinCreado,
+        check2_pinHashFalsy: !persona.pinHash,
+        check3_pinHashEmpty: typeof persona.pinHash === 'string' && persona.pinHash.trim().length === 0,
+        RESULTADO_pinEstaReseteado: !persona.pinCreado || !persona.pinHash || (typeof persona.pinHash === 'string' && persona.pinHash.trim().length === 0)
+      },
+      metadata: {
+        createdAt: persona.createdAt,
+        updatedAt: persona.updatedAt,
+        bloqueadoHasta: persona.bloqueadoHasta,
+        intentosFallidos: persona.intentosFallidos
+      }
+    };
+
+    logger.info('🔬 DEBUG ENDPOINT - Información completa:', debug);
+
+    res.json({
+      success: true,
+      ...debug
+    });
+  } catch (error) {
+    logger.error('Error en debug endpoint:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error en debug',
+      error: error.message
+    });
+  }
+}
 
 /**
  * Verificar si una cédula existe en el sistema
@@ -25,17 +99,29 @@ export async function verificarCedula(req, res) {
       where: { numeroIdentificacion: cedula },
       select: {
         id: true,
-        tipoPersona: true
+        tipoPersona: true,
+        pinCreado: true,
+        pinHash: true
       }
+    });
+
+    // Log para debugging
+    logger.info('🔍 verificarCedula - Resultado:', {
+      cedula,
+      existe: !!persona,
+      pinCreado: persona?.pinCreado,
+      pinHashLength: persona?.pinHash?.length || 0,
+      pinHashType: typeof persona?.pinHash
     });
 
     res.json({
       success: true,
       existe: !!persona,  // Convierte a boolean
-      tipoPersona: persona?.tipoPersona || null
+      tipoPersona: persona?.tipoPersona || null,
+      pinCreado: persona?.pinCreado ?? false  // Indica si tiene PIN creado o si necesita crearlo
     });
   } catch (error) {
-    console.error('Error verificando cédula:', error);
+    logger.error('Error verificando cédula:', error);
     res.status(500).json({
       success: false,
       message: 'Error al verificar cédula'
@@ -100,27 +186,95 @@ export async function registrarPersona(req, res) {
       where: { numeroIdentificacion: cedula }
     });
 
+    let persona;
+
     if (existente) {
-      return res.status(409).json({
-        success: false,
-        message: 'Esta cédula ya está registrada. Usa "Iniciar sesión" en su lugar.'
+      // Si la persona existe pero su PIN fue reseteado, permitir re-creación de PIN
+      // Verificar si NO tiene PIN creado O si el hash está vacío/nulo
+      logger.info('🔍 DEBUG - Persona existente encontrada:', {
+        cedula,
+        pinCreado: existente.pinCreado,
+        pinHashExists: !!existente.pinHash,
+        pinHashLength: existente.pinHash ? existente.pinHash.length : 0,
+        pinHashValue: existente.pinHash ? `[${existente.pinHash.substring(0, 10)}...]` : 'null/undefined',
+        pinHashType: typeof existente.pinHash
+      });
+
+      // Verificar si el PIN fue reseteado
+      // Un PIN está reseteado si:
+      // 1. pinCreado es false, O
+      // 2. pinHash no existe (null/undefined), O
+      // 3. pinHash es una cadena vacía o solo espacios
+      const pinEstaReseteado = !existente.pinCreado ||
+                                !existente.pinHash ||
+                                (typeof existente.pinHash === 'string' && existente.pinHash.trim().length === 0);
+
+      logger.info('🔍 DEBUG - Verificación PIN reseteado:', {
+        pinEstaReseteado,
+        check1_pinCreado: !existente.pinCreado,
+        check2_pinHashFalsy: !existente.pinHash,
+        check3_pinHashEmpty: typeof existente.pinHash === 'string' ? existente.pinHash.trim().length === 0 : 'N/A'
+      });
+
+      if (pinEstaReseteado) {
+        // Hash del nuevo PIN
+        const pinHash = await bcrypt.hash(pin, 10);
+
+        // Actualizar PIN y reactivar cuenta
+        persona = await prisma.personaRegistrada.update({
+          where: { id: existente.id },
+          data: {
+            pinHash,
+            pinCreado: true,
+            intentosFallidos: 0,      // Resetear intentos fallidos
+            bloqueadoHasta: null       // Desbloquear si estaba bloqueado
+          }
+        });
+
+        // Registrar en auditoría
+        await prisma.auditoriaPersona.create({
+          data: {
+            personaId: persona.id,
+            tipo: 'PIN_RECREADO',
+            descripcion: 'Usuario re-creó su PIN después de reseteo',
+            ipAddress: req.ip,
+            userAgent: req.get('User-Agent')
+          }
+        });
+      } else {
+        // PIN ya existe y está activo
+        return res.status(409).json({
+          success: false,
+          message: 'Esta cédula ya está registrada. Usa "Iniciar sesión" en su lugar.'
+        });
+      }
+    } else {
+      // Hash del PIN usando bcrypt (10 salt rounds = buen balance seguridad/performance)
+      const pinHash = await bcrypt.hash(pin, 10);
+
+      // Crear persona nueva en base de datos
+      persona = await prisma.personaRegistrada.create({
+        data: {
+          numeroIdentificacion: cedula,
+          tipoPersona,
+          pinHash,
+          pinCreado: true
+        }
+      });
+
+      // Registrar en auditoría
+      await prisma.auditoriaPersona.create({
+        data: {
+          personaId: persona.id,
+          tipo: 'REGISTRO',
+          descripcion: 'Usuario creó su cuenta',
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent')
+        }
       });
     }
 
-    // Hash del PIN usando bcrypt (10 salt rounds = buen balance seguridad/performance)
-    const pinHash = await bcrypt.hash(pin, 10);
-
-    // Crear persona en base de datos
-    const persona = await prisma.personaRegistrada.create({
-      data: {
-        numeroIdentificacion: cedula,
-        tipoPersona,
-        pinHash,
-        pinCreado: true
-      }
-    });
-
-    // Crear sesión automáticamente (auto-login después de registro)
+    // Crear sesión automáticamente (auto-login después de registro/re-creación)
     const tokenSesion = generarTokenSesion();
     const expiraEn = new Date(Date.now() + SECURITY_CONFIG.duracionSesion);
 
@@ -134,25 +288,16 @@ export async function registrarPersona(req, res) {
       }
     });
 
-    // Registrar en auditoría
-    await prisma.auditoriaPersona.create({
-      data: {
-        personaId: persona.id,
-        tipo: 'REGISTRO',
-        descripcion: 'Usuario creó su cuenta',
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent')
-      }
-    });
-
     res.status(201).json({
       success: true,
-      message: 'Cuenta creada exitosamente',
+      message: existente && !existente.pinCreado
+        ? 'PIN re-creado exitosamente'
+        : 'Cuenta creada exitosamente',
       sessionToken: tokenSesion,
       expiraEn: expiraEn.toISOString()
     });
   } catch (error) {
-    console.error('Error registrando persona:', error);
+    logger.error('Error registrando persona:', error);
     res.status(500).json({
       success: false,
       message: 'Error al crear cuenta'
@@ -204,6 +349,15 @@ export async function loginPersona(req, res) {
         success: false,
         message: `Cuenta bloqueada temporalmente. Intenta en ${minutosRestantes} minutos.`,
         bloqueadoHasta: persona.bloqueadoHasta.toISOString()
+      });
+    }
+
+    // Verificar si el PIN fue reseteado
+    if (!persona.pinCreado || !persona.pinHash) {
+      return res.status(403).json({
+        success: false,
+        message: 'Tu PIN ha sido reseteado. Por favor crea un nuevo PIN.',
+        pinReseteado: true
       });
     }
 
@@ -299,7 +453,7 @@ export async function loginPersona(req, res) {
       expiraEn: expiraEn.toISOString()
     });
   } catch (error) {
-    console.error('Error en login:', error);
+    logger.error('Error en login:', error);
     res.status(500).json({
       success: false,
       message: 'Error al iniciar sesión'
@@ -343,7 +497,7 @@ export async function obtenerMiInformacion(req, res) {
       data: persona
     });
   } catch (error) {
-    console.error('Error obteniendo información:', error);
+    logger.error('Error obteniendo información:', error);
     res.status(500).json({
       success: false,
       message: 'Error al obtener información'
@@ -410,7 +564,7 @@ export async function actualizarMiInformacion(req, res) {
       }
     });
   } catch (error) {
-    console.error('Error actualizando información:', error);
+    logger.error('Error actualizando información:', error);
     res.status(500).json({
       success: false,
       message: 'Error al actualizar información'
@@ -441,7 +595,7 @@ export async function logoutPersona(req, res) {
       message: 'Sesión cerrada correctamente'
     });
   } catch (error) {
-    console.error('Error en logout:', error);
+    logger.error('Error en logout:', error);
     res.status(500).json({
       success: false,
       message: 'Error al cerrar sesión'
@@ -499,7 +653,7 @@ export async function buscarPersonaPorCedula(req, res) {
       }
     });
   } catch (error) {
-    console.error('Error buscando persona:', error);
+    logger.error('Error buscando persona:', error);
     res.status(500).json({
       success: false,
       message: 'Error al buscar persona'
@@ -555,15 +709,32 @@ export async function resetearPIN(req, res) {
     // Realizar el reseteo del PIN en una transacción
     await prisma.$transaction(async (tx) => {
       // 1. Resetear PIN y desbloquear cuenta
-      await tx.personaRegistrada.update({
+      // Establecemos pinHash como cadena vacía (no puede ser null por el schema)
+      // y pinCreado en false para forzar la creación de un nuevo PIN
+      logger.info('🔄 DEBUG - Reseteando PIN para:', {
+        personaId,
+        cedula: persona.numeroIdentificacion,
+        pinCreado_antes: persona.pinCreado,
+        pinHash_antes: persona.pinHash ? `[${persona.pinHash.substring(0, 10)}...]` : 'null/undefined'
+      });
+
+      const personaActualizada = await tx.personaRegistrada.update({
         where: { id: personaId },
         data: {
-          pinCreado: false,              // Fuerza a crear nuevo PIN
-          pinHash: '',                    // Elimina el hash anterior
-          intentosFallidos: 0,            // Resetea intentos fallidos
-          bloqueadoHasta: null,           // Desbloquea la cuenta
-          pinResetCount: persona.pinResetCount + 1  // Incrementa contador
+          pinCreado: false,                            // Fuerza a crear nuevo PIN
+          pinHash: '',                                  // Elimina el hash anterior (cadena vacía)
+          intentosFallidos: 0,                          // Resetea intentos fallidos
+          bloqueadoHasta: null,                         // Desbloquea la cuenta
+          pinResetCount: persona.pinResetCount + 1     // Incrementa contador de resets
         }
+      });
+
+      logger.info('✅ DEBUG - PIN reseteado exitosamente:', {
+        personaId,
+        cedula: personaActualizada.numeroIdentificacion,
+        pinCreado_despues: personaActualizada.pinCreado,
+        pinHash_despues: personaActualizada.pinHash ? `[${personaActualizada.pinHash}]` : 'null/undefined',
+        pinHashLength: personaActualizada.pinHash ? personaActualizada.pinHash.length : 0
       });
 
       // 2. Cerrar todas las sesiones activas del usuario (seguridad)
@@ -571,15 +742,23 @@ export async function resetearPIN(req, res) {
         where: { personaId }
       });
 
-      await tx.sesionFormularioUafe.deleteMany({
-        where: {
-          personaProtocolo: {
-            personaCedula: persona.numeroIdentificacion
-          }
-        }
+      // 3. Cerrar sesiones de formularios UAFE de esta persona
+      // Primero obtenemos los IDs de PersonaProtocolo para esta persona
+      const personasProtocolo = await tx.personaProtocolo.findMany({
+        where: { personaCedula: persona.numeroIdentificacion },
+        select: { id: true }
       });
 
-      // 3. Registrar en auditoría
+      if (personasProtocolo.length > 0) {
+        const personaProtocoloIds = personasProtocolo.map(pp => pp.id);
+        await tx.sesionFormularioUAFE.deleteMany({
+          where: {
+            personaProtocoloId: { in: personaProtocoloIds }
+          }
+        });
+      }
+
+      // 4. Registrar en auditoría
       await tx.auditoriaPersona.create({
         data: {
           personaId,
@@ -602,7 +781,7 @@ export async function resetearPIN(req, res) {
       }
     });
   } catch (error) {
-    console.error('Error reseteando PIN:', error);
+    logger.error('Error reseteando PIN:', error);
     res.status(500).json({
       success: false,
       message: 'Error al resetear PIN'

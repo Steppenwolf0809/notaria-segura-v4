@@ -137,7 +137,6 @@ const Dashboard = () => {
 
   if (user.role === 'RECEPCION') {
     const uiV2 = readFlag('VITE_UI_ACTIVOS_ENTREGADOS', true);
-    console.info('[UI-GATE]', { role: user?.role, uiV2 });
     if (uiV2) {
       return (
         <RecepcionLayout currentView="documentos" onViewChange={() => {}}>

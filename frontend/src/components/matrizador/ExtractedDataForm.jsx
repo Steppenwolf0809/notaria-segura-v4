@@ -102,7 +102,6 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
    * Maneja datosCompletos tanto como string JSON o como objeto ya parseado
    */
   useEffect(() => {
-    console.log('[ExtractedDataForm] Cargando datos de escritura:', escritura?.id);
     
     if (escritura?.datosCompletos) {
       try {
@@ -111,12 +110,10 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
         // Si datosCompletos ya es un objeto, usarlo directamente
         if (typeof escritura.datosCompletos === 'object') {
           parsed = escritura.datosCompletos;
-          console.log('[ExtractedDataForm] datosCompletos ya parseado como objeto');
         } 
         // Si es un string, parsearlo como JSON
         else if (typeof escritura.datosCompletos === 'string') {
           parsed = JSON.parse(escritura.datosCompletos);
-          console.log('[ExtractedDataForm] datosCompletos parseado desde string');
         }
         else {
           throw new Error('datosCompletos tiene un formato inesperado');
@@ -129,25 +126,14 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
             a_favor_de: sanitizePersonas(parsed.otorgantes.a_favor_de || [])
           };
           parsed.otorgantes = otorgantesLimpios;
-          console.log('[ExtractedDataForm] Otorgantes limpiados:', {
-            otorgadoPor: otorgantesLimpios.otorgado_por.length,
-            aFavorDe: otorgantesLimpios.a_favor_de.length
-          });
         }
-        
+
         setFormData(parsed);
         setOriginalData(parsed);
-        console.log('[ExtractedDataForm] Datos cargados exitosamente:', {
-          acto: parsed.acto?.substring(0, 30) + '...',
-          numeroEscritura: parsed.escritura,
-          cuantia: parsed.cuantia
-        });
       } catch (e) {
-        console.error('[ExtractedDataForm] Error parsing datos completos:', e);
         setError('Error al cargar los datos extraídos');
       }
     } else {
-      console.warn('[ExtractedDataForm] No hay datosCompletos en la escritura');
     }
   }, [escritura]);
 
@@ -323,7 +309,6 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
       await navigator.clipboard.writeText(text);
       // TODO: Mostrar notificación de éxito
     } catch (err) {
-      console.error('Error copying to clipboard:', err);
     }
   };
 

@@ -25,7 +25,6 @@ const useAuthStore = create(
         try {
           localStorage.setItem('token', userToken);
         } catch (error) {
-          console.error('Error guardando token en localStorage:', error);
         }
         
         set({
@@ -47,7 +46,6 @@ const useAuthStore = create(
           localStorage.removeItem('refreshToken');
           localStorage.removeItem('notaria-auth-storage');
         } catch (error) {
-          console.error('Error limpiando tokens de localStorage:', error);
         }
         
         set({

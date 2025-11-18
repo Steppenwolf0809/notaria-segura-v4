@@ -139,7 +139,6 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
 
       await cargarDocumentos();
     } catch (error) {
-      console.error('Error:', error);
       setError('Error cargando datos');
     } finally {
       setLoading(false);
@@ -178,7 +177,6 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
         setError(response.message || 'Error cargando documentos');
       }
     } catch (error) {
-      console.error('Error:', error);
       setError('Error de conexión');
     }
   };

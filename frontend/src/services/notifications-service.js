@@ -22,7 +22,6 @@ class NotificationsService {
               config.headers.Authorization = `Bearer ${parsed.state.token}`;
             }
           } catch (error) {
-            console.error('Error parsing auth token:', error);
           }
         }
         return config;
@@ -36,7 +35,6 @@ class NotificationsService {
     this.api.interceptors.response.use(
       (response) => response.data,
       (error) => {
-        console.error('Error en NotificationsService:', error);
         if (error.response?.status === 401) {
           localStorage.removeItem('token');
           window.location.href = '/login';
@@ -62,7 +60,6 @@ class NotificationsService {
         throw new Error(response.message || 'Error obteniendo notificaciones del documento');
       }
     } catch (error) {
-      console.error('Error fetching document notifications:', error);
       return {
         success: false,
         message: error.response?.data?.message || 'Error de conexión',
@@ -111,7 +108,6 @@ class NotificationsService {
         throw new Error(response.message || 'Error obteniendo notificaciones');
       }
     } catch (error) {
-      console.error('Error fetching notifications:', error);
       return {
         success: false,
         message: error.response?.data?.message || 'Error de conexión',
@@ -136,7 +132,6 @@ class NotificationsService {
         throw new Error(response.message || 'Error obteniendo estadísticas');
       }
     } catch (error) {
-      console.error('Error fetching notification stats:', error);
       return {
         success: false,
         message: error.response?.data?.message || 'Error de conexión',
@@ -161,7 +156,6 @@ class NotificationsService {
         throw new Error('Error obteniendo estadísticas rápidas');
       }
     } catch (error) {
-      console.error('Error fetching quick stats:', error);
       return {
         success: false,
         stats: {

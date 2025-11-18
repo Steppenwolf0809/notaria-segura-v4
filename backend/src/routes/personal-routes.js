@@ -1,5 +1,6 @@
 import express from 'express';
 import {
+  debugPersona,
   verificarCedula,
   registrarPersona,
   loginPersona,
@@ -17,6 +18,9 @@ const router = express.Router();
 // ========================================
 // RUTAS PÚBLICAS (Sin autenticación)
 // ========================================
+
+// ENDPOINT TEMPORAL DE DEBUG
+router.get('/debug/:cedula', debugPersona);
 
 // Verificar si cédula existe
 router.get('/verificar-cedula/:cedula', verificarCedula);

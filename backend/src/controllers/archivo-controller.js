@@ -4,6 +4,7 @@ import whatsappService from '../services/whatsapp-service.js';
 import CodigoRetiroService from '../utils/codigo-retiro.js';
 import { getReversionCleanupData, STATUS_ORDER_LIST } from '../utils/status-transitions.js';
 import cache from '../services/cache-service.js';
+import logger from '../utils/logger.js';
 
 /**
  * CONTROLADOR DE ARCHIVO
@@ -67,7 +68,7 @@ async function dashboardArchivo(req, res) {
     });
 
   } catch (error) {
-    console.error('Error en dashboard archivo:', error);
+    logger.error('Error en dashboard archivo:', error);
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor'
@@ -183,7 +184,7 @@ async function listarMisDocumentos(req, res) {
     res.json({ success: true, data: payload });
 
   } catch (error) {
-    console.error('Error listando documentos archivo:', error);
+    logger.error('Error listando documentos archivo:', error);
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor'
@@ -267,7 +268,7 @@ async function cambiarEstadoDocumento(req, res) {
             }
           });
         } catch (auditError) {
-          console.error('Error registrando evento de código de retiro:', auditError);
+          logger.error('Error registrando evento de código de retiro:', auditError);
         }
       }
     }
@@ -284,7 +285,7 @@ async function cambiarEstadoDocumento(req, res) {
     let documentosActualizados = [];
     
     if (documento.isGrouped && documento.documentGroupId) {
-      console.log(`🔗 Documento ${id} es parte de un grupo, sincronizando cambio de estado...`);
+      logger.debug('Documento es parte de un grupo, sincronizando cambio de estado');
       
       if (nuevoEstado === 'LISTO') {
         // Marcar como LISTO todos los documentos del grupo asignados al mismo usuario
@@ -327,7 +328,7 @@ async function cambiarEstadoDocumento(req, res) {
           return result;
         });
 
-        console.log(`✅ ARCHIVO: ${documentosActualizados.length} documentos del grupo marcados como LISTO con códigos individuales`);
+        logger.debug(`${documentosActualizados.length} documentos del grupo marcados como LISTO`);
       } else {
         // Para otros estados (EN_PROCESO, ENTREGADO), propagar sin tocar códigos
         const dataGroupSync = { ...updateData };
@@ -349,7 +350,7 @@ async function cambiarEstadoDocumento(req, res) {
             assignedToId: userId
           }
         });
-        console.log(`✅ ARCHIVO: Sincronizados ${documentosActualizados.length} documentos del grupo para estado ${nuevoEstado}`);
+        logger.debug(`Sincronizados ${documentosActualizados.length} documentos del grupo`);
       }
     } else {
       // Actualizar solo el documento individual
@@ -370,22 +371,22 @@ async function cambiarEstadoDocumento(req, res) {
     if (nuevoEstado === 'LISTO') {
       // Respetar política de no notificar
       if (documento.notificationPolicy === 'no_notificar') {
-        console.log('🔕 ARCHIVO: Política no_notificar activa, omitimos WhatsApp (LISTO)');
+        logger.debug('Política no_notificar activa, omitiendo WhatsApp');
       } else {
         try {
           const clienteData = {
             clientName: documento.clientName,
             clientPhone: documento.clientPhone
           };
-          
+
           if (documento.isGrouped && documento.documentGroupId) {
             // Notificación grupal con TODOS los documentos del grupo y sus códigos individuales
-            const whatsappResult = await whatsappService.enviarGrupoDocumentosListo(
+            await whatsappService.enviarGrupoDocumentosListo(
               clienteData,
               documentosActualizados,
               documentosActualizados[0]?.codigoRetiro || null
             );
-            console.log('✅ ARCHIVO: Notificación WhatsApp GRUPAL enviada:', whatsappResult.messageId || 'simulado');
+            logger.debug('Notificación WhatsApp GRUPAL enviada');
             whatsappSent = true;
           } else if (codigoGenerado || updateData.codigoRetiro) {
             // Notificación individual
@@ -393,19 +394,19 @@ async function cambiarEstadoDocumento(req, res) {
               tipoDocumento: documento.documentType,
               protocolNumber: documento.protocolNumber
             };
-            const whatsappResult = await whatsappService.enviarDocumentoListo(
-              clienteData, 
-              documentoData, 
+            await whatsappService.enviarDocumentoListo(
+              clienteData,
+              documentoData,
               codigoGenerado || updateData.codigoRetiro
             );
-            console.log('✅ ARCHIVO: Notificación WhatsApp enviada:', whatsappResult.messageId || 'simulado');
+            logger.debug('Notificación WhatsApp enviada');
             whatsappSent = true;
           } else {
-            console.log('ℹ️ ARCHIVO: LISTO sin código de retiro disponible para WhatsApp');
+            logger.debug('LISTO sin código de retiro disponible para WhatsApp');
           }
         } catch (error) {
           // No fallar la operación principal si WhatsApp falla
-          console.error('⚠️ Error enviando WhatsApp desde archivo (operación continúa):', error.message);
+          logger.warn('Error enviando WhatsApp desde archivo (operación continúa):', error.message);
           whatsappError = error.message;
         }
       }
@@ -439,15 +440,15 @@ async function cambiarEstadoDocumento(req, res) {
         );
         
         whatsappSent = whatsappResult.success;
-        
+
         if (!whatsappResult.success) {
           whatsappError = whatsappResult.error;
-          console.error('Error enviando WhatsApp de entrega directa desde archivo:', whatsappResult.error);
+          logger.error('Error enviando WhatsApp de entrega directa:', whatsappResult.error);
         } else {
-          console.log('📱 Notificación WhatsApp de entrega directa desde archivo enviada exitosamente');
+          logger.debug('Notificación WhatsApp de entrega directa enviada');
         }
       } catch (error) {
-        console.error('Error en servicio WhatsApp para entrega directa desde archivo:', error);
+        logger.error('Error en servicio WhatsApp para entrega directa:', error);
         whatsappError = error.message;
       }
     }
@@ -476,7 +477,7 @@ async function cambiarEstadoDocumento(req, res) {
     });
 
   } catch (error) {
-    console.error('Error cambiando estado:', error);
+    logger.error('Error cambiando estado:', error);
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor'
@@ -575,8 +576,8 @@ async function procesarEntregaDocumento(req, res) {
     // 🔗 NUEVA FUNCIONALIDAD: Si el documento está agrupado, entregar todos los documentos del grupo
     let groupDocuments = [];
     if (documento.isGrouped && documento.documentGroupId) {
-      console.log(`🔗 ARCHIVO: Documento ${documento.protocolNumber} está agrupado, entregando grupo completo`);
-      
+      logger.debug('Documento agrupado, entregando grupo completo');
+
       // Buscar todos los documentos del grupo que estén LISTO
       const groupDocsToDeliver = await prisma.document.findMany({
         where: {
@@ -588,7 +589,7 @@ async function procesarEntregaDocumento(req, res) {
       });
 
       if (groupDocsToDeliver.length > 0) {
-        console.log(`🚚 ARCHIVO: Entregando ${groupDocsToDeliver.length + 1} documentos del grupo automáticamente`);
+        logger.debug(`Entregando ${groupDocsToDeliver.length + 1} documentos del grupo`);
         
         // Actualizar todos los documentos del grupo
         await prisma.document.updateMany({
@@ -706,15 +707,15 @@ async function procesarEntregaDocumento(req, res) {
         );
         
         whatsappSent = whatsappResult.success;
-        
+
         if (!whatsappResult.success) {
           whatsappError = whatsappResult.error;
-          console.error('Error enviando WhatsApp de entrega archivo:', whatsappResult.error);
+          logger.error('Error enviando WhatsApp de entrega:', whatsappResult.error);
         } else {
-          console.log('📱 Notificación WhatsApp de entrega archivo enviada exitosamente');
+          logger.debug('Notificación WhatsApp de entrega enviada');
         }
       } catch (error) {
-        console.error('Error en servicio WhatsApp para entrega archivo:', error);
+        logger.error('Error en servicio WhatsApp para entrega:', error);
         whatsappError = error.message;
       }
     }
@@ -764,7 +765,7 @@ async function procesarEntregaDocumento(req, res) {
     });
 
   } catch (error) {
-    console.error('Error procesando entrega archivo:', error);
+    logger.error('Error procesando entrega archivo:', error);
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor'
@@ -993,7 +994,7 @@ async function supervisionGeneral(req, res) {
     });
 
   } catch (error) {
-    console.error('Error en supervisión general:', error);
+    logger.error('Error en supervisión general:', error);
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor'
@@ -1009,7 +1010,7 @@ async function supportsUnaccentFn() {
     await prisma.$queryRaw`SELECT unaccent('áéíóúÁÉÍÓÚ')`;
     UNACCENT_SUPPORTED = true;
   } catch (e) {
-    console.warn('Extensión unaccent no disponible en ARCHIVO.');
+    logger.warn('Extensión unaccent no disponible');
     UNACCENT_SUPPORTED = false;
   }
   return UNACCENT_SUPPORTED;
@@ -1075,7 +1076,7 @@ async function resumenGeneral(req, res) {
     });
 
   } catch (error) {
-    console.error('Error en resumen general:', error);
+    logger.error('Error en resumen general:', error);
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor'
@@ -1117,7 +1118,7 @@ async function obtenerMatrizadores(req, res) {
     });
 
   } catch (error) {
-    console.error('Error obteniendo matrizadores:', error);
+    logger.error('Error obteniendo matrizadores:', error);
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor'
@@ -1184,7 +1185,7 @@ async function obtenerDetalleDocumento(req, res) {
     });
 
   } catch (error) {
-    console.error('Error obteniendo detalle:', error);
+    logger.error('Error obteniendo detalle:', error);
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor'
@@ -1205,7 +1206,7 @@ async function revertirEstadoDocumentoArchivo(req, res) {
     return await revertDocumentStatus(req, res);
     
   } catch (error) {
-    console.error('Error en revertirEstadoDocumentoArchivo:', error);
+    logger.error('Error en revertirEstadoDocumentoArchivo:', error);
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor'

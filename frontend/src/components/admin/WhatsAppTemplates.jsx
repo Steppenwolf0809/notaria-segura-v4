@@ -258,7 +258,6 @@ const WhatsAppTemplates = () => {
       }
     } catch (err) {
       // Silently fail preview
-      console.error('Error generating preview', err);
     } finally {
         setIsPreviewLoading(false);
     }

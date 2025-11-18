@@ -263,36 +263,7 @@ const UnifiedDocumentCard = ({
           </Box>
         )}
 
-        {/* Indicador de grupo */}
-        {document.isGrouped && (
-          <Box 
-            sx={{ 
-              bgcolor: 'primary.lighter',
-              border: '1px solid',
-              borderColor: 'primary.main',
-              borderRadius: 1,
-              p: 1,
-              mb: 1.5,
-              cursor: onShowGroupInfo ? 'pointer' : 'default',
-              transition: 'all 0.2s',
-              '&:hover': onShowGroupInfo ? {
-                bgcolor: 'primary.main',
-                color: 'white',
-                '& .MuiTypography-root': {
-                  color: 'white'
-                }
-              } : {}
-            }}
-            onClick={(e) => {
-              e.stopPropagation();
-              onShowGroupInfo?.(document);
-            }}
-          >
-            <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 600 }}>
-              ⚡ Parte de un grupo {onShowGroupInfo ? '(click para ver)' : ''}
-            </Typography>
-          </Box>
-        )}
+        {/* 🚫 Indicador de grupo ELIMINADO */}
 
         {/* Detector de agrupación inteligente - Para archivo y matrizador */}
         {onGroupDocuments && (

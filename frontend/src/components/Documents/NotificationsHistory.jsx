@@ -85,14 +85,7 @@ const NotificationsHistory = () => {
    */
   const loadNotifications = async () => {
     setLoading(true);
-    console.log('🔄 NOTIFICACIONES: Iniciando carga de notificaciones...', {
-      page,
-      rowsPerPage,
-      searchTerm,
-      statusFilter,
-      user: user?.firstName
-    });
-    
+
     try {
       // Calcular rango de fechas para el backend según dateFilter
       let dateFrom = '';
@@ -126,23 +119,15 @@ const NotificationsHistory = () => {
         sortOrder
       });
 
-      console.log('📊 NOTIFICACIONES: Respuesta del backend:', response);
 
       if (response.success) {
         setNotifications(response.data.notifications || []);
         setTotalNotifications(response.data.pagination?.total || 0);
         setStats(response.data.stats || stats);
-        console.log('✅ NOTIFICACIONES: Datos cargados exitosamente:', {
-          notificationsCount: response.data.notifications?.length || 0,
-          total: response.data.pagination?.total || 0,
-          stats: response.data.stats
-        });
       } else {
-        console.error('❌ NOTIFICACIONES: Error en respuesta:', response.message);
         setNotifications([]);
       }
     } catch (error) {
-      console.error('💥 NOTIFICACIONES: Error de conexión:', error);
       setNotifications([]);
     } finally {
       setLoading(false);

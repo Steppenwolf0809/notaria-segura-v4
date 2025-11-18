@@ -19,7 +19,6 @@ const receptionService = {
     } catch (error) {
       const status = error?.response?.status;
       const message = error?.response?.data?.message || error.message || 'Error al cargar recepciones';
-      console.error('[HTTP][ERR]', '/reception', status, message);
       if (status === 401 || status === 403) {
         return { success: false, error: 'Sesión expirada. Inicia sesión nuevamente.' };
       }
@@ -38,7 +37,6 @@ const receptionService = {
     } catch (error) {
       const status = error?.response?.status;
       const message = error?.response?.data?.message || error.message || 'Error al cargar conteos';
-      console.error('[HTTP][ERR]', '/reception/counts', status, message);
       if (status === 401 || status === 403) {
         return { success: false, error: 'Sesión expirada. Inicia sesión nuevamente.' };
       }
@@ -67,7 +65,6 @@ const receptionService = {
     } catch (error) {
       const status = error?.response?.status;
       const message = error?.response?.data?.message || error.message || 'Error al obtener sugerencias';
-      console.error('[HTTP][ERR]', '/reception/suggest', status, message);
       if (status === 401 || status === 403) {
         return { success: false, error: 'Sesión expirada. Inicia sesión nuevamente.' };
       }
@@ -165,21 +162,10 @@ const receptionService = {
    */
   async marcarComoListo(documentId) {
     try {
-      console.log('🌐 Enviando request para marcar como listo:', documentId);
       const response = await api.post(`/reception/documentos/${documentId}/marcar-listo`);
-      
-      console.log('🌐 Respuesta completa del servidor:', {
-        status: response.status,
-        statusText: response.statusText,
-        headers: response.headers,
-        data: response.data,
-        dataType: typeof response.data,
-        dataKeys: response.data ? Object.keys(response.data) : 'no keys'
-      });
 
       // Verificar estructura de respuesta
       if (!response.data) {
-        console.error('❌ Respuesta del servidor sin data');
         return {
           success: false,
           error: 'Respuesta del servidor vacía'
@@ -187,29 +173,18 @@ const receptionService = {
       }
 
       if (response.data.success === true) {
-        console.log('✅ Respuesta exitosa del servidor');
         return {
           success: true,
           data: response.data.data,
           message: response.data.message
         };
       } else {
-        console.error('❌ Respuesta del servidor indica error:', response.data);
         return {
           success: false,
           error: response.data.error || response.data.message || 'Error del servidor sin mensaje específico'
         };
       }
     } catch (error) {
-      console.error('🌐 Error en request marcar como listo:', {
-        name: error.name,
-        message: error.message,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        responseData: error.response?.data,
-        stack: error.stack
-      });
-      
       return {
         success: false,
         error: receptionService.handleError(error)
@@ -273,7 +248,6 @@ const receptionService = {
     } catch (error) {
       const status = error?.response?.status;
       const message = receptionService.handleError(error);
-      console.error('[HTTP][ERR]', `/documents/${documentId}/deliver`, status, message);
       return { success: false, error: message };
     }
   },
@@ -369,13 +343,11 @@ const receptionService = {
    */
   async revertirEstadoDocumento(documentId, newStatus, reversionReason) {
     try {
-      console.log('🔄 Enviando request para revertir estado:', { documentId, newStatus, reversionReason });
       const response = await api.post(`/reception/documentos/${documentId}/revertir-estado`, {
         newStatus,
         reversionReason
       });
       
-      console.log('🔄 Respuesta de reversión:', response.data);
 
       if (response.data.success === true) {
         return {
@@ -390,7 +362,6 @@ const receptionService = {
         };
       }
     } catch (error) {
-      console.error('❌ Error en reversión de estado:', error);
       return {
         success: false,
         error: receptionService.handleError(error)
@@ -423,17 +394,14 @@ const receptionService = {
    */
   async getNotificationHistory(params = {}) {
     try {
-      console.log('📱 Obteniendo historial de notificaciones:', params);
       const response = await api.get('/reception/notificaciones', { params });
       
-      console.log('📱 Historial de notificaciones obtenido:', response.data);
       
       return {
         success: true,
         data: response.data.data
       };
     } catch (error) {
-      console.error('❌ Error obteniendo historial de notificaciones:', error);
       return {
         success: false,
         error: receptionService.handleError(error)

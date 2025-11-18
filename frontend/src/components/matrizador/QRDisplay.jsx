@@ -3,7 +3,7 @@
  * Muestra códigos QR generados con opciones de descarga y compartir
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Paper,
@@ -32,11 +32,11 @@ import {
   CheckCircle as CheckIcon
 } from '@mui/icons-material';
 import QRCode from 'react-qr-code';
-import { 
-  getEscrituraQR, 
-  generateVerificationURL, 
-  copyToClipboard, 
-  downloadQRImage 
+import {
+  getEscrituraQR,
+  generateVerificationURL,
+  copyToClipboard,
+  downloadQRImage
 } from '../../services/escrituras-qr-service';
 
 const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
@@ -45,6 +45,10 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
   const [error, setError] = useState(null);
   const [selectedFormat, setSelectedFormat] = useState('display');
   const [showCopySuccess, setShowCopySuccess] = useState(false);
+  const [copyingQR, setCopyingQR] = useState(false);
+
+  // Referencia al elemento SVG del QR para copiarlo
+  const qrRef = useRef(null);
 
   // Formatos disponibles
   const formats = [
@@ -68,7 +72,6 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
       setQrData(response.data);
     } catch (err) {
       setError(err.message);
-      console.error('Error loading QR data:', err);
     } finally {
       setLoading(false);
     }
@@ -116,6 +119,86 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
   };
 
   /**
+   * Copia el QR como imagen PNG al portapapeles
+   * Permite pegar directamente en Word, Google Docs, etc.
+   */
+  const handleCopyQR = async () => {
+    if (!qrRef.current) return;
+
+    setCopyingQR(true);
+
+    try {
+      // Obtener el elemento SVG del QR
+      const svgElement = qrRef.current.querySelector('svg');
+      if (!svgElement) {
+        throw new Error('No se encontró el elemento SVG del QR');
+      }
+
+      // Obtener las dimensiones del SVG
+      const svgData = new XMLSerializer().serializeToString(svgElement);
+      const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+      const svgUrl = URL.createObjectURL(svgBlob);
+
+      // Crear una imagen desde el SVG
+      const img = new Image();
+
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = svgUrl;
+      });
+
+      // Crear un canvas y dibujar la imagen
+      const canvas = document.createElement('canvas');
+      const scale = 2; // Factor de escala para mejor calidad
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+
+      const ctx = canvas.getContext('2d');
+      ctx.scale(scale, scale);
+
+      // Fondo blanco para el QR
+      ctx.fillStyle = 'white';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Dibujar el QR
+      ctx.drawImage(img, 0, 0);
+
+      // Convertir canvas a blob PNG
+      const blob = await new Promise((resolve) => {
+        canvas.toBlob(resolve, 'image/png', 1.0);
+      });
+
+      // Copiar al clipboard usando la Clipboard API moderna
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'image/png': blob
+        })
+      ]);
+
+      // Limpiar URL temporal
+      URL.revokeObjectURL(svgUrl);
+
+      // Mostrar éxito
+      setShowCopySuccess(true);
+
+    } catch (err) {
+      console.error('Error al copiar QR:', err);
+
+      // Mensaje de error amigable
+      if (err.name === 'NotAllowedError') {
+        alert('Permiso denegado. Por favor, permite el acceso al portapapeles o usa el botón Descargar.');
+      } else if (!navigator.clipboard || !navigator.clipboard.write) {
+        alert('Tu navegador no soporta copiar imágenes al portapapeles. Por favor, usa el botón Descargar.');
+      } else {
+        alert('No se pudo copiar el QR. Intenta usar el botón Descargar como alternativa.');
+      }
+    } finally {
+      setCopyingQR(false);
+    }
+  };
+
+  /**
    * Descarga el QR como imagen
    */
   const handleDownload = () => {
@@ -141,7 +224,6 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
       } catch (err) {
         // Si el usuario cancela, no hacer nada
         if (err.name !== 'AbortError') {
-          console.error('Error sharing:', err);
         }
       }
     } else {
@@ -225,7 +307,6 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
                 light: '#FFFFFF'
               }
             }, function (error) {
-              if (error) console.error(error);
               else window.print();
             });
           </script>
@@ -305,15 +386,18 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
             <Typography variant="h6" gutterBottom>
               Código QR
             </Typography>
-            
-            <Box sx={{ 
-              display: 'inline-block', 
-              p: 2, 
-              bgcolor: 'white', 
-              borderRadius: 1,
-              border: 1,
-              borderColor: 'divider'
-            }}>
+
+            <Box
+              ref={qrRef}
+              sx={{
+                display: 'inline-block',
+                p: 2,
+                bgcolor: 'white',
+                borderRadius: 1,
+                border: 1,
+                borderColor: 'divider'
+              }}
+            >
               <QRCode
                 value={qrData.verificationURL}
                 size={200}
@@ -322,6 +406,21 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
                 bgColor="#FFFFFF"
               />
             </Box>
+
+            {/* Leyenda de verificación */}
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              align="center"
+              sx={{
+                mt: 1.5,
+                maxWidth: 256,
+                margin: '12px auto 0',
+                lineHeight: 1.4
+              }}
+            >
+              Para verificar la autenticidad de esta escritura, escanee este código QR
+            </Typography>
 
             <Box sx={{ mt: 2 }}>
               <Chip
@@ -335,24 +434,36 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
           </CardContent>
 
           <CardActions sx={{ justifyContent: 'center', flexWrap: 'wrap', gap: 1 }}>
+            <Tooltip title="Copiar QR al portapapeles">
+              <span>
+                <IconButton
+                  onClick={handleCopyQR}
+                  color="primary"
+                  disabled={copyingQR}
+                >
+                  <CopyIcon />
+                </IconButton>
+              </span>
+            </Tooltip>
+
             <Tooltip title="Descargar imagen">
               <IconButton onClick={handleDownload} color="primary">
                 <DownloadIcon />
               </IconButton>
             </Tooltip>
-            
+
             <Tooltip title="Compartir">
               <IconButton onClick={handleShare} color="primary">
                 <ShareIcon />
               </IconButton>
             </Tooltip>
-            
+
             <Tooltip title="Imprimir">
               <IconButton onClick={handlePrint} color="primary">
                 <PrintIcon />
               </IconButton>
             </Tooltip>
-            
+
             <Tooltip title="Regenerar">
               <IconButton onClick={() => loadQRData()} color="primary">
                 <RefreshIcon />

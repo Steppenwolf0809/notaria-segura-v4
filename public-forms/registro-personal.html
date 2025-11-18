@@ -1393,11 +1393,11 @@
                 currentCedula = cedula;
                 currentTipoPersona = tipoPersona;
 
-                if (data.existe) {
-                    // Usuario existe - ir a login
+                if (data.existe && data.pinCreado) {
+                    // Usuario existe y tiene PIN creado - ir a login
                     document.getElementById('cedulaDisplay2b').textContent = cedula;
                     showStep('step2b');
-                    
+
                     // Setup PIN login
                     setTimeout(() => {
                         setupPinInputs('pinLoginContainer', (pin) => {
@@ -1405,10 +1405,10 @@
                         });
                     }, 100);
                 } else {
-                    // Usuario nuevo - crear cuenta
+                    // Usuario nuevo O usuario existe pero necesita crear PIN (reseteado)
                     document.getElementById('cedulaDisplay2a').textContent = cedula;
                     showStep('step2a');
-                    
+
                     // Setup PIN inputs para crear cuenta
                     setTimeout(() => {
                         setupPinInputs('pinCreateContainer', actualizarValidacionPIN);

@@ -77,22 +77,16 @@ const NotificationHistory = () => {
         type: filters.messageType
       };
 
-      console.log('📱 Cargando historial con parámetros:', params);
       
       const response = await receptionService.getNotificationHistory(params);
       
       if (response.success) {
         setNotifications(response.data.notifications || []);
         setTotalCount(response.data.pagination?.total || 0);
-        console.log('✅ Historial cargado:', {
-          count: response.data.notifications?.length || 0,
-          total: response.data.pagination?.total || 0
-        });
       } else {
         throw new Error(response.error || 'Error desconocido');
       }
     } catch (error) {
-      console.error('❌ Error cargando historial:', error);
       setError('No se pudieron cargar las notificaciones: ' + error.message);
       setNotifications([]);
       setTotalCount(0);
