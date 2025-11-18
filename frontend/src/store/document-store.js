@@ -339,13 +339,8 @@ const useDocumentStore = create((set, get) => ({
       if (targetDoc?.isGrouped && targetDoc?.documentGroupId) {
         const sharedFields = ['clientPhone', 'clientEmail', 'clientName'];
         const hasSharedUpdate = sharedFields.some(field => documentData[field] !== undefined);
-        
+
         if (hasSharedUpdate) {
-            documentId,
-            groupId: targetDoc.documentGroupId,
-            fields: Object.keys(documentData).filter(field => sharedFields.includes(field))
-          });
-          
           try {
             // Preparar datos compartidos para actualizar
             const sharedData = {};
@@ -475,13 +470,8 @@ const useDocumentStore = create((set, get) => ({
    * @returns {Promise<Object>} Resultado detallado de la operación
    */
   updateDocumentStatusWithConfirmation: async (documentId, newStatus, options = {}) => {
-      documentId,
-      newStatus,
-      options
-    });
-    
     set({ loading: true, error: null });
-    
+
     try {
       const result = await documentService.updateDocumentStatus(documentId, newStatus, options);
       
