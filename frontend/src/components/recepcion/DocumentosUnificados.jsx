@@ -338,13 +338,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   const ejecutarMarcarListo = async () => {
     try {
       let result;
-      
-        actionType,
-        documentoId: currentDocumento?.id,
-        selectedDocuments: selectedDocuments.length,
-        timestamp: new Date().toISOString()
-      });
-      
+
       if (actionType === 'individual' && currentDocumento) {
         result = await receptionService.marcarComoListo(currentDocumento.id);
       } else if (actionType === 'grupal' && selectedDocuments.length > 0) {
@@ -357,14 +351,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
           result = await receptionService.marcarGrupoListo(selectedDocuments);
         }
       }
-
-        result,
-        type: typeof result,
-        success: result?.success,
-        error: result?.error,
-        message: result?.message,
-        keys: result ? Object.keys(result) : 'null/undefined'
-      });
 
       // Verificar que result existe y es un objeto válido
       if (!result) {
@@ -396,12 +382,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
         onEstadisticasChange?.();
         setSelectedDocuments([]);
       } else {
-          success: result?.success,
-          error: result?.error,
-          message: result?.message,
-          fullResult: result
-        });
-        
         // Crear mensaje de error más específico
         let errorMessage = 'Error inesperado al marcar como listo';
         if (result?.error) {
@@ -440,12 +420,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   const ejecutarReversion = async ({ documentId, newStatus, reversionReason }) => {
     try {
       setReversionLoading(true);
-      
-        documentId,
-        newStatus,
-        reversionReason,
-        timestamp: new Date().toISOString()
-      });
 
       const result = await receptionService.revertirEstadoDocumento(documentId, newStatus, reversionReason);
 
@@ -614,10 +588,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
    * Manejar agrupación inteligente detectada automáticamente
    */
   const handleGroupDocuments = async (groupableDocuments, mainDocument) => {
-      main: mainDocument.protocolNumber || mainDocument.id,
-      groupable: groupableDocuments.map(d => d.protocolNumber || d.id)
-    });
-    
     setPendingGroupData({
       main: mainDocument,
       related: groupableDocuments

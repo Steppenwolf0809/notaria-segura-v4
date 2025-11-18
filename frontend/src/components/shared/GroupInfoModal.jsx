@@ -54,12 +54,6 @@ const GroupInfoModal = ({ open, onClose, document, onUngrouped }) => {
   useEffect(() => {
     const loadGroup = async () => {
       if (open && document) {
-          documentId: document.id,
-          isGrouped: document.isGrouped,
-          documentGroupId: document.documentGroupId,
-          groupVerificationCode: document.groupVerificationCode
-        });
-
         if (!document.documentGroupId) {
           setGroupDocuments([]);
           return;

@@ -66,12 +66,7 @@ function buildProxyPdfUrl(pdfFileName) {
   
   // Usar el proxy del backend (mismo origen, sin CORS)
   const proxyUrl = `/api/proxy-pdf?url=${encodeURIComponent(remoteUrl)}`;
-  
-    archivo: pdfFileName, 
-    urlRemota: remoteUrl,
-    urlProxy: proxyUrl 
-  });
-  
+
   return proxyUrl;
 }
 

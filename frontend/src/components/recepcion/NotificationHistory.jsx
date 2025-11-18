@@ -83,9 +83,6 @@ const NotificationHistory = () => {
       if (response.success) {
         setNotifications(response.data.notifications || []);
         setTotalCount(response.data.pagination?.total || 0);
-          count: response.data.notifications?.length || 0,
-          total: response.data.pagination?.total || 0
-        });
       } else {
         throw new Error(response.error || 'Error desconocido');
       }
