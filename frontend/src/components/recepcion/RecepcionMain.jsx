@@ -427,32 +427,29 @@ function RecepcionMain() {
         </Typography>
       </Box>
 
-      {/* Panel de Estadísticas */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
+      {/* Panel de Estadísticas - Compacto */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
         {/* En Proceso */}
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={6} sm={3}>
           <Card sx={{
             bgcolor: '#fef3c7',
-            borderLeft: 4,
+            borderLeft: 3,
             borderColor: '#f59e0b',
-            transition: 'all 0.3s',
-            '&:hover': {
-              transform: 'translateY(-4px)',
-              boxShadow: 3
-            }
+            transition: 'all 0.2s',
+            '&:hover': { transform: 'translateY(-2px)', boxShadow: 2 }
           }}>
-            <CardContent>
+            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>
                     EN PROCESO
                   </Typography>
-                  <Typography variant="h3" sx={{ fontWeight: 'bold', color: '#92400e' }}>
+                  <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#92400e' }}>
                     {stats.enProceso}
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: '#f59e0b', width: 56, height: 56 }}>
-                  <HourglassEmptyIcon sx={{ fontSize: 32 }} />
+                <Avatar sx={{ bgcolor: '#f59e0b', width: 40, height: 40 }}>
+                  <HourglassEmptyIcon sx={{ fontSize: 20 }} />
                 </Avatar>
               </Box>
             </CardContent>
@@ -460,29 +457,26 @@ function RecepcionMain() {
         </Grid>
 
         {/* Listos */}
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={6} sm={3}>
           <Card sx={{
             bgcolor: '#d1fae5',
-            borderLeft: 4,
+            borderLeft: 3,
             borderColor: '#10b981',
-            transition: 'all 0.3s',
-            '&:hover': {
-              transform: 'translateY(-4px)',
-              boxShadow: 3
-            }
+            transition: 'all 0.2s',
+            '&:hover': { transform: 'translateY(-2px)', boxShadow: 2 }
           }}>
-            <CardContent>
+            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>
                     LISTOS
                   </Typography>
-                  <Typography variant="h3" sx={{ fontWeight: 'bold', color: '#065f46' }}>
+                  <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#065f46' }}>
                     {stats.listos}
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: '#10b981', width: 56, height: 56 }}>
-                  <DoneIcon sx={{ fontSize: 32 }} />
+                <Avatar sx={{ bgcolor: '#10b981', width: 40, height: 40 }}>
+                  <DoneIcon sx={{ fontSize: 20 }} />
                 </Avatar>
               </Box>
             </CardContent>
@@ -490,29 +484,26 @@ function RecepcionMain() {
         </Grid>
 
         {/* Entregados Hoy */}
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={6} sm={3}>
           <Card sx={{
             bgcolor: '#dbeafe',
-            borderLeft: 4,
+            borderLeft: 3,
             borderColor: '#3b82f6',
-            transition: 'all 0.3s',
-            '&:hover': {
-              transform: 'translateY(-4px)',
-              boxShadow: 3
-            }
+            transition: 'all 0.2s',
+            '&:hover': { transform: 'translateY(-2px)', boxShadow: 2 }
           }}>
-            <CardContent>
+            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>
                     ENTREGADOS HOY
                   </Typography>
-                  <Typography variant="h3" sx={{ fontWeight: 'bold', color: '#1e40af' }}>
+                  <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#1e40af' }}>
                     {stats.entregadosHoy}
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: '#3b82f6', width: 56, height: 56 }}>
-                  <LocalShippingIcon sx={{ fontSize: 32 }} />
+                <Avatar sx={{ bgcolor: '#3b82f6', width: 40, height: 40 }}>
+                  <LocalShippingIcon sx={{ fontSize: 20 }} />
                 </Avatar>
               </Box>
             </CardContent>
@@ -520,29 +511,26 @@ function RecepcionMain() {
         </Grid>
 
         {/* Total */}
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={6} sm={3}>
           <Card sx={{
             bgcolor: '#e0e7ff',
-            borderLeft: 4,
+            borderLeft: 3,
             borderColor: '#6366f1',
-            transition: 'all 0.3s',
-            '&:hover': {
-              transform: 'translateY(-4px)',
-              boxShadow: 3
-            }
+            transition: 'all 0.2s',
+            '&:hover': { transform: 'translateY(-2px)', boxShadow: 2 }
           }}>
-            <CardContent>
+            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+                  <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>
                     TOTAL VISIBLES
                   </Typography>
-                  <Typography variant="h3" sx={{ fontWeight: 'bold', color: '#3730a3' }}>
+                  <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#3730a3' }}>
                     {stats.total}
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: '#6366f1', width: 56, height: 56 }}>
-                  <AssignmentIcon sx={{ fontSize: 32 }} />
+                <Avatar sx={{ bgcolor: '#6366f1', width: 40, height: 40 }}>
+                  <AssignmentIcon sx={{ fontSize: 20 }} />
                 </Avatar>
               </Box>
             </CardContent>
@@ -733,15 +721,6 @@ function RecepcionMain() {
                         >
                           {documento.numeroIdentificacion || documento.clientId}
                         </Typography>
-                        {/* Indicador de grupo */}
-                        {documento.isGrouped && documento.groupSize && (
-                          <Chip
-                            label={`${documento.groupSize} documentos`}
-                            size="small"
-                            color="secondary"
-                            sx={{ mt: 0.5, fontSize: '0.7rem' }}
-                          />
-                        )}
                       </Box>
                     </TableCell>
 
