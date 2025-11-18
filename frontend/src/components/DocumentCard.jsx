@@ -286,25 +286,7 @@ const DocumentCard = ({ document, onStatusChange }) => {
           />
         </Box>
 
-        {/* Indicador de grupo */}
-        {document.isGrouped && (
-          <Chip 
-            icon={<GroupIcon />} 
-            label="Parte de un grupo" 
-            size="small"
-            sx={{ 
-              mb: 2,
-              bgcolor: (theme) => theme.palette.mode === 'dark'
-                ? 'rgba(255, 255, 255, 0.1)'
-                : 'rgb(226, 232, 240)',
-              color: (theme) => theme.palette.mode === 'dark'
-                ? 'rgba(255, 255, 255, 0.7)'
-                : 'rgb(71, 85, 105)',
-              border: 'none',
-              borderRadius: '12px' // rounded-full
-            }}
-          />
-        )}
+        {/* 🚫 Indicador de grupo ELIMINADO */}
 
         {/* 🔗 ALERTA DE AGRUPACIÓN INTELIGENTE */}
         {!document.isGrouped && (
