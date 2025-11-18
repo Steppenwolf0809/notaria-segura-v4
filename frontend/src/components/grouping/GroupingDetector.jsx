@@ -21,20 +21,12 @@ const GroupingDetector = ({
   const detectGroupableDocuments = async () => {
     // Requiere al menos clientName
     if (!document?.clientName) {
-        protocolo: document?.protocolNumber,
-        clientName: document?.clientName,
-        clientId: document?.clientId
-      });
       return;
     }
 
     // Advertencia si no hay clientId (menos preciso)
-    if (!document?.clientId) {
-        protocolo: document?.protocolNumber,
-        clientName: document?.clientName
-      });
-    }
-    
+    // Si no hay clientId, la detección será menos precisa pero aún funcional
+
     setLoading(true);
     try {
       const response = await documentService.detectGroupableDocuments({
@@ -44,19 +36,6 @@ const GroupingDetector = ({
       
       // Filtramos el documento actual de la lista de agrupables
       const otherGroupableDocs = response.groupableDocuments.filter(doc => doc.id !== document.id);
-
-        documentoActual: document.protocolNumber,
-        documentosEncontrados: response.groupableDocuments.map(d => ({
-          protocolo: d.protocolNumber,
-          id: d.id,
-          estado: d.status
-        })),
-        documentosFiltrados: otherGroupableDocs.map(d => ({
-          protocolo: d.protocolNumber,
-          id: d.id,
-          estado: d.status
-        }))
-      });
 
       if (response.canGroup && otherGroupableDocs.length > 0) {
         setGroupableDocuments(otherGroupableDocs);
