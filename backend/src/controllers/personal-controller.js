@@ -108,9 +108,30 @@ export async function registrarPersona(req, res) {
     if (existente) {
       // Si la persona existe pero su PIN fue reseteado, permitir re-creación de PIN
       // Verificar si NO tiene PIN creado O si el hash está vacío/nulo
+      logger.info('🔍 DEBUG - Persona existente encontrada:', {
+        cedula,
+        pinCreado: existente.pinCreado,
+        pinHashExists: !!existente.pinHash,
+        pinHashLength: existente.pinHash ? existente.pinHash.length : 0,
+        pinHashValue: existente.pinHash ? `[${existente.pinHash.substring(0, 10)}...]` : 'null/undefined',
+        pinHashType: typeof existente.pinHash
+      });
+
+      // Verificar si el PIN fue reseteado
+      // Un PIN está reseteado si:
+      // 1. pinCreado es false, O
+      // 2. pinHash no existe (null/undefined), O
+      // 3. pinHash es una cadena vacía o solo espacios
       const pinEstaReseteado = !existente.pinCreado ||
                                 !existente.pinHash ||
-                                existente.pinHash.trim().length === 0;
+                                (typeof existente.pinHash === 'string' && existente.pinHash.trim().length === 0);
+
+      logger.info('🔍 DEBUG - Verificación PIN reseteado:', {
+        pinEstaReseteado,
+        check1_pinCreado: !existente.pinCreado,
+        check2_pinHashFalsy: !existente.pinHash,
+        check3_pinHashEmpty: typeof existente.pinHash === 'string' ? existente.pinHash.trim().length === 0 : 'N/A'
+      });
 
       if (pinEstaReseteado) {
         // Hash del nuevo PIN
@@ -607,7 +628,14 @@ export async function resetearPIN(req, res) {
       // 1. Resetear PIN y desbloquear cuenta
       // Establecemos pinHash como cadena vacía (no puede ser null por el schema)
       // y pinCreado en false para forzar la creación de un nuevo PIN
-      await tx.personaRegistrada.update({
+      logger.info('🔄 DEBUG - Reseteando PIN para:', {
+        personaId,
+        cedula: persona.numeroIdentificacion,
+        pinCreado_antes: persona.pinCreado,
+        pinHash_antes: persona.pinHash ? `[${persona.pinHash.substring(0, 10)}...]` : 'null/undefined'
+      });
+
+      const personaActualizada = await tx.personaRegistrada.update({
         where: { id: personaId },
         data: {
           pinCreado: false,                            // Fuerza a crear nuevo PIN
@@ -616,6 +644,14 @@ export async function resetearPIN(req, res) {
           bloqueadoHasta: null,                         // Desbloquea la cuenta
           pinResetCount: persona.pinResetCount + 1     // Incrementa contador de resets
         }
+      });
+
+      logger.info('✅ DEBUG - PIN reseteado exitosamente:', {
+        personaId,
+        cedula: personaActualizada.numeroIdentificacion,
+        pinCreado_despues: personaActualizada.pinCreado,
+        pinHash_despues: personaActualizada.pinHash ? `[${personaActualizada.pinHash}]` : 'null/undefined',
+        pinHashLength: personaActualizada.pinHash ? personaActualizada.pinHash.length : 0
       });
 
       // 2. Cerrar todas las sesiones activas del usuario (seguridad)
