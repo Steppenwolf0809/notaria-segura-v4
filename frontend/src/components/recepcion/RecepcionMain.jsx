@@ -154,15 +154,18 @@ function RecepcionMain() {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
 
+    const entregados = documentos.filter(d => d.status === 'ENTREGADO');
+    const entregadosHoy = entregados.filter(d => {
+      const fechaEntrega = new Date(d.fechaEntrega || d.updatedAt);
+      fechaEntrega.setHours(0, 0, 0, 0);
+      return fechaEntrega.getTime() === now.getTime();
+    });
+
     return {
       enProceso: documentos.filter(d => d.status === 'EN_PROCESO').length,
       listos: documentos.filter(d => d.status === 'LISTO').length,
-      entregadosHoy: documentos.filter(d => {
-        if (d.status !== 'ENTREGADO') return false;
-        const fechaEntrega = new Date(d.fechaEntrega || d.updatedAt);
-        fechaEntrega.setHours(0, 0, 0, 0);
-        return fechaEntrega.getTime() === now.getTime();
-      }).length,
+      entregados: entregados.length, // Total de entregados (todos)
+      entregadosHoy: entregadosHoy.length, // Solo entregados hoy
       total: documentos.length
     };
   }, [documentos]);
@@ -482,8 +485,8 @@ function RecepcionMain() {
           />
           <Tab
             label={
-              <Badge badgeContent={stats.entregadosHoy} color="success" max={999}>
-                Entregados
+              <Badge badgeContent={stats.entregados} color="success" max={999}>
+                Entregados ({stats.entregadosHoy} hoy)
               </Badge>
             }
           />
