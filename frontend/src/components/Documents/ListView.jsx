@@ -552,22 +552,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
                           color={statusInfo.color}
                           variant="filled"
                         />
-                        {/* 🔗 ALERTA DE AGRUPACIÓN COMPACTA */}
-                        {/* 🚫 AGRUPACIÓN TEMPORALMENTE DESHABILITADA (sin notificaciones WhatsApp) */}
-                        {/* Mostrar chip de agrupación si aplica; si ya está agrupado, mostrar texto sutil */}
-                        {document.isGrouped && (
-                          <Chip
-                            label="⚡ Parte de un grupo"
-                            size="small"
-                            variant="outlined"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedGroupDocument(document);
-                              setGroupInfoModalOpen(true);
-                            }}
-                            sx={{ mt: 0.5, height: '20px', '& .MuiChip-label': { px: 1 } }}
-                          />
-                        )}
+                        {/* 🚫 AGRUPACIÓN ELIMINADA */}
                       </Box>
                     </TableCell>
                     <TableCell onClick={() => openDetailModal(document)}>
