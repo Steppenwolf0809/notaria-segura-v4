@@ -102,12 +102,12 @@ app.get('/ready', (_req, res) => {
 })
 
 // Configurar trust proxy de forma segura (evita ERR_ERL_PERMISSIVE_TRUST_PROXY)
+// IMPORTANTE: Debe estar consistente con rate-limiter.js
 // En Railway/producción confiamos solo en el primer proxy; en desarrollo no confiamos en proxies
-if (config.NODE_ENV === 'production' || config.NODE_ENV === 'staging') {
-  app.set('trust proxy', 1)
-} else {
-  app.set('trust proxy', false)
-}
+const TRUST_PROXY = config.NODE_ENV === 'production' || config.NODE_ENV === 'staging';
+app.set('trust proxy', TRUST_PROXY ? 1 : false);
+
+console.log(`✅ Trust Proxy configurado: ${TRUST_PROXY ? 'Habilitado (producción/staging)' : 'Deshabilitado (desarrollo)'}`);
 
 // Configuración CORS mejorada para desarrollo y producción
 const corsOptions = {
