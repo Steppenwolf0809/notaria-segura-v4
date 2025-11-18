@@ -20,6 +20,23 @@ function cleanTextSpaces(s) {
     .trim()
 }
 
+// Valida si un nombre es válido (no es dato de ubicación, asteriscos, etc.)
+function isValidPersonName(name) {
+  const nameStr = String(name || '').trim()
+  if (!nameStr || nameStr.length < 3) return false
+
+  // Detectar patrones inválidos
+  const invalidPatterns = [
+    /^\*+$/, // Solo asteriscos
+    /PROVINCIA|CANT[OÓ]N|PARROQUIA/i, // Datos de ubicación
+    /QUITO.*QUITO|PICHINCHA.*PICHINCHA/i, // Ubicaciones duplicadas
+    /^\d+$/, // Solo números
+    /GERENTE|PRESIDENTE|REPRESENTANTE\s+LEGAL/i, // Cargos
+  ]
+
+  return !invalidPatterns.some(pattern => pattern.test(nameStr))
+}
+
 // Crea la frase de un acto a partir de las variables del engine
 // v: variables devueltas por ExtractoTemplateEngine.render(...).variables
 export function buildActPhrase(v) {
@@ -35,7 +52,15 @@ export function buildActPhrase(v) {
   const tratBenef = String(vars.TRATAMIENTO_BENEFICIARIOS || '')
   const nombresBenef = String(vars.NOMBRES_BENEFICIARIOS || '')
 
-  const haveBenef = cleanTextSpaces(`${contraccionAFavor} ${tratBenef} ${nombresBenef}`) !== ''
+  // Validar que los nombres de beneficiarios sean válidos
+  const benefNamesValid = isValidPersonName(nombresBenef)
+
+  // Advertir si se detectan beneficiarios inválidos
+  if (!benefNamesValid && nombresBenef.trim().length > 0) {
+    console.warn(`⚠️ [phrase-builder] Beneficiario inválido detectado y filtrado: "${nombresBenef}"`)
+  }
+
+  const haveBenef = benefNamesValid && cleanTextSpaces(`${contraccionAFavor} ${tratBenef} ${nombresBenef}`) !== ''
 
   let phrase
   if (isRevocatoria) {
