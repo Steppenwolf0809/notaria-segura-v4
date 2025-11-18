@@ -163,14 +163,6 @@ const receptionService = {
   async marcarComoListo(documentId) {
     try {
       const response = await api.post(`/reception/documentos/${documentId}/marcar-listo`);
-      
-        status: response.status,
-        statusText: response.statusText,
-        headers: response.headers,
-        data: response.data,
-        dataType: typeof response.data,
-        dataKeys: response.data ? Object.keys(response.data) : 'no keys'
-      });
 
       // Verificar estructura de respuesta
       if (!response.data) {
