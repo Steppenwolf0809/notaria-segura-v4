@@ -13,6 +13,79 @@ const SECURITY_CONFIG = {
 };
 
 /**
+ * ENDPOINT TEMPORAL DE DIAGNÓSTICO
+ * GET /api/personal/debug/:cedula
+ * Muestra información detallada de una persona para debugging
+ */
+export async function debugPersona(req, res) {
+  try {
+    const { cedula } = req.params;
+
+    const persona = await prisma.personaRegistrada.findUnique({
+      where: { numeroIdentificacion: cedula },
+      select: {
+        id: true,
+        numeroIdentificacion: true,
+        tipoPersona: true,
+        pinCreado: true,
+        pinHash: true,
+        pinResetCount: true,
+        intentosFallidos: true,
+        bloqueadoHasta: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    });
+
+    if (!persona) {
+      return res.json({
+        success: true,
+        encontrado: false,
+        message: 'Persona no existe en BD'
+      });
+    }
+
+    // Información de debugging
+    const debug = {
+      encontrado: true,
+      pinCreado: persona.pinCreado,
+      pinHashExiste: !!persona.pinHash,
+      pinHashLength: persona.pinHash ? persona.pinHash.length : 0,
+      pinHashType: typeof persona.pinHash,
+      pinHashValue: persona.pinHash || 'VACIO',
+      pinHashPrimeros10Chars: persona.pinHash ? persona.pinHash.substring(0, 10) : 'N/A',
+      pinResetCount: persona.pinResetCount,
+      verificaciones: {
+        check1_pinCreado: !persona.pinCreado,
+        check2_pinHashFalsy: !persona.pinHash,
+        check3_pinHashEmpty: typeof persona.pinHash === 'string' && persona.pinHash.trim().length === 0,
+        RESULTADO_pinEstaReseteado: !persona.pinCreado || !persona.pinHash || (typeof persona.pinHash === 'string' && persona.pinHash.trim().length === 0)
+      },
+      metadata: {
+        createdAt: persona.createdAt,
+        updatedAt: persona.updatedAt,
+        bloqueadoHasta: persona.bloqueadoHasta,
+        intentosFallidos: persona.intentosFallidos
+      }
+    };
+
+    logger.info('🔬 DEBUG ENDPOINT - Información completa:', debug);
+
+    res.json({
+      success: true,
+      ...debug
+    });
+  } catch (error) {
+    logger.error('Error en debug endpoint:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error en debug',
+      error: error.message
+    });
+  }
+}
+
+/**
  * Verificar si una cédula existe en el sistema
  * GET /api/personal/verificar-cedula/:cedula
  *
@@ -27,8 +100,18 @@ export async function verificarCedula(req, res) {
       select: {
         id: true,
         tipoPersona: true,
-        pinCreado: true
+        pinCreado: true,
+        pinHash: true
       }
+    });
+
+    // Log para debugging
+    logger.info('🔍 verificarCedula - Resultado:', {
+      cedula,
+      existe: !!persona,
+      pinCreado: persona?.pinCreado,
+      pinHashLength: persona?.pinHash?.length || 0,
+      pinHashType: typeof persona?.pinHash
     });
 
     res.json({
