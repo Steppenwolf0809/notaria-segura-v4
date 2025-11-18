@@ -12,6 +12,12 @@ import { closePrismaClient, db } from './src/db.js'
 import { getConfig, isConfigurationComplete, validateConfigurationComplete, debugConfiguration } from './src/config/environment.js'
 import xmlWatcherService from './src/services/xml-watcher-service.js'
 import cache from './src/services/cache-service.js'
+import {
+  csrfCookieParser,
+  csrfProtection,
+  csrfTokenGenerator,
+  csrfErrorHandler
+} from './src/middleware/csrf-protection.js'
 
 // Importar rutas implementadas
 import authRoutes from './src/routes/auth-routes.js'
@@ -228,6 +234,11 @@ app.use(cors(corsOptions))
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
+// ============================================================================
+// CSRF PROTECTION - Protección contra Cross-Site Request Forgery
+// ============================================================================
+app.use(csrfCookieParser); // Requerido para leer cookies CSRF
+
 // Performance logger: registra requests lentas (>500ms)
 app.use((req, res, next) => {
   const start = process.hrtime.bigint();
@@ -267,6 +278,22 @@ app.get('/api/health', (req, res) => {
 })
 
 // Nota: liveness /health y readiness /ready se definen antes de middlewares
+
+// ============================================================================
+// CSRF TOKEN ENDPOINT - Obtener token para formularios protegidos
+// ============================================================================
+app.get('/api/csrf-token', csrfTokenGenerator, (req, res) => {
+  const token = req.csrfToken();
+
+  console.log(`🔐 CSRF token generado para IP: ${req.ip}`);
+
+  res.json({
+    success: true,
+    csrfToken: token,
+    message: 'Token CSRF generado exitosamente',
+    expiresIn: '1h'
+  });
+});
 
 // Health check específico para verificar feature flags del frontend
 // Útil para diagnosticar problemas de configuración en Railway
@@ -403,25 +430,36 @@ app.use('/api/*', (req, res) => {
 // Manejo de errores global
 app.use((error, req, res, next) => {
   console.error('💥 Error del servidor:', error)
-  
+
+  // Error CSRF
+  if (error.code === 'EBADCSRFTOKEN' || error.message?.includes('CSRF')) {
+    console.warn(`⚠️ CSRF token inválido: ${req.method} ${req.path} desde IP ${req.ip}`);
+    return res.status(403).json({
+      success: false,
+      error: 'Token de seguridad inválido o expirado',
+      message: 'Por favor recarga la página e intenta nuevamente.',
+      code: 'CSRF_VALIDATION_FAILED'
+    });
+  }
+
   // Error de validación de Prisma
   if (error.code === 'P2002') {
-    return res.status(400).json({ 
+    return res.status(400).json({
       success: false,
-      error: 'Ya existe un registro con esos datos únicos' 
+      error: 'Ya existe un registro con esos datos únicos'
     })
   }
-  
+
   // Error de JWT
   if (error.name === 'JsonWebTokenError') {
-    return res.status(401).json({ 
+    return res.status(401).json({
       success: false,
-      error: 'Token JWT inválido' 
+      error: 'Token JWT inválido'
     })
   }
-  
+
   // Error genérico
-  res.status(500).json({ 
+  res.status(500).json({
     success: false,
     error: 'Error interno del servidor',
     message: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'

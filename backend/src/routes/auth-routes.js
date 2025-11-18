@@ -18,6 +18,7 @@ import {
   registerRateLimit,
   addRateLimitHeaders
 } from '../middleware/rate-limiter.js';
+import { csrfProtection } from '../middleware/csrf-protection.js';
 
 const router = express.Router();
 
@@ -31,8 +32,9 @@ router.use(authGeneralRateLimit);
  * @route POST /api/auth/register
  * @desc Registrar nuevo usuario (solo ADMIN)
  * @access Private (ADMIN only)
+ * @csrf Protected - Requiere token CSRF
  */
-router.post('/register', registerRateLimit, authenticateToken, requireAdmin, register);
+router.post('/register', registerRateLimit, csrfProtection, authenticateToken, requireAdmin, register);
 
 /**
  * @route POST /api/auth/login
@@ -74,8 +76,9 @@ router.get('/verify', authenticateToken, (req, res) => {
  * @route PUT /api/auth/change-password
  * @desc Cambiar contraseña del usuario autenticado
  * @access Private
+ * @csrf Protected - Requiere token CSRF
  */
-router.put('/change-password', passwordChangeRateLimit, authenticateToken, changePassword);
+router.put('/change-password', passwordChangeRateLimit, csrfProtection, authenticateToken, changePassword);
 
 /**
  * @route POST /api/auth/init-users
