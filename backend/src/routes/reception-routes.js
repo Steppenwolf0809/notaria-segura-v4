@@ -16,7 +16,9 @@ import {
   // 🎯 NUEVA FUNCIONALIDAD: UI Activos/Entregados para Recepción
   getReceptionsUnified,
   getReceptionsCounts,
-  getReceptionSuggestions
+  getReceptionSuggestions,
+  // 🎯 NUEVA FUNCIONALIDAD: Entrega en bloque
+  bulkDelivery
 } from '../controllers/reception-controller.js';
 import { marcarVariosListos } from '../controllers/reception-bulk-controller.js';
 
@@ -105,6 +107,16 @@ router.post('/documentos/marcar-listos', authenticateToken, requireRecepcion, cs
  * @csrf Protected - Requiere token CSRF
  */
 router.post('/documentos/desagrupar', authenticateToken, requireRecepcion, csrfProtection, desagruparDocumentos);
+
+/**
+ * @route POST /api/reception/bulk-delivery
+ * @desc Entregar múltiples documentos en bloque (mismo cliente)
+ * @body documentIds - Array de IDs de documentos a entregar
+ * @body deliveryData - Datos de entrega (personaRetira, cedulaRetira, etc.)
+ * @access Private (RECEPCION only)
+ * @csrf Protected - Requiere token CSRF
+ */
+router.post('/bulk-delivery', authenticateToken, requireRecepcion, csrfProtection, bulkDelivery);
 
 /**
  * @route GET /api/reception/matrizadores
