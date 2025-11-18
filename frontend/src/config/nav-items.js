@@ -9,8 +9,8 @@ export const navItemsByRole = {
   ],
   RECEPCION: [
     // Dashboard removido - Las estadísticas están integradas en la vista principal
-    { id: 'documentos', label: 'Gestión de Documentos', view: 'documentos', icon: 'Assignment' },
-    { id: 'notificaciones', label: 'Historial WhatsApp', view: 'notificaciones', icon: 'WhatsApp' }
+    // Historial WhatsApp removido - Funcionalidad no implementada
+    { id: 'documentos', label: 'Gestión de Documentos', view: 'documentos', icon: 'Assignment' }
   ],
   MATRIZADOR: [
     { id: 'dashboard', label: 'Dashboard', view: 'dashboard', icon: 'Dashboard' },

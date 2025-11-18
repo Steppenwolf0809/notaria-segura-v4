@@ -150,20 +150,10 @@ function App() {
       MuiCard: {
         styleOverrides: {
           root: {
-            backgroundColor: resolvedIsDark ? '#1e2530 !important' : '#ffffff !important',
             borderRadius: 12,
             border: resolvedIsDark ? '1px solid #334155' : '1px solid #e2e8f0',
-            boxShadow: resolvedIsDark
-              ? '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important'
-              : '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06) !important',
             transition: 'all 0.2s ease-in-out',
-            '& .MuiCardContent-root': {
-              backgroundColor: resolvedIsDark ? '#1e2530 !important' : '#ffffff !important',
-            },
             '&:hover': {
-              boxShadow: resolvedIsDark
-                ? '0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important'
-                : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important',
               transform: 'translateY(-2px)',
               borderColor: resolvedIsDark ? 'rgba(59, 130, 246, 0.4)' : 'rgba(59, 130, 246, 0.2)'
             }
