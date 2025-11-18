@@ -41,12 +41,6 @@ import useUnifiedDocumentsStore from '../store/unified-documents-store';
  * Componente principal que maneja la nueva interfaz con pestañas y búsqueda global
  */
 const DocumentCenter = () => {
-  // 🔍 DEBUG: Verificar feature flag y log inicial
-  const featureFlag = import.meta.env.VITE_UI_ACTIVOS_ENTREGADOS;
-    NODE_ENV: import.meta.env.MODE,
-    VITE_API_URL: import.meta.env.VITE_API_URL,
-    VITE_UI_ACTIVOS_ENTREGADOS: featureFlag
-  });
   const {
     // Estado
     tab,
