@@ -365,6 +365,7 @@ export async function loginFormularioUAFE(req, res) {
             numeroIdentificacion: true,
             tipoPersona: true,
             pinHash: true,
+            pinCreado: true,
             bloqueadoHasta: true,
             datosPersonaNatural: true,
             datosPersonaJuridica: true,
@@ -391,6 +392,15 @@ export async function loginFormularioUAFE(req, res) {
       return res.status(403).json({
         success: false,
         message: `Tu cuenta está bloqueada temporalmente. Intenta en ${minutosRestantes} minutos.`
+      });
+    }
+
+    // 3.5. Verificar si el PIN fue reseteado
+    if (!personaEnProtocolo.persona.pinCreado || !personaEnProtocolo.persona.pinHash) {
+      return res.status(403).json({
+        success: false,
+        message: 'Tu PIN ha sido reseteado. Por favor crea un nuevo PIN en https://notaria18quito.com.ec/registro-personal/',
+        pinReseteado: true
       });
     }
 
