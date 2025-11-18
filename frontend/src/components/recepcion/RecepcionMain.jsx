@@ -495,9 +495,9 @@ function RecepcionMain() {
         {/* En Proceso */}
         <Grid item xs={6} sm={3}>
           <Card sx={{
-            bgcolor: '#fef3c7',
+            bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(245, 158, 11, 0.15)' : '#fef3c7',
             borderLeft: 3,
-            borderColor: '#f59e0b',
+            borderColor: 'warning.main',
             transition: 'all 0.2s',
             '&:hover': { transform: 'translateY(-2px)', boxShadow: 2 }
           }}>
@@ -507,11 +507,11 @@ function RecepcionMain() {
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>
                     EN PROCESO
                   </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#92400e' }}>
+                  <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'warning.dark' }}>
                     {stats.enProceso}
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: '#f59e0b', width: 40, height: 40 }}>
+                <Avatar sx={{ bgcolor: 'warning.main', width: 40, height: 40 }}>
                   <HourglassEmptyIcon sx={{ fontSize: 20 }} />
                 </Avatar>
               </Box>
@@ -522,9 +522,9 @@ function RecepcionMain() {
         {/* Listos */}
         <Grid item xs={6} sm={3}>
           <Card sx={{
-            bgcolor: '#d1fae5',
+            bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(16, 185, 129, 0.15)' : '#d1fae5',
             borderLeft: 3,
-            borderColor: '#10b981',
+            borderColor: 'success.main',
             transition: 'all 0.2s',
             '&:hover': { transform: 'translateY(-2px)', boxShadow: 2 }
           }}>
@@ -534,11 +534,11 @@ function RecepcionMain() {
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>
                     LISTOS
                   </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#065f46' }}>
+                  <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'success.dark' }}>
                     {stats.listos}
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: '#10b981', width: 40, height: 40 }}>
+                <Avatar sx={{ bgcolor: 'success.main', width: 40, height: 40 }}>
                   <DoneIcon sx={{ fontSize: 20 }} />
                 </Avatar>
               </Box>
@@ -549,9 +549,9 @@ function RecepcionMain() {
         {/* Entregados Hoy */}
         <Grid item xs={6} sm={3}>
           <Card sx={{
-            bgcolor: '#dbeafe',
+            bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(59, 130, 246, 0.15)' : '#dbeafe',
             borderLeft: 3,
-            borderColor: '#3b82f6',
+            borderColor: 'primary.main',
             transition: 'all 0.2s',
             '&:hover': { transform: 'translateY(-2px)', boxShadow: 2 }
           }}>
@@ -561,11 +561,11 @@ function RecepcionMain() {
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>
                     ENTREGADOS HOY
                   </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#1e40af' }}>
+                  <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'primary.dark' }}>
                     {stats.entregadosHoy}
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: '#3b82f6', width: 40, height: 40 }}>
+                <Avatar sx={{ bgcolor: 'primary.main', width: 40, height: 40 }}>
                   <LocalShippingIcon sx={{ fontSize: 20 }} />
                 </Avatar>
               </Box>
@@ -576,9 +576,9 @@ function RecepcionMain() {
         {/* Total */}
         <Grid item xs={6} sm={3}>
           <Card sx={{
-            bgcolor: '#e0e7ff',
+            bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(99, 102, 241, 0.15)' : '#e0e7ff',
             borderLeft: 3,
-            borderColor: '#6366f1',
+            borderColor: 'info.main',
             transition: 'all 0.2s',
             '&:hover': { transform: 'translateY(-2px)', boxShadow: 2 }
           }}>
@@ -588,11 +588,11 @@ function RecepcionMain() {
                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, fontSize: '0.7rem' }}>
                     TOTAL VISIBLES
                   </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 'bold', color: '#3730a3' }}>
+                  <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'info.dark' }}>
                     {stats.total}
                   </Typography>
                 </Box>
-                <Avatar sx={{ bgcolor: '#6366f1', width: 40, height: 40 }}>
+                <Avatar sx={{ bgcolor: 'info.main', width: 40, height: 40 }}>
                   <AssignmentIcon sx={{ fontSize: 20 }} />
                 </Avatar>
               </Box>
