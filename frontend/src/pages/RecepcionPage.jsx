@@ -1,14 +1,14 @@
 import React from 'react';
-import ReceptionCenter from '../components/ReceptionCenter';
+import RecepcionMain from '../components/recepcion/RecepcionMain';
 
 /**
  * Página principal del rol RECEPCION
- * Punto de entrada para gestión de entregas (UI Activos/Entregados)
+ * Interfaz rediseñada con panel de estadísticas, filtros avanzados y acciones batch
  */
 function RecepcionPage() {
   return (
     <div className="recepcion-page">
-      <ReceptionCenter />
+      <RecepcionMain />
     </div>
   );
 }
