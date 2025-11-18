@@ -1,8 +1,8 @@
-import { PrismaClient } from '@prisma/client';
+import { getPrismaClient } from '../db.js';
 import bcrypt from 'bcrypt';
 import { validarPIN, generarTokenSesion } from '../utils/pin-validator.js';
 
-const prisma = new PrismaClient();
+const prisma = getPrismaClient();
 
 // Configuración de seguridad centralizada
 const SECURITY_CONFIG = {
@@ -613,15 +613,23 @@ export async function resetearPIN(req, res) {
         where: { personaId }
       });
 
-      await tx.sesionFormularioUafe.deleteMany({
-        where: {
-          personaProtocolo: {
-            personaCedula: persona.numeroIdentificacion
-          }
-        }
+      // 3. Cerrar sesiones de formularios UAFE de esta persona
+      // Primero obtenemos los IDs de PersonaProtocolo para esta persona
+      const personasProtocolo = await tx.personaProtocolo.findMany({
+        where: { personaCedula: persona.numeroIdentificacion },
+        select: { id: true }
       });
 
-      // 3. Registrar en auditoría
+      if (personasProtocolo.length > 0) {
+        const personaProtocoloIds = personasProtocolo.map(pp => pp.id);
+        await tx.sesionFormularioUAFE.deleteMany({
+          where: {
+            personaProtocoloId: { in: personaProtocoloIds }
+          }
+        });
+      }
+
+      // 4. Registrar en auditoría
       await tx.auditoriaPersona.create({
         data: {
           personaId,
