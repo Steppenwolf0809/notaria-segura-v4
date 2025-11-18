@@ -742,7 +742,7 @@ async function previewConcuerdo(req, res) {
         }
         const connector = phrases.slice(1).map(p => `y de ${p}`).join('; ')
         const body = phrases.length > 1 ? `${phrases[0]}; ${connector}` : phrases[0]
-        const combined = `\n\nSe otorgó ante mí, en fe de ello confiero esta **${ordinalWord(n)} COPIA CERTIFICADA** de la escritura pública de ${body}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.\n\n${footerNotario}\n${footerNotaria}\n`
+        const combined = `\n\n\n\nSe otorgó ante mí, en fe de ello confiero esta **${ordinalWord(n)} COPIA CERTIFICADA** de la escritura pública de ${body}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.\n\n\n\n${footerNotario}\n${footerNotaria}\n`
         previews.push({ index: n, title: rot, text: `${rot}:\n\n${combined}` })
       } else {
         // Modo clásico: render individual por acto y concatenado con separador
@@ -752,8 +752,8 @@ async function previewConcuerdo(req, res) {
           const { text: t } = await ExtractoTemplateEngine.render('poder-universal.txt', engineData, override)
           rendered.push(t)
         }
-        // Asegurar que cada bloque individual respete el doble salto de línea antes de "Se otorgó"
-        const ensureDoubleNL = (txt) => txt.replace(/\n?\n?Se otorgó/, '\n\nSe otorgó')
+        // Asegurar que cada bloque individual respete saltos de línea antes de "Se otorgó"
+        const ensureDoubleNL = (txt) => txt.replace(/\n*Se otorgó/, '\n\n\n\nSe otorgó')
         const renderedFixed = rendered.map(ensureDoubleNL)
         const combined = renderedFixed.join('\n\n—\n\n')
         previews.push({ index: n, title: rot, text: `${rot}:\n\n${combined}` })
@@ -1131,7 +1131,7 @@ async function generateDocuments(req, res) {
           }
           const connector = phrases.slice(1).map(p => `y de ${p}`).join('; ')
           const body = phrases.length > 1 ? `${phrases[0]}; ${connector}` : phrases[0]
-          combined = `\n\nSe otorgó ante mí, en fe de ello confiero esta **${rotuloPalabra} COPIA CERTIFICADA** de la escritura pública de ${body}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.\n\n${footerNotario}\n${footerNotaria}\n`
+          combined = `\n\n\n\nSe otorgó ante mí, en fe de ello confiero esta **${rotuloPalabra} COPIA CERTIFICADA** de la escritura pública de ${body}, la misma que se encuentra debidamente firmada y sellada en el mismo lugar y fecha de su celebración.\n\n\n\n${footerNotario}\n${footerNotaria}\n`
         } else {
           console.log('📋 [concuerdos] Modo clásico: render individual por acto')
           // Render clásico por acto y concatenado con separador
@@ -1178,15 +1178,21 @@ async function generateDocuments(req, res) {
           '<div style="text-align:center; font-weight:700; white-space:nowrap;">$1$2$3</div>'
         )
         // 3) Centrar línea anterior si está justo antes de NOTARIA (nombre del notario)
+        // Captura nombres con o sin <strong> que estén antes de una línea con NOTARIA
         withCenteredSignature = withCenteredSignature.replace(
-          /(^(?:<strong>)?[A-ZÁÉÍÓÚÑ\s\.,\-]{6,}(?:<\/strong>)?\s*$)\n(?=\s*(?:<strong>)?[A-ZÁÉÍÓÚÑ\s\.,\-]*NOTAR[ÍI]A)/gm,
+          /^(<strong>[A-ZÁÉÍÓÚÑ\s\.,\-]{6,}<\/strong>)\n(?=.*NOTAR[ÍI]A)/gm,
+          '<div style="text-align:center; font-weight:700; white-space:nowrap;">$1</div>\n'
+        )
+        // También capturar nombres sin <strong>
+        withCenteredSignature = withCenteredSignature.replace(
+          /^([A-ZÁÉÍÓÚÑ\s\.,\-]{6,})\n(?=.*NOTAR[ÍI]A)/gm,
           '<div style="text-align:center; font-weight:700; white-space:nowrap;">$1</div>\n'
         )
 
         return `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"/><title>Concuerdo</title>
 <style>
   @media print { body { margin: 2cm; } }
-  body { font-family: 'Times New Roman', serif; line-height: 1.4; }
+  body { font-family: Arial, sans-serif; line-height: 1.4; }
   .doc { white-space: pre-wrap; font-size: 12pt; text-align: justify; }
 </style></head><body>
 <div class="doc">${withCenteredSignature}</div>
@@ -1213,15 +1219,22 @@ async function generateDocuments(req, res) {
         const lines = merged.split(/\r?\n/)
         const formatted = lines.map((line, idx) => {
           const trimmed = line.trim()
-          const isFooter = /^([A-ZÁÉÍÓÚÑ\s\.,\-]*NOTAR[ÍI]A[ A-ZÁÉÍÓÚÑ\s\.,\-]*)$/.test(trimmed)
-            || (/^[A-ZÁÉÍÓÚÑ\s\.,\-]{6,}$/.test(trimmed) && idx + 1 < lines.length && /NOTAR[ÍI]A/.test(lines[idx + 1]))
-            || /^\s{10,}[A-ZÁÉÍÓÚÑ\s\.]+$/.test(line)
+          // Verificar si la línea contiene NOTARIA
+          const hasNotaria = /NOTAR[ÍI]A/.test(trimmed)
+          // Verificar si es el nombre del notario (línea anterior a NOTARIA)
+          const isNotaryName = idx + 1 < lines.length && /NOTAR[ÍI]A/.test(lines[idx + 1])
+            && (/^[A-ZÁÉÍÓÚÑ\s\.,\-]{6,}$/.test(trimmed) || /^\{\\b [A-ZÁÉÍÓÚÑ\s\.,\-]{6,}\}$/.test(trimmed))
+          // Verificar si tiene muchos espacios iniciales
+          const hasManySpaces = /^\s{10,}[A-ZÁÉÍÓÚÑ\s\.]+$/.test(line)
+
+          const isFooter = hasNotaria || isNotaryName || hasManySpaces
+
           if (isFooter) {
             return `\\qc\\b ${trimmed} \\b0`
           }
           return `\\qj\\sl420\\slmult1 ${line}`
         })
-        return `{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0 Times New Roman;}}\\fs24 ${formatted.join('\\par\n')}}`
+        return `{\\rtf1\\ansi\\ansicpg1252\\deff0{\\fonttbl{\\f0 Arial;}}\\fs24 ${formatted.join('\\par\n')}}`
       }
 
       let filename, mimeType, payload
@@ -1280,8 +1293,15 @@ async function generateDocuments(req, res) {
             /^\s*(<strong>)?([A-ZÁÉÍÓÚÑ\s\.,\-]*NOTAR[ÍI]A[ A-ZÁÉÍÓÚÑ\s\.,\-]*)(<\/strong>)?\s*$/gm,
             '<div style="text-align:center; font-weight:700; white-space:nowrap;">$1$2$3</div>'
           )
+          // Centrar línea anterior si está justo antes de NOTARIA (nombre del notario)
+          // Captura nombres con o sin <strong> que estén antes de una línea con NOTARIA
           withCenteredSignature = withCenteredSignature.replace(
-            /(^(?:<strong>)?[A-ZÁÉÍÓÚÑ\s\.,\-]{6,}(?:<\/strong>)?\s*$)\n(?=\s*(?:<strong>)?[A-ZÁÉÍÓÚÑ\s\.,\-]*NOTAR[ÍI]A)/gm,
+            /^(<strong>[A-ZÁÉÍÓÚÑ\s\.,\-]{6,}<\/strong>)\n(?=.*NOTAR[ÍI]A)/gm,
+            '<div style="text-align:center; font-weight:700; white-space:nowrap;">$1</div>\n'
+          )
+          // También capturar nombres sin <strong>
+          withCenteredSignature = withCenteredSignature.replace(
+            /^([A-ZÁÉÍÓÚÑ\s\.,\-]{6,})\n(?=.*NOTAR[ÍI]A)/gm,
             '<div style="text-align:center; font-weight:700; white-space:nowrap;">$1</div>\n'
           )
           
@@ -1316,7 +1336,22 @@ ${body}
             if (m) body += `{\\b ${escapeRtfText(m[1])}}`
             else body += escapeRtfText(seg)
           }
-          return body.split(/\r?\n/).map(line => `\\qj\\sl420\\slmult1 ${line}`).join('\\par\n')
+          // Detectar pie de firma (igual que en toRtf)
+          const lines = body.split(/\r?\n/)
+          const formatted = lines.map((line, idx) => {
+            const trimmed = line.trim()
+            const hasNotaria = /NOTAR[ÍI]A/.test(trimmed)
+            const isNotaryName = idx + 1 < lines.length && /NOTAR[ÍI]A/.test(lines[idx + 1])
+              && (/^[A-ZÁÉÍÓÚÑ\s\.,\-]{6,}$/.test(trimmed) || /^\{\\b [A-ZÁÉÍÓÚÑ\s\.,\-]{6,}\}$/.test(trimmed))
+            const hasManySpaces = /^\s{10,}[A-ZÁÉÍÓÚÑ\s\.]+$/.test(line)
+            const isFooter = hasNotaria || isNotaryName || hasManySpaces
+
+            if (isFooter) {
+              return `\\qc\\b ${trimmed} \\b0`
+            }
+            return `\\qj\\sl420\\slmult1 ${line}`
+          })
+          return formatted.join('\\par\n')
         }
         const sections = entries.map((e, idx) => {
           const page = idx === 0 ? '' : '\\page\n'
