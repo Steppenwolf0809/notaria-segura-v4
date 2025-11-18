@@ -59,7 +59,7 @@ const ResetearPinDialog = ({ open, onClose, onSuccess }) => {
 
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/api/personal/buscar/${cedula}`, {
+      const response = await fetch(`${API_BASE}/personal/buscar/${cedula}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -97,7 +97,7 @@ const ResetearPinDialog = ({ open, onClose, onSuccess }) => {
     try {
       const token = localStorage.getItem('token');
       const response = await fetch(
-        `${API_BASE}/api/personal/${personaEncontrada.id}/resetear-pin`,
+        `${API_BASE}/personal/${personaEncontrada.id}/resetear-pin`,
         {
           method: 'POST',
           headers: {
