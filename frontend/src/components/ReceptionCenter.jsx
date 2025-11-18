@@ -53,12 +53,6 @@ import { readFlag } from '../config/featureFlags.js';
  * Componente principal que maneja la nueva interfaz de recepción con pestañas y búsqueda global
  */
 const ReceptionCenter = () => {
-  // 🔍 DEBUG: Verificar feature flag y log inicial
-  const featureFlag = readFlag('VITE_UI_ACTIVOS_ENTREGADOS', true);
-    NODE_ENV: import.meta.env.MODE,
-    VITE_API_URL: import.meta.env.VITE_API_URL,
-    VITE_UI_ACTIVOS_ENTREGADOS: featureFlag
-  });
   const {
     // Estado
     tab,
