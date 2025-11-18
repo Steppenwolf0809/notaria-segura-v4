@@ -68,7 +68,6 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
       setQrData(response.data);
     } catch (err) {
       setError(err.message);
-      console.error('Error loading QR data:', err);
     } finally {
       setLoading(false);
     }
@@ -141,7 +140,6 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
       } catch (err) {
         // Si el usuario cancela, no hacer nada
         if (err.name !== 'AbortError') {
-          console.error('Error sharing:', err);
         }
       }
     } else {
@@ -225,7 +223,6 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
                 light: '#FFFFFF'
               }
             }, function (error) {
-              if (error) console.error(error);
               else window.print();
             });
           </script>

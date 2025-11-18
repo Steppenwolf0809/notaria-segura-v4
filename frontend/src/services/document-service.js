@@ -37,12 +37,11 @@ const documentService = {
         message: response.data.message
       };
     } catch (error) {
-      console.error('Error uploading XML document:', error);
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
+      // Error uploading XML document
+      const errorMessage = error.response?.data?.message ||
+                          error.message ||
                           'Error al subir archivo XML';
-      
+
       return {
         success: false,
         error: errorMessage
@@ -102,7 +101,6 @@ const documentService = {
         message: response.data.message
       };
     } catch (error) {
-      console.error('Error uploading XML documents batch:', error);
       
       const errorMessage = error.response?.data?.message || 
                           error.message || 
@@ -126,7 +124,6 @@ const documentService = {
     } catch (error) {
       const status = error?.response?.status;
       const message = error?.response?.data?.message || error.message || 'Error al cargar documentos';
-      console.error('[HTTP][ERR]', '/documents', status, message);
       if (status === 401 || status === 403) {
         return { success: false, error: 'Sesión expirada. Inicia sesión nuevamente.' };
       }
@@ -145,7 +142,6 @@ const documentService = {
     } catch (error) {
       const status = error?.response?.status;
       const message = error?.response?.data?.message || error.message || 'Error al cargar conteos';
-      console.error('[HTTP][ERR]', '/documents/counts', status, message);
       if (status === 401 || status === 403) {
         return { success: false, error: 'Sesión expirada. Inicia sesión nuevamente.' };
       }
@@ -175,7 +171,6 @@ const documentService = {
         }
       };
     } catch (error) {
-      console.error('Error fetching all documents:', error);
       
       const errorMessage = error.response?.data?.message || 
                           error.message || 
@@ -206,7 +201,6 @@ const documentService = {
         message: response.data.message
       };
     } catch (error) {
-      console.error('Error assigning document:', error);
       
       const errorMessage = error.response?.data?.message || 
                           error.message || 
@@ -232,7 +226,6 @@ const documentService = {
         data: response.data.data
       };
     } catch (error) {
-      console.error('Error fetching my documents:', error);
       
       const errorMessage = error.response?.data?.message || 
                           error.message || 
@@ -252,7 +245,6 @@ const documentService = {
    * @returns {Promise<Object>} Documento actualizado
    */
   async updateDocumentStatus(documentId, newStatus, options = {}) {
-    console.log('🌐 SERVICE: updateDocumentStatus iniciado:', {
       documentId,
       newStatus,
       options,
@@ -280,18 +272,14 @@ const documentService = {
             // Si es una reversión, agregar una razón por defecto
             if (newIndex < currentIndex && newIndex >= 0) {
               requestBody.reversionReason = 'Cambio de estado desde interfaz de usuario (drag & drop)';
-              console.log('🔄 SERVICE: Reversión detectada, agregando razón automática');
             }
           }
         } catch (reversionCheckError) {
-          console.warn('⚠️ SERVICE: Error verificando reversión, continuando sin razón:', reversionCheckError);
         }
       }
 
-      console.log('📤 SERVICE: Enviando request al backend:', requestBody);
       
       const response = await api.put(`/documents/${documentId}/status`, requestBody);
-      console.log('📥 SERVICE: Respuesta del backend:', response.data);
       
       return {
         success: true,
@@ -299,8 +287,6 @@ const documentService = {
         message: response.data.message
       };
     } catch (error) {
-      console.error('💥 SERVICE: Error updating document status:', error);
-      console.error('📊 SERVICE: Error details:', {
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: error.response?.data,
@@ -333,7 +319,6 @@ const documentService = {
         message: response.data.message
       };
     } catch (error) {
-      console.error('Error extracting acts:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Error al extraer actos';
       return { success: false, error: errorMessage };
     }
@@ -366,7 +351,6 @@ const documentService = {
         data: response.data.data
       };
     } catch (error) {
-      console.error('Error fetching document by ID:', error);
       
       const errorMessage = error.response?.data?.message || 
                           error.message || 
@@ -392,7 +376,6 @@ const documentService = {
         data: response.data.data
       };
     } catch (error) {
-      console.error('Error fetching matrizadores:', error);
       
       const errorMessage = error.response?.data?.message || 
                           error.message || 
@@ -414,7 +397,6 @@ const documentService = {
       return response.data;
     } catch (error) {
       const message = error.response?.data?.message || 'Error detectando documentos agrupables';
-      console.error(message, error);
       throw new Error(message);
     }
   },
@@ -426,7 +408,6 @@ const documentService = {
       return response.data;
     } catch (error) {
       const message = error.response?.data?.message || 'Error creando el grupo de documentos';
-      console.error(message, error);
       throw new Error(message);
     }
   },
@@ -437,18 +418,15 @@ const documentService = {
    * @returns {Promise<Object>} Resultado de la operación
    */
   async markDocumentGroupAsReady(documentGroupId) {
-    console.log('🌐 SERVICE: markDocumentGroupAsReady iniciado:', {
       documentGroupId,
       url: '/documents/group/mark-ready'
     });
     
     try {
       const response = await api.post('/documents/group/mark-ready', { documentGroupId });
-      console.log('📊 SERVICE: Respuesta de markDocumentGroupAsReady:', response.data);
       return response.data;
     } catch (error) {
       const message = error.response?.data?.message || 'Error marcando grupo como listo';
-      console.error(message, error);
       return { success: false, error: message };
     }
   },
@@ -459,18 +437,15 @@ const documentService = {
    * @returns {Promise<Object>} Información del documento
    */
   async getEditableDocumentInfo(documentId) {
-    console.log('🌐 SERVICE: getEditableDocumentInfo iniciado:', {
       documentId,
       url: `/documents/${documentId}/editable-info`
     });
     
     try {
       const response = await api.get(`/documents/${documentId}/editable-info`);
-      console.log('📊 SERVICE: Respuesta de getEditableDocumentInfo:', response.data);
       return response.data;
     } catch (error) {
       const message = error.response?.data?.message || 'Error obteniendo información del documento';
-      console.error(message, error);
       return { success: false, error: message };
     }
   },
@@ -482,7 +457,6 @@ const documentService = {
    * @returns {Promise<Object>} Resultado de la operación
    */
   async updateDocumentInfo(documentId, updateData) {
-    console.log('🌐 SERVICE: updateDocumentInfo iniciado:', {
       documentId,
       updateData,
       url: `/documents/${documentId}/update-info`
@@ -490,11 +464,9 @@ const documentService = {
     
     try {
       const response = await api.put(`/documents/${documentId}/update-info`, updateData);
-      console.log('📊 SERVICE: Respuesta de updateDocumentInfo:', response.data);
       return response.data;
     } catch (error) {
       const message = error.response?.data?.message || 'Error actualizando información del documento';
-      console.error(message, error);
       return { success: false, error: message };
     }
   },
@@ -506,7 +478,6 @@ const documentService = {
       return response.data;
     } catch (error) {
       const message = error.response?.data?.message || 'Error entregando el grupo de documentos';
-      console.error(message, error);
       throw new Error(message);
     }
   },
@@ -529,7 +500,6 @@ const documentService = {
         message: response.data.message
       };
     } catch (error) {
-      console.error('Error delivering document:', error);
       
       const errorMessage = error.response?.data?.message || 
                           error.message || 
@@ -561,7 +531,6 @@ const documentService = {
         message: response.data.message
       };
     } catch (error) {
-      console.error('Error creating smart group:', error);
       
       const errorMessage = error.response?.data?.message || 
                           error.message || 
@@ -593,7 +562,6 @@ const documentService = {
         message: response.data.message
       };
     } catch (error) {
-      console.error('Error undoing document status change:', error);
       
       const errorMessage = error.response?.data?.message || 
                           error.message || 
@@ -622,7 +590,6 @@ const documentService = {
         message: response.data.message
       };
     } catch (error) {
-      console.error('Error fetching undoable changes:', error);
       
       const errorMessage = error.response?.data?.message || 
                           error.message || 
@@ -644,7 +611,6 @@ const documentService = {
    * @returns {Promise<Object>} Resultado de la operación
    */
   async updateDocumentGroupStatus(documentGroupId, newStatus, options = {}) {
-    console.log('🌐 SERVICE: updateDocumentGroupStatus iniciado:', {
       documentGroupId,
       newStatus,
       options,
@@ -667,10 +633,8 @@ const documentService = {
         }
       });
       
-      console.log('📤 SERVICE: Enviando request de grupo al backend (corregido):', requestBody);
       
       const response = await api.put('/documents/group/status', requestBody);
-      console.log('📥 SERVICE: Respuesta del backend para grupo:', response.data);
       
       return {
         success: true,
@@ -678,8 +642,6 @@ const documentService = {
         message: response.data.message
       };
     } catch (error) {
-      console.error('💥 SERVICE: Error updating group status:', error);
-      console.error('📊 SERVICE: Error details:', {
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: error.response?.data,
@@ -720,7 +682,6 @@ const documentService = {
    * @returns {Promise<Object>} Resultado de la operación
    */
   async updateDocumentGroupInfo(documentGroupId, sharedData) {
-    console.log('🌐 SERVICE: updateDocumentGroupInfo iniciado:', {
       documentGroupId,
       sharedData,
       url: '/documents/group/info'
@@ -732,10 +693,8 @@ const documentService = {
         sharedData
       };
       
-      console.log('📤 SERVICE: Enviando update de info grupal al backend:', requestBody);
       
       const response = await api.put('/documents/group/info', requestBody);
-      console.log('📥 SERVICE: Respuesta del backend para info grupal:', response.data);
       
       return {
         success: true,
@@ -743,8 +702,6 @@ const documentService = {
         message: response.data.message
       };
     } catch (error) {
-      console.error('💥 SERVICE: Error updating group info:', error);
-      console.error('📊 SERVICE: Error details:', {
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: error.response?.data,
@@ -770,7 +727,6 @@ const documentService = {
    * @returns {Promise<Object>} Historial del documento
    */
   async getDocumentHistory(documentId, params = {}) {
-    console.log('📈 SERVICE: getDocumentHistory iniciado:', {
       documentId,
       params,
       url: `/documents/${documentId}/history`
@@ -785,10 +741,8 @@ const documentService = {
       
       const url = `/documents/${documentId}/history${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       
-      console.log('📤 SERVICE: Solicitando historial del documento:', url);
       
       const response = await api.get(url);
-      console.log('📥 SERVICE: Respuesta del historial recibida:', response.data);
       
       return {
         success: true,
@@ -796,8 +750,6 @@ const documentService = {
         message: response.data.message
       };
     } catch (error) {
-      console.error('💥 SERVICE: Error obteniendo historial del documento:', error);
-      console.error('📊 SERVICE: Error details:', {
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: error.response?.data,
@@ -822,14 +774,12 @@ const documentService = {
    * @returns {Promise<Object>} Resultado de la operación masiva
    */
   async bulkStatusChange(bulkData) {
-    console.log('🔄 SERVICE: bulkStatusChange iniciado:', {
       bulkData,
       url: '/documents/bulk-status-change'
     });
     
     try {
       const response = await api.post('/documents/bulk-status-change', bulkData);
-      console.log('📊 SERVICE: Respuesta de bulkStatusChange:', response.data);
       
       return {
         success: true,
@@ -837,8 +787,6 @@ const documentService = {
         message: response.data.message
       };
     } catch (error) {
-      console.error('💥 SERVICE: Error en bulkStatusChange:', error);
-      console.error('📊 SERVICE: Error details:', {
         status: error.response?.status,
         statusText: error.response?.statusText,
         data: error.response?.data,
@@ -864,10 +812,8 @@ const documentService = {
    */
   async getGroupDocuments(groupId) {
     try {
-      console.log('📋 Obteniendo documentos del grupo:', groupId);
       const response = await api.get(`/documents/group/${groupId}`);
       
-      console.log('✅ Documentos del grupo obtenidos:', {
         groupId,
         documentCount: response.data.data?.length || 0
       });
@@ -878,7 +824,6 @@ const documentService = {
         message: response.data.message || 'Documentos del grupo obtenidos exitosamente'
       };
     } catch (error) {
-      console.error('❌ Error obteniendo documentos del grupo:', error);
       
       const errorMessage = error.response?.data?.message || 
                           error.message || 
@@ -902,14 +847,12 @@ const documentService = {
    */
   async revertDocumentStatus(documentId, newStatus, reversionReason) {
     try {
-      console.log('🔄 Revirtiendo estado de documento:', { documentId, newStatus, reversionReason });
       
       const response = await api.post(`/documents/${documentId}/revert`, {
         newStatus,
         reversionReason
       });
       
-      console.log('✅ Documento revertido exitosamente:', response.data);
       
       return {
         success: true,
@@ -917,7 +860,6 @@ const documentService = {
         message: response.data.message || 'Documento revertido exitosamente'
       };
     } catch (error) {
-      console.error('❌ Error revirtiendo estado del documento:', error);
       
       const errorMessage = error.response?.data?.message || 
                           error.message || 
@@ -939,17 +881,14 @@ const documentService = {
    */
   async updateNotificationPolicy(documentId, policy) {
     try {
-      console.log('🔔 Actualizando política de notificación:', { documentId, policy });
       
       const response = await api.put(`/documents/${documentId}/notification-policy`, {
         notificationPolicy: policy
       });
       
-      console.log('✅ Política de notificación actualizada:', response.data);
       
       // Manejar respuesta de migración pendiente
       if (response.status === 202 && response.data.data?.migrationPending) {
-        console.log('⚠️ Migración de BD pendiente, pero política guardada localmente');
       }
       
       return {
@@ -958,7 +897,6 @@ const documentService = {
         message: response.data.message || 'Política de notificación actualizada exitosamente'
       };
     } catch (error) {
-      console.error('❌ Error actualizando política de notificación:', error);
       
       const errorMessage = error.response?.data?.message || 
                           error.message || 
@@ -980,17 +918,14 @@ const documentService = {
    */
   async updateGroupNotificationPolicy(groupId, policy) {
     try {
-      console.log('🔔 Actualizando política de notificación del grupo:', { groupId, policy });
       
       const response = await api.put(`/documents/group/${groupId}/notification-policy`, {
         notificationPolicy: policy
       });
       
-      console.log('✅ Política de notificación del grupo actualizada:', response.data);
       
       // Manejar respuesta de migración pendiente
       if (response.status === 202 && response.data.data?.migrationPending) {
-        console.log('⚠️ Migración de BD pendiente, pero política de grupo guardada localmente');
       }
       
       return {
@@ -999,7 +934,6 @@ const documentService = {
         message: response.data.message || 'Política de notificación del grupo actualizada exitosamente'
       };
     } catch (error) {
-      console.error('❌ Error actualizando política de notificación del grupo:', error);
       
       const errorMessage = error.response?.data?.message || 
                           error.message || 
@@ -1021,7 +955,6 @@ const documentService = {
    */
   async markAsNotaCredito(documentId, motivo) {
     try {
-      console.log('💳 SERVICE: markAsNotaCredito iniciado:', {
         documentId,
         motivo,
         url: `/documents/${documentId}/nota-credito`
@@ -1031,7 +964,6 @@ const documentService = {
         motivo
       });
       
-      console.log('✅ Documento marcado como Nota de Crédito:', response.data);
       
       return {
         success: true,
@@ -1039,7 +971,6 @@ const documentService = {
         message: response.data.message || 'Documento marcado como Nota de Crédito exitosamente'
       };
     } catch (error) {
-      console.error('❌ Error marcando documento como Nota de Crédito:', error);
       
       const errorMessage = error.response?.data?.message || 
                           error.message || 
@@ -1061,7 +992,6 @@ const documentService = {
    */
   async markAsDeliveredImmediate(documentId, deliveryData = {}) {
     try {
-      console.log('⚡ Marcando documento como entregado inmediatamente:', { documentId, deliveryData });
       
       const immediateDeliveryData = {
         entregadoA: deliveryData.entregadoA || 'Cliente',
@@ -1075,7 +1005,6 @@ const documentService = {
 
       const response = await api.post(`/documents/${documentId}/deliver`, immediateDeliveryData);
       
-      console.log('✅ Documento marcado como entregado inmediatamente:', response.data);
       
       return {
         success: true,
@@ -1083,7 +1012,6 @@ const documentService = {
         message: response.data.message || 'Documento entregado inmediatamente'
       };
     } catch (error) {
-      console.error('❌ Error en entrega inmediata:', error);
       
       const errorMessage = error.response?.data?.message || 
                           error.message || 
@@ -1110,7 +1038,6 @@ const documentService = {
         data: response.data.data
       };
     } catch (error) {
-      console.error('Error obteniendo estadísticas de CAJA:', error);
 
       const errorMessage = error.response?.data?.message ||
                           error.message ||

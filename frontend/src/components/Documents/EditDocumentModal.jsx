@@ -99,11 +99,9 @@ const EditDocumentModal = ({
     setIsSaving(true);
     
     try {
-      console.log('🔍 Datos que se envían al backend:', formData);
       await onSave(formData);
       // onSave debe manejar el cierre del modal y mostrar toast de éxito
     } catch (error) {
-      console.error('Error guardando documento:', error);
       // El componente padre maneja los errores
     } finally {
       setIsSaving(false);

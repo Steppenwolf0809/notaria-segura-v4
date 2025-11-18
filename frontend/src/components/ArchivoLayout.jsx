@@ -65,7 +65,6 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
   // Trazas de verificación del layout
   useEffect(() => {
     // eslint-disable-next-line no-console
-    console.info('[LAYOUT]', { role: user?.role, sidebar: 'mounted' });
   }, [user?.role]);
 
   /**

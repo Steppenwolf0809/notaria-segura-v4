@@ -68,7 +68,6 @@ function ModalEntregaGrupal({ documentos, onClose, onEntregaExitosa }) {
         setRelacionesOptions(result.data.relaciones);
       }
     } catch (error) {
-      console.error('Error cargando opciones:', error);
     }
   };
 
@@ -114,7 +113,6 @@ function ModalEntregaGrupal({ documentos, onClose, onEntregaExitosa }) {
         setError(result.error || 'Error procesando entrega grupal');
       }
     } catch (error) {
-      console.error('Error:', error);
       setError('Error de conexión');
     } finally {
       setLoading(false);

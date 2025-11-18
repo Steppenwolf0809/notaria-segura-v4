@@ -47,7 +47,6 @@ const useDocumentHistory = (documentId, options = {}) => {
         ...(eventType && { eventType })
       };
 
-      console.log('🔍 Obteniendo historial real del documento:', documentId);
       const response = await documentService.getDocumentHistory(documentId, params);
       
       if (response.success && response.data) {
@@ -80,15 +79,12 @@ const useDocumentHistory = (documentId, options = {}) => {
           usingRealData: true
         }));
 
-        console.log('✅ Historial real cargado exitosamente:', formattedEvents.length, 'eventos');
         return;
       }
     } catch (err) {
-      console.error('❌ Error obteniendo historial real:', err);
       
       // Si falla la API y está habilitado el fallback, usar datos simulados
       if (fallbackToSimulated) {
-        console.log('🔄 Fallback a historial simulado');
         await loadSimulatedHistory();
         return;
       } else {
@@ -106,7 +102,6 @@ const useDocumentHistory = (documentId, options = {}) => {
    */
   const loadSimulatedHistory = useCallback(async () => {
     try {
-      console.log('📋 Cargando historial simulado para documento:', documentId);
       
       // Generar historial simulado base
       const simulatedHistory = generateSimulatedHistory(documentId);
@@ -143,10 +138,8 @@ const useDocumentHistory = (documentId, options = {}) => {
           combinedHistory = [...simulatedHistory, ...realNotificationEvents]
             .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
           
-          console.log('✅ Historial simulado enriquecido con notificaciones reales');
         }
       } catch (notificationError) {
-        console.warn('⚠️ No se pudieron cargar notificaciones reales:', notificationError);
       }
       
       setState(prev => ({
@@ -161,7 +154,6 @@ const useDocumentHistory = (documentId, options = {}) => {
       }));
 
     } catch (err) {
-      console.error('❌ Error en historial simulado:', err);
       setState(prev => ({
         ...prev,
         loading: false,

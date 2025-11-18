@@ -101,7 +101,6 @@ const SmartGroupingModal = ({
         return;
       }
 
-      console.log(`🔗 Procesando ${selectedGroups.length} grupos inteligentes...`);
 
       // Crear grupos uno por uno
       const results = [];
@@ -127,7 +126,6 @@ const SmartGroupingModal = ({
             });
           }
         } catch (error) {
-          console.error('Error creando grupo:', error);
           results.push({
             success: false,
             error: error.message,
@@ -152,7 +150,6 @@ const SmartGroupingModal = ({
       onClose();
 
     } catch (error) {
-      console.error('Error procesando agrupaciones:', error);
     } finally {
       setLoading(false);
     }

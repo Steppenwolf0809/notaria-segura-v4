@@ -87,7 +87,6 @@ function HistorialEntregas() {
         throw new Error(result.error);
       }
     } catch (error) {
-      console.error('Error:', error);
       setError('Error cargando historial de entregas');
     } finally {
       setLoading(false);

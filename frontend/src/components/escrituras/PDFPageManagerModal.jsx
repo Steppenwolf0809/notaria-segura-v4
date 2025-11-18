@@ -67,7 +67,6 @@ function buildProxyPdfUrl(pdfFileName) {
   // Usar el proxy del backend (mismo origen, sin CORS)
   const proxyUrl = `/api/proxy-pdf?url=${encodeURIComponent(remoteUrl)}`;
   
-  console.log('📄 PDF Modal: Usando proxy', { 
     archivo: pdfFileName, 
     urlRemota: remoteUrl,
     urlProxy: proxyUrl 
@@ -103,7 +102,6 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
       setHiddenPages(pages || []);
       setHasChanges(false);
     } catch (err) {
-      console.error('Error loading hidden pages:', err);
       setError('Error al cargar las páginas ocultas');
     } finally {
       setLoading(false);
@@ -116,9 +114,6 @@ export default function PDFPageManagerModal({ open, onClose, escritura, onSucces
   };
 
   const onDocumentLoadError = (error) => {
-    console.error('❌ Error loading PDF:', error);
-    console.error('📄 PDF URL (proxy):', pdfUrl);
-    console.error('📁 Archivo original:', escritura?.pdfFileName);
     setError(
       'Error al cargar el PDF. Verifica que el archivo esté correctamente subido al servidor FTP. ' +
       'Archivo: ' + (escritura?.pdfFileName || 'No disponible')

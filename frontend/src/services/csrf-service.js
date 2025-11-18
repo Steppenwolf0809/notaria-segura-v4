@@ -46,7 +46,6 @@ class CSRFService {
    */
   async fetchNewToken() {
     try {
-      console.log('[CSRF] Solicitando nuevo token...');
 
       const response = await apiClient.get('/csrf-token');
 
@@ -56,14 +55,12 @@ class CSRFService {
         // Token expira en 1 hora, renovar 5 minutos antes
         this.tokenExpiry = Date.now() + 55 * 60 * 1000;
 
-        console.log('[CSRF] Token obtenido exitosamente');
 
         return this.token;
       } else {
         throw new Error('Respuesta inválida del servidor al obtener token CSRF');
       }
     } catch (error) {
-      console.error('[CSRF] Error obteniendo token:', error);
 
       // Limpiar token en caso de error
       this.token = null;
@@ -77,7 +74,6 @@ class CSRFService {
    * Invalida el token actual (forzar renovación)
    */
   invalidate() {
-    console.log('[CSRF] Token invalidado, se solicitará uno nuevo');
     this.token = null;
     this.tokenExpiry = null;
   }

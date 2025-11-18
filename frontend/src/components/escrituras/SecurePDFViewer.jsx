@@ -107,7 +107,6 @@ export default function SecurePDFViewer({
   
   // Manejar error de carga
   const onDocumentLoadError = (error) => {
-    console.error('Error loading PDF:', error);
     setLoading(false);
     setError('No se pudo cargar el PDF. Verifica tu conexión e intenta nuevamente.');
   };

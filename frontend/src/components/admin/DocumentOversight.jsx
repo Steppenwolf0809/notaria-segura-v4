@@ -154,7 +154,6 @@ const DocumentOversight = () => {
         setStats(data.data.stats);
       }
     } catch (error) {
-      console.error('Error cargando documentos:', error);
       setError(error.message || 'Error al cargar los documentos');
       toast.error('Error al cargar los documentos');
     } finally {
@@ -182,7 +181,6 @@ const DocumentOversight = () => {
         }
       }
     } catch (error) {
-      console.error('Error cargando matrizadores:', error);
     }
   }, [token]);
 
@@ -334,7 +332,6 @@ const DocumentOversight = () => {
       setDeleteDialogOpen(false);
       setDocumentToDelete(null);
     } catch (error) {
-      console.error('Error eliminando documento:', error);
       toast.error(error.message || 'Error al eliminar el documento');
     } finally {
       setDeleting(false);
@@ -379,7 +376,6 @@ const DocumentOversight = () => {
       // Cerrar diálogo
       setBulkDeleteDialogOpen(false);
     } catch (error) {
-      console.error('Error eliminando documentos:', error);
       toast.error(error.message || 'Error al eliminar los documentos');
     } finally {
       setDeleting(false);
@@ -422,7 +418,6 @@ const DocumentOversight = () => {
         throw new Error('Error al exportar documentos');
       }
     } catch (error) {
-      console.error('Error exportando:', error);
       toast.error('Error al exportar documentos');
     }
   };

@@ -134,7 +134,6 @@ function AlertasPanel({ userRole, onDocumentClick, compact = false, maxHeight = 
         setError(response.data.error || 'Error obteniendo alertas');
       }
     } catch (error) {
-      console.error('Error obteniendo alertas:', error);
       
       let errorMessage = 'Error de conexión';
       if (error.response) {

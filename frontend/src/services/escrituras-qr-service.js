@@ -29,7 +29,6 @@ export async function uploadEscritura(pdfFile, photoFile = null) {
     
     return response.data;
   } catch (error) {
-    console.error('Error uploading escritura:', error);
     throw new Error(
       error.response?.data?.message || 
       'Error al subir el archivo PDF'
@@ -65,7 +64,6 @@ export async function createEscrituraManual(datosEscritura, photoFile = null) {
       return response.data;
     }
   } catch (error) {
-    console.error('Error creating manual escritura:', error);
     throw new Error(
       error.response?.data?.message || 
       'Error al crear la escritura manualmente'
@@ -94,7 +92,6 @@ export async function getEscrituras(params = {}) {
     const response = await apiClient.get(`/escrituras?${queryParams.toString()}`);
     return response.data;
   } catch (error) {
-    console.error('Error fetching escrituras:', error);
     throw new Error(
       error.response?.data?.message || 
       'Error al obtener las escrituras'
@@ -112,7 +109,6 @@ export async function getEscritura(id) {
     const response = await apiClient.get(`/escrituras/${id}`);
     return response.data;
   } catch (error) {
-    console.error('Error fetching escritura:', error);
     throw new Error(
       error.response?.data?.message || 
       'Error al obtener la escritura'
@@ -151,7 +147,6 @@ export async function updateEscritura(id, data, photoFile = null) {
       return response.data;
     }
   } catch (error) {
-    console.error('Error updating escritura:', error);
     throw new Error(
       error.response?.data?.message || 
       'Error al actualizar la escritura'
@@ -170,7 +165,6 @@ export async function getEscrituraQR(id, format = 'display') {
     const response = await apiClient.get(`/escrituras/${id}/qr?format=${format}`);
     return response.data;
   } catch (error) {
-    console.error('Error fetching QR:', error);
     throw new Error(
       error.response?.data?.message || 
       'Error al generar el código QR'
@@ -188,7 +182,6 @@ export async function deleteEscritura(id) {
     const response = await apiClient.delete(`/escrituras/${id}`);
     return response.data;
   } catch (error) {
-    console.error('Error deleting escritura:', error);
     throw new Error(
       error.response?.data?.message || 
       'Error al desactivar la escritura'
@@ -207,7 +200,6 @@ export async function hardDeleteEscritura(id) {
     const response = await apiClient.delete(`/escrituras/${id}/hard-delete`);
     return response.data;
   } catch (error) {
-    console.error('Error hard deleting escritura:', error);
     throw new Error(
       error.response?.data?.message || 
       'Error al eliminar la escritura permanentemente'
@@ -237,7 +229,6 @@ export async function verifyEscritura(token) {
     
     return await response.json();
   } catch (error) {
-    console.error('Error verifying escritura:', error);
     throw new Error(
       error.message || 'Error al verificar la escritura'
     );
@@ -377,7 +368,6 @@ export async function copyToClipboard(text) {
       return result;
     }
   } catch (error) {
-    console.error('Error copying to clipboard:', error);
     return false;
   }
 }
@@ -396,7 +386,6 @@ export function downloadQRImage(dataURL, filename = 'escritura-qr.png') {
     link.click();
     document.body.removeChild(link);
   } catch (error) {
-    console.error('Error downloading QR image:', error);
     throw new Error('Error al descargar la imagen QR');
   }
 }
@@ -440,7 +429,6 @@ export async function uploadPDFToEscritura(escrituraId, pdfFile, hiddenPages = [
     const response = await apiClient.post(`/escrituras/${escrituraId}/pdf`, formData, config);
     return response.data;
   } catch (error) {
-    console.error('Error uploading PDF:', error);
     throw new Error(
       error.response?.data?.message || 
       'Error al subir el PDF'
@@ -469,7 +457,6 @@ export async function getPDFMetadata(token) {
     
     return await response.json();
   } catch (error) {
-    console.error('Error fetching PDF metadata:', error);
     throw new Error(
       error.message || 'Error al obtener metadata del PDF'
     );
@@ -507,7 +494,6 @@ export async function updatePDFHiddenPages(escrituraId, hiddenPages = []) {
     });
     return response.data;
   } catch (error) {
-    console.error('Error updating hidden pages:', error);
     throw new Error(
       error.response?.data?.message || 
       'Error al actualizar las páginas ocultas'
@@ -532,14 +518,12 @@ export async function getPDFHiddenPages(escrituraId) {
           ? JSON.parse(escritura.pdfHiddenPages)
           : escritura.pdfHiddenPages;
       } catch (e) {
-        console.error('Error parsing pdfHiddenPages:', e);
         return [];
       }
     }
     
     return [];
   } catch (error) {
-    console.error('Error getting hidden pages:', error);
     throw new Error(
       error.response?.data?.message || 
       'Error al obtener las páginas ocultas'

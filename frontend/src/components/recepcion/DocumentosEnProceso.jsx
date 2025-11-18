@@ -99,18 +99,14 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
       const result = await receptionService.getDocumentosEnProceso(params);
 
       if (result.success) {
-        console.log('📋 Documentos recibidos:', result.data.documents?.length || 0);
-        console.log('📄 Primer documento:', result.data.documents?.[0]);
         
         setDocumentos(result.data.documents || []);
         setTotalPages(result.data.pagination?.totalPages || 1);
         setError(null);
       } else {
-        console.error('❌ Error en resultado:', result.error);
         throw new Error(result.error);
       }
     } catch (error) {
-      console.error('Error:', error);
       setError('Error cargando documentos en proceso');
     } finally {
       setLoading(false);
@@ -125,7 +121,6 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
         setMatrizadores(result.data.matrizadores || []);
       }
     } catch (error) {
-      console.error('Error cargando matrizadores:', error);
     }
   };
 
@@ -171,7 +166,6 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
 
   const ejecutarMarcarListo = async () => {
     if (processingRequest) {
-      console.log('🚫 Solicitud ya en proceso, ignorando...');
       return;
     }
 
@@ -183,7 +177,6 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
       setProcessingRequest(true);
       let result;
 
-      console.log('🎯 Iniciando marcar como listo:', {
         actionType,
         documentoIndividual: documentoIndividual?.id,
         selectedDocuments: selectedDocuments.length,
@@ -192,7 +185,6 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
 
       // OPTIMISTIC UPDATE: Actualizar estado local inmediatamente
       if (actionType === 'individual' && documentoIndividual) {
-        console.log('📄 Marcando documento individual:', documentoIndividual.id);
 
         // Actualizar estado local optimistamente
         setDocumentos(prev => prev.map(doc =>
@@ -203,7 +195,6 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
 
         result = await receptionService.marcarComoListo(documentoIndividual.id);
       } else if (actionType === 'grupal' && selectedDocuments.length > 0) {
-        console.log('📁 Marcando grupo de documentos:', selectedDocuments);
 
         // Actualizar estado local optimistamente para todos los documentos seleccionados
         setDocumentos(prev => prev.map(doc =>
@@ -215,7 +206,6 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
         result = await receptionService.marcarGrupoListo(selectedDocuments);
       }
 
-      console.log('✅ Resultado del servidor:', result);
 
       if (result?.success) {
         setSnackbar({
@@ -229,21 +219,15 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
         cerrarConfirmacion();
 
         // Recargar documentos en background para asegurar consistencia
-        console.log('🔄 Recargando documentos en background...');
         cargarDocumentos().then(() => {
-          console.log('📊 Actualizando estadísticas...');
           onEstadisticasChange?.();
         }).catch(error => {
-          console.error('⚠️ Error recargando documentos:', error);
         });
 
-        console.log('✅ Proceso completado exitosamente');
       } else {
-        console.error('❌ Error en resultado del servidor:', result);
         throw new Error(result?.error || 'Error inesperado');
       }
     } catch (error) {
-      console.error('💥 Error marcando como listo:', error);
 
       // ROLLBACK: Revertir cambios optimistas en caso de error
       setDocumentos(documentosAnteriores);
