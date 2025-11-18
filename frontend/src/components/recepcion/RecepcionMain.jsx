@@ -733,6 +733,15 @@ function RecepcionMain() {
                         >
                           {documento.numeroIdentificacion || documento.clientId}
                         </Typography>
+                        {/* Indicador de grupo */}
+                        {documento.isGrouped && documento.groupSize && (
+                          <Chip
+                            label={`${documento.groupSize} documentos`}
+                            size="small"
+                            color="secondary"
+                            sx={{ mt: 0.5, fontSize: '0.7rem' }}
+                          />
+                        )}
                       </Box>
                     </TableCell>
 
@@ -804,7 +813,7 @@ function RecepcionMain() {
 
                     {/* Acciones */}
                     <TableCell sx={{ textAlign: 'center' }}>
-                      {documento.status === 'EN_PROCESO' && (
+                      {documento.status === 'EN_PROCESO' ? (
                         <Button
                           variant="contained"
                           size="small"
@@ -814,9 +823,7 @@ function RecepcionMain() {
                         >
                           Marcar Listo
                         </Button>
-                      )}
-
-                      {(documento.status === 'LISTO' || documento.status === 'PAGADO') && (
+                      ) : (documento.status === 'LISTO' || documento.status === 'PAGADO') ? (
                         <Button
                           variant="contained"
                           size="small"
@@ -826,9 +833,7 @@ function RecepcionMain() {
                         >
                           Entregar
                         </Button>
-                      )}
-
-                      {documento.status === 'ENTREGADO' && (
+                      ) : documento.status === 'ENTREGADO' ? (
                         <Button
                           variant="outlined"
                           size="small"
@@ -837,6 +842,10 @@ function RecepcionMain() {
                         >
                           Ver
                         </Button>
+                      ) : (
+                        <Typography variant="caption" color="text.secondary">
+                          Sin acción
+                        </Typography>
                       )}
                     </TableCell>
                   </TableRow>
