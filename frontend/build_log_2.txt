@@ -1,0 +1,56 @@
+
+> notaria-segura-frontend@1.0.0 build
+> vite build
+
+[36mvite v7.0.6 [32mbuilding for production...[36m[39m
+transforming...
+[32m✓[39m 11611 modules transformed.
+[31m✗[39m Build failed in 13.40s
+[31merror during build:
+[31m[vite:esbuild] Transform failed with 3 errors:
+C:/notaria-segura/frontend/src/components/recepcion/DocumentosUnificados.jsx:1277:20: ERROR: Unexpected closing "TableRow" tag does not match opening "IconButton" tag
+C:/notaria-segura/frontend/src/components/recepcion/DocumentosUnificados.jsx:1280:14: ERROR: Unexpected closing "TableBody" tag does not match opening "Tooltip" tag
+C:/notaria-segura/frontend/src/components/recepcion/DocumentosUnificados.jsx:1281:18: ERROR: Unterminated regular expression[31m
+file: [36mC:/notaria-segura/frontend/src/components/recepcion/DocumentosUnificados.jsx:1277:20[31m
+[33m
+[33mUnexpected closing "TableRow" tag does not match opening "IconButton" tag[33m
+1275|                                }}
+1276|                              >
+1277|                    </TableRow>
+   |                      ^
+1278|                  ))
+1279|                )}
+
+[33mUnexpected closing "TableBody" tag does not match opening "Tooltip" tag[33m
+1278|                  ))
+1279|                )}
+1280|              </TableBody>
+   |                ^
+1281|            </Table>
+1282|          </TableContainer>
+
+[33mUnterminated regular expression[33m
+1279|                )}
+1280|              </TableBody>
+1281|            </Table>
+   |                    ^
+1282|          </TableContainer>
+1283|          <TablePagination component="div" count={totalPages * rowsPerPage} page={page} onPageChange={handleChangePage}
+[31m
+    at failureErrorWithLog (C:\notaria-segura\node_modules\esbuild\lib\main.js:1467:15)
+    at C:\notaria-segura\node_modules\esbuild\lib\main.js:736:50
+    at responseCallbacks.<computed> (C:\notaria-segura\node_modules\esbuild\lib\main.js:603:9)
+    at handleIncomingPacket (C:\notaria-segura\node_modules\esbuild\lib\main.js:658:12)
+    at Socket.readFromStdout (C:\notaria-segura\node_modules\esbuild\lib\main.js:581:7)
+    at Socket.emit (node:events:524:28)
+    at addChunk (node:internal/streams/readable:561:12)
+    at readableAddChunkPushByteMode (node:internal/streams/readable:512:3)
+    at Readable.push (node:internal/streams/readable:392:5)
+    at Pipe.onStreamRead (node:internal/stream_base_commons:191:23)[39m
+npm error Lifecycle script `build` failed with error:
+npm error code 1
+npm error path C:\notaria-segura\frontend
+npm error workspace notaria-segura-frontend@1.0.0
+npm error location C:\notaria-segura\frontend
+npm error command failed
+npm error command C:\Windows\system32\cmd.exe /d /s /c vite build

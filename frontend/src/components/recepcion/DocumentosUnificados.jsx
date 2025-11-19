@@ -1273,11 +1273,25 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                                   borderRadius: '50%'
                                 })
                               }}
-                            >
                               <UndoIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
                         )}
+
+                        {/* Botón de Ver Detalles - SIEMPRE VISIBLE */}
+                        <Tooltip title="Ver Detalles">
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              abrirDetalles(documento);
+                            }}
+                            sx={{ mr: 1 }}
+                          >
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
 
                         <IconButton
                           size="small"
@@ -1353,85 +1367,89 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
         </DialogActions>
       </Dialog>
 
-      {showModalEntrega && documentoSeleccionado && <ModalEntrega documento={documentoSeleccionado} onClose={cerrarModales} onEntregaExitosa={onEntregaCompletada} />}
-      {showEntregaGrupal && selectedDocuments.length > 0 && <ModalEntregaGrupal documentos={documentos.filter(doc => selectedDocuments.includes(doc.id))} onClose={cerrarModales} onEntregaExitosa={onEntregaCompletada} />}
+      { showModalEntrega && documentoSeleccionado && <ModalEntrega documento={documentoSeleccionado} onClose={cerrarModales} onEntregaExitosa={onEntregaCompletada} /> }
+  { showEntregaGrupal && selectedDocuments.length > 0 && <ModalEntregaGrupal documentos={documentos.filter(doc => selectedDocuments.includes(doc.id))} onClose={cerrarModales} onEntregaExitosa={onEntregaCompletada} /> }
 
-      {/* Modal de agrupación rápida */}
-      <QuickGroupingModal
-        open={showQuickGroupingModal}
-        onClose={() => setShowQuickGroupingModal(false)}
-        mainDocument={pendingGroupData.main}
-        relatedDocuments={pendingGroupData.related}
-        loading={groupingLoading}
-        onConfirm={handleCreateDocumentGroup}
+  {/* Modal de agrupación rápida */ }
+  <QuickGroupingModal
+    open={showQuickGroupingModal}
+    onClose={() => setShowQuickGroupingModal(false)}
+    mainDocument={pendingGroupData.main}
+    relatedDocuments={pendingGroupData.related}
+    loading={groupingLoading}
+    onConfirm={handleCreateDocumentGroup}
+  />
+
+  {/* Modal de información de grupo */ }
+              <GroupInfoModal
+                open={groupInfoModalOpen}
+                onClose={handleCloseGroupInfo}
+                document={selectedGroupDocument}
+              />
+
+              <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={cerrarSnackbar}>
+                <Alert onClose={cerrarSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>{snackbar.message}</Alert>
+              </Snackbar>
+
+  {
+    detailModalOpen && detailDocument && (
+      <DocumentDetailModal
+        open={detailModalOpen}
+        onClose={cerrarDetalles}
+        document={detailDocument}
+        onDocumentUpdated={() => { cargarDocumentos(); }}
       />
+    )
+  }
 
-      {/* Modal de información de grupo */}
-      <GroupInfoModal
-        open={groupInfoModalOpen}
-        onClose={handleCloseGroupInfo}
-        document={selectedGroupDocument}
-      />
+  {/* Modal de reversión de estado */ }
+  <ReversionModal
+    open={reversionModalOpen}
+    onClose={cerrarReversionModal}
+    documento={currentDocumento}
+    onConfirm={ejecutarReversion}
+    loading={reversionLoading}
+  />
 
-      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={cerrarSnackbar}>
-        <Alert onClose={cerrarSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>{snackbar.message}</Alert>
-      </Snackbar>
+  {/* 🎯 NUEVO: Modal de entrega en bloque */ }
+  <BulkDeliveryDialog
+    open={showBulkDeliveryDialog}
+    onClose={() => setShowBulkDeliveryDialog(false)}
+    documentIds={Array.from(bulkDeliverySelection)}
+    documents={documentos.filter(d => bulkDeliverySelection.has(d.id))}
+    onDeliveryComplete={handleBulkDeliveryComplete}
+  />
 
-      {detailModalOpen && detailDocument && (
-        <DocumentDetailModal
-          open={detailModalOpen}
-          onClose={cerrarDetalles}
-          document={detailDocument}
-          onDocumentUpdated={() => { cargarDocumentos(); }}
-        />
-      )}
-
-      {/* Modal de reversión de estado */}
-      <ReversionModal
-        open={reversionModalOpen}
-        onClose={cerrarReversionModal}
-        documento={currentDocumento}
-        onConfirm={ejecutarReversion}
-        loading={reversionLoading}
-      />
-
-      {/* 🎯 NUEVO: Modal de entrega en bloque */}
-      <BulkDeliveryDialog
-        open={showBulkDeliveryDialog}
-        onClose={() => setShowBulkDeliveryDialog(false)}
-        documentIds={Array.from(bulkDeliverySelection)}
-        documents={documentos.filter(d => bulkDeliverySelection.has(d.id))}
-        onDeliveryComplete={handleBulkDeliveryComplete}
-      />
-
-      {/* 🎯 NOTA INFORMATIVA: Checkboxes solo visuales para Recepción */}
-      {visualSelection.size > 0 && !bulkDeliveryMode && (
-        <Alert
-          severity="info"
+  {/* 🎯 NOTA INFORMATIVA: Checkboxes solo visuales para Recepción */ }
+  {
+    visualSelection.size > 0 && !bulkDeliveryMode && (
+      <Alert
+        severity="info"
+        sx={{
+          position: 'fixed',
+          bottom: 24,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 1200,
+          maxWidth: '90vw'
+        }}
+      >
+        <Typography variant="body2">
+          📋 Documentos seleccionados: {visualSelection.size} (solo visualización)
+        </Typography>
+        <Typography
+          variant="caption"
           sx={{
-            position: 'fixed',
-            bottom: 24,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 1200,
-            maxWidth: '90vw'
+            color: (theme) => theme.palette.mode === 'dark' ? '#cbd5e1' : '#4b5563'
           }}
         >
-          <Typography variant="body2">
-            📋 Documentos seleccionados: {visualSelection.size} (solo visualización)
-          </Typography>
-          <Typography
-            variant="caption"
-            sx={{
-              color: (theme) => theme.palette.mode === 'dark' ? '#cbd5e1' : '#4b5563'
-            }}
-          >
-            Los checkboxes permiten selección visual. Para cambios masivos, use las vistas de Matrizador o Archivo.
-          </Typography>
-        </Alert>
-      )}
-    </Box>
-  );
+          Los checkboxes permiten selección visual. Para cambios masivos, use las vistas de Matrizador o Archivo.
+        </Typography>
+      </Alert>
+    )
+  }
+            </Box >
+            );
 }
 
 export default DocumentosUnificados;
