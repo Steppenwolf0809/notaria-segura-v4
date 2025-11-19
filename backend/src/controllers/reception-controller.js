@@ -28,7 +28,15 @@ async function getDashboardStats(req, res) {
     // 🔄 CONSERVADOR: Estadísticas básicas para dashboard de recepción
     // 🔥 EXCLUYE Notas de Crédito de todas las estadísticas
     const baseFilter = { NOT: { status: 'ANULADO_NOTA_CREDITO' } };
-    
+
+    // Fechas de referencia
+    const now = new Date();
+    const hoy = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    const hace7Dias = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const hace15Dias = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000);
+    const hace3Dias = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+    const inicioSemana = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
     const stats = await Promise.all([
       // Total de documentos (sin NC)
       prisma.document.count({ where: baseFilter }),
@@ -43,7 +51,7 @@ async function getDashboardStats(req, res) {
         where: {
           ...baseFilter,
           createdAt: {
-            gte: new Date(new Date().setHours(0, 0, 0, 0))
+            gte: hoy
           }
         }
       }),
@@ -52,25 +60,133 @@ async function getDashboardStats(req, res) {
         where: {
           status: 'ENTREGADO',
           fechaEntrega: {
-            gte: new Date(new Date().setHours(0, 0, 0, 0))
+            gte: hoy
           }
         }
+      }),
+      // 📊 MÉTRICAS AVANZADAS
+      // Documentos no retirados hace más de 7 días
+      prisma.document.count({
+        where: {
+          status: 'LISTO',
+          updatedAt: {
+            lt: hace7Dias
+          }
+        }
+      }),
+      // Documentos no retirados hace más de 15 días
+      prisma.document.count({
+        where: {
+          status: 'LISTO',
+          updatedAt: {
+            lt: hace15Dias
+          }
+        }
+      }),
+      // Documentos atrasados en proceso (más de 3 días)
+      prisma.document.count({
+        where: {
+          status: 'EN_PROCESO',
+          createdAt: {
+            lt: hace3Dias
+          }
+        }
+      }),
+      // Documentos entregados esta semana
+      prisma.document.count({
+        where: {
+          status: 'ENTREGADO',
+          fechaEntrega: {
+            gte: inicioSemana
+          }
+        }
+      }),
+      // Grupos de documentos listos (contar códigos únicos en documentos LISTO)
+      prisma.document.groupBy({
+        by: ['codigoRetiro'],
+        where: {
+          status: 'LISTO',
+          codigoRetiro: { not: null }
+        },
+        _count: true
       })
     ]);
 
-    const [total, enProceso, listos, entregados, creadosHoy, entregadosHoy] = stats;
+    const [
+      total,
+      enProceso,
+      listos,
+      entregados,
+      creadosHoy,
+      entregadosHoy,
+      noRetirados7Dias,
+      noRetirados15Dias,
+      atrasados3Dias,
+      entregadosSemana,
+      gruposListosData
+    ] = stats;
+
+    // Contar grupos únicos
+    const gruposListos = gruposListosData.length;
+
+    // Calcular tiempo promedio de entrega (documentos entregados en la última semana)
+    const documentosEntregadosRecientes = await prisma.document.findMany({
+      where: {
+        status: 'ENTREGADO',
+        fechaEntrega: {
+          gte: inicioSemana
+        },
+        createdAt: { not: null },
+        fechaEntrega: { not: null }
+      },
+      select: {
+        createdAt: true,
+        fechaEntrega: true
+      }
+    });
+
+    let tiempoPromedioEntregaDias = 0;
+    if (documentosEntregadosRecientes.length > 0) {
+      const tiemposTotales = documentosEntregadosRecientes.reduce((sum, doc) => {
+        const diff = new Date(doc.fechaEntrega).getTime() - new Date(doc.createdAt).getTime();
+        const dias = diff / (1000 * 60 * 60 * 24);
+        return sum + dias;
+      }, 0);
+      tiempoPromedioEntregaDias = parseFloat((tiemposTotales / documentosEntregadosRecientes.length).toFixed(1));
+    }
+
+    // Calcular tasa de retiro (documentos entregados vs listos en la semana)
+    const totalActivosSemana = listos + entregadosSemana;
+    const tasaRetiroPorcentaje = totalActivosSemana > 0
+      ? Math.round((entregadosSemana / totalActivosSemana) * 100)
+      : 100;
 
     res.json({
       success: true,
       data: {
         stats: {
+          // Métricas básicas
           total,
+          documentosEnProceso: enProceso,
+          documentosListos: listos,
+          documentosEntregados: entregados,
+          creadosHoy,
+          documentosEntregadosHoy: entregadosHoy,
+          documentosEntregadosSemana: entregadosSemana,
+          gruposListos,
+
+          // 📊 Métricas avanzadas
+          documentosNoRetirados7Dias: noRetirados7Dias,
+          documentosNoRetirados15Dias: noRetirados15Dias,
+          documentosAtrasados3Dias: atrasados3Dias,
+          tiempoPromedioEntregaDias,
+          tasaRetiroPorcentaje,
+
+          // Compatibilidad con versión anterior
           enProceso,
           listos,
           entregados,
-          creadosHoy,
           entregadosHoy,
-          // Métricas adicionales
           pendientesEntrega: listos,
           eficienciaHoy: creadosHoy > 0 ? Math.round((entregadosHoy / creadosHoy) * 100) : 0
         }
