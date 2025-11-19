@@ -333,14 +333,15 @@ async function listarTodosDocumentos(req, res) {
             default: return Prisma.sql`d."createdAt"`;
           }
         })();
-        const directionSql = mappedSortOrder === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+        // Use string for direction since ASC/DESC are safe SQL keywords
+        const direction = mappedSortOrder === 'asc' ? 'ASC' : 'DESC';
 
         const documents = await prisma.$queryRaw`
           SELECT d.*, u.id as "_assignedToId", u."firstName" as "_assignedToFirstName", u."lastName" as "_assignedToLastName"
           FROM "documents" d
           LEFT JOIN "users" u ON u.id = d."assignedToId"
           WHERE ${whereSql}
-          ORDER BY ${fieldSql} ${directionSql}
+          ORDER BY ${fieldSql} ${Prisma.raw(direction)}
           OFFSET ${skip} LIMIT ${take}
         `;
         const countRows = await prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${whereSql}`;
