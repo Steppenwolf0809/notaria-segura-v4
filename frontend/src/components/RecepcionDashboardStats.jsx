@@ -47,26 +47,26 @@ function RecepcionDashboardStats({ estadisticas, onEstadisticasChange, onDocumen
     documentosListos: 0,
     documentosEntregadosHoy: 0,
     documentosEntregadosSemana: 0,
-    gruposListos: 0
+    gruposListos: 0,
+    // Métricas avanzadas del backend
+    documentosNoRetirados7Dias: 0,
+    documentosNoRetirados15Dias: 0,
+    documentosAtrasados3Dias: 0,
+    tiempoPromedioEntregaDias: 0,
+    tasaRetiroPorcentaje: 0
   };
 
   /**
    * Calcular métricas avanzadas
+   * Ahora usa datos reales del backend en lugar de estimaciones
    */
   const metricsAdvanced = useMemo(() => {
-    // Simular datos para documentos no retirados (en producción vendrían del backend)
-    // Estos cálculos deberían hacerse en el backend con datos reales
-    const documentosNoRetirados7Dias = Math.floor(stats.documentosListos * 0.3); // 30% estimado
-    const documentosNoRetirados15Dias = Math.floor(stats.documentosListos * 0.15); // 15% estimado
-    const documentosAtrasados = Math.floor(stats.documentosEnProceso * 0.25); // 25% estimado
-
-    // Calcular tasa de retiro estimada (documentos entregados / documentos listos)
-    const tasaRetiro = stats.documentosListos > 0
-      ? Math.round((stats.documentosEntregadosSemana / (stats.documentosListos + stats.documentosEntregadosSemana)) * 100)
-      : 100;
-
-    // Tiempo promedio estimado (en días)
-    const tiempoPromedioEntrega = stats.documentosEnProceso > 0 ? 2.5 : 0;
+    // Usar datos reales del backend
+    const documentosNoRetirados7Dias = stats.documentosNoRetirados7Dias || 0;
+    const documentosNoRetirados15Dias = stats.documentosNoRetirados15Dias || 0;
+    const documentosAtrasados = stats.documentosAtrasados3Dias || 0;
+    const tasaRetiro = stats.tasaRetiroPorcentaje || 0;
+    const tiempoPromedioEntrega = stats.tiempoPromedioEntregaDias || 0;
 
     return {
       documentosNoRetirados7Dias,
