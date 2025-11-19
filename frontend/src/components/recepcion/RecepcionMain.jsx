@@ -67,7 +67,9 @@ function RecepcionMain() {
     search: '',
     matrizadorId: '',
     estado: '',
-    tipoDocumento: ''
+    tipoDocumento: '',
+    fechaInicio: '',
+    fechaFin: ''
   });
 
   // Debounce para búsqueda
@@ -76,7 +78,16 @@ function RecepcionMain() {
   // Estados de paginación
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(20);
-  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+
+  // Estados de estadísticas del backend
+  const [stats, setStats] = useState({
+    enProceso: 0,
+    listos: 0,
+    entregados: 0,
+    entregadosHoy: 0,
+    total: 0
+  });
 
   // Estados de selección
   const [selectedDocuments, setSelectedDocuments] = useState(new Set());
@@ -91,21 +102,48 @@ function RecepcionMain() {
   const cargarDocumentos = useCallback(async () => {
     try {
       setLoading(true);
+
+      // Determinar el estado según la pestaña activa
+      let estadoFiltro = filters.estado;
+      if (!estadoFiltro) {
+        // Si no hay filtro de estado específico, filtrar por pestaña
+        if (tabValue === 0) {
+          // Pestaña Activos: no incluir ENTREGADO
+          // No podemos usar "no entregado" como filtro directo
+          // Así que no filtramos por estado aquí
+        } else if (tabValue === 1) {
+          // Pestaña Entregados: solo ENTREGADO
+          estadoFiltro = 'ENTREGADO';
+        }
+      }
+
       const params = {
         page: (page + 1).toString(),
         limit: rowsPerPage.toString(),
         ...(filters.search && { search: filters.search }),
         ...(filters.matrizadorId && { matrizador: filters.matrizadorId }),
-        ...(filters.estado && { estado: filters.estado }),
-        ...(filters.tipoDocumento && { tipoDocumento: filters.tipoDocumento })
+        ...(estadoFiltro && { estado: estadoFiltro }),
+        ...(filters.tipoDocumento && { tipoDocumento: filters.tipoDocumento }),
+        ...(filters.fechaInicio && { fechaDesde: filters.fechaInicio }),
+        ...(filters.fechaFin && { fechaHasta: filters.fechaFin })
       };
 
       const result = await receptionService.getTodosDocumentos(params);
 
       if (result.success) {
         const docs = result.data.documents || [];
+        const pagination = result.data.pagination || {};
+        const backendStats = result.data.stats || {};
+
         setDocumentos(docs);
-        setTotalPages(result.data.pagination?.totalPages || 1);
+        setTotal(pagination.total || 0);
+        setStats({
+          enProceso: backendStats.enProceso || 0,
+          listos: backendStats.listos || 0,
+          entregados: backendStats.entregados || 0,
+          entregadosHoy: backendStats.entregadosHoy || 0,
+          total: backendStats.total || 0
+        });
         setError(null);
       } else {
         throw new Error(result.error);
@@ -116,7 +154,7 @@ function RecepcionMain() {
     } finally {
       setLoading(false);
     }
-  }, [page, rowsPerPage, filters]);
+  }, [page, rowsPerPage, filters, tabValue]);
 
   /**
    * Cargar matrizadores para filtro
@@ -146,71 +184,6 @@ function RecepcionMain() {
     }, 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
-
-  /**
-   * Calcular estadísticas en tiempo real
-   */
-  const stats = useMemo(() => {
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-
-    const entregados = documentos.filter(d => d.status === 'ENTREGADO');
-    const entregadosHoy = entregados.filter(d => {
-      const fechaEntrega = new Date(d.fechaEntrega || d.updatedAt);
-      fechaEntrega.setHours(0, 0, 0, 0);
-      return fechaEntrega.getTime() === now.getTime();
-    });
-
-    return {
-      enProceso: documentos.filter(d => d.status === 'EN_PROCESO').length,
-      listos: documentos.filter(d => d.status === 'LISTO').length,
-      entregados: entregados.length, // Total de entregados (todos)
-      entregadosHoy: entregadosHoy.length, // Solo entregados hoy
-      total: documentos.length
-    };
-  }, [documentos]);
-
-  /**
-   * Filtrar documentos en tiempo real
-   */
-  const documentosFiltrados = useMemo(() => {
-    return documentos.filter(doc => {
-      // Filtro por pestaña activa
-      if (tabValue === 0) {
-        // Pestaña Activos: solo EN_PROCESO, LISTO, PAGADO
-        if (doc.status === 'ENTREGADO') return false;
-      } else {
-        // Pestaña Entregados: solo ENTREGADO
-        if (doc.status !== 'ENTREGADO') return false;
-      }
-
-      // Búsqueda general
-      if (filters.search) {
-        const search = filters.search.toLowerCase();
-        const matchCliente = doc.clientName?.toLowerCase().includes(search);
-        const matchCodigo = doc.protocolNumber?.toLowerCase().includes(search);
-        const matchMatriz = doc.numeroMatriz?.toLowerCase().includes(search);
-        if (!matchCliente && !matchCodigo && !matchMatriz) return false;
-      }
-
-      // Filtro por matrizador
-      if (filters.matrizadorId && doc.matrizadorId !== filters.matrizadorId) {
-        return false;
-      }
-
-      // Filtro por estado
-      if (filters.estado && doc.status !== filters.estado) {
-        return false;
-      }
-
-      // Filtro por tipo de documento
-      if (filters.tipoDocumento && doc.documentType !== filters.tipoDocumento) {
-        return false;
-      }
-
-      return true;
-    });
-  }, [documentos, filters, tabValue]);
 
   /**
    * Obtener tipos de documento únicos para filtro
@@ -331,7 +304,7 @@ function RecepcionMain() {
    */
   const handleSelectAll = (event) => {
     if (event.target.checked) {
-      const selectableIds = documentosFiltrados
+      const selectableIds = documentos
         .filter(doc => doc.status !== 'ENTREGADO')
         .map(doc => doc.id);
       setSelectedDocuments(new Set(selectableIds));
@@ -349,7 +322,9 @@ function RecepcionMain() {
       search: '',
       matrizadorId: '',
       estado: '',
-      tipoDocumento: ''
+      tipoDocumento: '',
+      fechaInicio: '',
+      fechaFin: ''
     });
     setPage(0);
   };
@@ -683,6 +658,36 @@ function RecepcionMain() {
               </FormControl>
             </Grid>
 
+            {/* Filtro Fecha Inicio - Solo visible en pestaña Entregados */}
+            {tabValue === 1 && (
+              <Grid item xs={12} sm={6} md={2}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  type="date"
+                  label="Desde"
+                  value={filters.fechaInicio}
+                  onChange={(e) => setFilters(prev => ({ ...prev, fechaInicio: e.target.value }))}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+            )}
+
+            {/* Filtro Fecha Fin - Solo visible en pestaña Entregados */}
+            {tabValue === 1 && (
+              <Grid item xs={12} sm={6} md={2}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  type="date"
+                  label="Hasta"
+                  value={filters.fechaFin}
+                  onChange={(e) => setFilters(prev => ({ ...prev, fechaFin: e.target.value }))}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+            )}
+
             {/* Botones de acción */}
             <Grid item xs={12} sm={6} md={2}>
               <Box sx={{ display: 'flex', gap: 1 }}>
@@ -722,11 +727,11 @@ function RecepcionMain() {
                   <Checkbox
                     indeterminate={
                       selectedDocuments.size > 0 &&
-                      selectedDocuments.size < documentosFiltrados.filter(d => d.status !== 'ENTREGADO').length
+                      selectedDocuments.size < documentos.filter(d => d.status !== 'ENTREGADO').length
                     }
                     checked={
-                      documentosFiltrados.filter(d => d.status !== 'ENTREGADO').length > 0 &&
-                      selectedDocuments.size === documentosFiltrados.filter(d => d.status !== 'ENTREGADO').length
+                      documentos.filter(d => d.status !== 'ENTREGADO').length > 0 &&
+                      selectedDocuments.size === documentos.filter(d => d.status !== 'ENTREGADO').length
                     }
                     onChange={handleSelectAll}
                   />
@@ -741,7 +746,7 @@ function RecepcionMain() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {documentosFiltrados.length === 0 ? (
+              {documentos.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} align="center" sx={{ py: 4 }}>
                     <Typography color="text.secondary">
@@ -750,7 +755,7 @@ function RecepcionMain() {
                   </TableCell>
                 </TableRow>
               ) : (
-                documentosFiltrados.map((documento) => (
+                documentos.map((documento) => (
                   <TableRow
                     key={documento.id}
                     hover
@@ -928,7 +933,7 @@ function RecepcionMain() {
 
         <TablePagination
           component="div"
-          count={totalPages * rowsPerPage}
+          count={total}
           page={page}
           onPageChange={handleChangePage}
           rowsPerPage={rowsPerPage}
