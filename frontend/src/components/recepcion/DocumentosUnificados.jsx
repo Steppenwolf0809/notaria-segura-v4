@@ -72,9 +72,9 @@ const StatusIndicator = ({ status }) => {
   return (
     <Box sx={{ display: 'flex', alignItems: 'center' }}>
       <Box component="span" sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: config.color, mr: 1 }} />
-      <Typography 
-        variant="body2" 
-        sx={{ 
+      <Typography
+        variant="body2"
+        sx={{
           fontWeight: 500,
           color: (theme) => theme.palette.mode === 'dark' ? '#e2e8f0' : '#374151'
         }}
@@ -86,25 +86,25 @@ const StatusIndicator = ({ status }) => {
 };
 
 const getInitials = (name) => {
-    if (!name) return '?';
-    const names = name.trim().split(' ').filter(n => n.length > 0);
-    if (names.length === 0) return '?';
-    const firstInitial = names[0][0];
-    let secondInitial;
-    if (names.length >= 3) {
-        secondInitial = names[2][0];
-    } else if (names.length === 2) {
-        secondInitial = names[1][0];
-    }
-    if (secondInitial) {
-        return `${firstInitial}${secondInitial}`.toUpperCase();
-    }
-    if (names.length === 1) {
-      return names[0].substring(0, 2).toUpperCase();
-    } else if (names.length > 1) {
-      return `${names[0][0]}${names[1][0]}`.toUpperCase();
-    }
-    return '?';
+  if (!name) return '?';
+  const names = name.trim().split(' ').filter(n => n.length > 0);
+  if (names.length === 0) return '?';
+  const firstInitial = names[0][0];
+  let secondInitial;
+  if (names.length >= 3) {
+    secondInitial = names[2][0];
+  } else if (names.length === 2) {
+    secondInitial = names[1][0];
+  }
+  if (secondInitial) {
+    return `${firstInitial}${secondInitial}`.toUpperCase();
+  }
+  if (names.length === 1) {
+    return names[0].substring(0, 2).toUpperCase();
+  } else if (names.length > 1) {
+    return `${names[0][0]}${names[1][0]}`.toUpperCase();
+  }
+  return '?';
 };
 
 function formatLocalDate(dateString) {
@@ -126,7 +126,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   const [bulkDeliveryMode, setBulkDeliveryMode] = useState(false);
   const [bulkDeliverySelection, setBulkDeliverySelection] = useState(new Set());
   const [showBulkDeliveryDialog, setShowBulkDeliveryDialog] = useState(false);
-  
+
   const [filters, setFilters] = useState({
     search: '',
     matrizador: '',
@@ -136,7 +136,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   });
 
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
@@ -157,21 +157,21 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   // Estado para modal de detalles y fila clickeable
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [detailDocument, setDetailDocument] = useState(null);
-  
+
   // Estados para funcionalidad de agrupación
   const [showQuickGroupingModal, setShowQuickGroupingModal] = useState(false);
   const [pendingGroupData, setPendingGroupData] = useState({ main: null, related: [] });
   const [groupingLoading, setGroupingLoading] = useState(false);
   const [groupingSuccess, setGroupingSuccess] = useState(null);
-  
+
   // Estados para modal de información de grupo
   const [groupInfoModalOpen, setGroupInfoModalOpen] = useState(false);
   const [selectedGroupDocument, setSelectedGroupDocument] = useState(null);
-  
+
   // Estados para modal de reversión
   const [reversionModalOpen, setReversionModalOpen] = useState(false);
   const [reversionLoading, setReversionLoading] = useState(false);
-  
+
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   // Cache de conteos de agrupables por cliente (clave: name|id)
   const [groupableCountCache, setGroupableCountCache] = useState(new Map());
@@ -230,18 +230,18 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   // Efecto para manejar navegación específica desde alertas
   useEffect(() => {
     if (documentoEspecifico && documentoEspecifico.autoSearch) {
-      
+
       // Aplicar filtro automático por código de protocolo
       setFilters(prev => ({
         ...prev,
         search: documentoEspecifico.protocolNumber
       }));
       setSearchQuery(documentoEspecifico.protocolNumber);
-      
+
       // Setear para highlight y scroll
       setHighlightedDocument(documentoEspecifico.id);
       setScrollToDocument(documentoEspecifico.id);
-      
+
       // Resetear página a 0 para asegurar que encuentre el documento
       setPage(0);
     }
@@ -252,18 +252,18 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
     if (scrollToDocument && documentos.length > 0) {
       // Buscar el documento en la lista actual
       const foundDocument = documentos.find(doc => doc.id === scrollToDocument);
-      
+
       if (foundDocument) {
-        
+
         // Hacer scroll al documento (con un pequeño delay para asegurar que el DOM esté actualizado)
         setTimeout(() => {
           const documentRow = document.querySelector(`[data-document-id="${scrollToDocument}"]`);
           if (documentRow) {
-            documentRow.scrollIntoView({ 
-              behavior: 'smooth', 
-              block: 'center' 
+            documentRow.scrollIntoView({
+              behavior: 'smooth',
+              block: 'center'
             });
-            
+
             // Limpiar estados después del scroll
             setTimeout(() => {
               setHighlightedDocument(null);
@@ -277,7 +277,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
       }
     }
   }, [documentos, scrollToDocument, onDocumentoFound]);
-  
+
   const handleFilterChange = (field, value) => {
     setFilters(prev => ({ ...prev, [field]: value }));
     setPage(0);
@@ -360,7 +360,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
       if (result.success === true) {
         // Notificación global según WhatsApp
         const w = result.data?.whatsapp || {};
-        const sentLike = !!(w.sent || ['sent','queued','delivered'].includes(w.status) || w.sid || w.messageId);
+        const sentLike = !!(w.sent || ['sent', 'queued', 'delivered'].includes(w.status) || w.sid || w.messageId);
         if (sentLike) {
           toast.success('Documento(s) marcados como LISTO. WhatsApp enviado.');
         } else if (w.skipped) {
@@ -391,7 +391,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
         } else if (result.success === false && !result.error && !result.message) {
           errorMessage = 'El servicio retornó un error sin mensaje específico';
         }
-        
+
         throw new Error(errorMessage);
       }
     } catch (error) {
@@ -425,12 +425,12 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
 
 
       if (result.success) {
-        setSnackbar({ 
-          open: true, 
-          message: result.message || 'Documento revertido exitosamente', 
-          severity: 'success' 
+        setSnackbar({
+          open: true,
+          message: result.message || 'Documento revertido exitosamente',
+          severity: 'success'
         });
-        
+
         // Recargar documentos y estadísticas
         await cargarDocumentos();
         onEstadisticasChange?.();
@@ -439,10 +439,10 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
         throw new Error(result.error || 'Error en la reversión del documento');
       }
     } catch (error) {
-      setSnackbar({ 
-        open: true, 
-        message: error.message || 'Error al revertir el documento', 
-        severity: 'error' 
+      setSnackbar({
+        open: true,
+        message: error.message || 'Error al revertir el documento',
+        severity: 'error'
       });
     } finally {
       setReversionLoading(false);
@@ -456,6 +456,11 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   };
 
   const abrirDetalles = (documento) => {
+    console.log('abrirDetalles called with:', documento);
+    if (!documento) {
+      console.error('abrirDetalles called with null document');
+      return;
+    }
     setDetailDocument(documento);
     setDetailModalOpen(true);
   };
@@ -483,7 +488,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
-  
+
   // Alternar orden por fecha
   const toggleSortOrder = () => {
     setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
@@ -500,7 +505,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
 
   // Documentos ordenados en memoria por fecha
   const documentosOrdenados = useMemo(() => {
-    const dateKeys = ['createdAt','fechaCreacion','created_at'];
+    const dateKeys = ['createdAt', 'fechaCreacion', 'created_at'];
     const defaultDateKey = documentos[0]?.fechaCreacion ? 'fechaCreacion' : 'createdAt';
     const field = sortBy || defaultDateKey;
     const sorted = [...documentos].sort((a, b) => {
@@ -583,7 +588,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   };
 
   // 🔗 FUNCIONES DE AGRUPACIÓN PARA RECEPCIÓN
-  
+
   /**
    * Manejar agrupación inteligente detectada automáticamente
    */
@@ -605,12 +610,12 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
     }
 
     setGroupingLoading(true);
-    
+
     try {
       const documentIds = [pendingGroupData.main.id, ...selectedDocumentIds];
-      
+
       const result = await createDocumentGroup(documentIds);
-      
+
       if (result.success) {
         // Mostrar mensaje de éxito
         setGroupingSuccess({
@@ -632,7 +637,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
           severity: 'success'
         });
 
-        
+
         // Auto-ocultar después de 5 segundos
         setTimeout(() => {
           setGroupingSuccess(null);
@@ -775,11 +780,11 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
 
   // Calcular documentos paginados
   const documentosPaginados = documentos.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
-  
+
   // Prefetch de conteos por cliente para los documentos visibles
   useEffect(() => {
     const fetchCounts = async () => {
-      const candidates = documentosPaginados.filter(d => ['EN_PROCESO','LISTO'].includes(d.status) && !d.isGrouped);
+      const candidates = documentosPaginados.filter(d => ['EN_PROCESO', 'LISTO'].includes(d.status) && !d.isGrouped);
       for (const doc of candidates) {
         const key = `${doc.clientName}|${doc.clientId || ''}`;
         if (groupableCountCache.has(key)) continue;
@@ -868,9 +873,9 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
             <Grid container spacing={2}>
               {/* Fila 1 */}
               <Grid item xs={12} sm={6} md={8}>
-                <TextField 
-                  fullWidth 
-                  size="small" 
+                <TextField
+                  fullWidth
+                  size="small"
                   placeholder="Buscar por cliente, teléfono, protocolo o acto principal..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
@@ -898,27 +903,27 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                 />
               </Grid>
               <Grid item xs={12} sm={6} md={4}>
-                 <FormControl fullWidth size="small">
-                   <Select
-                     value={filters.matrizador}
-                     onChange={(e) => handleFilterChange('matrizador', e.target.value)}
-                     displayEmpty
-                     renderValue={(selected) => {
-                       if (!selected) {
-                         return <em style={{ color: '#999' }}>Todos los matrizadores</em>;
-                       }
-                       const matrizador = matrizadores.find(mat => mat.id === selected);
-                       return matrizador ? (matrizador.nombre || `${matrizador.firstName} ${matrizador.lastName}`) : selected;
-                     }}
-                   >
-                     <MenuItem value="">Todos los matrizadores</MenuItem>
-                     {matrizadores.map(mat => <MenuItem key={mat.id} value={mat.id}>{mat.nombre || `${mat.firstName} ${mat.lastName}`}</MenuItem>)}
-                   </Select>
-                 </FormControl>
+                <FormControl fullWidth size="small">
+                  <Select
+                    value={filters.matrizador}
+                    onChange={(e) => handleFilterChange('matrizador', e.target.value)}
+                    displayEmpty
+                    renderValue={(selected) => {
+                      if (!selected) {
+                        return <em style={{ color: '#999' }}>Todos los matrizadores</em>;
+                      }
+                      const matrizador = matrizadores.find(mat => mat.id === selected);
+                      return matrizador ? (matrizador.nombre || `${matrizador.firstName} ${matrizador.lastName}`) : selected;
+                    }}
+                  >
+                    <MenuItem value="">Todos los matrizadores</MenuItem>
+                    {matrizadores.map(mat => <MenuItem key={mat.id} value={mat.id}>{mat.nombre || `${mat.firstName} ${mat.lastName}`}</MenuItem>)}
+                  </Select>
+                </FormControl>
               </Grid>
               <Grid item xs={12} sm={6} md={2} sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
-                <Button 
-                  variant="outlined" 
+                <Button
+                  variant="outlined"
                   onClick={toggleSortOrder}
                   sx={{ textTransform: 'none' }}
                 >
@@ -928,43 +933,43 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
 
               {/* Fila 2 */}
               <Grid item xs={12} sm={6} md={3}>
-                 <FormControl fullWidth size="small">
-                   <Select
-                     value={filters.estado}
-                     onChange={(e) => handleFilterChange('estado', e.target.value)}
-                     displayEmpty
-                     renderValue={(selected) => {
-                       if (!selected) {
-                         return <em style={{ color: '#999' }}>Todos los estados</em>;
-                       }
-                       const estadoLabels = {
-                         'EN_PROCESO': 'En Proceso',
-                         'LISTO': 'Listo',
-                         'ENTREGADO': 'Entregado'
-                       };
-                       return estadoLabels[selected] || selected;
-                     }}
-                   >
-                     <MenuItem value="">Todos los estados</MenuItem>
-                     <MenuItem value="EN_PROCESO">En Proceso</MenuItem>
-                     <MenuItem value="LISTO">Listo</MenuItem>
-                     <MenuItem value="ENTREGADO">Entregado</MenuItem>
-                   </Select>
-                 </FormControl>
+                <FormControl fullWidth size="small">
+                  <Select
+                    value={filters.estado}
+                    onChange={(e) => handleFilterChange('estado', e.target.value)}
+                    displayEmpty
+                    renderValue={(selected) => {
+                      if (!selected) {
+                        return <em style={{ color: '#999' }}>Todos los estados</em>;
+                      }
+                      const estadoLabels = {
+                        'EN_PROCESO': 'En Proceso',
+                        'LISTO': 'Listo',
+                        'ENTREGADO': 'Entregado'
+                      };
+                      return estadoLabels[selected] || selected;
+                    }}
+                  >
+                    <MenuItem value="">Todos los estados</MenuItem>
+                    <MenuItem value="EN_PROCESO">En Proceso</MenuItem>
+                    <MenuItem value="LISTO">Listo</MenuItem>
+                    <MenuItem value="ENTREGADO">Entregado</MenuItem>
+                  </Select>
+                </FormControl>
               </Grid>
               <Grid item xs={12} sm={6} md={3}>
-                  <TextField fullWidth size="small" type="date" label="Desde"
-                      value={filters.fechaDesde}
-                      onChange={(e) => handleFilterChange('fechaDesde', e.target.value)}
-                      InputLabelProps={{ shrink: true }}
-                  />
+                <TextField fullWidth size="small" type="date" label="Desde"
+                  value={filters.fechaDesde}
+                  onChange={(e) => handleFilterChange('fechaDesde', e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                />
               </Grid>
               <Grid item xs={12} sm={6} md={3}>
-                  <TextField fullWidth size="small" type="date" label="Hasta"
-                      value={filters.fechaHasta}
-                      onChange={(e) => handleFilterChange('fechaHasta', e.target.value)}
-                      InputLabelProps={{ shrink: true }}
-                  />
+                <TextField fullWidth size="small" type="date" label="Hasta"
+                  value={filters.fechaHasta}
+                  onChange={(e) => handleFilterChange('fechaHasta', e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                />
               </Grid>
               <Grid item xs={12} sm={6} md={3} sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
                 <Tooltip title="Refrescar">
@@ -976,16 +981,16 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
             </Grid>
 
             {selectedDocuments.length > 0 && (
-                <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-                    <Button
-                        variant="contained" color={selectedAction.color} disabled={selectedAction.disabled}
-                        startIcon={selectedAction.action === 'marcar-listo' ? <CheckCircleIcon /> : <SendIcon />}
-                        onClick={() => {
-                            if (selectedAction.action === 'marcar-listo') abrirConfirmacionGrupal();
-                            else if (selectedAction.action === 'entregar') setShowEntregaGrupal(true);
-                        }}
-                    >{selectedAction.text} ({selectedDocuments.length})</Button>
-                </Box>
+              <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
+                <Button
+                  variant="contained" color={selectedAction.color} disabled={selectedAction.disabled}
+                  startIcon={selectedAction.action === 'marcar-listo' ? <CheckCircleIcon /> : <SendIcon />}
+                  onClick={() => {
+                    if (selectedAction.action === 'marcar-listo') abrirConfirmacionGrupal();
+                    else if (selectedAction.action === 'entregar') setShowEntregaGrupal(true);
+                  }}
+                >{selectedAction.text} ({selectedDocuments.length})</Button>
+              </Box>
             )}
           </CardContent>
         </Card>
@@ -1017,8 +1022,8 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                 <TableCell sx={{ fontWeight: 'bold', py: 2 }}>Matrizador</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', py: 2 }}>
                   <TableSortLabel
-                    active={['createdAt','fechaCreacion'].includes(sortBy)}
-                    direction={['createdAt','fechaCreacion'].includes(sortBy) ? sortOrder : 'asc'}
+                    active={['createdAt', 'fechaCreacion'].includes(sortBy)}
+                    direction={['createdAt', 'fechaCreacion'].includes(sortBy) ? sortOrder : 'asc'}
                     onClick={() => {
                       setSortBy(documentos[0]?.fechaCreacion ? 'fechaCreacion' : 'createdAt');
                       toggleSortOrder();
@@ -1035,8 +1040,8 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
               {documentos.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                    <Typography 
-                      sx={{ 
+                    <Typography
+                      sx={{
                         fontWeight: 500,
                         color: (theme) => theme.palette.mode === 'dark' ? '#94a3b8' : '#6b7280'
                       }}
@@ -1047,13 +1052,13 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                 </TableRow>
               ) : (
                 documentosOrdenados.map((documento) => (
-                  <TableRow 
-                    key={documento.id} 
-                    selected={visualSelection.has(documento.id)} 
+                  <TableRow
+                    key={documento.id}
+                    selected={visualSelection.has(documento.id)}
                     hover
                     onClick={() => abrirDetalles(documento)}
                     data-document-id={documento.id} // Para scroll automático
-                    sx={{ 
+                    sx={{
                       cursor: 'pointer',
                       ...(visualSelection.has(documento.id) && {
                         bgcolor: 'action.selected'
@@ -1127,10 +1132,10 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                             {documento.clientName}
                           </Typography>
                         </Tooltip>
-                        <Typography 
-                          variant="caption" 
-                          component="div" 
-                          sx={{ 
+                        <Typography
+                          variant="caption"
+                          component="div"
+                          sx={{
                             fontWeight: 500,
                             color: (theme) => theme.palette.mode === 'dark' ? '#cbd5e1' : '#4b5563'
                           }}
@@ -1152,16 +1157,16 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                         )}
                         {documento.clientPhone && (
                           <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
-                             <PhoneIcon sx={{ fontSize: '0.8rem', color: 'action.active', mr: 0.5 }} />
-                             <Typography 
-                               variant="caption" 
-                               sx={{ 
-                                 fontWeight: 500,
-                                 color: (theme) => theme.palette.mode === 'dark' ? '#cbd5e1' : '#4b5563'
-                               }}
-                             >
-                               {documento.clientPhone}
-                             </Typography>
+                            <PhoneIcon sx={{ fontSize: '0.8rem', color: 'action.active', mr: 0.5 }} />
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                fontWeight: 500,
+                                color: (theme) => theme.palette.mode === 'dark' ? '#cbd5e1' : '#4b5563'
+                              }}
+                            >
+                              {documento.clientPhone}
+                            </Typography>
                           </Box>
                         )}
                         {/* 🚫 Indicador de grupo ELIMINADO */}
@@ -1185,14 +1190,14 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                     <TableCell>
                       <Tooltip title={documento.matrizador}>
                         <Avatar sx={{ width: 32, height: 32, fontSize: '0.8rem', bgcolor: 'primary.light' }}>
-                            {getInitials(documento.matrizador)}
+                          {getInitials(documento.matrizador)}
                         </Avatar>
                       </Tooltip>
                     </TableCell>
                     <TableCell>
-                      <Typography 
-                        variant="body2" 
-                        sx={{ 
+                      <Typography
+                        variant="body2"
+                        sx={{
                           fontWeight: 500,
                           color: (theme) => theme.palette.mode === 'dark' ? '#e2e8f0' : '#374151'
                         }}
@@ -1210,33 +1215,33 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'center' }}>
                         {/* Botón principal según estado */}
                         {documento.status === 'EN_PROCESO' && (
-                          <Button 
-                            size="small" 
-                            variant="contained" 
-                            color="success" 
+                          <Button
+                            size="small"
+                            variant="contained"
+                            color="success"
                             startIcon={<CheckCircleIcon />}
                             onClick={(e) => { e.stopPropagation(); abrirConfirmacionIndividual(documento); }}
                           >
                             Marcar Listo
                           </Button>
                         )}
-                        
+
                         {documento.status === 'LISTO' && (
-                          <Button 
-                            size="small" 
-                            variant="contained" 
-                            color="primary" 
+                          <Button
+                            size="small"
+                            variant="contained"
+                            color="primary"
                             startIcon={<SendIcon />}
                             onClick={(e) => { e.stopPropagation(); abrirModalEntrega(documento); }}
                           >
                             Entregar
                           </Button>
                         )}
-                        
+
                         {documento.status === 'ENTREGADO' && (
-                          <Typography 
-                            variant="body2" 
-                            sx={{ 
+                          <Typography
+                            variant="body2"
+                            sx={{
                               color: (theme) => theme.palette.mode === 'dark' ? '#94a3b8' : '#9ca3af',
                               fontStyle: 'italic'
                             }}
@@ -1244,12 +1249,12 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                             Completado
                           </Typography>
                         )}
-                        
+
                         {/* Botón de revertir estado (directo) - SIEMPRE VISIBLE para LISTO/ENTREGADO */}
                         {['LISTO', 'ENTREGADO'].includes(documento.status) && (
                           <Tooltip title={
-                            documento.isGrouped 
-                              ? "Revertir estado (afectará todo el grupo)" 
+                            documento.isGrouped
+                              ? "Revertir estado (afectará todo el grupo)"
                               : "Revertir al estado anterior"
                           }>
                             <IconButton
@@ -1259,7 +1264,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                                 e.stopPropagation();
                                 abrirReversionModal(documento);
                               }}
-                              sx={{ 
+                              sx={{
                                 ml: 1, // Margen izquierdo para separarlo
                                 // Indicador visual para documentos agrupados
                                 ...(documento.isGrouped && {
@@ -1274,9 +1279,9 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                           </Tooltip>
                         )}
 
-                        <IconButton 
+                        <IconButton
                           size="small"
-                          aria-label="more actions" 
+                          aria-label="more actions"
                           onClick={(event) => { event.stopPropagation(); handleMenuOpen(event, documento); }}
                         >
                           <MoreVertIcon fontSize="small" />
@@ -1293,7 +1298,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
           rowsPerPage={rowsPerPage} onRowsPerPageChange={handleChangeRowsPerPage} rowsPerPageOptions={[5, 10, 25, 50]} labelRowsPerPage="Filas:"
         />
       </Card>
-      
+
       <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={handleMenuClose}>
         <MenuItem onClick={() => { if (currentDocumento) abrirDetalles(currentDocumento); handleMenuClose(); }}>
           <ListItemIcon><VisibilityIcon fontSize="small" /></ListItemIcon>
@@ -1336,11 +1341,11 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
         </DialogContent>
         <DialogActions>
           <Button onClick={cerrarConfirmacion}>Cancelar</Button>
-          <Button 
-            onClick={ejecutarMarcarListo} 
-            variant="contained" 
-            color="success" 
-            startIcon={<CheckCircleIcon />} 
+          <Button
+            onClick={ejecutarMarcarListo}
+            variant="contained"
+            color="success"
+            startIcon={<CheckCircleIcon />}
             disabled={!((actionType === 'individual' && currentDocumento) || (actionType === 'grupal' && selectedDocuments.length > 0))}
           >
             Confirmar
@@ -1350,7 +1355,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
 
       {showModalEntrega && documentoSeleccionado && <ModalEntrega documento={documentoSeleccionado} onClose={cerrarModales} onEntregaExitosa={onEntregaCompletada} />}
       {showEntregaGrupal && selectedDocuments.length > 0 && <ModalEntregaGrupal documentos={documentos.filter(doc => selectedDocuments.includes(doc.id))} onClose={cerrarModales} onEntregaExitosa={onEntregaCompletada} />}
-      
+
       {/* Modal de agrupación rápida */}
       <QuickGroupingModal
         open={showQuickGroupingModal}

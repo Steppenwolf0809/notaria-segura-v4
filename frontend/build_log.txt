@@ -1,0 +1,30 @@
+
+> notaria-segura-frontend@1.0.0 build
+> vite build
+
+[36mvite v7.0.6 [32mbuilding for production...[36m[39m
+transforming...
+[32m✓[39m 11611 modules transformed.
+[31m✗[39m Build failed in 10.08s
+[31merror during build:
+[31m[vite]: Rollup failed to resolve import "dompurify" from "C:/notaria-segura/frontend/src/utils/sanitize.jsx".
+This is most likely unintended because it can break your application at runtime.
+If you do want to externalize this module explicitly add it to
+`build.rollupOptions.external`[31m
+    at viteLog (file:///C:/notaria-segura/node_modules/vite/dist/node/chunks/dep-BHkUv4Z8.js:34211:57)
+    at file:///C:/notaria-segura/node_modules/vite/dist/node/chunks/dep-BHkUv4Z8.js:34249:73
+    at onwarn (file:///C:/notaria-segura/node_modules/@vitejs/plugin-react/dist/index.js:90:7)
+    at file:///C:/notaria-segura/node_modules/vite/dist/node/chunks/dep-BHkUv4Z8.js:34249:28
+    at onRollupLog (file:///C:/notaria-segura/node_modules/vite/dist/node/chunks/dep-BHkUv4Z8.js:34244:3)
+    at onLog (file:///C:/notaria-segura/node_modules/vite/dist/node/chunks/dep-BHkUv4Z8.js:34032:4)
+    at file:///C:/notaria-segura/node_modules/rollup/dist/es/shared/node-entry.js:20866:32
+    at Object.logger [as onLog] (file:///C:/notaria-segura/node_modules/rollup/dist/es/shared/node-entry.js:22748:9)
+    at ModuleLoader.handleInvalidResolvedId (file:///C:/notaria-segura/node_modules/rollup/dist/es/shared/node-entry.js:21492:26)
+    at file:///C:/notaria-segura/node_modules/rollup/dist/es/shared/node-entry.js:21450:26[39m
+npm error Lifecycle script `build` failed with error:
+npm error code 1
+npm error path C:\notaria-segura\frontend
+npm error workspace notaria-segura-frontend@1.0.0
+npm error location C:\notaria-segura\frontend
+npm error command failed
+npm error command C:\Windows\system32\cmd.exe /d /s /c vite build

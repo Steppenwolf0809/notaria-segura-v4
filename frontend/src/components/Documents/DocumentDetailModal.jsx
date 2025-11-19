@@ -55,7 +55,7 @@ import NotificationPolicySelector from '../common/NotificationPolicySelector';
 import ImmediateDeliveryModal from '../common/ImmediateDeliveryModal';
 import { toast } from 'react-toastify';
 import archivoService from '../../services/archivo-service';
- 
+
 
 /**
  * Componente DocumentDetailModal - Modal de detalle avanzado del documento
@@ -72,10 +72,11 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
   const [showMatrizadorDeliveryModal, setShowMatrizadorDeliveryModal] = useState(false);
   const [showImmediateDeliveryModal, setShowImmediateDeliveryModal] = useState(false);
   const [localDocument, setLocalDocument] = useState(document);
-  
+
 
   // Actualizar documento local cuando cambie el prop
   useEffect(() => {
+    console.log('DocumentDetailModal mounted/updated with:', document);
     if (document) {
       setLocalDocument(document);
     }
@@ -115,7 +116,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
    * Manejar actualización de documento desde modal de edición
    */
   const handleDocumentUpdated = (updatedData) => {
-    
+
     // Actualizar documento local con los nuevos datos
     if (updatedData.data && updatedData.data.document) {
       setLocalDocument(prev => ({
@@ -123,10 +124,10 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
         ...updatedData.data.document
       }));
     }
-    
+
     // Cerrar modal de edición
     setShowEditModal(false);
-    
+
     // Notificar al componente padre si existe callback
     if (onDocumentUpdated && updatedData.data) {
       onDocumentUpdated(updatedData.data);
@@ -137,7 +138,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
    * Manejar entrega de documento desde modal de entrega
    */
   const handleDocumentDelivered = (deliveryData) => {
-    
+
     // Actualizar documento local
     if (deliveryData.document) {
       setLocalDocument(prev => ({
@@ -145,23 +146,23 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
         ...deliveryData.document
       }));
     }
-    
+
     // Cerrar modal de entrega
     setShowDeliveryModal(false);
-    
+
     // Notificar al componente padre si existe callback
     if (onDocumentUpdated && deliveryData) {
       onDocumentUpdated(deliveryData);
     }
   };
 
-  
+
 
   /**
    * Manejar entrega de documento desde modal simplificado de matrizador
    */
   const handleMatrizadorDelivered = (deliveryData) => {
-    
+
     // Actualizar documento local
     if (deliveryData.document) {
       setLocalDocument(prev => ({
@@ -169,10 +170,10 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
         ...deliveryData.document
       }));
     }
-    
+
     // Cerrar modal de entrega de matrizador
     setShowMatrizadorDeliveryModal(false);
-    
+
     // Notificar al componente padre si existe callback
     if (onDocumentUpdated && deliveryData) {
       onDocumentUpdated(deliveryData);
@@ -184,7 +185,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
    * Se ejecuta automáticamente al cambiar la política en el componente NotificationPolicySelector
    */
   const handleNotificationPolicyChange = (newPolicy, updatedData) => {
-    
+
     // Actualizar documento local
     setLocalDocument(prev => ({
       ...prev,
@@ -195,7 +196,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
     try {
       const affected = (localDocument?.isGrouped || updatedData?.isGrouped) ? ' (aplica al grupo)' : '';
       toast.success(`Política de notificación actualizada${affected}`);
-    } catch {}
+    } catch { }
   };
 
   /**
@@ -234,7 +235,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
             icon: <LocalShippingIcon />
           };
         }
-        
+
         return {
           text: 'Iniciar Procesamiento',
           action: 'EN_PROCESO',
@@ -251,7 +252,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
             icon: <LocalShippingIcon />
           };
         }
-        
+
         return {
           text: 'Marcar como Listo y Notificar',
           action: 'LISTO',
@@ -260,10 +261,10 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
         };
       case 'LISTO':
         // Cambiar texto según política de notificación
-        const deliveryText = localDocument?.notificationPolicy === 'entrega_inmediata' 
+        const deliveryText = localDocument?.notificationPolicy === 'entrega_inmediata'
           ? 'Entregar Inmediatamente'
           : 'Marcar como Entregado';
-        
+
         return {
           text: deliveryText,
           action: 'ENTREGADO',
@@ -331,7 +332,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
     setActionLoading(true);
     try {
       const result = await updateDocumentStatus(document.id, actionConfig.action);
-      
+
       if (result.success) {
         // Actualizar documento local
         setLocalDocument(prev => ({
@@ -367,7 +368,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
             }
             return;
           }
-          const sentLike = !!(w.sent || ['sent','queued','delivered'].includes(w.status) || w.sid || w.messageId);
+          const sentLike = !!(w.sent || ['sent', 'queued', 'delivered'].includes(w.status) || w.sid || w.messageId);
           if (sentLike) {
             toast.success('Documento marcado como LISTO. WhatsApp enviado.');
           } else if (w.skipped || localDocument?.notificationPolicy === 'no_notificar') {
@@ -381,7 +382,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
         } else {
           toast.success(baseMessage);
         }
-        
+
       } else {
         const errorMsg = result.error || result.message || 'No se pudo actualizar el documento';
         toast.error(errorMsg);
@@ -414,14 +415,14 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
       <DialogTitle sx={{ m: 0, p: 2, bgcolor: 'primary.main', color: 'white' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Avatar sx={{ 
-              bgcolor: (theme) => theme.palette.mode === 'dark' 
-                ? 'rgba(255, 255, 255, 0.15)' 
-                : 'white', 
-              color: 'primary.main', 
+            <Avatar sx={{
+              bgcolor: (theme) => theme.palette.mode === 'dark'
+                ? 'rgba(255, 255, 255, 0.15)'
+                : 'white',
+              color: 'primary.main',
               mr: 2,
-              border: (theme) => theme.palette.mode === 'dark' 
-                ? '1px solid rgba(255, 255, 255, 0.2)' 
+              border: (theme) => theme.palette.mode === 'dark'
+                ? '1px solid rgba(255, 255, 255, 0.2)'
                 : 'none'
             }}>
               <AssignmentIcon />
@@ -477,8 +478,8 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
               <Chip
                 label={localDocument?.documentType || 'Sin tipo'}
-                sx={{ 
-                  fontSize: '1rem', 
+                sx={{
+                  fontSize: '1rem',
                   p: 1,
                   bgcolor: (theme) => theme.palette.mode === 'dark'
                     ? 'rgba(255, 255, 255, 0.1)'
@@ -506,7 +507,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
                     <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, color: 'primary.main' }}>
                       👤 Información del Cliente
                     </Typography>
-                    
+
                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                       <Avatar sx={{ bgcolor: 'primary.main', mr: 2 }}>
                         <PersonIcon />
@@ -550,15 +551,15 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
                       </Box>
                     )}
 
-                    <Box sx={{ 
-                      mt: 2, 
-                      p: 2, 
-                      bgcolor: (theme) => theme.palette.mode === 'dark' 
-                        ? 'rgba(255, 255, 255, 0.05)' 
-                        : 'grey.50', 
+                    <Box sx={{
+                      mt: 2,
+                      p: 2,
+                      bgcolor: (theme) => theme.palette.mode === 'dark'
+                        ? 'rgba(255, 255, 255, 0.05)'
+                        : 'grey.50',
                       borderRadius: 1,
-                      border: (theme) => theme.palette.mode === 'dark' 
-                        ? '1px solid rgba(255, 255, 255, 0.1)' 
+                      border: (theme) => theme.palette.mode === 'dark'
+                        ? '1px solid rgba(255, 255, 255, 0.1)'
                         : 'none'
                     }}>
                       <Typography variant="body2" color="text.secondary">
@@ -576,7 +577,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
                     <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, color: 'success.main' }}>
                       📋 Acto Principal
                     </Typography>
-                    
+
                     <Typography variant="h5" sx={{ mb: 2, fontWeight: 'bold' }}>
                       {document.actoPrincipalDescripcion || 'No especificado'}
                     </Typography>
@@ -590,14 +591,14 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
 
                     <Divider sx={{ my: 2 }} />
 
-                    <Box sx={{ 
-                      p: 2, 
-                      bgcolor: (theme) => theme.palette.mode === 'dark' 
-                        ? 'rgba(34, 197, 94, 0.1)' 
-                        : 'success.50', 
+                    <Box sx={{
+                      p: 2,
+                      bgcolor: (theme) => theme.palette.mode === 'dark'
+                        ? 'rgba(34, 197, 94, 0.1)'
+                        : 'success.50',
                       borderRadius: 1,
-                      border: (theme) => theme.palette.mode === 'dark' 
-                        ? '1px solid rgba(34, 197, 94, 0.2)' 
+                      border: (theme) => theme.palette.mode === 'dark'
+                        ? '1px solid rgba(34, 197, 94, 0.2)'
                         : 'none'
                     }}>
                       <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
@@ -639,16 +640,16 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
         )}
 
         {/* 🔔 CONFIGURACIÓN DE NOTIFICACIÓN - COMPONENTE REUTILIZABLE */}
-        <NotificationPolicySelector 
+        <NotificationPolicySelector
           document={localDocument}
           onPolicyChange={handleNotificationPolicyChange}
           autoSave={!isReadOnly}
           disabled={isReadOnly}
-          sx={{ 
-            borderTop: (theme) => theme.palette.mode === 'dark' 
-              ? '1px solid rgba(255, 255, 255, 0.1)' 
+          sx={{
+            borderTop: (theme) => theme.palette.mode === 'dark'
+              ? '1px solid rgba(255, 255, 255, 0.1)'
               : '1px solid #e0e0e0',
-            m: 3, 
+            m: 3,
             mt: 0,
             pt: 3
           }}
@@ -656,13 +657,13 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
       </DialogContent>
 
       {/* Acciones */}
-      <DialogActions sx={{ 
-        p: 3, 
-        bgcolor: (theme) => theme.palette.mode === 'dark' 
-          ? 'rgba(255, 255, 255, 0.03)' 
+      <DialogActions sx={{
+        p: 3,
+        bgcolor: (theme) => theme.palette.mode === 'dark'
+          ? 'rgba(255, 255, 255, 0.03)'
           : 'grey.50',
-        borderTop: (theme) => theme.palette.mode === 'dark' 
-          ? '1px solid rgba(255, 255, 255, 0.1)' 
+        borderTop: (theme) => theme.palette.mode === 'dark'
+          ? '1px solid rgba(255, 255, 255, 0.1)'
           : 'none'
       }}>
         <Button
@@ -684,7 +685,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
             Editar Información
           </Button>
         )}
-        
+
         {/* Botón para regresar al estado anterior (solo ARCHIVO) */}
         {user?.role === 'ARCHIVO' && previousStatus && !isReadOnly && (
           <Button
@@ -754,7 +755,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
         onClose={() => setShowImmediateDeliveryModal(false)}
         document={localDocument}
         onDocumentDelivered={(deliveryData) => {
-          
+
           // Actualizar documento local
           if (deliveryData.document) {
             setLocalDocument(prev => ({
@@ -762,10 +763,10 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
               ...deliveryData.document
             }));
           }
-          
+
           // Cerrar modal
           setShowImmediateDeliveryModal(false);
-          
+
           // Notificar al componente padre
           if (onDocumentUpdated && deliveryData) {
             onDocumentUpdated(deliveryData);
@@ -773,7 +774,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
         }}
       />
 
-      
+
     </Dialog>
   );
 };
@@ -822,7 +823,7 @@ const DeliveryModal = ({ open, onClose, document, onDocumentDelivered, serviceTy
   const handleDeliver = async () => {
     // Validaciones
     const validationErrors = [];
-    
+
     if (!formData.entregadoA.trim()) {
       validationErrors.push('Nombre de quien retira es obligatorio');
     }
@@ -843,33 +844,33 @@ const DeliveryModal = ({ open, onClose, document, onDocumentDelivered, serviceTy
       // Usar endpoint específico de ARCHIVO cuando corresponda
       const result = serviceType === 'archivo'
         ? await archivoService.procesarEntrega(document.id, {
-            codigoVerificacion: formData.codigoVerificacion,
-            entregadoA: formData.entregadoA,
-            cedulaReceptor: formData.cedulaReceptor,
-            relacionTitular: formData.relacionTitular,
-            verificacionManual: formData.verificacionManual,
-            facturaPresenta: formData.facturaPresenta,
-            observaciones: formData.observacionesEntrega
-          })
+          codigoVerificacion: formData.codigoVerificacion,
+          entregadoA: formData.entregadoA,
+          cedulaReceptor: formData.cedulaReceptor,
+          relacionTitular: formData.relacionTitular,
+          verificacionManual: formData.verificacionManual,
+          facturaPresenta: formData.facturaPresenta,
+          observaciones: formData.observacionesEntrega
+        })
         : await documentService.deliverDocument(document.id, formData);
-      
+
       if (result.success) {
         // Notificar al componente padre
         if (onDocumentDelivered) {
           onDocumentDelivered(result.data);
         }
-        
+
         // Mostrar mensaje de éxito
         const message = result.message || 'Documento entregado exitosamente';
         const whatsappInfo = result.data?.whatsapp;
-        
+
         let alertMessage = message;
         if (whatsappInfo?.sent) {
           alertMessage += '\n\n✅ Notificación WhatsApp de entrega enviada';
         } else if (whatsappInfo?.error) {
           alertMessage += '\n\n⚠️ Error enviando WhatsApp: ' + whatsappInfo.error;
         }
-        
+
         if (whatsappInfo?.sent) {
           toast.success('Documento entregado. Confirmación WhatsApp enviada.');
         } else if (whatsappInfo?.error) {
@@ -913,8 +914,8 @@ const DeliveryModal = ({ open, onClose, document, onDocumentDelivered, serviceTy
               📄 Documento a Entregar
             </Typography>
             <Typography variant="body2">
-              <strong>Número:</strong> {document.protocolNumber} | 
-              <strong> Tipo:</strong> {document.documentType} | 
+              <strong>Número:</strong> {document.protocolNumber} |
+              <strong> Tipo:</strong> {document.documentType} |
               <strong> Cliente:</strong> {document.clientName}
             </Typography>
             {document.verificationCode && (
@@ -1087,7 +1088,7 @@ const MatrizadorDeliveryModal = ({ open, onClose, document, onDocumentDelivered 
   const handleDeliver = async () => {
     // Validaciones simplificadas
     const validationErrors = [];
-    
+
     if (!formData.entregadoA.trim()) {
       validationErrors.push('Nombre de quien retira es obligatorio');
     }
@@ -1112,13 +1113,13 @@ const MatrizadorDeliveryModal = ({ open, onClose, document, onDocumentDelivered 
       };
 
       const result = await documentService.deliverDocument(document.id, deliveryData);
-      
+
       if (result.success) {
         // Notificar al componente padre
         if (onDocumentDelivered) {
           onDocumentDelivered(result.data);
         }
-        
+
         // Mostrar mensaje de éxito
         const message = result.message || 'Documento entregado exitosamente';
         alert(message);
@@ -1157,8 +1158,8 @@ const MatrizadorDeliveryModal = ({ open, onClose, document, onDocumentDelivered 
               📄 Documento a Entregar
             </Typography>
             <Typography variant="body2">
-              <strong>Número:</strong> {document.protocolNumber} | 
-              <strong> Tipo:</strong> {document.documentType} | 
+              <strong>Número:</strong> {document.protocolNumber} |
+              <strong> Tipo:</strong> {document.documentType} |
               <strong> Cliente:</strong> {document.clientName}
             </Typography>
           </Box>
