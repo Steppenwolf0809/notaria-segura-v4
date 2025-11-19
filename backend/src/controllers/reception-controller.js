@@ -309,13 +309,13 @@ async function listarTodosDocumentos(req, res) {
 
         const whereSql = Prisma.sql`${Prisma.join([
           Prisma.sql`(
-            unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
-            unaccent(d."clientEmail") ILIKE unaccent(${pattern}) OR
-            unaccent(d."clientId") ILIKE unaccent(${pattern}) OR
-            unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
-            unaccent(d."actoPrincipalDescripcion") ILIKE unaccent(${pattern}) OR
-            unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
-            d."clientPhone" ILIKE ${pattern}
+            unaccent(COALESCE(d."clientName", '')::text) ILIKE unaccent(${pattern}) OR
+            unaccent(COALESCE(d."clientEmail", '')::text) ILIKE unaccent(${pattern}) OR
+            unaccent(COALESCE(d."clientId", '')::text) ILIKE unaccent(${pattern}) OR
+            unaccent(COALESCE(d."protocolNumber", '')::text) ILIKE unaccent(${pattern}) OR
+            unaccent(COALESCE(d."actoPrincipalDescripcion", '')::text) ILIKE unaccent(${pattern}) OR
+            unaccent(COALESCE(d."detalle_documento", '')::text) ILIKE unaccent(${pattern}) OR
+            COALESCE(d."clientPhone", '')::text ILIKE ${pattern}
           )`,
           ...filterClauses
         ], Prisma.sql` AND `)}`;
@@ -383,13 +383,13 @@ async function listarTodosDocumentos(req, res) {
         const statsWhere = (status, includeDate = false) => {
           const clauses = [
             Prisma.sql`(
-              unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
-              unaccent(d."clientEmail") ILIKE unaccent(${pattern}) OR
-              unaccent(d."clientId") ILIKE unaccent(${pattern}) OR
-              unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
-              unaccent(d."actoPrincipalDescripcion") ILIKE unaccent(${pattern}) OR
-              unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
-              d."clientPhone" ILIKE ${pattern}
+              unaccent(COALESCE(d."clientName", '')::text) ILIKE unaccent(${pattern}) OR
+              unaccent(COALESCE(d."clientEmail", '')::text) ILIKE unaccent(${pattern}) OR
+              unaccent(COALESCE(d."clientId", '')::text) ILIKE unaccent(${pattern}) OR
+              unaccent(COALESCE(d."protocolNumber", '')::text) ILIKE unaccent(${pattern}) OR
+              unaccent(COALESCE(d."actoPrincipalDescripcion", '')::text) ILIKE unaccent(${pattern}) OR
+              unaccent(COALESCE(d."detalle_documento", '')::text) ILIKE unaccent(${pattern}) OR
+              COALESCE(d."clientPhone", '')::text ILIKE ${pattern}
             )`,
             ...filterClauses,
             Prisma.sql`d."status"::text = ${status}`
@@ -574,13 +574,13 @@ async function getDocumentosEnProceso(req, res) {
         const whereSql = Prisma.sql`${Prisma.join([
           baseFilter,
           Prisma.sql`(
-            unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
-            unaccent(d."clientEmail") ILIKE unaccent(${pattern}) OR
-            unaccent(d."clientId") ILIKE unaccent(${pattern}) OR
-            unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
-            unaccent(d."actoPrincipalDescripcion") ILIKE unaccent(${pattern}) OR
-            unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
-            d."clientPhone" ILIKE ${pattern}
+            unaccent(COALESCE(d."clientName", '')::text) ILIKE unaccent(${pattern}) OR
+            unaccent(COALESCE(d."clientEmail", '')::text) ILIKE unaccent(${pattern}) OR
+            unaccent(COALESCE(d."clientId", '')::text) ILIKE unaccent(${pattern}) OR
+            unaccent(COALESCE(d."protocolNumber", '')::text) ILIKE unaccent(${pattern}) OR
+            unaccent(COALESCE(d."actoPrincipalDescripcion", '')::text) ILIKE unaccent(${pattern}) OR
+            unaccent(COALESCE(d."detalle_documento", '')::text) ILIKE unaccent(${pattern}) OR
+            COALESCE(d."clientPhone", '')::text ILIKE ${pattern}
           )`
         ], Prisma.sql` AND `)}`;
 
