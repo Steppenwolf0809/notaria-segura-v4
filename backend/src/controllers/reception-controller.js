@@ -307,8 +307,7 @@ async function listarTodosDocumentos(req, res) {
           filterClauses.push(Prisma.sql`d."createdAt" < ${hasta}`);
         }
 
-        const whereSql = Prisma.join([
-          Prisma.sql`(
+        let whereSql = Prisma.sql`(
             unaccent(COALESCE(d."clientName", '')::text) ILIKE unaccent(${pattern}) OR
             unaccent(COALESCE(d."clientEmail", '')::text) ILIKE unaccent(${pattern}) OR
             unaccent(COALESCE(d."clientId", '')::text) ILIKE unaccent(${pattern}) OR
@@ -316,9 +315,11 @@ async function listarTodosDocumentos(req, res) {
             unaccent(COALESCE(d."actoPrincipalDescripcion", '')::text) ILIKE unaccent(${pattern}) OR
             unaccent(COALESCE(d."detalle_documento", '')::text) ILIKE unaccent(${pattern}) OR
             COALESCE(d."clientPhone", '')::text ILIKE ${pattern}
-          )`,
-          ...filterClauses
-        ], Prisma.sql` AND `);
+          )`;
+
+        for (const clause of filterClauses) {
+          whereSql = Prisma.sql`${whereSql} AND ${clause}`;
+        }
 
         // Preparar ORDER BY seguro (solo campos permitidos)
         const fieldSql = (() => {
@@ -381,8 +382,7 @@ async function listarTodosDocumentos(req, res) {
 
         // Construir where clauses para stats
         const statsWhere = (status, includeDate = false) => {
-          const clauses = [
-            Prisma.sql`(
+          let sql = Prisma.sql`(
               unaccent(COALESCE(d."clientName", '')::text) ILIKE unaccent(${pattern}) OR
               unaccent(COALESCE(d."clientEmail", '')::text) ILIKE unaccent(${pattern}) OR
               unaccent(COALESCE(d."clientId", '')::text) ILIKE unaccent(${pattern}) OR
@@ -390,14 +390,18 @@ async function listarTodosDocumentos(req, res) {
               unaccent(COALESCE(d."actoPrincipalDescripcion", '')::text) ILIKE unaccent(${pattern}) OR
               unaccent(COALESCE(d."detalle_documento", '')::text) ILIKE unaccent(${pattern}) OR
               COALESCE(d."clientPhone", '')::text ILIKE ${pattern}
-            )`,
-            ...filterClauses,
-            Prisma.sql`d."status"::text = ${status}`
-          ];
-          if (includeDate) {
-            clauses.push(Prisma.sql`d."fechaEntrega" >= ${hoy}`);
+            )`;
+
+          for (const clause of filterClauses) {
+            sql = Prisma.sql`${sql} AND ${clause}`;
           }
-          return Prisma.join(clauses, Prisma.sql` AND `);
+
+          sql = Prisma.sql`${sql} AND d."status"::text = ${status}`;
+
+          if (includeDate) {
+            sql = Prisma.sql`${sql} AND d."fechaEntrega" >= ${hoy}`;
+          }
+          return sql;
         };
 
         const [enProceso, listos, entregados, entregadosHoy] = await Promise.all([
@@ -571,9 +575,8 @@ async function getDocumentosEnProceso(req, res) {
       if (supportsUnaccent) {
         const pattern = `%${searchTerm2}%`;
         const baseFilter = Prisma.sql`d."status" = 'EN_PROCESO'`;
-        const whereSql = Prisma.join([
-          baseFilter,
-          Prisma.sql`(
+        let whereSql = baseFilter;
+        whereSql = Prisma.sql`${whereSql} AND (
             unaccent(COALESCE(d."clientName", '')::text) ILIKE unaccent(${pattern}) OR
             unaccent(COALESCE(d."clientEmail", '')::text) ILIKE unaccent(${pattern}) OR
             unaccent(COALESCE(d."clientId", '')::text) ILIKE unaccent(${pattern}) OR
@@ -581,8 +584,7 @@ async function getDocumentosEnProceso(req, res) {
             unaccent(COALESCE(d."actoPrincipalDescripcion", '')::text) ILIKE unaccent(${pattern}) OR
             unaccent(COALESCE(d."detalle_documento", '')::text) ILIKE unaccent(${pattern}) OR
             COALESCE(d."clientPhone", '')::text ILIKE ${pattern}
-          )`
-        ], Prisma.sql` AND `);
+          )`;
 
         const documents = await prisma.$queryRaw`
           SELECT d.*, u.id as "_assignedToId", u."firstName" as "_assignedToFirstName", u."lastName" as "_assignedToLastName"
