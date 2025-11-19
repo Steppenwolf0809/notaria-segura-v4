@@ -374,6 +374,46 @@ async function listarTodosDocumentos(req, res) {
 
         const totalPages = Math.ceil(total / take);
 
+        // 📊 Calcular estadísticas globales (con búsqueda unaccent)
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+
+        // Construir where clauses para stats
+        const statsWhere = (status, includeDate = false) => {
+          const clauses = [
+            Prisma.sql`(
+              unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
+              unaccent(d."clientEmail") ILIKE unaccent(${pattern}) OR
+              unaccent(d."clientId") ILIKE unaccent(${pattern}) OR
+              unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
+              unaccent(d."actoPrincipalDescripcion") ILIKE unaccent(${pattern}) OR
+              unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
+              d."clientPhone" ILIKE ${pattern}
+            )`,
+            ...filterClauses,
+            Prisma.sql`d."status"::text = ${status}`
+          ];
+          if (includeDate) {
+            clauses.push(Prisma.sql`d."fechaEntrega" >= ${hoy}`);
+          }
+          return Prisma.join(clauses, Prisma.sql` AND `);
+        };
+
+        const [enProceso, listos, entregados, entregadosHoy] = await Promise.all([
+          prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${statsWhere('EN_PROCESO')}`,
+          prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${statsWhere('LISTO')}`,
+          prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${statsWhere('ENTREGADO')}`,
+          prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${statsWhere('ENTREGADO', true)}`
+        ]);
+
+        const stats = {
+          enProceso: Array.isArray(enProceso) ? (enProceso[0]?.count || 0) : (enProceso?.count || 0),
+          listos: Array.isArray(listos) ? (listos[0]?.count || 0) : (listos?.count || 0),
+          entregados: Array.isArray(entregados) ? (entregados[0]?.count || 0) : (entregados?.count || 0),
+          entregadosHoy: Array.isArray(entregadosHoy) ? (entregadosHoy[0]?.count || 0) : (entregadosHoy?.count || 0),
+          total
+        };
+
         const payload = {
           documents: formattedDocuments,
           pagination: {
@@ -381,7 +421,8 @@ async function listarTodosDocumentos(req, res) {
             limit: take,
             total,
             totalPages
-          }
+          },
+          stats
         };
         await cache.set(cacheKey, payload, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'search:reception:todos'] });
         return res.json({ success: true, data: payload });
@@ -450,6 +491,35 @@ async function listarTodosDocumentos(req, res) {
 
     const totalPages = Math.ceil(total / take);
 
+    // 📊 Calcular estadísticas globales (con los mismos filtros aplicados)
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+
+    const statsPromises = [
+      // Contar por estado (respetando los filtros where)
+      prisma.document.count({ where: { ...where, status: 'EN_PROCESO' } }),
+      prisma.document.count({ where: { ...where, status: 'LISTO' } }),
+      prisma.document.count({ where: { ...where, status: 'ENTREGADO' } }),
+      // Entregados hoy (respetando los filtros where)
+      prisma.document.count({
+        where: {
+          ...where,
+          status: 'ENTREGADO',
+          fechaEntrega: { gte: hoy }
+        }
+      })
+    ];
+
+    const [enProceso, listos, entregados, entregadosHoy] = await Promise.all(statsPromises);
+
+    const stats = {
+      enProceso,
+      listos,
+      entregados,
+      entregadosHoy,
+      total
+    };
+
     const payload = {
       documents: formattedDocuments,
       pagination: {
@@ -457,7 +527,8 @@ async function listarTodosDocumentos(req, res) {
         limit: take,
         total,
         totalPages
-      }
+      },
+      stats
     };
     await cache.set(cacheKey, payload, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'search:reception:todos'] });
     res.json({ success: true, data: payload });
