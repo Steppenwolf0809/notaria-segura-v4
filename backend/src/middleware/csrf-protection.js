@@ -114,9 +114,6 @@ export const protectedRoutes = [
   '/api/reception/entregar',
   '/api/archivo/entregar',
 
-  // Formularios UAFE - Envío de datos
-  '/api/formulario-uafe/protocolo',
-  '/api/formulario-uafe/responder',
 ];
 
 /**
