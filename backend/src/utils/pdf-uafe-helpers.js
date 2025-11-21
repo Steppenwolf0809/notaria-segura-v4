@@ -3,6 +3,8 @@
  * Diseño basado en el formulario oficial de la Notaría 18
  */
 
+import fs from 'fs';
+
 // Colores institucionales
 export const COLORS = {
   primary: '#1e5a8e',      // Azul institucional
@@ -99,8 +101,8 @@ export function drawHeader(doc, logoPath = null) {
 
   // Borde principal del header
   doc.rect(40, 40, 520, headerHeight)
-     .lineWidth(1.5)
-     .stroke(COLORS.primary);
+    .lineWidth(1.5)
+    .stroke(COLORS.primary);
 
   // === COLUMNA IZQUIERDA (Logo y notaría) ===
   const leftX = 50;
@@ -108,74 +110,74 @@ export function drawHeader(doc, logoPath = null) {
 
   // Logo - Intentar cargar imagen o usar placeholder (más pequeño: 40x40)
   try {
-    if (logoPath && require('fs').existsSync(logoPath)) {
+    if (logoPath && fs.existsSync(logoPath)) {
       doc.image(logoPath, leftX, topY, { width: 40, height: 40 });
     } else {
       // Logo placeholder - Círculo azul con "N18"
       doc.circle(leftX + 20, topY + 20, 18)
-         .fillAndStroke(COLORS.primary, COLORS.primary);
+        .fillAndStroke(COLORS.primary, COLORS.primary);
 
       doc.fillColor(COLORS.white)
-         .fontSize(12)
-         .font(FONTS.title)
-         .text('N18', leftX + 12, topY + 14);
+        .fontSize(12)
+        .font(FONTS.title)
+        .text('N18', leftX + 12, topY + 14);
     }
   } catch (error) {
     // Fallback a placeholder si hay error
     doc.circle(leftX + 20, topY + 20, 18)
-       .fillAndStroke(COLORS.primary, COLORS.primary);
+      .fillAndStroke(COLORS.primary, COLORS.primary);
 
     doc.fillColor(COLORS.white)
-       .fontSize(12)
-       .font(FONTS.title)
-       .text('N18', leftX + 12, topY + 14);
+      .fontSize(12)
+      .font(FONTS.title)
+      .text('N18', leftX + 12, topY + 14);
   }
 
   // Texto "NOTARÍA 18" compacto
   doc.fillColor(COLORS.primary)
-     .fontSize(11)
-     .font(FONTS.title)
-     .text('NOTARÍA 18', leftX + 50, topY + 5);
+    .fontSize(11)
+    .font(FONTS.title)
+    .text('NOTARÍA 18', leftX + 50, topY + 5);
 
   // Subtexto notaria compacto
   doc.fillColor(COLORS.textMedium)
-     .fontSize(7)
-     .font(FONTS.normal)
-     .text('Dra. Glenda Zapata Silva', leftX + 50, topY + 20);
+    .fontSize(7)
+    .font(FONTS.normal)
+    .text('Dra. Glenda Zapata Silva', leftX + 50, topY + 20);
 
   doc.fontSize(7)
-     .text('Notaria Décima Octava', leftX + 50, topY + 30);
+    .text('Notaria Décima Octava', leftX + 50, topY + 30);
 
   // === COLUMNA DERECHA (Títulos del formulario) - Compacta ===
   const rightX = 250;
 
   // Título principal
   doc.fillColor(COLORS.primary)
-     .fontSize(11)
-     .font(FONTS.title)
-     .text('FORMULARIO DE DEBIDA DILIGENCIA', rightX, topY + 8, {
-       width: 280,
-       align: 'center'
-     });
+    .fontSize(11)
+    .font(FONTS.title)
+    .text('FORMULARIO DE DEBIDA DILIGENCIA', rightX, topY + 8, {
+      width: 280,
+      align: 'center'
+    });
 
   doc.fontSize(10)
-     .text('CONOZCA A SU USUARIO', rightX, topY + 24, {
-       width: 280,
-       align: 'center'
-     });
+    .text('CONOZCA A SU USUARIO', rightX, topY + 24, {
+      width: 280,
+      align: 'center'
+    });
 
   // Box azul "PERSONAS NATURALES" compacto
   const boxY = topY + 42;
   doc.rect(rightX + 60, boxY, 160, 20)
-     .fill(COLORS.primary);
+    .fill(COLORS.primary);
 
   doc.fillColor(COLORS.white)
-     .fontSize(9)
-     .font(FONTS.title)
-     .text('PERSONAS NATURALES', rightX + 65, boxY + 6, {
-       width: 150,
-       align: 'center'
-     });
+    .fontSize(9)
+    .font(FONTS.title)
+    .text('PERSONAS NATURALES', rightX + 65, boxY + 6, {
+      width: 150,
+      align: 'center'
+    });
 
   return 125; // Retorna posición Y después del header (reducido de 180 a 125)
 }
@@ -189,17 +191,17 @@ export function drawDisclaimer(doc, y) {
 
   // Fondo gris
   doc.rect(40, y, 520, disclaimerHeight)
-     .fillAndStroke(COLORS.disclaimerBg, COLORS.disclaimerBorder);
+    .fillAndStroke(COLORS.disclaimerBg, COLORS.disclaimerBorder);
 
   // Texto del disclaimer
   doc.fillColor(COLORS.textDark)
-     .fontSize(7)
-     .font(FONTS.normal)
-     .text(disclaimerText, 50, y + 8, {
-       width: 500,
-       align: 'justify',
-       lineGap: 1
-     });
+    .fontSize(7)
+    .font(FONTS.normal)
+    .text(disclaimerText, 50, y + 8, {
+      width: 500,
+      align: 'justify',
+      lineGap: 1
+    });
 
   return y + disclaimerHeight + 12; // Retorna posición Y después del disclaimer (reducido de 20 a 12)
 }
@@ -212,13 +214,13 @@ export function drawProtocolBox(doc, y, protocolo, rol, calidad) {
 
   // Fondo azul claro
   doc.rect(40, y, 520, boxHeight)
-     .fillAndStroke(COLORS.lightBlue, COLORS.primary);
+    .fillAndStroke(COLORS.lightBlue, COLORS.primary);
 
   // Título
   doc.fillColor(COLORS.primary)
-     .fontSize(10)
-     .font(FONTS.title)
-     .text('INFORMACIÓN DEL TRÁMITE', 50, y + 6);
+    .fontSize(10)
+    .font(FONTS.title)
+    .text('INFORMACIÓN DEL TRÁMITE', 50, y + 6);
 
   // Grid de datos (más compacto)
   const dataY = y + 20;
@@ -252,19 +254,19 @@ function drawInlineField(doc, x, y, label, value, maxWidth) {
 
   // Label en negrita (tamaño reducido)
   doc.fillColor(COLORS.textDark)
-     .fontSize(8)
-     .font(FONTS.title)
-     .text(label, x, y);
+    .fontSize(8)
+    .font(FONTS.title)
+    .text(label, x, y);
 
   // Calcular ancho del label
   const labelWidth = doc.widthOfString(label);
 
   // Valor normal
   doc.fontSize(8)
-     .font(FONTS.normal)
-     .text(value || 'No aplica', x + labelWidth + 4, y, {
-       width: maxWidth - labelWidth - 4
-     });
+    .font(FONTS.normal)
+    .text(value || 'No aplica', x + labelWidth + 4, y, {
+      width: maxWidth - labelWidth - 4
+    });
 
   doc._fillColor = currentColor;
 }
@@ -275,16 +277,16 @@ function drawInlineField(doc, x, y, label, value, maxWidth) {
 export function drawSection(doc, y, title, contentHeight) {
   // Header azul (más delgado)
   doc.rect(40, y, 520, 20)
-     .fill(COLORS.primary);
+    .fill(COLORS.primary);
 
   doc.fillColor(COLORS.white)
-     .fontSize(9)
-     .font(FONTS.title)
-     .text(title.toUpperCase(), 50, y + 5);
+    .fontSize(9)
+    .font(FONTS.title)
+    .text(title.toUpperCase(), 50, y + 5);
 
   // Borde de contenido
   doc.rect(40, y + 20, 520, contentHeight)
-     .stroke(COLORS.primary);
+    .stroke(COLORS.primary);
 
   return y + 20 + 6; // Retorna posición Y para el contenido (reducido de 10 a 6)
 }
@@ -295,26 +297,26 @@ export function drawSection(doc, y, title, contentHeight) {
 export function drawField(doc, x, y, label, value, width = 150) {
   // Label (tamaño reducido)
   doc.fillColor(COLORS.textMedium)
-     .fontSize(7)
-     .font(FONTS.title)
-     .text(label, x, y);
+    .fontSize(7)
+    .font(FONTS.title)
+    .text(label, x, y);
 
   // Caja para el valor (más delgada)
   doc.rect(x, y + 11, width, 18)
-     .fillAndStroke(COLORS.lightGray, COLORS.borderGray);
+    .fillAndStroke(COLORS.lightGray, COLORS.borderGray);
 
   // Valor
   const displayValue = value || 'No aplica';
   const hasValue = value !== null && value !== undefined && value !== '';
 
   doc.fillColor(hasValue ? COLORS.textDark : COLORS.textLight)
-     .fontSize(8)
-     .font(hasValue ? FONTS.normal : FONTS.italic)
-     .text(displayValue, x + 5, y + 14, {
-       width: width - 10,
-       lineBreak: false,
-       ellipsis: true
-     });
+    .fontSize(8)
+    .font(hasValue ? FONTS.normal : FONTS.italic)
+    .text(displayValue, x + 5, y + 14, {
+      width: width - 10,
+      lineBreak: false,
+      ellipsis: true
+    });
 }
 
 /**
@@ -323,25 +325,25 @@ export function drawField(doc, x, y, label, value, width = 150) {
 export function drawTextAreaField(doc, x, y, label, value, width = 480, height = 40) {
   // Label
   doc.fillColor(COLORS.textMedium)
-     .fontSize(9)
-     .font(FONTS.title)
-     .text(label, x, y);
+    .fontSize(9)
+    .font(FONTS.title)
+    .text(label, x, y);
 
   // Caja para el valor
   doc.rect(x, y + 14, width, height)
-     .fillAndStroke(COLORS.lightGray, COLORS.borderGray);
+    .fillAndStroke(COLORS.lightGray, COLORS.borderGray);
 
   // Valor
   const displayValue = value || 'No aplica';
   const hasValue = value !== null && value !== undefined && value !== '';
 
   doc.fillColor(hasValue ? COLORS.textDark : COLORS.textLight)
-     .fontSize(10)
-     .font(hasValue ? FONTS.normal : FONTS.italic)
-     .text(displayValue, x + 6, y + 19, {
-       width: width - 12,
-       height: height - 10
-     });
+    .fontSize(10)
+    .font(hasValue ? FONTS.normal : FONTS.italic)
+    .text(displayValue, x + 6, y + 19, {
+      width: width - 12,
+      height: height - 10
+    });
 }
 
 /**
@@ -352,25 +354,25 @@ export function drawSignature(doc, y, nombre, cedula) {
 
   // Línea para firma
   doc.moveTo(200, signatureY)
-     .lineTo(400, signatureY)
-     .stroke(COLORS.textDark);
+    .lineTo(400, signatureY)
+    .stroke(COLORS.textDark);
 
   // Texto "Firma del Compareciente"
   doc.fillColor(COLORS.textMedium)
-     .fontSize(10)
-     .font(FONTS.title)
-     .text('Firma del Compareciente', 200, signatureY + 10, {
-       width: 200,
-       align: 'center'
-     });
+    .fontSize(10)
+    .font(FONTS.title)
+    .text('Firma del Compareciente', 200, signatureY + 10, {
+      width: 200,
+      align: 'center'
+    });
 
   // Nombre completo
   doc.fontSize(9)
-     .font(FONTS.normal)
-     .text(nombre, 200, signatureY + 25, {
-       width: 200,
-       align: 'center'
-     });
+    .font(FONTS.normal)
+    .text(nombre, 200, signatureY + 25, {
+      width: 200,
+      align: 'center'
+    });
 
   // Cédula
   doc.text(`C.I.: ${cedula}`, 200, signatureY + 38, {
@@ -389,29 +391,29 @@ export function drawFooter(doc) {
 
   // Línea superior azul
   doc.moveTo(50, footerY)
-     .lineTo(550, footerY)
-     .lineWidth(2)
-     .stroke(COLORS.primary);
+    .lineTo(550, footerY)
+    .lineWidth(2)
+    .stroke(COLORS.primary);
 
   // Timestamp
   doc.fillColor(COLORS.textLight)
-     .fontSize(8)
-     .font(FONTS.italic)
-     .text(formatTimestamp(), 50, footerY + 10, {
-       width: 500,
-       align: 'center'
-     });
+    .fontSize(8)
+    .font(FONTS.italic)
+    .text(formatTimestamp(), 50, footerY + 10, {
+      width: 500,
+      align: 'center'
+    });
 
   // Texto simple de página (sin numerar porque es PDF de una sola página por persona)
   doc.fillColor(COLORS.textLight)
-     .fontSize(8)
-     .font(FONTS.normal)
-     .text(
-       'Formulario UAFE - Notaría 18',
-       50,
-       footerY + 24,
-       { width: 500, align: 'center' }
-     );
+    .fontSize(8)
+    .font(FONTS.normal)
+    .text(
+      'Formulario UAFE - Notaría 18',
+      50,
+      footerY + 24,
+      { width: 500, align: 'center' }
+    );
 }
 
 /**
@@ -444,9 +446,9 @@ export function drawFormasPago(doc, y, formasPago) {
 
   // Título de la sección
   doc.fillColor(COLORS.primary)
-     .fontSize(11)
-     .font(FONTS.title)
-     .text('FORMAS DE PAGO', 60, y);
+    .fontSize(11)
+    .font(FONTS.title)
+    .text('FORMAS DE PAGO', 60, y);
 
   y += 20;
 
@@ -457,11 +459,11 @@ export function drawFormasPago(doc, y, formasPago) {
 
   // Header de la tabla
   doc.rect(tableX, y, tableWidth, 25)
-     .fill(COLORS.primary);
+    .fill(COLORS.primary);
 
   doc.fillColor(COLORS.white)
-     .fontSize(9)
-     .font(FONTS.title);
+    .fontSize(9)
+    .font(FONTS.title);
 
   doc.text('TIPO', tableX + 5, y + 8, { width: colWidths[0] - 10 });
   doc.text('MONTO', tableX + colWidths[0] + 5, y + 8, { width: colWidths[1] - 10 });
@@ -480,16 +482,16 @@ export function drawFormasPago(doc, y, formasPago) {
     // Fondo alternado para legibilidad
     if (index % 2 === 0) {
       doc.rect(tableX, rowY, tableWidth, 24)
-         .fillAndStroke(COLORS.lightGray, COLORS.borderGray);
+        .fillAndStroke(COLORS.lightGray, COLORS.borderGray);
     } else {
       doc.rect(tableX, rowY, tableWidth, 24)
-         .stroke(COLORS.borderGray);
+        .stroke(COLORS.borderGray);
     }
 
     // Contenido de la fila
     doc.fillColor(COLORS.textDark)
-       .fontSize(9)
-       .font(FONTS.normal);
+      .fontSize(9)
+      .font(FONTS.normal);
 
     doc.text(fp.tipo || 'N/A', tableX + 5, rowY + 7, { width: colWidths[0] - 10 });
     doc.text(formatCurrency(monto), tableX + colWidths[0] + 5, rowY + 7, { width: colWidths[1] - 10 });
@@ -500,12 +502,12 @@ export function drawFormasPago(doc, y, formasPago) {
 
   // Fila de total
   doc.rect(tableX, rowY, tableWidth, 25)
-     .fillAndStroke(COLORS.lightBlue, COLORS.primary);
+    .fillAndStroke(COLORS.lightBlue, COLORS.primary);
 
   doc.fillColor(COLORS.primary)
-     .fontSize(10)
-     .font(FONTS.title)
-     .text('TOTAL:', tableX + 5, rowY + 8, { width: colWidths[0] + colWidths[1] - 10, align: 'right' });
+    .fontSize(10)
+    .font(FONTS.title)
+    .text('TOTAL:', tableX + 5, rowY + 8, { width: colWidths[0] + colWidths[1] - 10, align: 'right' });
 
   doc.text(formatCurrency(totalMonto), tableX + colWidths[0] + colWidths[1] + 5, rowY + 8, { width: colWidths[2] - 10 });
 

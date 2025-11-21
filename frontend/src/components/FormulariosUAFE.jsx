@@ -951,12 +951,15 @@ const FormulariosUAFE = () => {
                                     }
                                   />
                                   <ListItemSecondaryAction>
-                                    <Chip
-                                      icon={persona.completado ? <CheckCircleIcon /> : <PendingIcon />}
-                                      label={persona.completado ? 'Completado' : 'Pendiente'}
-                                      color={persona.completado ? 'success' : 'warning'}
+                                    <Button
+                                      variant="outlined"
                                       size="small"
-                                    />
+                                      color={persona.completado ? 'success' : 'primary'}
+                                      startIcon={<PictureAsPdfIcon />}
+                                      onClick={() => descargarPDFIndividual(protocolo.id, persona.id)}
+                                    >
+                                      PDF
+                                    </Button>
                                   </ListItemSecondaryAction>
                                 </ListItem>
                               ))}
