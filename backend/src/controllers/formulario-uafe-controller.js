@@ -385,7 +385,7 @@ export async function loginFormularioUAFE(req, res) {
 
     // 3. Verificar si está bloqueado
     if (personaEnProtocolo.persona.bloqueadoHasta &&
-        personaEnProtocolo.persona.bloqueadoHasta > new Date()) {
+      personaEnProtocolo.persona.bloqueadoHasta > new Date()) {
       const minutosRestantes = Math.ceil(
         (personaEnProtocolo.persona.bloqueadoHasta - new Date()) / 60000
       );
@@ -448,7 +448,7 @@ export async function loginFormularioUAFE(req, res) {
           actuaPor: personaEnProtocolo.actuaPor
         },
         tusDatos: personaEnProtocolo.persona.datosPersonaNatural ||
-                  personaEnProtocolo.persona.datosPersonaJuridica,
+          personaEnProtocolo.persona.datosPersonaJuridica,
         completado: personaEnProtocolo.completado
       }
     });
@@ -1108,19 +1108,24 @@ export async function generarPDFs(req, res) {
       });
     }
 
-    // Verificar que haya personas completadas
-    const personasCompletadas = protocolo.personas.filter(pp => pp.completado);
-    if (personasCompletadas.length === 0) {
+    // Verificar que haya personas con datos (no necesariamente completadas)
+    const personasConDatos = protocolo.personas.filter(pp => {
+      const p = pp.persona;
+      return (p.tipoPersona === 'NATURAL' && p.datosPersonaNatural) ||
+        (p.tipoPersona === 'JURIDICA' && p.datosPersonaJuridica);
+    });
+
+    if (personasConDatos.length === 0) {
       return res.status(400).json({
         success: false,
-        message: 'No hay personas con formularios completados en este protocolo'
+        message: 'No hay personas con datos suficientes en este protocolo'
       });
     }
 
     const pdfsGenerados = [];
 
-    // 2. Generar PDF para cada persona completada
-    for (const personaProtocolo of personasCompletadas) {
+    // 2. Generar PDF para cada persona con datos
+    for (const personaProtocolo of personasConDatos) {
       const persona = personaProtocolo.persona;
       const datos = persona.tipoPersona === 'NATURAL'
         ? persona.datosPersonaNatural
@@ -1320,13 +1325,8 @@ export async function generarPDFIndividual(req, res) {
       });
     }
 
-    // Verificar que el formulario está completado
-    if (!personaProtocolo.completado) {
-      return res.status(400).json({
-        success: false,
-        message: 'El formulario de esta persona no ha sido completado'
-      });
-    }
+    // Verificar que el formulario tiene datos (no necesariamente completado)
+    // if (!personaProtocolo.completado) { ... } // REMOVED: Permitir generar sin completar
 
     const persona = personaProtocolo.persona;
     const datos = persona.tipoPersona === 'NATURAL'
@@ -1671,9 +1671,9 @@ function generateNaturalPersonPDF(doc, startY, datos, persona) {
 
   // Título de sección PEP
   doc.fillColor(COLORS.primary)
-     .fontSize(9)
-     .font(FONTS.title)
-     .text('6. PERSONA POLÍTICAMENTE EXPUESTA (PEP)', 60, y);
+    .fontSize(9)
+    .font(FONTS.title)
+    .text('6. PERSONA POLÍTICAMENTE EXPUESTA (PEP)', 60, y);
 
   y += 16;
 
@@ -1684,20 +1684,20 @@ function generateNaturalPersonPDF(doc, startY, datos, persona) {
 
   // Formato inline compacto - tres columnas
   doc.fillColor(COLORS.textDark)
-     .fontSize(8)
-     .font(FONTS.normal);
+    .fontSize(8)
+    .font(FONTS.normal);
 
   // Columna 1: ¿Es PEP?
   doc.font(FONTS.title).text('¿Es PEP?: ', 60, y, { continued: true })
-     .font(FONTS.normal).text(esPEP, { bold: esPEP === 'SÍ' });
+    .font(FONTS.normal).text(esPEP, { bold: esPEP === 'SÍ' });
 
   // Columna 2: ¿Familiar PEP?
   doc.font(FONTS.title).text('¿Familiar PEP?: ', 220, y, { continued: true })
-     .font(FONTS.normal).text(esFamiliarPEP, { bold: esFamiliarPEP === 'SÍ' });
+    .font(FONTS.normal).text(esFamiliarPEP, { bold: esFamiliarPEP === 'SÍ' });
 
   // Columna 3: ¿Colaborador PEP?
   doc.font(FONTS.title).text('¿Colaborador PEP?: ', 400, y, { continued: true })
-     .font(FONTS.normal).text(esColaboradorPEP, { bold: esColaboradorPEP === 'SÍ' });
+    .font(FONTS.normal).text(esColaboradorPEP, { bold: esColaboradorPEP === 'SÍ' });
 
   y += 18;
 
