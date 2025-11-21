@@ -59,6 +59,7 @@ import {
 import { API_BASE } from '../utils/apiConfig';
 import { formatDateES, formatDateTimeES } from '../utils/dateUtils';
 import ResetearPinDialog from './ResetearPinDialog';
+import apiClient from '../services/api-client';
 
 /**
  * Componente para gestionar formularios UAFE con sistema de Protocolos
@@ -131,24 +132,19 @@ const FormulariosUAFE = () => {
   const cargarProtocolos = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
       const params = new URLSearchParams();
       if (filtroProtocolo) params.append('search', filtroProtocolo);
 
-      const response = await fetch(`${API_BASE}/formulario-uafe/protocolos?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await apiClient.get(`/formulario-uafe/protocolos?${params}`);
 
-      const data = await response.json();
-      if (data.success) {
-        setProtocolos(data.data);
+      if (response.data.success) {
+        setProtocolos(response.data.data);
       } else {
         mostrarSnackbar('Error al cargar protocolos', 'error');
       }
     } catch (error) {
       mostrarSnackbar('Error al cargar protocolos', 'error');
+      console.error('Error cargando protocolos:', error);
     } finally {
       setLoading(false);
     }
@@ -181,8 +177,6 @@ const FormulariosUAFE = () => {
 
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-
       // Construir array de formasPago
       const formasPagoFinal = formasPagoValidas.map(fp => ({
         tipo: fp.tipo,
@@ -190,33 +184,27 @@ const FormulariosUAFE = () => {
         ...(fp.banco && { banco: fp.banco })
       }));
 
-      const response = await fetch(`${API_BASE}/formulario-uafe/protocolo`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          numeroProtocolo: formProtocolo.numeroProtocolo,
-          fecha: formProtocolo.fecha,
-          actoContrato: formProtocolo.actoContrato,
-          avaluoMunicipal: formProtocolo.avaluoMunicipal || null,
-          valorContrato: formProtocolo.valorContrato,
-          formasPago: formasPagoFinal
-        })
+      const response = await apiClient.post('/formulario-uafe/protocolo', {
+        numeroProtocolo: formProtocolo.numeroProtocolo,
+        fecha: formProtocolo.fecha,
+        actoContrato: formProtocolo.actoContrato,
+        avaluoMunicipal: formProtocolo.avaluoMunicipal || null,
+        valorContrato: formProtocolo.valorContrato,
+        formasPago: formasPagoFinal
       });
 
-      const data = await response.json();
-      if (data.success) {
+      if (response.data.success) {
         mostrarSnackbar('Protocolo creado exitosamente', 'success');
         setOpenNuevoProtocolo(false);
         resetFormProtocolo();
         cargarProtocolos();
       } else {
-        mostrarSnackbar(data.message || 'Error al crear protocolo', 'error');
+        mostrarSnackbar(response.data.message || 'Error al crear protocolo', 'error');
       }
     } catch (error) {
-      mostrarSnackbar('Error al crear protocolo', 'error');
+      const errorMsg = error.response?.data?.message || 'Error al crear protocolo';
+      mostrarSnackbar(errorMsg, 'error');
+      console.error('Error creando protocolo:', error);
     } finally {
       setLoading(false);
     }
@@ -233,16 +221,10 @@ const FormulariosUAFE = () => {
 
     setBuscandoPersona(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/personal/verificar-cedula/${formPersona.cedula}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await apiClient.get(`/personal/verificar-cedula/${formPersona.cedula}`);
 
-      const data = await response.json();
-      if (data.success && data.existe) {
-        setPersonaEncontrada(data);
+      if (response.data.success && response.data.existe) {
+        setPersonaEncontrada(response.data);
         mostrarSnackbar('Persona encontrada', 'success');
       } else {
         setPersonaEncontrada(null);
@@ -250,6 +232,7 @@ const FormulariosUAFE = () => {
       }
     } catch (error) {
       mostrarSnackbar('Error al buscar persona', 'error');
+      console.error('Error buscando persona:', error);
     } finally {
       setBuscandoPersona(false);
     }
@@ -271,34 +254,27 @@ const FormulariosUAFE = () => {
 
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(
-        `${API_BASE}/formulario-uafe/protocolo/${protocoloSeleccionado.id}/persona`,
+      const response = await apiClient.post(
+        `/formulario-uafe/protocolo/${protocoloSeleccionado.id}/persona`,
         {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            cedula: formPersona.cedula,
-            calidad: formPersona.calidad,
-            actuaPor: formPersona.actuaPor
-          })
+          cedula: formPersona.cedula,
+          calidad: formPersona.calidad,
+          actuaPor: formPersona.actuaPor
         }
       );
 
-      const data = await response.json();
-      if (data.success) {
+      if (response.data.success) {
         mostrarSnackbar('Persona agregada al protocolo exitosamente', 'success');
         setOpenAgregarPersona(false);
         resetFormPersona();
         cargarProtocolos();
       } else {
-        mostrarSnackbar(data.message || 'Error al agregar persona', 'error');
+        mostrarSnackbar(response.data.message || 'Error al agregar persona', 'error');
       }
     } catch (error) {
-      mostrarSnackbar('Error al agregar persona', 'error');
+      const errorMsg = error.response?.data?.message || 'Error al agregar persona';
+      mostrarSnackbar(errorMsg, 'error');
+      console.error('Error agregando persona:', error);
     } finally {
       setLoading(false);
     }
@@ -310,16 +286,10 @@ const FormulariosUAFE = () => {
   const verDetallesProtocolo = async (protocoloId) => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`${API_BASE}/formulario-uafe/protocolo/${protocoloId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const response = await apiClient.get(`/formulario-uafe/protocolo/${protocoloId}`);
 
-      const data = await response.json();
-      if (data.success) {
-        setProtocoloSeleccionado(data.data);
+      if (response.data.success) {
+        setProtocoloSeleccionado(response.data.data);
         setModoEditarProtocolo(false);
         setOpenVerProtocolo(true);
       } else {
@@ -327,6 +297,7 @@ const FormulariosUAFE = () => {
       }
     } catch (error) {
       mostrarSnackbar('Error al cargar detalles', 'error');
+      console.error('Error cargando detalles:', error);
     } finally {
       setLoading(false);
     }
@@ -388,8 +359,6 @@ const FormulariosUAFE = () => {
 
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-
       // Construir array de formasPago
       const formasPagoFinal = formasPagoValidas.map(fp => ({
         tipo: fp.tipo,
@@ -397,27 +366,19 @@ const FormulariosUAFE = () => {
         ...(fp.banco && { banco: fp.banco })
       }));
 
-      const response = await fetch(
-        `${API_BASE}/formulario-uafe/protocolo/${protocoloSeleccionado.id}`,
+      const response = await apiClient.put(
+        `/formulario-uafe/protocolo/${protocoloSeleccionado.id}`,
         {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            numeroProtocolo: protocoloEditando.numeroProtocolo,
-            fecha: protocoloEditando.fecha,
-            actoContrato: protocoloEditando.actoContrato,
-            avaluoMunicipal: protocoloEditando.avaluoMunicipal || null,
-            valorContrato: parseFloat(protocoloEditando.valorContrato),
-            formasPago: formasPagoFinal
-          })
+          numeroProtocolo: protocoloEditando.numeroProtocolo,
+          fecha: protocoloEditando.fecha,
+          actoContrato: protocoloEditando.actoContrato,
+          avaluoMunicipal: protocoloEditando.avaluoMunicipal || null,
+          valorContrato: parseFloat(protocoloEditando.valorContrato),
+          formasPago: formasPagoFinal
         }
       );
 
-      const data = await response.json();
-      if (data.success) {
+      if (response.data.success) {
         mostrarSnackbar('Protocolo actualizado exitosamente', 'success');
         setModoEditarProtocolo(false);
         setProtocoloEditando(null);
@@ -427,10 +388,12 @@ const FormulariosUAFE = () => {
         // Recargar lista de protocolos
         cargarProtocolos();
       } else {
-        mostrarSnackbar(data.message || 'Error al actualizar protocolo', 'error');
+        mostrarSnackbar(response.data.message || 'Error al actualizar protocolo', 'error');
       }
     } catch (error) {
-      mostrarSnackbar('Error al actualizar protocolo', 'error');
+      const errorMsg = error.response?.data?.message || 'Error al actualizar protocolo';
+      mostrarSnackbar(errorMsg, 'error');
+      console.error('Error actualizando protocolo:', error);
     } finally {
       setLoading(false);
     }
@@ -604,24 +567,15 @@ const FormulariosUAFE = () => {
 
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(
-        `${API_BASE}/formulario-uafe/protocolos/${protocoloSeleccionado.id}/personas/${personaEditar.id}`,
+      const response = await apiClient.patch(
+        `/formulario-uafe/protocolos/${protocoloSeleccionado.id}/personas/${personaEditar.id}`,
         {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            calidad: personaEditar.calidad,
-            actuaPor: personaEditar.actuaPor
-          })
+          calidad: personaEditar.calidad,
+          actuaPor: personaEditar.actuaPor
         }
       );
 
-      const data = await response.json();
-      if (data.success) {
+      if (response.data.success) {
         mostrarSnackbar('Persona actualizada exitosamente', 'success');
         setOpenEditarPersona(false);
         setPersonaEditar(null);
@@ -629,10 +583,12 @@ const FormulariosUAFE = () => {
         verDetallesProtocolo(protocoloSeleccionado.id);
         cargarProtocolos();
       } else {
-        mostrarSnackbar(data.message || 'Error al actualizar persona', 'error');
+        mostrarSnackbar(response.data.message || 'Error al actualizar persona', 'error');
       }
     } catch (error) {
-      mostrarSnackbar('Error al actualizar persona', 'error');
+      const errorMsg = error.response?.data?.message || 'Error al actualizar persona';
+      mostrarSnackbar(errorMsg, 'error');
+      console.error('Error actualizando persona:', error);
     } finally {
       setLoading(false);
     }
@@ -657,19 +613,11 @@ const FormulariosUAFE = () => {
 
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(
-        `${API_BASE}/formulario-uafe/protocolos/${protocoloSeleccionado.id}/personas/${personaEliminar.id}`,
-        {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
+      const response = await apiClient.delete(
+        `/formulario-uafe/protocolos/${protocoloSeleccionado.id}/personas/${personaEliminar.id}`
       );
 
-      const data = await response.json();
-      if (data.success) {
+      if (response.data.success) {
         mostrarSnackbar('Persona eliminada exitosamente', 'success');
         setOpenConfirmarEliminar(false);
         setPersonaEliminar(null);
@@ -677,10 +625,12 @@ const FormulariosUAFE = () => {
         verDetallesProtocolo(protocoloSeleccionado.id);
         cargarProtocolos();
       } else {
-        mostrarSnackbar(data.message || 'Error al eliminar persona', 'error');
+        mostrarSnackbar(response.data.message || 'Error al eliminar persona', 'error');
       }
     } catch (error) {
-      mostrarSnackbar('Error al eliminar persona', 'error');
+      const errorMsg = error.response?.data?.message || 'Error al eliminar persona';
+      mostrarSnackbar(errorMsg, 'error');
+      console.error('Error eliminando persona:', error);
     } finally {
       setLoading(false);
     }
@@ -692,30 +642,19 @@ const FormulariosUAFE = () => {
   const descargarPDFIndividual = async (protocoloId, personaId) => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(
-        `${API_BASE}/formulario-uafe/protocolos/${protocoloId}/personas/${personaId}/pdf`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
+      const response = await apiClient.get(
+        `/formulario-uafe/protocolos/${protocoloId}/personas/${personaId}/pdf`,
+        { responseType: 'blob' }
       );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        mostrarSnackbar(errorData.message || 'Error al generar PDF', 'error');
-        return;
-      }
-
       // Obtener filename del header Content-Disposition
-      const contentDisposition = response.headers.get('Content-Disposition');
+      const contentDisposition = response.headers['content-disposition'];
       const filename = contentDisposition
         ? contentDisposition.split('filename=')[1].replace(/"/g, '')
         : 'formulario_uafe.pdf';
 
       // Descargar archivo
-      const blob = await response.blob();
+      const blob = new Blob([response.data]);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -727,7 +666,9 @@ const FormulariosUAFE = () => {
 
       mostrarSnackbar('PDF descargado exitosamente', 'success');
     } catch (error) {
-      mostrarSnackbar('Error al descargar PDF', 'error');
+      const errorMsg = error.response?.data?.message || 'Error al descargar PDF';
+      mostrarSnackbar(errorMsg, 'error');
+      console.error('Error descargando PDF:', error);
     } finally {
       setLoading(false);
     }
@@ -758,30 +699,19 @@ const FormulariosUAFE = () => {
   const descargarPDFs = async (protocoloId) => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(
-        `${API_BASE}/formulario-uafe/protocolo/${protocoloId}/generar-pdfs`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
+      const response = await apiClient.get(
+        `/formulario-uafe/protocolo/${protocoloId}/generar-pdfs`,
+        { responseType: 'blob' }
       );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        mostrarSnackbar(errorData.message || 'Error al generar PDFs', 'error');
-        return;
-      }
-
       // Obtener filename del header Content-Disposition
-      const contentDisposition = response.headers.get('Content-Disposition');
+      const contentDisposition = response.headers['content-disposition'];
       const filename = contentDisposition
         ? contentDisposition.split('filename=')[1].replace(/"/g, '')
         : 'formularios_uafe.pdf';
 
       // Descargar archivo
-      const blob = await response.blob();
+      const blob = new Blob([response.data]);
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -793,7 +723,9 @@ const FormulariosUAFE = () => {
 
       mostrarSnackbar('PDFs descargados exitosamente', 'success');
     } catch (error) {
-      mostrarSnackbar('Error al descargar PDFs', 'error');
+      const errorMsg = error.response?.data?.message || 'Error al descargar PDFs';
+      mostrarSnackbar(errorMsg, 'error');
+      console.error('Error descargando PDFs:', error);
     } finally {
       setLoading(false);
     }
