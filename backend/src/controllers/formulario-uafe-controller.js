@@ -43,18 +43,6 @@ export async function crearProtocolo(req, res) {
       formasPago
     } = req.body;
 
-    // DEBUG: Ver qué datos están llegando
-    console.log('📝 [DEBUG] Datos recibidos en crearProtocolo:', {
-      numeroProtocolo,
-      fecha,
-      actoContrato,
-      avaluoMunicipal,
-      valorContrato,
-      formasPago: JSON.stringify(formasPago),
-      formasPagoType: typeof formasPago,
-      formasPagoIsArray: Array.isArray(formasPago)
-    });
-
     // Validaciones
     if (!numeroProtocolo || !fecha || !actoContrato || !valorContrato) {
       return res.status(400).json({
@@ -101,24 +89,18 @@ export async function crearProtocolo(req, res) {
       });
     }
 
-    // DEBUG: Ver qué se va a guardar
-    const dataToSave = {
-      numeroProtocolo,
-      fecha: new Date(fecha),
-      actoContrato,
-      avaluoMunicipal: avaluoMunicipal ? parseFloat(avaluoMunicipal) : null,
-      valorContrato: parseFloat(valorContrato),
-      formasPago: formasPago || [],
-      createdBy: req.user.id
-    };
-    console.log('💾 [DEBUG] Datos a guardar en BD:', JSON.stringify(dataToSave, null, 2));
-
     // Crear protocolo
     const protocolo = await prisma.protocoloUAFE.create({
-      data: dataToSave
+      data: {
+        numeroProtocolo,
+        fecha: new Date(fecha),
+        actoContrato,
+        avaluoMunicipal: avaluoMunicipal ? parseFloat(avaluoMunicipal) : null,
+        valorContrato: parseFloat(valorContrato),
+        formasPago: formasPago || [],
+        createdBy: req.user.id
+      }
     });
-
-    console.log('✅ [DEBUG] Protocolo creado:', JSON.stringify(protocolo, null, 2));
 
     res.status(201).json({
       success: true,
