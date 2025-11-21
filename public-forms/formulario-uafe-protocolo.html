@@ -1178,6 +1178,7 @@
 
         let sessionToken = null;
         let sessionData = null;
+        let csrfToken = null; // Token CSRF para protección
         let seccionActual = 1;
         const totalSecciones = 5;
 
@@ -1233,6 +1234,30 @@
         }
 
         // ========================================
+        // CSRF TOKEN
+        // ========================================
+        async function obtenerCsrfToken() {
+            try {
+                const response = await fetch(`${API_URL}/csrf-token`, {
+                    method: 'GET',
+                    credentials: 'include' // Importante para cookies
+                });
+                const data = await response.json();
+                if (data.success && data.csrfToken) {
+                    csrfToken = data.csrfToken;
+                    console.log('✅ Token CSRF obtenido');
+                    return true;
+                } else {
+                    console.error('❌ No se pudo obtener token CSRF');
+                    return false;
+                }
+            } catch (error) {
+                console.error('❌ Error obteniendo token CSRF:', error);
+                return false;
+            }
+        }
+
+        // ========================================
         // LOGIN
         // ========================================
         async function login() {
@@ -1272,6 +1297,9 @@
                     // Guardar en sessionStorage
                     sessionStorage.setItem('uafe-session-token', sessionToken);
                     sessionStorage.setItem('uafe-session-data', JSON.stringify(sessionData));
+
+                    // Obtener token CSRF para envío del formulario
+                    await obtenerCsrfToken();
 
                     mostrarDatosProtocolo();
                     precargarDatos();
@@ -1892,11 +1920,24 @@
                     return;
                 }
 
+                // Verificar que tengamos token CSRF
+                if (!csrfToken) {
+                    console.warn('⚠️ No hay token CSRF, obteniendo uno nuevo...');
+                    await obtenerCsrfToken();
+                }
+
+                if (!csrfToken) {
+                    showAlert('formAlert', 'Error de seguridad. Por favor recarga la página e intenta nuevamente.', 'error');
+                    showLoading(false);
+                    return;
+                }
+
                 const response = await fetch(`${API_URL}/formulario-uafe/responder`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'x-session-token': sessionToken
+                        'x-session-token': sessionToken,
+                        'x-csrf-token': csrfToken
                     },
                     body: JSON.stringify({
                         datosPersonaNatural: datosActualizados,
@@ -1948,6 +1989,12 @@
             if (savedToken && savedData) {
                 sessionToken = savedToken;
                 sessionData = JSON.parse(savedData);
+
+                // Obtener token CSRF para envío del formulario
+                obtenerCsrfToken().then(() => {
+                    console.log('✅ Sesión restaurada con token CSRF');
+                });
+
                 mostrarDatosProtocolo();
                 precargarDatos();
                 mostrarSeccion('formularioSection');
