@@ -943,6 +943,7 @@ cion()">Siguiente →</button>
 
         // Variables globales
         let sessionToken = null;
+        let csrfToken = null;
         let asignacionData = null;
         let seccionActual = 1;
         const totalSecciones = 6;
@@ -952,6 +953,25 @@ cion()">Siguiente →</button>
             const path = window.location.pathname;
             const match = path.match(/\/formulario-uafe\/([a-z0-9]+)/i);
             return match ? match[1] : null;
+        }
+
+        // Obtener token CSRF
+        async function fetchCsrfToken() {
+            try {
+                const response = await fetch(`${API_URL}/csrf-token`, {
+                    method: 'GET',
+                    credentials: 'include' // Importante para recibir la cookie CSRF
+                });
+                const data = await response.json();
+                if (data.success && data.csrfToken) {
+                    csrfToken = data.csrfToken;
+                    console.log('✅ Token CSRF obtenido exitosamente');
+                } else {
+                    console.error('❌ Error al obtener token CSRF:', data);
+                }
+            } catch (error) {
+                console.error('❌ Error al obtener token CSRF:', error);
+            }
         }
 
         // Inicializar
@@ -992,6 +1012,8 @@ cion()">Siguiente →</button>
 
                 if (data.success) {
                     sessionToken = data.token;
+                    // Obtener token CSRF antes de cargar el formulario
+                    await fetchCsrfToken();
                     await cargarFormulario();
                 } else {
                     showAlert('loginAlert', data.error || 'Error al iniciar sesión', 'error');
@@ -1386,13 +1408,22 @@ cion()">Siguiente →</button>
             };
 
             try {
+                // Verificar que tenemos el token CSRF
+                if (!csrfToken) {
+                    showAlert('formularioAlert', 'Error de seguridad. Por favor recargue la página.', 'error');
+                    showLoading(false);
+                    return;
+                }
+
                 const token = getTokenFromURL();
-                const response = await fetch(`${API_URL}/formulario-uafe/public/${token}/responder`, {
+                const response = await fetch(`${API_URL}/formulario-uafe/responder`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'x-session-token': sessionToken
+                        'x-session-token': sessionToken,
+                        'x-csrf-token': csrfToken
                     },
+                    credentials: 'include', // Importante para enviar la cookie CSRF
                     body: JSON.stringify(respuestaData)
                 });
 
@@ -1442,6 +1473,7 @@ cion()">Siguiente →</button>
         function logout() {
             if (confirm('¿Está seguro de salir? Los cambios no guardados se perderán.')) {
                 sessionToken = null;
+                csrfToken = null;
                 asignacionData = null;
                 seccionActual = 1;
                 mostrarSeccion('loginSection');
