@@ -337,7 +337,7 @@ const FormulariosUAFE = () => {
    */
   const guardarCambiosProtocolo = async () => {
     if (!protocoloEditando.numeroProtocolo || !protocoloEditando.fecha ||
-        !protocoloEditando.actoContrato || !protocoloEditando.valorContrato) {
+      !protocoloEditando.actoContrato || !protocoloEditando.valorContrato) {
       mostrarSnackbar('Todos los campos son obligatorios', 'warning');
       return;
     }
@@ -919,7 +919,7 @@ const FormulariosUAFE = () => {
                             size="small"
                             color="success"
                             onClick={() => descargarPDFs(protocolo.id)}
-                            disabled={!protocolo.personas || protocolo.personas.filter(p => p.completado).length === 0}
+                            disabled={!protocolo.personas || protocolo.personas.length === 0}
                           >
                             <PictureAsPdfIcon fontSize="small" />
                           </IconButton>
@@ -1625,17 +1625,15 @@ const FormulariosUAFE = () => {
                           >
                             Eliminar
                           </Button>
-                          {persona.completado && (
-                            <Button
-                              size="small"
-                              variant="outlined"
-                              color="primary"
-                              startIcon={<DownloadIcon />}
-                              onClick={() => descargarPDFIndividual(protocoloSeleccionado.id, persona.id)}
-                            >
-                              Descargar PDF
-                            </Button>
-                          )}
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="primary"
+                            startIcon={<DownloadIcon />}
+                            onClick={() => descargarPDFIndividual(protocoloSeleccionado.id, persona.id)}
+                          >
+                            Descargar PDF
+                          </Button>
                         </Box>
                       </ListItem>
                     ))}

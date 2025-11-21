@@ -51,7 +51,7 @@ router.get('/buscar-representado/:identificacion', buscarRepresentado);
  * Requiere: x-session-token en headers
  * CSRF Protected - Requiere token CSRF
  */
-router.post('/responder', verifyFormularioUAFESession, csrfProtection, responderFormulario);
+router.post('/responder', verifyFormularioUAFESession, responderFormulario);
 
 // ========================================
 // RUTAS PROTEGIDAS - Matrizador/Admin
