@@ -44,15 +44,15 @@ import useDocumentHistory from '../../hooks/useDocumentHistory';
  * Muestra eventos cronológicos con iconos, colores y metadata
  * Ahora integrado con el sistema de historial universal
  */
-const DocumentTimeline = ({ 
-  history, 
-  loading, 
-  error, 
+const DocumentTimeline = ({
+  history,
+  loading,
+  error,
   documentId,
   showLoadMore = true,
   showRefresh = true,
   autoRefresh = false,
-  options = {} 
+  options = {}
 }) => {
   // Usar el hook si se pasa documentId, sino usar props legacy
   const hookData = useDocumentHistory(documentId, {
@@ -62,18 +62,18 @@ const DocumentTimeline = ({
   });
 
   // Determinar qué datos usar
-  const timelineData = documentId ? hookData : { 
-    history: history || [], 
-    loading: loading || false, 
+  const timelineData = documentId ? hookData : {
+    history: history || [],
+    loading: loading || false,
     error: error || null,
-    refresh: () => {},
-    loadMore: () => {},
+    refresh: () => { },
+    loadMore: () => { },
     stats: { hasMoreToLoad: false }
   };
 
-  const { 
-    history: timelineHistory, 
-    loading: timelineLoading, 
+  const {
+    history: timelineHistory,
+    loading: timelineLoading,
     error: timelineError,
     refresh,
     loadMore,
@@ -98,7 +98,7 @@ const DocumentTimeline = ({
       group: GroupIcon,
       default: DefaultIcon
     };
-    
+
     const IconComponent = iconMap[iconType] || DefaultIcon;
     return <IconComponent sx={{ fontSize: 20 }} />;
   };
@@ -123,7 +123,7 @@ const DocumentTimeline = ({
   const formatTimestamp = (timestamp) => {
     try {
       return format(new Date(timestamp), 'dd/MM/yyyy HH:mm', { locale: es });
-    } catch (error) {
+    } catch {
       return 'Fecha inválida';
     }
   };
@@ -153,9 +153,72 @@ const DocumentTimeline = ({
   /**
    * Renderizar información contextual del evento (reemplaza metadata técnica)
    */
-  const renderEventContextInfo = (contextInfo) => {
+  const renderEventContextInfo = (contextInfo, event = {}) => {
     if (!contextInfo || contextInfo.length === 0) return null;
 
+    // Detectar si es un evento de entrega para mostrar detalles de forma destacada
+    const isDeliveryEvent = event.icon === 'delivery' ||
+      (event.type === 'STATUS_CHANGED' && event.title?.toLowerCase().includes('entrega'));
+
+    // Detectar si es un evento de LISTO 
+    const isReadyEvent = event.icon === 'check_circle' ||
+      (event.type === 'STATUS_CHANGED' && event.title?.toLowerCase().includes('listo'));
+
+    // Para eventos de entrega, mostrar en sección destacada
+    if (isDeliveryEvent) {
+      return (
+        <Box sx={{
+          mt: 2,
+          p: 2,
+          bgcolor: (theme) => theme.palette.mode === 'dark'
+            ? 'rgba(46, 125, 50, 0.15)'
+            : 'rgba(46, 125, 50, 0.08)',
+          borderRadius: 1.5,
+          border: '1px solid',
+          borderColor: (theme) => theme.palette.mode === 'dark'
+            ? 'rgba(46, 125, 50, 0.3)'
+            : 'success.light'
+        }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1.5, color: 'success.main', display: 'flex', alignItems: 'center', gap: 1 }}>
+            📋 Detalles de Entrega
+          </Typography>
+          {contextInfo.map((info, idx) => (
+            <Typography key={idx} variant="body2" sx={{ mb: 0.5, pl: 1 }}>
+              • {info}
+            </Typography>
+          ))}
+        </Box>
+      );
+    }
+
+    // Para eventos de LISTO, mostrar en sección con estilo de éxito
+    if (isReadyEvent && contextInfo.length > 0) {
+      return (
+        <Box sx={{
+          mt: 2,
+          p: 1.5,
+          bgcolor: (theme) => theme.palette.mode === 'dark'
+            ? 'rgba(25, 118, 210, 0.12)'
+            : 'rgba(25, 118, 210, 0.06)',
+          borderRadius: 1,
+          border: '1px solid',
+          borderColor: (theme) => theme.palette.mode === 'dark'
+            ? 'rgba(25, 118, 210, 0.3)'
+            : 'info.light'
+        }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1, color: 'info.main', fontSize: '0.8rem' }}>
+            ℹ️ Información adicional
+          </Typography>
+          {contextInfo.map((info, idx) => (
+            <Typography key={idx} variant="body2" sx={{ mb: 0.3, fontSize: '0.85rem' }}>
+              • {info}
+            </Typography>
+          ))}
+        </Box>
+      );
+    }
+
+    // Para otros eventos, usar chips (comportamiento original)
     return (
       <Box sx={{ mt: 1 }}>
         <Stack direction="row" spacing={1} flexWrap="wrap">
@@ -166,9 +229,9 @@ const DocumentTimeline = ({
               size="small"
               variant="outlined"
               color="primary"
-              sx={{ 
-                backgroundColor: (theme) => theme.palette.mode === 'dark' 
-                  ? 'rgba(144, 202, 249, 0.08)' 
+              sx={{
+                backgroundColor: (theme) => theme.palette.mode === 'dark'
+                  ? 'rgba(144, 202, 249, 0.08)'
                   : 'rgba(25, 118, 210, 0.08)',
                 '& .MuiChip-label': {
                   fontSize: '0.75rem',
@@ -182,6 +245,9 @@ const DocumentTimeline = ({
     );
   };
 
+
+
+
   /**
    * Renderizar información de usuario con mejor formato
    */
@@ -190,7 +256,7 @@ const DocumentTimeline = ({
 
     const roleColors = {
       'ADMIN': '#d32f2f',
-      'RECEPCION': '#1976d2', 
+      'RECEPCION': '#1976d2',
       'CAJA': '#388e3c',
       'ARCHIVO': '#f57c00',
       'MATRIZADOR': '#7b1fa2'
@@ -290,16 +356,16 @@ const DocumentTimeline = ({
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
           <Typography variant="body2" color="text.secondary">
             {timelineHistory.length} eventos mostrados
-            {stats?.totalEvents && stats.totalEvents !== timelineHistory.length && 
+            {stats?.totalEvents && stats.totalEvents !== timelineHistory.length &&
               ` de ${stats.totalEvents} totales`
             }
           </Typography>
           {usingRealData && (
-            <Chip 
-              label="Datos en vivo" 
-              size="small" 
-              color="success" 
-              variant="outlined" 
+            <Chip
+              label="Datos en vivo"
+              size="small"
+              color="success"
+              variant="outlined"
             />
           )}
         </Box>
@@ -310,12 +376,12 @@ const DocumentTimeline = ({
         {timelineHistory.map((event, index) => (
           <MuiTimelineItem key={event.id}>
             <MuiTimelineSeparator>
-              <MuiTimelineDot 
+              <MuiTimelineDot
                 color={getEventColor(event.color)}
-                sx={{ 
+                sx={{
                   boxShadow: 2,
-                  border: (theme) => theme.palette.mode === 'dark' 
-                    ? '2px solid rgba(255, 255, 255, 0.1)' 
+                  border: (theme) => theme.palette.mode === 'dark'
+                    ? '2px solid rgba(255, 255, 255, 0.1)'
                     : '2px solid white',
                   p: 1
                 }}
@@ -328,7 +394,7 @@ const DocumentTimeline = ({
             </MuiTimelineSeparator>
 
             <MuiTimelineContent sx={{ pb: 3 }}>
-              <Card sx={{ 
+              <Card sx={{
                 boxShadow: 1,
                 border: '1px solid',
                 borderColor: 'divider',
@@ -356,7 +422,7 @@ const DocumentTimeline = ({
                   {renderUserInfo(event.user, event.timestamp)}
 
                   {/* Información contextual (reemplaza metadata técnica) */}
-                  {renderEventContextInfo(event.contextInfo)}
+                  {renderEventContextInfo(event.contextInfo, event)}
                 </CardContent>
               </Card>
             </MuiTimelineContent>
@@ -379,15 +445,15 @@ const DocumentTimeline = ({
       )}
 
       {/* Footer con información adicional */}
-      <Box sx={{ 
-        mt: 3, 
-        p: 2, 
-        bgcolor: (theme) => theme.palette.mode === 'dark' 
-          ? 'rgba(255, 255, 255, 0.03)' 
-          : 'grey.50', 
+      <Box sx={{
+        mt: 3,
+        p: 2,
+        bgcolor: (theme) => theme.palette.mode === 'dark'
+          ? 'rgba(255, 255, 255, 0.03)'
+          : 'grey.50',
         borderRadius: 1,
-        border: (theme) => theme.palette.mode === 'dark' 
-          ? '1px solid rgba(255, 255, 255, 0.1)' 
+        border: (theme) => theme.palette.mode === 'dark'
+          ? '1px solid rgba(255, 255, 255, 0.1)'
           : 'none'
       }}>
         <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
