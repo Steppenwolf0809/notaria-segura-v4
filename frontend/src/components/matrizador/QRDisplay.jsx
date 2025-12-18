@@ -280,7 +280,7 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
 
     const printWindow = window.open('', '_blank');
     const qrSize = 300;
-    
+
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
@@ -353,7 +353,7 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
         </body>
       </html>
     `);
-    
+
     printWindow.document.close();
   };
 
@@ -369,8 +369,8 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
   if (error) {
     return (
       <Paper sx={{ p: 3 }}>
-        <Alert 
-          severity="error" 
+        <Alert
+          severity="error"
           action={
             <Button color="inherit" size="small" onClick={() => loadQRData()}>
               Reintentar
@@ -462,9 +462,9 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
             >
               <Typography
                 variant="body2"
-                color="text.primary"
                 align="center"
                 sx={{
+                  color: '#000000',
                   fontWeight: 500,
                   lineHeight: 1.5
                 }}
@@ -639,9 +639,9 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
         onClose={() => setShowCopySuccess(false)}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       >
-        <Alert 
-          onClose={() => setShowCopySuccess(false)} 
-          severity="success" 
+        <Alert
+          onClose={() => setShowCopySuccess(false)}
+          severity="success"
           sx={{ width: '100%' }}
           icon={<CheckIcon />}
         >
