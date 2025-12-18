@@ -989,16 +989,42 @@ async function supervisionGeneral(req, res) {
             filterClauses.push(Prisma.sql`d."updatedAt" > ${fechaAmarilla}`);
           }
         }
-        const whereSql = Prisma.sql`${Prisma.join([
+        // Construir la cláusula WHERE de forma segura
+        const conditions = [
           Prisma.sql`(
             unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
             unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
             unaccent(d."actoPrincipalDescripcion") ILIKE unaccent(${pattern}) OR
             unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
             d."clientPhone" ILIKE ${pattern}
-          )`,
-          ...filterClauses
-        ], Prisma.sql` AND `)}`;
+          )`
+        ];
+
+        if (matrizador && matrizador !== 'TODOS') {
+          conditions.push(Prisma.sql`d."assignedToId" = ${parseInt(matrizador)}`);
+        }
+        if (estado && estado !== 'TODOS') {
+          conditions.push(Prisma.sql`d."status"::text = ${estado}`);
+        }
+        if (fechaDesde) {
+          conditions.push(Prisma.sql`d."createdAt" >= ${new Date(fechaDesde)}`);
+        }
+        if (fechaHasta) {
+          conditions.push(Prisma.sql`d."createdAt" <= ${new Date(fechaHasta)}`);
+        }
+
+        // Aplicar filtro de alerta por updatedAt en SQL si corresponde
+        if (alerta && alerta !== 'TODAS') {
+          if (alerta === 'ROJAS') {
+            conditions.push(Prisma.sql`d."updatedAt" <= ${fechaRoja}`);
+          } else if (alerta === 'AMARILLAS') {
+            conditions.push(Prisma.sql`d."updatedAt" > ${fechaRoja} AND d."updatedAt" <= ${fechaAmarilla}`);
+          } else if (alerta === 'NORMALES') {
+            conditions.push(Prisma.sql`d."updatedAt" > ${fechaAmarilla}`);
+          }
+        }
+
+        const whereSql = Prisma.join(conditions, ' AND ');
 
         const sortLower = String(sortDias || '').toLowerCase();
         // Mapear: días desc => updatedAt ASC, días asc => updatedAt DESC
@@ -1014,7 +1040,12 @@ async function supervisionGeneral(req, res) {
           ORDER BY ${orderSql}
           OFFSET ${(parseInt(page) - 1) * parseInt(limit)} LIMIT ${parseInt(limit)}
         `;
-        const countRows = await prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${whereSql}`;
+
+        const countRows = await prisma.$queryRaw`
+          SELECT COUNT(*)::int AS count 
+          FROM "documents" d 
+          WHERE ${whereSql}
+        `;
         const total = Array.isArray(countRows) ? (countRows[0]?.count || 0) : (countRows?.count || 0);
 
         const documentosConAlertas = documentos.map(doc => {
@@ -1022,7 +1053,23 @@ async function supervisionGeneral(req, res) {
           let alerta = { nivel: 'normal', icono: '', dias: diasEnEstado };
           if (diasEnEstado >= 15) alerta = { nivel: 'roja', icono: '🔥', dias: diasEnEstado };
           else if (diasEnEstado >= 7) alerta = { nivel: 'amarilla', icono: '⚠️', dias: diasEnEstado };
-          return { ...doc, alerta };
+
+          // Reconstruir objeto assignedTo desde campos planos
+          const assignedTo = doc._assignedToId ? {
+            id: doc._assignedToId,
+            firstName: doc._assignedToFirstName,
+            lastName: doc._assignedToLastName,
+            fullName: `${doc._assignedToFirstName} ${doc._assignedToLastName}`
+          } : null;
+
+          // Limpiar campos auxiliares
+          const { _assignedToId, _assignedToFirstName, _assignedToLastName, ...cleanDoc } = doc;
+
+          return {
+            ...cleanDoc,
+            assignedTo,
+            alerta
+          };
         });
 
         // Filtrar por alertas si se especifica
