@@ -654,172 +654,195 @@ async function getUserStats(req, res) {
 }
 
 /**
- * Obtiene estadísticas generales del dashboard (solo admin)
- * @param {Object} req - Request object
- * @param {Object} res - Response object
+ * Obtiene estadísticas de supervisión del dashboard (Modo Supervisión)
+ * Soporta filtros: thresholdDays, matrixerId, startDate, endDate
  */
 async function getDashboardStats(req, res) {
   try {
+    const {
+      thresholdDays = 15,
+      matrixerId,
+      startDate,
+      endDate
+    } = req.query;
+
     const today = new Date();
-    const sevenDaysAgo = new Date(today);
-    sevenDaysAgo.setDate(today.getDate() - 7);
+    const thresholdDate = new Date();
+    thresholdDate.setDate(today.getDate() - parseInt(thresholdDays));
 
-    const thirtyDaysAgo = new Date(today);
-    thirtyDaysAgo.setDate(today.getDate() - 30);
-
-    // Definición de umbrales para alertas
-    const stagnantThreshold = new Date(today);
-    stagnantThreshold.setHours(today.getHours() - 48); // 48 horas sin procesar
-
-    const uncollectedThreshold = new Date(today);
-    uncollectedThreshold.setDate(today.getDate() - 7); // 7 días sin retirar
-
-    const [
-      totalDocuments,
-      documentsByStatus,
-      documentsByType,
-      totalFacturado,
-      creditNotesCount,
-      recentActivity,
-      stagnantDocuments,
-      uncollectedDocuments
-    ] = await Promise.all([
-      // Total documentos
-      prisma.document.count(),
-
-      // Agrupados por estado
-      prisma.document.groupBy({
-        by: ['status'],
-        _count: { status: true }
-      }),
-
-      // Agrupados por tipo
-      prisma.document.groupBy({
-        by: ['documentType'],
-        _count: { documentType: true }
-      }),
-
-      // Total facturado (suma de totalFactura)
-      prisma.document.aggregate({
-        _sum: {
-          totalFactura: true
-        }
-      }),
-
-      // Notas de crédito (status = ANULADO_NOTA_CREDITO)
-      prisma.document.count({
-        where: { status: 'ANULADO_NOTA_CREDITO' }
-      }),
-
-      // Actividad reciente (últimos 7 días) - Simple conteo diario
-      prisma.document.findMany({
-        where: {
-          createdAt: {
-            gte: sevenDaysAgo
-          }
-        },
-        select: {
-          createdAt: true,
-          status: true
-        }
-      }),
-
-      // Alertas: Trámites estancados (>48h en PENDIENTE o EN_PROCESO)
-      prisma.document.findMany({
-        where: {
-          status: { in: ['PENDIENTE', 'EN_PROCESO'] },
-          createdAt: { lt: stagnantThreshold }
-        },
-        select: {
-          id: true,
-          protocolNumber: true,
-          clientName: true,
-          status: true,
-          createdAt: true,
-          documentType: true
-        },
-        orderBy: { createdAt: 'asc' },
-        take: 20
-      }),
-
-      // Alertas: Trámites no retirados (>7 días en LISTO)
-      prisma.document.findMany({
-        where: {
-          status: 'LISTO',
-          updatedAt: { lt: uncollectedThreshold }
-        },
-        select: {
-          id: true,
-          protocolNumber: true,
-          clientName: true,
-          clientPhone: true,
-          status: true,
-          updatedAt: true, // Fecha en que pasó a LISTO
-          documentType: true
-        },
-        orderBy: { updatedAt: 'asc' },
-        take: 20
-      })
-    ]);
-
-    // Procesar datos para gráficos
-    const statsByStatus = {};
-    documentsByStatus.forEach(d => {
-      statsByStatus[d.status] = d._count.status;
-    });
-
-    const statsByType = {};
-    documentsByType.forEach(d => {
-      statsByType[d.documentType] = d._count.documentType;
-    });
-
-    // Procesar timeline de últimos 7 días
-    const last7Days = {};
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
-      last7Days[dateStr] = 0;
+    // Filtros de fecha base
+    const dateFilter = {};
+    if (startDate && endDate) {
+      dateFilter.createdAt = {
+        gte: new Date(startDate),
+        lte: new Date(endDate)
+      };
     }
 
-    recentActivity.forEach(doc => {
-      const dateStr = doc.createdAt.toISOString().split('T')[0];
-      if (last7Days[dateStr] !== undefined) {
-        last7Days[dateStr]++;
+    // Filtro de matrizador
+    const matrixerFilter = matrixerId ? { assignedToId: parseInt(matrixerId) } : {};
+
+    // 1. KPIs Generales
+    // Total Activos (No entregados ni anulados)
+    const activeCount = await prisma.document.count({
+      where: {
+        status: { notIn: ['ENTREGADO', 'ANULADO_NOTA_CREDITO'] },
+        ...dateFilter,
+        ...matrixerFilter
       }
     });
 
-    const timelineData = Object.entries(last7Days)
-      .map(([date, count]) => ({ date, count }))
-      .sort((a, b) => new Date(a.date) - new Date(b.date));
+    // Críticos (> threshold días)
+    const criticalCount = await prisma.document.count({
+      where: {
+        status: { notIn: ['ENTREGADO', 'ANULADO_NOTA_CREDITO'] },
+        createdAt: { lt: thresholdDate },
+        ...matrixerFilter
+      }
+    });
+
+    // Eficiencia Semanal (Entregados vs Ingresados esta semana)
+    const startOfWeek = new Date();
+    startOfWeek.setDate(today.getDate() - today.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const createdThisWeek = await prisma.document.count({
+      where: {
+        createdAt: { gte: startOfWeek },
+        ...matrixerFilter
+      }
+    });
+
+    const deliveredThisWeek = await prisma.document.count({
+      where: {
+        status: 'ENTREGADO',
+        updatedAt: { gte: startOfWeek },
+        ...matrixerFilter
+      }
+    });
+
+    const weeklyEfficiency = createdThisWeek > 0
+      ? Math.round((deliveredThisWeek / createdThisWeek) * 100)
+      : 0;
+
+    // 2. Alertas Críticas (> 10 días para mostrar naranja/rojo)
+    const warningThresholdDate = new Date();
+    warningThresholdDate.setDate(today.getDate() - 10);
+
+    const criticalDocs = await prisma.document.findMany({
+      where: {
+        status: { notIn: ['ENTREGADO', 'ANULADO_NOTA_CREDITO'] },
+        createdAt: { lt: warningThresholdDate },
+        ...matrixerFilter
+      },
+      include: {
+        assignedTo: {
+          select: { firstName: true, lastName: true }
+        }
+      },
+      orderBy: { createdAt: 'asc' },
+      take: 100
+    });
+
+    // 3. Rendimiento de Equipo
+    const teamWhere = { role: 'MATRIZADOR', isActive: true };
+    if (matrixerId) teamWhere.id = parseInt(matrixerId);
+
+    const matrizadores = await prisma.user.findMany({
+      where: teamWhere,
+      select: { id: true, firstName: true, lastName: true }
+    });
+
+    const loadGroup = await prisma.document.groupBy({
+      by: ['assignedToId'],
+      where: {
+        status: { notIn: ['ENTREGADO', 'ANULADO_NOTA_CREDITO'] },
+        assignedToId: { in: matrizadores.map(m => m.id) }
+      },
+      _count: { _all: true }
+    });
+
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const teamPerformance = [];
+
+    for (const m of matrizadores) {
+      const load = loadGroup.find(g => g.assignedToId === m.id)?._count._all || 0;
+
+      const criticals = await prisma.document.count({
+        where: {
+          assignedToId: m.id,
+          status: { notIn: ['ENTREGADO', 'ANULADO_NOTA_CREDITO'] },
+          createdAt: { lt: thresholdDate }
+        }
+      });
+
+      const deliveredMonth = await prisma.document.count({
+        where: {
+          assignedToId: m.id,
+          status: 'ENTREGADO',
+          updatedAt: { gte: startOfMonth }
+        }
+      });
+
+      const recentDeliveries = await prisma.document.findMany({
+        where: {
+          assignedToId: m.id,
+          status: 'ENTREGADO',
+          updatedAt: { gte: startOfMonth }
+        },
+        select: { createdAt: true, updatedAt: true },
+        take: 10,
+        orderBy: { updatedAt: 'desc' }
+      });
+
+      let avgDays = 0;
+      if (recentDeliveries.length > 0) {
+        const totalTime = recentDeliveries.reduce((acc, doc) => {
+          return acc + (new Date(doc.updatedAt) - new Date(doc.createdAt));
+        }, 0);
+        avgDays = Math.round(totalTime / recentDeliveries.length / (1000 * 60 * 60 * 24));
+      }
+
+      teamPerformance.push({
+        id: m.id,
+        name: `${m.firstName} ${m.lastName}`,
+        activeLoad: load,
+        criticalCount: criticals,
+        deliveredMonth,
+        avgVelocityDays: avgDays
+      });
+    }
 
     res.json({
       success: true,
       data: {
         kpis: {
-          totalDocuments,
-          totalFacturado: totalFacturado._sum.totalFactura || 0,
-          creditNotesCount,
-          pendingCount: (statsByStatus['PENDIENTE'] || 0) + (statsByStatus['EN_PROCESO'] || 0),
-          readyCount: statsByStatus['LISTO'] || 0
+          activeCount,
+          criticalCount,
+          weeklyEfficiency
         },
-        charts: {
-          byStatus: statsByStatus,
-          byType: statsByType,
-          timeline: timelineData
-        },
-        alerts: {
-          stagnant: stagnantDocuments,
-          uncollected: uncollectedDocuments
-        }
+        criticalList: criticalDocs.map(doc => ({
+          id: doc.id,
+          protocol: doc.protocolNumber,
+          client: doc.clientName,
+          type: doc.documentType,
+          matrixer: doc.assignedTo ? `${doc.assignedTo.firstName} ${doc.assignedTo.lastName}` : 'Sin asignar',
+          createdAt: doc.createdAt,
+          daysDelayed: Math.floor((new Date() - new Date(doc.createdAt)) / (1000 * 60 * 60 * 24)),
+          status: doc.status
+        })),
+        teamPerformance
       }
     });
 
   } catch (error) {
-    console.error('Error obteniendo estadísticas del dashboard:', error);
+    console.error('Error fetching dashboard stats:', error);
     res.status(500).json({
       success: false,
-      message: 'Error interno del servidor al obtener estadísticas'
+      message: 'Error interno al obtener estadísticas de supervisión'
     });
   }
 }
