@@ -15,7 +15,7 @@ import apiClient from './api-client';
 /**
  * Obtener dashboard con documentos propios
  */
-const getDashboard = async () => {
+const getDashboard = async (token) => {
   try {
     const response = await apiClient.get('/archivo/dashboard');
     return response.data;
@@ -30,7 +30,7 @@ const getDashboard = async () => {
 /**
  * Listar documentos propios con filtros
  */
-const getMisDocumentos = async (params = {}) => {
+const getMisDocumentos = async (token, params = {}) => {
   try {
     const queryParams = new URLSearchParams();
 
@@ -52,7 +52,7 @@ const getMisDocumentos = async (params = {}) => {
 /**
  * Cambiar estado de documento
  */
-const cambiarEstadoDocumento = async (documentoId, nuevoEstado, options = {}) => {
+const cambiarEstadoDocumento = async (token, documentoId, nuevoEstado, options = {}) => {
   try {
     const response = await apiClient.post(
       `/archivo/documentos/${documentoId}/estado`,
@@ -118,7 +118,7 @@ const procesarEntrega = async (documentoId, entregaData) => {
 /**
  * Obtener todos los documentos del sistema para supervisión
  */
-const getSupervisionGeneral = async (params = {}) => {
+const getSupervisionGeneral = async (token, params = {}) => {
   try {
     const queryParams = new URLSearchParams();
 
@@ -145,7 +145,7 @@ const getSupervisionGeneral = async (params = {}) => {
 /**
  * Obtener resumen general del sistema
  */
-const getResumenGeneral = async () => {
+const getResumenGeneral = async (token) => {
   try {
     const response = await apiClient.get('/archivo/supervision/resumen');
     return response.data;
@@ -160,7 +160,7 @@ const getResumenGeneral = async () => {
 /**
  * Obtener lista de matrizadores para filtros
  */
-const getMatrizadores = async () => {
+const getMatrizadores = async (token) => {
   try {
     const response = await apiClient.get('/archivo/supervision/matrizadores');
     return response.data;
@@ -181,7 +181,7 @@ const getMatrizadores = async () => {
 /**
  * Obtener detalle de documento (propio o ajeno)
  */
-const getDetalleDocumento = async (documentoId) => {
+const getDetalleDocumento = async (token, documentoId) => {
   try {
     const response = await apiClient.get(`/archivo/documentos/${documentoId}`);
     return response.data;
