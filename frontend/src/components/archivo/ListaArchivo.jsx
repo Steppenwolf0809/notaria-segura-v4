@@ -1554,6 +1554,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
               onRefresh();
             }
           }}
+          serviceType="archivo"
         />
       )}
 

@@ -110,6 +110,25 @@ const procesarEntrega = async (documentoId, entregaData) => {
 };
 
 /**
+ * Procesar entrega grupal (ARCHIVO)
+ */
+const procesarEntregaGrupal = async (entregaData) => {
+  try {
+    const response = await apiClient.post('/archivo/documentos/entrega-grupal', entregaData);
+    return {
+      success: true,
+      data: response.data.data,
+      message: response.data.message
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.response?.data?.message || 'Error de conexión'
+    };
+  }
+};
+
+/**
  * ============================================================================
  * SECCIÓN 2: SUPERVISIÓN GLOBAL (SOLO LECTURA)
  * ============================================================================
@@ -242,6 +261,7 @@ const archivoService = {
   cambiarEstadoDocumento,
   revertirEstadoDocumento,
   procesarEntrega,
+  procesarEntregaGrupal,
 
   // Supervisión global
   getSupervisionGeneral,

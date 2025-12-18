@@ -25,11 +25,12 @@ import {
 } from '@mui/material';
 import { Assignment as AssignmentIcon } from '@mui/icons-material';
 import receptionService from '../../services/reception-service';
+import archivoService from '../../services/archivo-service';
 
 /**
  * Modal para procesar entrega grupal, reconstruido con Material-UI
  */
-function ModalEntregaGrupal({ documentos, onClose, onEntregaExitosa }) {
+function ModalEntregaGrupal({ documentos, onClose, onEntregaExitosa, serviceType = 'reception' }) {
   const [formData, setFormData] = useState({
     codigoVerificacion: '',
     entregadoA: '',
@@ -63,11 +64,21 @@ function ModalEntregaGrupal({ documentos, onClose, onEntregaExitosa }) {
 
   const cargarRelacionesOptions = async () => {
     try {
+      // Usar servicio de recepción para opciones (compartido) o fallback
       const result = await receptionService.getRelacionesTitular();
       if (result.success) {
         setRelacionesOptions(result.data.relaciones);
       }
     } catch (error) {
+      // Fallback si falla o si es archivo y no tiene acceso
+      setRelacionesOptions([
+        { value: 'titular', label: 'Titular del documento' },
+        { value: 'conyuge', label: 'Cónyuge' },
+        { value: 'hijo', label: 'Hijo/Hija' },
+        { value: 'padre', label: 'Padre/Madre' },
+        { value: 'apoderado', label: 'Apoderado legal' },
+        { value: 'otro', label: 'Otro' }
+      ]);
     }
   };
 
@@ -81,7 +92,7 @@ function ModalEntregaGrupal({ documentos, onClose, onEntregaExitosa }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Validaciones
     if (!formData.entregadoA.trim()) {
       setError('Nombre de quien retira es obligatorio');
@@ -91,9 +102,13 @@ function ModalEntregaGrupal({ documentos, onClose, onEntregaExitosa }) {
       setError('Relación con titular es obligatoria');
       return;
     }
-    if (!formData.verificacionManual && !formData.codigoVerificacion.trim()) {
-      setError('Código de verificación es obligatorio (o marcar verificación manual)');
-      return;
+
+    // 🆕 Solo validar código para recepción
+    if (serviceType !== 'archivo') {
+      if (!formData.verificacionManual && !formData.codigoVerificacion.trim()) {
+        setError('Código de verificación es obligatorio (o marcar verificación manual)');
+        return;
+      }
     }
 
     try {
@@ -105,7 +120,9 @@ function ModalEntregaGrupal({ documentos, onClose, onEntregaExitosa }) {
         documentIds: documentos.map(doc => doc.id)
       };
 
-      const result = await receptionService.procesarEntregaGrupal(entregaData);
+      // Usar el servicio correcto
+      const service = serviceType === 'archivo' ? archivoService : receptionService;
+      const result = await service.procesarEntregaGrupal(entregaData);
 
       if (result.success) {
         onEntregaExitosa();
@@ -118,7 +135,7 @@ function ModalEntregaGrupal({ documentos, onClose, onEntregaExitosa }) {
       setLoading(false);
     }
   };
-  
+
   const clienteNombre = documentos.length > 0 ? documentos[0].clientName : 'Cliente';
 
   return (
@@ -130,28 +147,33 @@ function ModalEntregaGrupal({ documentos, onClose, onEntregaExitosa }) {
       </DialogTitle>
       <DialogContent dividers>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-        
+
         <Grid container spacing={3}>
           {/* Columna Izquierda: Detalles de Entrega */}
           <Grid item xs={12} md={6}>
             <form onSubmit={handleSubmit}>
               <Grid container spacing={3}>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Código de Verificación Grupal"
-                    name="codigoVerificacion"
-                    value={formData.codigoVerificacion}
-                    onChange={handleChange}
-                    disabled={formData.verificacionManual}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <FormControlLabel
-                    control={<Checkbox name="verificacionManual" checked={formData.verificacionManual} onChange={handleChange} />}
-                    label="Verificación Manual"
-                  />
-                </Grid>
+                {/* 🆕 Ocultar código para ARCHIVO */}
+                {serviceType !== 'archivo' && (
+                  <>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Código de Verificación Grupal"
+                        name="codigoVerificacion"
+                        value={formData.codigoVerificacion}
+                        onChange={handleChange}
+                        disabled={formData.verificacionManual}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <FormControlLabel
+                        control={<Checkbox name="verificacionManual" checked={formData.verificacionManual} onChange={handleChange} />}
+                        label="Verificación Manual"
+                      />
+                    </Grid>
+                  </>
+                )}
 
                 <Grid item xs={12} sm={6}>
                   <TextField fullWidth required label="Nombre de quien retira" name="entregadoA" value={formData.entregadoA} onChange={handleChange} helperText="Por defecto: titular del documento (editable)" />
@@ -199,10 +221,10 @@ function ModalEntregaGrupal({ documentos, onClose, onEntregaExitosa }) {
                 Documentos para {clienteNombre}
               </Typography>
               <Typography variant="body2" sx={{ mb: 2 }}>
-                <strong>Código Grupal:</strong> 
-                <Chip 
-                  label={documentos[0]?.codigoRetiro || 'N/A'} 
-                  size="small" 
+                <strong>Código Grupal:</strong>
+                <Chip
+                  label={documentos[0]?.codigoRetiro || 'N/A'}
+                  size="small"
                   color="success"
                   sx={{ ml: 1, fontFamily: 'monospace', fontWeight: 'bold' }}
                 />
@@ -228,9 +250,9 @@ function ModalEntregaGrupal({ documentos, onClose, onEntregaExitosa }) {
         <Button onClick={onClose} color="secondary">
           Cancelar
         </Button>
-        <Button 
-          onClick={handleSubmit} 
-          variant="contained" 
+        <Button
+          onClick={handleSubmit}
+          variant="contained"
           color="primary"
           disabled={loading}
           startIcon={loading ? <CircularProgress size={20} /> : null}
