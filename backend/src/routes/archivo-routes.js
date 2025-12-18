@@ -11,7 +11,8 @@ import {
   resumenGeneral,
   obtenerMatrizadores,
   obtenerDetalleDocumento,
-  revertirEstadoDocumentoArchivo
+  revertirEstadoDocumentoArchivo,
+  procesarEntregaGrupal
 } from '../controllers/archivo-controller.js';
 import { marcarVariosListosArchivo } from '../controllers/archivo-bulk-controller.js';
 
@@ -82,7 +83,22 @@ router.post('/documentos/marcar-listos', authenticateToken, requireArchivo, csrf
  * @access Private (ARCHIVO only)
  * @csrf Protected - Requiere token CSRF
  */
-router.post('/documentos/:id/entregar', authenticateToken, requireArchivo, csrfProtection, procesarEntregaDocumento);
+/**
+ * @route POST /api/archivo/documentos/entrega-grupal
+ * @desc Procesar entrega grupal de documentos propios (ARCHIVO)
+ * @body documentIds - Array de IDs de documentos
+ * @body entregadoA - Nombre de quien retira
+ * @body cedulaReceptor - Cédula/ID de quien retira (opcional)
+ * @body relacionTitular - Relación con el titular
+ * @body facturaPresenta - Si presentó factura
+ * @body observaciones - Observaciones adicionales
+ * @access Private (ARCHIVO only)
+ * @csrf Protected - Requiere token CSRF
+ */
+router.post('/documentos/entrega-grupal', authenticateToken, requireArchivo, csrfProtection, procesarEntregaGrupal);
+
+/**
+ * @route POST /api/archivo/documentos/:id/entregar
 
 /**
  * @route POST /api/archivo/documentos/:id/revertir-estado

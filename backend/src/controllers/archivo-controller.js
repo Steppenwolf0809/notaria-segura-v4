@@ -246,7 +246,7 @@ async function cambiarEstadoDocumento(req, res) {
       } else {
         codigoGenerado = await CodigoRetiroService.generarUnico();
         updateData.codigoRetiro = codigoGenerado;
-        
+
         // 📈 Registrar evento de generación de código de retiro
         try {
           await prisma.documentEvent.create({
@@ -283,10 +283,10 @@ async function cambiarEstadoDocumento(req, res) {
 
     // 🔗 NUEVA FUNCIONALIDAD: Sincronización grupal
     let documentosActualizados = [];
-    
+
     if (documento.isGrouped && documento.documentGroupId) {
       logger.debug('Documento es parte de un grupo, sincronizando cambio de estado');
-      
+
       if (nuevoEstado === 'LISTO') {
         // Marcar como LISTO todos los documentos del grupo asignados al mismo usuario
         // y garantizar código de retiro individual por documento
@@ -367,7 +367,7 @@ async function cambiarEstadoDocumento(req, res) {
     // 📱 ENVIAR NOTIFICACIÓN WHATSAPP si se marca como LISTO
     let whatsappSent = false;
     let whatsappError = null;
-    
+
     if (nuevoEstado === 'LISTO') {
       // Respetar política de no notificar
       if (documento.notificationPolicy === 'no_notificar') {
@@ -438,7 +438,7 @@ async function cambiarEstadoDocumento(req, res) {
           },
           datosEntrega
         );
-        
+
         whatsappSent = whatsappResult.success;
 
         if (!whatsappResult.success) {
@@ -455,13 +455,13 @@ async function cambiarEstadoDocumento(req, res) {
 
     // Preparar respuesta con información de sincronización
     const totalSincronizados = documentosActualizados.length;
-    const mensajeBase = totalSincronizados > 1 
+    const mensajeBase = totalSincronizados > 1
       ? `${totalSincronizados} documentos del grupo ${nuevoEstado.toLowerCase()}s`
       : `Documento ${nuevoEstado.toLowerCase()}`;
 
     res.json({
       success: true,
-      data: { 
+      data: {
         documento: documentoActualizado,
         documentos: documentosActualizados,
         documentosSincronizados: totalSincronizados,
@@ -590,7 +590,7 @@ async function procesarEntregaDocumento(req, res) {
 
       if (groupDocsToDeliver.length > 0) {
         logger.debug(`Entregando ${groupDocsToDeliver.length + 1} documentos del grupo`);
-        
+
         // Actualizar todos los documentos del grupo
         await prisma.document.updateMany({
           where: {
@@ -666,11 +666,11 @@ async function procesarEntregaDocumento(req, res) {
     // 📱 ENVIAR NOTIFICACIÓN WHATSAPP
     let whatsappSent = false;
     let whatsappError = null;
-    
+
     if (documentoActualizado.clientPhone) {
       try {
         // Preparar lista de documentos para el template (individual o grupal)
-        const documentosParaMensaje = groupDocuments.length > 0 
+        const documentosParaMensaje = groupDocuments.length > 0
           ? [documentoActualizado, ...groupDocuments]
           : [documentoActualizado];
 
@@ -705,7 +705,7 @@ async function procesarEntregaDocumento(req, res) {
           },
           datosEntrega
         );
-        
+
         whatsappSent = whatsappResult.success;
 
         if (!whatsappResult.success) {
@@ -721,10 +721,10 @@ async function procesarEntregaDocumento(req, res) {
     }
 
     // Preparar mensaje de respuesta (incluir información de grupo)
-    let message = groupDocuments.length > 0 
-      ? `Grupo de ${groupDocuments.length + 1} documentos entregado exitosamente` 
+    let message = groupDocuments.length > 0
+      ? `Grupo de ${groupDocuments.length + 1} documentos entregado exitosamente`
       : 'Documento entregado exitosamente';
-    
+
     if (whatsappSent) {
       message += ' y notificación WhatsApp enviada';
     } else if (documentoActualizado.clientPhone && whatsappError) {
@@ -773,6 +773,166 @@ async function procesarEntregaDocumento(req, res) {
   }
 }
 
+/**
+ * Procesar entrega grupal de documentos propios (ARCHIVO)
+ * Permite entregar múltiples documentos seleccionados manualmente
+ */
+async function procesarEntregaGrupal(req, res) {
+  try {
+    const { documentIds, entregadoA, cedulaReceptor, relacionTitular, facturaPresenta, observaciones } = req.body;
+    const userId = req.user.id;
+
+    // Validaciones básicas
+    if (!Array.isArray(documentIds) || documentIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Se requiere una lista de IDs de documentos'
+      });
+    }
+
+    if (!entregadoA) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nombre de quien retira es obligatorio'
+      });
+    }
+
+    if (!relacionTitular) {
+      return res.status(400).json({
+        success: false,
+        message: 'Relación con titular es obligatoria'
+      });
+    }
+
+    // Buscar documentos y validar propiedad
+    const documents = await prisma.document.findMany({
+      where: {
+        id: { in: documentIds },
+        assignedToId: userId, // Solo documentos propios
+        status: 'LISTO' // Solo documentos listos
+      }
+    });
+
+    if (documents.length !== documentIds.length) {
+      return res.status(400).json({
+        success: false,
+        message: `Solo ${documents.length} de ${documentIds.length} documentos están listos y asignados a usted`
+      });
+    }
+
+    // Actualizar documentos en transacción
+    const updatedDocuments = await prisma.$transaction(async (tx) => {
+      // Actualizar estado
+      await tx.document.updateMany({
+        where: { id: { in: documentIds } },
+        data: {
+          status: 'ENTREGADO',
+          entregadoA,
+          cedulaReceptor,
+          relacionTitular,
+          verificacionManual: true, // Siempre manual en entrega grupal de archivo
+          facturaPresenta: facturaPresenta || false,
+          fechaEntrega: new Date(),
+          usuarioEntregaId: userId,
+          observacionesEntrega: observaciones || `Entrega grupal manual de ${documents.length} documentos`
+        }
+      });
+
+      // Registrar eventos
+      const events = documents.map(doc => ({
+        documentId: doc.id,
+        userId: userId,
+        eventType: 'STATUS_CHANGED',
+        description: `Documento entregado grupalmente por ARCHIVO a ${entregadoA}`,
+        details: JSON.stringify({
+          entregadoA,
+          cedulaReceptor,
+          relacionTitular,
+          groupDelivery: true,
+          totalDocuments: documents.length,
+          deliveredBy: 'ARCHIVO'
+        }),
+        personaRetiro: entregadoA,
+        cedulaRetiro: cedulaReceptor || undefined,
+        metodoVerificacion: 'manual',
+        observacionesRetiro: observaciones
+      }));
+
+      await tx.documentEvent.createMany({ data: events });
+
+      // Retornar documentos actualizados para notificaciones
+      return await tx.document.findMany({
+        where: { id: { in: documentIds } }
+      });
+    });
+
+    // Agrupar por cliente para notificaciones
+    const docsByClient = updatedDocuments.reduce((acc, doc) => {
+      const key = doc.clientPhone || 'no-phone';
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(doc);
+      return acc;
+    }, {});
+
+    // Enviar notificaciones (una por cliente)
+    let whatsappSentCount = 0;
+
+    for (const [phone, clientDocs] of Object.entries(docsByClient)) {
+      if (phone === 'no-phone' || clientDocs[0].notificationPolicy === 'no_notificar') continue;
+
+      try {
+        const doc = clientDocs[0];
+        const datosEntrega = {
+          entregado_a: entregadoA,
+          deliveredTo: entregadoA,
+          fecha: new Date(),
+          usuario_entrega: `${req.user.firstName} ${req.user.lastName} (ARCHIVO)`,
+          cedulaReceptor,
+          relacionTitular,
+          documentos: clientDocs,
+          cantidadDocumentos: clientDocs.length
+        };
+
+        const result = await whatsappService.enviarDocumentoEntregado(
+          {
+            nombre: doc.clientName,
+            clientName: doc.clientName,
+            telefono: doc.clientPhone,
+            clientPhone: doc.clientPhone
+          },
+          {
+            tipo_documento: doc.documentType, // Referencia del primero
+            tipoDocumento: doc.documentType,
+            numero_documento: doc.protocolNumber,
+            protocolNumber: doc.protocolNumber
+          },
+          datosEntrega
+        );
+
+        if (result.success) whatsappSentCount++;
+      } catch (error) {
+        logger.warn(`Error enviando notificación grupal a ${phone}:`, error.message);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `${updatedDocuments.length} documentos entregados exitosamente`,
+      data: {
+        documentsCount: updatedDocuments.length,
+        whatsappSentCount
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error en entrega grupal archivo:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+}
+
 // ============================================================================
 // SECCIÓN 2: SUPERVISIÓN GLOBAL (VISTA DE TODOS LOS DOCUMENTOS)
 // ============================================================================
@@ -783,14 +943,14 @@ async function procesarEntregaDocumento(req, res) {
  */
 async function supervisionGeneral(req, res) {
   try {
-    const { 
-      search, 
-      matrizador, 
-      estado, 
+    const {
+      search,
+      matrizador,
+      estado,
       alerta,
-      fechaDesde, 
+      fechaDesde,
       fechaHasta,
-      page = 1, 
+      page = 1,
       limit = 20,
       sortDias
     } = req.query;
@@ -954,9 +1114,9 @@ async function supervisionGeneral(req, res) {
     // Calcular alertas de tiempo para cada documento (basado en updatedAt para consistencia)
     const documentosConAlertas = documentos.map(doc => {
       const diasEnEstado = Math.floor((Date.now() - new Date(doc.updatedAt).getTime()) / (1000 * 60 * 60 * 24));
-      
+
       let alerta = { nivel: 'normal', icono: '', dias: diasEnEstado };
-      
+
       if (diasEnEstado >= 15) {
         alerta = { nivel: 'roja', icono: '🔥', dias: diasEnEstado };
       } else if (diasEnEstado >= 7) {
@@ -1042,7 +1202,7 @@ async function resumenGeneral(req, res) {
 
     todosDocumentos.forEach(doc => {
       const diasEnEstado = Math.floor((Date.now() - new Date(doc.createdAt).getTime()) / (1000 * 60 * 60 * 24));
-      
+
       if (diasEnEstado >= 15) {
         atrasadosRojo++;
       } else if (diasEnEstado >= 7) {
@@ -1091,15 +1251,15 @@ async function resumenGeneral(req, res) {
 async function obtenerMatrizadores(req, res) {
   try {
     const matrizadores = await prisma.user.findMany({
-      where: { 
+      where: {
         role: { in: ['MATRIZADOR', 'ARCHIVO'] },
         isActive: true
       },
-      select: { 
-        id: true, 
-        firstName: true, 
+      select: {
+        id: true,
+        firstName: true,
         lastName: true,
-        role: true 
+        role: true
       },
       orderBy: { firstName: 'asc' }
     });
@@ -1160,7 +1320,7 @@ async function obtenerDetalleDocumento(req, res) {
     // Calcular alerta de tiempo
     const diasEnEstado = Math.floor((new Date() - new Date(documento.updatedAt)) / (1000 * 60 * 60 * 24));
     let alerta = { nivel: 'normal', icono: '', dias: diasEnEstado };
-    
+
     if (diasEnEstado >= 15) {
       alerta = { nivel: 'roja', icono: '🔥', dias: diasEnEstado };
     } else if (diasEnEstado >= 7) {
@@ -1201,10 +1361,10 @@ async function revertirEstadoDocumentoArchivo(req, res) {
   try {
     // Importar la función central de reversión
     const { revertDocumentStatus } = await import('./document-controller.js');
-    
+
     // Delegar a la función central que ya maneja toda la lógica de grupos
     return await revertDocumentStatus(req, res);
-    
+
   } catch (error) {
     logger.error('Error en revertirEstadoDocumentoArchivo:', error);
     res.status(500).json({
@@ -1224,11 +1384,12 @@ export {
   listarMisDocumentos,
   cambiarEstadoDocumento,
   procesarEntregaDocumento,
-  
+
   // Funciones de supervisión global
   supervisionGeneral,
   resumenGeneral,
   obtenerMatrizadores,
   obtenerDetalleDocumento,
-  revertirEstadoDocumentoArchivo
+  revertirEstadoDocumentoArchivo,
+  procesarEntregaGrupal
 };
