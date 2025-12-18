@@ -99,6 +99,11 @@ router.post('/documentos/entrega-grupal', authenticateToken, requireArchivo, csr
 
 /**
  * @route POST /api/archivo/documentos/:id/entregar
+ * @desc Procesar entrega de documento propio del archivo
+ * @access Private (ARCHIVO only)
+ * @csrf Protected
+ */
+router.post('/documentos/:id/entregar', authenticateToken, requireArchivo, csrfProtection, procesarEntregaDocumento);
 
 /**
  * @route POST /api/archivo/documentos/:id/revertir-estado
