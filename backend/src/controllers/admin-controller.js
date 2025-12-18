@@ -2,11 +2,11 @@ import bcrypt from 'bcryptjs';
 import prisma from '../db.js';
 import { validatePassword, sanitizePassword } from '../utils/password-validator.js';
 import { sendSuccess, sendError, sendNotFound, sendConflict, sendPaginated, sanitizeResponse } from '../utils/http.js';
-import { 
-  logAdminAction, 
-  logUserListAccess, 
-  extractRequestInfo, 
-  AuditEventTypes 
+import {
+  logAdminAction,
+  logUserListAccess,
+  extractRequestInfo,
+  AuditEventTypes
 } from '../utils/audit-logger.js';
 
 /**
@@ -35,7 +35,7 @@ async function getAllUsers(req, res) {
 
     // Construir filtros
     const where = {};
-    
+
     if (search) {
       where.OR = [
         { firstName: { contains: search, mode: 'insensitive' } },
@@ -80,8 +80,8 @@ async function getAllUsers(req, res) {
 
     const totalPages = Math.ceil(totalCount / take);
 
-    return sendPaginated(res, 
-      sanitizeResponse(users, ['password']), 
+    return sendPaginated(res,
+      sanitizeResponse(users, ['password']),
       {
         page: parseInt(page),
         limit: take,
@@ -216,7 +216,7 @@ async function createUser(req, res) {
     // Validar contraseña
     const sanitizedPassword = sanitizePassword(password);
     const passwordValidation = validatePassword(sanitizedPassword);
-    
+
     if (!passwordValidation.isValid) {
       return res.status(400).json({
         success: false,
@@ -269,7 +269,7 @@ async function createUser(req, res) {
 
   } catch (error) {
     console.error('Error creando usuario:', error);
-    
+
     const requestInfo = extractRequestInfo(req);
     logAdminAction({
       adminUserId: req.user.id,
@@ -364,7 +364,7 @@ async function updateUser(req, res) {
     if (password) {
       const sanitizedPassword = sanitizePassword(password);
       const passwordValidation = validatePassword(sanitizedPassword);
-      
+
       if (!passwordValidation.isValid) {
         return res.status(400).json({
           success: false,
@@ -653,6 +653,177 @@ async function getUserStats(req, res) {
   }
 }
 
+/**
+ * Obtiene estadísticas generales del dashboard (solo admin)
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+async function getDashboardStats(req, res) {
+  try {
+    const today = new Date();
+    const sevenDaysAgo = new Date(today);
+    sevenDaysAgo.setDate(today.getDate() - 7);
+
+    const thirtyDaysAgo = new Date(today);
+    thirtyDaysAgo.setDate(today.getDate() - 30);
+
+    // Definición de umbrales para alertas
+    const stagnantThreshold = new Date(today);
+    stagnantThreshold.setHours(today.getHours() - 48); // 48 horas sin procesar
+
+    const uncollectedThreshold = new Date(today);
+    uncollectedThreshold.setDate(today.getDate() - 7); // 7 días sin retirar
+
+    const [
+      totalDocuments,
+      documentsByStatus,
+      documentsByType,
+      totalFacturado,
+      creditNotesCount,
+      recentActivity,
+      stagnantDocuments,
+      uncollectedDocuments
+    ] = await Promise.all([
+      // Total documentos
+      prisma.document.count(),
+
+      // Agrupados por estado
+      prisma.document.groupBy({
+        by: ['status'],
+        _count: { status: true }
+      }),
+
+      // Agrupados por tipo
+      prisma.document.groupBy({
+        by: ['documentType'],
+        _count: { documentType: true }
+      }),
+
+      // Total facturado (suma de totalFactura)
+      prisma.document.aggregate({
+        _sum: {
+          totalFactura: true
+        }
+      }),
+
+      // Notas de crédito (status = ANULADO_NOTA_CREDITO)
+      prisma.document.count({
+        where: { status: 'ANULADO_NOTA_CREDITO' }
+      }),
+
+      // Actividad reciente (últimos 7 días) - Simple conteo diario
+      prisma.document.findMany({
+        where: {
+          createdAt: {
+            gte: sevenDaysAgo
+          }
+        },
+        select: {
+          createdAt: true,
+          status: true
+        }
+      }),
+
+      // Alertas: Trámites estancados (>48h en PENDIENTE o EN_PROCESO)
+      prisma.document.findMany({
+        where: {
+          status: { in: ['PENDIENTE', 'EN_PROCESO'] },
+          createdAt: { lt: stagnantThreshold }
+        },
+        select: {
+          id: true,
+          protocolNumber: true,
+          clientName: true,
+          status: true,
+          createdAt: true,
+          documentType: true
+        },
+        orderBy: { createdAt: 'asc' },
+        take: 20
+      }),
+
+      // Alertas: Trámites no retirados (>7 días en LISTO)
+      prisma.document.findMany({
+        where: {
+          status: 'LISTO',
+          updatedAt: { lt: uncollectedThreshold }
+        },
+        select: {
+          id: true,
+          protocolNumber: true,
+          clientName: true,
+          clientPhone: true,
+          status: true,
+          updatedAt: true, // Fecha en que pasó a LISTO
+          documentType: true
+        },
+        orderBy: { updatedAt: 'asc' },
+        take: 20
+      })
+    ]);
+
+    // Procesar datos para gráficos
+    const statsByStatus = {};
+    documentsByStatus.forEach(d => {
+      statsByStatus[d.status] = d._count.status;
+    });
+
+    const statsByType = {};
+    documentsByType.forEach(d => {
+      statsByType[d.documentType] = d._count.documentType;
+    });
+
+    // Procesar timeline de últimos 7 días
+    const last7Days = {};
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      last7Days[dateStr] = 0;
+    }
+
+    recentActivity.forEach(doc => {
+      const dateStr = doc.createdAt.toISOString().split('T')[0];
+      if (last7Days[dateStr] !== undefined) {
+        last7Days[dateStr]++;
+      }
+    });
+
+    const timelineData = Object.entries(last7Days)
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    res.json({
+      success: true,
+      data: {
+        kpis: {
+          totalDocuments,
+          totalFacturado: totalFacturado._sum.totalFactura || 0,
+          creditNotesCount,
+          pendingCount: (statsByStatus['PENDIENTE'] || 0) + (statsByStatus['EN_PROCESO'] || 0),
+          readyCount: statsByStatus['LISTO'] || 0
+        },
+        charts: {
+          byStatus: statsByStatus,
+          byType: statsByType,
+          timeline: timelineData
+        },
+        alerts: {
+          stagnant: stagnantDocuments,
+          uncollected: uncollectedDocuments
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error obteniendo estadísticas del dashboard:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor al obtener estadísticas'
+    });
+  }
+}
+
 export {
   getAllUsers,
   getUserById,
@@ -660,5 +831,6 @@ export {
   updateUser,
   toggleUserStatus,
   deleteUser,
-  getUserStats
+  getUserStats,
+  getDashboardStats
 };

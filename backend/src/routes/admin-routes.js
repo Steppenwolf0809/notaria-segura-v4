@@ -7,7 +7,8 @@ import {
   updateUser,
   toggleUserStatus,
   deleteUser,
-  getUserStats
+  getUserStats,
+  getDashboardStats
 } from '../controllers/admin-controller.js';
 
 import {
@@ -45,9 +46,9 @@ import {
   previewTemplate,
   initializeDefaultTemplates
 } from '../controllers/admin-whatsapp-templates-controller.js';
-import { 
-  authenticateToken, 
-  requireAdmin 
+import {
+  authenticateToken,
+  requireAdmin
 } from '../middleware/auth-middleware.js';
 import {
   adminRateLimit,
@@ -86,6 +87,13 @@ router.get('/users', getAllUsers);
  * @access Private (ADMIN only)
  */
 router.get('/users/stats', getUserStats);
+
+/**
+ * @route GET /api/admin/dashboard/stats
+ * @desc Obtener estadísticas generales para el dashboard
+ * @access Private (ADMIN only)
+ */
+router.get('/dashboard/stats', getDashboardStats);
 
 /**
  * @route GET /api/admin/users/:id
