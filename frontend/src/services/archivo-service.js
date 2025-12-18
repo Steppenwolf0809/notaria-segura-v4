@@ -1,22 +1,10 @@
-import axios from 'axios';
+import apiClient from './api-client';
 
 /**
  * SERVICIO DE ARCHIVO
  * Maneja las peticiones al backend para el rol ARCHIVO
  * Funcionalidad dual: documentos propios + supervisión global
  */
-
-const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
-
-/**
- * Configurar headers con token de autorización
- */
-const getAuthHeaders = (token) => ({
-  headers: {
-    'Authorization': `Bearer ${token}`,
-    'Content-Type': 'application/json'
-  }
-});
 
 /**
  * ============================================================================
@@ -27,12 +15,9 @@ const getAuthHeaders = (token) => ({
 /**
  * Obtener dashboard con documentos propios
  */
-const getDashboard = async (token) => {
+const getDashboard = async () => {
   try {
-    const response = await axios.get(
-      `${API_BASE_URL}/archivo/dashboard`,
-      getAuthHeaders(token)
-    );
+    const response = await apiClient.get('/archivo/dashboard');
     return response.data;
   } catch (error) {
     return {
@@ -45,19 +30,16 @@ const getDashboard = async (token) => {
 /**
  * Listar documentos propios con filtros
  */
-const getMisDocumentos = async (token, params = {}) => {
+const getMisDocumentos = async (params = {}) => {
   try {
     const queryParams = new URLSearchParams();
-    
+
     if (params.search) queryParams.append('search', params.search);
     if (params.estado) queryParams.append('estado', params.estado);
     if (params.page) queryParams.append('page', params.page);
     if (params.limit) queryParams.append('limit', params.limit);
 
-    const response = await axios.get(
-      `${API_BASE_URL}/archivo/mis-documentos?${queryParams.toString()}`,
-      getAuthHeaders(token)
-    );
+    const response = await apiClient.get(`/archivo/mis-documentos?${queryParams.toString()}`);
     return response.data;
   } catch (error) {
     return {
@@ -68,14 +50,13 @@ const getMisDocumentos = async (token, params = {}) => {
 };
 
 /**
- 
+ * Cambiar estado de documento
  */
-const cambiarEstadoDocumento = async (token, documentoId, nuevoEstado) => {
+const cambiarEstadoDocumento = async (documentoId, nuevoEstado, options = {}) => {
   try {
-    const response = await axios.post(
-      `${API_BASE_URL}/archivo/documentos/${documentoId}/estado`,
-      { nuevoEstado },
-      getAuthHeaders(token)
+    const response = await apiClient.post(
+      `/archivo/documentos/${documentoId}/estado`,
+      { nuevoEstado, ...options }
     );
     return response.data;
   } catch (error) {
@@ -92,7 +73,7 @@ const cambiarEstadoDocumento = async (token, documentoId, nuevoEstado) => {
  */
 const revertirEstadoDocumento = async (documentoId, newStatus, reversionReason) => {
   try {
-    const response = await api.post(`/archivo/documentos/${documentoId}/revertir-estado`, {
+    const response = await apiClient.post(`/archivo/documentos/${documentoId}/revertir-estado`, {
       newStatus,
       reversionReason
     });
@@ -112,51 +93,9 @@ const revertirEstadoDocumento = async (documentoId, newStatus, reversionReason) 
 /**
  * Procesar entrega de documento (nueva funcionalidad ARQUIVO = RECEPCIÓN)
  */
-/**
- * Crear instancia configurada de axios con interceptor
- */
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  timeout: 10000
-});
-
-// Interceptor para agregar token automáticamente
-api.interceptors.request.use(
-  (config) => {
-    const authData = localStorage.getItem('notaria-auth-storage');
-    if (authData) {
-      try {
-        const parsed = JSON.parse(authData);
-        if (parsed.state && parsed.state.token) {
-          config.headers.Authorization = `Bearer ${parsed.state.token}`;
-        }
-      } catch (error) {
-        // Fallback al token directo
-        const token = localStorage.getItem('token');
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
-        }
-      }
-    } else {
-      // Fallback al token directo
-      const token = localStorage.getItem('token');
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
 const procesarEntrega = async (documentoId, entregaData) => {
   try {
-    const response = await api.post(`/archivo/documentos/${documentoId}/entregar`, entregaData);
+    const response = await apiClient.post(`/archivo/documentos/${documentoId}/entregar`, entregaData);
     return {
       success: true,
       data: response.data.data,
@@ -179,10 +118,10 @@ const procesarEntrega = async (documentoId, entregaData) => {
 /**
  * Obtener todos los documentos del sistema para supervisión
  */
-const getSupervisionGeneral = async (token, params = {}) => {
+const getSupervisionGeneral = async (params = {}) => {
   try {
     const queryParams = new URLSearchParams();
-    
+
     if (params.search) queryParams.append('search', params.search);
     if (params.matrizador) queryParams.append('matrizador', params.matrizador);
     if (params.estado) queryParams.append('estado', params.estado);
@@ -193,10 +132,7 @@ const getSupervisionGeneral = async (token, params = {}) => {
     if (params.page) queryParams.append('page', params.page);
     if (params.limit) queryParams.append('limit', params.limit);
 
-    const response = await axios.get(
-      `${API_BASE_URL}/archivo/supervision/todos?${queryParams.toString()}`,
-      getAuthHeaders(token)
-    );
+    const response = await apiClient.get(`/archivo/supervision/todos?${queryParams.toString()}`);
     return response.data;
   } catch (error) {
     return {
@@ -209,12 +145,9 @@ const getSupervisionGeneral = async (token, params = {}) => {
 /**
  * Obtener resumen general del sistema
  */
-const getResumenGeneral = async (token) => {
+const getResumenGeneral = async () => {
   try {
-    const response = await axios.get(
-      `${API_BASE_URL}/archivo/supervision/resumen`,
-      getAuthHeaders(token)
-    );
+    const response = await apiClient.get('/archivo/supervision/resumen');
     return response.data;
   } catch (error) {
     return {
@@ -227,12 +160,9 @@ const getResumenGeneral = async (token) => {
 /**
  * Obtener lista de matrizadores para filtros
  */
-const getMatrizadores = async (token) => {
+const getMatrizadores = async () => {
   try {
-    const response = await axios.get(
-      `${API_BASE_URL}/archivo/supervision/matrizadores`,
-      getAuthHeaders(token)
-    );
+    const response = await apiClient.get('/archivo/supervision/matrizadores');
     return response.data;
   } catch (error) {
     return {
@@ -251,12 +181,9 @@ const getMatrizadores = async (token) => {
 /**
  * Obtener detalle de documento (propio o ajeno)
  */
-const getDetalleDocumento = async (token, documentoId) => {
+const getDetalleDocumento = async (documentoId) => {
   try {
-    const response = await axios.get(
-      `${API_BASE_URL}/archivo/documentos/${documentoId}`,
-      getAuthHeaders(token)
-    );
+    const response = await apiClient.get(`/archivo/documentos/${documentoId}`);
     return response.data;
   } catch (error) {
     return {
@@ -292,12 +219,12 @@ const formatearAlerta = (alerta) => {
   if (!alerta || alerta.nivel === 'normal') {
     return { texto: 'Normal', color: 'success', icono: '' };
   }
-  
+
   const alertas = {
     'amarilla': { texto: 'Atención', color: 'warning', icono: '⚠️' },
     'roja': { texto: 'Crítico', color: 'error', icono: '🔥' }
   };
-  
+
   return alertas[alerta.nivel] || { texto: 'Normal', color: 'success', icono: '' };
 };
 
@@ -315,15 +242,15 @@ const archivoService = {
   cambiarEstadoDocumento,
   revertirEstadoDocumento,
   procesarEntrega,
-  
+
   // Supervisión global
   getSupervisionGeneral,
   getResumenGeneral,
   getMatrizadores,
-  
+
   // Documentos individuales
   getDetalleDocumento,
-  
+
   // Utilidades
   formatearEstado,
   formatearAlerta
