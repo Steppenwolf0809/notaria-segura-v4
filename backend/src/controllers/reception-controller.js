@@ -997,6 +997,36 @@ async function marcarGrupoListo(req, res) {
       logger.warn('Error enviando WhatsApp grupal (operación continúa):', whatsappError.message);
     }
 
+    // 📈 Registrar eventos de auditoría para cada documento del grupo
+    try {
+      for (const doc of updatedDocuments) {
+        await prisma.documentEvent.create({
+          data: {
+            documentId: doc.id,
+            userId: req.user.id,
+            eventType: 'STATUS_CHANGED',
+            description: `Marcado como LISTO (grupo de ${updatedDocuments.length}) por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
+            details: JSON.stringify({
+              previousStatus: 'EN_PROCESO',
+              newStatus: 'LISTO',
+              codigoRetiro: nuevoCodigo,
+              bulk: true,
+              groupSize: updatedDocuments.length,
+              changedBy: `${req.user.firstName} ${req.user.lastName}`,
+              userRole: req.user.role,
+              timestamp: new Date().toISOString()
+            }),
+            ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+            userAgent: req.get('User-Agent') || 'unknown'
+          }
+        });
+      }
+      logger.debug(`Registrados ${updatedDocuments.length} eventos de auditoría para grupo LISTO`);
+    } catch (auditError) {
+      logger.error('Error registrando eventos de auditoría grupal:', auditError);
+      // No fallar la operación principal
+    }
+
     // Headers para evitar cache del navegador
     res.set({
       'Cache-Control': 'no-cache, no-store, must-revalidate',

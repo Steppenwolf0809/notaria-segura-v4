@@ -14,7 +14,7 @@ const useBulkActions = () => {
   const VALID_BULK_TRANSITIONS = {
     'EN_PROCESO': ['AGRUPADO', 'LISTO'],
     'AGRUPADO': ['LISTO', 'EN_PROCESO'],
-    'LISTO': [] // No permitimos LISTO → ENTREGADO en masa (requiere info específica)
+    'LISTO': ['ENTREGADO'] // Permitir entrega grupal desde LISTO
   };
 
   const MAX_BULK_SELECTION = 50;
@@ -24,13 +24,13 @@ const useBulkActions = () => {
    */
   const getCommonStatus = useCallback((documents) => {
     if (!documents || documents.length === 0) return null;
-    
+
     const selectedDocs = documents.filter(doc => selectedDocuments.has(doc.id));
     if (selectedDocs.length === 0) return null;
 
     const statuses = selectedDocs.map(doc => doc.status);
     const uniqueStatuses = [...new Set(statuses)];
-    
+
     // Solo retornar si todos tienen el mismo estado
     return uniqueStatuses.length === 1 ? uniqueStatuses[0] : null;
   }, [selectedDocuments]);
@@ -41,7 +41,7 @@ const useBulkActions = () => {
   const getValidTransitions = useCallback((documents) => {
     const commonStatus = getCommonStatus(documents);
     if (!commonStatus) return [];
-    
+
     return VALID_BULK_TRANSITIONS[commonStatus] || [];
   }, [getCommonStatus]);
 
@@ -51,11 +51,11 @@ const useBulkActions = () => {
   const toggleDocumentSelection = useCallback((documentId, documentStatus, allDocuments) => {
     setSelectedDocuments(prev => {
       const newSelection = new Set(prev);
-      
+
       if (newSelection.has(documentId)) {
         // Deseleccionar
         newSelection.delete(documentId);
-        
+
         // Si no hay documentos seleccionados, salir del modo bulk
         if (newSelection.size === 0) {
           setBulkActionMode(false);
@@ -68,15 +68,15 @@ const useBulkActions = () => {
 
         // Verificar compatibilidad de estado
         const currentCommonStatus = getCommonStatus(allDocuments);
-        
+
         if (currentCommonStatus && currentCommonStatus !== documentStatus) {
           // Si hay documentos seleccionados de diferente estado, limpiar selección
           newSelection.clear();
         }
-        
+
         // Agregar nuevo documento
         newSelection.add(documentId);
-        
+
         // Activar modo bulk si es el primer documento seleccionado
         if (!bulkActionMode) {
           setBulkActionMode(true);
@@ -94,13 +94,13 @@ const useBulkActions = () => {
     if (selectAll) {
       // Seleccionar todos los documentos visibles del mismo estado
       if (documents.length === 0) return;
-      
+
       // Tomar el estado del primer documento como referencia
       const referenceStatus = documents[0].status;
       const compatibleDocs = documents
         .filter(doc => doc.status === referenceStatus)
         .slice(0, MAX_BULK_SELECTION); // Respetar límite máximo
-      
+
       const newSelection = new Set(compatibleDocs.map(doc => doc.id));
       setSelectedDocuments(newSelection);
       setBulkActionMode(newSelection.size > 0);
@@ -108,7 +108,7 @@ const useBulkActions = () => {
       // Deseleccionar todos
       setSelectedDocuments(new Set());
       setBulkActionMode(false);
-      
+
     }
   }, []);
 
@@ -125,7 +125,7 @@ const useBulkActions = () => {
    */
   const executeBulkStatusChange = useCallback(async (documents, newStatus, options = {}) => {
     const selectedDocs = documents.filter(doc => selectedDocuments.has(doc.id));
-    
+
     if (selectedDocs.length === 0) {
       throw new Error('No hay documentos seleccionados');
     }
@@ -154,7 +154,7 @@ const useBulkActions = () => {
       if (response.success) {
         // Limpiar selección después del éxito
         clearSelection();
-        
+
         return response;
       } else {
         throw new Error(response.message || 'Error en cambio masivo');
@@ -183,13 +183,13 @@ const useBulkActions = () => {
   const canSelectDocument = useCallback((document, allDocuments) => {
     // Si no hay selección, cualquier documento es válido
     if (selectedDocuments.size === 0) return true;
-    
+
     // Si ya está seleccionado, puede ser deseleccionado
     if (selectedDocuments.has(document.id)) return true;
-    
+
     // Verificar límite
     if (selectedDocuments.size >= MAX_BULK_SELECTION) return false;
-    
+
     // Verificar compatibilidad de estado
     const commonStatus = getCommonStatus(allDocuments);
     return !commonStatus || commonStatus === document.status;
@@ -201,18 +201,18 @@ const useBulkActions = () => {
     bulkActionMode,
     isExecuting,
     selectionInfo,
-    
+
     // Funciones
     toggleDocumentSelection,
     toggleSelectAll,
     clearSelection,
     executeBulkStatusChange,
-    
+
     // Utilidades
     getCommonStatus,
     getValidTransitions,
     canSelectDocument,
-    
+
     // Constantes
     MAX_BULK_SELECTION,
     VALID_BULK_TRANSITIONS

@@ -351,6 +351,12 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
       bulkActions.selectedDocuments.has(doc.id)
     );
 
+    // Para ENTREGADO, abrir modal de entrega grupal en lugar de cambio de estado
+    if (targetStatus === 'ENTREGADO') {
+      setShowGroupDeliveryModal(true);
+      return;
+    }
+
     setPendingBulkAction({
       documents: selectedDocs,
       fromStatus: bulkActions.getCommonStatus(documentosFiltrados),
