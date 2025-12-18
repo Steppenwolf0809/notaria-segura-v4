@@ -8,27 +8,33 @@ import {
   Alert,
   Chip,
   CircularProgress,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
-  LinearProgress,
-  Paper
+  Paper,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Tooltip,
+  IconButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Avatar
 } from '@mui/material';
 import {
   Person as PersonIcon,
   Dashboard as DashboardIcon,
-  Settings as SettingsIcon,
-  Assessment as StatsIcon,
   Assignment as DocumentIcon,
-  Security as SecurityIcon,
   AttachMoney as MoneyIcon,
   Warning as WarningIcon,
-  AccessTime as TimeIcon,
   Description as DescriptionIcon,
   TrendingUp as TrendingUpIcon,
-  Error as ErrorIcon
+  Error as ErrorIcon,
+  Refresh as RefreshIcon,
+  Visibility as VisibilityIcon,
+  CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import AdminLayout from './AdminLayout';
@@ -40,51 +46,36 @@ import NotificationTemplates from './admin/NotificationTemplates';
 import WhatsAppTemplates from './admin/WhatsAppTemplates';
 import AdminSettings from './admin/AdminSettings';
 import AdminFormulariosUAFE from './admin/AdminFormulariosUAFE';
-import { getDashboardStats } from '../services/admin-dashboard-service';
+import { getSupervisionStats, getMatrizadores } from '../services/admin-supervision-service';
 
 /**
  * Centro de administración - Panel principal para ADMIN
- * Ahora usando AdminLayout con sidebar como otros roles
  */
 const AdminCenter = () => {
   const [currentView, setCurrentView] = useState('dashboard');
 
-  /**
-   * Manejar cambios de vista
-   */
   const handleViewChange = (view) => {
     setCurrentView(view);
   };
 
-  /**
-   * Renderizar contenido según la vista actual
-   */
   const renderContent = () => {
     switch (currentView) {
       case 'dashboard':
         return <AdminDashboard />;
-
       case 'users':
         return <UserManagement />;
-
       case 'documents':
         return <DocumentOversight />;
-
       case 'formularios-uafe':
         return <AdminFormulariosUAFE />;
-
       case 'notifications':
         return <NotificationHistory />;
-
       case 'notification-templates':
         return <NotificationTemplates />;
-
       case 'whatsapp-templates':
         return <WhatsAppTemplates />;
-
       case 'settings':
         return <AdminSettings />;
-
       default:
         return <AdminDashboard />;
     }
@@ -98,32 +89,54 @@ const AdminCenter = () => {
 };
 
 /**
- * Dashboard principal del administrador
+ * Dashboard de Supervisión
  */
 const AdminDashboard = () => {
   const { user } = useAuth();
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [stats, setStats] = useState(null);
+
+  // Filtros
+  const [thresholdDays, setThresholdDays] = useState(15);
+  const [selectedMatrixer, setSelectedMatrixer] = useState('');
+  const [matrizadores, setMatrizadores] = useState([]);
 
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoading(true);
-        const data = await getDashboardStats();
-        setStats(data);
-      } catch (err) {
-        setError('Error al cargar estadísticas del sistema');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStats();
+    loadMatrizadores();
   }, []);
 
-  if (loading) {
+  useEffect(() => {
+    loadStats();
+  }, [thresholdDays, selectedMatrixer]);
+
+  const loadMatrizadores = async () => {
+    try {
+      const users = await getMatrizadores();
+      setMatrizadores(users);
+    } catch (e) {
+      console.error('Error cargando matrizadores', e);
+    }
+  };
+
+  const loadStats = async () => {
+    try {
+      setLoading(true);
+      const data = await getSupervisionStats({
+        thresholdDays,
+        matrixerId: selectedMatrixer
+      });
+      setStats(data);
+      setError(null);
+    } catch (err) {
+      setError('Error al cargar estadísticas de supervisión.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading && !stats) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
         <CircularProgress />
@@ -132,156 +145,199 @@ const AdminDashboard = () => {
   }
 
   if (error) {
-    return (
-      <Alert severity="error" sx={{ m: 2 }}>{error}</Alert>
-    );
+    return <Alert severity="error" sx={{ m: 2 }}>{error}</Alert>;
   }
 
-  const { kpis, charts, alerts } = stats || {};
+  const { kpis, criticalList, teamPerformance } = stats || {};
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-        <DashboardIcon sx={{ mr: 1, fontSize: 30, color: 'primary.main' }} />
-        <Typography variant="h5" sx={{ fontWeight: 'bold' }}>
-          Panel de Control General
-        </Typography>
+      {/* Encabezado con Filtros */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <DashboardIcon sx={{ mr: 1, fontSize: 32, color: 'primary.main' }} />
+          <Typography variant="h5" fontWeight="bold">Supervisión</Typography>
+        </Box>
+
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel>Umbral Retraso</InputLabel>
+            <Select
+              value={thresholdDays}
+              label="Umbral Retraso"
+              onChange={(e) => setThresholdDays(e.target.value)}
+            >
+              <MenuItem value={5}>5 días</MenuItem>
+              <MenuItem value={10}>10 días</MenuItem>
+              <MenuItem value={15}>15 días</MenuItem>
+              <MenuItem value={30}>30 días</MenuItem>
+            </Select>
+          </FormControl>
+
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel>Matrizador</InputLabel>
+            <Select
+              value={selectedMatrixer}
+              label="Matrizador"
+              onChange={(e) => setSelectedMatrixer(e.target.value)}
+            >
+              <MenuItem value="">Todos</MenuItem>
+              {matrizadores.map(m => (
+                <MenuItem key={m.id} value={m.id}>{m.firstName} {m.lastName}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <Tooltip title="Actualizar">
+            <IconButton onClick={loadStats} color="primary">
+              <RefreshIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
       </Box>
 
-      {/* KPIs Principales */}
+      {/* KPIs */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={4}>
           <SummaryCard
-            title="Trámites Totales"
-            value={kpis?.totalDocuments || 0}
-            icon={<DocumentIcon />}
-            color="primary"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <SummaryCard
-            title="Facturación Total"
-            value={`$${(kpis?.totalFacturado || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-            icon={<MoneyIcon />}
-            color="success"
-            subtext="Acumulado histórico"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <SummaryCard
-            title="Pendientes"
-            value={kpis?.pendingCount || 0}
-            icon={<TimeIcon />}
-            color="warning"
-            subtext="En proceso o pendientes"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <SummaryCard
-            title="Por Retirar"
-            value={kpis?.readyCount || 0}
+            title="Total Activos"
+            value={kpis?.activeCount || 0}
             icon={<DescriptionIcon />}
-            color="info"
-            subtext="Listos para entrega"
+            color="primary"
+            subtext="Trámites en curso"
+          />
+        </Grid>
+        <Grid item xs={12} sm={4}>
+          <SummaryCard
+            title={`Críticos (> ${thresholdDays}d)`}
+            value={kpis?.criticalCount || 0}
+            icon={<WarningIcon />}
+            color="error"
+            subtext="Requieren atención"
+          />
+        </Grid>
+        <Grid item xs={12} sm={4}>
+          <SummaryCard
+            title="Eficiencia Semanal"
+            value={`${kpis?.weeklyEfficiency || 0}%`}
+            icon={<TrendingUpIcon />}
+            color={kpis?.weeklyEfficiency > 80 ? "success" : "warning"}
+            subtext="Entregados / Ingresados"
           />
         </Grid>
       </Grid>
 
-      <Grid container spacing={3}>
-        {/* Sección de Alertas */}
-        <Grid item xs={12} md={8}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                <WarningIcon color="error" sx={{ mr: 1 }} />
-                Alertas y Atención Requerida
-              </Typography>
+      {/* Tabla de Alertas Críticas */}
+      <Card variant="outlined" sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+            <ErrorIcon color="error" sx={{ mr: 1 }} />
+            Alertas de Retraso
+          </Typography>
 
-              <Box sx={{ mt: 2 }}>
-                {(!alerts?.stagnant?.length && !alerts?.uncollected?.length) && (
-                  <Alert severity="success">Todo está al día. No hay trámites estancados ni olvidados.</Alert>
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Protocolo</TableCell>
+                  <TableCell>Cliente</TableCell>
+                  <TableCell>Matrizador</TableCell>
+                  <TableCell>Acto</TableCell>
+                  <TableCell>Estado</TableCell>
+                  <TableCell>Días</TableCell>
+                  <TableCell>Acción</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {criticalList?.map((row) => {
+                  const isCritical = row.daysDelayed > 15;
+                  const isWarning = row.daysDelayed >= 10 && row.daysDelayed <= 15;
+                  let bgSx = {};
+                  if (isCritical) bgSx = { bgcolor: '#ffebee' };
+                  else if (isWarning) bgSx = { bgcolor: '#fff3e0' };
+
+                  return (
+                    <TableRow key={row.id} sx={bgSx}>
+                      <TableCell sx={{ fontWeight: 'bold' }}>{row.protocol || 'S/N'}</TableCell>
+                      <TableCell>{row.client}</TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Avatar sx={{ width: 24, height: 24, mr: 1, fontSize: 12 }}>
+                            {row.matrixer?.charAt(0) || '?'}
+                          </Avatar>
+                          {row.matrixer}
+                        </Box>
+                      </TableCell>
+                      <TableCell><Chip label={row.type} size="small" variant="outlined" /></TableCell>
+                      <TableCell>{row.status}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={`${row.daysDelayed}d`}
+                          color={isCritical ? "error" : "warning"}
+                          size="small"
+                          sx={{ fontWeight: 'bold' }}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Tooltip title="Ver Detalles">
+                          <IconButton size="small"><VisibilityIcon fontSize="small" /></IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {(!criticalList || criticalList.length === 0) && (
+                  <TableRow>
+                    <TableCell colSpan={7} align="center">
+                      <Box sx={{ py: 3 }}>
+                        <CheckCircleIcon color="success" sx={{ fontSize: 40, mb: 1 }} />
+                        <Typography>¡Excelente! No hay trámites con retraso crítico.</Typography>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
                 )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </CardContent>
+      </Card>
 
-                {/* Trámites Estancados */}
-                {alerts?.stagnant?.length > 0 && (
-                  <Box sx={{ mb: 3 }}>
-                    <Typography variant="subtitle2" color="error" sx={{ fontWeight: 'bold', mb: 1 }}>
-                      ⚠️ Trámites sin procesar ({'>'} 48h)
-                    </Typography>
-                    <Paper variant="outlined" sx={{ maxHeight: 200, overflow: 'auto' }}>
-                      <List dense>
-                        {alerts.stagnant.map(doc => (
-                          <ListItem key={doc.id}>
-                            <ListItemIcon><TimeIcon color="error" fontSize="small" /></ListItemIcon>
-                            <ListItemText
-                              primary={`${doc.protocolNumber || 'S/N'} - ${doc.clientName}`}
-                              secondary={`${new Date(doc.createdAt).toLocaleDateString()} - ${doc.status}`}
-                            />
-                            <Chip size="small" label={doc.documentType} color="error" variant="outlined" />
-                          </ListItem>
-                        ))}
-                      </List>
-                    </Paper>
-                  </Box>
-                )}
-
-                {/* Trámites No Retirados */}
-                {alerts?.uncollected?.length > 0 && (
-                  <Box>
-                    <Typography variant="subtitle2" color="warning.main" sx={{ fontWeight: 'bold', mb: 1 }}>
-                      📦 Listos sin retirar ({'>'} 7 días)
-                    </Typography>
-                    <Paper variant="outlined" sx={{ maxHeight: 200, overflow: 'auto' }}>
-                      <List dense>
-                        {alerts.uncollected.map(doc => (
-                          <ListItem key={doc.id}>
-                            <ListItemIcon><DescriptionIcon color="warning" fontSize="small" /></ListItemIcon>
-                            <ListItemText
-                              primary={`${doc.protocolNumber || 'S/N'} - ${doc.clientName}`}
-                              secondary={`Listo desde: ${new Date(doc.updatedAt).toLocaleDateString()}`}
-                            />
-                            <Chip size="small" label={doc.clientPhone} icon={<PersonIcon />} />
-                          </ListItem>
-                        ))}
-                      </List>
-                    </Paper>
-                  </Box>
-                )}
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Resumen de Estados */}
-        <Grid item xs={12} md={4}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Distribución por Estado
-              </Typography>
-              <Box sx={{ mt: 3 }}>
-                <StatusRow label="Pendiente" value={charts?.byStatus?.['PENDIENTE'] || 0} total={kpis?.totalDocuments} color="warning" />
-                <StatusRow label="En Proceso" value={charts?.byStatus?.['EN_PROCESO'] || 0} total={kpis?.totalDocuments} color="info" />
-                <StatusRow label="Listo" value={charts?.byStatus?.['LISTO'] || 0} total={kpis?.totalDocuments} color="success" />
-                <StatusRow label="Entregado" value={charts?.byStatus?.['ENTREGADO'] || 0} total={kpis?.totalDocuments} color="primary" />
-                <StatusRow label="Anulado (NC)" value={charts?.byStatus?.['ANULADO_NOTA_CREDITO'] || 0} total={kpis?.totalDocuments} color="error" />
-              </Box>
-
-              <Box sx={{ mt: 4, p: 2, bgcolor: 'background.default', borderRadius: 2 }}>
-                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                  Notas de Crédito Emitidas
-                </Typography>
-                <Typography variant="h4" color="error.main">
-                  {kpis?.creditNotesCount || 0}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  Trámites anulados con nota de crédito
-                </Typography>
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+      {/* Rendimiento de Equipo */}
+      <Card variant="outlined">
+        <CardContent>
+          <Typography variant="h6" gutterBottom>Rendimiento de Equipo</Typography>
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Matrizador</TableCell>
+                  <TableCell align="center">Carga Activa</TableCell>
+                  <TableCell align="center">Críticos</TableCell>
+                  <TableCell align="center">Entregas (Mes)</TableCell>
+                  <TableCell align="center">Velocidad Prom.</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {teamPerformance?.map((member) => (
+                  <TableRow key={member.id}>
+                    <TableCell sx={{ fontWeight: 'bold' }}>{member.name}</TableCell>
+                    <TableCell align="center">{member.activeLoad}</TableCell>
+                    <TableCell align="center">
+                      <Typography color={member.criticalCount > 0 ? "error" : "textPrimary"} fontWeight={member.criticalCount > 0 ? "bold" : "regular"}>
+                        {member.criticalCount}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center">{member.deliveredMonth}</TableCell>
+                    <TableCell align="center">
+                      {member.avgVelocityDays > 0 ? `${member.avgVelocityDays}d` : '-'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </CardContent>
+      </Card>
     </Box>
   );
 };
@@ -291,48 +347,18 @@ const SummaryCard = ({ title, value, icon, color, subtext }) => (
     <CardContent>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <Box>
-          <Typography color="textSecondary" gutterBottom variant="overline">
-            {title}
-          </Typography>
-          <Typography variant="h4" component="div" sx={{ fontWeight: 'bold', color: `${color}.main` }}>
-            {value}
-          </Typography>
+          <Typography color="textSecondary" gutterBottom variant="overline">{title}</Typography>
+          <Typography variant="h4" component="div" sx={{ fontWeight: 'bold', color: `${color}.main` }}>{value}</Typography>
         </Box>
-        <Box sx={{
-          p: 1.5,
-          borderRadius: 2,
-          bgcolor: `${color}.light`,
-          color: `${color}.contrastText`,
-          display: 'flex'
-        }}>
+        <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: `${color}.light`, color: `${color}.contrastText`, display: 'flex' }}>
           {React.cloneElement(icon, { fontSize: 'medium' })}
         </Box>
       </Box>
       {subtext && (
-        <Typography variant="caption" color="textSecondary" sx={{ mt: 1, display: 'block' }}>
-          {subtext}
-        </Typography>
+        <Typography variant="caption" color="textSecondary" sx={{ mt: 1, display: 'block' }}>{subtext}</Typography>
       )}
     </CardContent>
   </Card>
 );
-
-const StatusRow = ({ label, value, total, color }) => {
-  const percentage = total > 0 ? Math.round((value / total) * 100) : 0;
-  return (
-    <Box sx={{ mb: 2 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-        <Typography variant="body2">{label}</Typography>
-        <Typography variant="body2" fontWeight="bold">{value} ({percentage}%)</Typography>
-      </Box>
-      <LinearProgress
-        variant="determinate"
-        value={percentage}
-        color={color}
-        sx={{ height: 8, borderRadius: 4 }}
-      />
-    </Box>
-  );
-};
 
 export default AdminCenter;
