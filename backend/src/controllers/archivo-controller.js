@@ -553,11 +553,11 @@ async function procesarEntregaDocumento(req, res) {
       });
     }
 
-    // Solo documentos LISTO pueden ser entregados
-    if (documento.status !== 'LISTO') {
+    // Solo documentos LISTO o EN_PROCESO pueden ser entregados
+    if (!['LISTO', 'EN_PROCESO'].includes(documento.status)) {
       return res.status(400).json({
         success: false,
-        message: 'Solo se pueden entregar documentos que estén LISTO'
+        message: 'Solo se pueden entregar documentos que estén LISTO o EN PROCESO'
       });
     }
 
@@ -578,11 +578,11 @@ async function procesarEntregaDocumento(req, res) {
     if (documento.isGrouped && documento.documentGroupId) {
       logger.debug('Documento agrupado, entregando grupo completo');
 
-      // Buscar todos los documentos del grupo que estén LISTO
+      // Buscar todos los documentos del grupo que estén LISTO o EN_PROCESO
       const groupDocsToDeliver = await prisma.document.findMany({
         where: {
           documentGroupId: documento.documentGroupId,
-          status: 'LISTO',
+          status: { in: ['LISTO', 'EN_PROCESO'] },
           id: { not: id }, // Excluir el documento actual
           isGrouped: true
         }
@@ -809,14 +809,14 @@ async function procesarEntregaGrupal(req, res) {
       where: {
         id: { in: documentIds },
         assignedToId: userId, // Solo documentos propios
-        status: 'LISTO' // Solo documentos listos
+        status: { in: ['LISTO', 'EN_PROCESO'] } // Permitir EN_PROCESO también
       }
     });
 
     if (documents.length !== documentIds.length) {
       return res.status(400).json({
         success: false,
-        message: `Solo ${documents.length} de ${documentIds.length} documentos están listos y asignados a usted`
+        message: `Solo ${documents.length} de ${documentIds.length} documentos están listos (o en proceso) y asignados a usted`
       });
     }
 
