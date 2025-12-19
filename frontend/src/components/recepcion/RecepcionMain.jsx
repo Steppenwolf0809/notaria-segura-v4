@@ -815,7 +815,21 @@ function RecepcionMain() {
                     {/* Cliente */}
                     <TableCell>
                       <Box>
-                        <Typography variant="body2" fontWeight={600}>
+                        <Typography
+                          variant="body2"
+                          fontWeight={600}
+                          sx={{
+                            cursor: 'pointer',
+                            '&:hover': {
+                              color: 'primary.main',
+                              textDecoration: 'underline'
+                            }
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSearchQuery(documento.clientName);
+                          }}
+                        >
                           {documento.clientName}
                         </Typography>
                         <Typography
