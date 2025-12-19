@@ -1648,11 +1648,9 @@ async function getReceptionSuggestions(req, res) {
       message: 'Error interno del servidor en sugerencias',
       error: error?.message || 'Unknown error'
     });
-    message: 'Error al realizar entrega en bloque',
-      error: error.message
-  });
-}
+
   }
+}
 
 /**
  * Entregar múltiples documentos (compatible con ModalEntregaGrupal)
