@@ -663,7 +663,11 @@ async function getDashboardStats(req, res) {
       thresholdDays = 15,
       matrixerId,
       startDate,
-      endDate
+      endDate,
+      status, // Nuevo filtro de estado
+      page = 1, // Paginación
+      limit = 20, // Paginación
+      billedTimeRange = 'current_month' // Filtro para KPI de facturación
     } = req.query;
 
     const today = new Date();
@@ -701,6 +705,49 @@ async function getDashboardStats(req, res) {
       }
     });
 
+    // KPI: Total Facturado
+    // Definir rango de tiempo para facturación
+    const billedDateFilter = {};
+    const now = new Date();
+    let startBilledDate = new Date();
+
+    switch (billedTimeRange) {
+      case 'current_month':
+        startBilledDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        billedDateFilter.createdAt = { gte: startBilledDate };
+        break;
+      case 'last_month':
+        startBilledDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const endBilledDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+        billedDateFilter.createdAt = { gte: startBilledDate, lte: endBilledDate };
+        break;
+      case 'year_to_date':
+        startBilledDate = new Date(now.getFullYear(), 0, 1);
+        billedDateFilter.createdAt = { gte: startBilledDate };
+        break;
+      case 'all_time':
+        // No filter
+        break;
+      default: // current_month default
+        startBilledDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        billedDateFilter.createdAt = { gte: startBilledDate };
+    }
+
+    // Calcular suma de totalFactura (excluyendo anulados)
+    const billedAggregate = await prisma.document.aggregate({
+      _sum: {
+        totalFactura: true
+      },
+      where: {
+        status: { not: 'ANULADO_NOTA_CREDITO' },
+        ...billedDateFilter,
+        ...matrixerFilter // Aplicar filtro de matrizador si está seleccionado
+      }
+    });
+
+    const totalBilled = billedAggregate._sum.totalFactura || 0;
+
+
     // Eficiencia Semanal (Entregados vs Ingresados esta semana)
     const startOfWeek = new Date();
     startOfWeek.setDate(today.getDate() - today.getDay());
@@ -725,24 +772,52 @@ async function getDashboardStats(req, res) {
       ? Math.round((deliveredThisWeek / createdThisWeek) * 100)
       : 0;
 
-    // 2. Alertas Críticas (> 10 días para mostrar naranja/rojo)
-    const warningThresholdDate = new Date();
-    warningThresholdDate.setDate(today.getDate() - 10);
+    // 2. Lista de Alertas / Documentos con filtros
+    // Filtro base: activos (no entregados, no anulados) y warnngThreshold para atrás
+    // PERO el usuario pidió filtro por ESTADO, así que si hay status param, respetamos ese status
+    // Si NO hay status, mantenemos la lógica de alertas (antiguos)
 
-    const criticalDocs = await prisma.document.findMany({
-      where: {
-        status: { notIn: ['ENTREGADO', 'ANULADO_NOTA_CREDITO'] },
-        createdAt: { lt: warningThresholdDate },
-        ...matrixerFilter
-      },
-      include: {
-        assignedTo: {
-          select: { firstName: true, lastName: true }
-        }
-      },
-      orderBy: { createdAt: 'asc' },
-      take: 100
-    });
+    const docWhere = { ...matrixerFilter };
+
+    // Si el usuario filtra por estado específico
+    if (status && status !== '') {
+      docWhere.status = status;
+    } else {
+      // Comportamiento por defecto: Mostrar alertas (no entregados, no anulados)
+      docWhere.status = { notIn: ['ENTREGADO', 'ANULADO_NOTA_CREDITO'] };
+
+      // Si estamos en modo "Alertas Críticas" (sin filtro de estado explícito), 
+      // ¿deberíamos filtrar solo los viejos?
+      // El requerimiento dice "agregar un filtro por estado".
+      // Y también "no muestre tantos documentos de golpe".
+      // Mantengamos la vista de "Alertas" por defecto mostrando SOLO los retrasados si no hay filtro activo.
+      // Si hay filtro activo, mostramos todos los de ese estado.
+
+      const warningThresholdDate = new Date();
+      warningThresholdDate.setDate(today.getDate() - 10);
+      docWhere.createdAt = { lt: warningThresholdDate };
+    }
+
+    // Paginación
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const take = parseInt(limit);
+
+    const [criticalDocs, totalDocs] = await Promise.all([
+      prisma.document.findMany({
+        where: docWhere,
+        include: {
+          assignedTo: {
+            select: { firstName: true, lastName: true }
+          }
+        },
+        orderBy: { createdAt: 'asc' }, // Los más antiguos primero (prioridad atención)
+        skip,
+        take
+      }),
+      prisma.document.count({ where: docWhere })
+    ]);
+
+    const hasMore = skip + take < totalDocs;
 
     // 3. Rendimiento de Equipo
     const teamWhere = { role: 'MATRIZADOR', isActive: true };
@@ -822,7 +897,8 @@ async function getDashboardStats(req, res) {
         kpis: {
           activeCount,
           criticalCount,
-          weeklyEfficiency
+          weeklyEfficiency,
+          totalBilled // Nuevo KPI
         },
         criticalList: criticalDocs.map(doc => ({
           id: doc.id,
@@ -834,6 +910,11 @@ async function getDashboardStats(req, res) {
           daysDelayed: Math.floor((new Date() - new Date(doc.createdAt)) / (1000 * 60 * 60 * 24)),
           status: doc.status
         })),
+        pagination: {
+          page: parseInt(page),
+          hasMore,
+          total: totalDocs
+        },
         teamPerformance
       }
     });
