@@ -353,7 +353,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
   const handleConfirmBulkAction = async (actionData) => {
     try {
       // Filtrar opciones para evitar duplicados de fromStatus/toStatus
-      const { fromStatus, toStatus, ...cleanOptions } = actionData.options || {};
+      const { fromStatus, toStatus, ...cleanOptions } = actionData;
 
       const result = await bulkActions.executeBulkStatusChange(
         filteredAndSortedDocuments,
