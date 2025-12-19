@@ -47,6 +47,7 @@ import {
 import { toast } from 'react-toastify';
 import receptionService from '../../services/reception-service';
 import ModalEntrega from './ModalEntrega';
+import ModalEntregaGrupal from './ModalEntregaGrupal';
 
 /**
  * Componente principal de recepción rediseñado
@@ -94,6 +95,7 @@ function RecepcionMain() {
 
   // Estados de modales
   const [showModalEntrega, setShowModalEntrega] = useState(false);
+  const [showEntregaGrupal, setShowEntregaGrupal] = useState(false);
   const [documentoSeleccionado, setDocumentoSeleccionado] = useState(null);
 
   /**
@@ -392,6 +394,7 @@ function RecepcionMain() {
    */
   const handleCloseModalEntrega = () => {
     setShowModalEntrega(false);
+    setShowEntregaGrupal(false);
     setDocumentoSeleccionado(null);
   };
 
@@ -871,10 +874,10 @@ function RecepcionMain() {
                             }}
                           >
                             {documento.status === 'EN_PROCESO' ? 'PROC' :
-                             documento.status === 'LISTO' ? 'LSTO' :
-                             documento.status === 'PAGADO' ? 'PAGD' :
-                             documento.status === 'ENTREGADO' ? 'ENTR' :
-                             documento.status}
+                              documento.status === 'LISTO' ? 'LSTO' :
+                                documento.status === 'PAGADO' ? 'PAGD' :
+                                  documento.status === 'ENTREGADO' ? 'ENTR' :
+                                    documento.status}
                           </Typography>
                         </Box>
                       </Tooltip>
@@ -890,15 +893,27 @@ function RecepcionMain() {
                     {/* Acciones */}
                     <TableCell sx={{ textAlign: 'center' }}>
                       {documento.status === 'EN_PROCESO' ? (
-                        <Button
-                          variant="contained"
-                          size="small"
-                          color="success"
-                          startIcon={<CheckCircleIcon />}
-                          onClick={() => handleMarcarListo(documento.id)}
-                        >
-                          Marcar Listo
-                        </Button>
+                        <>
+                          <Button
+                            variant="contained"
+                            size="small"
+                            color="success"
+                            startIcon={<CheckCircleIcon />}
+                            onClick={() => handleMarcarListo(documento.id)}
+                          >
+                            Marcar Listo
+                          </Button>
+                          <Button
+                            variant="contained"
+                            size="small"
+                            color="primary"
+                            startIcon={<LocalShippingIcon />}
+                            onClick={() => handleEntregar(documento)}
+                            sx={{ ml: 1 }}
+                          >
+                            Entregar
+                          </Button>
+                        </>
                       ) : (documento.status === 'LISTO' || documento.status === 'PAGADO') ? (
                         <Button
                           variant="contained"
@@ -944,63 +959,71 @@ function RecepcionMain() {
       </Card>
 
       {/* Acciones Rápidas */}
-      {selectedDocuments.size > 0 && (
-        <Paper
-          sx={{
-            position: 'fixed',
-            bottom: 24,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            p: 2,
-            bgcolor: 'background.paper',
-            boxShadow: 4,
-            borderRadius: 2,
-            zIndex: 1200,
-            minWidth: 400
-          }}
-        >
-          <Box display="flex" gap={2} alignItems="center">
-            <Typography variant="body2" fontWeight={600}>
-              {selectedDocuments.size} documento(s) seleccionado(s)
-            </Typography>
+      {
+        selectedDocuments.size > 0 && (
+          <Paper
+            sx={{
+              position: 'fixed',
+              bottom: 24,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              p: 2,
+              bgcolor: 'background.paper',
+              boxShadow: 4,
+              borderRadius: 2,
+              zIndex: 1200,
+              minWidth: 400
+            }}
+          >
+            <Box display="flex" gap={2} alignItems="center">
+              <Typography variant="body2" fontWeight={600}>
+                {selectedDocuments.size} documento(s) seleccionado(s)
+              </Typography>
 
-            <Button
-              variant="contained"
-              color="success"
-              startIcon={<CheckCircleIcon />}
-              onClick={handleMarkMultipleReady}
-            >
-              Marcar como Listos
-            </Button>
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={<CheckCircleIcon />}
+                onClick={handleMarkMultipleReady}
+              >
+                Marcar como Listos
+              </Button>
 
-            <Button
-              variant="outlined"
-              startIcon={<NotificationsIcon />}
-              onClick={() => toast.info('Funcionalidad en desarrollo')}
-            >
-              Notificar
-            </Button>
-
-            <Button
-              variant="outlined"
-              startIcon={<DownloadIcon />}
-              onClick={handleExport}
-            >
-              Exportar
-            </Button>
-          </Box>
-        </Paper>
-      )}
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<LocalShippingIcon />}
+                onClick={() => setShowEntregaGrupal(true)}
+              >
+                Entregar
+              </Button>
+            </Box>
+          </Paper>
+        )
+      }
 
       {/* Modal de Entrega */}
-      {showModalEntrega && documentoSeleccionado && (
-        <ModalEntrega
-          documento={documentoSeleccionado}
-          onClose={handleCloseModalEntrega}
-          onEntregaExitosa={handleEntregaExitosa}
-        />
-      )}
-    </Box>
+      {
+        showModalEntrega && documentoSeleccionado && (
+          <ModalEntrega
+            documento={documentoSeleccionado}
+            onClose={handleCloseModalEntrega}
+            onEntregaExitosa={handleEntregaExitosa}
+          />
+        )
+      }
+
+      {/* Modal de Entrega Grupal */}
+      {
+        showEntregaGrupal && selectedDocuments.size > 0 && (
+          <ModalEntregaGrupal
+            documentos={documentos.filter(doc => selectedDocuments.has(doc.id))}
+            onClose={handleCloseModalEntrega}
+            onEntregaExitosa={handleEntregaExitosa}
+          />
+        )
+      }
+    </Box >
   );
 }
 
