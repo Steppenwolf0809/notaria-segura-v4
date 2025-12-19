@@ -42,7 +42,8 @@ import {
   Description as DescriptionIcon,
   Assignment as AssignmentIcon,
   HourglassEmpty as HourglassEmptyIcon,
-  HourglassEmpty as HourglassEmptyIcon,
+
+
   Done as DoneIcon,
   History as HistoryIcon
 } from '@mui/icons-material';
@@ -50,8 +51,8 @@ import { toast } from 'react-toastify';
 import receptionService from '../../services/reception-service';
 import ModalEntrega from './ModalEntrega';
 import ModalEntregaGrupal from './ModalEntregaGrupal';
-import ModalEntrega from './ModalEntrega';
-import ModalEntregaGrupal from './ModalEntregaGrupal';
+
+
 import DocumentDetailModal from '../Documents/DocumentDetailModal';
 import ReversionModal from './ReversionModal';
 
@@ -104,7 +105,8 @@ function RecepcionMain() {
   const [showEntregaGrupal, setShowEntregaGrupal] = useState(false);
   const [documentoSeleccionado, setDocumentoSeleccionado] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [showDetailModal, setShowDetailModal] = useState(false);
+
+
   const [documentForDetail, setDocumentForDetail] = useState(null);
   const [reversionOpen, setReversionOpen] = useState(false);
   const [documentForReversion, setDocumentForReversion] = useState(null);
@@ -857,9 +859,7 @@ function RecepcionMain() {
                       </Typography>
                     </TableCell>
 
-                        {documento.protocolNumber}
-                      </Typography>
-                    </TableCell>
+
 
                     {/* Matrizador y Acto Principal */}
                     <TableCell>
@@ -988,115 +988,115 @@ function RecepcionMain() {
         />
       </Card >
 
-    {/* Acciones Rápidas */ }
-  {
-    selectedDocuments.size > 0 && (
-      <Paper
-        sx={{
-          position: 'fixed',
-          bottom: 24,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          p: 2,
-          bgcolor: 'background.paper',
-          boxShadow: 4,
-          borderRadius: 2,
-          zIndex: 1200,
-          minWidth: 400
-        }}
-      >
-        <Box display="flex" gap={2} alignItems="center">
-          <Typography variant="body2" fontWeight={600}>
-            {selectedDocuments.size} documento(s) seleccionado(s)
-          </Typography>
-
-          <Button
-            variant="contained"
-            color="success"
-            startIcon={<CheckCircleIcon />}
-            onClick={handleMarkMultipleReady}
+      {/* Acciones Rápidas */}
+      {
+        selectedDocuments.size > 0 && (
+          <Paper
+            sx={{
+              position: 'fixed',
+              bottom: 24,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              p: 2,
+              bgcolor: 'background.paper',
+              boxShadow: 4,
+              borderRadius: 2,
+              zIndex: 1200,
+              minWidth: 400
+            }}
           >
-            Marcar como Listos
-          </Button>
+            <Box display="flex" gap={2} alignItems="center">
+              <Typography variant="body2" fontWeight={600}>
+                {selectedDocuments.size} documento(s) seleccionado(s)
+              </Typography>
 
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<LocalShippingIcon />}
-            onClick={() => setShowEntregaGrupal(true)}
-          >
-            Entregar
-          </Button>
-        </Box>
-      </Paper>
-    )
-  }
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={<CheckCircleIcon />}
+                onClick={handleMarkMultipleReady}
+              >
+                Marcar como Listos
+              </Button>
 
-  {/* Modal de Entrega */ }
-  {
-    showModalEntrega && documentoSeleccionado && (
-      <ModalEntrega
-        documento={documentoSeleccionado}
-        onClose={handleCloseModalEntrega}
-        onEntregaExitosa={handleEntregaExitosa}
-      />
-    )
-  }
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<LocalShippingIcon />}
+                onClick={() => setShowEntregaGrupal(true)}
+              >
+                Entregar
+              </Button>
+            </Box>
+          </Paper>
+        )
+      }
 
-  {/* Modal de Entrega Grupal */ }
-  {
-    showEntregaGrupal && selectedDocuments.size > 0 && (
-      <ModalEntregaGrupal
-        documentos={documentos.filter(doc => selectedDocuments.has(doc.id))}
-        onClose={handleCloseModalEntrega}
-        onEntregaExitosa={handleEntregaExitosa}
-      />
-    )
-  }
+      {/* Modal de Entrega */}
+      {
+        showModalEntrega && documentoSeleccionado && (
+          <ModalEntrega
+            documento={documentoSeleccionado}
+            onClose={handleCloseModalEntrega}
+            onEntregaExitosa={handleEntregaExitosa}
+          />
+        )
+      }
 
-  {/* Modal de Detalle */ }
-  {
-    showDetailModal && documentForDetail && (
-      <DocumentDetailModal
-        open={showDetailModal}
-        document={documentForDetail}
-        onClose={handleCloseModalEntrega}
-        onDocumentUpdated={cargarDocumentos}
-      />
-    )
-  }
+      {/* Modal de Entrega Grupal */}
+      {
+        showEntregaGrupal && selectedDocuments.size > 0 && (
+          <ModalEntregaGrupal
+            documentos={documentos.filter(doc => selectedDocuments.has(doc.id))}
+            onClose={handleCloseModalEntrega}
+            onEntregaExitosa={handleEntregaExitosa}
+          />
+        )
+      }
 
-  {/* Modal de Reversión */ }
-  {
-    reversionOpen && documentForReversion && (
-      <ReversionModal
-        open={reversionOpen}
-        onClose={() => {
-          setReversionOpen(false);
-          setDocumentForReversion(null);
-        }}
-        documento={documentForReversion}
-        onConfirm={async ({ documentId, newStatus, reversionReason }) => {
-          // Llamada directa al servicio o via prop, asumiendo que ReversionModal maneja la logica o la pasamos aqui
-          // ReversionModal usually handles the call if props not fully intercepted
-          // But let's verify props. If ReversionModal requires onConfirm to implement logic:
-          try {
-            const result = await receptionService.revertirEstadoDocumento(documentId, newStatus, reversionReason);
-            if (result.success) {
-              toast.success('Estado revertido exitosamente');
-              await cargarDocumentos();
+      {/* Modal de Detalle */}
+      {
+        showDetailModal && documentForDetail && (
+          <DocumentDetailModal
+            open={showDetailModal}
+            document={documentForDetail}
+            onClose={handleCloseModalEntrega}
+            onDocumentUpdated={cargarDocumentos}
+          />
+        )
+      }
+
+      {/* Modal de Reversión */}
+      {
+        reversionOpen && documentForReversion && (
+          <ReversionModal
+            open={reversionOpen}
+            onClose={() => {
               setReversionOpen(false);
               setDocumentForReversion(null);
-            } else {
-              toast.error(result.error || 'Error al revertir estado');
-            }
-          } catch (e) {
-            toast.error('Error de conexión');
-          }
-        }}
-      />
-    )
-  }
+            }}
+            documento={documentForReversion}
+            onConfirm={async ({ documentId, newStatus, reversionReason }) => {
+              // Llamada directa al servicio o via prop, asumiendo que ReversionModal maneja la logica o la pasamos aqui
+              // ReversionModal usually handles the call if props not fully intercepted
+              // But let's verify props. If ReversionModal requires onConfirm to implement logic:
+              try {
+                const result = await receptionService.revertirEstadoDocumento(documentId, newStatus, reversionReason);
+                if (result.success) {
+                  toast.success('Estado revertido exitosamente');
+                  await cargarDocumentos();
+                  setReversionOpen(false);
+                  setDocumentForReversion(null);
+                } else {
+                  toast.error(result.error || 'Error al revertir estado');
+                }
+              } catch (e) {
+                toast.error('Error de conexión');
+              }
+            }}
+          />
+        )
+      }
     </Box >
   );
 }
