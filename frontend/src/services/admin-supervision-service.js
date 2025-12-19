@@ -18,6 +18,12 @@ export const getSupervisionStats = async (filters = {}) => {
         if (filters.startDate) params.append('startDate', filters.startDate.toISOString());
         if (filters.endDate) params.append('endDate', filters.endDate.toISOString());
 
+        // Nuevos filtros
+        if (filters.status) params.append('status', filters.status);
+        if (filters.page) params.append('page', filters.page);
+        if (filters.limit) params.append('limit', filters.limit);
+        if (filters.billedTimeRange) params.append('billedTimeRange', filters.billedTimeRange);
+
         const response = await axios.get(`${API_URL}/admin/dashboard/stats?${params.toString()}`, {
             headers: { Authorization: `Bearer ${token}` }
         });

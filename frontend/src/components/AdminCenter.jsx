@@ -21,7 +21,9 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Avatar
+  Avatar,
+  Button,
+  Menu
 } from '@mui/material';
 import {
   Person as PersonIcon,
@@ -100,15 +102,28 @@ const AdminDashboard = () => {
   // Filtros
   const [thresholdDays, setThresholdDays] = useState(15);
   const [selectedMatrixer, setSelectedMatrixer] = useState('');
+  const [statusFilter, setStatusFilter] = useState(''); // Filtro de estado
+  const [billedTimeRange, setBilledTimeRange] = useState('current_month'); // Filtro Facturación
   const [matrizadores, setMatrizadores] = useState([]);
+
+  // Paginación
+  const [page, setPage] = useState(1);
+  const [docsList, setDocsList] = useState([]); // Lista acumulativa
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Menu para filtro de facturación
+  const [billingAnchorEl, setBillingAnchorEl] = useState(null);
 
   useEffect(() => {
     loadMatrizadores();
   }, []);
 
+  // Recargar al cambiar filtros principales (resetea paginación)
   useEffect(() => {
-    loadStats();
-  }, [thresholdDays, selectedMatrixer]);
+    setPage(1);
+    loadStats(1, false);
+  }, [thresholdDays, selectedMatrixer, statusFilter, billedTimeRange]);
 
   const loadMatrizadores = async () => {
     try {
@@ -119,24 +134,53 @@ const AdminDashboard = () => {
     }
   };
 
-  const loadStats = async () => {
+  const loadStats = async (pageNum = 1, isLoadMore = false) => {
     try {
-      setLoading(true);
+      if (!isLoadMore) setLoading(true);
+      else setLoadingMore(true);
+
       const data = await getSupervisionStats({
         thresholdDays,
-        matrixerId: selectedMatrixer
+        matrixerId: selectedMatrixer,
+        status: statusFilter,
+        billedTimeRange,
+        page: pageNum,
+        limit: 20
       });
-      setStats(data);
+
+      setStats(prev => isLoadMore ? { ...prev, ...data.data } : data.data); // Actualizar KPIs siempre
+
+      // Manejo de lista con paginación
+      const newDocs = data.criticalList || [];
+      if (isLoadMore) {
+        setDocsList(prev => [...prev, ...newDocs]);
+      } else {
+        setDocsList(newDocs);
+      }
+
+      setHasMore(data.pagination?.hasMore || false);
       setError(null);
     } catch (err) {
       setError('Error al cargar estadísticas de supervisión.');
       console.error(err);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
-  if (loading && !stats) {
+  const handleLoadMore = () => {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    loadStats(nextPage, true);
+  };
+
+  const handleBillingIntervalChange = (interval) => {
+    setBilledTimeRange(interval);
+    setBillingAnchorEl(null);
+  };
+
+  if (loading && page === 1) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
         <CircularProgress />
@@ -148,7 +192,15 @@ const AdminDashboard = () => {
     return <Alert severity="error" sx={{ m: 2 }}>{error}</Alert>;
   }
 
-  const { kpis, criticalList, teamPerformance } = stats || {};
+  const { kpis, teamPerformance } = stats || {};
+
+  // Mapping para textos de intervalos
+  const billingIntervals = {
+    'current_month': 'Mes Actual',
+    'last_month': 'Mes Anterior',
+    'year_to_date': 'Año Actual',
+    'all_time': 'Histórico'
+  };
 
   return (
     <Box>
@@ -160,6 +212,22 @@ const AdminDashboard = () => {
         </Box>
 
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+          {/* Filtro de Estado REQUERIDO */}
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel>Estado</InputLabel>
+            <Select
+              value={statusFilter}
+              label="Estado"
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <MenuItem value="">ALERTAS (Default)</MenuItem>
+              <MenuItem value="PENDIENTE">PENDIENTE</MenuItem>
+              <MenuItem value="EN_PROCESO">EN PROCESO</MenuItem>
+              <MenuItem value="LISTO">LISTO</MenuItem>
+              <MenuItem value="ENTREGADO">ENTREGADO</MenuItem>
+            </Select>
+          </FormControl>
+
           <FormControl size="small" sx={{ minWidth: 140 }}>
             <InputLabel>Umbral Retraso</InputLabel>
             <Select
@@ -189,7 +257,7 @@ const AdminDashboard = () => {
           </FormControl>
 
           <Tooltip title="Actualizar">
-            <IconButton onClick={loadStats} color="primary">
+            <IconButton onClick={() => loadStats(1, false)} color="primary">
               <RefreshIcon />
             </IconButton>
           </Tooltip>
@@ -198,7 +266,7 @@ const AdminDashboard = () => {
 
       {/* KPIs */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={4}>
+        <Grid item xs={12} sm={6} md={3}>
           <SummaryCard
             title="Total Activos"
             value={kpis?.activeCount || 0}
@@ -207,7 +275,7 @@ const AdminDashboard = () => {
             subtext="Trámites en curso"
           />
         </Grid>
-        <Grid item xs={12} sm={4}>
+        <Grid item xs={12} sm={6} md={3}>
           <SummaryCard
             title={`Críticos (> ${thresholdDays}d)`}
             value={kpis?.criticalCount || 0}
@@ -216,7 +284,45 @@ const AdminDashboard = () => {
             subtext="Requieren atención"
           />
         </Grid>
-        <Grid item xs={12} sm={4}>
+        {/* Nueva Tarjeta Facturación */}
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ height: '100%' }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={(e) => setBillingAnchorEl(e.currentTarget)}>
+                    <Typography color="textSecondary" gutterBottom variant="overline">
+                      FACTURADO ({billingIntervals[billedTimeRange]})
+                    </Typography>
+                    <RefreshIcon sx={{ fontSize: 14, ml: 0.5, color: 'text.secondary' }} />
+                  </Box>
+                  {/* Menu Dropdown para Facturación */}
+                  <Menu
+                    anchorEl={billingAnchorEl}
+                    open={Boolean(billingAnchorEl)}
+                    onClose={() => setBillingAnchorEl(null)}
+                  >
+                    <MenuItem onClick={() => handleBillingIntervalChange('current_month')}>Mes Actual</MenuItem>
+                    <MenuItem onClick={() => handleBillingIntervalChange('last_month')}>Mes Anterior</MenuItem>
+                    <MenuItem onClick={() => handleBillingIntervalChange('year_to_date')}>Año Actual</MenuItem>
+                    <MenuItem onClick={() => handleBillingIntervalChange('all_time')}>Histórico</MenuItem>
+                  </Menu>
+
+                  <Typography variant="h4" component="div" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                    ${(kpis?.totalBilled || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </Typography>
+                </Box>
+                <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'success.light', color: 'success.contrastText', display: 'flex' }}>
+                  <MoneyIcon />
+                </Box>
+              </Box>
+              <Typography variant="caption" color="textSecondary" sx={{ mt: 1, display: 'block' }}>
+                Excluye anulados
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
           <SummaryCard
             title="Eficiencia Semanal"
             value={`${kpis?.weeklyEfficiency || 0}%`}
@@ -227,12 +333,12 @@ const AdminDashboard = () => {
         </Grid>
       </Grid>
 
-      {/* Tabla de Alertas Críticas */}
+      {/* Tabla de Documentos / Alertas */}
       <Card variant="outlined" sx={{ mb: 3 }}>
         <CardContent>
           <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-            <ErrorIcon color="error" sx={{ mr: 1 }} />
-            Alertas de Retraso
+            <DescriptionIcon color={statusFilter ? "primary" : "error"} sx={{ mr: 1 }} />
+            {statusFilter ? `Documentos: ${statusFilter}` : "Alertas de Retraso"}
           </Typography>
 
           <TableContainer>
@@ -244,20 +350,18 @@ const AdminDashboard = () => {
                   <TableCell>Matrizador</TableCell>
                   <TableCell>Acto</TableCell>
                   <TableCell>Estado</TableCell>
-                  <TableCell>Días</TableCell>
+                  <TableCell>Antigüedad</TableCell>
                   <TableCell>Acción</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {criticalList?.map((row) => {
-                  const isCritical = row.daysDelayed > 15;
-                  const isWarning = row.daysDelayed >= 10 && row.daysDelayed <= 15;
-                  let bgSx = {};
-                  if (isCritical) bgSx = { bgcolor: '#ffebee' };
-                  else if (isWarning) bgSx = { bgcolor: '#fff3e0' };
+                {docsList.map((row) => {
+                  const days = row.daysDelayed;
+                  const isCritical = days > 15 && statusFilter === '';
+                  // Si hay filtro de estado, no resaltamos tanto en rojo a menos que sea muy critico
 
                   return (
-                    <TableRow key={row.id} sx={bgSx}>
+                    <TableRow key={row.id} hover>
                       <TableCell sx={{ fontWeight: 'bold' }}>{row.protocol || 'S/N'}</TableCell>
                       <TableCell>{row.client}</TableCell>
                       <TableCell>
@@ -269,13 +373,19 @@ const AdminDashboard = () => {
                         </Box>
                       </TableCell>
                       <TableCell><Chip label={row.type} size="small" variant="outlined" /></TableCell>
-                      <TableCell>{row.status}</TableCell>
                       <TableCell>
                         <Chip
-                          label={`${row.daysDelayed}d`}
-                          color={isCritical ? "error" : "warning"}
+                          label={row.status}
                           size="small"
-                          sx={{ fontWeight: 'bold' }}
+                          color={row.status === 'LISTO' ? 'success' : row.status === 'EN_PROCESO' ? 'info' : 'default'}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={`${days}d`}
+                          color={(days > 15 && !['ENTREGADO'].includes(row.status)) ? "error" : "default"}
+                          size="small"
+                          variant="outlined"
                         />
                       </TableCell>
                       <TableCell>
@@ -286,12 +396,11 @@ const AdminDashboard = () => {
                     </TableRow>
                   );
                 })}
-                {(!criticalList || criticalList.length === 0) && (
+                {docsList.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={7} align="center">
                       <Box sx={{ py: 3 }}>
-                        <CheckCircleIcon color="success" sx={{ fontSize: 40, mb: 1 }} />
-                        <Typography>¡Excelente! No hay trámites con retraso crítico.</Typography>
+                        <Typography color="textSecondary">No se encontraron documentos.</Typography>
                       </Box>
                     </TableCell>
                   </TableRow>
@@ -299,6 +408,21 @@ const AdminDashboard = () => {
               </TableBody>
             </Table>
           </TableContainer>
+
+          {/* Load More Button */}
+          {hasMore && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+              <Button
+                variant="outlined"
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                startIcon={loadingMore ? <CircularProgress size={20} /> : null}
+              >
+                {loadingMore ? 'Cargando...' : 'Cargar más documentos'}
+              </Button>
+            </Box>
+          )}
+
         </CardContent>
       </Card>
 
