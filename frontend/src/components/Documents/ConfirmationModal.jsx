@@ -42,7 +42,6 @@ const ConfirmationModal = ({
   isLoading = false,
   // 🔗 NUEVOS PROPS para soporte de grupos
   isGroupMove = false,
-  isGroupMove = false,
   groupSize = 1,
   // 🔗 NUEVO PROP: Acción alternativa (ej: Entregar Directamente)
   alternativeAction = null
