@@ -1652,6 +1652,139 @@ async function getReceptionSuggestions(req, res) {
   }
 }
 
+
+/**
+ * Entregar múltiples documentos en bloque (mismo cliente)
+ * POST /api/reception/bulk-delivery
+ */
+async function bulkDelivery(req, res) {
+  try {
+    const { documentIds, deliveryData } = req.body;
+
+    // Validaciones
+    if (!Array.isArray(documentIds) || documentIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Debe proporcionar al menos un documento'
+      });
+    }
+
+    if (documentIds.length > 50) {
+      return res.status(400).json({
+        success: false,
+        message: 'Máximo 50 documentos por entrega'
+      });
+    }
+
+    // Validar datos de entrega
+    const {
+      personaRetira,
+      cedulaRetira,
+      verificationType,
+      verificationCode
+    } = deliveryData;
+
+    if (!personaRetira || !cedulaRetira) {
+      return res.status(400).json({
+        success: false,
+        message: 'Debe proporcionar nombre y cédula de quien retira'
+      });
+    }
+
+    // Buscar todos los documentos
+    const documents = await prisma.document.findMany({
+      where: {
+        id: { in: documentIds },
+        status: 'LISTO' // Solo documentos listos
+      }
+    });
+
+    if (documents.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No se encontraron documentos listos para entrega'
+      });
+    }
+
+    if (documents.length !== documentIds.length) {
+      return res.status(400).json({
+        success: false,
+        message: `Solo ${documents.length} de ${documentIds.length} documentos están listos para entrega`
+      });
+    }
+
+    // Verificar que todos sean del mismo cliente
+    const uniqueClients = new Set(documents.map(d => d.clientId));
+    if (uniqueClients.size > 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Todos los documentos deben ser del mismo cliente'
+      });
+    }
+
+    // Actualizar todos los documentos en una transacción
+    const result = await prisma.$transaction(async (tx) => {
+      // Actualizar estado de todos
+      const updated = await tx.document.updateMany({
+        where: { id: { in: documentIds } },
+        data: {
+          status: 'ENTREGADO',
+          fechaEntrega: new Date(),
+          personaRetira,
+          cedulaRetira,
+          deliveryVerificationType: verificationType,
+          deliveryVerificationCode: verificationCode || null,
+          deliveredAt: new Date(),
+          deliveredBy: req.user.id
+        }
+      });
+
+      // Crear eventos de auditoría para cada documento
+      const events = documents.map(doc => ({
+        documentId: doc.id,
+        userId: req.user.id,
+        eventType: 'ENTREGA_BLOQUE',
+        description: `Entregado en bloque (${documents.length} docs) a ${personaRetira}`,
+        details: JSON.stringify({
+          personaRetira,
+          cedulaRetira,
+          verificationType,
+          totalDocuments: documents.length,
+          documentIds: documentIds,
+          deliveredBy: req.user.id,
+          timestamp: new Date().toISOString()
+        }),
+        ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+        userAgent: req.get('User-Agent') || 'unknown'
+      }));
+
+      await tx.documentEvent.createMany({
+        data: events
+      });
+
+      return { updated: updated.count };
+    });
+
+    return res.json({
+      success: true,
+      message: `${result.updated} documentos entregados exitosamente`,
+      data: {
+        deliveredCount: result.updated,
+        personaRetira,
+        cedulaRetira
+      }
+    });
+
+  } catch (error) {
+    logger.error('Error en entrega en bloque:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al realizar entrega en bloque',
+      error: error.message
+    });
+  }
+}
+
 /**
  * Entregar múltiples documentos (compatible con ModalEntregaGrupal)
  * @param {Object} req - Request object
