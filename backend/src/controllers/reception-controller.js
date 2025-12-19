@@ -1730,12 +1730,10 @@ async function bulkDelivery(req, res) {
         data: {
           status: 'ENTREGADO',
           fechaEntrega: new Date(),
-          personaRetira,
-          cedulaRetira,
-          deliveryVerificationType: verificationType,
-          deliveryVerificationCode: verificationCode || null,
-          deliveredAt: new Date(),
-          deliveredBy: req.user.id
+          entregadoA: personaRetira,
+          cedulaReceptor: cedulaRetira,
+          usuarioEntregaId: req.user.id,
+          verificacionManual: verificationType === 'manual' || !verificationCode
         }
       });
 
@@ -1792,7 +1790,16 @@ async function bulkDelivery(req, res) {
  */
 async function entregaGrupal(req, res) {
   try {
-    const { documentIds, entregadoA, cedulaReceptor, relacionTitular, observaciones, verificacionManual, codigoVerificacion } = req.body;
+    const {
+      documentIds,
+      entregadoA,
+      cedulaReceptor,
+      relacionTitular,
+      observaciones,
+      verificacionManual,
+      codigoVerificacion,
+      facturaPresenta
+    } = req.body;
 
     if (!Array.isArray(documentIds) || documentIds.length === 0) {
       return res.status(400).json({ success: false, message: 'Se requiere una lista válida de IDs de documentos' });
@@ -1812,7 +1819,7 @@ async function entregaGrupal(req, res) {
     }
 
     // Validar estados (LISTO o EN_PROCESO)
-    const invalidDocs = documents.filter(d => !['LISTO', 'EN_PROCESO'].includes(d.status));
+    const invalidDocs = documents.filter(d => !['LISTO', 'EN_PROCESO', 'PAGADO'].includes(d.status));
     if (invalidDocs.length > 0) {
       return res.status(400).json({
         success: false,
@@ -1826,21 +1833,14 @@ async function entregaGrupal(req, res) {
       return res.status(400).json({ success: false, message: 'Todos los documentos deben ser del mismo cliente' });
     }
 
-    // Validar código si no es manual y no están todos en proceso (alguno listo requiere código)
-    // Si todos son EN_PROCESO, es entrega directa, código opcional o manual implícito
+    // Validar código si no es manual y alguno está LISTO
     const anyReady = documents.some(d => d.status === 'LISTO');
     if (anyReady && !verificacionManual && !codigoVerificacion) {
-      // Check if documents share a group code
-      const groupCode = documents[0].groupVerificationCode || documents[0].codigoRetiro;
+      // Intentar obtener código del grupo o individual
+      const groupCode = documents[0].groupVerificationCode || documents[0].codigoRetiro || documents[0].verificationCode;
       if (!groupCode) {
-        // Si no tienen código grupal, requerimos uno en el body o manual
         return res.status(400).json({ success: false, message: 'Se requiere código de verificación para documentos listos' });
       }
-      // If provided code matches group code logic could go here, but strict check:
-      // For simplicity, if manual is false, we require matching code provided by user or simple validation override.
-      // Let's assume if !verificacionManual, codigoVerificacion must be matched against DB or accepted if valid.
-      // Here we just check presence. Actual match verification logic might be more complex.
-      // For now, consistent with individual delivery logic usually handled.
     }
 
     // Actualizar documentos
@@ -1853,12 +1853,13 @@ async function entregaGrupal(req, res) {
         data: {
           status: 'ENTREGADO',
           fechaEntrega: now,
-          personaRetira: entregadoA,
-          cedulaRetira: cedulaReceptor,
-          observacionesEntrega: observaciones,
-          entregadoPorId: req.user.id,
-          deliveredAt: now,
-          deliveredBy: req.user.id
+          entregadoA: entregadoA,
+          cedulaReceptor: cedulaReceptor || null,
+          relacionTitular: relacionTitular || null,
+          observacionesEntrega: observaciones || null,
+          usuarioEntregaId: req.user.id,
+          verificacionManual: !!verificacionManual,
+          facturaPresenta: !!facturaPresenta
         }
       });
 
@@ -1867,14 +1868,24 @@ async function entregaGrupal(req, res) {
         documentId: id,
         userId: req.user.id,
         eventType: 'ENTREGA_GRUPAL',
-        description: `Entrega grupal a ${entregadoA} (${relacionTitular})`,
-        details: JSON.stringify({ entregadoA, cedulaReceptor, relacionTitular, observaciones }),
-        ipAddress: req.ip,
-        userAgent: req.get('User-Agent')
+        description: `Entrega grupal a ${entregadoA} (${relacionTitular || 'N/A'})`,
+        details: JSON.stringify({
+          entregadoA,
+          cedulaReceptor,
+          relacionTitular,
+          observaciones,
+          verificacionManual,
+          facturaPresenta,
+          docsCount: documentIds.length
+        }),
+        ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+        userAgent: req.get('User-Agent') || 'unknown'
       }));
 
       await tx.documentEvent.createMany({ data: events });
     });
+
+    logger.info(`Entrega grupal exitosa: ${documentIds.length} documentos por usuario ${req.user.id}`);
 
     return res.json({
       success: true,
@@ -1884,7 +1895,11 @@ async function entregaGrupal(req, res) {
 
   } catch (error) {
     logger.error('Error en entrega grupal:', error);
-    return res.status(500).json({ success: false, error: 'Error interno al procesar entrega grupal' });
+    return res.status(500).json({
+      success: false,
+      error: 'Error interno al procesar entrega grupal',
+      message: error.message
+    });
   }
 }
 

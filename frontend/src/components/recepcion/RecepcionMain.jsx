@@ -48,6 +48,7 @@ import { toast } from 'react-toastify';
 import receptionService from '../../services/reception-service';
 import ModalEntrega from './ModalEntrega';
 import ModalEntregaGrupal from './ModalEntregaGrupal';
+import DocumentDetailModal from '../Documents/DocumentDetailModal';
 
 /**
  * Componente principal de recepción rediseñado
@@ -97,6 +98,8 @@ function RecepcionMain() {
   const [showModalEntrega, setShowModalEntrega] = useState(false);
   const [showEntregaGrupal, setShowEntregaGrupal] = useState(false);
   const [documentoSeleccionado, setDocumentoSeleccionado] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [documentForDetail, setDocumentForDetail] = useState(null);
 
   /**
    * Cargar documentos con filtros
@@ -390,12 +393,22 @@ function RecepcionMain() {
   };
 
   /**
+   * Abrir modal de detalle
+   */
+  const handleVerDetalle = (documento) => {
+    setDocumentForDetail(documento);
+    setShowDetailModal(true);
+  };
+
+  /**
    * Cerrar modal de entrega
    */
   const handleCloseModalEntrega = () => {
     setShowModalEntrega(false);
     setShowEntregaGrupal(false);
     setDocumentoSeleccionado(null);
+    setShowDetailModal(false);
+    setDocumentForDetail(null);
   };
 
   /**
@@ -763,6 +776,11 @@ function RecepcionMain() {
                     key={documento.id}
                     hover
                     selected={selectedDocuments.has(documento.id)}
+                    onClick={(e) => {
+                      // No abrir detalle si se hace clic en el checkbox o botones
+                      if (e.target.type === 'checkbox' || e.target.closest('button')) return;
+                      handleVerDetalle(documento);
+                    }}
                     sx={{
                       cursor: 'pointer',
                       transition: 'all 0.2s',
@@ -890,54 +908,17 @@ function RecepcionMain() {
                       </Typography>
                     </TableCell>
 
-                    {/* Acciones */}
+                    {/* Acciones - Solo Ver Detalle para limpiar la UI */}
                     <TableCell sx={{ textAlign: 'center' }}>
-                      {documento.status === 'EN_PROCESO' ? (
-                        <>
-                          <Button
-                            variant="contained"
-                            size="small"
-                            color="success"
-                            startIcon={<CheckCircleIcon />}
-                            onClick={() => handleMarcarListo(documento.id)}
-                          >
-                            Marcar Listo
-                          </Button>
-                          <Button
-                            variant="contained"
-                            size="small"
-                            color="primary"
-                            startIcon={<LocalShippingIcon />}
-                            onClick={() => handleEntregar(documento)}
-                            sx={{ ml: 1 }}
-                          >
-                            Entregar
-                          </Button>
-                        </>
-                      ) : (documento.status === 'LISTO' || documento.status === 'PAGADO') ? (
-                        <Button
-                          variant="contained"
-                          size="small"
+                      <Tooltip title="Ver Detalles">
+                        <IconButton
                           color="primary"
-                          startIcon={<LocalShippingIcon />}
-                          onClick={() => handleEntregar(documento)}
-                        >
-                          Entregar
-                        </Button>
-                      ) : documento.status === 'ENTREGADO' ? (
-                        <Button
-                          variant="outlined"
+                          onClick={() => handleVerDetalle(documento)}
                           size="small"
-                          startIcon={<VisibilityIcon />}
-                          disabled
                         >
-                          Ver
-                        </Button>
-                      ) : (
-                        <Typography variant="caption" color="text.secondary">
-                          Sin acción
-                        </Typography>
-                      )}
+                          <VisibilityIcon />
+                        </IconButton>
+                      </Tooltip>
                     </TableCell>
                   </TableRow>
                 ))
@@ -1020,6 +1001,18 @@ function RecepcionMain() {
             documentos={documentos.filter(doc => selectedDocuments.has(doc.id))}
             onClose={handleCloseModalEntrega}
             onEntregaExitosa={handleEntregaExitosa}
+          />
+        )
+      }
+
+      {/* Modal de Detalle */}
+      {
+        showDetailModal && documentForDetail && (
+          <DocumentDetailModal
+            open={showDetailModal}
+            document={documentForDetail}
+            onClose={handleCloseModalEntrega}
+            onDocumentUpdated={cargarDocumentos}
           />
         )
       }
