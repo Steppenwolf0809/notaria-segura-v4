@@ -841,9 +841,7 @@ async function getDashboardStats(req, res) {
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
 
-    const teamPerformance = [];
-
-    for (const m of matrizadores) {
+    const teamPerformance = await Promise.all(matrizadores.map(async (m) => {
       const load = loadGroup.find(g => g.assignedToId === m.id)?._count._all || 0;
 
       const criticals = await prisma.document.count({
@@ -881,15 +879,28 @@ async function getDashboardStats(req, res) {
         avgDays = Math.round(totalTime / recentDeliveries.length / (1000 * 60 * 60 * 24));
       }
 
-      teamPerformance.push({
+      return {
         id: m.id,
         name: `${m.firstName} ${m.lastName}`,
         activeLoad: load,
         criticalCount: criticals,
         deliveredMonth,
         avgVelocityDays: avgDays
-      });
-    }
+      };
+    }));
+
+    console.log('Dashboard Stats Debug:', {
+      activeCount,
+      criticalCount,
+      totalBilled,
+      teamPerformanceLength: teamPerformance.length,
+      matrizadoresLength: matrizadores.length,
+      filters: {
+        dateFilter,
+        matrixerFilter,
+        billedDateFilter
+      }
+    });
 
     res.json({
       success: true,
