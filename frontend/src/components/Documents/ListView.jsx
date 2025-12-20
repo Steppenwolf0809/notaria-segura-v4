@@ -243,9 +243,9 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
   };
 
   // Confirmar entrega (ENTREGADO) para matrizador
-  const handleConfirmEntrega = async ({ deliveredTo }) => {
+  const handleConfirmEntrega = async ({ deliveredTo, relationType, receptorId, observations }) => {
     if (!currentDocumento) return;
-    const result = await updateDocumentStatus(currentDocumento.id, 'ENTREGADO', { deliveredTo });
+    const result = await updateDocumentStatus(currentDocumento.id, 'ENTREGADO', { deliveredTo, relationType, receptorId, observations });
     closeEntrega();
     if (!result) return;
     if (result.success) {
