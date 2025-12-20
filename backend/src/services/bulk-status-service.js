@@ -286,12 +286,13 @@ export async function bulkDeliverDocuments({ documentIds, actor, deliveryData, s
       const data = {
         status: 'ENTREGADO',
         updatedAt: now,
-        deliveredAt: now,
-        // Datos de entrega
-        deliveredTo: deliveryData.deliveredTo,
-        receptorId: deliveryData.receptorId || null,
-        relationType: deliveryData.relationType || null,
-        observations: deliveryData.observations || null
+        fechaEntrega: now,
+        usuarioEntregaId: actor.id,
+        // Datos de entrega (mapping de frontend a schema DB)
+        entregadoA: deliveryData.deliveredTo,
+        cedulaReceptor: deliveryData.receptorId || null,
+        relacionTitular: deliveryData.relationType || null,
+        observacionesEntrega: deliveryData.observations || null
       };
 
       const ud = await tx.document.update({ where: { id: d.id }, data });
