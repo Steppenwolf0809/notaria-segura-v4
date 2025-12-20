@@ -148,7 +148,7 @@ const AdminDashboard = () => {
         limit: 20
       });
 
-      setStats(prev => isLoadMore ? { ...prev, ...data.data } : data.data); // Actualizar KPIs siempre
+      setStats(prev => isLoadMore ? { ...prev, ...data } : data); // Actualizar KPIs siempre
 
       // Manejo de lista con paginación
       const newDocs = data.criticalList || [];
