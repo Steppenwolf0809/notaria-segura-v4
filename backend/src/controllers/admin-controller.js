@@ -2,11 +2,11 @@ import bcrypt from 'bcryptjs';
 import prisma from '../db.js';
 import { validatePassword, sanitizePassword } from '../utils/password-validator.js';
 import { sendSuccess, sendError, sendNotFound, sendConflict, sendPaginated, sanitizeResponse } from '../utils/http.js';
-import { 
-  logAdminAction, 
-  logUserListAccess, 
-  extractRequestInfo, 
-  AuditEventTypes 
+import {
+  logAdminAction,
+  logUserListAccess,
+  extractRequestInfo,
+  AuditEventTypes
 } from '../utils/audit-logger.js';
 
 /**
@@ -35,7 +35,7 @@ async function getAllUsers(req, res) {
 
     // Construir filtros
     const where = {};
-    
+
     if (search) {
       where.OR = [
         { firstName: { contains: search, mode: 'insensitive' } },
@@ -80,8 +80,8 @@ async function getAllUsers(req, res) {
 
     const totalPages = Math.ceil(totalCount / take);
 
-    return sendPaginated(res, 
-      sanitizeResponse(users, ['password']), 
+    return sendPaginated(res,
+      sanitizeResponse(users, ['password']),
       {
         page: parseInt(page),
         limit: take,
@@ -216,7 +216,7 @@ async function createUser(req, res) {
     // Validar contraseña
     const sanitizedPassword = sanitizePassword(password);
     const passwordValidation = validatePassword(sanitizedPassword);
-    
+
     if (!passwordValidation.isValid) {
       return res.status(400).json({
         success: false,
@@ -269,7 +269,7 @@ async function createUser(req, res) {
 
   } catch (error) {
     console.error('Error creando usuario:', error);
-    
+
     const requestInfo = extractRequestInfo(req);
     logAdminAction({
       adminUserId: req.user.id,
@@ -364,7 +364,7 @@ async function updateUser(req, res) {
     if (password) {
       const sanitizedPassword = sanitizePassword(password);
       const passwordValidation = validatePassword(sanitizedPassword);
-      
+
       if (!passwordValidation.isValid) {
         return res.status(400).json({
           success: false,
@@ -653,6 +653,292 @@ async function getUserStats(req, res) {
   }
 }
 
+/**
+ * Obtiene estadísticas de supervisión del dashboard (Modo Supervisión)
+ * Soporta filtros: thresholdDays, matrixerId, startDate, endDate
+ */
+async function getDashboardStats(req, res) {
+  try {
+    const {
+      thresholdDays = 15,
+      matrixerId,
+      startDate,
+      endDate,
+      status, // Nuevo filtro de estado
+      page = 1, // Paginación
+      limit = 20, // Paginación
+      billedTimeRange = 'current_month' // Filtro para KPI de facturación
+    } = req.query;
+
+    const today = new Date();
+    const thresholdDate = new Date();
+    thresholdDate.setDate(today.getDate() - parseInt(thresholdDays));
+
+    // Filtros de fecha base
+    const dateFilter = {};
+    if (startDate && endDate) {
+      dateFilter.createdAt = {
+        gte: new Date(startDate),
+        lte: new Date(endDate)
+      };
+    }
+
+    // Filtro de matrizador
+    const matrixerFilter = matrixerId ? { assignedToId: parseInt(matrixerId) } : {};
+
+    // 1. KPIs Generales
+    // Total Activos (No entregados ni anulados)
+    const activeCount = await prisma.document.count({
+      where: {
+        status: { notIn: ['ENTREGADO', 'ANULADO_NOTA_CREDITO'] },
+        ...dateFilter,
+        ...matrixerFilter
+      }
+    });
+
+    // Críticos (> threshold días)
+    const criticalCount = await prisma.document.count({
+      where: {
+        status: { notIn: ['ENTREGADO', 'ANULADO_NOTA_CREDITO'] },
+        createdAt: { lt: thresholdDate },
+        ...matrixerFilter
+      }
+    });
+
+    // KPI: Total Facturado
+    // Definir rango de tiempo para facturación
+    const billedDateFilter = {};
+    const now = new Date();
+    let startBilledDate = new Date();
+
+    switch (billedTimeRange) {
+      case 'current_month':
+        startBilledDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        billedDateFilter.createdAt = { gte: startBilledDate };
+        break;
+      case 'last_month':
+        startBilledDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        const endBilledDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+        billedDateFilter.createdAt = { gte: startBilledDate, lte: endBilledDate };
+        break;
+      case 'year_to_date':
+        startBilledDate = new Date(now.getFullYear(), 0, 1);
+        billedDateFilter.createdAt = { gte: startBilledDate };
+        break;
+      case 'all_time':
+        // No filter
+        break;
+      default: // current_month default
+        startBilledDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        billedDateFilter.createdAt = { gte: startBilledDate };
+    }
+
+    // Calcular suma de totalFactura (excluyendo anulados)
+    const billedAggregate = await prisma.document.aggregate({
+      _sum: {
+        totalFactura: true
+      },
+      where: {
+        status: { not: 'ANULADO_NOTA_CREDITO' },
+        ...billedDateFilter,
+        ...matrixerFilter // Aplicar filtro de matrizador si está seleccionado
+      }
+    });
+
+    const totalBilled = billedAggregate._sum.totalFactura || 0;
+
+
+    // Eficiencia Semanal (Entregados vs Ingresados esta semana)
+    const startOfWeek = new Date();
+    startOfWeek.setDate(today.getDate() - today.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const createdThisWeek = await prisma.document.count({
+      where: {
+        createdAt: { gte: startOfWeek },
+        ...matrixerFilter
+      }
+    });
+
+    const deliveredThisWeek = await prisma.document.count({
+      where: {
+        status: 'ENTREGADO',
+        updatedAt: { gte: startOfWeek },
+        ...matrixerFilter
+      }
+    });
+
+    const weeklyEfficiency = createdThisWeek > 0
+      ? Math.round((deliveredThisWeek / createdThisWeek) * 100)
+      : 0;
+
+    // 2. Lista de Alertas / Documentos con filtros
+    // Filtro base: activos (no entregados, no anulados) y warnngThreshold para atrás
+    // PERO el usuario pidió filtro por ESTADO, así que si hay status param, respetamos ese status
+    // Si NO hay status, mantenemos la lógica de alertas (antiguos)
+
+    const docWhere = { ...matrixerFilter };
+
+    // Si el usuario filtra por estado específico
+    if (status && status !== '') {
+      docWhere.status = status;
+    } else {
+      // Comportamiento por defecto: Mostrar alertas (no entregados, no anulados)
+      docWhere.status = { notIn: ['ENTREGADO', 'ANULADO_NOTA_CREDITO'] };
+
+      // Si estamos en modo "Alertas Críticas" (sin filtro de estado explícito), 
+      // ¿deberíamos filtrar solo los viejos?
+      // El requerimiento dice "agregar un filtro por estado".
+      // Y también "no muestre tantos documentos de golpe".
+      // Mantengamos la vista de "Alertas" por defecto mostrando SOLO los retrasados si no hay filtro activo.
+      // Si hay filtro activo, mostramos todos los de ese estado.
+
+      const warningThresholdDate = new Date();
+      warningThresholdDate.setDate(today.getDate() - 10);
+      docWhere.createdAt = { lt: warningThresholdDate };
+    }
+
+    // Paginación
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const take = parseInt(limit);
+
+    const [criticalDocs, totalDocs] = await Promise.all([
+      prisma.document.findMany({
+        where: docWhere,
+        include: {
+          assignedTo: {
+            select: { firstName: true, lastName: true }
+          }
+        },
+        orderBy: { createdAt: 'asc' }, // Los más antiguos primero (prioridad atención)
+        skip,
+        take
+      }),
+      prisma.document.count({ where: docWhere })
+    ]);
+
+    const hasMore = skip + take < totalDocs;
+
+    // 3. Rendimiento de Equipo
+    const teamWhere = { role: 'MATRIZADOR', isActive: true };
+    if (matrixerId) teamWhere.id = parseInt(matrixerId);
+
+    const matrizadores = await prisma.user.findMany({
+      where: teamWhere,
+      select: { id: true, firstName: true, lastName: true }
+    });
+
+    const loadGroup = await prisma.document.groupBy({
+      by: ['assignedToId'],
+      where: {
+        status: { notIn: ['ENTREGADO', 'ANULADO_NOTA_CREDITO'] },
+        assignedToId: { in: matrizadores.map(m => m.id) }
+      },
+      _count: { _all: true }
+    });
+
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const teamPerformance = await Promise.all(matrizadores.map(async (m) => {
+      const load = loadGroup.find(g => g.assignedToId === m.id)?._count._all || 0;
+
+      const criticals = await prisma.document.count({
+        where: {
+          assignedToId: m.id,
+          status: { notIn: ['ENTREGADO', 'ANULADO_NOTA_CREDITO'] },
+          createdAt: { lt: thresholdDate }
+        }
+      });
+
+      const deliveredMonth = await prisma.document.count({
+        where: {
+          assignedToId: m.id,
+          status: 'ENTREGADO',
+          updatedAt: { gte: startOfMonth }
+        }
+      });
+
+      const recentDeliveries = await prisma.document.findMany({
+        where: {
+          assignedToId: m.id,
+          status: 'ENTREGADO',
+          updatedAt: { gte: startOfMonth }
+        },
+        select: { createdAt: true, updatedAt: true },
+        take: 10,
+        orderBy: { updatedAt: 'desc' }
+      });
+
+      let avgDays = 0;
+      if (recentDeliveries.length > 0) {
+        const totalTime = recentDeliveries.reduce((acc, doc) => {
+          return acc + (new Date(doc.updatedAt) - new Date(doc.createdAt));
+        }, 0);
+        avgDays = Math.round(totalTime / recentDeliveries.length / (1000 * 60 * 60 * 24));
+      }
+
+      return {
+        id: m.id,
+        name: `${m.firstName} ${m.lastName}`,
+        activeLoad: load,
+        criticalCount: criticals,
+        deliveredMonth,
+        avgVelocityDays: avgDays
+      };
+    }));
+
+    console.log('Dashboard Stats Debug:', {
+      activeCount,
+      criticalCount,
+      totalBilled,
+      teamPerformanceLength: teamPerformance.length,
+      matrizadoresLength: matrizadores.length,
+      filters: {
+        dateFilter,
+        matrixerFilter,
+        billedDateFilter
+      }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        kpis: {
+          activeCount,
+          criticalCount,
+          weeklyEfficiency,
+          totalBilled // Nuevo KPI
+        },
+        criticalList: criticalDocs.map(doc => ({
+          id: doc.id,
+          protocol: doc.protocolNumber,
+          client: doc.clientName,
+          type: doc.documentType,
+          matrixer: doc.assignedTo ? `${doc.assignedTo.firstName} ${doc.assignedTo.lastName}` : 'Sin asignar',
+          createdAt: doc.createdAt,
+          daysDelayed: Math.floor((new Date() - new Date(doc.createdAt)) / (1000 * 60 * 60 * 24)),
+          status: doc.status
+        })),
+        pagination: {
+          page: parseInt(page),
+          hasMore,
+          total: totalDocs
+        },
+        teamPerformance
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching dashboard stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno al obtener estadísticas de supervisión'
+    });
+  }
+}
+
 export {
   getAllUsers,
   getUserById,
@@ -660,5 +946,6 @@ export {
   updateUser,
   toggleUserStatus,
   deleteUser,
-  getUserStats
+  getUserStats,
+  getDashboardStats
 };

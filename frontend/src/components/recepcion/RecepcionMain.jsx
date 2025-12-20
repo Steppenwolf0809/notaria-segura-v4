@@ -42,11 +42,19 @@ import {
   Description as DescriptionIcon,
   Assignment as AssignmentIcon,
   HourglassEmpty as HourglassEmptyIcon,
-  Done as DoneIcon
+
+
+  Done as DoneIcon,
+  History as HistoryIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import receptionService from '../../services/reception-service';
 import ModalEntrega from './ModalEntrega';
+import ModalEntregaGrupal from './ModalEntregaGrupal';
+
+
+import DocumentDetailModal from '../Documents/DocumentDetailModal';
+import ReversionModal from './ReversionModal';
 
 /**
  * Componente principal de recepción rediseñado
@@ -94,7 +102,14 @@ function RecepcionMain() {
 
   // Estados de modales
   const [showModalEntrega, setShowModalEntrega] = useState(false);
+  const [showEntregaGrupal, setShowEntregaGrupal] = useState(false);
   const [documentoSeleccionado, setDocumentoSeleccionado] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+
+
+  const [documentForDetail, setDocumentForDetail] = useState(null);
+  const [reversionOpen, setReversionOpen] = useState(false);
+  const [documentForReversion, setDocumentForReversion] = useState(null);
 
   /**
    * Cargar documentos con filtros
@@ -368,7 +383,8 @@ function RecepcionMain() {
     try {
       const result = await receptionService.marcarGrupoListo(documentosEnProceso);
       if (result.success) {
-        toast.success(`${documentosEnProceso.length} documento(s) marcado(s) como listo(s)`);
+        // Notificación clara al usuario
+        toast.success(`${count} documento(s) marcado(s) como listo(s)`);
         setSelectedDocuments(new Set());
         await cargarDocumentos();
       } else {
@@ -388,11 +404,22 @@ function RecepcionMain() {
   };
 
   /**
+   * Abrir modal de detalle
+   */
+  const handleVerDetalle = (documento) => {
+    setDocumentForDetail(documento);
+    setShowDetailModal(true);
+  };
+
+  /**
    * Cerrar modal de entrega
    */
   const handleCloseModalEntrega = () => {
     setShowModalEntrega(false);
+    setShowEntregaGrupal(false);
     setDocumentoSeleccionado(null);
+    setShowDetailModal(false);
+    setDocumentForDetail(null);
   };
 
   /**
@@ -401,6 +428,7 @@ function RecepcionMain() {
   const handleEntregaExitosa = async () => {
     toast.success('Documento entregado exitosamente');
     await cargarDocumentos();
+    setSelectedDocuments(new Set()); // Limpiar selección después de entrega exitosa
     handleCloseModalEntrega();
   };
 
@@ -760,6 +788,11 @@ function RecepcionMain() {
                     key={documento.id}
                     hover
                     selected={selectedDocuments.has(documento.id)}
+                    onClick={(e) => {
+                      // No abrir detalle si se hace clic en el checkbox o botones
+                      if (e.target.type === 'checkbox' || e.target.closest('button')) return;
+                      handleVerDetalle(documento);
+                    }}
                     sx={{
                       cursor: 'pointer',
                       transition: 'all 0.2s',
@@ -782,7 +815,21 @@ function RecepcionMain() {
                     {/* Cliente */}
                     <TableCell>
                       <Box>
-                        <Typography variant="body2" fontWeight={600}>
+                        <Typography
+                          variant="body2"
+                          fontWeight={600}
+                          sx={{
+                            cursor: 'pointer',
+                            '&:hover': {
+                              color: 'primary.main',
+                              textDecoration: 'underline'
+                            }
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSearchQuery(documento.clientName);
+                          }}
+                        >
                           {documento.clientName}
                         </Typography>
                         <Typography
@@ -826,22 +873,42 @@ function RecepcionMain() {
                       </Typography>
                     </TableCell>
 
-                    {/* Matrizador */}
+
+
+                    {/* Matrizador y Acto Principal */}
                     <TableCell>
-                      <Box display="flex" alignItems="center" gap={1}>
-                        <Avatar
+                      <Box>
+                        {/* Matrizador */}
+                        <Box display="flex" alignItems="center" gap={1} mb={0.5}>
+                          <Avatar
+                            sx={{
+                              width: 24,
+                              height: 24,
+                              bgcolor: 'action.disabledBackground',
+                              fontSize: '0.75rem',
+                              fontWeight: 700
+                            }}
+                          >
+                            {getInitials(documento.matrizador)}
+                          </Avatar>
+                          <Typography variant="caption" color="text.secondary">
+                            {documento.matrizador}
+                          </Typography>
+                        </Box>
+
+                        {/* Acto Principal */}
+                        <Typography
+                          variant="body2"
                           sx={{
-                            width: 32,
-                            height: 32,
-                            bgcolor: 'primary.main',
-                            fontSize: '0.875rem',
-                            fontWeight: 700
+                            fontWeight: 600,
+                            color: 'text.primary',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden'
                           }}
                         >
-                          {getInitials(documento.matrizador)}
-                        </Avatar>
-                        <Typography variant="body2">
-                          {documento.matrizador}
+                          {documento.mainAct || documento.actoPrincipalDescripcion || 'Sin Acto Principal'}
                         </Typography>
                       </Box>
                     </TableCell>
@@ -871,10 +938,10 @@ function RecepcionMain() {
                             }}
                           >
                             {documento.status === 'EN_PROCESO' ? 'PROC' :
-                             documento.status === 'LISTO' ? 'LSTO' :
-                             documento.status === 'PAGADO' ? 'PAGD' :
-                             documento.status === 'ENTREGADO' ? 'ENTR' :
-                             documento.status}
+                              documento.status === 'LISTO' ? 'LSTO' :
+                                documento.status === 'PAGADO' ? 'PAGD' :
+                                  documento.status === 'ENTREGADO' ? 'ENTR' :
+                                    documento.status}
                           </Typography>
                         </Box>
                       </Tooltip>
@@ -887,41 +954,33 @@ function RecepcionMain() {
                       </Typography>
                     </TableCell>
 
-                    {/* Acciones */}
+                    {/* Acciones - Solo Ver Detalle para limpiar la UI */}
                     <TableCell sx={{ textAlign: 'center' }}>
-                      {documento.status === 'EN_PROCESO' ? (
-                        <Button
-                          variant="contained"
-                          size="small"
-                          color="success"
-                          startIcon={<CheckCircleIcon />}
-                          onClick={() => handleMarcarListo(documento.id)}
-                        >
-                          Marcar Listo
-                        </Button>
-                      ) : (documento.status === 'LISTO' || documento.status === 'PAGADO') ? (
-                        <Button
-                          variant="contained"
-                          size="small"
+                      <Tooltip title="Ver Detalles">
+                        <IconButton
                           color="primary"
-                          startIcon={<LocalShippingIcon />}
-                          onClick={() => handleEntregar(documento)}
-                        >
-                          Entregar
-                        </Button>
-                      ) : documento.status === 'ENTREGADO' ? (
-                        <Button
-                          variant="outlined"
+                          onClick={() => handleVerDetalle(documento)}
                           size="small"
-                          startIcon={<VisibilityIcon />}
-                          disabled
                         >
-                          Ver
-                        </Button>
-                      ) : (
-                        <Typography variant="caption" color="text.secondary">
-                          Sin acción
-                        </Typography>
+                          <VisibilityIcon />
+                        </IconButton>
+                      </Tooltip>
+
+                      {/* Botón de Revertir (Undo) */}
+                      {['LISTO', 'ENTREGADO'].includes(documento.status) && (
+                        <Tooltip title="Revertir estado">
+                          <IconButton
+                            color="warning"
+                            size="small"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDocumentForReversion(documento);
+                              setReversionOpen(true);
+                            }}
+                          >
+                            <HistoryIcon /> {/* Assuming HistoryIcon was intended or similar UndoIcon */}
+                          </IconButton>
+                        </Tooltip>
                       )}
                     </TableCell>
                   </TableRow>
@@ -941,66 +1000,118 @@ function RecepcionMain() {
           rowsPerPageOptions={[10, 20, 50, 100]}
           labelRowsPerPage="Filas por página:"
         />
-      </Card>
+      </Card >
 
       {/* Acciones Rápidas */}
-      {selectedDocuments.size > 0 && (
-        <Paper
-          sx={{
-            position: 'fixed',
-            bottom: 24,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            p: 2,
-            bgcolor: 'background.paper',
-            boxShadow: 4,
-            borderRadius: 2,
-            zIndex: 1200,
-            minWidth: 400
-          }}
-        >
-          <Box display="flex" gap={2} alignItems="center">
-            <Typography variant="body2" fontWeight={600}>
-              {selectedDocuments.size} documento(s) seleccionado(s)
-            </Typography>
+      {
+        selectedDocuments.size > 0 && (
+          <Paper
+            sx={{
+              position: 'fixed',
+              bottom: 24,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              p: 2,
+              bgcolor: 'background.paper',
+              boxShadow: 4,
+              borderRadius: 2,
+              zIndex: 1200,
+              minWidth: 400
+            }}
+          >
+            <Box display="flex" gap={2} alignItems="center">
+              <Typography variant="body2" fontWeight={600}>
+                {selectedDocuments.size} documento(s) seleccionado(s)
+              </Typography>
 
-            <Button
-              variant="contained"
-              color="success"
-              startIcon={<CheckCircleIcon />}
-              onClick={handleMarkMultipleReady}
-            >
-              Marcar como Listos
-            </Button>
+              <Button
+                variant="contained"
+                color="success"
+                startIcon={<CheckCircleIcon />}
+                onClick={handleMarkMultipleReady}
+              >
+                Marcar como Listos
+              </Button>
 
-            <Button
-              variant="outlined"
-              startIcon={<NotificationsIcon />}
-              onClick={() => toast.info('Funcionalidad en desarrollo')}
-            >
-              Notificar
-            </Button>
-
-            <Button
-              variant="outlined"
-              startIcon={<DownloadIcon />}
-              onClick={handleExport}
-            >
-              Exportar
-            </Button>
-          </Box>
-        </Paper>
-      )}
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<LocalShippingIcon />}
+                onClick={() => setShowEntregaGrupal(true)}
+              >
+                Entregar
+              </Button>
+            </Box>
+          </Paper>
+        )
+      }
 
       {/* Modal de Entrega */}
-      {showModalEntrega && documentoSeleccionado && (
-        <ModalEntrega
-          documento={documentoSeleccionado}
-          onClose={handleCloseModalEntrega}
-          onEntregaExitosa={handleEntregaExitosa}
-        />
-      )}
-    </Box>
+      {
+        showModalEntrega && documentoSeleccionado && (
+          <ModalEntrega
+            documento={documentoSeleccionado}
+            onClose={handleCloseModalEntrega}
+            onEntregaExitosa={handleEntregaExitosa}
+          />
+        )
+      }
+
+      {/* Modal de Entrega Grupal */}
+      {
+        showEntregaGrupal && selectedDocuments.size > 0 && (
+          <ModalEntregaGrupal
+            documentos={documentos.filter(doc => selectedDocuments.has(doc.id))}
+            onClose={handleCloseModalEntrega}
+            onEntregaExitosa={handleEntregaExitosa}
+          />
+        )
+      }
+
+      {/* Modal de Detalle */}
+      {
+        showDetailModal && documentForDetail && (
+          <DocumentDetailModal
+            open={showDetailModal}
+            document={documentForDetail}
+            onClose={handleCloseModalEntrega}
+            onDocumentUpdated={cargarDocumentos}
+          />
+        )
+      }
+
+      {/* Modal de Reversión */}
+      {
+        reversionOpen && documentForReversion && (
+          <ReversionModal
+            open={reversionOpen}
+            onClose={() => {
+              setReversionOpen(false);
+              setDocumentForReversion(null);
+            }}
+            documento={documentForReversion}
+            onConfirm={async ({ documentId, newStatus, reversionReason }) => {
+              // Llamada directa al servicio o via prop, asumiendo que ReversionModal maneja la logica o la pasamos aqui
+              // ReversionModal usually handles the call if props not fully intercepted
+              // But let's verify props. If ReversionModal requires onConfirm to implement logic:
+              try {
+                const result = await receptionService.revertirEstadoDocumento(documentId, newStatus, reversionReason);
+                if (result.success) {
+                  toast.success('Estado revertido exitosamente');
+                  await cargarDocumentos();
+                  setReversionOpen(false);
+                  setDocumentForReversion(null);
+                } else {
+                  toast.error(result.error || 'Error al revertir estado');
+                }
+              } catch (e) {
+                toast.error('Error de conexión');
+              }
+            }}
+          />
+        )
+      }
+    </Box >
   );
 }
 

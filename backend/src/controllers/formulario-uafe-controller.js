@@ -1,5 +1,5 @@
 import prisma from '../db.js';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { generarTokenSesion } from '../utils/pin-validator.js';
 import PDFDocument from 'pdfkit';
 import fs from 'fs';

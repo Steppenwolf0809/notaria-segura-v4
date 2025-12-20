@@ -77,6 +77,8 @@ function ModalEntregaGrupal({ documentos, onClose, onEntregaExitosa, serviceType
         { value: 'hijo', label: 'Hijo/Hija' },
         { value: 'padre', label: 'Padre/Madre' },
         { value: 'apoderado', label: 'Apoderado legal' },
+        { value: 'mensajero', label: 'Mensajero' },
+        { value: 'empleado', label: 'Empleado' },
         { value: 'otro', label: 'Otro' }
       ]);
     }
@@ -103,13 +105,12 @@ function ModalEntregaGrupal({ documentos, onClose, onEntregaExitosa, serviceType
       return;
     }
 
-    // 🆕 Solo validar código para recepción
+    // 🆕 Validación de código relax para recepción también
+    /*
     if (serviceType !== 'archivo') {
-      if (!formData.verificacionManual && !formData.codigoVerificacion.trim()) {
-        setError('Código de verificación es obligatorio (o marcar verificación manual)');
-        return;
-      }
+       if (!formData.verificacionManual && !formData.codigoVerificacion.trim()) { ... }
     }
+    */
 
     try {
       setLoading(true);
@@ -153,27 +154,10 @@ function ModalEntregaGrupal({ documentos, onClose, onEntregaExitosa, serviceType
           <Grid item xs={12} md={6}>
             <form onSubmit={handleSubmit}>
               <Grid container spacing={3}>
-                {/* 🆕 Ocultar código para ARCHIVO */}
-                {serviceType !== 'archivo' && (
-                  <>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        label="Código de Verificación Grupal"
-                        name="codigoVerificacion"
-                        value={formData.codigoVerificacion}
-                        onChange={handleChange}
-                        disabled={formData.verificacionManual}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <FormControlLabel
-                        control={<Checkbox name="verificacionManual" checked={formData.verificacionManual} onChange={handleChange} />}
-                        label="Verificación Manual"
-                      />
-                    </Grid>
-                  </>
-                )}
+                {/* 🆕 Ocultar código para TODOS por simplificación */}
+                {/* 
+                {serviceType !== 'archivo' && ( ... )}
+                */}
 
                 <Grid item xs={12} sm={6}>
                   <TextField fullWidth required label="Nombre de quien retira" name="entregadoA" value={formData.entregadoA} onChange={handleChange} helperText="Por defecto: titular del documento (editable)" />

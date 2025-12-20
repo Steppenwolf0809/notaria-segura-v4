@@ -18,7 +18,8 @@ import {
   getReceptionsCounts,
   getReceptionSuggestions,
   // 🎯 NUEVA FUNCIONALIDAD: Entrega en bloque
-  bulkDelivery
+  bulkDelivery,
+  entregaGrupal
 } from '../controllers/reception-controller.js';
 import { marcarVariosListos } from '../controllers/reception-bulk-controller.js';
 
@@ -117,6 +118,12 @@ router.post('/documentos/desagrupar', authenticateToken, requireRecepcion, csrfP
  * @csrf Protected - Requiere token CSRF
  */
 router.post('/bulk-delivery', authenticateToken, requireRecepcion, csrfProtection, bulkDelivery);
+
+/**
+ * @route POST /api/reception/documentos/entrega-grupal
+ * @desc Entregar múltiples documentos (compatible con ModalEntregaGrupal)
+ */
+router.post('/documentos/entrega-grupal', authenticateToken, requireRecepcion, csrfProtection, entregaGrupal);
 
 /**
  * @route GET /api/reception/matrizadores

@@ -75,6 +75,8 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
       setRelacionesOptions([
         { value: 'titular', label: 'Titular del documento' },
         { value: 'apoderado', label: 'Apoderado legal' },
+        { value: 'mensajero', label: 'Mensajero' },
+        { value: 'empleado', label: 'Empleado' },
         { value: 'otro', label: 'Otro' }
       ]);
     }
@@ -90,7 +92,7 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Validaciones
     if (!formData.entregadoA.trim()) {
       setError('Nombre de quien retira es obligatorio');
@@ -102,13 +104,17 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
       return;
     }
 
-    // 🆕 Solo validar código de verificación para RECEPCIÓN, NO para ARCHIVO
+    // 🆕 Solo validar código de verificación para RECEPCIÓN si se requiere explícitamente (ahora simplificado)
+    // El usuario pidió quitar el código para recepción también.
+    // if (serviceType !== 'archivo') { ... } -> Lo comentamos    // 🆕 Validación de código relax para recepción también
+    /*
     if (serviceType !== 'archivo') {
-      if (!formData.verificacionManual && !formData.codigoVerificacion.trim()) {
-        setError('Código de verificación es obligatorio (o marcar verificación manual)');
+       if (!formData.verificacionManual && !formData.codigoVerificacion.trim()) {
+        setError('Código de verificación es obligatorio');
         return;
       }
     }
+    */
 
     try {
       setLoading(true);
@@ -155,11 +161,11 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
       </DialogTitle>
       <DialogContent dividers>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-        
+
         {/* 🔗 NUEVA FUNCIONALIDAD: Alerta de entrega grupal */}
         {documento.isGrouped && (
-          <Alert 
-            severity="info" 
+          <Alert
+            severity="info"
             sx={{ mb: 2 }}
             icon={<Box component="span">📦</Box>}
           >
@@ -167,12 +173,12 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
               ⚡ Entrega Grupal Automática
             </Typography>
             <Typography variant="body2">
-              Este documento es parte de un grupo. Al procesarlo, se entregarán automáticamente 
+              Este documento es parte de un grupo. Al procesarlo, se entregarán automáticamente
               TODOS los documentos del grupo que estén listos.
             </Typography>
           </Alert>
         )}
-        
+
         <Box sx={{ p: 2, bgcolor: (theme) => theme.palette.background.default, borderRadius: 2, mb: 3 }}>
           <Typography variant="h6" sx={{ mb: 1 }}>
             📄 {documento.clientName}
@@ -186,10 +192,10 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
             </Grid>
             <Grid item xs={12} sm={4}>
               <Typography variant="body2">
-                <strong>Código:</strong> 
-                <Chip 
-                  label={documento.codigoRetiro || documento.verificationCode || 'N/A'} 
-                  size="small" 
+                <strong>Código:</strong>
+                <Chip
+                  label={documento.codigoRetiro || documento.verificationCode || 'N/A'}
+                  size="small"
                   color="success"
                   sx={{ ml: 1, fontFamily: 'monospace', fontWeight: 'bold' }}
                 />
@@ -200,34 +206,17 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
 
         <form onSubmit={handleSubmit}>
           <Grid container spacing={3}>
-            {/* 🆕 Solo mostrar código de verificación para RECEPCIÓN, NO para ARCHIVO */}
+            {/* 🆕 Código oculto/simplificado para todos según requerimiento */}
+            {/*
             {serviceType !== 'archivo' && (
               <>
                 <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Código de Verificación"
-                    name="codigoVerificacion"
-                    value={formData.codigoVerificacion}
-                    onChange={handleChange}
-                    disabled={formData.verificacionManual}
-                    helperText="Código de 4 dígitos enviado al cliente"
-                  />
+                  <TextField ... />
                 </Grid>
-                <Grid item xs={12} sm={6}>
-                  <FormControlLabel
-                    control={
-                      <Checkbox
-                        name="verificacionManual"
-                        checked={formData.verificacionManual}
-                        onChange={handleChange}
-                      />
-                    }
-                    label="Verificación Manual (cliente no tiene código)"
-                  />
-                </Grid>
+                ...
               </>
             )}
+            */}
 
             <Grid item xs={12} sm={6}>
               <TextField
@@ -298,9 +287,9 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
         <Button onClick={onClose} color="secondary">
           Cancelar
         </Button>
-        <Button 
-          onClick={handleSubmit} 
-          variant="contained" 
+        <Button
+          onClick={handleSubmit}
+          variant="contained"
           color="primary"
           disabled={loading}
           startIcon={loading ? <CircularProgress size={20} /> : null}

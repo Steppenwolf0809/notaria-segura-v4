@@ -3,12 +3,12 @@ import { getReversionCleanupData, isValidStatus, isReversion as isReversionFn } 
 import { parseXmlDocument, generateVerificationCode } from '../services/xml-parser-service.js';
 import DocumentGroupingService from '../services/document-grouping-service.js';
 import MatrizadorAssignmentService from '../services/matrizador-assignment-service.js';
-import { 
-  formatEventDescription, 
-  getEventContextInfo, 
+import {
+  formatEventDescription,
+  getEventContextInfo,
   getEventTitle,
   getEventIcon,
-  getEventColor 
+  getEventColor
 } from '../utils/event-formatter.js';
 import AdvancedExtractionService from '../services/advanced-extraction-service.js';
 import ActosExtractorService from '../services/actos-extractor-service.js';
@@ -48,22 +48,22 @@ async function uploadXmlDocument(req, res) {
 
     // Leer contenido del archivo XML
     const xmlContent = req.file.buffer.toString('utf8');
-    
+
     // Procesar XML con el parser service
     const parsedData = await parseXmlDocument(xmlContent);
-    
+
     // Verificar que no existe un documento con el mismo protocolNumber
     const existingDocument = await prisma.document.findUnique({
       where: { protocolNumber: parsedData.protocolNumber }
     });
-    
+
     if (existingDocument) {
       return res.status(400).json({
         success: false,
         message: `Ya existe un documento con número de protocolo: ${parsedData.protocolNumber}`
       });
     }
-    
+
     // Crear documento en la base de datos
     const document = await prisma.document.create({
       data: {
@@ -124,7 +124,7 @@ async function uploadXmlDocument(req, res) {
     // 🤖 ASIGNACIÓN AUTOMÁTICA DE MATRIZADOR
     console.log(`🔍 Intentando asignación automática para matrizador: "${parsedData.matrizadorName}"`);
     const assignmentResult = await MatrizadorAssignmentService.autoAssignDocument(
-      document.id, 
+      document.id,
       parsedData.matrizadorName
     );
 
@@ -151,11 +151,11 @@ async function uploadXmlDocument(req, res) {
             documentId: document.id,
             userId: req.user.id,
             eventType: 'EXTRACTION_SNAPSHOT',
-            description: `Snapshot extracción avanzada (auto) al crear desde XML` ,
+            description: `Snapshot extracción avanzada (auto) al crear desde XML`,
             details: JSON.stringify({
               acts: actos.acts,
               parties,
-              signals: base.fields.filter(f => ['valor_operacion','forma_pago','articulo_29'].includes(f.fieldName)),
+              signals: base.fields.filter(f => ['valor_operacion', 'forma_pago', 'articulo_29'].includes(f.fieldName)),
               confidence: base.confidence,
               meta: base.metadata,
               extractor: 'advanced-actos-v1'
@@ -273,7 +273,7 @@ async function extractDocumentActs(req, res) {
             details: JSON.stringify({
               acts: actos.acts,
               parties,
-              signals: base.fields.filter(f => ['valor_operacion','forma_pago','articulo_29'].includes(f.fieldName)),
+              signals: base.fields.filter(f => ['valor_operacion', 'forma_pago', 'articulo_29'].includes(f.fieldName)),
               confidence: base.confidence,
               meta: base.metadata,
               extractor: 'advanced-actos-v1'
@@ -293,7 +293,7 @@ async function extractDocumentActs(req, res) {
         enabled: true,
         acts: actos.acts,
         parties,
-        signals: base.fields.filter(f => ['valor_operacion','forma_pago','articulo_29'].includes(f.fieldName)),
+        signals: base.fields.filter(f => ['valor_operacion', 'forma_pago', 'articulo_29'].includes(f.fieldName)),
         confidence: base.confidence,
         meta: base.metadata,
         saved: !!saveSnapshot
@@ -328,7 +328,7 @@ async function applyExtractionSuggestions(req, res) {
     const details = snapshot.details;
     const confidence = typeof details.confidence === 'number' ? details.confidence : 0;
     if (confidence < minConfidence) {
-      return res.status(400).json({ success: false, message: `Confianza insuficiente (${Math.round(confidence*100)}%). Umbral: ${Math.round(minConfidence*100)}%` });
+      return res.status(400).json({ success: false, message: `Confianza insuficiente (${Math.round(confidence * 100)}%). Umbral: ${Math.round(minConfidence * 100)}%` });
     }
 
     const acts = Array.isArray(details.acts) ? details.acts : [];
@@ -370,7 +370,7 @@ async function applyExtractionSuggestions(req, res) {
           userAgent: req.get('User-Agent') || 'unknown'
         }
       });
-    } catch {}
+    } catch { }
 
     return res.json({ success: true, message: 'Sugerencias aplicadas', data: { document: updated, applied } });
   } catch (error) {
@@ -782,7 +782,7 @@ async function updateDocumentStatus(req, res) {
     // Generar código de verificación si se marca como LISTO Y no tiene código
     if (status === 'LISTO' && !document.verificationCode) {
       updateData.verificationCode = generateVerificationCode();
-      
+
       // 📈 Registrar evento de generación de código de verificación
       try {
         await prisma.documentEvent.create({
@@ -809,7 +809,7 @@ async function updateDocumentStatus(req, res) {
     // NUEVA FUNCIONALIDAD: Manejar propagación de estado en documentos agrupados
     let updatedDocuments = [];
     let groupAffected = false;
-    
+
     // Verificar si el documento pertenece a un grupo y si el cambio debe propagarse
     // Ahora: si el usuario es MATRIZADOR y el documento está agrupado, propagamos SIEMPRE
     if (document.documentGroupId && req.user.role === 'MATRIZADOR') {
@@ -897,7 +897,7 @@ async function updateDocumentStatus(req, res) {
         for (let i = 0; i < updatedDocuments.length; i++) {
           const doc = updatedDocuments[i];
           const originalStatus = documentsToUpdate[i].originalStatus;
-          
+
           try {
             await prisma.documentEvent.create({
               data: {
@@ -966,18 +966,18 @@ async function updateDocumentStatus(req, res) {
     let whatsappSent = false;
     let whatsappError = null;
     let whatsappResults = [];
-    
+
     if (status === 'LISTO' && updatedDocument?.notificationPolicy === 'no_notificar') {
       console.log('🔕 Política de notificación: no_notificar. Se omite envío de WhatsApp (LISTO).');
     } else if (status === 'LISTO') {
       try {
         // Importar el servicio de WhatsApp
         const whatsappService = await import('../services/whatsapp-service.js');
-        
+
         if (groupAffected && updatedDocuments.length > 1) {
           // Enviar notificaciones grupales - una por cada documento con teléfono único
           const uniqueClients = new Map();
-          
+
           // Agrupar documentos por teléfono del cliente
           for (const doc of updatedDocuments) {
             if (doc.clientPhone) {
@@ -991,9 +991,9 @@ async function updateDocumentStatus(req, res) {
               uniqueClients.get(doc.clientPhone).documents.push(doc);
             }
           }
-          
+
           console.log(`📱 Enviando notificaciones grupales a ${uniqueClients.size} cliente(s)`);
-          
+
           // Enviar notificación a cada cliente único
           for (const [phone, clientData] of uniqueClients) {
             try {
@@ -1033,24 +1033,24 @@ async function updateDocumentStatus(req, res) {
               });
             }
           }
-          
+
           whatsappSent = whatsappResults.some(result => result.success);
           const failedNotifications = whatsappResults.filter(result => !result.success);
           if (failedNotifications.length > 0) {
             whatsappError = `Falló envío a ${failedNotifications.length} cliente(s)`;
           }
-          
+
         } else if (updatedDocument.clientPhone) {
           // Enviar notificación individual (comportamiento original)
           const whatsappResult = await whatsappService.default.sendDocumentReadyNotification(updatedDocument);
           whatsappSent = whatsappResult.success;
-          
+
           if (!whatsappResult.success) {
             whatsappError = whatsappResult.error;
             console.error('Error enviando WhatsApp:', whatsappResult.error);
           } else {
             console.log('Notificación WhatsApp enviada exitosamente');
-          
+
             // 📈 Registrar evento de notificación WhatsApp enviada
             try {
               await prisma.documentEvent.create({
@@ -1087,7 +1087,7 @@ async function updateDocumentStatus(req, res) {
       try {
         // Importar el servicio de WhatsApp
         const whatsappService = await import('../services/whatsapp-service.js');
-        
+
         // Preparar datos de entrega
         const datosEntrega = {
           entregado_a: updateData.entregadoA,
@@ -1112,15 +1112,15 @@ async function updateDocumentStatus(req, res) {
           },
           datosEntrega
         );
-        
+
         whatsappSent = whatsappResult.success;
-        
+
         if (!whatsappResult.success) {
           whatsappError = whatsappResult.error;
           console.error('Error enviando WhatsApp de entrega directa:', whatsappResult.error);
         } else {
           console.log('📱 Notificación WhatsApp de entrega directa enviada exitosamente');
-          
+
           // 📈 Registrar evento de notificación WhatsApp de entrega directa
           try {
             await prisma.documentEvent.create({
@@ -1185,10 +1185,10 @@ async function updateDocumentStatus(req, res) {
     }
 
     // Preparar mensaje de respuesta
-    let message = groupAffected 
+    let message = groupAffected
       ? `${updatedDocuments.length} documentos del grupo actualizados exitosamente`
       : 'Estado del documento actualizado exitosamente';
-      
+
     if (status === 'LISTO') {
       if (groupAffected) {
         if (whatsappSent) {
@@ -1407,23 +1407,23 @@ async function detectGroupableDocuments(req, res) {
     const { clientName, clientId } = req.body;
     // Solo forza filtro por asignación cuando es MATRIZADOR, para RECEPCION/ARCHIVO/ADMIN buscamos por cliente sin restringir asignación
     const matrizadorId = req.user.role === 'MATRIZADOR' ? req.user.id : null;
-    
+
     console.log('🔍 Controller: detectGroupableDocuments solicitado:', {
       clientName,
       clientId: clientId || '(sin ID)',
       matrizadorId,
       userRole: req.user.role
     });
-    
+
     const groupableDocuments = await DocumentGroupingService
       .detectGroupableDocuments({ clientName, clientId }, matrizadorId);
-    
+
     res.json({
       success: true,
       groupableDocuments,
       canGroup: groupableDocuments.length >= 2
     });
-    
+
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -1448,44 +1448,44 @@ async function createDocumentGroup(req, res) {
     const { documentIds, verifiedPhone, notificationMessage } = req.body;
     // Para crear grupo: solo restringimos por asignación cuando el usuario es MATRIZADOR
     const matrizadorId = req.user.role === 'MATRIZADOR' ? req.user.id : null;
-    
+
     // NUEVA FUNCIONALIDAD: Crear grupo con estado configurable
     const markAsReady = req.body.markAsReady || false; // Por defecto solo agrupar
     const result = await DocumentGroupingService
       .createDocumentGroup(documentIds, matrizadorId, markAsReady);
-    
+
     // Enviar notificación grupal si se solicita
     let whatsappSent = false;
     let whatsappError = null;
-    
+
     console.log('🔍 DEBUG: Verificando condiciones para WhatsApp grupal:', {
       sendNotification: req.body.sendNotification,
       clientPhone: result.group.clientPhone,
       clientName: result.group.clientName,
       documentsCount: result.documents.length
     });
-    
+
     // NUEVA FUNCIONALIDAD: Solo enviar notificación si se marca como listo
     if (markAsReady && req.body.sendNotification && result.group.clientPhone) {
       try {
         // Importar el servicio de WhatsApp
         const whatsappService = await import('../services/whatsapp-service.js');
-        
+
         // Preparar datos del cliente
         const cliente = {
           nombre: result.group.clientName,
           telefono: result.group.clientPhone
         };
-        
+
         // Enviar notificación grupal
         const whatsappResult = await whatsappService.default.enviarGrupoDocumentosListo(
           cliente,
           result.documents,
           result.group.verificationCode
         );
-        
+
         whatsappSent = whatsappResult.success;
-        
+
         if (!whatsappResult.success) {
           whatsappError = whatsappResult.error;
           console.error('Error enviando WhatsApp grupal:', whatsappResult.error);
@@ -1496,7 +1496,7 @@ async function createDocumentGroup(req, res) {
         console.error('Error en servicio WhatsApp grupal:', error);
         whatsappError = error.message;
       }
-      
+
       // Marcar notificación enviada solo si fue exitosa
       if (whatsappSent) {
         await prisma.documentGroup.update({
@@ -1508,7 +1508,7 @@ async function createDocumentGroup(req, res) {
         });
       }
     }
-    
+
     // Preparar mensaje de respuesta
     let message = `Grupo creado con ${result.documents.length} documentos`;
     if (req.body.sendNotification) {
@@ -1532,7 +1532,7 @@ async function createDocumentGroup(req, res) {
         phone: result.group.clientPhone
       }
     });
-    
+
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -1548,18 +1548,18 @@ async function deliverDocumentGroup(req, res) {
   try {
     const { verificationCode, deliveredTo, deliveryNotes } = req.body;
     const deliveredBy = req.user.id;
-    
+
     const group = await DocumentGroupingService.deliverDocumentGroup(
       verificationCode,
       { deliveredTo, deliveredBy, deliveryNotes }
     );
-    
+
     res.json({
       success: true,
       message: `Grupo de ${group.documentsCount} documentos entregado`,
       group
     });
-    
+
   } catch (error) {
     res.status(400).json({
       success: false,
@@ -1601,7 +1601,7 @@ async function uploadXmlDocumentsBatch(req, res) {
     // Procesar cada archivo secuencialmente para evitar sobrecargar la base de datos
     for (let i = 0; i < req.files.length; i++) {
       const archivo = req.files[i];
-      
+
       try {
         console.log(`📄 Procesando archivo ${i + 1}/${req.files.length}: ${archivo.originalname}`);
 
@@ -1665,7 +1665,7 @@ async function uploadXmlDocumentsBatch(req, res) {
 
         // 🤖 ASIGNACIÓN AUTOMÁTICA DE MATRIZADOR
         const assignmentResult = await MatrizadorAssignmentService.autoAssignDocument(
-          document.id, 
+          document.id,
           parsedData.matrizadorName
         );
 
@@ -1770,7 +1770,7 @@ async function uploadXmlDocumentsBatch(req, res) {
 async function createSmartDocumentGroup(req, res) {
   try {
     const { documentIds, notificationPolicy = 'automatica' } = req.body;
-    
+
     // Validar roles autorizados para agrupación inteligente
     if (!['MATRIZADOR', 'RECEPCION', 'ARCHIVO', 'ADMIN'].includes(req.user.role)) {
       return res.status(403).json({
@@ -1790,7 +1790,7 @@ async function createSmartDocumentGroup(req, res) {
 
     // Usar el servicio existente pero con lógica mejorada
     const groupResult = await DocumentGroupingService.createDocumentGroup(
-      documentIds, 
+      documentIds,
       req.user.id // CAJA puede crear grupos aunque no sea matrizador
     );
 
@@ -1866,7 +1866,7 @@ async function createSmartDocumentGroup(req, res) {
 async function getEditableDocumentInfo(req, res) {
   try {
     const { id } = req.params;
-    
+
     console.log('📝 getEditableDocumentInfo iniciado:', {
       documentId: id,
       userRole: req.user.role,
@@ -1945,7 +1945,7 @@ async function updateDocumentInfo(req, res) {
       clientId,
       actoPrincipalDescripcion
     } = req.body;
-    
+
     console.log('📝 updateDocumentInfo iniciado:', {
       documentId: id,
       userRole: req.user.role,
@@ -2102,20 +2102,20 @@ async function markDocumentGroupAsReady(req, res) {
     if (result.group.clientPhone) {
       try {
         const whatsappService = await import('../services/whatsapp-service.js');
-        
+
         const cliente = {
           nombre: result.group.clientName,
           telefono: result.group.clientPhone
         };
-        
+
         const whatsappResult = await whatsappService.default.enviarGrupoDocumentosListo(
           cliente,
           result.documents,
           result.group.verificationCode
         );
-        
+
         whatsappSent = whatsappResult.success;
-        
+
         if (!whatsappResult.success) {
           whatsappError = whatsappResult.error;
           console.error('Error enviando WhatsApp al marcar grupo como listo:', whatsappResult.error);
@@ -2160,7 +2160,7 @@ async function markDocumentGroupAsReady(req, res) {
 async function updateDocumentGroupStatus(req, res) {
   try {
     const { documentGroupId, newStatus, deliveredTo, reversionReason } = req.body;
-    
+
     console.log('🔄 updateDocumentGroupStatus iniciado:', {
       documentGroupId,
       newStatus,
@@ -2188,7 +2188,7 @@ async function updateDocumentGroupStatus(req, res) {
     // Buscar documentos del grupo y verificar permisos
     console.log('🔍 Buscando documentos del grupo:', documentGroupId);
     const groupDocuments = await prisma.document.findMany({
-      where: { 
+      where: {
         documentGroupId,
         isGrouped: true
       },
@@ -2323,7 +2323,7 @@ async function updateDocumentGroupStatus(req, res) {
     // Enviar notificación grupal si corresponde
     let whatsappSent = false;
     let whatsappError = null;
-    
+
     console.log('🔍 Verificando condiciones iniciales para WhatsApp grupal:', {
       newStatus,
       isListo: newStatus === 'LISTO',
@@ -2336,20 +2336,20 @@ async function updateDocumentGroupStatus(req, res) {
         verificationCode: updatedDocsOnly[0].documentGroup.verificationCode
       } : null
     });
-    
+
     // 🔧 CORRECCIÓN: Verificar/obtener documentGroup si no está presente
     let documentGroupForWhatsApp = updatedDocsOnly[0]?.documentGroup;
-    
+
     if (newStatus === 'LISTO' && updatedDocsOnly[0]?.clientPhone && !documentGroupForWhatsApp && updatedDocsOnly[0]?.documentGroupId) {
       console.log('🔄 documentGroup no incluido, obteniendo manualmente...', {
         documentGroupId: updatedDocsOnly[0].documentGroupId
       });
-      
+
       try {
         documentGroupForWhatsApp = await prisma.documentGroup.findUnique({
           where: { id: updatedDocsOnly[0].documentGroupId }
         });
-        
+
         console.log('✅ DocumentGroup obtenido manualmente:', {
           id: documentGroupForWhatsApp?.id,
           verificationCode: documentGroupForWhatsApp?.verificationCode
@@ -2358,21 +2358,21 @@ async function updateDocumentGroupStatus(req, res) {
         console.error('❌ Error obteniendo documentGroup manualmente:', error);
       }
     }
-    
+
     console.log('🔍 Condiciones finales para WhatsApp grupal:', {
       newStatus,
       isListo: newStatus === 'LISTO',
       hasClientPhone: !!updatedDocuments[0]?.clientPhone,
       hasDocumentGroup: !!documentGroupForWhatsApp,
-      willSendWhatsApp: newStatus === 'LISTO' && 
-                        !!updatedDocsOnly[0]?.clientPhone && 
-                        !!documentGroupForWhatsApp
+      willSendWhatsApp: newStatus === 'LISTO' &&
+        !!updatedDocsOnly[0]?.clientPhone &&
+        !!documentGroupForWhatsApp
     });
 
     if (newStatus === 'LISTO' && updatedDocsOnly[0]?.clientPhone && documentGroupForWhatsApp) {
       try {
         const whatsappService = await import('../services/whatsapp-service.js');
-        
+
         const cliente = {
           nombre: updatedDocsOnly[0].clientName,
           telefono: updatedDocsOnly[0].clientPhone
@@ -2383,9 +2383,9 @@ async function updateDocumentGroupStatus(req, res) {
           updatedDocsOnly,
           documentGroupForWhatsApp.verificationCode
         );
-        
+
         whatsappSent = whatsappResult.success;
-        
+
         if (!whatsappResult.success) {
           whatsappError = whatsappResult.error;
           console.error('Error enviando WhatsApp grupal:', whatsappResult.error);
@@ -2435,7 +2435,7 @@ async function updateDocumentGroupStatus(req, res) {
     if (newStatus === 'ENTREGADO' && updatedDocsOnly[0]?.clientPhone) {
       try {
         const whatsappService = await import('../services/whatsapp-service.js');
-        
+
         const cliente = {
           nombre: updatedDocsOnly[0].clientName,
           clientName: updatedDocsOnly[0].clientName,
@@ -2462,15 +2462,15 @@ async function updateDocumentGroupStatus(req, res) {
           },
           datosEntrega
         );
-        
+
         whatsappSent = whatsappResult.success;
-        
+
         if (!whatsappResult.success) {
           whatsappError = whatsappResult.error;
           console.error('Error enviando WhatsApp de entrega grupal:', whatsappResult.error);
         } else {
           console.log('📱 Notificación grupal WhatsApp de entrega enviada exitosamente');
-          
+
           // 📈 Registrar evento de notificación WhatsApp grupal
           try {
             await prisma.documentEvent.create({
@@ -2555,7 +2555,7 @@ async function updateDocumentGroupInfo(req, res) {
 
     // Buscar documentos del grupo
     const groupDocuments = await prisma.document.findMany({
-      where: { 
+      where: {
         documentGroupId,
         isGrouped: true
       }
@@ -2582,7 +2582,7 @@ async function updateDocumentGroupInfo(req, res) {
 
     // Preparar datos que se pueden actualizar de forma compartida
     const updateData = {};
-    
+
     // Solo permitir actualizar campos específicos que son compartidos
     const allowedFields = ['clientPhone', 'clientEmail', 'clientName'];
     allowedFields.forEach(field => {
@@ -2600,7 +2600,7 @@ async function updateDocumentGroupInfo(req, res) {
 
     // Actualizar todos los documentos del grupo
     const updateResult = await prisma.document.updateMany({
-      where: { 
+      where: {
         documentGroupId,
         isGrouped: true
       },
@@ -2621,7 +2621,7 @@ async function updateDocumentGroupInfo(req, res) {
 
     // Obtener documentos actualizados
     const updatedDocuments = await prisma.document.findMany({
-      where: { 
+      where: {
         documentGroupId,
         isGrouped: true
       }
@@ -2946,19 +2946,21 @@ async function deliverDocument(req, res) {
       }
     }
 
-    // Verificar que el documento esté LISTO o permitir entrega inmediata
+    // Verificar que el documento esté LISTO o permitir entrega inmediata (EN_PROCESO)
+    // ⚡ FIX: Permitir entregar documentos EN_PROCESO como "Entrega Directa"
     const { immediateDelivery } = req.body;
-    if (!immediateDelivery && document.status !== 'LISTO') {
+    const allowedStatuses = ['LISTO', 'EN_PROCESO'];
+
+    if (!immediateDelivery && !allowedStatuses.includes(document.status)) {
       return res.status(400).json({
         success: false,
-        message: 'Solo se pueden entregar documentos que estén LISTO'
+        message: 'Solo se pueden entregar documentos que estén LISTO o EN PROCESO (entrega directa)'
       });
     }
 
-    // Si es entrega inmediata, validar permisos y estados permitidos
+    // Si es entrega inmediata explícita, validar permisos y estados permitidos
     if (immediateDelivery) {
-      const allowedStatuses = ['PENDIENTE', 'EN_PROCESO', 'LISTO'];
-      if (!allowedStatuses.includes(document.status)) {
+      if (!allowedStatuses.includes(document.status) && document.status !== 'PENDIENTE') {
         return res.status(400).json({
           success: false,
           message: 'No se puede realizar entrega inmediata de documentos ya entregados'
@@ -2970,6 +2972,16 @@ async function deliverDocument(req, res) {
 
     // Verificar código de verificación si no es manual (aceptar individual o grupal)
     if (!verificacionManual) {
+      // ⚡ FIX: Si está EN_PROCESO, es posible que no tenga código aún.
+      // En ese caso, requerimos que el usuario confirme "Verificación Manual" en el frontend,
+      // O generamos uno al vuelo si fuera necesario (pero aquí validamos contra lo que hay).
+      if (document.status === 'EN_PROCESO' && !document.verificationCode && !document.codigoRetiro && !document.groupVerificationCode) {
+        return res.status(400).json({
+          success: false,
+          message: 'Documento en proceso sin código. Debe seleccionar "Verificación Manual" para entregar directamente.'
+        });
+      }
+
       if (!codigoVerificacion) {
         return res.status(400).json({
           success: false,
@@ -2999,7 +3011,7 @@ async function deliverDocument(req, res) {
       const allGroupDocuments = document.documentGroup.documents;
 
       // Entregar todos los documentos del grupo que estén LISTO (excepto el actual)
-      const documentsToDeliver = allGroupDocuments.filter(doc => 
+      const documentsToDeliver = allGroupDocuments.filter(doc =>
         doc.status === 'LISTO' && doc.id !== id
       );
 
@@ -3085,11 +3097,11 @@ async function deliverDocument(req, res) {
     // Enviar notificación WhatsApp de entrega
     let whatsappSent = false;
     let whatsappError = null;
-    
+
     if (updatedDocument.clientPhone) {
       try {
         const whatsappService = await import('../services/whatsapp-service.js');
-        
+
         const fechaEntrega = new Date();
         const datosEntrega = {
           // Variables básicas (compatibilidad)
@@ -3097,12 +3109,12 @@ async function deliverDocument(req, res) {
           deliveredTo: entregadoA,
           fecha: fechaEntrega,
           usuario_entrega: `${req.user.firstName} ${req.user.lastName}`,
-          
+
           // Claves adicionales que esperan los templates del servicio
           entregadoA,
           cedulaReceptor,
           relacionTitular,
-          
+
           // Variables mejoradas para template
           fechaEntrega: fechaEntrega,
           nombreRetirador: entregadoA,
@@ -3110,7 +3122,7 @@ async function deliverDocument(req, res) {
           cedula_receptor: cedulaReceptor,
           relacionTitular: relacionTitular,
           relacion_titular: relacionTitular,
-          
+
           // Variables adicionales
           verificacionManual: verificacionManual || false,
           facturaPresenta: facturaPresenta || false,
@@ -3130,7 +3142,7 @@ async function deliverDocument(req, res) {
             tipoDocumento: `Grupo de ${allDocuments.length} documentos`,
             numero_documento: updatedDocument.protocolNumber,
             protocolNumber: updatedDocument.protocolNumber,
-            
+
             // Para template mejorado
             documentType: `Grupo de ${allDocuments.length} documentos`,
             esGrupo: true,
@@ -3151,7 +3163,7 @@ async function deliverDocument(req, res) {
             tipoDocumento: updatedDocument.documentType,
             numero_documento: updatedDocument.protocolNumber,
             protocolNumber: updatedDocument.protocolNumber,
-            
+
             // Para template mejorado
             documentType: updatedDocument.documentType,
             esGrupo: false,
@@ -3172,7 +3184,7 @@ async function deliverDocument(req, res) {
           documentoData,
           datosEntrega
         );
-        
+
         whatsappSent = whatsappResult.success;
         if (!whatsappResult.success) {
           whatsappError = whatsappResult.error;
@@ -3213,10 +3225,10 @@ async function deliverDocument(req, res) {
 
     // Registrar evento de auditoría
     try {
-      const eventDescription = immediateDelivery 
+      const eventDescription = immediateDelivery
         ? `Documento entregado INMEDIATAMENTE a ${entregadoA} por ${req.user.firstName} ${req.user.lastName} (${req.user.role}) - Estado anterior: ${document.status}`
         : `Documento entregado a ${entregadoA} por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`;
-      
+
       await prisma.documentEvent.create({
         data: {
           documentId: id,
@@ -3253,12 +3265,12 @@ async function deliverDocument(req, res) {
 
     // Preparar mensaje de respuesta
     const totalDelivered = 1 + groupDocuments.length;
-    let message = immediateDelivery 
+    let message = immediateDelivery
       ? 'Documento entregado inmediatamente (sin notificación previa)'
-      : totalDelivered > 1 
+      : totalDelivered > 1
         ? `${totalDelivered} documentos entregados exitosamente (entrega grupal)`
         : 'Documento entregado exitosamente';
-    
+
     if (whatsappSent) {
       message += ' y notificación WhatsApp enviada';
     } else if (updatedDocument.clientPhone && whatsappError) {
@@ -3373,7 +3385,7 @@ async function undoDocumentStatusChange(req, res) {
 
     // Verificar permisos - solo el usuario que hizo el cambio o ADMIN puede deshacer
     let lastChangeEvent = null;
-    
+
     if (changeId) {
       // Buscar evento específico por ID
       lastChangeEvent = await prisma.documentEvent.findUnique({
@@ -3425,7 +3437,7 @@ async function undoDocumentStatusChange(req, res) {
     // Verificar permisos
     const isOwner = lastChangeEvent.userId === req.user.id;
     const isAdmin = req.user.role === 'ADMIN';
-    
+
     if (!isOwner && !isAdmin) {
       return res.status(403).json({
         success: false,
@@ -3436,7 +3448,7 @@ async function undoDocumentStatusChange(req, res) {
     // Extraer estado anterior del detalle del evento
     const eventDetails = lastChangeEvent.details;
     const previousStatus = eventDetails.previousStatus;
-    
+
     if (!previousStatus) {
       return res.status(400).json({
         success: false,
@@ -3512,7 +3524,7 @@ async function undoDocumentStatusChange(req, res) {
           undoEventId: result.undoEvent.id,
           timeSinceOriginalChange: `${Math.round(timeDifference / 1000)} segundos`,
           whatsappWasSent: eventDetails.whatsappSent || false,
-          note: eventDetails.whatsappSent ? 
+          note: eventDetails.whatsappSent ?
             'Nota: Se había enviado notificación WhatsApp que no puede ser revertida automáticamente' : null
         }
       }
@@ -3536,7 +3548,7 @@ async function undoDocumentStatusChange(req, res) {
 async function getUndoableChanges(req, res) {
   try {
     const { documentId } = req.params;
-    
+
     // Buscar cambios recientes (últimos 10 minutos) que pueden ser deshechos
     const recentChanges = await prisma.documentEvent.findMany({
       where: {
@@ -3712,7 +3724,7 @@ async function getDocumentHistory(req, res) {
 
       // Obtener información contextual adicional
       const contextInfo = getEventContextInfo(eventWithParsedDetails);
-      
+
       return {
         id: event.id,
         type: event.eventType,
@@ -3734,7 +3746,7 @@ async function getDocumentHistory(req, res) {
         ...(event.metodoVerificacion && { metodoVerificacion: event.metodoVerificacion }),
         ...(event.observacionesRetiro && { observacionesRetiro: event.observacionesRetiro }),
         // Omitir metadata técnica innecesaria para el usuario final
-        ...(userRole === 'ADMIN' && { 
+        ...(userRole === 'ADMIN' && {
           metadata: {
             ipAddress: event.ipAddress,
             userAgent: event.userAgent
@@ -3791,7 +3803,7 @@ async function getDocumentHistory(req, res) {
 async function getGroupDocuments(req, res) {
   try {
     const { groupId } = req.params;
-    
+
     console.log('📋 getGroupDocuments iniciado:', {
       groupId,
       userId: req.user.id,
@@ -3961,7 +3973,7 @@ async function revertDocumentStatus(req, res) {
       // Usar transacción para revertir todos los documentos del grupo
       updatedDocuments = await prisma.$transaction(async (tx) => {
         const updates = [];
-        
+
         for (const doc of groupDocuments) {
           const updated = await tx.document.update({
             where: { id: doc.id },
@@ -4055,7 +4067,7 @@ async function revertDocumentStatus(req, res) {
     }
 
     // Preparar mensaje de respuesta
-    const message = groupAffected 
+    const message = groupAffected
       ? `${updatedDocuments.length} documentos del grupo revertidos exitosamente de ${document.status} a ${newStatus}`
       : `Estado revertido exitosamente de ${document.status} a ${newStatus}`;
 
@@ -4149,9 +4161,9 @@ async function updateNotificationPolicy(req, res) {
           }
         }
       });
-      
+
       console.log(`🔔 Política de notificación actualizada: ${document.protocolNumber} -> ${notificationPolicy}`);
-      
+
     } catch (updateError) {
       // Si el campo no existe aún (migración pendiente), devolver respuesta simulada
       if (updateError.message.includes('notificationPolicy') || updateError.message.includes('column')) {
@@ -4246,10 +4258,10 @@ async function updateGroupNotificationPolicy(req, res) {
 
     // Si es matrizador, verificar que tiene al menos un documento asignado en el grupo
     if (userRole === 'MATRIZADOR') {
-      const hasAssignedDoc = documentGroup.documents.some(doc => 
+      const hasAssignedDoc = documentGroup.documents.some(doc =>
         doc.assignedToId === req.user.id
       );
-      
+
       if (!hasAssignedDoc) {
         return res.status(403).json({
           success: false,
@@ -4281,9 +4293,9 @@ async function updateGroupNotificationPolicy(req, res) {
 
         return { updateResult, updatedDocuments };
       });
-      
+
       console.log(`🔔 Política de grupo actualizada: Grupo ${groupId} -> ${notificationPolicy} (${result.updateResult.count} documentos)`);
-      
+
     } catch (updateError) {
       // Si el campo no existe aún (migración pendiente), devolver respuesta simulada
       if (updateError.message.includes('notificationPolicy') || updateError.message.includes('column')) {
@@ -4579,7 +4591,7 @@ async function getDocumentsCounts(req, res) {
       // 🔥 IMPORTANTE: Excluir Notas de Crédito de todos los conteos
       status: { not: 'ANULADO_NOTA_CREDITO' }
     };
-    
+
     if (clientId) {
       baseWhere.clientId = clientId;
     }

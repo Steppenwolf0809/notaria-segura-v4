@@ -1,5 +1,5 @@
 import { getPrismaClient } from '../db.js';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { validarPIN, generarTokenSesion } from '../utils/pin-validator.js';
 import logger from '../utils/logger.js';
 
@@ -206,8 +206,8 @@ export async function registrarPersona(req, res) {
       // 2. pinHash no existe (null/undefined), O
       // 3. pinHash es una cadena vacía o solo espacios
       const pinEstaReseteado = !existente.pinCreado ||
-                                !existente.pinHash ||
-                                (typeof existente.pinHash === 'string' && existente.pinHash.trim().length === 0);
+        !existente.pinHash ||
+        (typeof existente.pinHash === 'string' && existente.pinHash.trim().length === 0);
 
       logger.info('🔍 DEBUG - Verificación PIN reseteado:', {
         pinEstaReseteado,
@@ -582,7 +582,7 @@ export async function actualizarMiInformacion(req, res) {
 export async function logoutPersona(req, res) {
   try {
     const sessionToken = req.cookies?.personal_session ||
-                         req.headers['x-session-token'];
+      req.headers['x-session-token'];
 
     if (sessionToken) {
       await prisma.sesionPersonal.deleteMany({
