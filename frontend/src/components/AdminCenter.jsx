@@ -221,7 +221,7 @@ const AdminDashboard = () => {
               onChange={(e) => setStatusFilter(e.target.value)}
             >
               <MenuItem value="">ALERTAS (Default)</MenuItem>
-              <MenuItem value="PENDIENTE">PENDIENTE</MenuItem>
+
               <MenuItem value="EN_PROCESO">EN PROCESO</MenuItem>
               <MenuItem value="LISTO">LISTO</MenuItem>
               <MenuItem value="ENTREGADO">ENTREGADO</MenuItem>
