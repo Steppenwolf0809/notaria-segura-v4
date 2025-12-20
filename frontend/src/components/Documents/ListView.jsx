@@ -191,20 +191,20 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
    * Manejar actualización de documento desde modal de detalle
    */
   const handleDocumentUpdated = (updatedData) => {
-    
+
     // Si tenemos la estructura { document: documentData }
     if (updatedData && updatedData.document) {
       const updatedDocument = updatedData.document;
-      
+
       // Actualizar el documento seleccionado para el modal
       setSelectedDocument(prev => prev ? {
         ...prev,
         ...updatedDocument
       } : null);
-      
+
       // Actualizar documento en el store para que se refleje en la vista
       updateDocument(updatedDocument.id, updatedDocument);
-      
+
     }
   };
 
@@ -225,7 +225,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
     if (!result) return;
     if (result.success) {
       const w = result.data?.whatsapp || {};
-      const sentLike = !!(w.sent || ['sent','queued','delivered'].includes(w.status) || w.sid || w.messageId);
+      const sentLike = !!(w.sent || ['sent', 'queued', 'delivered'].includes(w.status) || w.sid || w.messageId);
       if (sentLike) {
         toast.success('Documento marcado como LISTO. WhatsApp enviado.');
       } else if (w.skipped || currentDocumento?.notificationPolicy === 'no_notificar') {
@@ -243,9 +243,9 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
   };
 
   // Confirmar entrega (ENTREGADO) para matrizador
-  const handleConfirmEntrega = async ({ deliveredTo }) => {
+  const handleConfirmEntrega = async ({ deliveredTo, relationType, receptorId, observations }) => {
     if (!currentDocumento) return;
-    const result = await updateDocumentStatus(currentDocumento.id, 'ENTREGADO', { deliveredTo });
+    const result = await updateDocumentStatus(currentDocumento.id, 'ENTREGADO', { deliveredTo, relationType, receptorId, observations });
     closeEntrega();
     if (!result) return;
     if (result.success) {
@@ -324,7 +324,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
    * Verificar si algunos documentos están seleccionados (para indeterminate)
    */
   const isIndeterminate = useMemo(() => {
-    const selectedCount = paginatedDocuments.filter(doc => 
+    const selectedCount = paginatedDocuments.filter(doc =>
       bulkActions.selectedDocuments.has(doc.id)
     ).length;
     return selectedCount > 0 && selectedCount < paginatedDocuments.length;
@@ -334,10 +334,10 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
    * Manejar clic en acción masiva desde toolbar
    */
   const handleBulkAction = (targetStatus, options) => {
-    const selectedDocs = filteredAndSortedDocuments.filter(doc => 
+    const selectedDocs = filteredAndSortedDocuments.filter(doc =>
       bulkActions.selectedDocuments.has(doc.id)
     );
-    
+
     setPendingBulkAction({
       documents: selectedDocs,
       fromStatus: bulkActions.getCommonStatus(filteredAndSortedDocuments),
@@ -353,14 +353,14 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
   const handleConfirmBulkAction = async (actionData) => {
     try {
       // Filtrar opciones para evitar duplicados de fromStatus/toStatus
-      const { fromStatus, toStatus, ...cleanOptions } = actionData.options || {};
-      
+      const { fromStatus, toStatus, ...cleanOptions } = actionData;
+
       const result = await bulkActions.executeBulkStatusChange(
-        filteredAndSortedDocuments, 
-        actionData.toStatus, 
+        filteredAndSortedDocuments,
+        actionData.toStatus,
         cleanOptions
       );
-      
+
       // Refrescar la lista para reflejar estados actualizados
       if (result && result.success && typeof fetchMyDocuments === 'function') {
         await fetchMyDocuments();
@@ -448,11 +448,11 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
               {paginatedDocuments.map((document) => {
                 const statusInfo = getStatusColor(document.status);
                 return (
-                  <TableRow 
-                    key={document.id} 
+                  <TableRow
+                    key={document.id}
                     hover
                     selected={bulkActions.selectedDocuments.has(document.id)}
-                    sx={{ 
+                    sx={{
                       cursor: 'pointer',
                       '&:hover': { bgcolor: 'action.hover' },
                       ...(bulkActions.selectedDocuments.has(document.id) && {
@@ -461,15 +461,15 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
                     }}
                   >
                     {/* 🎯 NUEVA CELDA: Checkbox individual */}
-                    <TableCell 
+                    <TableCell
                       padding="checkbox"
                       onClick={(e) => e.stopPropagation()} // Evitar que abra el modal
                     >
                       <Checkbox
                         checked={bulkActions.selectedDocuments.has(document.id)}
                         onChange={() => bulkActions.toggleDocumentSelection(
-                          document.id, 
-                          document.status, 
+                          document.id,
+                          document.status,
                           filteredAndSortedDocuments
                         )}
                         disabled={!bulkActions.canSelectDocument(document, filteredAndSortedDocuments)}
@@ -573,52 +573,52 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
                         {document.actoPrincipalDescripcion}
                       </Typography>
                     </TableCell>
-                <TableCell align="center">
-                  <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
-                    {/* Ver detalles */}
-                    <Tooltip title="Ver detalles">
-                      <IconButton 
-                        size="small"
-                        onClick={(e) => { e.stopPropagation(); openDetailModal(document); }}
-                      >
-                        <ViewIcon fontSize="small" />
-                      </IconButton>
-                    </Tooltip>
-                    {/* Botón principal según estado */}
-                    {document.status === 'EN_PROCESO' && (
-                      <Button
-                        size="small"
-                        variant="contained"
-                        color="success"
-                        startIcon={<CheckCircleIcon />}
-                        onClick={(e) => { e.stopPropagation(); openConfirmListo(document); }}
-                        sx={{ textTransform: 'none' }}
-                      >
-                        Marcar Listo
-                      </Button>
-                    )}
-                    {document.status === 'LISTO' && (
-                      <Button
-                        size="small"
-                        variant="contained"
-                        color="primary"
-                        startIcon={<SendIcon />}
-                        onClick={(e) => { e.stopPropagation(); openEntrega(document); }}
-                        sx={{ textTransform: 'none' }}
-                      >
-                        Entregar
-                      </Button>
-                    )}
-                    {/* Revertir estado: visible para LISTO o ENTREGADO */}
-                    {['LISTO','ENTREGADO'].includes(document.status) && (
-                      <Tooltip title={document.isGrouped ? 'Revertir (afectará al grupo)' : 'Revertir estado'}>
-                        <IconButton size="small" color="warning" onClick={(e) => { e.stopPropagation(); openReversion(document); }}>
-                          <UndoIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                    )}
-                  </Box>
-                </TableCell>
+                    <TableCell align="center">
+                      <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
+                        {/* Ver detalles */}
+                        <Tooltip title="Ver detalles">
+                          <IconButton
+                            size="small"
+                            onClick={(e) => { e.stopPropagation(); openDetailModal(document); }}
+                          >
+                            <ViewIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        {/* Botón principal según estado */}
+                        {document.status === 'EN_PROCESO' && (
+                          <Button
+                            size="small"
+                            variant="contained"
+                            color="success"
+                            startIcon={<CheckCircleIcon />}
+                            onClick={(e) => { e.stopPropagation(); openConfirmListo(document); }}
+                            sx={{ textTransform: 'none' }}
+                          >
+                            Marcar Listo
+                          </Button>
+                        )}
+                        {document.status === 'LISTO' && (
+                          <Button
+                            size="small"
+                            variant="contained"
+                            color="primary"
+                            startIcon={<SendIcon />}
+                            onClick={(e) => { e.stopPropagation(); openEntrega(document); }}
+                            sx={{ textTransform: 'none' }}
+                          >
+                            Entregar
+                          </Button>
+                        )}
+                        {/* Revertir estado: visible para LISTO o ENTREGADO */}
+                        {['LISTO', 'ENTREGADO'].includes(document.status) && (
+                          <Tooltip title={document.isGrouped ? 'Revertir (afectará al grupo)' : 'Revertir estado'}>
+                            <IconButton size="small" color="warning" onClick={(e) => { e.stopPropagation(); openReversion(document); }}>
+                              <UndoIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </Box>
+                    </TableCell>
                   </TableRow>
                 );
               })}
@@ -636,7 +636,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
           onPageChange={handleChangePage}
           onRowsPerPageChange={handleChangeRowsPerPage}
           labelRowsPerPage="Filas por página:"
-          labelDisplayedRows={({ from, to, count }) => 
+          labelDisplayedRows={({ from, to, count }) =>
             `${from}-${to} de ${count !== -1 ? count : `más de ${to}`}`
           }
         />
@@ -655,9 +655,26 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
             </Alert>
           )}
         </DialogContent>
-        <DialogActions>
-          <Button onClick={closeConfirmListo}>Cancelar</Button>
-          <Button onClick={handleConfirmMarcarListo} variant="contained" color="success">Confirmar</Button>
+        <DialogActions sx={{ justifyContent: 'space-between' }}>
+          <Button onClick={closeConfirmListo} color="inherit">Cancelar</Button>
+          <Box>
+            {/* ⚡ Opción de Entrega Directa desde EN_PROCESO */}
+            {currentDocumento?.status === 'EN_PROCESO' && (
+              <Button
+                onClick={() => {
+                  closeConfirmListo();
+                  openEntrega(currentDocumento);
+                }}
+                variant="outlined"
+                color="primary"
+                startIcon={<SendIcon />}
+                sx={{ mr: 1 }}
+              >
+                Entregar Ahora
+              </Button>
+            )}
+            <Button onClick={handleConfirmMarcarListo} variant="contained" color="success">Confirmar</Button>
+          </Box>
         </DialogActions>
       </Dialog>
 
@@ -729,7 +746,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
       />
 
       {/* 🎯 NUEVOS COMPONENTES: Selección múltiple */}
-      
+
       {/* Toolbar flotante para acciones masivas */}
       <BulkActionToolbar
         selectionCount={bulkActions.selectionInfo.count}
@@ -757,18 +774,18 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
 
       {/* Alerta informativa cuando hay documentos con estados mixtos */}
       {bulkActions.selectionInfo.count > 0 && !bulkActions.getCommonStatus(filteredAndSortedDocuments) && (
-        <Alert 
-          severity="warning" 
-          sx={{ 
-            position: 'fixed', 
-            bottom: 100, 
-            left: '50%', 
-            transform: 'translateX(-50%)', 
+        <Alert
+          severity="warning"
+          sx={{
+            position: 'fixed',
+            bottom: 100,
+            left: '50%',
+            transform: 'translateX(-50%)',
             zIndex: 1200,
             maxWidth: '90vw'
           }}
         >
-          Solo se pueden realizar cambios masivos en documentos del mismo estado. 
+          Solo se pueden realizar cambios masivos en documentos del mismo estado.
           Documentos con estados diferentes han sido deseleccionados automáticamente.
         </Alert>
       )}

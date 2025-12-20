@@ -1516,6 +1516,17 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
           newStatus={confirmationData.newStatus}
           confirmationInfo={confirmationData.confirmationInfo}
           isLoading={isConfirmationLoading}
+          // ⚡ FIX: Opción de entrega directa para ARCHIVO
+          alternativeAction={
+            confirmationData.currentStatus === 'EN_PROCESO' ? {
+              label: 'Entregar Ahora',
+              icon: <DeliveryIcon />,
+              onClick: () => {
+                handleCloseConfirmation();
+                handleSingleDelivery(confirmationData.document);
+              }
+            } : null
+          }
         />
       )}
 

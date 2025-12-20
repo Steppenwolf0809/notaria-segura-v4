@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Card,
@@ -6,15 +6,37 @@ import {
   Typography,
   Grid,
   Alert,
-  Chip
+  Chip,
+  CircularProgress,
+  Paper,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Tooltip,
+  IconButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Avatar,
+  Button,
+  Menu
 } from '@mui/material';
 import {
   Person as PersonIcon,
   Dashboard as DashboardIcon,
-  Settings as SettingsIcon,
-  Assessment as StatsIcon,
   Assignment as DocumentIcon,
-  Security as SecurityIcon
+  AttachMoney as MoneyIcon,
+  Warning as WarningIcon,
+  Description as DescriptionIcon,
+  TrendingUp as TrendingUpIcon,
+  Error as ErrorIcon,
+  Refresh as RefreshIcon,
+  Visibility as VisibilityIcon,
+  CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import AdminLayout from './AdminLayout';
@@ -26,50 +48,36 @@ import NotificationTemplates from './admin/NotificationTemplates';
 import WhatsAppTemplates from './admin/WhatsAppTemplates';
 import AdminSettings from './admin/AdminSettings';
 import AdminFormulariosUAFE from './admin/AdminFormulariosUAFE';
+import { getSupervisionStats, getMatrizadores } from '../services/admin-supervision-service';
 
 /**
  * Centro de administración - Panel principal para ADMIN
- * Ahora usando AdminLayout con sidebar como otros roles
  */
 const AdminCenter = () => {
   const [currentView, setCurrentView] = useState('dashboard');
 
-  /**
-   * Manejar cambios de vista
-   */
   const handleViewChange = (view) => {
     setCurrentView(view);
   };
 
-  /**
-   * Renderizar contenido según la vista actual
-   */
   const renderContent = () => {
     switch (currentView) {
       case 'dashboard':
         return <AdminDashboard />;
-
       case 'users':
         return <UserManagement />;
-
       case 'documents':
         return <DocumentOversight />;
-
       case 'formularios-uafe':
         return <AdminFormulariosUAFE />;
-
       case 'notifications':
         return <NotificationHistory />;
-
       case 'notification-templates':
         return <NotificationTemplates />;
-
       case 'whatsapp-templates':
         return <WhatsAppTemplates />;
-
       case 'settings':
         return <AdminSettings />;
-
       default:
         return <AdminDashboard />;
     }
@@ -83,147 +91,398 @@ const AdminCenter = () => {
 };
 
 /**
- * Dashboard principal del administrador
+ * Dashboard de Supervisión
  */
 const AdminDashboard = () => {
   const { user } = useAuth();
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Filtros
+  const [thresholdDays, setThresholdDays] = useState(15);
+  const [selectedMatrixer, setSelectedMatrixer] = useState('');
+  const [statusFilter, setStatusFilter] = useState(''); // Filtro de estado
+  const [billedTimeRange, setBilledTimeRange] = useState('current_month'); // Filtro Facturación
+  const [matrizadores, setMatrizadores] = useState([]);
+
+  // Paginación
+  const [page, setPage] = useState(1);
+  const [docsList, setDocsList] = useState([]); // Lista acumulativa
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // Menu para filtro de facturación
+  const [billingAnchorEl, setBillingAnchorEl] = useState(null);
+
+  useEffect(() => {
+    loadMatrizadores();
+  }, []);
+
+  // Recargar al cambiar filtros principales (resetea paginación)
+  useEffect(() => {
+    setPage(1);
+    loadStats(1, false);
+  }, [thresholdDays, selectedMatrixer, statusFilter, billedTimeRange]);
+
+  const loadMatrizadores = async () => {
+    try {
+      const users = await getMatrizadores();
+      setMatrizadores(users);
+    } catch (e) {
+      console.error('Error cargando matrizadores', e);
+    }
+  };
+
+  const loadStats = async (pageNum = 1, isLoadMore = false) => {
+    try {
+      if (!isLoadMore) setLoading(true);
+      else setLoadingMore(true);
+
+      const data = await getSupervisionStats({
+        thresholdDays,
+        matrixerId: selectedMatrixer,
+        status: statusFilter,
+        billedTimeRange,
+        page: pageNum,
+        limit: 20
+      });
+
+      setStats(prev => isLoadMore ? { ...prev, ...data } : data); // Actualizar KPIs siempre
+
+      // Manejo de lista con paginación
+      const newDocs = data.criticalList || [];
+      if (isLoadMore) {
+        setDocsList(prev => [...prev, ...newDocs]);
+      } else {
+        setDocsList(newDocs);
+      }
+
+      setHasMore(data.pagination?.hasMore || false);
+      setError(null);
+    } catch (err) {
+      setError('Error al cargar estadísticas de supervisión.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  const handleLoadMore = () => {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    loadStats(nextPage, true);
+  };
+
+  const handleBillingIntervalChange = (interval) => {
+    setBilledTimeRange(interval);
+    setBillingAnchorEl(null);
+  };
+
+  if (loading && page === 1) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return <Alert severity="error" sx={{ m: 2 }}>{error}</Alert>;
+  }
+
+  const { kpis, teamPerformance } = stats || {};
+
+  // Mapping para textos de intervalos
+  const billingIntervals = {
+    'current_month': 'Mes Actual',
+    'last_month': 'Mes Anterior',
+    'year_to_date': 'Año Actual',
+    'all_time': 'Histórico'
+  };
 
   return (
     <Box>
-      <Typography variant="h5" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-        <DashboardIcon sx={{ mr: 1 }} />
-        Panel de Control
-      </Typography>
+      {/* Encabezado con Filtros */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <DashboardIcon sx={{ mr: 1, fontSize: 32, color: 'primary.main' }} />
+          <Typography variant="h5" fontWeight="bold">Supervisión</Typography>
+        </Box>
 
-      <Grid container spacing={3}>
-        {/* Estadísticas rápidas */}
-        <Grid item xs={12} md={4}>
-          <Card>
-            <CardContent sx={{ textAlign: 'center' }}>
-              <StatsIcon sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
-              <Typography variant="h6" gutterBottom>
-                Sistema Activo
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Todos los servicios funcionando correctamente
-              </Typography>
-              <Chip label="✅ Operativo" color="success" sx={{ mt: 1 }} />
-            </CardContent>
-          </Card>
+        <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+          {/* Filtro de Estado REQUERIDO */}
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel>Estado</InputLabel>
+            <Select
+              value={statusFilter}
+              label="Estado"
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <MenuItem value="">ALERTAS (Default)</MenuItem>
+
+              <MenuItem value="EN_PROCESO">EN PROCESO</MenuItem>
+              <MenuItem value="LISTO">LISTO</MenuItem>
+              <MenuItem value="ENTREGADO">ENTREGADO</MenuItem>
+            </Select>
+          </FormControl>
+
+          <FormControl size="small" sx={{ minWidth: 140 }}>
+            <InputLabel>Umbral Retraso</InputLabel>
+            <Select
+              value={thresholdDays}
+              label="Umbral Retraso"
+              onChange={(e) => setThresholdDays(e.target.value)}
+            >
+              <MenuItem value={5}>5 días</MenuItem>
+              <MenuItem value={10}>10 días</MenuItem>
+              <MenuItem value={15}>15 días</MenuItem>
+              <MenuItem value={30}>30 días</MenuItem>
+            </Select>
+          </FormControl>
+
+          <FormControl size="small" sx={{ minWidth: 180 }}>
+            <InputLabel>Matrizador</InputLabel>
+            <Select
+              value={selectedMatrixer}
+              label="Matrizador"
+              onChange={(e) => setSelectedMatrixer(e.target.value)}
+            >
+              <MenuItem value="">Todos</MenuItem>
+              {matrizadores.map(m => (
+                <MenuItem key={m.id} value={m.id}>{m.firstName} {m.lastName}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <Tooltip title="Actualizar">
+            <IconButton onClick={() => loadStats(1, false)} color="primary">
+              <RefreshIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      </Box>
+
+      {/* KPIs */}
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid item xs={12} sm={6} md={3}>
+          <SummaryCard
+            title="Total Activos"
+            value={kpis?.activeCount || 0}
+            icon={<DescriptionIcon />}
+            color="primary"
+            subtext="Trámites en curso"
+          />
         </Grid>
-
-        <Grid item xs={12} md={4}>
-          <Card>
-            <CardContent sx={{ textAlign: 'center' }}>
-              <PersonIcon sx={{ fontSize: 40, color: 'info.main', mb: 1 }} />
-              <Typography variant="h6" gutterBottom>
-                Gestión de Usuarios
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Administra usuarios y roles del sistema
-              </Typography>
-              <Chip label="Acceso Completo" color="info" sx={{ mt: 1 }} />
-            </CardContent>
-          </Card>
+        <Grid item xs={12} sm={6} md={3}>
+          <SummaryCard
+            title={`Críticos (> ${thresholdDays}d)`}
+            value={kpis?.criticalCount || 0}
+            icon={<WarningIcon />}
+            color="error"
+            subtext="Requieren atención"
+          />
         </Grid>
-
-        <Grid item xs={12} md={4}>
-          <Card>
-            <CardContent sx={{ textAlign: 'center' }}>
-              <SecurityIcon sx={{ fontSize: 40, color: 'warning.main', mb: 1 }} />
-              <Typography variant="h6" gutterBottom>
-                Seguridad
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Auditoría y logs de seguridad
-              </Typography>
-              <Chip label="Monitoreo Activo" color="warning" sx={{ mt: 1 }} />
-            </CardContent>
-          </Card>
-        </Grid>
-
-        {/* Información del administrador */}
-        <Grid item xs={12}>
-          <Card>
+        {/* Nueva Tarjeta Facturación */}
+        <Grid item xs={12} sm={6} md={3}>
+          <Card sx={{ height: '100%' }}>
             <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Información del Administrador
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={(e) => setBillingAnchorEl(e.currentTarget)}>
+                    <Typography color="textSecondary" gutterBottom variant="overline">
+                      FACTURADO ({billingIntervals[billedTimeRange]})
+                    </Typography>
+                    <RefreshIcon sx={{ fontSize: 14, ml: 0.5, color: 'text.secondary' }} />
+                  </Box>
+                  {/* Menu Dropdown para Facturación */}
+                  <Menu
+                    anchorEl={billingAnchorEl}
+                    open={Boolean(billingAnchorEl)}
+                    onClose={() => setBillingAnchorEl(null)}
+                  >
+                    <MenuItem onClick={() => handleBillingIntervalChange('current_month')}>Mes Actual</MenuItem>
+                    <MenuItem onClick={() => handleBillingIntervalChange('last_month')}>Mes Anterior</MenuItem>
+                    <MenuItem onClick={() => handleBillingIntervalChange('year_to_date')}>Año Actual</MenuItem>
+                    <MenuItem onClick={() => handleBillingIntervalChange('all_time')}>Histórico</MenuItem>
+                  </Menu>
+
+                  <Typography variant="h4" component="div" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                    ${(kpis?.totalBilled || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                  </Typography>
+                </Box>
+                <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'success.light', color: 'success.contrastText', display: 'flex' }}>
+                  <MoneyIcon />
+                </Box>
+              </Box>
+              <Typography variant="caption" color="textSecondary" sx={{ mt: 1, display: 'block' }}>
+                Excluye anulados
               </Typography>
-              <Grid container spacing={2}>
-                <Grid item xs={12} md={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Usuario:
-                  </Typography>
-                  <Typography variant="body1">
-                    {user?.firstName} {user?.lastName}
-                  </Typography>
-                  
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                    Email:
-                  </Typography>
-                  <Typography variant="body1">
-                    {user?.email}
-                  </Typography>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <Typography variant="body2" color="text.secondary">
-                    Rol:
-                  </Typography>
-                  <Chip label={user?.role} color="error" sx={{ mb: 2 }} />
-                  
-                  <Typography variant="body2" color="text.secondary">
-                    Permisos:
-                  </Typography>
-                  <Typography variant="body1">
-                    Control total del sistema
-                  </Typography>
-                </Grid>
-              </Grid>
             </CardContent>
           </Card>
         </Grid>
-
-        {/* Acciones rápidas */}
-        <Grid item xs={12}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                Funcionalidades Disponibles
-              </Typography>
-              <Grid container spacing={2}>
-                {[
-                  'Crear y gestionar usuarios de todos los roles',
-                  'Activar/desactivar cuentas de usuario',
-                  'Modificar información de usuarios existentes',
-                  'Acceso a auditorías y logs del sistema',
-                  'Configuración avanzada del sistema',
-                  'Supervisión de todas las operaciones'
-                ].map((feature, index) => (
-                  <Grid item xs={12} md={6} key={index}>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Box
-                        sx={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: '50%',
-                          bgcolor: 'success.main',
-                          mr: 2
-                        }}
-                      />
-                      <Typography variant="body2">
-                        {feature}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                ))}
-              </Grid>
-            </CardContent>
-          </Card>
+        <Grid item xs={12} sm={6} md={3}>
+          <SummaryCard
+            title="Eficiencia Semanal"
+            value={`${kpis?.weeklyEfficiency || 0}%`}
+            icon={<TrendingUpIcon />}
+            color={kpis?.weeklyEfficiency > 80 ? "success" : "warning"}
+            subtext="Entregados / Ingresados"
+          />
         </Grid>
       </Grid>
+
+      {/* Tabla de Documentos / Alertas */}
+      <Card variant="outlined" sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+            <DescriptionIcon color={statusFilter ? "primary" : "error"} sx={{ mr: 1 }} />
+            {statusFilter ? `Documentos: ${statusFilter}` : "Alertas de Retraso"}
+          </Typography>
+
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Protocolo</TableCell>
+                  <TableCell>Cliente</TableCell>
+                  <TableCell>Matrizador</TableCell>
+                  <TableCell>Acto</TableCell>
+                  <TableCell>Estado</TableCell>
+                  <TableCell>Antigüedad</TableCell>
+                  <TableCell>Acción</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {docsList.map((row) => {
+                  const days = row.daysDelayed;
+                  const isCritical = days > 15 && statusFilter === '';
+                  // Si hay filtro de estado, no resaltamos tanto en rojo a menos que sea muy critico
+
+                  return (
+                    <TableRow key={row.id} hover>
+                      <TableCell sx={{ fontWeight: 'bold' }}>{row.protocol || 'S/N'}</TableCell>
+                      <TableCell>{row.client}</TableCell>
+                      <TableCell>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                          <Avatar sx={{ width: 24, height: 24, mr: 1, fontSize: 12 }}>
+                            {row.matrixer?.charAt(0) || '?'}
+                          </Avatar>
+                          {row.matrixer}
+                        </Box>
+                      </TableCell>
+                      <TableCell><Chip label={row.type} size="small" variant="outlined" /></TableCell>
+                      <TableCell>
+                        <Chip
+                          label={row.status}
+                          size="small"
+                          color={row.status === 'LISTO' ? 'success' : row.status === 'EN_PROCESO' ? 'info' : 'default'}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          label={`${days}d`}
+                          color={(days > 15 && !['ENTREGADO'].includes(row.status)) ? "error" : "default"}
+                          size="small"
+                          variant="outlined"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Tooltip title="Ver Detalles">
+                          <IconButton size="small"><VisibilityIcon fontSize="small" /></IconButton>
+                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {docsList.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} align="center">
+                      <Box sx={{ py: 3 }}>
+                        <Typography color="textSecondary">No se encontraron documentos.</Typography>
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          {/* Load More Button */}
+          {hasMore && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
+              <Button
+                variant="outlined"
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                startIcon={loadingMore ? <CircularProgress size={20} /> : null}
+              >
+                {loadingMore ? 'Cargando...' : 'Cargar más documentos'}
+              </Button>
+            </Box>
+          )}
+
+        </CardContent>
+      </Card>
+
+      {/* Rendimiento de Equipo */}
+      <Card variant="outlined">
+        <CardContent>
+          <Typography variant="h6" gutterBottom>Rendimiento de Equipo</Typography>
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Matrizador</TableCell>
+                  <TableCell align="center">Carga Activa</TableCell>
+                  <TableCell align="center">Críticos</TableCell>
+                  <TableCell align="center">Entregas (Mes)</TableCell>
+                  <TableCell align="center">Velocidad Prom.</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {teamPerformance?.map((member) => (
+                  <TableRow key={member.id}>
+                    <TableCell sx={{ fontWeight: 'bold' }}>{member.name}</TableCell>
+                    <TableCell align="center">{member.activeLoad}</TableCell>
+                    <TableCell align="center">
+                      <Typography color={member.criticalCount > 0 ? "error" : "textPrimary"} fontWeight={member.criticalCount > 0 ? "bold" : "regular"}>
+                        {member.criticalCount}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="center">{member.deliveredMonth}</TableCell>
+                    <TableCell align="center">
+                      {member.avgVelocityDays > 0 ? `${member.avgVelocityDays}d` : '-'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </CardContent>
+      </Card>
     </Box>
   );
 };
 
+const SummaryCard = ({ title, value, icon, color, subtext }) => (
+  <Card sx={{ height: '100%' }}>
+    <CardContent>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <Box>
+          <Typography color="textSecondary" gutterBottom variant="overline">{title}</Typography>
+          <Typography variant="h4" component="div" sx={{ fontWeight: 'bold', color: `${color}.main` }}>{value}</Typography>
+        </Box>
+        <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: `${color}.light`, color: `${color}.contrastText`, display: 'flex' }}>
+          {React.cloneElement(icon, { fontSize: 'medium' })}
+        </Box>
+      </Box>
+      {subtext && (
+        <Typography variant="caption" color="textSecondary" sx={{ mt: 1, display: 'block' }}>{subtext}</Typography>
+      )}
+    </CardContent>
+  </Card>
+);
 
 export default AdminCenter;

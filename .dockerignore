@@ -1,0 +1,29 @@
+# Ignorar las dependencias locales (¡las más pesadas!)
+node_modules
+frontend/node_modules
+backend/node_modules
+
+# Ignorar archivos de git
+.git
+.github
+
+# Ignorar archivos de entorno (por seguridad y peso)
+.env
+.env.local
+.env.development
+.env.test
+
+# Ignorar carpetas de construcción locales (Railway crea las suyas)
+dist
+build
+frontend/dist
+backend/dist
+
+# Ignorar archivos de sistema innecesarios
+.DS_Store
+Thumbs.db
+
+# Ignorar documentación pesada o archivos temporales
+*.md
+docs/
+*.log

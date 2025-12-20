@@ -1648,8 +1648,10 @@ async function getReceptionSuggestions(req, res) {
       message: 'Error interno del servidor en sugerencias',
       error: error?.message || 'Unknown error'
     });
+
   }
 }
+
 
 /**
  * Entregar múltiples documentos en bloque (mismo cliente)
@@ -1728,12 +1730,10 @@ async function bulkDelivery(req, res) {
         data: {
           status: 'ENTREGADO',
           fechaEntrega: new Date(),
-          personaRetira,
-          cedulaRetira,
-          deliveryVerificationType: verificationType,
-          deliveryVerificationCode: verificationCode || null,
-          deliveredAt: new Date(),
-          deliveredBy: req.user.id
+          entregadoA: personaRetira,
+          cedulaReceptor: cedulaRetira,
+          usuarioEntregaId: req.user.id,
+          verificacionManual: verificationType === 'manual' || !verificationCode
         }
       });
 
@@ -1783,6 +1783,126 @@ async function bulkDelivery(req, res) {
   }
 }
 
+/**
+ * Entregar múltiples documentos (compatible con ModalEntregaGrupal)
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+async function entregaGrupal(req, res) {
+  try {
+    const {
+      documentIds,
+      entregadoA,
+      cedulaReceptor,
+      relacionTitular,
+      observaciones,
+      verificacionManual,
+      codigoVerificacion,
+      facturaPresenta
+    } = req.body;
+
+    if (!Array.isArray(documentIds) || documentIds.length === 0) {
+      return res.status(400).json({ success: false, message: 'Se requiere una lista válida de IDs de documentos' });
+    }
+
+    if (!entregadoA) {
+      return res.status(400).json({ success: false, message: 'Nombre de quien retira es obligatorio' });
+    }
+
+    // Buscar documentos
+    const documents = await prisma.document.findMany({
+      where: { id: { in: documentIds } }
+    });
+
+    if (documents.length === 0) {
+      return res.status(404).json({ success: false, message: 'Documentos no encontrados' });
+    }
+
+    // Validar estados (LISTO o EN_PROCESO)
+    const invalidDocs = documents.filter(d => !['LISTO', 'EN_PROCESO', 'PAGADO'].includes(d.status));
+    if (invalidDocs.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Algunos documentos no están listos para entrega (Estado inválido: ${invalidDocs[0].status})`
+      });
+    }
+
+    // Validar cliente único
+    const uniqueClients = new Set(documents.map(d => d.clientId));
+    if (uniqueClients.size > 1) {
+      return res.status(400).json({ success: false, message: 'Todos los documentos deben ser del mismo cliente' });
+    }
+
+    // Validar código si no es manual y alguno está LISTO
+    const anyReady = documents.some(d => d.status === 'LISTO');
+    if (anyReady && !verificacionManual && !codigoVerificacion) {
+      // Intentar obtener código del grupo o individual
+      const groupCode = documents[0].groupVerificationCode || documents[0].codigoRetiro || documents[0].verificationCode;
+      if (!groupCode) {
+        return res.status(400).json({ success: false, message: 'Se requiere código de verificación para documentos listos' });
+      }
+    }
+
+    // Actualizar documentos
+    await prisma.$transaction(async (tx) => {
+      const now = new Date();
+
+      // Actualizar a ENTREGADO
+      await tx.document.updateMany({
+        where: { id: { in: documentIds } },
+        data: {
+          status: 'ENTREGADO',
+          fechaEntrega: now,
+          entregadoA: entregadoA,
+          cedulaReceptor: cedulaReceptor || null,
+          relacionTitular: relacionTitular || null,
+          observacionesEntrega: observaciones || null,
+          usuarioEntregaId: req.user.id,
+          verificacionManual: !!verificacionManual,
+          facturaPresenta: !!facturaPresenta
+        }
+      });
+
+      // Eventos
+      const events = documentIds.map(id => ({
+        documentId: id,
+        userId: req.user.id,
+        eventType: 'ENTREGA_GRUPAL',
+        description: `Entrega grupal a ${entregadoA} (${relacionTitular || 'N/A'})`,
+        details: JSON.stringify({
+          entregadoA,
+          cedulaReceptor,
+          relacionTitular,
+          observaciones,
+          verificacionManual,
+          facturaPresenta,
+          docsCount: documentIds.length
+        }),
+        ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+        userAgent: req.get('User-Agent') || 'unknown'
+      }));
+
+      await tx.documentEvent.createMany({ data: events });
+    });
+
+    logger.info(`Entrega grupal exitosa: ${documentIds.length} documentos por usuario ${req.user.id}`);
+
+    return res.json({
+      success: true,
+      message: `${documents.length} documentos entregados exitosamente`,
+      data: { deliveredCount: documents.length }
+    });
+
+  } catch (error) {
+    logger.error('Error en entrega grupal:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Error interno al procesar entrega grupal',
+      message: error.message
+    });
+  }
+}
+
 export {
   getDashboardStats,
   getMatrizadores,
@@ -1799,5 +1919,6 @@ export {
   getReceptionsCounts,
   getReceptionSuggestions,
   // 🎯 NUEVA FUNCIONALIDAD: Entrega en bloque
-  bulkDelivery
+  bulkDelivery,
+  entregaGrupal
 };

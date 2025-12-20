@@ -12,7 +12,7 @@ const useBulkActions = () => {
 
   // Definir transiciones válidas para operaciones masivas
   const VALID_BULK_TRANSITIONS = {
-    'EN_PROCESO': ['AGRUPADO', 'LISTO'],
+    'EN_PROCESO': ['AGRUPADO', 'LISTO', 'ENTREGADO'],
     'AGRUPADO': ['LISTO', 'EN_PROCESO'],
     'LISTO': ['ENTREGADO'] // Permitir entrega grupal desde LISTO
   };

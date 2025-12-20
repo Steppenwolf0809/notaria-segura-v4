@@ -42,7 +42,9 @@ const ConfirmationModal = ({
   isLoading = false,
   // 🔗 NUEVOS PROPS para soporte de grupos
   isGroupMove = false,
-  groupSize = 1
+  groupSize = 1,
+  // 🔗 NUEVO PROP: Acción alternativa (ej: Entregar Directamente)
+  alternativeAction = null
 }) => {
   const [confirmed, setConfirmed] = useState(false);
   const [reversionReason, setReversionReason] = useState('');
@@ -121,15 +123,15 @@ const ConfirmationModal = ({
     });
   };
 
-  const isConfirmDisabled = !confirmed || 
-    (showReversionField && !reversionReason.trim()) || 
+  const isConfirmDisabled = !confirmed ||
+    (showReversionField && !reversionReason.trim()) ||
     isLoading;
 
   if (!document) return null;
 
   return (
-    <Dialog 
-      open={open} 
+    <Dialog
+      open={open}
       onClose={onClose}
       maxWidth="md"
       fullWidth
@@ -166,7 +168,7 @@ const ConfirmationModal = ({
           <Typography variant="subtitle2" color="text.secondary" gutterBottom>
             {isGroupMove ? 'INFORMACIÓN DEL GRUPO' : 'INFORMACIÓN DEL DOCUMENTO'}
           </Typography>
-          
+
           {/* 🔗 NUEVA FUNCIONALIDAD: Información de grupo */}
           {isGroupMove && (
             <Alert severity="info" sx={{ mb: 2 }}>
@@ -175,7 +177,7 @@ const ConfirmationModal = ({
               </Typography>
             </Alert>
           )}
-          
+
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <AssignmentIcon sx={{ fontSize: 16, color: 'primary.main' }} />
@@ -183,11 +185,11 @@ const ConfirmationModal = ({
                 <strong>{isGroupMove ? 'Documento principal:' : 'Documento:'}</strong> {document.protocolNumber}
               </Typography>
             </Box>
-            
+
             <Typography variant="body2">
               <strong>Cliente:</strong> {document.clientName || 'Sin nombre'}
             </Typography>
-            
+
             <Typography variant="body2">
               <strong>Tipo:</strong> {document.documentType || 'No especificado'}
             </Typography>
@@ -268,7 +270,7 @@ const ConfirmationModal = ({
                 <li>⚡ Proceso simplificado sin códigos</li>
               </Box>
             </Alert>
-            
+
             {/* Campo para nombre de quien retira */}
             <Box sx={{ mb: 2 }}>
               <TextField
@@ -331,8 +333,8 @@ const ConfirmationModal = ({
           }
           label={
             <Typography variant="body2" fontWeight={600}>
-              {changeInfo.isDirectDelivery ? 
-                'Confirmo que he entregado este documento directamente' : 
+              {changeInfo.isDirectDelivery ?
+                'Confirmo que he entregado este documento directamente' :
                 'Entiendo las consecuencias y deseo continuar'}
             </Typography>
           }
@@ -340,13 +342,25 @@ const ConfirmationModal = ({
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
-        <Button 
-          onClick={onClose} 
+        <Button
+          onClick={onClose}
           variant="outlined"
           disabled={isLoading}
         >
           Cancelar
         </Button>
+        {/* 🔗 BOTÓN DE ACCIÓN ALTERNATIVA */}
+        {alternativeAction && (
+          <Button
+            onClick={alternativeAction.onClick}
+            variant="outlined"
+            color="primary"
+            startIcon={alternativeAction.icon || <ArrowIcon />}
+            sx={{ mr: 1 }}
+          >
+            {alternativeAction.label}
+          </Button>
+        )}
         <Button
           onClick={handleConfirm}
           variant="contained"
