@@ -1,4 +1,4 @@
-import { bulkMarkReady } from '../services/bulk-status-service.js';
+import { bulkMarkReady, bulkDeliverDocuments } from '../services/bulk-status-service.js';
 
 /**
  * Controlador: Cambio masivo de estado a LISTO
@@ -6,12 +6,27 @@ import { bulkMarkReady } from '../services/bulk-status-service.js';
  */
 export async function bulkStatusChange(req, res) {
   try {
-    const { documentIds, sendNotifications = true } = req.body || {};
-    const result = await bulkMarkReady({
-      documentIds,
-      actor: req.user,
-      sendNotifications
-    });
+    const { documentIds, sendNotifications = true, toStatus, ...options } = req.body || {};
+
+    let result;
+
+    if (toStatus === 'ENTREGADO') {
+      // Flujo de Entrega
+      result = await bulkDeliverDocuments({
+        documentIds,
+        actor: req.user,
+        deliveryData: options, // deliveredTo, receptorId, etc.
+        sendNotifications
+      });
+    } else {
+      // Flujo por defecto (Marcar Listo)
+      // Nota: Si se agregan más estados, usar switch
+      result = await bulkMarkReady({
+        documentIds,
+        actor: req.user,
+        sendNotifications
+      });
+    }
 
     return res.status(result.status).json({
       success: result.success,
