@@ -139,6 +139,16 @@ const BulkStatusChangeModal = ({
         showNotificationOption: true,
         showDeliveryForm: true,
         successMessage: 'Se registrará la entrega de todo el grupo.'
+      },
+      'EN_PROCESO->ENTREGADO': {
+        title: 'Entregar Documentos (Directo)',
+        description: 'Registrar entrega directa de documentos en proceso',
+        icon: <SendIcon sx={{ color: 'primary.main' }} />,
+        color: 'primary',
+        actionLabel: 'Confirmar Entrega',
+        showNotificationOption: true,
+        showDeliveryForm: true,
+        successMessage: 'Se registrará la entrega directa y fecha en el sistema.'
       }
     };
 

@@ -206,5 +206,161 @@ export async function bulkMarkReady({ documentIds, actor, sendNotifications = tr
   };
 }
 
-export default { bulkMarkReady };
+/**
+ * Servicio para ENTREGA masiva de documentos (LISTO/AGRUPADO/EN_PROCESO -> ENTREGADO)
+ */
+export async function bulkDeliverDocuments({ documentIds, actor, deliveryData, sendNotifications = true }) {
+  if (!Array.isArray(documentIds) || documentIds.length === 0) {
+    return {
+      success: false,
+      status: 400,
+      message: 'Se requiere una lista válida de IDs de documentos'
+    };
+  }
+
+  const allowedRoles = new Set(['RECEPCION', 'ARCHIVO', 'MATRIZADOR', 'ADMIN']);
+  if (!actor || !allowedRoles.has(actor.role)) {
+    return {
+      success: false,
+      status: 403,
+      message: 'Sin permisos para realizar entregas masivas'
+    };
+  }
+
+  // Cargar documentos
+  const documents = await prisma.document.findMany({
+    where: { id: { in: documentIds } },
+    select: {
+      id: true,
+      status: true,
+      protocolNumber: true,
+      documentType: true,
+      clientName: true,
+      clientPhone: true,
+      clientId: true,
+      assignedToId: true,
+      notificationPolicy: true,
+      actoPrincipalDescripcion: true,
+      actoPrincipalValor: true,
+      // Campos para notificación
+      verificationCode: true,
+      codigoRetiro: true
+    }
+  });
+
+  if (documents.length !== documentIds.length) {
+    return {
+      success: false,
+      status: 400,
+      message: 'Algunos documentos no fueron encontrados'
+    };
+  }
+
+  // Validar permisos para MATRIZADOR
+  if (actor.role === 'MATRIZADOR') {
+    const unauthorized = documents.filter(d => d.assignedToId && d.assignedToId !== actor.id);
+    if (unauthorized.length > 0) {
+      return {
+        success: false,
+        status: 403,
+        message: `Sin permisos para entregar ${unauthorized.length} documento(s) asignado(s) a otro matrizador`
+      };
+    }
+  }
+
+  // Agrupar por cliente
+  const groupKey = (d) => d.clientId || `${d.clientName}__${d.clientPhone || ''}`;
+  const byClient = new Map();
+  for (const d of documents) {
+    const key = groupKey(d);
+    if (!byClient.has(key)) byClient.set(key, []);
+    byClient.get(key).push(d);
+  }
+
+  // Ejecutar actualización
+  const updated = await prisma.$transaction(async (tx) => {
+    const updatedDocs = [];
+    const now = new Date();
+
+    for (const d of documents) {
+      const data = {
+        status: 'ENTREGADO',
+        updatedAt: now,
+        deliveredAt: now,
+        // Datos de entrega
+        deliveredTo: deliveryData.deliveredTo,
+        receptorId: deliveryData.receptorId || null,
+        relationType: deliveryData.relationType || null,
+        observations: deliveryData.observations || null
+      };
+
+      const ud = await tx.document.update({ where: { id: d.id }, data });
+      updatedDocs.push(ud);
+
+      // Evento auditoría
+      await tx.documentEvent.create({
+        data: {
+          documentId: d.id,
+          userId: actor.id,
+          eventType: 'STATUS_CHANGED',
+          description: `Entrega masiva a ${deliveryData.deliveredTo} (${actor.firstName || ''} ${actor.role})`,
+          details: JSON.stringify({
+            fromStatus: d.status,
+            toStatus: 'ENTREGADO',
+            bulk: true,
+            deliveryData
+          }),
+          createdAt: now
+        }
+      });
+    }
+    return updatedDocs;
+  });
+
+  // Notificaciones (1 por cliente, agrupando documentos)
+  let notifications = [];
+  if (sendNotifications) {
+    for (const [key, docs] of byClient.entries()) {
+      const firstDoc = docs[0];
+
+      if (firstDoc.notificationPolicy === 'no_notificar') continue;
+
+      const clienteData = {
+        clientName: firstDoc.clientName,
+        clientPhone: firstDoc.clientPhone
+      };
+
+      const datosEntregaFull = {
+        ...deliveryData,
+        fechaEntrega: new Date(),
+        documentos: docs // Pasar array para mensaje agrupado
+      };
+
+      try {
+        // Aprovechar método existente que soporta grupos (revisamos implementación)
+        // Se asume que enviarDocumentoEntregado maneja el array 'documentos' en datosEntrega
+        const result = await whatsappService.enviarDocumentoEntregado(
+          clienteData,
+          firstDoc,
+          datosEntregaFull
+        );
+        notifications.push({ status: 'fulfilled', value: result });
+      } catch (error) {
+        notifications.push({ status: 'rejected', reason: error.message });
+      }
+    }
+  }
+
+  return {
+    success: true,
+    status: 200,
+    message: `Se registraron ${updated.length} entregas exitosamente`,
+    data: {
+      updatedCount: updated.length,
+      clientsNotified: notifications.length
+    }
+  };
+}
+
+export default { bulkMarkReady, bulkDeliverDocuments };
 
