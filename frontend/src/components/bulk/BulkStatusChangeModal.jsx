@@ -266,49 +266,6 @@ const BulkStatusChangeModal = ({
           </CardContent>
         </Card>
 
-        {/* Opción de notificaciones WhatsApp */}
-        {transitionConfig.showNotificationOption && (
-          <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>
-            <CardContent sx={{ py: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                <PhoneIcon color="primary" />
-                <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  Notificaciones WhatsApp
-                </Typography>
-              </Box>
-
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={sendNotifications}
-                    onChange={(e) => setSendNotifications(e.target.checked)}
-                    color="primary"
-                  />
-                }
-                label="Enviar notificaciones WhatsApp automáticamente"
-                sx={{ mb: 1 }}
-              />
-
-              <Box sx={{ pl: 4 }}>
-                <Typography variant="body2" color="text.secondary">
-                  • Con teléfono: {documentsWithPhone.length} documento{documentsWithPhone.length !== 1 ? 's' : ''}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  • Sin teléfono: {documentsWithoutPhone.length} documento{documentsWithoutPhone.length !== 1 ? 's' : ''}
-                </Typography>
-              </Box>
-
-              {documentsWithoutPhone.length > 0 && (
-                <Alert severity="info" sx={{ mt: 2 }}>
-                  <Typography variant="body2">
-                    Los documentos sin teléfono no recibirán notificación automática.
-                  </Typography>
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
         {/* Formulario de Entrega (Condicional) */}
         {transitionConfig.showDeliveryForm && (
           <Card sx={{ mb: 3, border: '1px solid #e0e0e0' }}>

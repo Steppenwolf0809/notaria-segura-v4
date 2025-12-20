@@ -2,7 +2,6 @@
 
 import axios from 'axios';
 import { API_BASE } from '../utils/apiConfig';
-import csrfService from './csrf-service';
 import { sanitizeObject } from '../utils/sanitize.jsx';
 
 // Bandera local para evitar loops de refresh (si se habilita el flujo opcional)
@@ -20,10 +19,10 @@ function handleUnauthorized() {
     localStorage.removeItem('token');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('notaria-auth-storage'); // persist de Zustand
-  } catch {}
+  } catch { }
   try {
     window.location.assign('/login');
-  } catch {}
+  } catch { }
 }
 
 // Instancia principal
@@ -45,7 +44,7 @@ apiClient.interceptors.request.use(
       try {
         const parsed = JSON.parse(raw);
         tokenToUse = parsed?.state?.token;
-      } catch {}
+      } catch { }
     }
 
     // PRIORIDAD 2: Fallback a localStorage directo (por compatibilidad)
@@ -64,7 +63,7 @@ apiClient.interceptors.request.use(
         if (zustandToken && zustandToken !== localToken) {
           localStorage.setItem('token', zustandToken);
         }
-      } catch {}
+      } catch { }
     }
 
     // Agregar token a headers si existe
@@ -77,14 +76,18 @@ apiClient.interceptors.request.use(
     const method = config.method?.toUpperCase();
     if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
       try {
-        const csrfToken = await csrfService.getToken();
-        config.headers = config.headers || {};
-        config.headers['x-csrf-token'] = csrfToken;
-        // eslint-disable-next-line no-console
-        console.debug('[CSRF] Token agregado a request', { url: config.url, method });
+        // Dynamic import to avoid circular dependency
+        const { default: csrfService } = await import('./csrf-service');
+        if (csrfService && typeof csrfService.getToken === 'function') {
+          const csrfToken = await csrfService.getToken();
+          config.headers = config.headers || {};
+          config.headers['x-csrf-token'] = csrfToken;
+          // eslint-disable-next-line no-console
+          console.debug('[CSRF] Token agregado a request', { url: config.url, method });
+        }
       } catch (error) {
         // eslint-disable-next-line no-console
-        // Continuar sin CSRF - el servidor rechazará si es necesario
+        console.warn('[CSRF] Error al obtener token (continuando sin él):', error);
       }
     }
 
