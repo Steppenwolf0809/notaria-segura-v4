@@ -1,9 +1,21 @@
-# Variables de entorno - NUNCA subir al repositorio
+# ============================================
+# 🔐 ARCHIVOS SENSIBLES - NUNCA SUBIR AL REPO
+# ============================================
+
+# Variables de entorno
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Notas privadas y documentación con credenciales
+USUARIOS-REALES.md
+CREDENCIALES*.md
+PASSWORDS*.md
+SECRETS*.md
+*-credentials*
+*-secrets*
 
 # Base de datos local
 *.db

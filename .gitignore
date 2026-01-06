@@ -4,7 +4,11 @@ frontend/node_modules/
 prisma/node_modules/
 node_modules/
 
-# Environment variables - NUNCA subir al repositorio
+# ============================================
+# 🔐 ARCHIVOS SENSIBLES - NUNCA SUBIR AL REPO
+# ============================================
+
+# Variables de entorno
 .env
 .env.*
 backend/.env
@@ -13,6 +17,14 @@ frontend/.env
 frontend/.env.*
 **/.env
 **/.env.*
+
+# Notas privadas y documentación con credenciales
+**/USUARIOS-REALES.md
+**/CREDENCIALES*.md
+**/PASSWORDS*.md
+**/SECRETS*.md
+**/*-credentials*
+**/*-secrets*
 
 # Build outputs
 dist/
