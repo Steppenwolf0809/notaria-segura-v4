@@ -38,9 +38,13 @@ const {
     return req.headers[HEADER_NAME] || req.body?._csrf;
   },
   getSessionIdentifier: (req) => {
-    // Usar siempre la IP como identificador de sesión para mantener consistencia
-    // entre la generación del token (sin auth) y la validación (con auth)
-    return req.ip || 'anonymous';
+    // Usamos un identificador fijo porque en entornos cloud (Railway, AWS, etc.)
+    // la IP del cliente puede cambiar entre peticiones debido a load balancers.
+    // La seguridad CSRF se mantiene porque:
+    // 1. El token se genera con un secreto del servidor
+    // 2. El token se envía en header Y comparado con la cookie
+    // 3. La cookie tiene sameSite y httpOnly
+    return 'notaria-session';
   },
 });
 
