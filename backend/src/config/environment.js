@@ -128,30 +128,12 @@ const environmentSchema = z.object({
     .default('false')
     .transform(val => val === 'true'),
 
-  // LLM_STRATEGY: selecciona la estrategia de extracción
-  //  - "hibrido" | "solo_gemini" | "solo_node"
+  // LLM_STRATEGY: estrategia de extracción (forzado a 'gemini' para simplificar)
   LLM_STRATEGY: z
-    .enum(['hibrido', 'solo_gemini', 'solo_node'])
-    .optional()
-    .default('hibrido'),
-
-  // Flags legacy opcionales (para compatibilidad)
-  GEMINI_ENABLED: z
-    .enum(['true', 'false'])
-    .optional()
-    .transform(v => v ? v === 'true' : undefined),
-  EXTRACT_HYBRID: z
-    .enum(['true', 'false'])
-    .optional()
-    .transform(v => v ? v === 'true' : undefined),
-  FORCE_PYTHON_EXTRACTOR: z
-    .enum(['true', 'false'])
-    .optional()
-    .transform(v => v ? v === 'true' : undefined),
-  GEMINI_PRIORITY: z
     .string()
     .optional()
-    .transform(v => parseBoolean(v, false)),
+    .default('gemini')
+    .transform(() => 'gemini'), // Siempre forzar a Gemini
 
   // PROMPT_FORCE_TEMPLATE: fuerza el template estructural base
   //  - "auto" | "A" | "B" | "C"
@@ -159,19 +141,6 @@ const environmentSchema = z.object({
     .enum(['auto', 'A', 'B', 'C'])
     .optional()
     .default('auto'),
-
-  // STRUCTURE_ROUTER_ENABLED: activa el enrutador de estructura (A/B/C)
-  STRUCTURE_ROUTER_ENABLED: z
-    .enum(['true', 'false'])
-    .optional()
-    .default('true')
-    .transform(val => val === 'true'),
-
-  // TEMPLATE_MODE: modo de plantillas (structural/family)
-  TEMPLATE_MODE: z
-    .enum(['structural', 'family'])
-    .optional()
-    .default('structural'),
 
   // GEMINI_JSON_MODE: obliga a respuesta JSON strict en Gemini
   GEMINI_JSON_MODE: z
@@ -270,12 +239,10 @@ function getConfig() {
         timeout: parseInt(process.env.PDF_EXTRACTOR_TIMEOUT || '30000', 10)
       },
       llm: {
-        // Defaults seguros para flags nuevos
+        // Defaults seguros - forzado a Gemini
         llmRouterEnabled: false,
-        llmStrategy: 'hibrido',
+        llmStrategy: 'gemini',
         promptForceTemplate: 'auto',
-        structureRouterEnabled: true,
-        templateMode: 'structural',
         geminiJsonMode: true
       }
     };
@@ -289,50 +256,20 @@ function getConfig() {
     return fallbackConfig;
   }
 
-  // Construir configuración extendida
-  // Resolver estrategia efectiva y compatibilidad con flags legacy (sin imprimir valores)
-  const resolveStrategy = (env) => {
-    let strategy = env.LLM_STRATEGY || 'hibrido';
-    // Si no se definió estrategia, inferir desde flags legacy si existen
-    if (!process.env.LLM_STRATEGY) {
-      const legacyGeminiEnabled = typeof env.GEMINI_ENABLED === 'boolean' ? env.GEMINI_ENABLED : undefined;
-      const legacyHybrid = typeof env.EXTRACT_HYBRID === 'boolean' ? env.EXTRACT_HYBRID : undefined;
-      if (legacyGeminiEnabled === false) strategy = 'solo_node';
-      else if (legacyHybrid === true) strategy = 'hibrido';
-      else if (legacyHybrid === false) strategy = 'solo_gemini';
-      // FORCE_PYTHON_EXTRACTOR no mapea inequívocamente; no altera strategy si solo aparece este flag
-    }
-    return strategy;
-  };
-
-  const effectiveStrategy = resolveStrategy(validatedEnv);
-
-  // Derivar flags legacy desde la estrategia para compatibilidad:
-  const derivedLegacy = {
-    geminiEnabled: effectiveStrategy !== 'solo_node',
-    extractHybrid: effectiveStrategy === 'hibrido'
-  };
-
+  // Construir configuración extendida - Estrategia forzada a Gemini
   const cfg = {
     ...validatedEnv,
     pdfExtractor: {
-      baseUrl: validatedEnv.PDF_EXTRACTOR_BASE_URL || 'http://localhost:8001',
+      baseUrl: validatedEnv.PDF_EXTRACTOR_BASE_URL || null,
       token: validatedEnv.PDF_EXTRACTOR_TOKEN || '',
       timeout: parseInt(validatedEnv.PDF_EXTRACTOR_TIMEOUT || '30000', 10)
     },
     llm: {
-      // Flags agrupados para el sistema de extracción LLM
+      // Estrategia simplificada: siempre Gemini
       llmRouterEnabled: validatedEnv.LLM_ROUTER_ENABLED,
-      llmStrategy: effectiveStrategy,
+      llmStrategy: 'gemini', // Forzado a Gemini
       promptForceTemplate: validatedEnv.PROMPT_FORCE_TEMPLATE,
-      structureRouterEnabled: validatedEnv.STRUCTURE_ROUTER_ENABLED,
-      templateMode: validatedEnv.TEMPLATE_MODE,
-      geminiJsonMode: validatedEnv.GEMINI_JSON_MODE,
-      // Compatibilidad legacy derivada
-      derived: {
-        GEMINI_ENABLED: derivedLegacy.geminiEnabled,
-        EXTRACT_HYBRID: derivedLegacy.extractHybrid
-      }
+      geminiJsonMode: validatedEnv.GEMINI_JSON_MODE
     }
   };
 
@@ -348,16 +285,7 @@ function getConfig() {
     try {
       console.log('🔧 CONFIGURACIÓN CARGADA EXITOSAMENTE');
       console.log('='.repeat(50));
-
-      // Warnings por flags deprecados presentes
-      const deprecated = ['EXTRACT_HYBRID', 'FORCE_PYTHON_EXTRACTOR', 'GEMINI_PRIORITY'];
-      const present = deprecated.filter(k => typeof process.env[k] !== 'undefined');
-      if (present.length) {
-        console.warn('⚠️ FLAGS DEPRECADOS DETECTADOS:');
-        console.warn('   Usa LLM_STRATEGY en su lugar para mejor control:');
-        present.forEach(k => console.warn(`   • ${k} → reemplazar con LLM_STRATEGY`));
-        console.log('');
-      }
+      console.log('📌 Estrategia de extracción: Gemini (forzada)');
 
       // Validación crítica en producción (relajada: GOOGLE_API_KEY ya no es crítica)
       if (cfg.NODE_ENV === 'production') {
@@ -392,10 +320,8 @@ function getConfig() {
         ['DATABASE_URL', cfg.DATABASE_URL ? 'SET' : 'UNSET'],
         ['JWT_SECRET', cfg.JWT_SECRET ? 'SET' : 'UNSET'],
         ['GOOGLE_API_KEY', process.env.GOOGLE_API_KEY ? 'SET' : 'UNSET'],
-        ['LLM_STRATEGY', cfg.llm.llmStrategy],
-        ['WHATSAPP_ENABLED', cfg.WHATSAPP_ENABLED ? 'TRUE' : 'FALSE'],
-        ['PDF_EXTRACTOR_BASE_URL', cfg.pdfExtractor?.baseUrl ? 'SET' : 'UNSET'],
-        ['STRUCTURE_ROUTER_ENABLED', cfg.llm.structureRouterEnabled ? 'TRUE' : 'FALSE']
+        ['LLM_STRATEGY', 'gemini (forzado)'],
+        ['WHATSAPP_ENABLED', cfg.WHATSAPP_ENABLED ? 'TRUE' : 'FALSE']
       ];
 
       console.log('📋 CONFIGURACIÓN EFECTIVA:');
@@ -463,11 +389,7 @@ function validateConfigurationComplete(config) {
       check: () => process.env.GOOGLE_API_KEY,
       message: 'Sin GOOGLE_API_KEY, Gemini AI no funcionará'
     },
-    {
-      name: 'PDF Extractor',
-      check: () => config.pdfExtractor?.baseUrl && config.pdfExtractor?.token,
-      message: 'Sin configuración de PDF Extractor, se usará solo procesamiento local'
-    },
+
     {
       name: 'WhatsApp',
       check: () => config.WHATSAPP_ENABLED && config.TWILIO_ACCOUNT_SID && config.TWILIO_AUTH_TOKEN,
@@ -484,9 +406,6 @@ function validateConfigurationComplete(config) {
   });
 
   // Recomendaciones
-  if (!config.pdfExtractor?.baseUrl) {
-    result.recommendations.push('Configure PDF_EXTRACTOR_BASE_URL para mejor rendimiento de extracción');
-  }
   if (!process.env.GOOGLE_API_KEY) {
     result.recommendations.push('Configure GOOGLE_API_KEY para usar IA en procesamiento de documentos');
   }
@@ -510,11 +429,7 @@ function debugConfiguration(config) {
     console.log('   JWT_SECRET:', config.JWT_SECRET ? '[CONFIGURADO]' : '[FALTANTE]');
     console.log('   WHATSAPP_ENABLED:', config.WHATSAPP_ENABLED);
     console.log('   FRONTEND_URL:', config.FRONTEND_URL || '[NO CONFIGURADA]');
-    if (config.pdfExtractor) {
-      console.log('   PDF_EXTRACTOR_BASE_URL:', config.pdfExtractor.baseUrl || '[NO CONFIGURADA]');
-      console.log('   PDF_EXTRACTOR_TIMEOUT:', config.pdfExtractor.timeout);
-      console.log('   PDF_EXTRACTOR_TOKEN:', config.pdfExtractor.token ? '[CONFIGURADO]' : '[FALTANTE]');
-    }
+    console.log('   LLM_STRATEGY:', 'gemini (forzado)');
   }
 }
 
