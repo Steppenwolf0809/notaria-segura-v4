@@ -108,7 +108,7 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
     QrCode: <QrCodeIcon />
   };
   const navigationItems = useMemo(() => {
-    const allowed = ['dashboard', 'documents', 'history', 'formularios-uafe', 'concuerdos', 'generador-qr'];
+    const allowed = ['dashboard', 'documents', 'history', 'formularios-uafe', 'generador-qr'];
     const source = (navItemsByRole[role] || []).filter(i => allowed.includes(i.id));
     return source.map(i => ({
       text: i.label,
@@ -142,17 +142,17 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
    * Contenido del drawer - ESTRUCTURA OPTIMIZADA CON COLAPSO
    */
   const drawer = (
-    <Box sx={{ 
-      height: '100%', 
-      display: 'flex', 
+    <Box sx={{
+      height: '100%',
+      display: 'flex',
       flexDirection: 'column',
       backgroundColor: !isDarkMode ? '#1A5799' : undefined,
       color: !isDarkMode ? '#ffffff' : undefined,
       transition: 'all 0.3s ease',
     }}>
       {/* Header del Sidebar con botón de colapso */}
-      <Box sx={{ 
-        p: 2, 
+      <Box sx={{
+        p: 2,
         bgcolor: !isDarkMode ? '#1A5799' : 'primary.main',
         color: 'white',
         minHeight: '64px',
@@ -199,16 +199,16 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
           </IconButton>
         </Tooltip>
       </Box>
-      
+
       <Divider sx={{ borderColor: !isDarkMode ? 'rgba(255, 255, 255, 0.2)' : undefined }} />
-      
+
       {/* Navegación Principal */}
       <Box sx={{ flex: 1, overflow: 'auto' }}>
         <List sx={{ px: 1, py: 2 }}>
           {navigationItems.map((item) => (
             <ListItem key={item.view} disablePadding sx={{ mb: 0.5 }}>
-              <Tooltip 
-                title={sidebarCollapsed ? item.text : ''} 
+              <Tooltip
+                title={sidebarCollapsed ? item.text : ''}
                 placement="right"
                 disableHoverListener={!sidebarCollapsed}
               >
@@ -218,14 +218,14 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
                     borderRadius: 1,
                     py: 1.5,
                     px: sidebarCollapsed ? 1.5 : 2,
-                    bgcolor: item.active 
+                    bgcolor: item.active
                       ? (!isDarkMode ? '#468BE6' : 'primary.main')
                       : 'transparent',
-                    color: item.active 
-                      ? 'white' 
+                    color: item.active
+                      ? 'white'
                       : (!isDarkMode ? '#ffffff' : 'text.primary'),
                     '&:hover': {
-                      bgcolor: item.active 
+                      bgcolor: item.active
                         ? (!isDarkMode ? '#1A5799' : 'primary.dark')
                         : (!isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'action.hover')
                     },
@@ -233,9 +233,9 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
                     transition: 'all 0.2s ease',
                   }}
                 >
-                  <ListItemIcon sx={{ 
-                    color: item.active 
-                      ? 'white' 
+                  <ListItemIcon sx={{
+                    color: item.active
+                      ? 'white'
                       : (!isDarkMode ? '#93BFEF' : 'primary.main'),
                     minWidth: sidebarCollapsed ? 'unset' : 40,
                     justifyContent: 'center'
@@ -261,19 +261,19 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
                           component: 'span',
                           variant: 'body2',
                           fontWeight: item.active ? 'bold' : 'medium',
-                          color: item.active 
-                            ? 'white' 
+                          color: item.active
+                            ? 'white'
                             : (!isDarkMode ? '#ffffff' : 'inherit')
                         }}
                       />
                     ) : (
-                      <ListItemText 
+                      <ListItemText
                         primary={item.text}
                         primaryTypographyProps={{
                           variant: 'body2',
                           fontWeight: item.active ? 'bold' : 'medium',
-                          color: item.active 
-                            ? 'white' 
+                          color: item.active
+                            ? 'white'
                             : (!isDarkMode ? '#ffffff' : 'inherit')
                         }}
                       />
@@ -353,11 +353,11 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
       <AppBar
         position="fixed"
         sx={{
-          width: { 
-            sm: `calc(100% - ${sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH}px)` 
+          width: {
+            sm: `calc(100% - ${sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH}px)`
           },
-          ml: { 
-            sm: `${sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH}px` 
+          ml: {
+            sm: `${sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH}px`
           },
           zIndex: (theme) => theme.zIndex.drawer + 1,
           transition: 'width 0.3s ease, margin-left 0.3s ease',
@@ -373,11 +373,11 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
           >
             <MenuIcon />
           </IconButton>
-          
+
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Centro de Control - Matrizador
           </Typography>
-          
+
           {/* Controles de usuario en header */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             {/* Toggle de modo oscuro (usa ThemeCtx) */}
@@ -459,8 +459,8 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
       {/* Sidebar Navigation */}
       <Box
         component="nav"
-        sx={{ 
-          width: { sm: sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH }, 
+        sx={{
+          width: { sm: sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH },
           flexShrink: { sm: 0 },
           transition: 'width 0.3s ease'
         }}
@@ -475,8 +475,8 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
           }}
           sx={{
             display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': { 
-              boxSizing: 'border-box', 
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
               width: DRAWER_WIDTH,
               backgroundColor: !isDarkMode ? '#1A5799' : undefined,
             },
@@ -484,14 +484,14 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
         >
           {drawer}
         </Drawer>
-        
+
         {/* Drawer permanente desktop - EXTENDIDO A TODA LA ALTURA */}
         <Drawer
           variant="permanent"
           sx={{
             display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': { 
-              boxSizing: 'border-box', 
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
               width: sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH,
               backgroundColor: !isDarkMode ? '#1A5799' : undefined,
               height: '100vh',
@@ -511,8 +511,8 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
         component="main"
         sx={{
           flexGrow: 1,
-          width: { 
-            sm: `calc(100% - ${sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH}px)` 
+          width: {
+            sm: `calc(100% - ${sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH}px)`
           },
           minHeight: '100vh',
           bgcolor: 'background.default',
@@ -520,7 +520,7 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
         }}
       >
         <Toolbar />
-        
+
         {/* Área de contenido */}
         <Container maxWidth="xl" sx={{ py: 3 }}>
           {children}
@@ -528,7 +528,7 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
       </Box>
 
       {/* Modal de cambio de contraseña */}
-      <ChangePassword 
+      <ChangePassword
         open={showChangePassword}
         onClose={() => setShowChangePassword(false)}
       />

@@ -17,7 +17,6 @@ export const navItemsByRole = {
     { id: 'documents', label: 'Documentos', view: 'documents', icon: 'Assignment' },
     { id: 'history', label: 'Historial', view: 'history', icon: 'History' },
     { id: 'formularios-uafe', label: 'Formularios UAFE', view: 'formularios-uafe', icon: 'Description' },
-    { id: 'concuerdos', label: 'Generar Concuerdos', view: 'concuerdos', icon: 'Article', beta: true },
     { id: 'generador-qr', label: 'Generador QR', view: 'generador-qr', icon: 'QrCode' }
   ],
   ADMIN: [

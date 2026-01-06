@@ -13,11 +13,10 @@ const reportsDir = path.join(repoRoot, 'qa', 'reports');
 
 // Declared set from task (paste exactly)
 const DECLARED = [
-  "CONCUERDOS_USE_GEMINI_FIRST","DATABASE_PUBLIC_URL","DATABASE_URL","DEBUG_EXTRACTION_METHOD","EXTRACT_HYBRID","FORCE_PYTHON_EXTRACTOR","FRONTEND_URL","GEMINI_ENABLED","GEMINI_JSON_MODE","GEMINI_MODEL","GEMINI_PRIORITY","GEMINI_TIMEOUT","GOOGLE_API_KEY","JWT_SECRET","LLM_STRATEGY","NEXT_PUBLIC_DOCS_ARCHIVO_TABS","NEXT_PUBLIC_DOCS_LAZY_DELIVERED","NEXT_PUBLIC_DOCS_MATRIZADOR_TABS","NEXT_PUBLIC_DOCS_RECEPCION_GROUPED","NEXT_PUBLIC_DOCS_SEARCH_SMART_SCOPE","NEXT_PUBLIC_DOCS_SEARCH_TOGGLE_RECEPCION","NEXT_PUBLIC_DOCS_WINDOWING","NODE_ENV","RAILWAY_START_COMMAND","REDIS_URL","STRUCTURE_ROUTER_ENABLED","TEMPLATE_MODE","TWILIO_ACCOUNT_SID","TWILIO_AUTH_TOKEN","TWILIO_PHONE_NUMBER","TWILIO_WHATSAPP_FROM","VITE_API_URL","VITE_DOCS_ARCHIVO_TABS","VITE_DOCS_LAZY_DELIVERED","VITE_DOCS_MATRIZADOR_TABS","VITE_DOCS_RECEPCION_GROUPED","VITE_DOCS_SEARCH_SMART_SCOPE","VITE_DOCS_SEARCH_TOGGLE_RECEPCION","VITE_DOCS_WINDOWING","WHATSAPP_ENABLED","RUN_MIGRATIONS_ON_START","TEMPLATE_CACHE_TTL_MS","RATE_LIMIT_MAX","RATE_LIMIT_WINDOW_MS","CIRCUIT_BREAKER_THRESHOLD","RETRY_MAX_ATTEMPTS"
+  "DATABASE_PUBLIC_URL", "DATABASE_URL", "DEBUG_EXTRACTION_METHOD", "EXTRACT_HYBRID", "FORCE_PYTHON_EXTRACTOR", "FRONTEND_URL", "GEMINI_ENABLED", "GEMINI_JSON_MODE", "GEMINI_MODEL", "GEMINI_PRIORITY", "GEMINI_TIMEOUT", "GOOGLE_API_KEY", "JWT_SECRET", "LLM_STRATEGY", "NEXT_PUBLIC_DOCS_ARCHIVO_TABS", "NEXT_PUBLIC_DOCS_LAZY_DELIVERED", "NEXT_PUBLIC_DOCS_MATRIZADOR_TABS", "NEXT_PUBLIC_DOCS_RECEPCION_GROUPED", "NEXT_PUBLIC_DOCS_SEARCH_SMART_SCOPE", "NEXT_PUBLIC_DOCS_SEARCH_TOGGLE_RECEPCION", "NEXT_PUBLIC_DOCS_WINDOWING", "NODE_ENV", "RAILWAY_START_COMMAND", "REDIS_URL", "STRUCTURE_ROUTER_ENABLED", "TEMPLATE_MODE", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_PHONE_NUMBER", "TWILIO_WHATSAPP_FROM", "VITE_API_URL", "VITE_DOCS_ARCHIVO_TABS", "VITE_DOCS_LAZY_DELIVERED", "VITE_DOCS_MATRIZADOR_TABS", "VITE_DOCS_RECEPCION_GROUPED", "VITE_DOCS_SEARCH_SMART_SCOPE", "VITE_DOCS_SEARCH_TOGGLE_RECEPCION", "VITE_DOCS_WINDOWING", "WHATSAPP_ENABLED", "RUN_MIGRATIONS_ON_START", "TEMPLATE_CACHE_TTL_MS", "RATE_LIMIT_MAX", "RATE_LIMIT_WINDOW_MS", "CIRCUIT_BREAKER_THRESHOLD", "RETRY_MAX_ATTEMPTS"
 ];
 
 const DEPRECATE_CANDIDATES = new Set([
-  'CONCUERDOS_USE_GEMINI_FIRST',
   'EXTRACT_HYBRID',
   'FORCE_PYTHON_EXTRACTOR',
   'GEMINI_PRIORITY',
@@ -25,10 +24,10 @@ const DEPRECATE_CANDIDATES = new Set([
 
 // Heuristic: files/dirs to ignore
 const IGNORE_DIRS = new Set([
-  'node_modules','dist','build','.git','.next','.turbo','.cache','.vercel','.expo','android','ios','.vscode','coverage','out','.idea','qa/reports'
+  'node_modules', 'dist', 'build', '.git', '.next', '.turbo', '.cache', '.vercel', '.expo', 'android', 'ios', '.vscode', 'coverage', 'out', '.idea', 'qa/reports'
 ]);
 
-const TEXT_EXTS = new Set(['.js','.jsx','.ts','.tsx','.mjs','.cjs','.json','.yml','.yaml','.md','.sh','.bash','.env','.txt','.sql']);
+const TEXT_EXTS = new Set(['.js', '.jsx', '.ts', '.tsx', '.mjs', '.cjs', '.json', '.yml', '.yaml', '.md', '.sh', '.bash', '.env', '.txt', '.sql']);
 
 function isBinaryContent(buf) {
   // simple binary check: presence of null byte
@@ -59,7 +58,7 @@ function walk(dir, out = []) {
       } else if (ent.isFile()) {
         if (shouldScanFile(full)) out.push(full);
       }
-    } catch {}
+    } catch { }
   }
   return out;
 }
@@ -82,7 +81,7 @@ function inferUsageKind(line) {
 }
 
 function inferLayer(file, matchKind) {
-  const p = file.replace(/\\/g,'/');
+  const p = file.replace(/\\/g, '/');
   if (/^(frontend|apps\/frontend|packages\/frontend)\//.test(p)) return 'frontend-build';
   if (/^(backend|server|api)\//.test(p)) return 'backend';
   if (matchKind === 'importmeta' || /import\.meta\.env/.test(matchKind)) return 'frontend-build';
@@ -107,7 +106,7 @@ const varMap = new Map(); // name -> { name, occurrences:[], usage_kind: best?, 
 function addOcc(name, file, lineNo, line, matchKind) {
   const usage_kind = inferUsageKind(line);
   const layer = inferLayer(file, matchKind);
-  const occ = { file: path.relative(repoRoot, file).replace(/\\/g,'/'), line: lineNo, snippet: safeSnippet(line) };
+  const occ = { file: path.relative(repoRoot, file).replace(/\\/g, '/'), line: lineNo, snippet: safeSnippet(line) };
   if (!varMap.has(name)) {
     varMap.set(name, {
       name,
@@ -120,11 +119,11 @@ function addOcc(name, file, lineNo, line, matchKind) {
     const v = varMap.get(name);
     v.occurrences.push(occ);
     // Upgrade usage_kind priority: log > default > branch > read
-    const order = { log:3, default:2, branch:1, read:0 };
+    const order = { log: 3, default: 2, branch: 1, read: 0 };
     if (order[usage_kind] > order[v.usage_kind]) v.usage_kind = usage_kind;
     // Upgrade layer: backend/frontend-build over shared; if mixed, keep shared? We'll prefer backend/frontend-build if consistent.
     if (v.layer === 'shared' && layer !== 'shared') v.layer = layer;
-    if (v.layer !== layer && (v.layer === 'backend' && layer==='frontend-build' || v.layer==='frontend-build' && layer==='backend')) {
+    if (v.layer !== layer && (v.layer === 'backend' && layer === 'frontend-build' || v.layer === 'frontend-build' && layer === 'backend')) {
       v.layer = 'shared';
     }
   }
@@ -143,39 +142,39 @@ for (const file of files) {
     let m;
     reProcessDot.lastIndex = 0;
     while ((m = reProcessDot.exec(line)) !== null) {
-      addOcc(m[1], file, i+1, line, 'processenv');
+      addOcc(m[1], file, i + 1, line, 'processenv');
     }
     reProcessIndex.lastIndex = 0;
     while ((m = reProcessIndex.exec(line)) !== null) {
-      addOcc(m[1], file, i+1, line, 'processenv');
+      addOcc(m[1], file, i + 1, line, 'processenv');
     }
     reImportMetaDot.lastIndex = 0;
     while ((m = reImportMetaDot.exec(line)) !== null) {
-      addOcc(m[1], file, i+1, line, 'importmeta');
+      addOcc(m[1], file, i + 1, line, 'importmeta');
     }
     reImportMetaIndex.lastIndex = 0;
     while ((m = reImportMetaIndex.exec(line)) !== null) {
-      addOcc(m[1], file, i+1, line, 'importmeta');
+      addOcc(m[1], file, i + 1, line, 'importmeta');
     }
     rePublicKey.lastIndex = 0;
     while ((m = rePublicKey.exec(line)) !== null) {
       // treat as frontend-build var usage
-      addOcc(m[1], file, i+1, line, 'string-next');
+      addOcc(m[1], file, i + 1, line, 'string-next');
     }
     reViteKey.lastIndex = 0;
     while ((m = reViteKey.exec(line)) !== null) {
-      addOcc(m[1], file, i+1, line, 'string-vite');
+      addOcc(m[1], file, i + 1, line, 'string-vite');
     }
   }
 }
 
 // Build arrays
-const foundVars = Array.from(varMap.values()).sort((a,b)=> a.name.localeCompare(b.name));
+const foundVars = Array.from(varMap.values()).sort((a, b) => a.name.localeCompare(b.name));
 
-const foundNames = new Set(foundVars.map(v=>v.name));
+const foundNames = new Set(foundVars.map(v => v.name));
 const declaredSet = new Set(DECLARED);
 const unused_declared = DECLARED.filter(n => !foundNames.has(n));
-const missing_declared = foundVars.map(v=>v.name).filter(n => !declaredSet.has(n));
+const missing_declared = foundVars.map(v => v.name).filter(n => !declaredSet.has(n));
 
 // Count references for candidates
 const candidateCounts = {};
@@ -188,7 +187,7 @@ const hasLLMStrategy = foundNames.has('LLM_STRATEGY');
 const hasPort = foundNames.has('PORT');
 const warnings = [];
 if (!hasPort) {
-  warnings.push({ missing: 'PORT', severity: 'high', message: 'Server should bind process.env.PORT; not found in codebase.'});
+  warnings.push({ missing: 'PORT', severity: 'high', message: 'Server should bind process.env.PORT; not found in codebase.' });
 }
 
 // .env example existence and missing keys proposal
@@ -216,10 +215,10 @@ const stagingKeys = extractKeysFromEnv(envStaging);
 
 // Keys we recommend adding to examples
 const operationalNew = [
-  'RUN_MIGRATIONS_ON_START','TEMPLATE_CACHE_TTL_MS','RATE_LIMIT_MAX','RATE_LIMIT_WINDOW_MS','CIRCUIT_BREAKER_THRESHOLD','RETRY_MAX_ATTEMPTS'
+  'RUN_MIGRATIONS_ON_START', 'TEMPLATE_CACHE_TTL_MS', 'RATE_LIMIT_MAX', 'RATE_LIMIT_WINDOW_MS', 'CIRCUIT_BREAKER_THRESHOLD', 'RETRY_MAX_ATTEMPTS'
 ];
 
-const usedBackendLike = foundVars.filter(v => v.layer !== 'frontend-build').map(v=>v.name);
+const usedBackendLike = foundVars.filter(v => v.layer !== 'frontend-build').map(v => v.name);
 const backendDesired = Array.from(new Set([...usedBackendLike, ...DECLARED]));
 
 const toAddExample = backendDesired.filter(k => !exampleKeys.has(k));
@@ -243,7 +242,7 @@ const jsonReport = {
   repo_root: repoRoot,
   totals: {
     vars: foundVars.length,
-    occurrences: foundVars.reduce((acc,v)=> acc + v.occurrences.length, 0),
+    occurrences: foundVars.reduce((acc, v) => acc + v.occurrences.length, 0),
   },
   warnings,
   declared_set: DECLARED,
@@ -273,8 +272,8 @@ const mdSummary = [
   `Generated: ${new Date().toISOString()}`,
   '',
   `Total variables: ${foundVars.length}`,
-  `Total occurrences: ${rows.reduce((a,b)=>a+b.occurrences,0)}`,
-  warnings.length ? `Warnings: ${warnings.map(w=>`${w.missing} (${w.severity})`).join(', ')}` : 'Warnings: none',
+  `Total occurrences: ${rows.reduce((a, b) => a + b.occurrences, 0)}`,
+  warnings.length ? `Warnings: ${warnings.map(w => `${w.missing} (${w.severity})`).join(', ')}` : 'Warnings: none',
   '',
   '## Declared vs Used',
   '',
@@ -291,7 +290,7 @@ const mdSummary = [
 ].join('\n');
 
 // Cleanup plan
-const varsToKeep = foundVars.map(v=>v.name).filter(n => !DEPRECATE_CANDIDATES.has(n));
+const varsToKeep = foundVars.map(v => v.name).filter(n => !DEPRECATE_CANDIDATES.has(n));
 const varsToDeprecate = Object.keys(candidateCounts).filter(name => candidateCounts[name] <= 1 || hasLLMStrategy);
 const planMd = [
   '# Env Cleanup Plan (Safe)',
@@ -300,11 +299,11 @@ const planMd = [
   '',
   '## Keep',
   '',
-  varsToKeep.length ? varsToKeep.sort().map(v=>`- ${v}`).join('\n') : '- (none detected)',
+  varsToKeep.length ? varsToKeep.sort().map(v => `- ${v}`).join('\n') : '- (none detected)',
   '',
   '## Deprecate + Migration',
   '',
-  varsToDeprecate.length ? varsToDeprecate.map(v=>`- ${v}: Replace with LLM_STRATEGY presets. Suggested mapping: \n  - ${v}=true -> LLM_STRATEGY=gemini \n  - ${v}=false -> LLM_STRATEGY=default`).join('\n') : '- (none)',
+  varsToDeprecate.length ? varsToDeprecate.map(v => `- ${v}: Replace with LLM_STRATEGY presets. Suggested mapping: \n  - ${v}=true -> LLM_STRATEGY=gemini \n  - ${v}=false -> LLM_STRATEGY=default`).join('\n') : '- (none)',
   '',
   'Also ensure documentation states these are superseded by `LLM_STRATEGY`.',
   '',
@@ -315,11 +314,11 @@ const planMd = [
   '',
   '## Frontend-only vars',
   '',
-  frontendOnly.length ? frontendOnly.map(v=>`- ${v} (frontend service .env, exposed at build)`).join('\n') : '- (none)',
+  frontendOnly.length ? frontendOnly.map(v => `- ${v} (frontend service .env, exposed at build)`).join('\n') : '- (none)',
   '',
   '## Additional Notes',
   '',
-  warnings.length ? warnings.map(w=>`- Missing ${w.missing} (${w.severity}): ${w.message}`).join('\n') : '- No high-severity findings',
+  warnings.length ? warnings.map(w => `- Missing ${w.missing} (${w.severity}): ${w.message}`).join('\n') : '- No high-severity findings',
 ].join('\n');
 
 // Ensure report dir
@@ -332,10 +331,10 @@ fs.writeFileSync(path.join(reportsDir, 'env-cleanup-plan.md'), planMd);
 const checklist = [
   'Env audit complete:',
   `- Vars found: ${foundVars.length}`,
-  `- Total occurrences: ${rows.reduce((a,b)=>a+b.occurrences,0)}`,
+  `- Total occurrences: ${rows.reduce((a, b) => a + b.occurrences, 0)}`,
   `- Unused declared: ${unused_declared.length}`,
   `- Missing declared: ${missing_declared.length}`,
-  warnings.length ? `- Warnings: ${warnings.map(w=>w.missing).join(', ')}` : '- Warnings: none',
+  warnings.length ? `- Warnings: ${warnings.map(w => w.missing).join(', ')}` : '- Warnings: none',
   `- JSON: qa/reports/env-audit.json`,
   `- Summary: qa/reports/env-audit.md`,
   `- Plan: qa/reports/env-cleanup-plan.md`,

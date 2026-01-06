@@ -43,7 +43,6 @@ model User {
   
   // Relación de auditoría - NUEVA FUNCIONALIDAD
   documentEvents    DocumentEvent[]                            // Eventos de auditoría realizados por el usuario
-  concuerdoAudits   ConcuerdoAuditLog[]                        // Auditoría de generación de concuerdos
   escriturasQR      EscrituraQR[]                              // Escrituras QR creadas por el usuario
   auditoriaPersonas AuditoriaPersona[]                         // Auditoría de reseteos de PIN de personas
   formularioUAFEAsignaciones FormularioUAFEAsignacion[]        // Formularios UAFE asignados por el matrizador
@@ -126,7 +125,6 @@ model Document {
   // Relación de auditoría - NUEVA FUNCIONALIDAD
   events                DocumentEvent[]        // Historial de eventos del documento
   notifications         WhatsAppNotification[] // Notificaciones enviadas para este documento
-  concuerdoAudits       ConcuerdoAuditLog[]    // Auditoría de generación de concuerdos
 
   createdAt               DateTime       @default(now())
   updatedAt               DateTime       @updatedAt
@@ -271,28 +269,6 @@ model SystemSetting {
   @@index([key])
 }
 
-// MODELO DE AUDITORÍA PARA CONCUERDOS - T10 Hardening
-model ConcuerdoAuditLog {
-  id              String   @id @default(uuid())
-  docId           String?  // FK opcional al documento fuente
-  estructura      String   // "A"|"B"|"C"
-  templateMode    String   // "structural"|"family"
-  force           String   // "auto"|"A"|"B"|"C"
-  hashConcuerdo   String   // SHA-256 de PRIMERA+SEGUNDA
-  createdBy       Int      // FK al usuario que generó
-  createdAt       DateTime @default(now())
-  meta            String?    // JSON con métricas, warnings, versión plantilla, timings
-
-  // Relaciones
-  user            User     @relation(fields: [createdBy], references: [id])
-  document        Document? @relation(fields: [docId], references: [id])
-
-  @@map("concuerdo_audit_logs")
-  @@index([docId])
-  @@index([createdBy])
-  @@index([createdAt])
-  @@index([estructura])
-}
 
 // MODELO PARA ESCRITURAS QR - Módulo de verificación de escrituras notariales
 model EscrituraQR {

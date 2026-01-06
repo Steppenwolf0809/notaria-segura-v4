@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Box, Alert } from '@mui/material';
 import MatrizadorLayout from './MatrizadorLayout';
 import MatrizadorDashboard from './MatrizadorDashboard';
-import ConcuerdoGenerator from './matrizador/concuerdos/ConcuerdoGenerator.jsx';
 import GeneradorQR from './matrizador/GeneradorQR';
 import GestionDocumentos from './GestionDocumentos';
 import NotificationsHistory from './Documents/NotificationsHistory';
@@ -18,12 +17,12 @@ import useDocumentStore from '../store/document-store';
 const MatrizadorCenter = () => {
   const [currentView, setCurrentView] = useState('documents'); // Iniciar en documentos por defecto
   const [documentoEspecifico, setDocumentoEspecifico] = useState(null);
-  const { 
-    documents, 
-    loading, 
-    error, 
-    fetchMyDocuments, 
-    clearError 
+  const {
+    documents,
+    loading,
+    error,
+    fetchMyDocuments,
+    clearError
   } = useDocumentStore();
 
   /**
@@ -45,7 +44,7 @@ const MatrizadorCenter = () => {
    * Función para navegar a un documento desde alertas
    */
   const handleDocumentClick = (alerta) => {
-    
+
     // Preparar información del documento específico
     const documentoTarget = {
       id: alerta.id,
@@ -58,7 +57,7 @@ const MatrizadorCenter = () => {
 
     // Setear el documento específico para navegación
     setDocumentoEspecifico(documentoTarget);
-    
+
     // Cambiar a la vista de documentos
     setCurrentView('documents');
   };
@@ -70,23 +69,20 @@ const MatrizadorCenter = () => {
     switch (currentView) {
       case 'dashboard':
         return <MatrizadorDashboard onDocumentClick={handleDocumentClick} />;
-      
+
       case 'documents':
         return (
-          <GestionDocumentos 
+          <GestionDocumentos
             documentoEspecifico={documentoEspecifico}
             onDocumentoFound={() => setDocumentoEspecifico(null)}
           />
         );
-      
+
       case 'history':
         return <NotificationsHistory />;
 
       case 'formularios-uafe':
         return <FormulariosUAFE />;
-
-      case 'concuerdos':
-        return <ConcuerdoGenerator />;
 
       case 'generador-qr':
         return <GeneradorQR />;
@@ -97,14 +93,14 @@ const MatrizadorCenter = () => {
   };
 
   return (
-    <MatrizadorLayout 
-      currentView={currentView} 
+    <MatrizadorLayout
+      currentView={currentView}
       onViewChange={handleViewChange}
     >
       {/* Error Global */}
       {error && (
-        <Alert 
-          severity="error" 
+        <Alert
+          severity="error"
           onClose={clearError}
           sx={{ mb: 3 }}
         >

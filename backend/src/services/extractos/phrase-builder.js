@@ -1,4 +1,4 @@
-// Construcción genérica de frases para actos en concuerdos combinados
+// Construcción genérica de frases para actos en extractos combinados
 // - Evita hardcodear un solo caso (p.ej., poder + revocatoria)
 // - Aplica reglas gramaticales mínimas por tipo
 

@@ -104,7 +104,7 @@ const environmentSchema = z.object({
     .string()
     .url('BASE_URL debe ser una URL válida')
     .optional()
-,
+  ,
 
   // Integración Microservicio Python PDF Extractor (opcionales)
   PDF_EXTRACTOR_BASE_URL: z
@@ -118,9 +118,9 @@ const environmentSchema = z.object({
     .string()
     .optional()
     .default('30000')
-,
+  ,
 
-  // Flags Concuerdos / LLM (opcionales con defaults)
+  // Flags LLM (opcionales con defaults)
   // LLM_ROUTER_ENABLED: habilita un router que decide estrategias LLM/Node
   LLM_ROUTER_ENABLED: z
     .enum(['true', 'false'])
@@ -137,15 +137,15 @@ const environmentSchema = z.object({
 
   // Flags legacy opcionales (para compatibilidad)
   GEMINI_ENABLED: z
-    .enum(['true','false'])
+    .enum(['true', 'false'])
     .optional()
     .transform(v => v ? v === 'true' : undefined),
   EXTRACT_HYBRID: z
-    .enum(['true','false'])
+    .enum(['true', 'false'])
     .optional()
     .transform(v => v ? v === 'true' : undefined),
   FORCE_PYTHON_EXTRACTOR: z
-    .enum(['true','false'])
+    .enum(['true', 'false'])
     .optional()
     .transform(v => v ? v === 'true' : undefined),
   GEMINI_PRIORITY: z
@@ -269,7 +269,7 @@ function getConfig() {
         token: process.env.PDF_EXTRACTOR_TOKEN || null,
         timeout: parseInt(process.env.PDF_EXTRACTOR_TIMEOUT || '30000', 10)
       },
-      concuerdos: {
+      llm: {
         // Defaults seguros para flags nuevos
         llmRouterEnabled: false,
         llmStrategy: 'hibrido',
@@ -288,7 +288,7 @@ function getConfig() {
 
     return fallbackConfig;
   }
-  
+
   // Construir configuración extendida
   // Resolver estrategia efectiva y compatibilidad con flags legacy (sin imprimir valores)
   const resolveStrategy = (env) => {
@@ -320,8 +320,8 @@ function getConfig() {
       token: validatedEnv.PDF_EXTRACTOR_TOKEN || '',
       timeout: parseInt(validatedEnv.PDF_EXTRACTOR_TIMEOUT || '30000', 10)
     },
-    concuerdos: {
-      // Flags agrupados para el sistema de concuerdos
+    llm: {
+      // Flags agrupados para el sistema de extracción LLM
       llmRouterEnabled: validatedEnv.LLM_ROUTER_ENABLED,
       llmStrategy: effectiveStrategy,
       promptForceTemplate: validatedEnv.PROMPT_FORCE_TEMPLATE,
@@ -341,16 +341,16 @@ function getConfig() {
     console.warn('⚠️  WhatsApp habilitado pero credenciales Twilio faltantes. Desactivando WhatsApp.');
     cfg.WHATSAPP_ENABLED = false;
   }
-  
+
   // Impresión única de advertencias y tabla de configuración efectiva
   if (!printedOnce) {
     printedOnce = true;
     try {
       console.log('🔧 CONFIGURACIÓN CARGADA EXITOSAMENTE');
-      console.log('=' .repeat(50));
+      console.log('='.repeat(50));
 
       // Warnings por flags deprecados presentes
-      const deprecated = ['CONCUERDOS_USE_GEMINI_FIRST','EXTRACT_HYBRID','FORCE_PYTHON_EXTRACTOR','GEMINI_PRIORITY'];
+      const deprecated = ['EXTRACT_HYBRID', 'FORCE_PYTHON_EXTRACTOR', 'GEMINI_PRIORITY'];
       const present = deprecated.filter(k => typeof process.env[k] !== 'undefined');
       if (present.length) {
         console.warn('⚠️ FLAGS DEPRECADOS DETECTADOS:');
@@ -392,10 +392,10 @@ function getConfig() {
         ['DATABASE_URL', cfg.DATABASE_URL ? 'SET' : 'UNSET'],
         ['JWT_SECRET', cfg.JWT_SECRET ? 'SET' : 'UNSET'],
         ['GOOGLE_API_KEY', process.env.GOOGLE_API_KEY ? 'SET' : 'UNSET'],
-        ['LLM_STRATEGY', cfg.concuerdos.llmStrategy],
+        ['LLM_STRATEGY', cfg.llm.llmStrategy],
         ['WHATSAPP_ENABLED', cfg.WHATSAPP_ENABLED ? 'TRUE' : 'FALSE'],
         ['PDF_EXTRACTOR_BASE_URL', cfg.pdfExtractor?.baseUrl ? 'SET' : 'UNSET'],
-        ['STRUCTURE_ROUTER_ENABLED', cfg.concuerdos.structureRouterEnabled ? 'TRUE' : 'FALSE']
+        ['STRUCTURE_ROUTER_ENABLED', cfg.llm.structureRouterEnabled ? 'TRUE' : 'FALSE']
       ];
 
       console.log('📋 CONFIGURACIÓN EFECTIVA:');
@@ -405,7 +405,7 @@ function getConfig() {
         console.log(`| ${key} | ${value} |`);
       });
 
-      console.log('=' .repeat(50));
+      console.log('='.repeat(50));
       console.log('✅ Configuración validada y lista para usar');
     } catch (logError) {
       console.warn('⚠️ Error en logging de configuración:', logError?.message || logError);
