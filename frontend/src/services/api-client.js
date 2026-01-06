@@ -29,6 +29,7 @@ function handleUnauthorized() {
 const apiClient = axios.create({
   baseURL: API_BASE,
   timeout: 30000,
+  withCredentials: true, // CRÍTICO: Necesario para enviar cookies CSRF al servidor
   headers: {
     'Content-Type': 'application/json',
   },

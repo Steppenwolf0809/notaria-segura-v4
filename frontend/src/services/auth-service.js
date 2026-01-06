@@ -1,25 +1,10 @@
-import axios from 'axios';
+import apiClient from './api-client.js';
 
-// URL base de la API - Auto-detectar producción
-const getApiBaseUrl = () => {
-  // Si estamos en producción (mismo dominio), usar rutas relativas
-  if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-    return '/api';
-  }
-  // En desarrollo, usar la variable de entorno o fallback
-  return import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-};
-
-const API_BASE_URL = getApiBaseUrl();
-
-// Instancia de axios configurada
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  timeout: 10000 // 10 segundos
-});
+// Nota: Usamos apiClient en lugar de una instancia privada de axios
+// para que todas las peticiones incluyan automáticamente:
+// - Token JWT de autorización
+// - Token CSRF para métodos POST/PUT/PATCH/DELETE
+// - Sanitización XSS de respuestas
 
 /**
  * Servicio de autenticación
@@ -35,7 +20,7 @@ const authService = {
    */
   login: async (credentials) => {
     try {
-      const response = await api.post('/auth/login', credentials);
+      const response = await apiClient.post('/auth/login', credentials);
       return response.data;
     } catch (error) {
       throw authService.handleError(error);
@@ -55,7 +40,7 @@ const authService = {
    */
   register: async (userData, token) => {
     try {
-      const response = await api.post('/auth/register', userData, {
+      const response = await apiClient.post('/auth/register', userData, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -73,7 +58,7 @@ const authService = {
    */
   getProfile: async (token) => {
     try {
-      const response = await api.get('/auth/profile', {
+      const response = await apiClient.get('/auth/profile', {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -91,7 +76,7 @@ const authService = {
    */
   refreshToken: async (token) => {
     try {
-      const response = await api.post('/auth/refresh', {}, {
+      const response = await apiClient.post('/auth/refresh', {}, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -109,7 +94,7 @@ const authService = {
    */
   verifyToken: async (token) => {
     try {
-      const response = await api.get('/auth/verify', {
+      const response = await apiClient.get('/auth/verify', {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -131,7 +116,7 @@ const authService = {
    */
   changePassword: async (passwordData, token) => {
     try {
-      const response = await api.put('/auth/change-password', passwordData, {
+      const response = await apiClient.put('/auth/change-password', passwordData, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -148,7 +133,7 @@ const authService = {
    */
   checkHealth: async () => {
     try {
-      const response = await api.get('/health');
+      const response = await apiClient.get('/health');
       return response.data;
     } catch (error) {
       throw authService.handleError(error);
