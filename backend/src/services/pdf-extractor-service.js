@@ -117,7 +117,7 @@ const PdfExtractorService = {
           const l = lines[j].toUpperCase().trim()
           const mNum = l.match(/NOTAR[ÍI]A\s*(.+)$/i)
           if (mNum && mNum[1]) {
-            const raw = mNum[1].replace(/\s+/g, ' ').trim().replace(/[\.;,]+$/,'')
+            const raw = mNum[1].replace(/\s+/g, ' ').trim().replace(/[\.;,]+$/, '')
             notariaNumero = raw
             break
           }
@@ -147,7 +147,7 @@ const PdfExtractorService = {
           // Capturar todo lo que sigue a "NOTARÍA " hasta fin de línea
           const mNum = l.match(/NOTAR[ÍI]A\s*(.+)$/i)
           if (mNum && mNum[1]) {
-            notariaNumero = mNum[1].replace(/\s+/g, ' ').trim().replace(/[\.;,]+$/,'')
+            notariaNumero = mNum[1].replace(/\s+/g, ' ').trim().replace(/[\.;,]+$/, '')
             break
           }
         }
@@ -177,7 +177,7 @@ const PdfExtractorService = {
       // Capturar texto posterior a NOTARÍA, preferentemente completo
       const mAny = upper.match(/NOTAR[ÍI]A\s+([^\n]+?)(?:\n|$)/)
       if (mAny && mAny[1]) {
-        notariaNumero = mAny[1].replace(/\s+/g, ' ').trim().replace(/[\.;,]+$/,'')
+        notariaNumero = mAny[1].replace(/\s+/g, ' ').trim().replace(/[\.;,]+$/, '')
       }
     }
 
@@ -211,18 +211,18 @@ const PdfExtractorService = {
       return tokens.join(' ')
     }
 
-    const particles = new Set(['DE','DEL','DELA','DELOS','DELAS','LA','LOS','LAS','SAN','SANTA','VON','VAN','DA','DI'])
-    const female = new Set(['MARIA','ANA','ROSA','ELENA','FERNANDA','LUISA','VALERIA','CAMILA','GABRIELA','SOFIA','ISABEL','PATRICIA','VERONICA','CARMEN','LUZ'])
-    const male = new Set(['JOSE','JUAN','CARLOS','DANIEL','MIGUEL','DIEGO','ANDRES','LUIS','PEDRO','PABLO','FRANCISCO','JAVIER','FERNANDO','ROBERTO','ANTONIO','MANUEL'])
-    
+    const particles = new Set(['DE', 'DEL', 'DELA', 'DELOS', 'DELAS', 'LA', 'LOS', 'LAS', 'SAN', 'SANTA', 'VON', 'VAN', 'DA', 'DI'])
+    const female = new Set(['MARIA', 'ANA', 'ROSA', 'ELENA', 'FERNANDA', 'LUISA', 'VALERIA', 'CAMILA', 'GABRIELA', 'SOFIA', 'ISABEL', 'PATRICIA', 'VERONICA', 'CARMEN', 'LUZ'])
+    const male = new Set(['JOSE', 'JUAN', 'CARLOS', 'DANIEL', 'MIGUEL', 'DIEGO', 'ANDRES', 'LUIS', 'PEDRO', 'PABLO', 'FRANCISCO', 'JAVIER', 'FERNANDO', 'ROBERTO', 'ANTONIO', 'MANUEL'])
+
     const isParticle = (t) => particles.has(t)
     const isProbableName = (t) => female.has(t) || male.has(t)
     const endsWithVowel = (t) => /[AEIO]$/.test(t)
 
     // Detectar si ya están en orden correcto (nombres primero)
     const firstToken = tokens[0]
-    const lastToken = tokens[n-1]
-    
+    const lastToken = tokens[n - 1]
+
     // Si el primer token es claramente un nombre, probablemente ya está bien ordenado
     if (isProbableName(firstToken)) {
       return tokens.join(' ')
@@ -233,7 +233,7 @@ const PdfExtractorService = {
       // Proceder con reordenamiento
     } else if (n >= 3) {
       // Para nombres de 3+ tokens, revisar si los últimos son nombres
-      const secondToLast = tokens[n-2]
+      const secondToLast = tokens[n - 2]
       if (isProbableName(lastToken) && isProbableName(secondToLast)) {
         // Los últimos dos son nombres, reordenar
       } else if (isProbableName(firstToken) || endsWithVowel(firstToken)) {
@@ -254,24 +254,24 @@ const PdfExtractorService = {
     if (n === 2) {
       nameCount = 1
     } else if (n === 3) {
-      const last = tokens[n-1], prev = tokens[n-2]
+      const last = tokens[n - 1], prev = tokens[n - 2]
       nameCount = (isProbableName(last) && isProbableName(prev)) ? 2 : 1
     } else if (n === 4) {
       // Para 4 tokens, usualmente 2 nombres + 2 apellidos
-      const last = tokens[n-1], prev = tokens[n-2]
+      const last = tokens[n - 1], prev = tokens[n - 2]
       nameCount = (isProbableName(last) && isProbableName(prev)) ? 2 : 1
     } else {
       // Para 5+ tokens, detectar por partículas
-      const prev = tokens[n-2]
+      const prev = tokens[n - 2]
       nameCount = isParticle(prev) ? 1 : 2
     }
-    
+
     nameCount = Math.max(1, Math.min(2, nameCount))
-    
+
     // Manejar partículas en apellidos compuestos
     let surnameStart = 0
     let surnameEnd = n - nameCount
-    
+
     // Encontrar partículas al inicio que son parte del apellido
     for (let i = 0; i < surnameEnd - 1; i++) {
       if (isParticle(tokens[i]) && !isParticle(tokens[i + 1])) {
@@ -279,7 +279,7 @@ const PdfExtractorService = {
         continue
       }
     }
-    
+
     const names = tokens.slice(-nameCount)
     const surnames = tokens.slice(0, n - nameCount)
     return (names.join(' ') + ' ' + surnames.join(' ')).replace(/\s+/g, ' ').trim()
@@ -298,7 +298,7 @@ const PdfExtractorService = {
 
     // Extraer nombres usando patrón por filas tipo tabla: NATURAL <NOMBRES> POR SUS PROPIOS
     const tableNames = []
-    
+
     // Patrón 1: Personas naturales tradicional
     const natRe = /NATURAL\s+([A-ZÁÉÍÓÚÑ\s]{3,80}?)\s+POR\s+SUS\s+PROPIOS/gi
     let nm
@@ -308,7 +308,7 @@ const PdfExtractorService = {
       if (!block) continue
       // Remover encabezados conocidos y términos de tabla
       const headerTokens = [
-        'PERSONA','NOMBRES','RAZON','RAZÓN','SOCIAL','TIPO','INTERVINIENTE','DOCUMENTO','IDENTIDAD','NACIONALIDAD','CALIDAD','REPRESENTA','REPRESENTE','NO','Nº','N°','NUMERO','NÚMERO','UBICACION','UBICACIÓN','PROVINCIA','CANTON','CANTÓN','PARROQUIA','DESCRIPCION','DESCRIPCIÓN','CUANTIA','CUANTÍA'
+        'PERSONA', 'NOMBRES', 'RAZON', 'RAZÓN', 'SOCIAL', 'TIPO', 'INTERVINIENTE', 'DOCUMENTO', 'IDENTIDAD', 'NACIONALIDAD', 'CALIDAD', 'REPRESENTA', 'REPRESENTE', 'NO', 'Nº', 'N°', 'NUMERO', 'NÚMERO', 'UBICACION', 'UBICACIÓN', 'PROVINCIA', 'CANTON', 'CANTÓN', 'PARROQUIA', 'DESCRIPCION', 'DESCRIPCIÓN', 'CUANTIA', 'CUANTÍA'
       ]
       const headerBlockRe = new RegExp(`\\b(?:${headerTokens.join('|')})\\b`, 'g')
       block = block.replace(headerBlockRe, ' ').replace(/\s+/g, ' ').trim()
@@ -319,8 +319,8 @@ const PdfExtractorService = {
       let candidate = (mName[1] || '').replace(/\s+/g, ' ').trim()
       if (!candidate) continue
       // Filtrar tokens basura
-      const badTokens = new Set(['POR','SUS','PROPIOS','DERECHOS','PASAPORTE','CEDULA','CÉDULA','MANDANTE','MANDATARIO','PETICIONARIO','ECUATORIA','ECUATORIANA','ECUATORIANO','COLOMBIANA','COLOMBIANO','PERUANA','PERUANO','VENEZOLANA','VENEZOLANO','RAZON','RAZÓN','SOCIAL','SOCIALTIPO','TIPO','INTERVINIENTE','NO','Nº','N°','NUMERO','NÚMERO'])
-      const particles = new Set(['DE','DEL','DELA','DELOS','DELAS','LA','LOS','LAS'])
+      const badTokens = new Set(['POR', 'SUS', 'PROPIOS', 'DERECHOS', 'PASAPORTE', 'CEDULA', 'CÉDULA', 'MANDANTE', 'MANDATARIO', 'PETICIONARIO', 'ECUATORIA', 'ECUATORIANA', 'ECUATORIANO', 'COLOMBIANA', 'COLOMBIANO', 'PERUANA', 'PERUANO', 'VENEZOLANA', 'VENEZOLANO', 'RAZON', 'RAZÓN', 'SOCIAL', 'SOCIALTIPO', 'TIPO', 'INTERVINIENTE', 'NO', 'Nº', 'N°', 'NUMERO', 'NÚMERO'])
+      const particles = new Set(['DE', 'DEL', 'DELA', 'DELOS', 'DELAS', 'LA', 'LOS', 'LAS'])
       const toks = candidate.split(' ').filter(Boolean)
       const tokensOk = toks.filter(t => !badTokens.has(t))
       if (tokensOk.length < 2) continue
@@ -434,11 +434,11 @@ const PdfExtractorService = {
       if (!candidate) continue
       // Filtrar candidatos que contienen dígitos o palabras no-nombre típicas
       if (/\d/.test(candidate)) continue
-      const badTokens = new Set(['POR','SUS','PROPIOS','DERECHOS','PASAPORTE','CEDULA','CÉDULA','MANDANTE','MANDATARIO','PETICIONARIO','ECUATORIA','ECUATORIANA','ECUATORIANO','COLOMBIANA','COLOMBIANO','PERUANA','PERUANO','VENEZOLANA','VENEZOLANO','RAZON','RAZÓN','SOCIAL','SOCIALTIPO','TIPO','INTERVINIENTE','NO','Nº','N°','NUMERO','NÚMERO'])
+      const badTokens = new Set(['POR', 'SUS', 'PROPIOS', 'DERECHOS', 'PASAPORTE', 'CEDULA', 'CÉDULA', 'MANDANTE', 'MANDATARIO', 'PETICIONARIO', 'ECUATORIA', 'ECUATORIANA', 'ECUATORIANO', 'COLOMBIANA', 'COLOMBIANO', 'PERUANA', 'PERUANO', 'VENEZOLANA', 'VENEZOLANO', 'RAZON', 'RAZÓN', 'SOCIAL', 'SOCIALTIPO', 'TIPO', 'INTERVINIENTE', 'NO', 'Nº', 'N°', 'NUMERO', 'NÚMERO'])
       const toks = candidate.split(' ')
       if (toks.some(t => badTokens.has(t))) continue
       // Quitar partículas de 1-2 letras no permitidas, pero conservar tokens de empresas
-      const particles = new Set(['DE','DEL','DELA','DELOS','DELAS','LA','LOS','LAS'])
+      const particles = new Set(['DE', 'DEL', 'DELA', 'DELOS', 'DELAS', 'LA', 'LOS', 'LAS'])
       const companyTokens = new Set(['S.A.', 'SA', 'S.A', 'LTDA', 'LTDA.', 'L.T.D.A.', 'CIA', 'CIA.', 'CÍA', 'CÍA.', 'S.A.S', 'SAS', 'CORP', 'CORP.', 'INC', 'INC.'])
       const filtered = toks.filter(t => !badTokens.has(t))
       const cleaned = filtered.filter(t => t.length > 2 || particles.has(t) || companyTokens.has(t)).join(' ')
@@ -512,7 +512,7 @@ const PdfExtractorService = {
           const pdfjsLib = pdfjs?.default || pdfjs
           // Desactivar worker en Node
           if (pdfjsLib?.GlobalWorkerOptions) {
-            try { pdfjsLib.GlobalWorkerOptions.workerSrc = '' } catch {}
+            try { pdfjsLib.GlobalWorkerOptions.workerSrc = '' } catch { }
           }
           const loadingTask = pdfjsLib.getDocument({ data: pdfBuffer })
           const doc = await loadingTask.promise
@@ -693,217 +693,217 @@ const PdfExtractorService = {
         const section = sliceSection(start, end)
         if (!section) continue
 
-      // Título del acto: desde fin del encabezado hasta FECHA/OTORG/FIN DE LÍNEA
-      const titleMatch = section.match(/ACTO(?:S)?\s+O\s+CON\s*-?\s*TRATO(?:S)?\s*[:\-]?\s*([\s\S]*?)(?:\n| FECHA| OTORGADO\s+POR| OTORGANTE| OTORGANTES|$)/i)
-      const tipoActoRaw = titleMatch && titleMatch[1] ? titleMatch[1].trim() : ''
-      const tipoActo = this.cleanActType(tipoActoRaw)
+        // Título del acto: desde fin del encabezado hasta FECHA/OTORG/FIN DE LÍNEA
+        const titleMatch = section.match(/ACTO(?:S)?\s+O\s+CON\s*-?\s*TRATO(?:S)?\s*[:\-]?\s*([\s\S]*?)(?:\n| FECHA| OTORGADO\s+POR| OTORGANTE| OTORGANTES|$)/i)
+        const tipoActoRaw = titleMatch && titleMatch[1] ? titleMatch[1].trim() : ''
+        const tipoActo = this.cleanActType(tipoActoRaw)
 
-      const blockBetween = (startRegex, endRegex) => {
-        const s = section.search(startRegex)
-        if (s === -1) return ''
-        const afterStart = section.slice(s)
-        const e = afterStart.search(endRegex)
-        return e === -1 ? afterStart.replace(startRegex, '') : afterStart.slice(0, e).replace(startRegex, '')
-      }
-
-      // Variantes de etiquetas (ampliado: COMPARECIENTE/INTERVINIENTE)
-      const startOtRegex = /(?:OTORGADO\s+POR|OTORGANTE(?:S)?|OTORGANTES|COMPARECIENTE(?:S)?|INTERVINIENTE(?:S)?|NOMBRES\s*\/\s*RAZ[ÓO]N\s+SOCIAL)\s*[:\-]?\s*/i
-      const startBenRegex = /(?:A\s+FAVOR\s+DE|BENEFICIARIO(?:S)?)\s*[:\-]?\s*/i
-      const notarioRegex = /NOTARIO\s*\(\s*A\s*\)\s*[:\-]?\s*(.+?)(?:\n|\.|$)/i
-
-      let otorgantesRaw = blockBetween(startOtRegex, startBenRegex)
-      let beneficiariosRaw = blockBetween(startBenRegex, /NOTARIO|ACTO\s+O\s+CON|EXTRACTO|\n\s*ESCRITURA|\.$/i)
-
-      // Debug: log secciones para diagnosticar mejor la extracción
-      if (process.env.NODE_ENV !== 'production') {
-        console.log('🔍 Debug secciones:')
-        console.log('  - Otorgantes raw (length):', otorgantesRaw?.length || 0)
-        console.log('  - Beneficiarios raw (length):', beneficiariosRaw?.length || 0)
-        if (beneficiariosRaw) {
-          console.log('  - Beneficiarios preview:', beneficiariosRaw.substring(0, 150))
+        const blockBetween = (startRegex, endRegex) => {
+          const s = section.search(startRegex)
+          if (s === -1) return ''
+          const afterStart = section.slice(s)
+          const e = afterStart.search(endRegex)
+          return e === -1 ? afterStart.replace(startRegex, '') : afterStart.slice(0, e).replace(startRegex, '')
         }
-      }
 
-      // Fallbacks para otorgantes:
-      // 1) Variante de etiqueta "OTORGADO POR" que a veces aparece como "OTORGADO  POR" o con salto raro
-      if (!otorgantesRaw || otorgantesRaw.trim().length < 3) {
-        const altStart = section.search(/OTORGAD[OA]\s+POR\s*[:\-]?/i)
-        if (altStart !== -1) {
-          const after = section.slice(altStart)
-          const e = after.search(/A\s+FAVOR\s+DE|BENEFICIARIO|NOTARIO|ACTO\s+O\s+CON|EXTRACTO|\n\s*ESCRITURA|\.$/i)
-          otorgantesRaw = e === -1 ? after.replace(/OTORGAD[OA]\s+POR\s*[:\-]?/i, '') : after.slice(0, e).replace(/OTORGAD[OA]\s+POR\s*[:\-]?/i, '')
+        // Variantes de etiquetas (ampliado: COMPARECIENTE/INTERVINIENTE)
+        const startOtRegex = /(?:OTORGADO\s+POR|OTORGANTE(?:S)?|OTORGANTES|COMPARECIENTE(?:S)?|INTERVINIENTE(?:S)?|NOMBRES\s*\/\s*RAZ[ÓO]N\s+SOCIAL)\s*[:\-]?\s*/i
+        const startBenRegex = /(?:A\s+FAVOR\s+DE|BENEFICIARIO(?:S)?)\s*[:\-]?\s*/i
+        const notarioRegex = /NOTARIO\s*\(\s*A\s*\)\s*[:\-]?\s*(.+?)(?:\n|\.|$)/i
+
+        let otorgantesRaw = blockBetween(startOtRegex, startBenRegex)
+        let beneficiariosRaw = blockBetween(startBenRegex, /NOTARIO|ACTO\s+O\s+CON|EXTRACTO|\n\s*ESCRITURA|\.$/i)
+
+        // Debug: log secciones para diagnosticar mejor la extracción
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('🔍 Debug secciones:')
+          console.log('  - Otorgantes raw (length):', otorgantesRaw?.length || 0)
+          console.log('  - Beneficiarios raw (length):', beneficiariosRaw?.length || 0)
+          if (beneficiariosRaw) {
+            console.log('  - Beneficiarios preview:', beneficiariosRaw.substring(0, 150))
+          }
         }
-      }
 
-      // 2) Afinar con ancla NATURAL dentro de la sección para otorgantes
-      const secUpper = section.toUpperCase()
-      const idxNat = secUpper.indexOf('NATURAL')
-      if ((!otorgantesRaw || otorgantesRaw.trim().length < 3) && idxNat !== -1) {
-        let region = secUpper.slice(idxNat + 'NATURAL'.length)
-        const stop = region.search(/A\s+FAVOR\s+DE|BENEFICIARIO|NOTARIO|ACTO\s+O\s+CON|\.$/i)
-        if (stop !== -1) region = region.slice(0, stop)
-        otorgantesRaw = region
-      }
+        // Fallbacks para otorgantes:
+        // 1) Variante de etiqueta "OTORGADO POR" que a veces aparece como "OTORGADO  POR" o con salto raro
+        if (!otorgantesRaw || otorgantesRaw.trim().length < 3) {
+          const altStart = section.search(/OTORGAD[OA]\s+POR\s*[:\-]?/i)
+          if (altStart !== -1) {
+            const after = section.slice(altStart)
+            const e = after.search(/A\s+FAVOR\s+DE|BENEFICIARIO|NOTARIO|ACTO\s+O\s+CON|EXTRACTO|\n\s*ESCRITURA|\.$/i)
+            otorgantesRaw = e === -1 ? after.replace(/OTORGAD[OA]\s+POR\s*[:\-]?/i, '') : after.slice(0, e).replace(/OTORGAD[OA]\s+POR\s*[:\-]?/i, '')
+          }
+        }
 
-      // 3) En algunos PDFs falta la etiqueta y sólo hay tabla; tomar bloque desde "OTORGANTES" hasta siguiente encabezado
-      if (!otorgantesRaw || otorgantesRaw.trim().length < 3) {
-        const idxHeader = secUpper.search(/\bOTORGANTES?\b/i)
-        if (idxHeader !== -1) {
-          let region = section.slice(idxHeader)
-          const stop = region.search(/A\s+FAVOR\s+DE|BENEFICIARIO|NOTARIO|ACTO\s+O\s+CON|EXTRACTO|\n\s*ESCRITURA|\.$/i)
-          region = stop === -1 ? region : region.slice(0, stop)
-          // Eliminar la palabra OTORGANTES y dos puntos si existen
-          region = region.replace(/OTORGANTES?\s*[:\-]?/i, '')
+        // 2) Afinar con ancla NATURAL dentro de la sección para otorgantes
+        const secUpper = section.toUpperCase()
+        const idxNat = secUpper.indexOf('NATURAL')
+        if ((!otorgantesRaw || otorgantesRaw.trim().length < 3) && idxNat !== -1) {
+          let region = secUpper.slice(idxNat + 'NATURAL'.length)
+          const stop = region.search(/A\s+FAVOR\s+DE|BENEFICIARIO|NOTARIO|ACTO\s+O\s+CON|\.$/i)
+          if (stop !== -1) region = region.slice(0, stop)
           otorgantesRaw = region
         }
-      }
 
-      // 4) Fallback adicional robusto: si aún no hay otorgantes, usar ventana entre "FECHA DE OTORGAMIENTO" y "A FAVOR DE"
-      if (!otorgantesRaw || otorgantesRaw.trim().length < 3) {
-        const idxBen = secUpper.search(/A\s+FAVOR\s+DE|BENEFICIARIO(?:S)?/i)
-        const idxAfterFecha = (() => {
-          const m = secUpper.match(/FECHA\s+DE\s+OTORGAMIENTO[\s:]+/i)
-          if (!m) return -1
-          return secUpper.indexOf(m[0]) + m[0].length
+        // 3) En algunos PDFs falta la etiqueta y sólo hay tabla; tomar bloque desde "OTORGANTES" hasta siguiente encabezado
+        if (!otorgantesRaw || otorgantesRaw.trim().length < 3) {
+          const idxHeader = secUpper.search(/\bOTORGANTES?\b/i)
+          if (idxHeader !== -1) {
+            let region = section.slice(idxHeader)
+            const stop = region.search(/A\s+FAVOR\s+DE|BENEFICIARIO|NOTARIO|ACTO\s+O\s+CON|EXTRACTO|\n\s*ESCRITURA|\.$/i)
+            region = stop === -1 ? region : region.slice(0, stop)
+            // Eliminar la palabra OTORGANTES y dos puntos si existen
+            region = region.replace(/OTORGANTES?\s*[:\-]?/i, '')
+            otorgantesRaw = region
+          }
+        }
+
+        // 4) Fallback adicional robusto: si aún no hay otorgantes, usar ventana entre "FECHA DE OTORGAMIENTO" y "A FAVOR DE"
+        if (!otorgantesRaw || otorgantesRaw.trim().length < 3) {
+          const idxBen = secUpper.search(/A\s+FAVOR\s+DE|BENEFICIARIO(?:S)?/i)
+          const idxAfterFecha = (() => {
+            const m = secUpper.match(/FECHA\s+DE\s+OTORGAMIENTO[\s:]+/i)
+            if (!m) return -1
+            return secUpper.indexOf(m[0]) + m[0].length
+          })()
+          const idxStart = idxAfterFecha !== -1 ? idxAfterFecha : 0
+          if (idxBen !== -1) {
+            otorgantesRaw = section.slice(idxStart, idxBen)
+          } else {
+            // Como último recurso, tomar una ventana limitada después de FECHA
+            otorgantesRaw = section.slice(idxStart)
+          }
+        }
+
+        let notario
+        const notMatch = section.match(notarioRegex)
+        if (notMatch && notMatch[1]) notario = notMatch[1].trim()
+
+        // Intentar dividir múltiples actos dentro de una sola sección "ACTO O CONTRATO"
+        const splitMultiActs = (s) => {
+          const base = String(s || '').replace(/\s+/g, ' ').trim()
+          if (!base) return []
+          // Separadores comunes y listas numeradas
+          let tmp = base
+            .replace(/\b\d+\s*[\).:-]\s*/g, '|') // 1), 2., 3:
+            .replace(/\s+[-–—]\s+/g, '|')
+            .replace(/\s+Y\/?O?\s+/g, '|')
+            .replace(/\s+E\s+/g, '|')
+            .replace(/\s*[,;/]\s*/g, '|')
+          let parts = tmp.split('|').map(p => this.cleanActType(p)).filter(p => p && p.length >= 3)
+          // Caso especial: REVOCATORIA embebida sin separadores
+          if (parts.length <= 1) {
+            const up = base.toUpperCase()
+            const idxRev = up.indexOf('REVOCATORIA')
+            if (idxRev > 0) {
+              const p1 = this.cleanActType(base.slice(0, idxRev))
+              const p2 = this.cleanActType(base.slice(idxRev))
+              parts = [p1, p2].filter(Boolean)
+            }
+          }
+          // Descartar duplicados triviales
+          return Array.from(new Set(parts))
+        }
+
+        const multi = splitMultiActs(tipoActoRaw)
+        const actsTitles = multi.length > 1 ? multi : [tipoActo]
+
+        const otClean = this.cleanPersonNames(otorgantesRaw)
+        // Si seguimos sin detectar, hacer una última búsqueda global de patrones de tabla dentro de la sección
+        if ((!otClean || otClean.length === 0) && /NATURAL|RAZ[ÓO]N\s+SOCIAL|APELLIDOS?/i.test(secUpper)) {
+          const lastTry = this.cleanPersonNames(section)
+          if (lastTry && lastTry.length) {
+            otClean.push(...lastTry.filter(n => !otClean.includes(n)))
+          }
+        }
+        let beClean = this.cleanPersonNames(beneficiariosRaw)
+
+        // Fallback mejorado para beneficiarios en formato tabular
+        if ((!beClean || beClean.length === 0) && /A\s+FAVOR\s+DE/i.test(section)) {
+          console.log('🔍 Fallback: Buscando beneficiarios en formato tabular')
+
+          // Buscar desde "A FAVOR DE" hasta el final de la sección o siguiente encabezado
+          const aFavorIdx = section.search(/A\s+FAVOR\s+DE/i)
+          if (aFavorIdx !== -1) {
+            const afterAFavor = section.slice(aFavorIdx + 11) // después de "A FAVOR DE"
+            const endIdx = afterAFavor.search(/NOTARIO|ACTO\s+O\s+CON|EXTRACTO|\n\s*ESCRITURA|$/)
+            const benefRegion = endIdx === -1 ? afterAFavor : afterAFavor.slice(0, endIdx)
+
+            console.log('🔍 Región A FAVOR DE encontrada:', benefRegion.substring(0, 200))
+            beClean = this.cleanPersonNames(benefRegion)
+            console.log('🔍 Beneficiarios extraídos del fallback:', beClean)
+          }
+        }
+
+        // Heurística anti-duplicación: si no existe etiqueta clara de beneficiarios
+        // o si la lista coincide con otorgantes, limpiar beneficiarios.
+        const hasBenefLabel = /A\s+FAVOR\s+DE|BENEFICIARIO(?:S)?/i.test(section)
+        if (!hasBenefLabel) {
+          beClean = []
+        }
+        // Si hay etiqueta pero las listas se solapan, excluir los que ya son otorgantes
+        if (hasBenefLabel && beClean.length) {
+          const otSet = new Set(otClean)
+          const filtered = beClean.filter(n => !otSet.has(n))
+          // Si después de filtrar quedan todos vacíos, mantener vacío para evitar espejar otorgantes
+          beClean = filtered
+        }
+
+        // Extraer representantes: soportar tanto encabezado de tabla como "REPRESENTADO POR"
+        const representantes = []
+        const repWindow = (() => {
+          // 1) Si existe columna/encabezado "PERSONA QUE LE REPRESENTA", tomar ventana desde allí hasta el bloque de beneficiarios
+          const idxCol = section.search(/PERSONA\s+QUE\s+LE\s+REPRESENTA/i)
+          if (idxCol !== -1) {
+            const after = section.slice(idxCol)
+            const stop = after.search(/A\s+FAVOR\s+DE|BENEFICIARIO|UBICACI[ÓO]N|ACTO\s+O\s+CON|EXTRACTO/i)
+            return stop === -1 ? after : after.slice(0, stop)
+          }
+          // 2) Buscar "REPRESENTADO POR" cerca del bloque de otorgantes
+          const idxRep = section.search(/REPRESENTAD[OA]\s+POR/i)
+          if (idxRep !== -1) {
+            const after = section.slice(idxRep)
+            const stop = after.search(/A\s+FAVOR\s+DE|BENEFICIARIO|UBICACI[ÓO]N|ACTO\s+O\s+CON|EXTRACTO/i)
+            return stop === -1 ? after : after.slice(0, stop)
+          }
+          return ''
         })()
-        const idxStart = idxAfterFecha !== -1 ? idxAfterFecha : 0
-        if (idxBen !== -1) {
-          otorgantesRaw = section.slice(idxStart, idxBen)
-        } else {
-          // Como último recurso, tomar una ventana limitada después de FECHA
-          otorgantesRaw = section.slice(idxStart)
-        }
-      }
+        if (repWindow && repWindow.length) {
+          // Buscar nombres tipo persona natural dentro de la ventana, evitando tokens de empresa y encabezados
+          const candRe = /([A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,}){1,4})/g
+          const bad = new Set(['POR', 'SUS', 'PROPIOS', 'DERECHOS', 'JURIDICA', 'JURÍDICA', 'REPRESENTADO', 'REPRESENTADA', 'RUC', 'CEDULA', 'CÉDULA', 'MANDANTE', 'MANDATARIO', 'PERSONA', 'QUE', 'LE', 'REPRESENTA'])
+          const company = /(FUNDACI[ÓO]N|S\.?A\.?|\bSA\b|LTDA\.?|C[ÍI]A\.?|CORP\.?|CORPORACI[ÓO]N|EMPRESA|ASOCIACI[ÓO]N|COOPERATIVA|UNIVERSIDAD|MUNICIPIO|GAD|\bEP\b)/i
+          const repSet = new Set()
 
-      let notario
-      const notMatch = section.match(notarioRegex)
-      if (notMatch && notMatch[1]) notario = notMatch[1].trim()
-
-      // Intentar dividir múltiples actos dentro de una sola sección "ACTO O CONTRATO"
-      const splitMultiActs = (s) => {
-        const base = String(s || '').replace(/\s+/g, ' ').trim()
-        if (!base) return []
-        // Separadores comunes y listas numeradas
-        let tmp = base
-          .replace(/\b\d+\s*[\).:-]\s*/g, '|') // 1), 2., 3:
-          .replace(/\s+[-–—]\s+/g, '|')
-          .replace(/\s+Y\/?O?\s+/g, '|')
-          .replace(/\s+E\s+/g, '|')
-          .replace(/\s*[,;/]\s*/g, '|')
-        let parts = tmp.split('|').map(p => this.cleanActType(p)).filter(p => p && p.length >= 3)
-        // Caso especial: REVOCATORIA embebida sin separadores
-        if (parts.length <= 1) {
-          const up = base.toUpperCase()
-          const idxRev = up.indexOf('REVOCATORIA')
-          if (idxRev > 0) {
-            const p1 = this.cleanActType(base.slice(0, idxRev))
-            const p2 = this.cleanActType(base.slice(idxRev))
-            parts = [p1, p2].filter(Boolean)
+          const cleanWindow = repWindow.toUpperCase()
+          // 1) Regla: combinar líneas de 2+2 tokens consecutivas ("NOMBRES" + "APELLIDOS")
+          const lines = cleanWindow.split(/\n+/).map(s => s.trim()).filter(Boolean)
+          const twoWords = (s) => /^([A-ZÁÉÍÓÚÑ]{2,})(\s+)([A-ZÁÉÍÓÚÑ]{2,})$/.test(s) && !company.test(s) && !/REPRESENTAD|RUC|CEDULA|CÉDULA/.test(s)
+          for (let i = 0; i < lines.length - 1; i++) {
+            if (twoWords(lines[i]) && twoWords(lines[i + 1])) {
+              const merged = `${lines[i]} ${lines[i + 1]}`.replace(/\s+/g, ' ').trim()
+              repSet.add(merged)
+            }
+          }
+          // 2) Capturar secuencias largas en el bloque ignorando palabras malas
+          let m
+          while ((m = candRe.exec(cleanWindow)) !== null) {
+            const name = m[1].replace(/\s+/g, ' ').trim()
+            if (/REPRESENTAD|RUC/.test(name)) continue
+            const toks = name.split(' ')
+            if (toks.some(t => bad.has(t))) continue
+            if (company.test(name)) continue
+            repSet.add(name)
+          }
+          // Deduplicar: eliminar nombres que son subcadenas de uno más largo (p.ej., apellidos solos)
+          const repArr = Array.from(repSet)
+          for (const r of repArr) {
+            if (!r || otClean.includes(r)) continue
+            const isSub = repArr.some(other => other !== r && other.includes(r))
+            if (!isSub) representantes.push(r)
           }
         }
-        // Descartar duplicados triviales
-        return Array.from(new Set(parts))
-      }
 
-      const multi = splitMultiActs(tipoActoRaw)
-      const actsTitles = multi.length > 1 ? multi : [tipoActo]
-
-      const otClean = this.cleanPersonNames(otorgantesRaw)
-      // Si seguimos sin detectar, hacer una última búsqueda global de patrones de tabla dentro de la sección
-      if ((!otClean || otClean.length === 0) && /NATURAL|RAZ[ÓO]N\s+SOCIAL|APELLIDOS?/i.test(secUpper)) {
-        const lastTry = this.cleanPersonNames(section)
-        if (lastTry && lastTry.length) {
-          otClean.push(...lastTry.filter(n => !otClean.includes(n)))
-        }
-      }
-      let beClean = this.cleanPersonNames(beneficiariosRaw)
-      
-      // Fallback mejorado para beneficiarios en formato tabular
-      if ((!beClean || beClean.length === 0) && /A\s+FAVOR\s+DE/i.test(section)) {
-        console.log('🔍 Fallback: Buscando beneficiarios en formato tabular')
-        
-        // Buscar desde "A FAVOR DE" hasta el final de la sección o siguiente encabezado
-        const aFavorIdx = section.search(/A\s+FAVOR\s+DE/i)
-        if (aFavorIdx !== -1) {
-          const afterAFavor = section.slice(aFavorIdx + 11) // después de "A FAVOR DE"
-          const endIdx = afterAFavor.search(/NOTARIO|ACTO\s+O\s+CON|EXTRACTO|\n\s*ESCRITURA|$/)
-          const benefRegion = endIdx === -1 ? afterAFavor : afterAFavor.slice(0, endIdx)
-          
-          console.log('🔍 Región A FAVOR DE encontrada:', benefRegion.substring(0, 200))
-          beClean = this.cleanPersonNames(benefRegion)
-          console.log('🔍 Beneficiarios extraídos del fallback:', beClean)
-        }
-      }
-      
-      // Heurística anti-duplicación: si no existe etiqueta clara de beneficiarios
-      // o si la lista coincide con otorgantes, limpiar beneficiarios.
-      const hasBenefLabel = /A\s+FAVOR\s+DE|BENEFICIARIO(?:S)?/i.test(section)
-      if (!hasBenefLabel) {
-        beClean = []
-      }
-      // Si hay etiqueta pero las listas se solapan, excluir los que ya son otorgantes
-      if (hasBenefLabel && beClean.length) {
-        const otSet = new Set(otClean)
-        const filtered = beClean.filter(n => !otSet.has(n))
-        // Si después de filtrar quedan todos vacíos, mantener vacío para evitar espejar otorgantes
-        beClean = filtered
-      }
-      
-      // Extraer representantes: soportar tanto encabezado de tabla como "REPRESENTADO POR"
-      const representantes = []
-      const repWindow = (() => {
-        // 1) Si existe columna/encabezado "PERSONA QUE LE REPRESENTA", tomar ventana desde allí hasta el bloque de beneficiarios
-        const idxCol = section.search(/PERSONA\s+QUE\s+LE\s+REPRESENTA/i)
-        if (idxCol !== -1) {
-          const after = section.slice(idxCol)
-          const stop = after.search(/A\s+FAVOR\s+DE|BENEFICIARIO|UBICACI[ÓO]N|ACTO\s+O\s+CON|EXTRACTO/i)
-          return stop === -1 ? after : after.slice(0, stop)
-        }
-        // 2) Buscar "REPRESENTADO POR" cerca del bloque de otorgantes
-        const idxRep = section.search(/REPRESENTAD[OA]\s+POR/i)
-        if (idxRep !== -1) {
-          const after = section.slice(idxRep)
-          const stop = after.search(/A\s+FAVOR\s+DE|BENEFICIARIO|UBICACI[ÓO]N|ACTO\s+O\s+CON|EXTRACTO/i)
-          return stop === -1 ? after : after.slice(0, stop)
-        }
-        return ''
-      })()
-      if (repWindow && repWindow.length) {
-        // Buscar nombres tipo persona natural dentro de la ventana, evitando tokens de empresa y encabezados
-        const candRe = /([A-ZÁÉÍÓÚÑ]{2,}(?:\s+[A-ZÁÉÍÓÚÑ]{2,}){1,4})/g
-        const bad = new Set(['POR','SUS','PROPIOS','DERECHOS','JURIDICA','JURÍDICA','REPRESENTADO','REPRESENTADA','RUC','CEDULA','CÉDULA','MANDANTE','MANDATARIO','PERSONA','QUE','LE','REPRESENTA'])
-        const company = /(FUNDACI[ÓO]N|S\.?A\.?|\bSA\b|LTDA\.?|C[ÍI]A\.?|CORP\.?|CORPORACI[ÓO]N|EMPRESA|ASOCIACI[ÓO]N|COOPERATIVA|UNIVERSIDAD|MUNICIPIO|GAD|\bEP\b)/i
-        const repSet = new Set()
-
-        const cleanWindow = repWindow.toUpperCase()
-        // 1) Regla: combinar líneas de 2+2 tokens consecutivas ("NOMBRES" + "APELLIDOS")
-        const lines = cleanWindow.split(/\n+/).map(s => s.trim()).filter(Boolean)
-        const twoWords = (s) => /^([A-ZÁÉÍÓÚÑ]{2,})(\s+)([A-ZÁÉÍÓÚÑ]{2,})$/.test(s) && !company.test(s) && !/REPRESENTAD|RUC|CEDULA|CÉDULA/.test(s)
-        for (let i = 0; i < lines.length - 1; i++) {
-          if (twoWords(lines[i]) && twoWords(lines[i + 1])) {
-            const merged = `${lines[i]} ${lines[i + 1]}`.replace(/\s+/g, ' ').trim()
-            repSet.add(merged)
-          }
-        }
-        // 2) Capturar secuencias largas en el bloque ignorando palabras malas
-        let m
-        while ((m = candRe.exec(cleanWindow)) !== null) {
-          const name = m[1].replace(/\s+/g, ' ').trim()
-          if (/REPRESENTAD|RUC/.test(name)) continue
-          const toks = name.split(' ')
-          if (toks.some(t => bad.has(t))) continue
-          if (company.test(name)) continue
-          repSet.add(name)
-        }
-        // Deduplicar: eliminar nombres que son subcadenas de uno más largo (p.ej., apellidos solos)
-        const repArr = Array.from(repSet)
-        for (const r of repArr) {
-          if (!r || otClean.includes(r)) continue
-          const isSub = repArr.some(other => other !== r && other.includes(r))
-          if (!isSub) representantes.push(r)
-        }
-      }
-      
         // Normalización de tipo/persona
         const guessTipo = (name) => /FUNDACI[ÓO]N|S\.?A\.?|\bSA\b|LTDA\.?|C[ÍI]A\.?|CORP\.?|CORPORACI[ÓO]N|EMPRESA|ASOCIACI[ÓO]N|COOPERATIVA|UNIVERSIDAD|MUNICIPIO|GAD|\bEP\b/i.test(name) ? 'Jurídica' : 'Natural'
 
@@ -914,7 +914,7 @@ const PdfExtractorService = {
             beneficiarios: beClean.map(n => ({ nombre: n, tipo_persona: guessTipo(n) })),
             ...(notario ? { notario } : {})
           }
-          
+
           // Log condicional para diagnóstico cuando no se detectan otorgantes
           if (!actData.otorgantes || actData.otorgantes.length === 0) {
             try {
@@ -933,7 +933,7 @@ const PdfExtractorService = {
               ))
             }
           }
-          
+
           acts.push(actData)
         }
       }
@@ -952,14 +952,14 @@ const PdfExtractorService = {
       const single = this.parseSimpleData(rawText)
       const t = String(single?.tipoActo || '').toUpperCase()
       if (t && !/INDETERMINADA/.test(t) && ALLOW.some(k => t.includes(k))) return { acts: [single] }
-      
+
       // Último recurso: parser tabular si tenemos el buffer
       if (pdfBuffer) {
         console.log('[PdfExtractorService] Fallback: usando parser tabular avanzado')
         try {
           const tableParser = new NotarialTableParser()
           const structuredData = await tableParser.parseStructuredData(pdfBuffer)
-          
+
           if (structuredData.length > 0) {
             const tabularActs = this.convertStructuredDataToActs(structuredData, rawText)
             if (tabularActs.length > 0) {
@@ -979,7 +979,7 @@ const PdfExtractorService = {
         console.log(`[PdfExtractorService] Extracción agresiva encontró ${desperateAct.otorgantes.length} otorgantes, ${desperateAct.beneficiarios.length} beneficiarios`)
         return { acts: [desperateAct] }
       }
-      
+
       return { acts: [] }
     }
 
@@ -991,13 +991,13 @@ const PdfExtractorService = {
    */
   convertStructuredDataToActs(structuredData, rawText) {
     const acts = []
-    
+
     // Extraer tipo de acto con múltiples estrategias
     const tipoActo = this.extractRealActType(rawText)
-    
+
     let otorgantes = []
     let beneficiarios = []
-    
+
     // Combinar entidades por tipo y filtrar válidas
     for (const section of structuredData) {
       if (section.type === 'otorgantes' && section.entities) {
@@ -1006,13 +1006,13 @@ const PdfExtractorService = {
         beneficiarios.push(...section.entities.filter(this.isValidEntityForExtraction))
       }
     }
-    
+
     // Si no encontramos separación clara, usar la primera sección como otorgantes
     if (otorgantes.length === 0 && structuredData.length > 0) {
       const allEntities = structuredData[0].entities?.filter(this.isValidEntityForExtraction) || []
       otorgantes = allEntities
     }
-    
+
     if (otorgantes.length > 0 || beneficiarios.length > 0) {
       acts.push({
         tipoActo,
@@ -1027,7 +1027,7 @@ const PdfExtractorService = {
         }))
       })
     }
-    
+
     return acts
   },
 
@@ -1036,7 +1036,7 @@ const PdfExtractorService = {
    */
   extractRealActType(rawText) {
     const text = rawText.toUpperCase()
-    
+
     // Estrategia 1: Buscar después de "ACTO O CONTRATO:"
     const actMatch = text.match(/ACTO\s+O\s+CONTRATO\s*[:\-]?\s*([^\n]+?)(?:\s+FECHA|\n|$)/i)
     if (actMatch && actMatch[1]) {
@@ -1045,7 +1045,7 @@ const PdfExtractorService = {
         return cleaned
       }
     }
-    
+
     // Estrategia 2: Buscar patrones específicos de actos
     const actPatterns = [
       /PODER\s+GENERAL(?:\s+PERSONA\s+(?:NATURAL|JUR[IÍ]DICA))?/,
@@ -1056,14 +1056,14 @@ const PdfExtractorService = {
       /DONACI[ÓO]N/,
       /TESTAMENTO/
     ]
-    
+
     for (const pattern of actPatterns) {
       const match = text.match(pattern)
       if (match) {
         return match[0]
       }
     }
-    
+
     // Estrategia 3: Inferir por contexto
     if (text.includes('PERSONA NATURAL')) {
       if (text.includes('PODER GENERAL')) return 'PODER GENERAL PERSONA NATURAL'
@@ -1074,7 +1074,7 @@ const PdfExtractorService = {
       if (text.includes('PODER ESPECIAL')) return 'PODER ESPECIAL PERSONA JURÍDICA'
       return 'PODER ESPECIAL PERSONA JURÍDICA'
     }
-    
+
     // Fallback final
     return 'PODER ESPECIAL'
   },
@@ -1084,12 +1084,12 @@ const PdfExtractorService = {
    */
   isValidEntityForExtraction(entity) {
     if (!entity || !entity.nombre) return false
-    
+
     const nombre = entity.nombre.trim()
-    
+
     // Filtrar entidades muy cortas
     if (nombre.length < 3) return false
-    
+
     // Filtrar encabezados conocidos
     const badPatterns = [
       /^OTORGANTES?$/i,
@@ -1112,11 +1112,11 @@ const PdfExtractorService = {
       /^\d{1,2}\s+DE\s+\w+\s+DEL\s+\d{4}/i, // Fechas
       /^\d{15,}[A-Z]\d+$/i // Números de escritura
     ]
-    
+
     if (badPatterns.some(pattern => pattern.test(nombre))) {
       return false
     }
-    
+
     // Debe tener al menos 2 palabras o ser una empresa reconocible
     const words = nombre.split(/\s+/).filter(Boolean)
     if (words.length < 2) {
@@ -1124,7 +1124,7 @@ const PdfExtractorService = {
       const companyTokens = /(?:S\.A\.|LTDA|CIA|CORP|FUNDACI[ÓO]N|EMPRESA)/i
       return companyTokens.test(nombre)
     }
-    
+
     return true
   },
 
@@ -1136,10 +1136,10 @@ const PdfExtractorService = {
     if (!rawText) return null
 
     console.log('[parseDesperatePatterns] Iniciando extracción agresiva')
-    
+
     const text = String(rawText).toUpperCase()
     const allNames = []
-    
+
     // Patrón 1: Buscar cualquier secuencia de nombres que parezca persona
     const namePatterns = [
       // Nombres completos típicos (2-4 palabras)
@@ -1151,7 +1151,7 @@ const PdfExtractorService = {
       // Nombres en contexto de tabla (más flexible)
       /(?:^|\n)\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\.&-]{8,60}?)(?=\s+(?:ECUATORIAN|MANDATARIO|CEDULA|RUC|\d{10,13}|$))/gm
     ]
-    
+
     for (const pattern of namePatterns) {
       let match
       while ((match = pattern.exec(text)) !== null) {
@@ -1161,31 +1161,31 @@ const PdfExtractorService = {
         }
       }
     }
-    
+
     // Limpiar y deduplicar nombres
     const cleanedNames = [...new Set(allNames)]
       .map(name => this.cleanDesperateName(name))
       .filter(name => name && name.length >= 3)
       .slice(0, 10) // Limitar a 10 para evitar spam
-    
+
     console.log(`[parseDesperatePatterns] Encontrados ${cleanedNames.length} nombres candidatos:`, cleanedNames)
-    
+
     if (cleanedNames.length === 0) return null
-    
+
     // Intentar separar otorgantes vs beneficiarios por contexto
     const otorgantes = []
     const beneficiarios = []
-    
+
     for (const name of cleanedNames) {
       // Buscar contexto del nombre en el texto original
       const nameRegex = new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
       const match = text.match(nameRegex)
-      
+
       if (match) {
         const index = text.indexOf(match[0].toUpperCase())
         const before = text.slice(Math.max(0, index - 100), index)
         const after = text.slice(index, Math.min(text.length, index + 200))
-        
+
         // Heurística: si aparece antes "A FAVOR" o después de "OTORGADO POR", es beneficiario
         if (/A\s+FAVOR|BENEFICIARIO/i.test(before) || /FAVOR.*DE/i.test(before)) {
           beneficiarios.push({
@@ -1206,14 +1206,14 @@ const PdfExtractorService = {
         })
       }
     }
-    
+
     // Si todos fueron a una categoría, redistribuir
     if (otorgantes.length === 0 && beneficiarios.length > 0) {
       otorgantes.push(beneficiarios.shift())
     }
-    
+
     const tipoActo = this.extractDesperateActType(text) || 'PODER ESPECIAL'
-    
+
     return {
       tipoActo,
       otorgantes,
@@ -1226,26 +1226,26 @@ const PdfExtractorService = {
    */
   isValidNameCandidate(name) {
     const trimmed = name.trim()
-    
+
     // Debe tener al menos 6 caracteres
     if (trimmed.length < 6) return false
-    
+
     // No debe ser solo números
     if (/^\d+$/.test(trimmed)) return false
-    
+
     // No debe contener demasiados espacios consecutivos
     if (/\s{3,}/.test(trimmed)) return false
-    
+
     // Debe tener al menos 2 palabras o ser una empresa conocida
     const words = trimmed.split(/\s+/).filter(Boolean)
     if (words.length < 2 && !/FUNDACI[ÓO]N|EMPRESA|S\.A\.|LTDA|CIA/i.test(trimmed)) {
       return false
     }
-    
+
     // No debe contener palabras comunes de encabezados
     const badWords = ['PERSONA', 'NATURAL', 'JURIDICA', 'JURÍDICA', 'TIPO', 'INTERVINIENTE', 'DOCUMENTO', 'NACIONALIDAD', 'CALIDAD', 'REPRESENTA', 'UBICACION', 'PROVINCIA', 'CANTON', 'PARROQUIA']
     if (badWords.some(bad => trimmed.includes(bad))) return false
-    
+
     return true
   },
 
@@ -1273,19 +1273,19 @@ const PdfExtractorService = {
       /TESTAMENTO/i,
       /DONACI[ÓO]N/i
     ]
-    
+
     for (const pattern of patterns) {
       const match = text.match(pattern)
       if (match) {
         return match[0].toUpperCase()
       }
     }
-    
+
     return null
   },
 
   /**
-   * Determina tipo de persona (reutilizado desde concuerdo-controller pero más simple)
+   * Determina tipo de persona (Natural o Jurídica) basado en el nombre
    */
   guessTipoPersona(name) {
     const s = String(name || '').toUpperCase()
@@ -1294,7 +1294,7 @@ const PdfExtractorService = {
       'CORPORACION', 'CORPORACIÓN', 'EMPRESA', 'ASOCIACION', 'ASOCIACIÓN',
       'COOPERATIVA', 'UNIVERSIDAD', 'MUNICIPIO', 'GAD', 'EP'
     ]
-    
+
     const pattern = new RegExp(`\\b(${entityTokens.join('|').replace(/\./g, '\\.')})\\b`)
     return pattern.test(s) ? 'Jurídica' : 'Natural'
   }

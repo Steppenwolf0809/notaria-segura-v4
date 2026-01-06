@@ -27,7 +27,7 @@ import adminRoutes from './src/routes/admin-routes.js'
 import archivoRoutes from './src/routes/archivo-routes.js'
 import receptionRoutes from './src/routes/reception-routes.js'
 import alertasRoutes from './src/routes/alertas-routes.js'
-import concuerdoRoutes from './src/routes/concuerdo-routes.js'
+
 import escriturasQRRoutes from './src/routes/escrituras-qr-routes.js'
 import pdfProxyRoutes from './src/routes/pdf-proxy-routes.js'
 import personalRoutes from './src/routes/personal-routes.js'
@@ -114,10 +114,10 @@ const corsOptions = {
   origin: function (origin, callback) {
     // En producción, usar orígenes específicos del .env
     if (process.env.NODE_ENV === 'production') {
-      const productionOrigins = process.env.ALLOWED_ORIGINS 
+      const productionOrigins = process.env.ALLOWED_ORIGINS
         ? process.env.ALLOWED_ORIGINS.split(',').map(url => url.trim())
         : [process.env.FRONTEND_URL || 'https://notaria-segura.com'];
-      
+
       // Auto-detectar URL de Railway para permitir requests desde la misma aplicación
       if (process.env.RAILWAY_PUBLIC_DOMAIN) {
         const railwayUrl = `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
@@ -125,7 +125,7 @@ const corsOptions = {
           productionOrigins.push(railwayUrl);
         }
       }
-      
+
       // Agregar dominio personalizado de la notaría (con y sin www)
       const notariaOrigins = [
         'https://www.notaria18quito.com.ec',
@@ -136,7 +136,7 @@ const corsOptions = {
           productionOrigins.push(url);
         }
       });
-      
+
       // Permitir requests sin origin (API calls) o desde orígenes permitidos
       if (!origin || productionOrigins.includes(origin)) {
         callback(null, true);
@@ -147,14 +147,14 @@ const corsOptions = {
       }
     } else {
       // En desarrollo, usar lista combinada de orígenes permitidos
-      const developmentOrigins = process.env.ALLOWED_ORIGINS_DEV 
+      const developmentOrigins = process.env.ALLOWED_ORIGINS_DEV
         ? process.env.ALLOWED_ORIGINS_DEV.split(',').map(url => url.trim())
         : [
-            'http://localhost:5173',  // Frontend principal (Vite)
-            'http://localhost:5174',  // Frontend backup
-            'http://127.0.0.1:5173',  // Variante local
-            'http://127.0.0.1:5174',  // Variante local backup
-          ];
+          'http://localhost:5173',  // Frontend principal (Vite)
+          'http://localhost:5174',  // Frontend backup
+          'http://127.0.0.1:5173',  // Variante local
+          'http://127.0.0.1:5174',  // Variante local backup
+        ];
 
       // Agregar FRONTEND_URL si no está en la lista
       if (process.env.FRONTEND_URL && !developmentOrigins.includes(process.env.FRONTEND_URL)) {
@@ -184,7 +184,7 @@ const corsOptions = {
     'x-session-token'
   ],
   exposedHeaders: [
-    'X-RateLimit-Policy', 
+    'X-RateLimit-Policy',
     'X-Security-Info',
     'X-RateLimit-Limit',
     'X-RateLimit-Remaining',
@@ -249,7 +249,7 @@ app.use((req, res, next) => {
       if (ms > (parseInt(process.env.SLOW_REQUEST_MS || '500', 10))) {
         console.log(`🐢 Slow ${req.method} ${req.originalUrl} → ${ms}ms`);
       }
-    } catch {}
+    } catch { }
   });
   next();
 });
@@ -346,8 +346,7 @@ app.use('/api/reception', receptionRoutes)
 // RUTAS DE ALERTAS (/api/alertas/*)
 app.use('/api/alertas', alertasRoutes)
 
-// RUTAS DE CONCUERDOS (/api/concuerdos/*)
-app.use('/api/concuerdos', concuerdoRoutes)
+
 
 // RUTAS DE ESCRITURAS QR (/api/escrituras/* y /api/verify/*)
 app.use('/api/escrituras', escriturasQRRoutes)
@@ -384,7 +383,7 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(frontendPath, 'index.html'));
   } else {
     // Para rutas API no encontradas, devolver 404 JSON
-    res.status(404).json({ 
+    res.status(404).json({
       success: false,
       error: 'Endpoint no encontrado',
       availableEndpoints: [
@@ -407,13 +406,13 @@ app.get('*', (req, res) => {
 
 // Manejo de errores 404 para APIs (fallback)
 app.use('/api/*', (req, res) => {
-  res.status(404).json({ 
+  res.status(404).json({
     success: false,
     error: 'Endpoint no encontrado',
     availableEndpoints: [
       'GET /api/health',
       'POST /api/auth/login',
-      'GET /api/auth/verify', 
+      'GET /api/auth/verify',
       'GET /api/documents/my-documents',
       'POST /api/documents/upload-xml',
       'POST /api/documents/upload-xml-batch',
@@ -482,7 +481,7 @@ const server = app.listen(PORT, HOST, () => {
   console.log(`📞 Reception endpoints: http://localhost:${PORT}/api/reception/*`)
   console.log(`🏷️  Environment: ${process.env.NODE_ENV || 'development'}`)
   console.log('🔥=====================================🔥')
-  
+
   // Verificar conexión a Prisma en desarrollo
   if (process.env.NODE_ENV !== 'production') {
     console.log('🔍 Backend completamente funcional con:')
@@ -513,19 +512,19 @@ const server = app.listen(PORT, HOST, () => {
     .catch(() => console.log('⚠️ Caché: uso de memoria por defecto'))
 })
 
-// Chequeo de readiness: intentar query ligera a la base de datos
-;(async function initReadiness() {
-  try {
-    console.log('[READY] Verificando conexión a base de datos...')
-    await db.$queryRaw`SELECT 1`
-    isReady = true
-    console.log('[READY] Base de datos OK, servicio listo')
-  } catch (e) {
-    isReady = false
-    console.error('[READY] Falla en verificación de base de datos:', e?.message || e)
-    // No arrojamos excepción: el contenedor sigue vivo y /ready reporta 503 hasta estar OK
-  }
-})()
+  // Chequeo de readiness: intentar query ligera a la base de datos
+  ; (async function initReadiness() {
+    try {
+      console.log('[READY] Verificando conexión a base de datos...')
+      await db.$queryRaw`SELECT 1`
+      isReady = true
+      console.log('[READY] Base de datos OK, servicio listo')
+    } catch (e) {
+      isReady = false
+      console.error('[READY] Falla en verificación de base de datos:', e?.message || e)
+      // No arrojamos excepción: el contenedor sigue vivo y /ready reporta 503 hasta estar OK
+    }
+  })()
 
 // ============================================================================
 // SHUTDOWN HANDLERS PARA CIERRE ORDENADO
@@ -553,13 +552,13 @@ async function gracefulShutdown() {
   }
   console.log('📊 Cerrando conexión con base de datos...')
   await closePrismaClient()
-  
+
   console.log('🛑 Cerrando servidor HTTP...')
   server.close(() => {
     console.log('✅ Servidor cerrado correctamente')
     process.exit(0)
   })
-  
+
   // Forzar cierre después de 10 segundos
   setTimeout(() => {
     console.error('❌ Cierre forzado: timeout alcanzado')

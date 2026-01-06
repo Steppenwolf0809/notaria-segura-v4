@@ -1,7 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
-import { generarConcuerdos } from './concuerdo-service.js'
 import { getConfig } from '../config/environment.js'
-import { logConcuerdoAudit } from './audit-service.js'
 import crypto from 'crypto'
 import { ENHANCED_PROMPT } from './gemini-prompt-enhanced.js'
 
@@ -213,7 +211,7 @@ export async function extractDataWithGemini(pdfText) {
               beneficiarios: (parsed.beneficiarios || []).map(b => `${b?.nombres || ''} ${b?.apellidos || ''}`.trim())
             }
             console.log('👥 NOMBRES EXTRAÍDOS:', nombresExtract)
-          } catch {}
+          } catch { }
         }
         return parsed
       }
@@ -246,88 +244,7 @@ export async function extractDataWithGemini(pdfText) {
   return null
 }
 
-/**
- * Procesa texto completo del documento y genera concuerdos.
- * Integra extracción de datos + generación de concuerdos.
- *
- * @param {string} pdfText - Texto completo del documento
- * @param {Object} options - Opciones adicionales
- * @param {number} options.userId - ID del usuario que procesa
- * @param {string} options.docId - ID del documento fuente
- * @returns {Object} - Resultado con datos extraídos y concuerdos generados
- */
-export async function processDocumentWithConcuerdos(pdfText, options = {}) {
-  try {
-    // 1) Extraer datos usando Gemini
-    const extractedData = await extractDataWithGemini(pdfText);
-    if (!extractedData) {
-      return { success: false, error: 'No se pudieron extraer datos del documento' };
-    }
-
-    // 2) Preparar datos para concuerdos
-    const dataForConcuerdos = {
-      actos: [{
-        tipo: extractedData.acto_o_contrato || 'ACTO GENERICO'
-      }],
-      notario: extractedData.notario || '',
-      notaria: extractedData.notaria || '',
-      otorgantes: extractedData.otorgantes || [],
-      beneficiarios: extractedData.beneficiarios || [],
-      source: pdfText // Para detección de estructura
-    };
-
-    // 3) Obtener configuración del sistema
-    const config = getConfig();
-    const settings = {
-      PROMPT_FORCE_TEMPLATE: config.concuerdos?.promptForceTemplate || 'auto',
-      TEMPLATE_MODE: config.concuerdos?.templateMode || 'structural'
-    };
-
-    // 4) Generar concuerdos
-    const concuerdosResult = await generarConcuerdos({
-      data: dataForConcuerdos,
-      settings,
-      userId: options.userId,
-      docId: options.docId || `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    });
-
-    // 5) Registrar auditoría en base de datos
-    const auditData = {
-      docId: `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      estructura: concuerdosResult.estructura,
-      templateMode: settings.TEMPLATE_MODE,
-      force: settings.PROMPT_FORCE_TEMPLATE,
-      primera: concuerdosResult.primera,
-      segunda: concuerdosResult.segunda,
-      createdAt: new Date().toISOString()
-    };
-
-    // Registrar auditoría (con PII masking automático)
-    await logConcuerdoAudit(auditData);
-
-    // 6) Retornar resultado completo
-    return {
-      success: true,
-      extraction: extractedData,
-      concuerdos: concuerdosResult,
-      audit: auditData,
-      metadata: {
-        processedAt: new Date().toISOString(),
-        templateMode: settings.TEMPLATE_MODE,
-        forceTemplate: settings.PROMPT_FORCE_TEMPLATE
-      }
-    };
-
-  } catch (error) {
-    console.error('Error procesando documento con concuerdos:', error);
-    return {
-      success: false,
-      error: error.message || 'Error interno del servidor'
-    };
-  }
-}
-
-export default { extractDataWithGemini, processDocumentWithConcuerdos }
+export default { extractDataWithGemini }
 
 // Prueba de conectividad simple con Gemini
 export async function testGeminiConnection() {
