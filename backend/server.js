@@ -181,7 +181,8 @@ const corsOptions = {
     'Origin',
     'Access-Control-Request-Method',
     'Access-Control-Request-Headers',
-    'x-session-token'
+    'x-session-token',
+    'x-csrf-token'
   ],
   exposedHeaders: [
     'X-RateLimit-Policy',
@@ -390,6 +391,7 @@ app.get('*', (req, res) => {
         'GET /api/health',
         'POST /api/auth/login',
         'GET /api/auth/verify',
+        'PUT /api/auth/change-password',
         'GET /api/documents/my-documents',
         'POST /api/documents/upload-xml',
         'POST /api/documents/upload-xml-batch',
@@ -413,6 +415,7 @@ app.use('/api/*', (req, res) => {
       'GET /api/health',
       'POST /api/auth/login',
       'GET /api/auth/verify',
+      'PUT /api/auth/change-password',
       'GET /api/documents/my-documents',
       'POST /api/documents/upload-xml',
       'POST /api/documents/upload-xml-batch',
