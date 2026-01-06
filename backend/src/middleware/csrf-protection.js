@@ -11,7 +11,11 @@ import cookieParser from 'cookie-parser';
  */
 
 const CSRF_SECRET = process.env.CSRF_SECRET || 'notaria-segura-csrf-secret-change-in-production';
-const COOKIE_NAME = '__Host-csrf';
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+// __Host- prefix requiere HTTPS, así que solo lo usamos en producción
+// En desarrollo usamos un nombre simple para evitar problemas con HTTP
+const COOKIE_NAME = IS_PRODUCTION ? '__Host-csrf' : 'csrf-token';
 const HEADER_NAME = 'x-csrf-token';
 
 // Configurar doubleCsrf con opciones de seguridad
@@ -23,8 +27,8 @@ const {
   cookieName: COOKIE_NAME,
   cookieOptions: {
     httpOnly: true,
-    sameSite: 'strict',
-    secure: process.env.NODE_ENV === 'production', // HTTPS en producción
+    sameSite: IS_PRODUCTION ? 'strict' : 'lax', // Más flexible en desarrollo
+    secure: IS_PRODUCTION, // HTTPS solo en producción
     path: '/',
     maxAge: 3600000 // 1 hora
   },
