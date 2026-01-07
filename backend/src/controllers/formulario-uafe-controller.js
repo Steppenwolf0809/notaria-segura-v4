@@ -2443,3 +2443,82 @@ export async function listarPersonasRegistradas(req, res) {
     });
   }
 }
+
+/**
+ * Eliminar una persona registrada (solo ADMIN)
+ * DELETE /api/formulario-uafe/admin/personas-registradas/:cedula
+ * Requiere: JWT + role ADMIN
+ * 
+ * NOTA: Primero elimina las relaciones en PersonaProtocolo, luego la persona.
+ * Si la persona tiene protocolos activos, se puede forzar la eliminación con ?force=true
+ */
+export async function eliminarPersonaRegistrada(req, res) {
+  try {
+    const { cedula } = req.params;
+    const { force } = req.query;
+
+    if (!cedula) {
+      return res.status(400).json({
+        success: false,
+        message: 'Se requiere el número de identificación'
+      });
+    }
+
+    // Verificar que la persona existe
+    const persona = await prisma.personaRegistrada.findUnique({
+      where: { numeroIdentificacion: cedula },
+      include: {
+        protocolos: {
+          select: { id: true, protocoloId: true }
+        }
+      }
+    });
+
+    if (!persona) {
+      return res.status(404).json({
+        success: false,
+        message: 'Persona no encontrada'
+      });
+    }
+
+    // Si tiene protocolos asociados y no se fuerza, advertir
+    if (persona.protocolos.length > 0 && force !== 'true') {
+      return res.status(400).json({
+        success: false,
+        message: `Esta persona está asociada a ${persona.protocolos.length} protocolo(s). Use ?force=true para eliminar igualmente.`,
+        protocolosCount: persona.protocolos.length
+      });
+    }
+
+    // Eliminar en transacción: primero relaciones, luego persona
+    await prisma.$transaction(async (tx) => {
+      // 1. Eliminar relaciones con protocolos
+      if (persona.protocolos.length > 0) {
+        await tx.personaProtocolo.deleteMany({
+          where: { personaCedula: cedula }
+        });
+      }
+
+      // 2. Eliminar la persona
+      await tx.personaRegistrada.delete({
+        where: { numeroIdentificacion: cedula }
+      });
+    });
+
+    console.log(`[ADMIN] Persona eliminada: ${cedula} por ${req.user.email}`);
+
+    res.json({
+      success: true,
+      message: 'Persona eliminada exitosamente',
+      cedula
+    });
+
+  } catch (error) {
+    console.error('Error eliminando persona registrada:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al eliminar persona',
+      error: error.message
+    });
+  }
+}

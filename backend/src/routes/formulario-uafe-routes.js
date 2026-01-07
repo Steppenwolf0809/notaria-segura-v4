@@ -18,7 +18,8 @@ import {
   buscarRepresentado,
   listarTodosProtocolos,
   eliminarProtocolo,
-  listarPersonasRegistradas
+  listarPersonasRegistradas,
+  eliminarPersonaRegistrada
 } from '../controllers/formulario-uafe-controller.js';
 
 const router = express.Router();
@@ -270,6 +271,22 @@ router.get(
   authenticateToken,
   requireRoles(['ADMIN']),
   listarPersonasRegistradas
+);
+
+/**
+ * Eliminar una persona registrada (solo ADMIN)
+ * DELETE /api/formulario-uafe/admin/personas-registradas/:cedula
+ * Requiere: JWT + role ADMIN
+ * CSRF Protected
+ * Query params:
+ * - force: 'true' para forzar eliminación aunque tenga protocolos asociados
+ */
+router.delete(
+  '/admin/personas-registradas/:cedula',
+  authenticateToken,
+  requireRoles(['ADMIN']),
+  csrfProtection,
+  eliminarPersonaRegistrada
 );
 
 // ========================================
