@@ -442,12 +442,29 @@ export function drawFooter(doc) {
 }
 
 /**
- * Obtener nombre completo de persona natural
+ * Obtener nombre completo de persona (natural o jurídica)
  */
 export function getNombreCompleto(datos) {
-  if (!datos || !datos.datosPersonales) return 'Sin nombre';
-  const { nombres, apellidos } = datos.datosPersonales;
-  return `${nombres || ''} ${apellidos || ''}`.trim() || 'Sin nombre';
+  if (!datos) return 'Sin nombre';
+
+  // Persona Natural
+  if (datos.datosPersonales) {
+    const { nombres, apellidos } = datos.datosPersonales;
+    return `${nombres || ''} ${apellidos || ''}`.trim() || 'Sin nombre';
+  }
+
+  // Persona Jurídica
+  if (datos.compania?.razonSocial) {
+    return datos.compania.razonSocial;
+  }
+
+  // Representante Legal de Persona Jurídica
+  if (datos.representanteLegal) {
+    const { nombres, apellidos } = datos.representanteLegal;
+    return `${nombres || ''} ${apellidos || ''}`.trim() || 'Sin nombre';
+  }
+
+  return 'Sin nombre';
 }
 
 /**

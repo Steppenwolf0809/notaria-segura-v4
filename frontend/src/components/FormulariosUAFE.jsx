@@ -580,14 +580,7 @@ const FormulariosUAFE = ({ adminMode = false }) => {
     }
   };
 
-  /**
-   * Previsualizar formulario público
-   */
-  const previsualizarFormulario = () => {
-    // Abrir en nueva pestaña la URL del formulario público
-    const urlFormularioPublico = `${window.location.origin}/formulario-uafe-protocolo.html`;
-    window.open(urlFormularioPublico, '_blank');
-  };
+
 
   /**
    * Abrir modal para agregar persona
@@ -1866,15 +1859,7 @@ const FormulariosUAFE = ({ adminMode = false }) => {
           <span>Detalles del Protocolo</span>
           {protocoloSeleccionado && !modoEditarProtocolo && (
             <Box>
-              <Tooltip title="Previsualizar Formulario Público">
-                <IconButton
-                  size="small"
-                  onClick={previsualizarFormulario}
-                  sx={{ color: 'white', mr: 1 }}
-                >
-                  <VisibilityIcon />
-                </IconButton>
-              </Tooltip>
+
               <Tooltip title="Editar Protocolo">
                 <IconButton
                   size="small"
