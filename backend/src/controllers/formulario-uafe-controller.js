@@ -1879,20 +1879,192 @@ function generateNaturalPersonPDF(doc, startY, datos, persona) {
 
 /**
  * Generar contenido del PDF para persona jurídica
- * TODO: Implementar cuando se agregue soporte para personas jurídicas
  */
 function generateJuridicalPersonPDF(doc, startY, datos, persona) {
   let y = startY;
 
-  y = checkAndAddPage(doc, y, 100);
-  y = drawSection(doc, y, 'Información de Persona Jurídica', 80);
+  // === SECCIÓN 1: IDENTIFICACIÓN DE LA COMPAÑÍA ===
+  y = checkAndAddPage(doc, y, 120);
+  y = drawSection(doc, y, '1. Identificación de la Compañía', 110);
 
   drawField(doc, 60, y, 'Razón Social', datos.compania?.razonSocial, 480);
 
-  y += 50;
-  drawTextAreaField(doc, 60, y, 'Nota', 'El formulario completo para personas jurídicas estará disponible próximamente.', 480, 40);
+  y += 40;
+  drawField(doc, 60, y, 'RUC', datos.compania?.ruc || persona.numeroIdentificacion, 160);
+  drawField(doc, 240, y, 'Objeto Social', datos.compania?.objetoSocial, 300);
 
-  return y + 100;
+  y += 55;
+
+  // === SECCIÓN 2: DIRECCIÓN DE LA COMPAÑÍA ===
+  y = checkAndAddPage(doc, y, 100);
+  y = drawSection(doc, y, '2. Dirección de la Compañía', 90);
+
+  drawField(doc, 60, y, 'Calle Principal', datos.direccionCompania?.callePrincipal, 200);
+  drawField(doc, 280, y, 'Número', datos.direccionCompania?.numero, 100);
+  drawField(doc, 400, y, 'Calle Secundaria', datos.direccionCompania?.calleSecundaria, 140);
+
+  y += 40;
+  drawField(doc, 60, y, 'Provincia', datos.direccionCompania?.provincia, 150);
+  drawField(doc, 230, y, 'Cantón', datos.direccionCompania?.canton, 150);
+  drawField(doc, 400, y, 'Parroquia', datos.direccionCompania?.parroquia, 140);
+
+  y += 55;
+
+  // === SECCIÓN 3: CONTACTO DE LA COMPAÑÍA ===
+  y = checkAndAddPage(doc, y, 80);
+  y = drawSection(doc, y, '3. Contacto de la Compañía', 70);
+
+  drawField(doc, 60, y, 'Email', datos.contactoCompania?.email, 200);
+  drawField(doc, 280, y, 'Teléfono', datos.contactoCompania?.telefono, 130);
+  drawField(doc, 430, y, 'Celular', datos.contactoCompania?.celular, 110);
+
+  y += 55;
+
+  // === SECCIÓN 4: REPRESENTANTE LEGAL ===
+  y = checkAndAddPage(doc, y, 200);
+  y = drawSection(doc, y, '4. Representante Legal', 190);
+
+  const rep = datos.representanteLegal || {};
+
+  drawField(doc, 60, y, 'Apellidos', rep.apellidos, 230);
+  drawField(doc, 310, y, 'Nombres', rep.nombres, 230);
+
+  y += 40;
+  drawField(doc, 60, y, 'Tipo ID', rep.tipoIdentificacion, 100);
+  drawField(doc, 180, y, 'Número ID', rep.numeroIdentificacion, 160);
+  drawField(doc, 360, y, 'Nacionalidad', rep.nacionalidad, 180);
+
+  y += 40;
+  drawField(doc, 60, y, 'Género', rep.genero, 140);
+  drawField(doc, 220, y, 'Estado Civil', rep.estadoCivil, 160);
+  drawField(doc, 400, y, 'Nivel Estudio', rep.nivelEstudio, 140);
+
+  y += 40;
+  drawField(doc, 60, y, 'Email', rep.email, 200);
+  drawField(doc, 280, y, 'Teléfono', rep.telefono, 130);
+  drawField(doc, 430, y, 'Celular', rep.celular, 110);
+
+  // Dirección del representante
+  if (rep.direccion) {
+    y += 40;
+    const direccionRep = `${rep.direccion.callePrincipal || ''} ${rep.direccion.numero || ''} y ${rep.direccion.calleSecundaria || ''}`.trim();
+    drawTextAreaField(doc, 60, y, 'Dirección Domiciliaria', direccionRep, 480, 36);
+  }
+
+  // Información laboral del representante
+  if (rep.informacionLaboral) {
+    y += 50;
+    y = checkAndAddPage(doc, y, 80);
+    drawField(doc, 60, y, 'Situación Laboral', rep.informacionLaboral.situacion, 160);
+    drawField(doc, 240, y, 'Rel. Dependencia', rep.informacionLaboral.relacionDependencia ? 'SÍ' : 'NO', 100);
+    drawField(doc, 360, y, 'Ingreso Mensual', formatCurrency(rep.informacionLaboral.ingresoMensual), 180);
+
+    y += 40;
+    drawField(doc, 60, y, 'Profesión/Ocupación', rep.informacionLaboral.profesionOcupacion, 480);
+  }
+
+  y += 55;
+
+  // === SECCIÓN 5: CÓNYUGE DEL REPRESENTANTE (si aplica) ===
+  const conyuge = datos.conyugeRepresentante || {};
+  const tieneConyuge = conyuge.nombres && conyuge.apellidos;
+
+  if (tieneConyuge) {
+    y = checkAndAddPage(doc, y, 150);
+    y = drawSection(doc, y, '5. Cónyuge del Representante Legal', 140);
+
+    drawField(doc, 60, y, 'Apellidos', conyuge.apellidos, 230);
+    drawField(doc, 310, y, 'Nombres', conyuge.nombres, 230);
+
+    y += 40;
+    drawField(doc, 60, y, 'Tipo ID', conyuge.tipoIdentificacion, 100);
+    drawField(doc, 180, y, 'Número ID', conyuge.numeroIdentificacion, 160);
+    drawField(doc, 360, y, 'Nacionalidad', conyuge.nacionalidad, 180);
+
+    y += 40;
+    drawField(doc, 60, y, 'Email', conyuge.email, 240);
+    drawField(doc, 320, y, 'Celular', conyuge.celular, 220);
+
+    y += 40;
+    drawField(doc, 60, y, 'Profesión', conyuge.profesionOcupacion, 480);
+
+    y += 55;
+  }
+
+  // === SECCIÓN 6: SOCIOS/ACCIONISTAS ===
+  const socios = datos.socios || [];
+  if (socios.length > 0) {
+    y = checkAndAddPage(doc, y, 80 + (socios.length * 35));
+    y = drawSection(doc, y, `${tieneConyuge ? '6' : '5'}. Socios / Accionistas`, 70 + (socios.length * 35));
+
+    // Header de tabla
+    doc.fillColor(COLORS.primary).fontSize(8).font(FONTS.title);
+    doc.text('Nombres y Apellidos', 60, y, { width: 200 });
+    doc.text('Identificación', 270, y, { width: 100 });
+    doc.text('Teléfono', 380, y, { width: 80 });
+    doc.text('Celular', 470, y, { width: 70 });
+
+    y += 18;
+
+    socios.forEach((socio, index) => {
+      doc.fillColor(COLORS.textDark).fontSize(8).font(FONTS.normal);
+      doc.text(socio.nombresApellidos || 'N/A', 60, y, { width: 200 });
+      doc.text(socio.identificacion || 'N/A', 270, y, { width: 100 });
+      doc.text(socio.telefono || 'N/A', 380, y, { width: 80 });
+      doc.text(socio.celular || 'N/A', 470, y, { width: 70 });
+      y += 18;
+    });
+
+    y += 35;
+  }
+
+  // === SECCIÓN 7: PEP ===
+  y = checkAndAddPage(doc, y, 60);
+
+  const pepSectionNum = tieneConyuge ? (socios.length > 0 ? '7' : '6') : (socios.length > 0 ? '6' : '5');
+  doc.fillColor(COLORS.primary)
+    .fontSize(9)
+    .font(FONTS.title)
+    .text(`${pepSectionNum}. PERSONA POLÍTICAMENTE EXPUESTA (PEP)`, 60, y);
+
+  y += 16;
+
+  const pep = datos.pep || {};
+  const esPEP = pep.esPersonaExpuesta ? 'SÍ' : 'NO';
+  const esFamiliarPEP = pep.esFamiliarPEP ? 'SÍ' : 'NO';
+  const esColaboradorPEP = pep.esColaboradorPEP ? 'SÍ' : 'NO';
+
+  doc.fillColor(COLORS.textDark).fontSize(8).font(FONTS.normal);
+
+  doc.font(FONTS.title).text('¿Es PEP?: ', 60, y, { continued: true })
+    .font(FONTS.normal).text(esPEP, { bold: esPEP === 'SÍ' });
+
+  doc.font(FONTS.title).text('¿Familiar PEP?: ', 220, y, { continued: true })
+    .font(FONTS.normal).text(esFamiliarPEP, { bold: esFamiliarPEP === 'SÍ' });
+
+  doc.font(FONTS.title).text('¿Colaborador PEP?: ', 400, y, { continued: true })
+    .font(FONTS.normal).text(esColaboradorPEP, { bold: esColaboradorPEP === 'SÍ' });
+
+  y += 25;
+
+  // === SECCIÓN 8: BENEFICIARIO FINAL (si aplica) ===
+  const beneficiario = datos.beneficiarioFinal || {};
+  const tieneBeneficiario = beneficiario.nombres || beneficiario.apellidos;
+
+  if (tieneBeneficiario) {
+    y = checkAndAddPage(doc, y, 80);
+    const benefSectionNum = parseInt(pepSectionNum) + 1;
+    y = drawSection(doc, y, `${benefSectionNum}. Beneficiario Final`, 70);
+
+    drawField(doc, 60, y, 'Apellidos', beneficiario.apellidos, 230);
+    drawField(doc, 310, y, 'Nombres', beneficiario.nombres, 230);
+
+    y += 40;
+    drawField(doc, 60, y, 'Tipo ID', beneficiario.tipoIdentificacion, 140);
+    drawField(doc, 220, y, 'Número ID', beneficiario.numeroIdentificacion, 320);
+  }
+
+  return y + 30;
 }
 export async function descargarArchivo(req, res) {
   try {
