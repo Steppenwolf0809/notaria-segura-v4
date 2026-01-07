@@ -112,6 +112,20 @@ router.put(
 );
 
 /**
+ * Eliminar protocolo
+ * DELETE /api/formulario-uafe/protocolo/:protocoloId
+ * Requiere: JWT + role MATRIZADOR o ADMIN
+ * CSRF Protected - Requiere token CSRF
+ */
+router.delete(
+  '/protocolo/:protocoloId',
+  authenticateToken,
+  requireRoles(['MATRIZADOR', 'ADMIN']),
+  csrfProtection,
+  eliminarProtocolo
+);
+
+/**
  * Actualizar persona en protocolo (cambiar rol/calidad)
  * PUT /api/formulario-uafe/protocolo/:protocoloId/persona/:personaProtocoloId
  * Requiere: JWT + role MATRIZADOR o ADMIN

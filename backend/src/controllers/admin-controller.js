@@ -939,6 +939,57 @@ async function getDashboardStats(req, res) {
   }
 }
 
+
+/**
+ * Obtener lista completa de Personas Registradas (Base de datos UAFE)
+ * GET /api/admin/personas-registradas
+ * Requiere: Role ADMIN
+ */
+async function getPersonasRegistradas(req, res) {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const search = req.query.search || '';
+
+    const where = {};
+    if (search) {
+      where.OR = [
+        { cedula: { contains: search } }
+      ];
+    }
+
+    const total = await prisma.personaRegistrada.count({ where });
+    const personas = await prisma.personaRegistrada.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * limit,
+      take: limit
+    });
+
+    // Mapear para facilitar lectura en frontend
+    const personasMapped = personas.map(p => {
+      let nombre = 'Sin Nombre';
+      if (p.tipoPersona === 'NATURAL' && p.datosPersonaNatural) {
+        const d = p.datosPersonaNatural;
+        if (d && d.datosPersonales) {
+          nombre = `${d.datosPersonales.nombres || ''} ${d.datosPersonales.apellidos || ''}`.trim();
+        }
+      } else if (p.tipoPersona === 'JURIDICA' && p.datosPersonaJuridica) {
+        const d = p.datosPersonaJuridica;
+        if (d && d.compania) {
+          nombre = d.compania.razonSocial || 'Sin Razón Social';
+        }
+      }
+      return { ...p, nombre };
+    });
+
+    sendPaginated(res, personasMapped, page, limit, total);
+  } catch (error) {
+    console.error('Error getting personas registradas:', error);
+    sendError(res, error, 'Error al listar personas registradas');
+  }
+}
+
 export {
   getAllUsers,
   getUserById,
@@ -947,5 +998,6 @@ export {
   toggleUserStatus,
   deleteUser,
   getUserStats,
-  getDashboardStats
+  getDashboardStats,
+  getPersonasRegistradas
 };

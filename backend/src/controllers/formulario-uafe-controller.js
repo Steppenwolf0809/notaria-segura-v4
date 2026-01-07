@@ -792,6 +792,13 @@ export async function actualizarProtocolo(req, res) {
       numeroProtocolo,
       fecha,
       actoContrato,
+      tipoActoOtro,
+      bienInmuebleDescripcion,
+      bienInmuebleUbicacion,
+      vehiculoPlaca,
+      vehiculoMarca,
+      vehiculoModelo,
+      vehiculoAnio,
       avaluoMunicipal,
       valorContrato,
       formasPago
@@ -839,8 +846,6 @@ export async function actualizarProtocolo(req, res) {
           message: 'formasPago debe ser un array'
         });
       }
-
-      // Validar estructura de cada forma de pago
       for (const fp of formasPago) {
         if (!fp.tipo || !fp.monto || fp.monto <= 0) {
           return res.status(400).json({
@@ -864,6 +869,13 @@ export async function actualizarProtocolo(req, res) {
         ...(numeroProtocolo && { numeroProtocolo }),
         ...(fecha && { fecha: new Date(fecha) }),
         ...(actoContrato && { actoContrato }),
+        tipoActoOtro: tipoActoOtro || null,
+        bienInmuebleDescripcion: bienInmuebleDescripcion || null,
+        bienInmuebleUbicacion: bienInmuebleUbicacion || null,
+        vehiculoPlaca: vehiculoPlaca || null,
+        vehiculoMarca: vehiculoMarca || null,
+        vehiculoModelo: vehiculoModelo || null,
+        vehiculoAnio: vehiculoAnio || null,
         ...(avaluoMunicipal !== undefined && { avaluoMunicipal: parseFloat(avaluoMunicipal) }),
         ...(valorContrato !== undefined && { valorContrato: parseFloat(valorContrato) }),
         ...(formasPago !== undefined && { formasPago })
@@ -1171,7 +1183,7 @@ export async function generarPDFs(req, res) {
           // === GENERAR CONTENIDO DEL PDF ===
 
           // Ruta del logo (si existe)
-          const logoPath = path.join(__dirname, '../../assets/images/logo-notaria.png');
+          const logoPath = path.join(__dirname, '../../assets/images/logo-notaria18.png');
 
           // HEADER
           let currentY = drawHeader(doc, logoPath);
@@ -1378,7 +1390,7 @@ export async function generarPDFIndividual(req, res) {
         // === GENERAR CONTENIDO DEL PDF ===
 
         // Ruta del logo (si existe)
-        const logoPath = path.join(__dirname, '../../assets/images/logo-notaria.png');
+        const logoPath = path.join(__dirname, '../../assets/images/logo-notaria18.png');
 
         // HEADER
         let currentY = drawHeader(doc, logoPath);
@@ -1906,9 +1918,9 @@ export async function listarTodosProtocolos(req, res) {
 }
 
 /**
- * Eliminar un protocolo completo (solo para ADMIN)
+ * Eliminar un protocolo completo
  * DELETE /api/formulario-uafe/admin/protocolo/:protocoloId
- * Requiere: authenticateToken + role ADMIN
+ * (Ahora permite también al creador eliminar su propio protocolo)
  */
 export async function eliminarProtocolo(req, res) {
   try {
@@ -1936,6 +1948,14 @@ export async function eliminarProtocolo(req, res) {
       });
     }
 
+    // Verificar permisos: Admin o Creador
+    if (req.user.role !== 'ADMIN' && protocolo.createdBy !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tiene permiso para eliminar este protocolo'
+      });
+    }
+
     // Eliminar protocolo (cascade eliminará las personas asociadas)
     await prisma.protocoloUAFE.delete({
       where: { id: protocoloId }
@@ -1943,13 +1963,7 @@ export async function eliminarProtocolo(req, res) {
 
     res.json({
       success: true,
-      message: 'Protocolo eliminado exitosamente',
-      data: {
-        protocoloId,
-        numeroProtocolo: protocolo.numeroProtocolo,
-        personasEliminadas: protocolo.personas.length,
-        creador: `${protocolo.creador.firstName} ${protocolo.creador.lastName}`
-      }
+      message: 'Protocolo eliminado exitosamente'
     });
 
   } catch (error) {
@@ -1960,3 +1974,4 @@ export async function eliminarProtocolo(req, res) {
     });
   }
 }
+
