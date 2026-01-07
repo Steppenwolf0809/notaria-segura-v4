@@ -9,7 +9,7 @@
     "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch",
     "test:ci": "NODE_OPTIONS=--experimental-vm-modules jest --ci --coverage --watchAll=false",
     "prebuild": "npm run test:ci",
-    "start": "node server.js",
+    "start": "npx prisma generate && npx prisma migrate deploy && node server.js",
     "build": "npx prisma generate",
     "start:prod": "npx prisma generate && (npx prisma migrate deploy || npx prisma db push --accept-data-loss) && node server.js",
     "start:railway": "node scripts/railway-deploy.js",
