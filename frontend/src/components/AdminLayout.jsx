@@ -38,7 +38,9 @@ import {
   Analytics as AnalyticsIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
-import useThemeStore from '../store/theme-store';
+import { useThemeCtx } from '../contexts/theme-ctx';
+import { ThemeProvider } from '@mui/material/styles';
+import { getAppTheme } from '../config/theme';
 import ChangePassword from './ChangePassword';
 import { navItemsByRole } from '../config/nav-items';
 
@@ -56,7 +58,11 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [configMenuOpen, setConfigMenuOpen] = useState(false);
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
-  const { isDarkMode, toggleTheme } = useThemeStore();
+  const { resolvedIsDark: isDarkMode, setMode } = useThemeCtx();
+
+  const toggleTheme = () => {
+    setMode(isDarkMode ? 'light' : 'dark');
+  };
 
   // Trazas de verificación del layout
   useEffect(() => {
@@ -409,17 +415,18 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               {isDarkMode ? <DarkModeIcon sx={{ mr: 1, fontSize: 20 }} /> : <LightModeIcon sx={{ mr: 1, fontSize: 20 }} />}
               <Typography variant="body2">
-                Modo {isDarkMode ? 'Oscuro' : 'Claro'}
+                {isDarkMode ? 'Modo Oscuro' : 'Modo Claro'}
               </Typography>
             </Box>
           )}
-          <Tooltip title={sidebarCollapsed ? `Cambiar a modo ${isDarkMode ? 'claro' : 'oscuro'}` : ''} placement="right">
+          <Tooltip title={sidebarCollapsed ? `Cambiar a ${isDarkMode ? 'modo claro' : 'modo oscuro'}` : ''} placement="right">
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               {sidebarCollapsed && (isDarkMode ? <DarkModeIcon sx={{ mr: 0.5, fontSize: 20 }} /> : <LightModeIcon sx={{ mr: 0.5, fontSize: 20 }} />)}
               <Switch
-                checked={isDarkMode}
+                checked={!!isDarkMode}
                 onChange={toggleTheme}
                 size="small"
+                color="default"
               />
             </Box>
           </Tooltip>
@@ -464,100 +471,107 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
   );
 
   const currentDrawerWidth = sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH;
+  const theme = React.useMemo(() => getAppTheme(isDarkMode), [isDarkMode]);
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
-      {/* App Bar */}
-      <AppBar
-        position="fixed"
-        sx={{
-          width: { sm: `calc(100% - ${currentDrawerWidth}px)` },
-          ml: { sm: `${currentDrawerWidth}px` },
-          transition: 'all 0.3s ease',
-        }}
-      >
-        <Toolbar>
-          <IconButton
-            color="inherit"
-            aria-label="open drawer"
-            edge="start"
-            onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { sm: 'none' } }}
+    <ThemeProvider theme={theme}>
+      <Box sx={{ display: 'flex', minHeight: '100vh' }} style={{ backgroundColor: isDarkMode ? '#0f1419' : '#E9F5FF' }}>
+        {/* App Bar */}
+        <AppBar
+          position="fixed"
+          sx={{
+            width: { sm: `calc(100% - ${currentDrawerWidth}px)` },
+            ml: { sm: `${currentDrawerWidth}px` },
+            transition: 'all 0.3s ease',
+            bgcolor: isDarkMode ? '#1a1f2e' : '#ffffff',
+            color: isDarkMode ? '#ffffff' : 'text.primary',
+            borderBottom: isDarkMode ? '1px solid #334155' : 'none',
+            boxShadow: isDarkMode ? '0 1px 3px 0 rgba(0, 0, 0, 0.3)' : 1
+          }}
+        >
+          <Toolbar>
+            <IconButton
+              color="inherit"
+              aria-label="open drawer"
+              edge="start"
+              onClick={handleDrawerToggle}
+              sx={{ mr: 2, display: { sm: 'none' } }}
+            >
+              <MenuIcon />
+            </IconButton>
+            <Typography variant="h6" noWrap component="div">
+              Panel de Administración
+            </Typography>
+          </Toolbar>
+        </AppBar>
+
+        {/* Drawer */}
+        <Box
+          component="nav"
+          sx={{ width: { sm: currentDrawerWidth }, flexShrink: { sm: 0 } }}
+          aria-label="navigation folders"
+        >
+          {/* Drawer móvil */}
+          <Drawer
+            variant="temporary"
+            open={mobileOpen}
+            onClose={handleDrawerToggle}
+            ModalProps={{
+              keepMounted: true, // Mejor performance en móvil
+            }}
+            sx={{
+              display: { xs: 'block', sm: 'none' },
+              '& .MuiDrawer-paper': {
+                boxSizing: 'border-box',
+                width: DRAWER_WIDTH
+              },
+            }}
           >
-            <MenuIcon />
-          </IconButton>
-          <Typography variant="h6" noWrap component="div">
-            Panel de Administración
-          </Typography>
-        </Toolbar>
-      </AppBar>
+            {drawer}
+          </Drawer>
 
-      {/* Drawer */}
-      <Box
-        component="nav"
-        sx={{ width: { sm: currentDrawerWidth }, flexShrink: { sm: 0 } }}
-        aria-label="navigation folders"
-      >
-        {/* Drawer móvil */}
-        <Drawer
-          variant="temporary"
-          open={mobileOpen}
-          onClose={handleDrawerToggle}
-          ModalProps={{
-            keepMounted: true, // Mejor performance en móvil
-          }}
+          {/* Drawer permanente */}
+          <Drawer
+            variant="permanent"
+            sx={{
+              display: { xs: 'none', sm: 'block' },
+              '& .MuiDrawer-paper': {
+                boxSizing: 'border-box',
+                width: currentDrawerWidth,
+                transition: 'width 0.3s ease'
+              },
+            }}
+            open
+          >
+            {drawer}
+          </Drawer>
+        </Box>
+
+        {/* Contenido principal */}
+        <Box
+          component="main"
           sx={{
-            display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': {
-              boxSizing: 'border-box',
-              width: DRAWER_WIDTH
-            },
+            flexGrow: 1,
+            width: { sm: `calc(100% - ${currentDrawerWidth}px)` },
+            minHeight: '100vh',
+            overflow: 'auto',
+            transition: 'all 0.3s ease'
           }}
+          style={{ backgroundColor: isDarkMode ? '#0f1419' : '#E9F5FF' }}
         >
-          {drawer}
-        </Drawer>
+          <Toolbar /> {/* Espaciado para el AppBar */}
+          <Container maxWidth="xl" sx={{ py: 3 }}>
+            {children}
+          </Container>
+        </Box>
 
-        {/* Drawer permanente */}
-        <Drawer
-          variant="permanent"
-          sx={{
-            display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': {
-              boxSizing: 'border-box',
-              width: currentDrawerWidth,
-              transition: 'width 0.3s ease'
-            },
-          }}
-          open
-        >
-          {drawer}
-        </Drawer>
+        {/* Modal de cambio de contraseña */}
+        <ChangePassword
+          open={showChangePassword}
+          onClose={() => setShowChangePassword(false)}
+        />
       </Box>
-
-      {/* Contenido principal */}
-      <Box
-        component="main"
-        sx={{
-          flexGrow: 1,
-          width: { sm: `calc(100% - ${currentDrawerWidth}px)` },
-          minHeight: '100vh',
-          bgcolor: 'background.default',
-          overflow: 'auto',
-          transition: 'all 0.3s ease'
-        }}
-      >
-        <Toolbar /> {/* Espaciado para el AppBar */}
-        <Container maxWidth="xl" sx={{ py: 3 }}>
-          {children}
-        </Container>
-      </Box>
-
-      {/* Modal de cambio de contraseña */}
-      <ChangePassword
-        open={showChangePassword}
-        onClose={() => setShowChangePassword(false)}
-      />
-    </Box>
+    </ThemeProvider>
   );
 };
 
