@@ -340,15 +340,29 @@ const FormulariosUAFE = ({ adminMode = false }) => {
       // const response = await apiClient.get(`/formulario-uafe/buscar-representado/${formRepresentado.identificacion}`);
 
       if (response.data.success && response.data.existe) {
-        const p = response.data; // Ajustar según estructura de respuesta
-        // Si el endpoint devuelve datos básicos
+        const p = response.data;
+
+        let extractedNombres = '';
+        let extractedApellidos = '';
+        let extractedRazonSocial = '';
+        let extractedTipo = p.tipoPersona || 'NATURAL';
+
+        if (p.tipoPersona === 'NATURAL' && p.datosPersonaNatural) {
+          extractedNombres = p.datosPersonaNatural.datosPersonales?.nombres || '';
+          extractedApellidos = p.datosPersonaNatural.datosPersonales?.apellidos || '';
+        } else if (p.tipoPersona === 'JURIDICA' && p.datosPersonaJuridica) {
+          extractedRazonSocial = p.datosPersonaJuridica.compania?.razonSocial || '';
+        }
+
         setFormRepresentado(prev => ({
           ...prev,
-          nombres: p.nombres || '',
-          apellidos: p.apellidos || '',
+          tipoPersona: extractedTipo,
+          nombres: extractedNombres,
+          apellidos: extractedApellidos,
+          razonSocial: extractedRazonSocial,
           representadoId: p.numeroIdentificacion || formRepresentado.identificacion
         }));
-        mostrarSnackbar('Representado encontrado', 'success');
+        mostrarSnackbar('Representado encontrado y datos cargados', 'success');
       } else {
         // Intento de búsqueda en backend si existe endpoint específico, sino solo warning
         setFormRepresentado(prev => ({ ...prev, representadoId: null }));
