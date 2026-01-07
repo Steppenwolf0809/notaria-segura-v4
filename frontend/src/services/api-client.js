@@ -104,7 +104,13 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => {
     // XSS Protection: Sanitizar datos de respuesta antes de llegar a componentes
-    if (response.data && typeof response.data === 'object') {
+    // IMPORTANTE: NO sanitizar blobs (PDFs, ZIPs, etc.) ni ArrayBuffers
+    const isBinaryData = response.data instanceof Blob ||
+      response.data instanceof ArrayBuffer ||
+      response.config?.responseType === 'blob' ||
+      response.config?.responseType === 'arraybuffer';
+
+    if (response.data && typeof response.data === 'object' && !isBinaryData) {
       try {
         // Sanitizar todo el objeto de respuesta
         response.data = sanitizeObject(response.data);
