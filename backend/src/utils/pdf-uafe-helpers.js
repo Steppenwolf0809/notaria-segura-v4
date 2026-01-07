@@ -437,6 +437,45 @@ export function checkAndAddPage(doc, currentY, requiredSpace = 100) {
 }
 
 /**
+ * Dibujar sección de bienes (inmueble o vehículo) según el tipo de acto
+ */
+export function drawBienesSection(doc, y, protocolo) {
+  // Tipos que requieren datos de bien inmueble
+  const TIPOS_BIEN_INMUEBLE = ['COMPRAVENTA', 'DONACION', 'CESION_DERECHOS', 'PROMESA_COMPRAVENTA'];
+  // Tipos que requieren datos de vehículo
+  const TIPOS_VEHICULO = ['VENTA_VEHICULO'];
+
+  const acto = protocolo.actoContrato;
+
+  // Verificar si hay datos de bien inmueble
+  if (TIPOS_BIEN_INMUEBLE.includes(acto) && (protocolo.bienInmuebleDescripcion || protocolo.bienInmuebleUbicacion)) {
+    // Sección de bien inmueble
+    y = checkAndAddPage(doc, y, 80);
+    y = drawSection(doc, y, 'Datos del Bien Inmueble', 60);
+
+    drawTextAreaField(doc, 60, y, 'Descripción del Inmueble', protocolo.bienInmuebleDescripcion, 480, 22);
+    y += 40;
+    drawTextAreaField(doc, 60, y, 'Ubicación del Inmueble', protocolo.bienInmuebleUbicacion, 480, 22);
+    y += 50;
+  }
+
+  // Verificar si hay datos de vehículo
+  if (TIPOS_VEHICULO.includes(acto) && (protocolo.vehiculoPlaca || protocolo.vehiculoMarca || protocolo.vehiculoModelo || protocolo.vehiculoAnio)) {
+    // Sección de vehículo
+    y = checkAndAddPage(doc, y, 80);
+    y = drawSection(doc, y, 'Datos del Vehículo', 45);
+
+    drawField(doc, 60, y, 'Placa', protocolo.vehiculoPlaca, 120);
+    drawField(doc, 200, y, 'Marca', protocolo.vehiculoMarca, 140);
+    drawField(doc, 360, y, 'Modelo', protocolo.vehiculoModelo, 100);
+    drawField(doc, 480, y, 'Año', protocolo.vehiculoAnio, 60);
+    y += 55;
+  }
+
+  return y;
+}
+
+/**
  * Dibujar tabla de formas de pago
  */
 export function drawFormasPago(doc, y, formasPago) {
