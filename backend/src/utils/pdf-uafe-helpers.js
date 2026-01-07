@@ -228,7 +228,7 @@ export function drawProtocolBox(doc, y, protocolo, rol, calidad) {
   const col2 = 300;
 
   // Protocolo y Fecha en una línea
-  drawInlineField(doc, col1, dataY, 'No. Protocolo:', protocolo.numeroProtocolo, 110);
+  drawInlineField(doc, col1, dataY, 'No. Protocolo:', protocolo.numeroProtocolo, 200);
   drawInlineField(doc, col2, dataY, 'Fecha:', formatDate(protocolo.fecha), 140);
 
   // Acto/Contrato
@@ -247,7 +247,22 @@ export function drawProtocolBox(doc, y, protocolo, rol, calidad) {
 }
 
 /**
- * Dibujar campo inline (label: valor en la misma línea) - VERSIÓN COMPACTA
+ * Helper para dibujar texto con auto-escalado si es muy largo
+ */
+function drawScaledText(doc, text, x, y, maxWidth, initialFontSize, font) {
+  let fontSize = initialFontSize;
+  doc.font(font).fontSize(fontSize);
+
+  while (doc.widthOfString(text) > maxWidth && fontSize > 6) {
+    fontSize -= 0.5;
+    doc.fontSize(fontSize);
+  }
+
+  doc.text(text, x, y);
+}
+
+/**
+ * Dibujar campo inline (label: valor en la misma línea) - VERSIÓN COMPACTA MEJORADA
  */
 function drawInlineField(doc, x, y, label, value, maxWidth) {
   const currentColor = doc._fillColor;
@@ -260,13 +275,23 @@ function drawInlineField(doc, x, y, label, value, maxWidth) {
 
   // Calcular ancho del label
   const labelWidth = doc.widthOfString(label);
+  const valueMaxWidth = maxWidth - labelWidth - 4;
 
-  // Valor normal
-  doc.fontSize(8)
-    .font(FONTS.normal)
-    .text(value || 'No aplica', x + labelWidth + 4, y, {
-      width: maxWidth - labelWidth - 4
-    });
+  // Valor con auto-escalado si es necesario
+  const displayValue = value || 'No aplica';
+
+  if (label === 'No. Protocolo:') {
+    // Tratamiento especial para Protocolo: Validación de espacio y ajuste
+    doc.fillColor(COLORS.textDark); // Asegurar color
+    drawScaledText(doc, displayValue, x + labelWidth + 4, y, valueMaxWidth, 10, FONTS.title);
+  } else {
+    // Valor normal
+    doc.fontSize(8)
+      .font(FONTS.normal)
+      .text(displayValue, x + labelWidth + 4, y, {
+        width: valueMaxWidth
+      });
+  }
 
   doc._fillColor = currentColor;
 }

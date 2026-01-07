@@ -87,6 +87,8 @@ const TIPOS_BIEN_INMUEBLE = ['COMPRAVENTA', 'DONACION', 'CESION_DERECHOS', 'PROM
 // Tipos que requieren datos de vehículo
 const TIPOS_VEHICULO = ['VENTA_VEHICULO'];
 
+import ModalDatosRepresentado from './ModalDatosRepresentado';
+
 const FormulariosUAFE = ({ adminMode = false }) => {
   // Estados principales
   const [protocolos, setProtocolos] = useState([]);
@@ -310,7 +312,13 @@ const FormulariosUAFE = ({ adminMode = false }) => {
   /**
    * Agregar persona al protocolo
    */
-  const agregarPersonaAProtocolo = async () => {
+  // Estado para modal de representado
+  const [openModalRepresentado, setOpenModalRepresentado] = useState(false);
+
+  /**
+   * Agregar persona al protocolo
+   */
+  const agregarPersonaAProtocolo = async (datosExtra = null) => {
     if (!personaEncontrada) {
       mostrarSnackbar('Primero busca a la persona', 'warning');
       return;
@@ -321,22 +329,37 @@ const FormulariosUAFE = ({ adminMode = false }) => {
       return;
     }
 
+    // Interceptar si es REPRESENTANDO_A y no tenemos datosExtra todavia
+    if (formPersona.actuaPor === 'REPRESENTANDO_A' && !datosExtra) {
+      setOpenModalRepresentado(true);
+      return;
+    }
+
     setLoading(true);
     try {
+      const payload = {
+        cedula: formPersona.cedula,
+        calidad: formPersona.calidad,
+        actuaPor: formPersona.actuaPor
+      };
+
+      if (datosExtra) {
+        if (datosExtra.representadoId) payload.representadoId = datosExtra.representadoId;
+        if (datosExtra.datosRepresentado) payload.datosRepresentado = datosExtra.datosRepresentado;
+      }
+
       const response = await apiClient.post(
         `/formulario-uafe/protocolo/${protocoloSeleccionado.id}/persona`,
-        {
-          cedula: formPersona.cedula,
-          calidad: formPersona.calidad,
-          actuaPor: formPersona.actuaPor
-        }
+        payload
       );
 
       if (response.data.success) {
         mostrarSnackbar('Persona agregada al protocolo exitosamente', 'success');
         setOpenAgregarPersona(false);
+        setOpenModalRepresentado(false); // Asegurar cierre
         resetFormPersona();
-        cargarProtocolos();
+        verDetallesProtocolo(protocoloSeleccionado.id); // Actualizar vista detalles
+        cargarProtocolos(); // Actualizar lista principal
       } else {
         mostrarSnackbar(response.data.message || 'Error al agregar persona', 'error');
       }
@@ -347,6 +370,10 @@ const FormulariosUAFE = ({ adminMode = false }) => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleConfirmRepresentado = (datos) => {
+    agregarPersonaAProtocolo(datos);
   };
 
   /**
@@ -1977,7 +2004,11 @@ const FormulariosUAFE = ({ adminMode = false }) => {
                             <strong>Calidad:</strong> {persona.calidad}
                           </Typography>
                           <Typography variant="body2" color="text.secondary">
-                            <strong>Actúa por:</strong> {persona.actuaPor === 'REPRESENTANDO_A' || persona.actuaPor === 'REPRESENTANDO' ? 'Representando a otra persona' : 'Sus propios derechos'}
+                            <strong>Actúa por:</strong> {(persona.actuaPor === 'REPRESENTANDO_A' || persona.actuaPor === 'REPRESENTANDO') ? (
+                              <span>
+                                Representando a <strong>{persona.representado?.nombre || persona.datosRepresentado?.nombres || '...'}</strong>
+                              </span>
+                            ) : 'Sus propios derechos'}
                           </Typography>
                           {persona.completadoAt && (
                             <Typography variant="body2" color="text.secondary">
