@@ -20,6 +20,7 @@ import {
   formatDate,
   checkAndAddPage,
   drawFormasPago,
+  drawBienesSection,
   COLORS,
   FONTS
 } from '../utils/pdf-uafe-helpers.js';
@@ -1207,6 +1208,9 @@ export async function generarPDFs(req, res) {
             currentY = drawFormasPago(doc, currentY, protocolo.formasPago);
           }
 
+          // SECCIÓN DE BIENES (inmueble o vehículo)
+          currentY = drawBienesSection(doc, currentY, protocolo);
+
           // SECCIÓN DE REPRESENTADO (si aplica)
           // Soporta tanto "REPRESENTANDO_A" como "REPRESENTANDO" (legacy)
           if (personaProtocolo.actuaPor === 'REPRESENTANDO_A' || personaProtocolo.actuaPor === 'REPRESENTANDO') {
@@ -1221,9 +1225,10 @@ export async function generarPDFs(req, res) {
             currentY = generateJuridicalPersonPDF(doc, currentY, datos, persona);
           }
 
-          // FIRMA
+          // FIRMA - Posición relativa al contenido, agregar página si no hay espacio
+          currentY = checkAndAddPage(doc, currentY, 100);
           const nombreCompleto = getNombreCompleto(datos);
-          drawSignature(doc, 650, nombreCompleto, persona.numeroIdentificacion);
+          drawSignature(doc, currentY + 30, nombreCompleto, persona.numeroIdentificacion);
 
           // FOOTER
           drawFooter(doc);
@@ -1415,6 +1420,9 @@ export async function generarPDFIndividual(req, res) {
           currentY = drawFormasPago(doc, currentY, protocolo.formasPago);
         }
 
+        // SECCIÓN DE BIENES (inmueble o vehículo)
+        currentY = drawBienesSection(doc, currentY, protocolo);
+
         // SECCIÓN DE REPRESENTADO (si aplica)
         if (personaProtocolo.actuaPor === 'REPRESENTANDO_A' || personaProtocolo.actuaPor === 'REPRESENTANDO') {
           currentY = await generateRepresentadoSection(doc, currentY, personaProtocolo);
@@ -1427,9 +1435,10 @@ export async function generarPDFIndividual(req, res) {
           currentY = generateJuridicalPersonPDF(doc, currentY, datos, persona);
         }
 
-        // FIRMA
+        // FIRMA - Posición relativa al contenido, agregar página si no hay espacio
+        currentY = checkAndAddPage(doc, currentY, 100);
         const nombreCompleto = getNombreCompleto(datos);
-        drawSignature(doc, 650, nombreCompleto, persona.numeroIdentificacion);
+        drawSignature(doc, currentY + 30, nombreCompleto, persona.numeroIdentificacion);
 
         // FOOTER
         drawFooter(doc);
