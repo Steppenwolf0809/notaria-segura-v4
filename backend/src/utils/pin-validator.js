@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+
 /**
  * Valida formato y seguridad de un PIN
  *
