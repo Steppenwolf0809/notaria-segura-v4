@@ -552,14 +552,14 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
                     </TableCell>
                     <TableCell onClick={() => openDetailModal(document)}>
                       <Typography variant="body2">
-                        {new Date(document.createdAt).toLocaleDateString('es-EC', {
+                        {new Date(document.fechaFactura || document.createdAt).toLocaleDateString('es-EC', {
                           day: '2-digit',
                           month: '2-digit',
                           year: 'numeric'
                         })}
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {new Date(document.createdAt).toLocaleTimeString('es-EC', {
+                        {new Date(document.fechaFactura || document.createdAt).toLocaleTimeString('es-EC', {
                           hour: '2-digit',
                           minute: '2-digit'
                         })}

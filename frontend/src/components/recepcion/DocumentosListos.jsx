@@ -88,7 +88,7 @@ function DocumentosListos({ onEstadisticasChange }) {
   const cargarDocumentos = async () => {
     try {
       setLoading(true);
-      
+
       const params = {
         page: (page + 1).toString(),
         limit: rowsPerPage.toString(),
@@ -101,7 +101,7 @@ function DocumentosListos({ onEstadisticasChange }) {
       };
 
       // Usar diferentes endpoints según la pestaña
-      const result = currentTab === 0 
+      const result = currentTab === 0
         ? await receptionService.getDocumentosListos(params)
         : await receptionService.getTodosDocumentos(params);
 
@@ -123,7 +123,7 @@ function DocumentosListos({ onEstadisticasChange }) {
   const cargarMatrizadores = async () => {
     try {
       const result = await receptionService.getMatrizadores();
-      
+
       if (result.success) {
         setMatrizadores(result.data.matrizadores || []);
       }
@@ -267,8 +267,8 @@ function DocumentosListos({ onEstadisticasChange }) {
 
   if (error) {
     return (
-      <Alert 
-        severity="error" 
+      <Alert
+        severity="error"
         action={
           <Button color="inherit" size="small" onClick={cargarDocumentos}>
             Reintentar
@@ -287,25 +287,25 @@ function DocumentosListos({ onEstadisticasChange }) {
         <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold', mb: 3, color: 'text.primary' }}>
           Gestión de Documentos
         </Typography>
-        
+
         {/* Pestañas */}
         <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
           <Tabs value={currentTab} onChange={handleTabChange}>
-            <Tab 
-              icon={<CheckCircleIcon />} 
-              label="Documentos Listos" 
+            <Tab
+              icon={<CheckCircleIcon />}
+              label="Documentos Listos"
               iconPosition="start"
               sx={{ textTransform: 'none', fontWeight: 'medium' }}
             />
-            <Tab 
-              icon={<ListIcon />} 
-              label="Todos los Documentos" 
+            <Tab
+              icon={<ListIcon />}
+              label="Todos los Documentos"
               iconPosition="start"
               sx={{ textTransform: 'none', fontWeight: 'medium' }}
             />
           </Tabs>
         </Box>
-        
+
         {/* Filtros y búsqueda */}
         <Card sx={{ mb: 3 }}>
           <CardContent>
@@ -323,7 +323,7 @@ function DocumentosListos({ onEstadisticasChange }) {
                   }}
                 />
               </Grid>
-              
+
               {/* Filtro por matrizador */}
               <Grid item xs={12} md={currentTab === 1 ? 2.5 : 3}>
                 <FormControl fullWidth>
@@ -376,7 +376,7 @@ function DocumentosListos({ onEstadisticasChange }) {
                   </Box>
                 </Grid>
               )}
-              
+
               {/* Botones de acción */}
               <Grid item xs={12} md={currentTab === 1 ? 2 : 5}>
                 <Stack direction="row" spacing={2} justifyContent="flex-end">
@@ -400,17 +400,17 @@ function DocumentosListos({ onEstadisticasChange }) {
                       Entrega Grupal ({selectedDocuments.length})
                     </Button>
                   )}
-                  
+
                   {/* Información de consulta en pestaña "Todos" */}
                   {currentTab === 1 && (
-                    <Chip 
+                    <Chip
                       icon={<InfoIcon />}
                       label="Solo consulta - Sin entregas"
                       color="info"
                       variant="outlined"
                     />
                   )}
-                  
+
                   <Tooltip title="Refrescar">
                     <IconButton onClick={cargarDocumentos} color="primary">
                       <RefreshIcon />
@@ -463,8 +463,8 @@ function DocumentosListos({ onEstadisticasChange }) {
                 {/* Fecha en ambas pestañas */}
                 <TableCell sx={{ fontWeight: 'bold' }}>
                   <TableSortLabel
-                    active={['createdAt','fechaCreacion','created_at'].includes(sortBy)}
-                    direction={['createdAt','fechaCreacion','created_at'].includes(sortBy) ? sortOrder : 'asc'}
+                    active={['createdAt', 'fechaCreacion', 'created_at'].includes(sortBy)}
+                    direction={['createdAt', 'fechaCreacion', 'created_at'].includes(sortBy) ? sortOrder : 'asc'}
                     onClick={() => {
                       const candidate = documentos[0]?.createdAt ? 'createdAt' : (documentos[0]?.fechaCreacion ? 'fechaCreacion' : 'createdAt');
                       setSortBy(candidate);
@@ -493,7 +493,7 @@ function DocumentosListos({ onEstadisticasChange }) {
             </TableHead>
             <TableBody>
               {documentosOrdenados.map((documento) => (
-                <TableRow 
+                <TableRow
                   key={documento.id}
                   selected={currentTab === 0 && selectedDocuments.includes(documento.id)}
                   hover
@@ -519,9 +519,9 @@ function DocumentosListos({ onEstadisticasChange }) {
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Chip 
-                      label={documento.documentType} 
-                      size="small" 
+                    <Chip
+                      label={documento.documentType}
+                      size="small"
                       color="info"
                       variant="outlined"
                     />
@@ -538,50 +538,50 @@ function DocumentosListos({ onEstadisticasChange }) {
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2">
-                      {new Date(documento.createdAt || documento.fechaCreacion).toLocaleDateString('es-EC', {
+                      {new Date(documento.fechaFactura || documento.createdAt || documento.fechaCreacion).toLocaleDateString('es-EC', {
                         day: '2-digit', month: '2-digit', year: 'numeric'
                       })}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {new Date(documento.createdAt || documento.fechaCreacion).toLocaleTimeString('es-EC', {
+                      {new Date(documento.fechaFactura || documento.createdAt || documento.fechaCreacion).toLocaleTimeString('es-EC', {
                         hour: '2-digit', minute: '2-digit'
                       })}
                     </Typography>
                   </TableCell>
-                  
+
                   {/* Estado solo en pestaña "Todos" */}
                   {currentTab === 1 && (
                     <TableCell>
-                      <Chip 
-                        label={documento.status || 'PENDIENTE'} 
-                        size="small" 
+                      <Chip
+                        label={documento.status || 'PENDIENTE'}
+                        size="small"
                         color={getEstadoColor(documento.status)}
                       />
                     </TableCell>
                   )}
-                  
+
                   {/* Código y grupo solo en pestaña "Listos" */}
                   {currentTab === 0 && (
                     <>
                       <TableCell>
-                        <Chip 
-                          label={documento.codigoRetiro || 'N/A'} 
-                          size="small" 
+                        <Chip
+                          label={documento.codigoRetiro || 'N/A'}
+                          size="small"
                           color="success"
                           sx={{ fontFamily: 'monospace', fontWeight: 'bold' }}
                         />
                       </TableCell>
                       <TableCell>
-                        <Chip 
-                          label={documento.isGrouped ? 'Grupo' : 'Individual'} 
-                          size="small" 
+                        <Chip
+                          label={documento.isGrouped ? 'Grupo' : 'Individual'}
+                          size="small"
                           color={documento.isGrouped ? 'secondary' : 'default'}
                           variant="outlined"
                         />
                       </TableCell>
                     </>
                   )}
-                  
+
                   {/* Acciones solo en pestaña "Listos" */}
                   {currentTab === 0 && (
                     <TableCell>
@@ -602,7 +602,7 @@ function DocumentosListos({ onEstadisticasChange }) {
             </TableBody>
           </Table>
         </TableContainer>
-        
+
         {/* Paginación */}
         <TablePagination
           component="div"
@@ -613,7 +613,7 @@ function DocumentosListos({ onEstadisticasChange }) {
           onRowsPerPageChange={handleChangeRowsPerPage}
           rowsPerPageOptions={[5, 10, 25, 50]}
           labelRowsPerPage="Filas por página:"
-          labelDisplayedRows={({ from, to, count }) => 
+          labelDisplayedRows={({ from, to, count }) =>
             `${from}-${to} de ${count !== -1 ? count : `más de ${to}`}`
           }
         />

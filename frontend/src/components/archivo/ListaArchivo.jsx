@@ -1340,7 +1340,7 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
 
                   <TableCell>
                     <Typography variant="body2" color="text.secondary">
-                      {formatearFecha(documento.createdAt)}
+                      {formatearFecha(documento.fechaFactura || documento.createdAt)}
                     </Typography>
                   </TableCell>
 

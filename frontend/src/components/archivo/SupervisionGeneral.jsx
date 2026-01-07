@@ -62,7 +62,7 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
   const [totalDocuments, setTotalDocuments] = useState(0);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState(null);
-  
+
   const [filtros, setFiltros] = useState(() => {
     try {
       const saved = sessionStorage.getItem('archivo_supervision_filtros');
@@ -275,7 +275,7 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
     }
 
     const config = archivoService.formatearAlerta(alerta);
-    
+
     return (
       <Tooltip title={`${config.texto} - ${alerta.dias} días`}>
         <Chip
@@ -291,12 +291,12 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
 
   if (loading) {
     return (
-      <Box 
-        sx={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center', 
-          height: '50vh' 
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '50vh'
         }}
       >
         <CircularProgress />
@@ -318,8 +318,8 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
 
       {/* Error */}
       {error && (
-        <Alert 
-          severity="error" 
+        <Alert
+          severity="error"
           onClose={() => setError(null)}
           sx={{ mb: 3 }}
         >
@@ -513,33 +513,33 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
         {/* Resumen de filtros activos */}
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
           {filtros.search && (
-            <Chip 
-              label={`Búsqueda: "${filtros.search}"`} 
-              size="small" 
+            <Chip
+              label={`Búsqueda: "${filtros.search}"`}
+              size="small"
               onDelete={() => handleFilterChange('search', '')}
             />
           )}
-          
+
           {filtros.matrizador !== 'TODOS' && (
-            <Chip 
-              label={`Matrizador: ${matrizadores.find(m => m.id === parseInt(filtros.matrizador))?.fullName || filtros.matrizador}`} 
-              size="small" 
+            <Chip
+              label={`Matrizador: ${matrizadores.find(m => m.id === parseInt(filtros.matrizador))?.fullName || filtros.matrizador}`}
+              size="small"
               onDelete={() => handleFilterChange('matrizador', 'TODOS')}
             />
           )}
-          
+
           {filtros.estado !== 'TODOS' && (
-            <Chip 
-              label={`Estado: ${archivoService.formatearEstado(filtros.estado).texto}`} 
-              size="small" 
+            <Chip
+              label={`Estado: ${archivoService.formatearEstado(filtros.estado).texto}`}
+              size="small"
               onDelete={() => handleFilterChange('estado', 'TODOS')}
             />
           )}
 
           {filtros.alerta !== 'TODAS' && (
-            <Chip 
-              label={`Alertas: ${filtros.alerta}`} 
-              size="small" 
+            <Chip
+              label={`Alertas: ${filtros.alerta}`}
+              size="small"
               onDelete={() => handleFilterChange('alerta', 'TODAS')}
             />
           )}
@@ -573,13 +573,13 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
             </TableHead>
             <TableBody>
               {documentos.map((documento) => (
-                <TableRow 
+                <TableRow
                   key={documento.id}
                   hover
-                  sx={{ 
-                    '&:hover': { 
-                      backgroundColor: 'action.hover' 
-                    } 
+                  sx={{
+                    '&:hover': {
+                      backgroundColor: 'action.hover'
+                    }
                   }}
                 >
                   <TableCell>
@@ -587,7 +587,7 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
                       #{documento.protocolNumber}
                     </Typography>
                   </TableCell>
-                  
+
                   <TableCell>
                     <Typography variant="body2">
                       {documento.clientName}
@@ -598,41 +598,41 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
                       </Typography>
                     )}
                   </TableCell>
-                  
+
                   <TableCell>
                     <Typography variant="body2">
-                      {documento.assignedTo 
+                      {documento.assignedTo
                         ? `${documento.assignedTo.firstName} ${documento.assignedTo.lastName}`
                         : 'Sin asignar'
                       }
                     </Typography>
                   </TableCell>
-                  
+
                   <TableCell>
-                    <Chip 
+                    <Chip
                       label={archivoService.formatearEstado(documento.status).texto}
                       color={getEstadoColor(documento.status)}
                       size="small"
                       sx={{ fontWeight: 600 }}
                     />
                   </TableCell>
-                  
+
                   <TableCell>
                     <Typography variant="body2" color="text.secondary">
                       {documento.alerta?.dias || 0} días
                     </Typography>
                   </TableCell>
-                  
+
                   <TableCell>
                     {renderAlerta(documento.alerta)}
                   </TableCell>
-                  
+
                   <TableCell>
                     <Typography variant="body2" color="text.secondary">
-                      {formatearFecha(documento.createdAt)}
+                      {formatearFecha(documento.fechaFactura || documento.createdAt)}
                     </Typography>
                   </TableCell>
-                  
+
                   <TableCell>
                     <Tooltip title="Ver detalles (solo lectura)">
                       <IconButton size="small" onClick={() => handleOpenDetail(documento)}>
@@ -642,7 +642,7 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
                   </TableCell>
                 </TableRow>
               ))}
-              
+
               {documentos.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={9} sx={{ textAlign: 'center', py: 4 }}>
