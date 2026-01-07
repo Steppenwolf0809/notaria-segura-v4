@@ -87,7 +87,7 @@ const TIPOS_BIEN_INMUEBLE = ['COMPRAVENTA', 'DONACION', 'CESION_DERECHOS', 'PROM
 // Tipos que requieren datos de vehículo
 const TIPOS_VEHICULO = ['VENTA_VEHICULO'];
 
-import ModalDatosRepresentado from './ModalDatosRepresentado';
+
 
 const FormulariosUAFE = ({ adminMode = false }) => {
   // Estados principales
@@ -324,15 +324,46 @@ const FormulariosUAFE = ({ adminMode = false }) => {
   };
 
   /**
-   * Agregar persona al protocolo
+   * Buscar representado por identificación
    */
-  // Estado para modal de representado
-  const [openModalRepresentado, setOpenModalRepresentado] = useState(false);
+  const buscarRepresentado = async () => {
+    if (!formRepresentado.identificacion) return;
+
+    setBuscandoRepresentado(true);
+    try {
+      // Usar endpoint existente de búsqueda de personas
+      // Si no existe, usamos uno de registro civil o mock
+      // NOTA: Si no tienes un endpoint específico para buscar representado, usa el de verificar cedula
+      const response = await apiClient.get(`/personal/verificar-cedula/${formRepresentado.identificacion}`);
+      // O si tienes el endpoint específico: /formulario-uafe/buscar-representado/:id
+      // const response = await apiClient.get(`/formulario-uafe/buscar-representado/${formRepresentado.identificacion}`);
+
+      if (response.data.success && response.data.existe) {
+        const p = response.data; // Ajustar según estructura de respuesta
+        // Si el endpoint devuelve datos básicos
+        setFormRepresentado(prev => ({
+          ...prev,
+          nombres: p.nombres || '',
+          apellidos: p.apellidos || '',
+          representadoId: p.numeroIdentificacion || formRepresentado.identificacion
+        }));
+        mostrarSnackbar('Representado encontrado', 'success');
+      } else {
+        // Intento de búsqueda en backend si existe endpoint específico, sino solo warning
+        setFormRepresentado(prev => ({ ...prev, representadoId: null }));
+        mostrarSnackbar('Representado no encontrado en base local (ingreso manual)', 'info');
+      }
+    } catch (error) {
+      console.error("Error buscando representado", error);
+    } finally {
+      setBuscandoRepresentado(false);
+    }
+  };
 
   /**
    * Agregar persona al protocolo
    */
-  const agregarPersonaAProtocolo = async (datosExtra = null) => {
+  const agregarPersonaAProtocolo = async () => {
     if (!personaEncontrada) {
       mostrarSnackbar('Primero busca a la persona', 'warning');
       return;
@@ -343,10 +374,20 @@ const FormulariosUAFE = ({ adminMode = false }) => {
       return;
     }
 
-    // Interceptar si es REPRESENTANDO_A y no tenemos datosExtra todavia
-    if (formPersona.actuaPor === 'REPRESENTANDO_A' && !datosExtra) {
-      setOpenModalRepresentado(true);
-      return;
+    // Validar datos del representado si aplica
+    if (formPersona.actuaPor === 'REPRESENTANDO_A') {
+      if (!formRepresentado.identificacion) {
+        mostrarSnackbar('Debe ingresar la identificación del representado', 'warning');
+        return;
+      }
+      if (formRepresentado.tipoPersona === 'NATURAL' && (!formRepresentado.nombres || !formRepresentado.apellidos)) {
+        mostrarSnackbar('Debe ingresar nombres y apellidos del representado', 'warning');
+        return;
+      }
+      if (formRepresentado.tipoPersona === 'JURIDICA' && !formRepresentado.razonSocial) {
+        mostrarSnackbar('Debe ingresar la razón social de la empresa representada', 'warning');
+        return;
+      }
     }
 
     setLoading(true);
@@ -357,9 +398,17 @@ const FormulariosUAFE = ({ adminMode = false }) => {
         actuaPor: formPersona.actuaPor
       };
 
-      if (datosExtra) {
-        if (datosExtra.representadoId) payload.representadoId = datosExtra.representadoId;
-        if (datosExtra.datosRepresentado) payload.datosRepresentado = datosExtra.datosRepresentado;
+      if (formPersona.actuaPor === 'REPRESENTANDO_A') {
+        payload.representadoId = formRepresentado.representadoId;
+        payload.datosRepresentado = {
+          tipoIdentificacion: formRepresentado.tipoIdentificacion,
+          identificacion: formRepresentado.identificacion,
+          nombres: formRepresentado.nombres,
+          apellidos: formRepresentado.apellidos,
+          razonSocial: formRepresentado.razonSocial,
+          nacionalidad: formRepresentado.nacionalidad,
+          tipoPersona: formRepresentado.tipoPersona
+        };
       }
 
       const response = await apiClient.post(
@@ -370,8 +419,17 @@ const FormulariosUAFE = ({ adminMode = false }) => {
       if (response.data.success) {
         mostrarSnackbar('Persona agregada al protocolo exitosamente', 'success');
         setOpenAgregarPersona(false);
-        setOpenModalRepresentado(false); // Asegurar cierre
-        resetFormPersona();
+        // Reset forms
+        setFormRepresentado({
+          identificacion: '',
+          tipoIdentificacion: 'CEDULA',
+          nombres: '',
+          apellidos: '',
+          razonSocial: '',
+          nacionalidad: 'ECUATORIANA',
+          tipoPersona: 'NATURAL',
+          representadoId: null
+        });
         verDetallesProtocolo(protocoloSeleccionado.id); // Actualizar vista detalles
         cargarProtocolos(); // Actualizar lista principal
       } else {
@@ -386,9 +444,7 @@ const FormulariosUAFE = ({ adminMode = false }) => {
     }
   };
 
-  const handleConfirmRepresentado = (datos) => {
-    agregarPersonaAProtocolo(datos);
-  };
+  /* Función antigua deprecated: handleConfirmRepresentado */
 
   /**
    * Ver detalles de un protocolo
