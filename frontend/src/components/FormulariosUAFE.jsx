@@ -149,6 +149,20 @@ const FormulariosUAFE = ({ adminMode = false }) => {
     calidad: 'COMPRADOR',
     actuaPor: 'PROPIOS_DERECHOS'
   });
+
+  // Estado para datos del representado (INLINE)
+  const [formRepresentado, setFormRepresentado] = useState({
+    identificacion: '',
+    tipoIdentificacion: 'CEDULA',
+    nombres: '',
+    apellidos: '',
+    razonSocial: '',
+    nacionalidad: 'ECUATORIANA',
+    tipoPersona: 'NATURAL',
+    representadoId: null // Si se encuentra en BD
+  });
+  const [buscandoRepresentado, setBuscandoRepresentado] = useState(false);
+
   const [buscandoPersona, setBuscandoPersona] = useState(false);
   const [personaEncontrada, setPersonaEncontrada] = useState(null);
 
