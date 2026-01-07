@@ -658,7 +658,7 @@ model PersonaProtocolo {
   representado          PersonaRegistrada? @relation("Representado", fields: [representadoId], references: [numeroIdentificacion])
   sesiones              SesionFormularioUAFE[]
 
-  @@unique([protocoloId, personaCedula])
+  @@unique([protocoloId, personaCedula, calidad, actuaPor])
   @@map("personas_protocolo")
   @@index([protocoloId])
   @@index([personaCedula])

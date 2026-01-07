@@ -147,7 +147,7 @@ export async function crearProtocolo(req, res) {
 export async function agregarPersonaAProtocolo(req, res) {
   try {
     const { protocoloId } = req.params;
-    const { cedula, calidad, actuaPor } = req.body;
+    const { cedula, calidad, actuaPor, representadoId, datosRepresentado } = req.body;
 
     // Validaciones
     if (!cedula || !calidad || !actuaPor) {
@@ -182,12 +182,14 @@ export async function agregarPersonaAProtocolo(req, res) {
       });
     }
 
-    // Verificar que no esté ya en el protocolo
+    // Verificar si ya existe EXACTAMENTE la misma entrada (Cedula + Calidad + ActuaPor)
     const existente = await prisma.personaProtocolo.findUnique({
       where: {
-        protocoloId_personaCedula: {
+        protocoloId_personaCedula_calidad_actuaPor: {
           protocoloId,
-          personaCedula: cedula
+          personaCedula: cedula,
+          calidad,
+          actuaPor
         }
       }
     });
@@ -195,24 +197,56 @@ export async function agregarPersonaAProtocolo(req, res) {
     if (existente) {
       return res.status(409).json({
         success: false,
-        message: 'Esta persona ya está agregada a este protocolo'
+        message: 'Esta persona ya está agregada con esa misma calidad y rol.'
       });
+    }
+
+    // Preparar objeto data
+    const dataToCreate = {
+      protocoloId,
+      personaCedula: cedula,
+      calidad,
+      actuaPor
+    };
+
+    // Agregar datos de representación si aplican
+    if (actuaPor === 'REPRESENTANDO_A') {
+      if (representadoId) {
+        // Verificar que el representado existe
+        const representado = await prisma.personaRegistrada.findUnique({
+          where: { numeroIdentificacion: representadoId }
+        });
+        if (!representado) {
+          return res.status(404).json({
+            success: false,
+            message: 'El representado indicado no se encuentra registrado'
+          });
+        }
+        dataToCreate.representadoId = representadoId;
+      }
+
+      if (datosRepresentado) {
+        dataToCreate.datosRepresentado = datosRepresentado;
+      }
     }
 
     // Agregar persona al protocolo
     const personaProtocolo = await prisma.personaProtocolo.create({
-      data: {
-        protocoloId,
-        personaCedula: cedula,
-        calidad,
-        actuaPor
-      },
+      data: dataToCreate,
       include: {
         persona: {
           select: {
             numeroIdentificacion: true,
             tipoPersona: true,
             completado: true,
+            datosPersonaNatural: true,
+            datosPersonaJuridica: true
+          }
+        },
+        representado: {
+          select: {
+            numeroIdentificacion: true,
+            tipoPersona: true,
             datosPersonaNatural: true,
             datosPersonaJuridica: true
           }
@@ -234,6 +268,23 @@ export async function agregarPersonaAProtocolo(req, res) {
       }
     }
 
+    // Determinar nombre del representado para la respuesta
+    let nombreRepresentado = null;
+    if (personaProtocolo.representado) {
+      if (personaProtocolo.representado.tipoPersona === 'NATURAL') {
+        const d = personaProtocolo.representado.datosPersonaNatural;
+        nombreRepresentado = `${d?.datosPersonales?.nombres || ''} ${d?.datosPersonales?.apellidos || ''}`.trim();
+      } else {
+        nombreRepresentado = personaProtocolo.representado.datosPersonaJuridica?.compania?.razonSocial;
+      }
+    } else if (personaProtocolo.datosRepresentado) {
+      if (personaProtocolo.datosRepresentado.tipoPersona === 'NATURAL') {
+        nombreRepresentado = `${personaProtocolo.datosRepresentado.nombres || ''} ${personaProtocolo.datosRepresentado.apellidos || ''}`.trim();
+      } else {
+        nombreRepresentado = personaProtocolo.datosRepresentado.razonSocial;
+      }
+    }
+
     res.status(201).json({
       success: true,
       message: 'Persona agregada al protocolo exitosamente',
@@ -244,6 +295,7 @@ export async function agregarPersonaAProtocolo(req, res) {
         tipoPersona: personaProtocolo.persona.tipoPersona,
         calidad: personaProtocolo.calidad,
         actuaPor: personaProtocolo.actuaPor,
+        representado: nombreRepresentado ? { nombre: nombreRepresentado } : null,
         completado: personaProtocolo.completado,
         completadoAt: personaProtocolo.completadoAt,
         createdAt: personaProtocolo.createdAt
@@ -253,7 +305,8 @@ export async function agregarPersonaAProtocolo(req, res) {
     console.error('Error agregando persona al protocolo:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al agregar persona'
+      message: 'Error al agregar persona',
+      error: error.message
     });
   }
 }
@@ -374,12 +427,14 @@ export async function loginFormularioUAFE(req, res) {
     }
 
     // 2. Verificar que la persona esté en este protocolo
-    const personaEnProtocolo = await prisma.personaProtocolo.findUnique({
+    // NOTA: Como ahora puede haber múltiples entradas (mismo ID pero diferente calidad),
+    // buscamos la primera válida para permitir el login.
+    // Idealmente se debería permitir seleccionar el rol al hacer login, pero por ahora
+    // logueamos con el primero que encontremos.
+    const personaEnProtocolo = await prisma.personaProtocolo.findFirst({
       where: {
-        protocoloId_personaCedula: {
-          protocoloId: protocolo.id,
-          personaCedula: cedula
-        }
+        protocoloId: protocolo.id,
+        personaCedula: cedula
       },
       include: {
         persona: {
@@ -634,6 +689,23 @@ export async function listarProtocolos(req, res) {
           }
         }
 
+        // Determinar nombre del representado (Listar)
+        let nombreRepresentado = null;
+        if (pp.representado) {
+          if (pp.representado.tipoPersona === 'NATURAL') {
+            const d = pp.representado.datosPersonaNatural;
+            nombreRepresentado = `${d?.datosPersonales?.nombres || ''} ${d?.datosPersonales?.apellidos || ''}`.trim();
+          } else {
+            nombreRepresentado = pp.representado.datosPersonaJuridica?.compania?.razonSocial;
+          }
+        } else if (pp.datosRepresentado) {
+          if (pp.datosRepresentado.tipoPersona === 'NATURAL') {
+            nombreRepresentado = `${pp.datosRepresentado.nombres || ''} ${pp.datosRepresentado.apellidos || ''}`.trim();
+          } else {
+            nombreRepresentado = pp.datosRepresentado.razonSocial;
+          }
+        }
+
         return {
           id: pp.id,
           cedula: pp.persona.numeroIdentificacion,
@@ -641,6 +713,7 @@ export async function listarProtocolos(req, res) {
           tipoPersona: pp.persona.tipoPersona,
           calidad: pp.calidad,
           actuaPor: pp.actuaPor,
+          representado: nombreRepresentado ? { nombre: nombreRepresentado } : null,
           completado: pp.completado,
           completadoAt: pp.completadoAt,
           createdAt: pp.createdAt
@@ -709,6 +782,14 @@ export async function obtenerProtocolo(req, res) {
                 datosPersonaJuridica: true,
                 completado: true
               }
+            },
+            representado: {
+              select: {
+                numeroIdentificacion: true,
+                tipoPersona: true,
+                datosPersonaNatural: true,
+                datosPersonaJuridica: true
+              }
             }
           }
         },
@@ -755,6 +836,23 @@ export async function obtenerProtocolo(req, res) {
         }
       }
 
+      // Determinar nombre del representado
+      let nombreRepresentado = null;
+      if (pp.representado) {
+        if (pp.representado.tipoPersona === 'NATURAL') {
+          const d = pp.representado.datosPersonaNatural;
+          nombreRepresentado = `${d?.datosPersonales?.nombres || ''} ${d?.datosPersonales?.apellidos || ''}`.trim();
+        } else {
+          nombreRepresentado = pp.representado.datosPersonaJuridica?.compania?.razonSocial;
+        }
+      } else if (pp.datosRepresentado) {
+        if (pp.datosRepresentado.tipoPersona === 'NATURAL') {
+          nombreRepresentado = `${pp.datosRepresentado.nombres || ''} ${pp.datosRepresentado.apellidos || ''}`.trim();
+        } else {
+          nombreRepresentado = pp.datosRepresentado.razonSocial;
+        }
+      }
+
       return {
         id: pp.id,
         cedula: pp.persona.numeroIdentificacion,
@@ -762,6 +860,7 @@ export async function obtenerProtocolo(req, res) {
         tipoPersona: pp.persona.tipoPersona,
         calidad: pp.calidad,
         actuaPor: pp.actuaPor,
+        representado: nombreRepresentado ? { nombre: nombreRepresentado } : null,
         completado: pp.completado,
         completadoAt: pp.completadoAt,
         respuestaFormulario: pp.respuestaFormulario,
