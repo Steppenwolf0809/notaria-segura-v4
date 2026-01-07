@@ -2076,15 +2076,21 @@ export async function listarPersonasRegistradas(req, res) {
       let profesion = 'N/A';
 
       if (persona.tipoPersona === 'NATURAL') {
-        const dp = datosNatural.datosPersonales || {};
+        const dp = datosNatural.datosPersonales || datosNatural || {};
         const contacto = datosNatural.contacto || {};
         const laboral = datosNatural.informacionLaboral || {};
 
-        nombre = `${dp.nombres || ''} ${dp.apellidos || ''}`.trim() || 'Sin nombre';
-        email = contacto.email || 'N/A';
-        telefono = contacto.celular || contacto.telefono || 'N/A';
-        ingresoMensual = parseFloat(laboral.ingresoMensual) || 0;
-        profesion = laboral.profesionOcupacion || laboral.profesion || 'N/A';
+        // Intentar varias rutas para obtener nombre
+        const nombres = dp.nombres || datosNatural.nombres || '';
+        const apellidos = dp.apellidos || datosNatural.apellidos || '';
+        nombre = `${nombres} ${apellidos}`.trim();
+
+        if (!nombre) nombre = 'Sin nombre';
+
+        email = contacto.email || datosNatural.email || 'N/A';
+        telefono = contacto.celular || contacto.telefono || datosNatural.telefono || datosNatural.celular || 'N/A';
+        ingresoMensual = parseFloat(laboral.ingresoMensual || datosNatural.ingresoMensual) || 0;
+        profesion = laboral.profesionOcupacion || laboral.profesion || datosNatural.profesion || 'N/A';
       } else {
         const comp = datosJuridica.compania || {};
         const contacto = datosJuridica.contacto || {};
