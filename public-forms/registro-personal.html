@@ -1,16 +1,17 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Registro Personal - Notaría 18 Quito</title>
-    
+
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    
+
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+
     <style>
         :root {
             --azul-notaria: #1A5799;
@@ -36,7 +37,7 @@
             padding: 20px;
             border-radius: 15px 15px 0 0;
             text-align: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
 
         .header-notaria h1 {
@@ -56,7 +57,7 @@
             background: white;
             padding: 30px;
             border-radius: 0 0 15px 15px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
 
         .step {
@@ -69,8 +70,15 @@
         }
 
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         /* PIN Input Styles */
@@ -235,14 +243,16 @@
             margin-bottom: 8px;
         }
 
-        .form-control, .form-select {
+        .form-control,
+        .form-select {
             border: 2px solid #e0e0e0;
             border-radius: 8px;
             padding: 10px 15px;
             transition: border-color 0.3s;
         }
 
-        .form-control:focus, .form-select:focus {
+        .form-control:focus,
+        .form-select:focus {
             border-color: var(--azul-notaria);
             box-shadow: 0 0 0 3px rgba(26, 87, 153, 0.1);
         }
@@ -313,14 +323,16 @@
             display: inline-block;
             width: 20px;
             height: 20px;
-            border: 3px solid rgba(255,255,255,.3);
+            border: 3px solid rgba(255, 255, 255, .3);
             border-radius: 50%;
             border-top-color: white;
             animation: spin 1s ease-in-out infinite;
         }
 
         @keyframes spin {
-            to { transform: rotate(360deg); }
+            to {
+                transform: rotate(360deg);
+            }
         }
 
         /* Radio Buttons */
@@ -349,7 +361,7 @@
             display: none;
         }
 
-        .radio-option input[type="radio"]:checked + label {
+        .radio-option input[type="radio"]:checked+label {
             color: var(--azul-notaria);
             font-weight: 600;
         }
@@ -409,6 +421,7 @@
                 transform: scale(0);
                 opacity: 0;
             }
+
             to {
                 transform: scale(1);
                 opacity: 1;
@@ -446,7 +459,8 @@
                 margin-bottom: 5px;
             }
 
-            .btn-notaria, .btn-secondary-notaria {
+            .btn-notaria,
+            .btn-secondary-notaria {
                 padding: 10px 20px;
                 font-size: 0.9rem;
             }
@@ -483,8 +497,99 @@
                 padding: 0 10px;
             }
         }
+
+        /* Socios Table Styles */
+        .socios-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        .socios-table th,
+        .socios-table td {
+            padding: 10px;
+            border: 1px solid #dee2e6;
+            text-align: left;
+        }
+
+        .socios-table th {
+            background: var(--azul-notaria);
+            color: white;
+            font-weight: 500;
+        }
+
+        .socios-table input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        .btn-remove-socio {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-remove-socio:hover {
+            background: #c82333;
+        }
+
+        .btn-add-socio {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+
+        .btn-add-socio:hover {
+            background: #218838;
+        }
+
+        /* Section Headers */
+        .section-header {
+            background: linear-gradient(90deg, var(--azul-notaria) 0%, var(--azul-oscuro) 100%);
+            color: white;
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .section-header i {
+            margin-right: 10px;
+        }
+
+        /* Form container visibility */
+        .form-natural,
+        .form-juridica {
+            display: none;
+        }
+
+        .form-natural.active,
+        .form-juridica.active {
+            display: block;
+        }
+
+        @media (max-width: 576px) {
+
+            .socios-table th,
+            .socios-table td {
+                padding: 6px;
+                font-size: 0.85rem;
+            }
+        }
     </style>
 </head>
+
 <body>
     <div class="main-container">
         <!-- Header -->
@@ -501,21 +606,13 @@
             <!-- STEP 1: Verificar Cédula -->
             <div id="step1" class="step active">
                 <h4 class="text-center mb-4">Verificación de Identidad</h4>
-                
+
                 <div class="mb-3">
                     <label for="cedula" class="form-label">
                         <i class="fas fa-id-card"></i> Número de Cédula o RUC
                     </label>
-                    <input
-                        type="text"
-                        class="form-control"
-                        id="cedula"
-                        placeholder="Ej: 1234567890"
-                        maxlength="13"
-                        inputmode="numeric"
-                        pattern="[0-9]*"
-                        autocomplete="off"
-                    >
+                    <input type="text" class="form-control" id="cedula" placeholder="Ej: 1234567890" maxlength="13"
+                        inputmode="numeric" pattern="[0-9]*" autocomplete="off">
                     <small class="text-muted">Ingrese su número de identificación sin espacios ni guiones</small>
                 </div>
 
@@ -546,7 +643,7 @@
             <!-- STEP 2A: Crear Cuenta -->
             <div id="step2a" class="step">
                 <h4 class="text-center mb-4">Crear Cuenta Nueva</h4>
-                
+
                 <div class="alert alert-info">
                     <strong><i class="fas fa-info-circle"></i> Cédula:</strong> <span id="cedulaDisplay2a"></span>
                 </div>
@@ -555,12 +652,18 @@
 
                 <div class="pin-wrapper">
                     <div class="pin-container" id="pinCreateContainer">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="0" inputmode="numeric" pattern="[0-9]*">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="1" inputmode="numeric" pattern="[0-9]*">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="2" inputmode="numeric" pattern="[0-9]*">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="3" inputmode="numeric" pattern="[0-9]*">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="4" inputmode="numeric" pattern="[0-9]*">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="5" inputmode="numeric" pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="0" inputmode="numeric"
+                            pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="1" inputmode="numeric"
+                            pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="2" inputmode="numeric"
+                            pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="3" inputmode="numeric"
+                            pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="4" inputmode="numeric"
+                            pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="5" inputmode="numeric"
+                            pattern="[0-9]*">
                     </div>
                     <button class="toggle-pin-btn" onclick="togglePinVisibility('pinCreateContainer')" type="button">
                         <i class="fas fa-eye" id="iconCreate"></i>
@@ -578,12 +681,18 @@
 
                 <div class="pin-wrapper">
                     <div class="pin-container" id="pinConfirmContainer">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="0" inputmode="numeric" pattern="[0-9]*">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="1" inputmode="numeric" pattern="[0-9]*">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="2" inputmode="numeric" pattern="[0-9]*">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="3" inputmode="numeric" pattern="[0-9]*">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="4" inputmode="numeric" pattern="[0-9]*">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="5" inputmode="numeric" pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="0" inputmode="numeric"
+                            pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="1" inputmode="numeric"
+                            pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="2" inputmode="numeric"
+                            pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="3" inputmode="numeric"
+                            pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="4" inputmode="numeric"
+                            pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="5" inputmode="numeric"
+                            pattern="[0-9]*">
                     </div>
                     <button class="toggle-pin-btn" onclick="togglePinVisibility('pinConfirmContainer')" type="button">
                         <i class="fas fa-eye" id="iconConfirm"></i>
@@ -606,7 +715,7 @@
             <!-- STEP 2B: Login -->
             <div id="step2b" class="step">
                 <h4 class="text-center mb-4">Iniciar Sesión</h4>
-                
+
                 <div class="alert alert-info">
                     <strong><i class="fas fa-info-circle"></i> Cédula:</strong> <span id="cedulaDisplay2b"></span>
                 </div>
@@ -615,12 +724,18 @@
 
                 <div class="pin-wrapper">
                     <div class="pin-container" id="pinLoginContainer">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="0" inputmode="numeric" pattern="[0-9]*">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="1" inputmode="numeric" pattern="[0-9]*">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="2" inputmode="numeric" pattern="[0-9]*">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="3" inputmode="numeric" pattern="[0-9]*">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="4" inputmode="numeric" pattern="[0-9]*">
-                        <input type="password" maxlength="1" class="pin-digit" data-index="5" inputmode="numeric" pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="0" inputmode="numeric"
+                            pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="1" inputmode="numeric"
+                            pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="2" inputmode="numeric"
+                            pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="3" inputmode="numeric"
+                            pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="4" inputmode="numeric"
+                            pattern="[0-9]*">
+                        <input type="password" maxlength="1" class="pin-digit" data-index="5" inputmode="numeric"
+                            pattern="[0-9]*">
                     </div>
                     <button class="toggle-pin-btn" onclick="togglePinVisibility('pinLoginContainer')" type="button">
                         <i class="fas fa-eye" id="iconLogin"></i>
@@ -644,7 +759,7 @@
                 <div class="alert alert-warning">
                     <h6><i class="fas fa-lock"></i> ¿Olvidó su PIN?</h6>
                     <p class="mb-0 small">
-                        Por seguridad, debe acercarse a la <strong>Notaría 18</strong> 
+                        Por seguridad, debe acercarse a la <strong>Notaría 18</strong>
                         con su cédula física para resetear su PIN.
                     </p>
                 </div>
@@ -672,393 +787,945 @@
                     <div class="progress-label" id="progressLabel">Paso 1 de 5: Datos Personales</div>
                 </div>
 
-                <!-- Tabs -->
-                <ul class="nav nav-tabs mb-4" id="formTabs" role="tablist">
-                    <li class="nav-item">
-                        <a class="nav-link active" id="tab-personales" data-bs-toggle="tab" href="#personales" onclick="updateProgress(0)">
-                            <i class="fas fa-user"></i> <span class="d-none d-md-inline">Personales</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" id="tab-direccion" data-bs-toggle="tab" href="#direccion" onclick="updateProgress(1)">
-                            <i class="fas fa-map-marker-alt"></i> <span class="d-none d-md-inline">Dirección</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" id="tab-laboral" data-bs-toggle="tab" href="#laboral" onclick="updateProgress(2)">
-                            <i class="fas fa-briefcase"></i> <span class="d-none d-md-inline">Laboral</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" id="tab-conyuge" data-bs-toggle="tab" href="#conyuge" onclick="updateProgress(3)">
-                            <i class="fas fa-ring"></i> <span class="d-none d-md-inline">Cónyuge</span>
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" id="tab-pep" data-bs-toggle="tab" href="#pep" onclick="updateProgress(4)">
-                            <i class="fas fa-shield-alt"></i> <span class="d-none d-md-inline">PEP</span>
-                        </a>
-                    </li>
-                </ul>
+                <!-- ==================== FORMULARIO PERSONA NATURAL ==================== -->
+                <div id="formNatural" class="form-natural">
+                    <!-- Tabs -->
+                    <ul class="nav nav-tabs mb-4" id="formTabs" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" id="tab-personales" data-bs-toggle="tab" href="#personales"
+                                onclick="updateProgress(0)">
+                                <i class="fas fa-user"></i> <span class="d-none d-md-inline">Personales</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="tab-direccion" data-bs-toggle="tab" href="#direccion"
+                                onclick="updateProgress(1)">
+                                <i class="fas fa-map-marker-alt"></i> <span class="d-none d-md-inline">Dirección</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="tab-laboral" data-bs-toggle="tab" href="#laboral"
+                                onclick="updateProgress(2)">
+                                <i class="fas fa-briefcase"></i> <span class="d-none d-md-inline">Laboral</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="tab-conyuge" data-bs-toggle="tab" href="#conyuge"
+                                onclick="updateProgress(3)">
+                                <i class="fas fa-ring"></i> <span class="d-none d-md-inline">Cónyuge</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="tab-pep" data-bs-toggle="tab" href="#pep"
+                                onclick="updateProgress(4)">
+                                <i class="fas fa-shield-alt"></i> <span class="d-none d-md-inline">PEP</span>
+                            </a>
+                        </li>
+                    </ul>
 
-                <!-- Tab Content -->
-                <div class="tab-content" id="formTabsContent">
-                    <!-- Tab Datos Personales -->
-                    <div class="tab-pane fade show active" id="personales">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Apellidos</label>
-                                <input type="text" class="form-control" id="apellidos">
+                    <!-- Tab Content -->
+                    <div class="tab-content" id="formTabsContent">
+                        <!-- Tab Datos Personales -->
+                        <div class="tab-pane fade show active" id="personales">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Apellidos</label>
+                                    <input type="text" class="form-control" id="apellidos">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Nombres</label>
+                                    <input type="text" class="form-control" id="nombres">
+                                </div>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Nombres</label>
-                                <input type="text" class="form-control" id="nombres">
-                            </div>
-                        </div>
 
-                        <div class="row">
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">Género</label>
-                                <select class="form-select" id="genero">
-                                    <option value="">Seleccionar...</option>
-                                    <option value="MASCULINO">Masculino</option>
-                                    <option value="FEMENINO">Femenino</option>
-                                </select>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Género</label>
+                                    <select class="form-select" id="genero">
+                                        <option value="">Seleccionar...</option>
+                                        <option value="MASCULINO">Masculino</option>
+                                        <option value="FEMENINO">Femenino</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Estado Civil</label>
+                                    <select class="form-select" id="estadoCivil">
+                                        <option value="">Seleccionar...</option>
+                                        <option value="SOLTERO">Soltero/a</option>
+                                        <option value="CASADO">Casado/a</option>
+                                        <option value="DIVORCIADO">Divorciado/a</option>
+                                        <option value="VIUDO">Viudo/a</option>
+                                        <option value="UNION_LIBRE">Unión Libre</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Nivel de Estudio</label>
+                                    <select class="form-select" id="nivelEstudio">
+                                        <option value="">Seleccionar...</option>
+                                        <option value="BACHILLER">Bachiller</option>
+                                        <option value="UNIVERSITARIO">Universitario</option>
+                                        <option value="MAESTRIA">Maestría</option>
+                                        <option value="POSTGRADO">Post Grado</option>
+                                    </select>
+                                </div>
                             </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">Estado Civil</label>
-                                <select class="form-select" id="estadoCivil">
-                                    <option value="">Seleccionar...</option>
-                                    <option value="SOLTERO">Soltero/a</option>
-                                    <option value="CASADO">Casado/a</option>
-                                    <option value="DIVORCIADO">Divorciado/a</option>
-                                    <option value="VIUDO">Viudo/a</option>
-                                    <option value="UNION_LIBRE">Unión Libre</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">Nivel de Estudio</label>
-                                <select class="form-select" id="nivelEstudio">
-                                    <option value="">Seleccionar...</option>
-                                    <option value="BACHILLER">Bachiller</option>
-                                    <option value="UNIVERSITARIO">Universitario</option>
-                                    <option value="MAESTRIA">Maestría</option>
-                                    <option value="POSTGRADO">Post Grado</option>
-                                </select>
-                            </div>
-                        </div>
 
-                        <div class="row">
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">Email</label>
-                                <input type="email" class="form-control" id="email">
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Email</label>
+                                    <input type="email" class="form-control" id="email">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Teléfono</label>
+                                    <input type="tel" class="form-control" id="telefono">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Celular</label>
+                                    <input type="tel" class="form-control" id="celular">
+                                </div>
                             </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">Teléfono</label>
-                                <input type="tel" class="form-control" id="telefono">
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">Celular</label>
-                                <input type="tel" class="form-control" id="celular">
-                            </div>
-                        </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Nacionalidad</label>
-                            <input type="text" class="form-control" id="nacionalidad" value="ECUATORIANA">
-                        </div>
-
-                        <!-- Navigation -->
-                        <div class="tab-navigation">
-                            <button class="btn btn-notaria btn-nav" onclick="nextTab()">
-                                Siguiente <i class="fas fa-arrow-right"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Tab Dirección -->
-                    <div class="tab-pane fade" id="direccion">
-                        <div class="row">
-                            <div class="col-md-8 mb-3">
-                                <label class="form-label">Calle Principal</label>
-                                <input type="text" class="form-control" id="callePrincipal">
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">Número</label>
-                                <input type="text" class="form-control" id="numeroCasa">
-                            </div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Calle Secundaria</label>
-                            <input type="text" class="form-control" id="calleSecundaria">
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">Provincia</label>
-                                <input type="text" class="form-control" id="provincia">
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">Cantón</label>
-                                <input type="text" class="form-control" id="canton">
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">Parroquia</label>
-                                <input type="text" class="form-control" id="parroquia">
-                            </div>
-                        </div>
-
-                        <!-- Navigation -->
-                        <div class="tab-navigation">
-                            <button class="btn btn-secondary-notaria btn-nav" onclick="prevTab()">
-                                <i class="fas fa-arrow-left"></i> Anterior
-                            </button>
-                            <button class="btn btn-notaria btn-nav" onclick="nextTab()">
-                                Siguiente <i class="fas fa-arrow-right"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Tab Información Laboral -->
-                    <div class="tab-pane fade" id="laboral">
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Situación Laboral</label>
-                                <select class="form-select" id="situacionLaboral">
-                                    <option value="">Seleccionar...</option>
-                                    <option value="PUBLICO">Público</option>
-                                    <option value="PRIVADO">Privado</option>
-                                    <option value="JUBILADO">Jubilado</option>
-                                    <option value="NO_APLICA">No Aplica</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Relación de Dependencia</label>
-                                <select class="form-select" id="relacionDependencia">
-                                    <option value="">Seleccionar...</option>
-                                    <option value="SI">Sí</option>
-                                    <option value="NO">No</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Nombre de la Entidad</label>
-                            <input type="text" class="form-control" id="nombreEntidad">
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Dirección de la Empresa</label>
-                            <input type="text" class="form-control" id="direccionEmpresa">
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Provincia / Cantón</label>
-                                <input type="text" class="form-control" id="provinciaCantonEmpresa">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Profesión / Ocupación</label>
-                                <input type="text" class="form-control" id="profesion">
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">Cargo</label>
-                                <input type="text" class="form-control" id="cargo">
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">Ingreso Mensual</label>
-                                <input type="number" class="form-control" id="ingresoMensual" step="0.01" inputmode="decimal">
-                            </div>
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">Fecha de Ingreso</label>
-                                <input type="date" class="form-control" id="fechaIngreso">
-                            </div>
-                        </div>
-
-                        <!-- Navigation -->
-                        <div class="tab-navigation">
-                            <button class="btn btn-secondary-notaria btn-nav" onclick="prevTab()">
-                                <i class="fas fa-arrow-left"></i> Anterior
-                            </button>
-                            <button class="btn btn-notaria btn-nav" onclick="nextTab()">
-                                Siguiente <i class="fas fa-arrow-right"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Tab Cónyuge -->
-                    <div class="tab-pane fade" id="conyuge">
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle"></i> Complete esta sección solo si su estado civil es Casado/a o Unión Libre
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Apellidos</label>
-                                <input type="text" class="form-control" id="conyugeApellidos">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Nombres</label>
-                                <input type="text" class="form-control" id="conyugeNombres">
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Tipo de Identificación</label>
-                                <select class="form-select" id="conyugeTipoId">
-                                    <option value="">Seleccionar...</option>
-                                    <option value="CEDULA">Cédula</option>
-                                    <option value="PASAPORTE">Pasaporte</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Número de Identificación</label>
-                                <input type="text" class="form-control" id="conyugeNumeroId" inputmode="numeric" pattern="[0-9]*">
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
+                            <div class="mb-3">
                                 <label class="form-label">Nacionalidad</label>
-                                <input type="text" class="form-control" id="conyugeNacionalidad">
+                                <input type="text" class="form-control" id="nacionalidad" value="ECUATORIANA">
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Correo Electrónico</label>
-                                <input type="email" class="form-control" id="conyugeEmail">
+
+                            <!-- Navigation -->
+                            <div class="tab-navigation">
+                                <button class="btn btn-notaria btn-nav" onclick="nextTab()">
+                                    Siguiente <i class="fas fa-arrow-right"></i>
+                                </button>
                             </div>
                         </div>
 
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Profesión / Ocupación</label>
-                                <input type="text" class="form-control" id="conyugeProfesion">
+                        <!-- Tab Dirección -->
+                        <div class="tab-pane fade" id="direccion">
+                            <div class="row">
+                                <div class="col-md-8 mb-3">
+                                    <label class="form-label">Calle Principal</label>
+                                    <input type="text" class="form-control" id="callePrincipal">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Número</label>
+                                    <input type="text" class="form-control" id="numeroCasa">
+                                </div>
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Celular</label>
-                                <input type="tel" class="form-control" id="conyugeCelular">
+
+                            <div class="mb-3">
+                                <label class="form-label">Calle Secundaria</label>
+                                <input type="text" class="form-control" id="calleSecundaria">
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Provincia</label>
+                                    <input type="text" class="form-control" id="provincia">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Cantón</label>
+                                    <input type="text" class="form-control" id="canton">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Parroquia</label>
+                                    <input type="text" class="form-control" id="parroquia">
+                                </div>
+                            </div>
+
+                            <!-- Navigation -->
+                            <div class="tab-navigation">
+                                <button class="btn btn-secondary-notaria btn-nav" onclick="prevTab()">
+                                    <i class="fas fa-arrow-left"></i> Anterior
+                                </button>
+                                <button class="btn btn-notaria btn-nav" onclick="nextTab()">
+                                    Siguiente <i class="fas fa-arrow-right"></i>
+                                </button>
                             </div>
                         </div>
 
-                        <div class="row">
-                            <div class="col-md-12 mb-3">
-                                <label class="form-label">Situación Laboral</label>
-                                <select class="form-select" id="conyugeSituacionLaboral">
-                                    <option value="">Seleccionar...</option>
-                                    <option value="EMPLEADO_PUBLICO">Empleado Público</option>
-                                    <option value="EMPLEADO_PRIVADO">Empleado Privado</option>
-                                    <option value="INDEPENDIENTE">Independiente/Profesional</option>
-                                    <option value="COMERCIANTE">Comerciante</option>
-                                    <option value="JUBILADO">Jubilado/Pensionado</option>
-                                    <option value="AMA_DE_CASA">Ama de Casa</option>
-                                    <option value="ESTUDIANTE">Estudiante</option>
-                                    <option value="DESEMPLEADO">Desempleado</option>
-                                    <option value="OTRO">Otro</option>
-                                </select>
+                        <!-- Tab Información Laboral -->
+                        <div class="tab-pane fade" id="laboral">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Situación Laboral</label>
+                                    <select class="form-select" id="situacionLaboral">
+                                        <option value="">Seleccionar...</option>
+                                        <option value="PUBLICO">Público</option>
+                                        <option value="PRIVADO">Privado</option>
+                                        <option value="JUBILADO">Jubilado</option>
+                                        <option value="NO_APLICA">No Aplica</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Relación de Dependencia</label>
+                                    <select class="form-select" id="relacionDependencia">
+                                        <option value="">Seleccionar...</option>
+                                        <option value="SI">Sí</option>
+                                        <option value="NO">No</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Nombre de la Entidad</label>
+                                <input type="text" class="form-control" id="nombreEntidad">
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Dirección de la Empresa</label>
+                                <input type="text" class="form-control" id="direccionEmpresa">
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Provincia / Cantón</label>
+                                    <input type="text" class="form-control" id="provinciaCantonEmpresa">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Profesión / Ocupación</label>
+                                    <input type="text" class="form-control" id="profesion">
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Cargo</label>
+                                    <input type="text" class="form-control" id="cargo">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Ingreso Mensual</label>
+                                    <input type="number" class="form-control" id="ingresoMensual" step="0.01"
+                                        inputmode="decimal">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Fecha de Ingreso</label>
+                                    <input type="date" class="form-control" id="fechaIngreso">
+                                </div>
+                            </div>
+
+                            <!-- Navigation -->
+                            <div class="tab-navigation">
+                                <button class="btn btn-secondary-notaria btn-nav" onclick="prevTab()">
+                                    <i class="fas fa-arrow-left"></i> Anterior
+                                </button>
+                                <button class="btn btn-notaria btn-nav" onclick="nextTab()">
+                                    Siguiente <i class="fas fa-arrow-right"></i>
+                                </button>
                             </div>
                         </div>
 
-                        <!-- Navigation -->
-                        <div class="tab-navigation">
-                            <button class="btn btn-secondary-notaria btn-nav" onclick="prevTab()">
-                                <i class="fas fa-arrow-left"></i> Anterior
-                            </button>
-                            <button class="btn btn-notaria btn-nav" onclick="nextTab()">
-                                Siguiente <i class="fas fa-arrow-right"></i>
-                            </button>
-                        </div>
-                    </div>
+                        <!-- Tab Cónyuge -->
+                        <div class="tab-pane fade" id="conyuge">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i> Complete esta sección solo si su estado civil es
+                                Casado/a
+                                o Unión Libre
+                            </div>
 
-                    <!-- Tab PEP -->
-                    <div class="tab-pane fade" id="pep">
-                        <div class="alert alert-warning">
-                            <h6><i class="fas fa-shield-alt"></i> Persona Expuesta Políticamente (PEP)</h6>
-                            <p class="mb-0 small">
-                                Se considera PEP a quienes desempeñan o han desempeñado funciones públicas destacadas.
-                            </p>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Apellidos</label>
+                                    <input type="text" class="form-control" id="conyugeApellidos">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Nombres</label>
+                                    <input type="text" class="form-control" id="conyugeNombres">
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Tipo de Identificación</label>
+                                    <select class="form-select" id="conyugeTipoId">
+                                        <option value="">Seleccionar...</option>
+                                        <option value="CEDULA">Cédula</option>
+                                        <option value="PASAPORTE">Pasaporte</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Número de Identificación</label>
+                                    <input type="text" class="form-control" id="conyugeNumeroId" inputmode="numeric"
+                                        pattern="[0-9]*">
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Nacionalidad</label>
+                                    <input type="text" class="form-control" id="conyugeNacionalidad">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Correo Electrónico</label>
+                                    <input type="email" class="form-control" id="conyugeEmail">
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Profesión / Ocupación</label>
+                                    <input type="text" class="form-control" id="conyugeProfesion">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Celular</label>
+                                    <input type="tel" class="form-control" id="conyugeCelular">
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-12 mb-3">
+                                    <label class="form-label">Situación Laboral</label>
+                                    <select class="form-select" id="conyugeSituacionLaboral">
+                                        <option value="">Seleccionar...</option>
+                                        <option value="EMPLEADO_PUBLICO">Empleado Público</option>
+                                        <option value="EMPLEADO_PRIVADO">Empleado Privado</option>
+                                        <option value="INDEPENDIENTE">Independiente/Profesional</option>
+                                        <option value="COMERCIANTE">Comerciante</option>
+                                        <option value="JUBILADO">Jubilado/Pensionado</option>
+                                        <option value="AMA_DE_CASA">Ama de Casa</option>
+                                        <option value="ESTUDIANTE">Estudiante</option>
+                                        <option value="DESEMPLEADO">Desempleado</option>
+                                        <option value="OTRO">Otro</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Navigation -->
+                            <div class="tab-navigation">
+                                <button class="btn btn-secondary-notaria btn-nav" onclick="prevTab()">
+                                    <i class="fas fa-arrow-left"></i> Anterior
+                                </button>
+                                <button class="btn btn-notaria btn-nav" onclick="nextTab()">
+                                    Siguiente <i class="fas fa-arrow-right"></i>
+                                </button>
+                            </div>
                         </div>
 
-                        <div class="mb-4">
-                            <label class="form-label d-block">
-                                ¿Se considera una Persona Expuesta Políticamente?
-                            </label>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" name="esPEP" id="esPEPSi" value="SI">
-                                <label class="form-check-label" for="esPEPSi">Sí</label>
+                        <!-- Tab PEP -->
+                        <div class="tab-pane fade" id="pep">
+                            <div class="alert alert-warning">
+                                <h6><i class="fas fa-shield-alt"></i> Persona Expuesta Políticamente (PEP)</h6>
+                                <p class="mb-0 small">
+                                    Se considera PEP a quienes desempeñan o han desempeñado funciones públicas
+                                    destacadas.
+                                </p>
                             </div>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" name="esPEP" id="esPEPNo" value="NO" checked>
-                                <label class="form-check-label" for="esPEPNo">No</label>
-                            </div>
-                        </div>
 
-                        <div class="mb-4">
-                            <label class="form-label d-block">
-                                ¿Es familiar de un PEP? (1er y 2do grado de consanguinidad)
-                            </label>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" name="esFamiliarPEP" id="esFamiliarPEPSi" value="SI">
-                                <label class="form-check-label" for="esFamiliarPEPSi">Sí</label>
+                            <div class="mb-4">
+                                <label class="form-label d-block">
+                                    ¿Se considera una Persona Expuesta Políticamente?
+                                </label>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="esPEP" id="esPEPSi" value="SI">
+                                    <label class="form-check-label" for="esPEPSi">Sí</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="esPEP" id="esPEPNo" value="NO"
+                                        checked>
+                                    <label class="form-check-label" for="esPEPNo">No</label>
+                                </div>
                             </div>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" name="esFamiliarPEP" id="esFamiliarPEPNo" value="NO" checked>
-                                <label class="form-check-label" for="esFamiliarPEPNo">No</label>
-                            </div>
-                        </div>
 
-                        <div class="mb-4">
-                            <label class="form-label d-block">
-                                ¿Es colaborador cercano de un PEP?
-                            </label>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" name="esColaboradorPEP" id="esColaboradorPEPSi" value="SI">
-                                <label class="form-check-label" for="esColaboradorPEPSi">Sí</label>
+                            <div class="mb-4">
+                                <label class="form-label d-block">
+                                    ¿Es familiar de un PEP? (1er y 2do grado de consanguinidad)
+                                </label>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="esFamiliarPEP"
+                                        id="esFamiliarPEPSi" value="SI">
+                                    <label class="form-check-label" for="esFamiliarPEPSi">Sí</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="esFamiliarPEP"
+                                        id="esFamiliarPEPNo" value="NO" checked>
+                                    <label class="form-check-label" for="esFamiliarPEPNo">No</label>
+                                </div>
                             </div>
-                            <div class="form-check form-check-inline">
-                                <input class="form-check-input" type="radio" name="esColaboradorPEP" id="esColaboradorPEPNo" value="NO" checked>
-                                <label class="form-check-label" for="esColaboradorPEPNo">No</label>
-                            </div>
-                        </div>
 
-                        <!-- Navigation -->
-                        <div class="tab-navigation">
-                            <button class="btn btn-secondary-notaria btn-nav" onclick="prevTab()">
-                                <i class="fas fa-arrow-left"></i> Anterior
-                            </button>
+                            <div class="mb-4">
+                                <label class="form-label d-block">
+                                    ¿Es colaborador cercano de un PEP?
+                                </label>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="esColaboradorPEP"
+                                        id="esColaboradorPEPSi" value="SI">
+                                    <label class="form-check-label" for="esColaboradorPEPSi">Sí</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="esColaboradorPEP"
+                                        id="esColaboradorPEPNo" value="NO" checked>
+                                    <label class="form-check-label" for="esColaboradorPEPNo">No</label>
+                                </div>
+                            </div>
+
+                            <!-- Navigation -->
+                            <div class="tab-navigation">
+                                <button class="btn btn-secondary-notaria btn-nav" onclick="prevTab()">
+                                    <i class="fas fa-arrow-left"></i> Anterior
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
+                <!-- ==================== FIN FORMULARIO PERSONA NATURAL ==================== -->
+
+                <!-- ==================== FORMULARIO PERSONA JURÍDICA ==================== -->
+                <div id="formJuridica" class="form-juridica">
+                    <!-- Tabs Persona Jurídica -->
+                    <ul class="nav nav-tabs mb-4" id="formTabsJuridica" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active" id="tab-compania" data-bs-toggle="tab" href="#compania"
+                                onclick="updateProgressJuridica(0)">
+                                <i class="fas fa-building"></i> <span class="d-none d-md-inline">Compañía</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="tab-representante" data-bs-toggle="tab" href="#representante"
+                                onclick="updateProgressJuridica(1)">
+                                <i class="fas fa-user-tie"></i> <span class="d-none d-md-inline">Rep. Legal</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="tab-conyugeRep" data-bs-toggle="tab" href="#conyugeRep"
+                                onclick="updateProgressJuridica(2)">
+                                <i class="fas fa-ring"></i> <span class="d-none d-md-inline">Cónyuge Rep.</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="tab-socios" data-bs-toggle="tab" href="#socios"
+                                onclick="updateProgressJuridica(3)">
+                                <i class="fas fa-users"></i> <span class="d-none d-md-inline">Socios</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="tab-pepJuridica" data-bs-toggle="tab" href="#pepJuridica"
+                                onclick="updateProgressJuridica(4)">
+                                <i class="fas fa-shield-alt"></i> <span class="d-none d-md-inline">PEP</span>
+                            </a>
+                        </li>
+                    </ul>
+
+                    <!-- Tab Content Persona Jurídica -->
+                    <div class="tab-content" id="formTabsContentJuridica">
+                        <!-- Tab 1: Compañía -->
+                        <div class="tab-pane fade show active" id="compania">
+                            <div class="section-header">
+                                <i class="fas fa-building"></i> Datos de la Compañía
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-8 mb-3">
+                                    <label class="form-label">Razón Social *</label>
+                                    <input type="text" class="form-control" id="jRazonSocial"
+                                        placeholder="Ej: CONSTRUCTORA EJEMPLO S.A.">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">RUC *</label>
+                                    <input type="text" class="form-control" id="jRuc" maxlength="13" inputmode="numeric"
+                                        pattern="[0-9]*" readonly>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Objeto Social *</label>
+                                <textarea class="form-control" id="jObjetoSocial" rows="2"
+                                    placeholder="Actividad económica principal de la empresa"></textarea>
+                            </div>
+
+                            <div class="section-header mt-4">
+                                <i class="fas fa-map-marker-alt"></i> Dirección de la Compañía
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-8 mb-3">
+                                    <label class="form-label">Calle Principal</label>
+                                    <input type="text" class="form-control" id="jCallePrincipal">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Número</label>
+                                    <input type="text" class="form-control" id="jNumero">
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Calle Secundaria</label>
+                                <input type="text" class="form-control" id="jCalleSecundaria">
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Provincia</label>
+                                    <input type="text" class="form-control" id="jProvincia" value="PICHINCHA">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Cantón</label>
+                                    <input type="text" class="form-control" id="jCanton" value="QUITO">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Parroquia</label>
+                                    <input type="text" class="form-control" id="jParroquia">
+                                </div>
+                            </div>
+
+                            <div class="section-header mt-4">
+                                <i class="fas fa-phone-alt"></i> Contacto de la Compañía
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Email</label>
+                                    <input type="email" class="form-control" id="jEmailCompania">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Teléfono</label>
+                                    <input type="tel" class="form-control" id="jTelefonoCompania">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Celular</label>
+                                    <input type="tel" class="form-control" id="jCelularCompania">
+                                </div>
+                            </div>
+
+                            <!-- Navigation -->
+                            <div class="tab-navigation">
+                                <button class="btn btn-notaria btn-nav" onclick="nextTabJuridica()">
+                                    Siguiente <i class="fas fa-arrow-right"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Tab 2: Representante Legal -->
+                        <div class="tab-pane fade" id="representante">
+                            <div class="section-header">
+                                <i class="fas fa-user-tie"></i> Datos del Representante Legal
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Apellidos *</label>
+                                    <input type="text" class="form-control" id="jRepApellidos">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Nombres *</label>
+                                    <input type="text" class="form-control" id="jRepNombres">
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Tipo Identificación</label>
+                                    <select class="form-select" id="jRepTipoId">
+                                        <option value="CEDULA">Cédula</option>
+                                        <option value="PASAPORTE">Pasaporte</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Número Identificación *</label>
+                                    <input type="text" class="form-control" id="jRepNumeroId" inputmode="numeric"
+                                        pattern="[0-9]*" maxlength="13">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Nacionalidad</label>
+                                    <input type="text" class="form-control" id="jRepNacionalidad" value="ECUATORIANA">
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Género</label>
+                                    <select class="form-select" id="jRepGenero">
+                                        <option value="">Seleccionar...</option>
+                                        <option value="MASCULINO">Masculino</option>
+                                        <option value="FEMENINO">Femenino</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Estado Civil</label>
+                                    <select class="form-select" id="jRepEstadoCivil">
+                                        <option value="">Seleccionar...</option>
+                                        <option value="SOLTERO">Soltero/a</option>
+                                        <option value="CASADO">Casado/a</option>
+                                        <option value="DIVORCIADO">Divorciado/a</option>
+                                        <option value="VIUDO">Viudo/a</option>
+                                        <option value="UNION_LIBRE">Unión Libre</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Nivel de Estudio</label>
+                                    <select class="form-select" id="jRepNivelEstudio">
+                                        <option value="">Seleccionar...</option>
+                                        <option value="BACHILLER">Bachiller</option>
+                                        <option value="UNIVERSITARIO">Universitario</option>
+                                        <option value="MAESTRIA">Maestría</option>
+                                        <option value="POSTGRADO">Post Grado</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Email</label>
+                                    <input type="email" class="form-control" id="jRepEmail">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Teléfono</label>
+                                    <input type="tel" class="form-control" id="jRepTelefono">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Celular</label>
+                                    <input type="tel" class="form-control" id="jRepCelular">
+                                </div>
+                            </div>
+
+                            <div class="section-header mt-4">
+                                <i class="fas fa-home"></i> Dirección Domiciliaria del Representante
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Calle Principal</label>
+                                    <input type="text" class="form-control" id="jRepCallePrincipal">
+                                </div>
+                                <div class="col-md-2 mb-3">
+                                    <label class="form-label">Número</label>
+                                    <input type="text" class="form-control" id="jRepNumero">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Calle Secundaria</label>
+                                    <input type="text" class="form-control" id="jRepCalleSecundaria">
+                                </div>
+                            </div>
+
+                            <div class="section-header mt-4">
+                                <i class="fas fa-briefcase"></i> Información Laboral del Representante
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Situación Laboral</label>
+                                    <select class="form-select" id="jRepSituacionLaboral">
+                                        <option value="">Seleccionar...</option>
+                                        <option value="PUBLICO">Público</option>
+                                        <option value="PRIVADO">Privado</option>
+                                        <option value="JUBILADO">Jubilado</option>
+                                        <option value="NO_APLICA">No Aplica</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Relación de Dependencia</label>
+                                    <select class="form-select" id="jRepRelacionDependencia">
+                                        <option value="">Seleccionar...</option>
+                                        <option value="SI">Sí</option>
+                                        <option value="NO">No</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Profesión / Ocupación</label>
+                                    <input type="text" class="form-control" id="jRepProfesion">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Ingreso Mensual</label>
+                                    <input type="number" class="form-control" id="jRepIngresoMensual" step="0.01"
+                                        inputmode="decimal">
+                                </div>
+                            </div>
+
+                            <!-- Navigation -->
+                            <div class="tab-navigation">
+                                <button class="btn btn-secondary-notaria btn-nav" onclick="prevTabJuridica()">
+                                    <i class="fas fa-arrow-left"></i> Anterior
+                                </button>
+                                <button class="btn btn-notaria btn-nav" onclick="nextTabJuridica()">
+                                    Siguiente <i class="fas fa-arrow-right"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Tab 3: Cónyuge del Representante -->
+                        <div class="tab-pane fade" id="conyugeRep">
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i> Complete esta sección solo si el representante
+                                legal es Casado/a o Unión Libre
+                            </div>
+
+                            <div class="section-header">
+                                <i class="fas fa-ring"></i> Datos del Cónyuge del Representante Legal
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Apellidos</label>
+                                    <input type="text" class="form-control" id="jConyugeApellidos">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Nombres</label>
+                                    <input type="text" class="form-control" id="jConyugeNombres">
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Tipo Identificación</label>
+                                    <select class="form-select" id="jConyugeTipoId">
+                                        <option value="">Seleccionar...</option>
+                                        <option value="CEDULA">Cédula</option>
+                                        <option value="PASAPORTE">Pasaporte</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Número Identificación</label>
+                                    <input type="text" class="form-control" id="jConyugeNumeroId" inputmode="numeric"
+                                        pattern="[0-9]*">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Nacionalidad</label>
+                                    <input type="text" class="form-control" id="jConyugeNacionalidad">
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Género</label>
+                                    <select class="form-select" id="jConyugeGenero">
+                                        <option value="">Seleccionar...</option>
+                                        <option value="MASCULINO">Masculino</option>
+                                        <option value="FEMENINO">Femenino</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Estado Civil</label>
+                                    <select class="form-select" id="jConyugeEstadoCivil">
+                                        <option value="">Seleccionar...</option>
+                                        <option value="CASADO">Casado/a</option>
+                                        <option value="UNION_LIBRE">Unión Libre</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Nivel de Estudio</label>
+                                    <select class="form-select" id="jConyugeNivelEstudio">
+                                        <option value="">Seleccionar...</option>
+                                        <option value="BACHILLER">Bachiller</option>
+                                        <option value="UNIVERSITARIO">Universitario</option>
+                                        <option value="MAESTRIA">Maestría</option>
+                                        <option value="POSTGRADO">Post Grado</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Email</label>
+                                    <input type="email" class="form-control" id="jConyugeEmail">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Celular</label>
+                                    <input type="tel" class="form-control" id="jConyugeCelular">
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Calle Principal</label>
+                                    <input type="text" class="form-control" id="jConyugeCallePrincipal">
+                                </div>
+                                <div class="col-md-2 mb-3">
+                                    <label class="form-label">Número</label>
+                                    <input type="text" class="form-control" id="jConyugeNumero">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label class="form-label">Calle Secundaria</label>
+                                    <input type="text" class="form-control" id="jConyugeCalleSecundaria">
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">Profesión / Ocupación</label>
+                                <input type="text" class="form-control" id="jConyugeProfesion">
+                            </div>
+
+                            <!-- Navigation -->
+                            <div class="tab-navigation">
+                                <button class="btn btn-secondary-notaria btn-nav" onclick="prevTabJuridica()">
+                                    <i class="fas fa-arrow-left"></i> Anterior
+                                </button>
+                                <button class="btn btn-notaria btn-nav" onclick="nextTabJuridica()">
+                                    Siguiente <i class="fas fa-arrow-right"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Tab 4: Socios/Accionistas -->
+                        <div class="tab-pane fade" id="socios">
+                            <div class="section-header">
+                                <i class="fas fa-users"></i> Socios / Accionistas de la Compañía
+                            </div>
+
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i> Agregue los datos de los socios o accionistas
+                                principales de la compañía.
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="socios-table" id="tablaSocios">
+                                    <thead>
+                                        <tr>
+                                            <th style="width: 35%">Nombres y Apellidos</th>
+                                            <th style="width: 20%">Identificación</th>
+                                            <th style="width: 18%">Teléfono</th>
+                                            <th style="width: 18%">Celular</th>
+                                            <th style="width: 9%">Acción</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sociosBody">
+                                        <!-- Filas dinámicas se agregan aquí -->
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <button type="button" class="btn-add-socio" onclick="agregarSocio()">
+                                <i class="fas fa-plus"></i> Agregar Socio
+                            </button>
+
+                            <!-- Navigation -->
+                            <div class="tab-navigation">
+                                <button class="btn btn-secondary-notaria btn-nav" onclick="prevTabJuridica()">
+                                    <i class="fas fa-arrow-left"></i> Anterior
+                                </button>
+                                <button class="btn btn-notaria btn-nav" onclick="nextTabJuridica()">
+                                    Siguiente <i class="fas fa-arrow-right"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Tab 5: PEP y Beneficiario Final -->
+                        <div class="tab-pane fade" id="pepJuridica">
+                            <div class="alert alert-warning">
+                                <h6><i class="fas fa-shield-alt"></i> Persona Expuesta Políticamente (PEP)</h6>
+                                <p class="mb-0 small">
+                                    Se considera PEP a quienes desempeñan o han desempeñado funciones públicas
+                                    destacadas.
+                                </p>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label d-block">
+                                    ¿La empresa o sus representantes son Personas Expuestas Políticamente?
+                                </label>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="jEsPEP" id="jEsPEPSi" value="SI">
+                                    <label class="form-check-label" for="jEsPEPSi">Sí</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="jEsPEP" id="jEsPEPNo" value="NO"
+                                        checked>
+                                    <label class="form-check-label" for="jEsPEPNo">No</label>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label d-block">
+                                    ¿Son familiares de un PEP? (1er y 2do grado de consanguinidad)
+                                </label>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="jEsFamiliarPEP"
+                                        id="jEsFamiliarPEPSi" value="SI">
+                                    <label class="form-check-label" for="jEsFamiliarPEPSi">Sí</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="jEsFamiliarPEP"
+                                        id="jEsFamiliarPEPNo" value="NO" checked>
+                                    <label class="form-check-label" for="jEsFamiliarPEPNo">No</label>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label d-block">
+                                    ¿Son colaboradores cercanos de un PEP?
+                                </label>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="jEsColaboradorPEP"
+                                        id="jEsColaboradorPEPSi" value="SI">
+                                    <label class="form-check-label" for="jEsColaboradorPEPSi">Sí</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="radio" name="jEsColaboradorPEP"
+                                        id="jEsColaboradorPEPNo" value="NO" checked>
+                                    <label class="form-check-label" for="jEsColaboradorPEPNo">No</label>
+                                </div>
+                            </div>
+
+                            <div class="section-header mt-4">
+                                <i class="fas fa-user-check"></i> Beneficiario Final (si aplica)
+                            </div>
+
+                            <div class="alert alert-info small">
+                                <i class="fas fa-info-circle"></i> Complete solo si existe un beneficiario final
+                                diferente a los socios/accionistas registrados.
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Apellidos</label>
+                                    <input type="text" class="form-control" id="jBeneficiarioApellidos">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Nombres</label>
+                                    <input type="text" class="form-control" id="jBeneficiarioNombres">
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Tipo Identificación</label>
+                                    <select class="form-select" id="jBeneficiarioTipoId">
+                                        <option value="">Seleccionar...</option>
+                                        <option value="CEDULA">Cédula</option>
+                                        <option value="PASAPORTE">Pasaporte</option>
+                                        <option value="RUC">RUC</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label">Número Identificación</label>
+                                    <input type="text" class="form-control" id="jBeneficiarioNumeroId"
+                                        inputmode="numeric" pattern="[0-9]*">
+                                </div>
+                            </div>
+
+                            <!-- Navigation -->
+                            <div class="tab-navigation">
+                                <button class="btn btn-secondary-notaria btn-nav" onclick="prevTabJuridica()">
+                                    <i class="fas fa-arrow-left"></i> Anterior
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- ==================== FIN FORMULARIO PERSONA JURÍDICA ==================== -->
 
                 <!-- Aceptación de Política de Datos -->
                 <div class="policy-acceptance">
                     <div class="form-check">
-                        <input 
-                            class="form-check-input" 
-                            type="checkbox" 
-                            id="aceptoPolitica" 
-                            onchange="validarAceptacionPolitica()"
-                        >
+                        <input class="form-check-input" type="checkbox" id="aceptoPolitica"
+                            onchange="validarAceptacionPolitica()">
                         <label class="form-check-label" for="aceptoPolitica">
-                            He leído y acepto la 
+                            He leído y acepto la
                             <a href="/politica-datos-personales.pdf" target="_blank">
                                 Política de Tratamiento de Datos Personales
-                            </a> 
+                            </a>
                             de la Notaría 18 Quito
                         </label>
                     </div>
                     <small class="text-muted d-block mt-2">
-                        <i class="fas fa-info-circle"></i> 
+                        <i class="fas fa-info-circle"></i>
                         Es necesario aceptar la política para poder guardar su información
                     </small>
                 </div>
 
                 <!-- Botón Guardar -->
                 <div class="text-center mt-4">
-                    <button class="btn btn-notaria btn-lg" id="btnGuardarInfo" onclick="guardarInformacion()" disabled style="opacity: 0.6; cursor: not-allowed;">
+                    <button class="btn btn-notaria btn-lg" id="btnGuardarInfo" onclick="guardarInformacion()" disabled
+                        style="opacity: 0.6; cursor: not-allowed;">
                         <i class="fas fa-save"></i> Guardar Cambios
                     </button>
                 </div>
@@ -1075,7 +1742,8 @@
                 <i class="fas fa-envelope"></i> notaria18uio@gmail.com / jzapata@notaria18quito.com.ec
             </p>
             <p class="mb-3">
-                <i class="fas fa-map-marker-alt"></i> Calle Azuay E2-231 entre Av. Amazonas y Av. Azuay, Quito, Ecuador
+                <i class="fas fa-map-marker-alt"></i> Calle Azuay E2-231 entre Av. Amazonas y Av. Azuay, Quito,
+                Ecuador
             </p>
             <p class="small mb-0">Notaría Décima Octava del Cantón Quito</p>
         </div>
@@ -1095,12 +1763,8 @@
                     <p class="text-muted mb-4">
                         Sus datos han sido actualizados correctamente
                     </p>
-                    <button 
-                        type="button" 
-                        class="btn btn-success btn-lg" 
-                        data-bs-dismiss="modal"
-                        style="min-width: 150px;"
-                    >
+                    <button type="button" class="btn btn-success btn-lg" data-bs-dismiss="modal"
+                        style="min-width: 150px;">
                         Aceptar
                     </button>
                 </div>
@@ -1115,7 +1779,7 @@
         // ===================================
         // CONFIGURACIÓN
         // ===================================
-        const API_BASE_URL = 'https://notaria-segura-v4-staging.up.railway.app/api';
+        const API_BASE_URL = 'https://notaria-segura-v4-production.up.railway.app/api';
         let sessionToken = null;
         let sessionTimer = null;
         let tiempoRestante = 1800; // 30 minutos en segundos
@@ -1147,6 +1811,11 @@
                 step.classList.remove('active');
             });
             document.getElementById(stepId).classList.add('active');
+
+            // Si es step3, renderizar el formulario correcto según tipo de persona
+            if (stepId === 'step3') {
+                renderizarFormularioSegunTipo();
+            }
         }
 
         function setLoading(buttonId, loading) {
@@ -1165,10 +1834,10 @@
         function validarAceptacionPolitica() {
             const checkbox = document.getElementById('aceptoPolitica');
             const btnGuardar = document.getElementById('btnGuardarInfo');
-            
+
             // Habilitar/deshabilitar botón según estado del checkbox
             btnGuardar.disabled = !checkbox.checked;
-            
+
             // Efecto visual
             if (checkbox.checked) {
                 btnGuardar.style.opacity = '1';
@@ -1184,7 +1853,7 @@
             const modalElement = document.getElementById('modalConfirmacion');
             const modal = new bootstrap.Modal(modalElement);
             modal.show();
-            
+
             // Auto-cerrar después de 3 segundos
             setTimeout(() => {
                 modal.hide();
@@ -1197,11 +1866,11 @@
         function setupPinInputs(containerId, onComplete) {
             const container = document.getElementById(containerId);
             const inputs = container.querySelectorAll('.pin-digit');
-            
+
             inputs.forEach((input, index) => {
                 input.addEventListener('input', (e) => {
                     const value = e.target.value;
-                    
+
                     // Solo permitir números
                     if (!/^\d$/.test(value)) {
                         e.target.value = '';
@@ -1249,7 +1918,7 @@
         function togglePinVisibility(containerId) {
             const container = document.getElementById(containerId);
             const inputs = container.querySelectorAll('.pin-digit');
-            
+
             // Determinar el ID correcto para los elementos de texto e icono
             let iconId, textId;
             if (containerId === 'pinCreateContainer') {
@@ -1266,7 +1935,7 @@
             const icon = document.getElementById(iconId);
             const text = document.getElementById(textId);
             const isPassword = inputs[0].type === 'password';
-            
+
             inputs.forEach(input => {
                 input.type = isPassword ? 'text' : 'password';
             });
@@ -1302,7 +1971,7 @@
         // ===================================
         function validarPIN(pin) {
             const errores = [];
-            
+
             // Longitud correcta
             if (pin.length !== 6) {
                 errores.push('Debe tener 6 dígitos');
@@ -1329,19 +1998,19 @@
 
         function actualizarValidacionPIN() {
             const pin = getPinValue('pinCreateContainer');
-            
+
             document.getElementById('validLength').className = pin.length === 6 ? 'valid' : '';
-            document.getElementById('validLength').innerHTML = 
+            document.getElementById('validLength').innerHTML =
                 `<i class="fas ${pin.length === 6 ? 'fa-check-circle' : 'fa-circle'}"></i> 6 dígitos numéricos`;
 
             const noSecuencial = !['123456', '234567', '345678', '456789', '654321', '765432', '876543', '987654'].includes(pin);
             document.getElementById('validNoSequential').className = noSecuencial && pin.length === 6 ? 'valid' : '';
-            document.getElementById('validNoSequential').innerHTML = 
+            document.getElementById('validNoSequential').innerHTML =
                 `<i class="fas ${noSecuencial && pin.length === 6 ? 'fa-check-circle' : 'fa-circle'}"></i> No usar secuencias`;
 
             const noRepetido = !/^(\d)\1{5}$/.test(pin);
             document.getElementById('validNoRepeated').className = noRepetido && pin.length === 6 ? 'valid' : '';
-            document.getElementById('validNoRepeated').innerHTML = 
+            document.getElementById('validNoRepeated').innerHTML =
                 `<i class="fas ${noRepetido && pin.length === 6 ? 'fa-check-circle' : 'fa-circle'}"></i> No usar repeticiones`;
 
             verificarCoincidenciaPINs();
@@ -1356,7 +2025,7 @@
             if (pinConfirm.length === 6) {
                 if (pin === pinConfirm) {
                     mensaje.innerHTML = '<span class="text-success"><i class="fas fa-check-circle"></i> Los PINs coinciden</span>';
-                    
+
                     const errores = validarPIN(pin);
                     btnCrear.disabled = errores.length > 0;
                 } else {
@@ -1466,7 +2135,7 @@
                 if (data.success) {
                     sessionToken = data.sessionToken;
                     showAlert('Cuenta creada exitosamente', 'success');
-                    
+
                     // Ir al formulario
                     showStep('step3');
                     iniciarTimerSesion();
@@ -1512,16 +2181,16 @@
                 if (data.success) {
                     sessionToken = data.sessionToken;
                     showAlert('Sesión iniciada correctamente', 'success');
-                    
+
                     // Ir al formulario
                     showStep('step3');
                     iniciarTimerSesion();
                     cargarInformacion();
                 } else {
                     showAlert(data.message || 'PIN incorrecto', 'danger');
-                    
+
                     if (data.intentosRestantes !== undefined) {
-                        document.getElementById('intentosRestantes').innerHTML = 
+                        document.getElementById('intentosRestantes').innerHTML =
                             `<span class="text-danger">Intentos restantes: ${data.intentosRestantes}</span>`;
                     }
 
@@ -1546,9 +2215,9 @@
             const progress = ((tabIndex + 1) / tabs.length) * 100;
             const progressBar = document.getElementById('progressBar');
             const progressLabel = document.getElementById('progressLabel');
-            
+
             progressBar.style.width = progress + '%';
-            
+
             const tabNames = ['Datos Personales', 'Dirección', 'Información Laboral', 'Cónyuge', 'PEP'];
             progressLabel.textContent = `Paso ${tabIndex + 1} de ${tabs.length}: ${tabNames[tabIndex]}`;
         }
@@ -1557,14 +2226,14 @@
             if (currentTabIndex < tabs.length - 1) {
                 const nextIndex = currentTabIndex + 1;
                 const nextTabId = tabs[nextIndex];
-                
+
                 // Activar siguiente tab usando Bootstrap
                 const nextTabElement = document.getElementById('tab-' + nextTabId);
                 const tab = new bootstrap.Tab(nextTabElement);
                 tab.show();
-                
+
                 updateProgress(nextIndex);
-                
+
                 // Scroll suave al inicio
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             }
@@ -1574,16 +2243,333 @@
             if (currentTabIndex > 0) {
                 const prevIndex = currentTabIndex - 1;
                 const prevTabId = tabs[prevIndex];
-                
+
                 // Activar tab anterior usando Bootstrap
                 const prevTabElement = document.getElementById('tab-' + prevTabId);
                 const tab = new bootstrap.Tab(prevTabElement);
                 tab.show();
-                
+
                 updateProgress(prevIndex);
-                
+
                 // Scroll suave al inicio
                 window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        // ===================================
+        // PERSONA JURÍDICA - NAVEGACIÓN Y FUNCIONES
+        // ===================================
+        const tabsJuridica = ['compania', 'representante', 'conyugeRep', 'socios', 'pepJuridica'];
+        let currentTabIndexJuridica = 0;
+        let sociosData = [];
+
+        function updateProgressJuridica(tabIndex) {
+            currentTabIndexJuridica = tabIndex;
+            const progress = ((tabIndex + 1) / tabsJuridica.length) * 100;
+            const progressBar = document.getElementById('progressBar');
+            const progressLabel = document.getElementById('progressLabel');
+
+            progressBar.style.width = progress + '%';
+
+            const tabNames = ['Compañía', 'Representante Legal', 'Cónyuge Rep.', 'Socios', 'PEP'];
+            progressLabel.textContent = `Paso ${tabIndex + 1} de ${tabsJuridica.length}: ${tabNames[tabIndex]}`;
+        }
+
+        function nextTabJuridica() {
+            if (currentTabIndexJuridica < tabsJuridica.length - 1) {
+                const nextIndex = currentTabIndexJuridica + 1;
+                const nextTabId = tabsJuridica[nextIndex];
+
+                const nextTabElement = document.getElementById('tab-' + nextTabId);
+                const tab = new bootstrap.Tab(nextTabElement);
+                tab.show();
+
+                updateProgressJuridica(nextIndex);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        function prevTabJuridica() {
+            if (currentTabIndexJuridica > 0) {
+                const prevIndex = currentTabIndexJuridica - 1;
+                const prevTabId = tabsJuridica[prevIndex];
+
+                const prevTabElement = document.getElementById('tab-' + prevTabId);
+                const tab = new bootstrap.Tab(prevTabElement);
+                tab.show();
+
+                updateProgressJuridica(prevIndex);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        // Renderizar formulario según tipo de persona
+        function renderizarFormularioSegunTipo() {
+            const formNatural = document.getElementById('formNatural');
+            const formJuridica = document.getElementById('formJuridica');
+
+            if (currentTipoPersona === 'NATURAL') {
+                formNatural.classList.add('active');
+                formJuridica.classList.remove('active');
+                updateProgress(0);
+            } else {
+                formNatural.classList.remove('active');
+                formJuridica.classList.add('active');
+                // Set RUC from cedula
+                document.getElementById('jRuc').value = currentCedula;
+                updateProgressJuridica(0);
+            }
+        }
+
+        // ===================================
+        // SOCIOS - TABLA DINÁMICA
+        // ===================================
+        function agregarSocio() {
+            const tbody = document.getElementById('sociosBody');
+            const index = sociosData.length;
+
+            const row = document.createElement('tr');
+            row.id = `socio-row-${index}`;
+            row.innerHTML = `
+                    <td><input type="text" class="form-control" id="socioNombre_${index}" placeholder="Nombres y Apellidos"></td>
+                    <td><input type="text" class="form-control" id="socioId_${index}" placeholder="Cédula/RUC" inputmode="numeric"></td>
+                    <td><input type="tel" class="form-control" id="socioTel_${index}" placeholder="Teléfono"></td>
+                    <td><input type="tel" class="form-control" id="socioCel_${index}" placeholder="Celular"></td>
+                    <td><button type="button" class="btn-remove-socio" onclick="eliminarSocio(${index})"><i class="fas fa-trash"></i></button></td>
+                `;
+            tbody.appendChild(row);
+            sociosData.push({ index });
+        }
+
+        function eliminarSocio(index) {
+            const row = document.getElementById(`socio-row-${index}`);
+            if (row) {
+                row.remove();
+                sociosData = sociosData.filter(s => s.index !== index);
+            }
+        }
+
+        function recopilarSocios() {
+            const socios = [];
+            sociosData.forEach(s => {
+                const nombre = document.getElementById(`socioNombre_${s.index}`)?.value || '';
+                const id = document.getElementById(`socioId_${s.index}`)?.value || '';
+                const tel = document.getElementById(`socioTel_${s.index}`)?.value || '';
+                const cel = document.getElementById(`socioCel_${s.index}`)?.value || '';
+
+                if (nombre || id) {
+                    socios.push({
+                        nombresApellidos: nombre,
+                        identificacion: id,
+                        telefono: tel,
+                        celular: cel
+                    });
+                }
+            });
+            return socios;
+        }
+
+        // ===================================
+        // PERSONA JURÍDICA - RECOPILAR DATOS
+        // ===================================
+        function recopilarDatosPersonaJuridica() {
+            return {
+                compania: {
+                    razonSocial: document.getElementById('jRazonSocial').value,
+                    ruc: document.getElementById('jRuc').value,
+                    objetoSocial: document.getElementById('jObjetoSocial').value
+                },
+                direccionCompania: {
+                    callePrincipal: document.getElementById('jCallePrincipal').value,
+                    numero: document.getElementById('jNumero').value,
+                    calleSecundaria: document.getElementById('jCalleSecundaria').value,
+                    provincia: document.getElementById('jProvincia').value,
+                    canton: document.getElementById('jCanton').value,
+                    parroquia: document.getElementById('jParroquia').value
+                },
+                contactoCompania: {
+                    email: document.getElementById('jEmailCompania').value,
+                    telefono: document.getElementById('jTelefonoCompania').value,
+                    celular: document.getElementById('jCelularCompania').value
+                },
+                representanteLegal: {
+                    apellidos: document.getElementById('jRepApellidos').value,
+                    nombres: document.getElementById('jRepNombres').value,
+                    tipoIdentificacion: document.getElementById('jRepTipoId').value,
+                    numeroIdentificacion: document.getElementById('jRepNumeroId').value,
+                    nacionalidad: document.getElementById('jRepNacionalidad').value,
+                    genero: document.getElementById('jRepGenero').value,
+                    estadoCivil: document.getElementById('jRepEstadoCivil').value,
+                    nivelEstudio: document.getElementById('jRepNivelEstudio').value,
+                    email: document.getElementById('jRepEmail').value,
+                    telefono: document.getElementById('jRepTelefono').value,
+                    celular: document.getElementById('jRepCelular').value,
+                    direccion: {
+                        callePrincipal: document.getElementById('jRepCallePrincipal').value,
+                        numero: document.getElementById('jRepNumero').value,
+                        calleSecundaria: document.getElementById('jRepCalleSecundaria').value
+                    },
+                    informacionLaboral: {
+                        situacion: document.getElementById('jRepSituacionLaboral').value,
+                        relacionDependencia: document.getElementById('jRepRelacionDependencia').value === 'SI',
+                        profesionOcupacion: document.getElementById('jRepProfesion').value,
+                        ingresoMensual: parseFloat(document.getElementById('jRepIngresoMensual').value) || 0
+                    }
+                },
+                conyugeRepresentante: {
+                    apellidos: document.getElementById('jConyugeApellidos').value,
+                    nombres: document.getElementById('jConyugeNombres').value,
+                    tipoIdentificacion: document.getElementById('jConyugeTipoId').value,
+                    numeroIdentificacion: document.getElementById('jConyugeNumeroId').value,
+                    nacionalidad: document.getElementById('jConyugeNacionalidad').value,
+                    genero: document.getElementById('jConyugeGenero').value,
+                    estadoCivil: document.getElementById('jConyugeEstadoCivil').value,
+                    nivelEstudio: document.getElementById('jConyugeNivelEstudio').value,
+                    email: document.getElementById('jConyugeEmail').value,
+                    celular: document.getElementById('jConyugeCelular').value,
+                    direccion: {
+                        callePrincipal: document.getElementById('jConyugeCallePrincipal').value,
+                        numero: document.getElementById('jConyugeNumero').value,
+                        calleSecundaria: document.getElementById('jConyugeCalleSecundaria').value
+                    },
+                    profesionOcupacion: document.getElementById('jConyugeProfesion').value
+                },
+                socios: recopilarSocios(),
+                pep: {
+                    esPersonaExpuesta: document.querySelector('input[name="jEsPEP"]:checked')?.value === 'SI',
+                    esFamiliarPEP: document.querySelector('input[name="jEsFamiliarPEP"]:checked')?.value === 'SI',
+                    esColaboradorPEP: document.querySelector('input[name="jEsColaboradorPEP"]:checked')?.value === 'SI'
+                },
+                beneficiarioFinal: {
+                    apellidos: document.getElementById('jBeneficiarioApellidos').value || null,
+                    nombres: document.getElementById('jBeneficiarioNombres').value || null,
+                    tipoIdentificacion: document.getElementById('jBeneficiarioTipoId').value || null,
+                    numeroIdentificacion: document.getElementById('jBeneficiarioNumeroId').value || null
+                }
+            };
+        }
+
+        // ===================================
+        // PERSONA JURÍDICA - CARGAR DATOS
+        // ===================================
+        function cargarDatosPersonaJuridica(datos) {
+            if (!datos) return;
+
+            // Compañía
+            if (datos.compania) {
+                document.getElementById('jRazonSocial').value = datos.compania.razonSocial || '';
+                document.getElementById('jRuc').value = datos.compania.ruc || currentCedula;
+                document.getElementById('jObjetoSocial').value = datos.compania.objetoSocial || '';
+            }
+
+            // Dirección Compañía
+            if (datos.direccionCompania) {
+                document.getElementById('jCallePrincipal').value = datos.direccionCompania.callePrincipal || '';
+                document.getElementById('jNumero').value = datos.direccionCompania.numero || '';
+                document.getElementById('jCalleSecundaria').value = datos.direccionCompania.calleSecundaria || '';
+                document.getElementById('jProvincia').value = datos.direccionCompania.provincia || 'PICHINCHA';
+                document.getElementById('jCanton').value = datos.direccionCompania.canton || 'QUITO';
+                document.getElementById('jParroquia').value = datos.direccionCompania.parroquia || '';
+            }
+
+            // Contacto Compañía
+            if (datos.contactoCompania) {
+                document.getElementById('jEmailCompania').value = datos.contactoCompania.email || '';
+                document.getElementById('jTelefonoCompania').value = datos.contactoCompania.telefono || '';
+                document.getElementById('jCelularCompania').value = datos.contactoCompania.celular || '';
+            }
+
+            // Representante Legal
+            if (datos.representanteLegal) {
+                const rep = datos.representanteLegal;
+                document.getElementById('jRepApellidos').value = rep.apellidos || '';
+                document.getElementById('jRepNombres').value = rep.nombres || '';
+                document.getElementById('jRepTipoId').value = rep.tipoIdentificacion || 'CEDULA';
+                document.getElementById('jRepNumeroId').value = rep.numeroIdentificacion || '';
+                document.getElementById('jRepNacionalidad').value = rep.nacionalidad || 'ECUATORIANA';
+                document.getElementById('jRepGenero').value = rep.genero || '';
+                document.getElementById('jRepEstadoCivil').value = rep.estadoCivil || '';
+                document.getElementById('jRepNivelEstudio').value = rep.nivelEstudio || '';
+                document.getElementById('jRepEmail').value = rep.email || '';
+                document.getElementById('jRepTelefono').value = rep.telefono || '';
+                document.getElementById('jRepCelular').value = rep.celular || '';
+
+                if (rep.direccion) {
+                    document.getElementById('jRepCallePrincipal').value = rep.direccion.callePrincipal || '';
+                    document.getElementById('jRepNumero').value = rep.direccion.numero || '';
+                    document.getElementById('jRepCalleSecundaria').value = rep.direccion.calleSecundaria || '';
+                }
+
+                if (rep.informacionLaboral) {
+                    document.getElementById('jRepSituacionLaboral').value = rep.informacionLaboral.situacion || '';
+                    document.getElementById('jRepRelacionDependencia').value = rep.informacionLaboral.relacionDependencia ? 'SI' : 'NO';
+                    document.getElementById('jRepProfesion').value = rep.informacionLaboral.profesionOcupacion || '';
+                    document.getElementById('jRepIngresoMensual').value = rep.informacionLaboral.ingresoMensual || '';
+                }
+            }
+
+            // Cónyuge del Representante
+            if (datos.conyugeRepresentante) {
+                const cony = datos.conyugeRepresentante;
+                document.getElementById('jConyugeApellidos').value = cony.apellidos || '';
+                document.getElementById('jConyugeNombres').value = cony.nombres || '';
+                document.getElementById('jConyugeTipoId').value = cony.tipoIdentificacion || '';
+                document.getElementById('jConyugeNumeroId').value = cony.numeroIdentificacion || '';
+                document.getElementById('jConyugeNacionalidad').value = cony.nacionalidad || '';
+                document.getElementById('jConyugeGenero').value = cony.genero || '';
+                document.getElementById('jConyugeEstadoCivil').value = cony.estadoCivil || '';
+                document.getElementById('jConyugeNivelEstudio').value = cony.nivelEstudio || '';
+                document.getElementById('jConyugeEmail').value = cony.email || '';
+                document.getElementById('jConyugeCelular').value = cony.celular || '';
+                document.getElementById('jConyugeProfesion').value = cony.profesionOcupacion || '';
+
+                if (cony.direccion) {
+                    document.getElementById('jConyugeCallePrincipal').value = cony.direccion.callePrincipal || '';
+                    document.getElementById('jConyugeNumero').value = cony.direccion.numero || '';
+                    document.getElementById('jConyugeCalleSecundaria').value = cony.direccion.calleSecundaria || '';
+                }
+            }
+
+            // Socios
+            if (datos.socios && Array.isArray(datos.socios)) {
+                // Limpiar tabla existente
+                document.getElementById('sociosBody').innerHTML = '';
+                sociosData = [];
+
+                datos.socios.forEach((socio, i) => {
+                    agregarSocio();
+                    document.getElementById(`socioNombre_${i}`).value = socio.nombresApellidos || '';
+                    document.getElementById(`socioId_${i}`).value = socio.identificacion || '';
+                    document.getElementById(`socioTel_${i}`).value = socio.telefono || '';
+                    document.getElementById(`socioCel_${i}`).value = socio.celular || '';
+                });
+            }
+
+            // PEP
+            if (datos.pep) {
+                if (datos.pep.esPersonaExpuesta) {
+                    document.getElementById('jEsPEPSi').checked = true;
+                } else {
+                    document.getElementById('jEsPEPNo').checked = true;
+                }
+                if (datos.pep.esFamiliarPEP) {
+                    document.getElementById('jEsFamiliarPEPSi').checked = true;
+                } else {
+                    document.getElementById('jEsFamiliarPEPNo').checked = true;
+                }
+                if (datos.pep.esColaboradorPEP) {
+                    document.getElementById('jEsColaboradorPEPSi').checked = true;
+                } else {
+                    document.getElementById('jEsColaboradorPEPNo').checked = true;
+                }
+            }
+
+            // Beneficiario Final
+            if (datos.beneficiarioFinal) {
+                document.getElementById('jBeneficiarioApellidos').value = datos.beneficiarioFinal.apellidos || '';
+                document.getElementById('jBeneficiarioNombres').value = datos.beneficiarioFinal.nombres || '';
+                document.getElementById('jBeneficiarioTipoId').value = datos.beneficiarioFinal.tipoIdentificacion || '';
+                document.getElementById('jBeneficiarioNumeroId').value = datos.beneficiarioFinal.numeroIdentificacion || '';
             }
         }
 
@@ -1600,7 +2586,7 @@
                 const minutos = Math.floor(tiempoRestante / 60);
                 const segundos = tiempoRestante % 60;
                 const display = `${minutos}:${segundos.toString().padStart(2, '0')}`;
-                
+
                 document.getElementById('timerDisplay').textContent = display;
 
                 // Advertencia en los últimos 5 minutos
@@ -1621,6 +2607,9 @@
         async function cargarInformacion() {
             if (!sessionToken) return;
 
+            // Renderizar formulario según tipo antes de cargar datos
+            renderizarFormularioSegunTipo();
+
             try {
                 const response = await fetch(`${API_BASE_URL}/personal/mi-informacion`, {
                     headers: {
@@ -1632,11 +2621,12 @@
 
                 if (data.success && data.data) {
                     const persona = data.data;
-                    
+
                     if (persona.tipoPersona === 'NATURAL' && persona.datosPersonaNatural) {
                         cargarDatosPersonaNatural(persona.datosPersonaNatural);
+                    } else if (persona.tipoPersona === 'JURIDICA' && persona.datosPersonaJuridica) {
+                        cargarDatosPersonaJuridica(persona.datosPersonaJuridica);
                     }
-                    // TODO: Implementar carga para Persona Jurídica
                 }
             } catch (error) {
                 console.error('Error al cargar información:', error);
@@ -1780,13 +2770,22 @@
             };
 
             try {
+                // Preparar body según tipo de persona
+                let bodyData = {};
+                if (currentTipoPersona === 'NATURAL') {
+                    bodyData = { datosPersonaNatural };
+                } else {
+                    const datosPersonaJuridica = recopilarDatosPersonaJuridica();
+                    bodyData = { datosPersonaJuridica };
+                }
+
                 const response = await fetch(`${API_BASE_URL}/personal/mi-informacion`, {
                     method: 'PUT',
                     headers: {
                         'Content-Type': 'application/json',
                         'x-session-token': sessionToken
                     },
-                    body: JSON.stringify({ datosPersonaNatural })
+                    body: JSON.stringify(bodyData)
                 });
 
                 const data = await response.json();
@@ -1794,7 +2793,7 @@
                 if (data.success) {
                     // Ocultar cualquier alert anterior
                     document.getElementById('alertContainer').innerHTML = '';
-                    
+
                     // Mostrar modal de confirmación
                     mostrarModalConfirmacion();
                 } else {
@@ -1847,4 +2846,5 @@
         });
     </script>
 </body>
+
 </html>
