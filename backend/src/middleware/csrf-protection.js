@@ -134,6 +134,8 @@ export const excludedRoutes = [
   '/api/health',               // Health checks
   '/api/verify/*',             // Verificación pública de QR
   '/api/personal/verificar-cedula', // Verificación pública
+  '/api/documents/upload-xml', // M2M: xml-watcher service (protegido por JWT)
+  '/api/documents/upload-xml-batch', // M2M: xml-watcher service batch (protegido por JWT)
 ];
 
 export default {
