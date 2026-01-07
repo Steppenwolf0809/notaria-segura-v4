@@ -22,7 +22,12 @@ import {
     Collapse,
     FormControlLabel,
     Switch,
-    Stack
+    Stack,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Snackbar
 } from '@mui/material';
 import {
     Analytics as AnalyticsIcon,
@@ -33,7 +38,8 @@ import {
     People as PeopleIcon,
     AttachMoney as MoneyIcon,
     Refresh as RefreshIcon,
-    Download as DownloadIcon
+    Download as DownloadIcon,
+    Delete as DeleteIcon
 } from '@mui/icons-material';
 import apiClient from '../../services/api-client';
 
@@ -51,6 +57,8 @@ const AnalisisUAFE = () => {
     const [expandedRow, setExpandedRow] = useState(null);
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(false);
+    const [deleteDialog, setDeleteDialog] = useState({ open: false, persona: null });
+    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
     useEffect(() => {
         cargarPersonas();
@@ -141,6 +149,36 @@ const AnalisisUAFE = () => {
         link.download = `analisis_uafe_${new Date().toISOString().split('T')[0]}.csv`;
         link.click();
         URL.revokeObjectURL(url);
+    };
+
+    const handleDeletePersona = async (force = false) => {
+        if (!deleteDialog.persona) return;
+
+        try {
+            setLoading(true);
+            const url = `/formulario-uafe/admin/personas-registradas/${deleteDialog.persona.numeroIdentificacion}${force ? '?force=true' : ''}`;
+            const response = await apiClient.delete(url);
+
+            if (response.data.success) {
+                setSnackbar({ open: true, message: 'Persona eliminada exitosamente', severity: 'success' });
+                setDeleteDialog({ open: false, persona: null });
+                cargarPersonas(1, false);
+            }
+        } catch (err) {
+            const errorMsg = err.response?.data?.message || 'Error al eliminar';
+            if (err.response?.data?.protocolosCount && !force) {
+                // Mostrar confirmación para forzar
+                setSnackbar({
+                    open: true,
+                    message: `${errorMsg} ¿Desea forzar la eliminación?`,
+                    severity: 'warning'
+                });
+            } else {
+                setSnackbar({ open: true, message: errorMsg, severity: 'error' });
+            }
+        } finally {
+            setLoading(false);
+        }
     };
 
     if (loading && personas.length === 0) {
@@ -273,6 +311,7 @@ const AnalisisUAFE = () => {
                             <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }} align="right">Ingreso Mensual</TableCell>
                             <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>Última Actividad</TableCell>
                             <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }} align="center">Alerta</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }} align="center">Acciones</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
@@ -318,11 +357,22 @@ const AnalisisUAFE = () => {
                                             <Chip label="OK" size="small" color="success" variant="outlined" />
                                         )}
                                     </TableCell>
+                                    <TableCell align="center">
+                                        <Tooltip title="Eliminar persona">
+                                            <IconButton
+                                                size="small"
+                                                color="error"
+                                                onClick={() => setDeleteDialog({ open: true, persona })}
+                                            >
+                                                <DeleteIcon fontSize="small" />
+                                            </IconButton>
+                                        </Tooltip>
+                                    </TableCell>
                                 </TableRow>
 
                                 {/* Fila expandida con detalles */}
                                 <TableRow>
-                                    <TableCell colSpan={9} sx={{ p: 0 }}>
+                                    <TableCell colSpan={10} sx={{ p: 0 }}>
                                         <Collapse in={expandedRow === persona.id} timeout="auto" unmountOnExit>
                                             <Box sx={{ p: 2, backgroundColor: '#f5f5f5' }}>
                                                 <Grid container spacing={2}>
@@ -375,7 +425,7 @@ const AnalisisUAFE = () => {
 
                         {personas.length === 0 && (
                             <TableRow>
-                                <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
+                                <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                                     <Typography color="textSecondary">
                                         No se encontraron personas registradas
                                     </Typography>
@@ -394,6 +444,49 @@ const AnalisisUAFE = () => {
                     </Button>
                 </Box>
             )}
+
+            {/* Dialog de confirmación de eliminación */}
+            <Dialog open={deleteDialog.open} onClose={() => setDeleteDialog({ open: false, persona: null })}>
+                <DialogTitle sx={{ bgcolor: 'error.main', color: 'white' }}>
+                    ⚠️ Confirmar Eliminación
+                </DialogTitle>
+                <DialogContent sx={{ mt: 2 }}>
+                    <Typography>
+                        ¿Está seguro que desea eliminar a <strong>{deleteDialog.persona?.nombre}</strong> ({deleteDialog.persona?.numeroIdentificacion})?
+                    </Typography>
+                    {deleteDialog.persona?.totalProtocolos > 0 && (
+                        <Alert severity="warning" sx={{ mt: 2 }}>
+                            Esta persona tiene {deleteDialog.persona?.totalProtocolos} protocolo(s) asociados.
+                            La eliminación también removerá las asociaciones.
+                        </Alert>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDeleteDialog({ open: false, persona: null })}>
+                        Cancelar
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="error"
+                        onClick={() => handleDeletePersona(deleteDialog.persona?.totalProtocolos > 0)}
+                        disabled={loading}
+                    >
+                        {loading ? <CircularProgress size={20} /> : 'Eliminar'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Snackbar */}
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={4000}
+                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 };

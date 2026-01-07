@@ -1083,14 +1083,6 @@ const FormulariosUAFE = ({ adminMode = false }) => {
           </Button>
           <Button
             variant="outlined"
-            startIcon={<LinkIcon />}
-            onClick={copiarLinkFormulario}
-            sx={{ borderRadius: 2 }}
-          >
-            Link Formulario
-          </Button>
-          <Button
-            variant="outlined"
             startIcon={<HowToRegIcon />}
             onClick={copiarLinkRegistro}
             sx={{ borderRadius: 2 }}
