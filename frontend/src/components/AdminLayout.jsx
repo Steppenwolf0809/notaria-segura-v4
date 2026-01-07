@@ -466,7 +466,7 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
   const currentDrawerWidth = sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH;
 
   return (
-    <Box sx={{ display: 'flex', height: '100vh' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
       {/* App Bar */}
       <AppBar
         position="fixed"
@@ -540,7 +540,8 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
         sx={{
           flexGrow: 1,
           width: { sm: `calc(100% - ${currentDrawerWidth}px)` },
-          height: '100vh',
+          minHeight: '100vh',
+          bgcolor: 'background.default',
           overflow: 'auto',
           transition: 'all 0.3s ease'
         }}
