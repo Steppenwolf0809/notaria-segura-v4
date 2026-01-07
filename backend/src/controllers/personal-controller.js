@@ -90,6 +90,7 @@ export async function debugPersona(req, res) {
  * GET /api/personal/verificar-cedula/:cedula
  *
  * Caso de uso: Frontend verifica si debe mostrar "Crear cuenta" o "Iniciar sesión"
+ * También usado por matrizador para buscar personas antes de agregarlas a protocolos
  */
 export async function verificarCedula(req, res) {
   try {
@@ -101,7 +102,9 @@ export async function verificarCedula(req, res) {
         id: true,
         tipoPersona: true,
         pinCreado: true,
-        pinHash: true
+        pinHash: true,
+        datosPersonaNatural: true,
+        datosPersonaJuridica: true
       }
     });
 
@@ -118,7 +121,9 @@ export async function verificarCedula(req, res) {
       success: true,
       existe: !!persona,  // Convierte a boolean
       tipoPersona: persona?.tipoPersona || null,
-      pinCreado: persona?.pinCreado ?? false  // Indica si tiene PIN creado o si necesita crearlo
+      pinCreado: persona?.pinCreado ?? false,  // Indica si tiene PIN creado o si necesita crearlo
+      datosPersonaNatural: persona?.datosPersonaNatural || null,
+      datosPersonaJuridica: persona?.datosPersonaJuridica || null
     });
   } catch (error) {
     logger.error('Error verificando cédula:', error);
@@ -128,6 +133,7 @@ export async function verificarCedula(req, res) {
     });
   }
 }
+
 
 /**
  * Registrar nueva persona con PIN

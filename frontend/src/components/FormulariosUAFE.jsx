@@ -59,6 +59,7 @@ import {
 import { API_BASE } from '../utils/apiConfig';
 import { formatDateES, formatDateTimeES } from '../utils/dateUtils';
 import ResetearPinDialog from './ResetearPinDialog';
+import VistaPreviewFormulario from './VistaPreviewFormulario';
 import apiClient from '../services/api-client';
 
 /**
@@ -70,6 +71,22 @@ import apiClient from '../services/api-client';
  * 2. Agregar personas al protocolo
  * 3. Cada persona puede acceder con: Protocolo + Cédula + PIN
  */
+
+// Tipos de Acto/Contrato disponibles
+const TIPOS_ACTO_CONTRATO = [
+  { value: 'COMPRAVENTA', label: 'Compraventa de Bien Inmueble' },
+  { value: 'VENTA_VEHICULO', label: 'Venta de Vehículo' },
+  { value: 'DONACION', label: 'Donación' },
+  { value: 'CESION_DERECHOS', label: 'Cesión de Derechos' },
+  { value: 'PROMESA_COMPRAVENTA', label: 'Promesa de Compraventa' },
+  { value: 'OTROS', label: 'Otros (especificar)' }
+];
+
+// Tipos que requieren datos de bien inmueble
+const TIPOS_BIEN_INMUEBLE = ['COMPRAVENTA', 'DONACION', 'CESION_DERECHOS', 'PROMESA_COMPRAVENTA'];
+// Tipos que requieren datos de vehículo
+const TIPOS_VEHICULO = ['VENTA_VEHICULO'];
+
 const FormulariosUAFE = () => {
   // Estados principales
   const [protocolos, setProtocolos] = useState([]);
@@ -87,6 +104,10 @@ const FormulariosUAFE = () => {
   const [personaEliminar, setPersonaEliminar] = useState(null);
   const [openResetearPin, setOpenResetearPin] = useState(false);
 
+  // Estados para preview de formulario
+  const [openPreview, setOpenPreview] = useState(false);
+  const [previewPersona, setPreviewPersona] = useState(null);
+
   // Estados de expansión de tabla
   const [expandedProtocol, setExpandedProtocol] = useState(null);
 
@@ -100,6 +121,15 @@ const FormulariosUAFE = () => {
     numeroProtocolo: '',
     fecha: new Date().toISOString().split('T')[0],
     actoContrato: '',
+    tipoActoOtro: '',           // Campo para "Otros (especificar)"
+    // Campos para bien inmueble
+    bienInmuebleDescripcion: '',
+    bienInmuebleUbicacion: '',
+    // Campos para vehículo
+    vehiculoPlaca: '',
+    vehiculoMarca: '',
+    vehiculoModelo: '',
+    vehiculoAnio: '',
     avaluoMunicipal: '',
     valorContrato: ''
   });
@@ -108,6 +138,7 @@ const FormulariosUAFE = () => {
   const [formasPago, setFormasPago] = useState([
     { tipo: 'EFECTIVO', monto: '', banco: '' }
   ]);
+
 
   // Formulario de agregar persona
   const [formPersona, setFormPersona] = useState({
@@ -154,9 +185,15 @@ const FormulariosUAFE = () => {
    * Crear nuevo protocolo
    */
   const crearProtocolo = async () => {
-    // Validaciones
+    // Validaciones básicas
     if (!formProtocolo.numeroProtocolo || !formProtocolo.actoContrato || !formProtocolo.valorContrato) {
       mostrarSnackbar('Completa los campos obligatorios: Número de Protocolo, Acto/Contrato y Valor del Contrato', 'warning');
+      return;
+    }
+
+    // Validar campo "Otros" si está seleccionado
+    if (formProtocolo.actoContrato === 'OTROS' && !formProtocolo.tipoActoOtro?.trim()) {
+      mostrarSnackbar('Debes especificar el tipo de acto/contrato', 'warning');
       return;
     }
 
@@ -184,14 +221,34 @@ const FormulariosUAFE = () => {
         ...(fp.banco && { banco: fp.banco })
       }));
 
-      const response = await apiClient.post('/formulario-uafe/protocolo', {
+      // Construir datos del protocolo con campos condicionales
+      const datosProtocolo = {
         numeroProtocolo: formProtocolo.numeroProtocolo,
         fecha: formProtocolo.fecha,
         actoContrato: formProtocolo.actoContrato,
         avaluoMunicipal: formProtocolo.avaluoMunicipal || null,
         valorContrato: formProtocolo.valorContrato,
         formasPago: formasPagoFinal
-      });
+      };
+
+      // Añadir campos condicionales según tipo de acto
+      if (formProtocolo.actoContrato === 'OTROS') {
+        datosProtocolo.tipoActoOtro = formProtocolo.tipoActoOtro;
+      }
+
+      if (TIPOS_BIEN_INMUEBLE.includes(formProtocolo.actoContrato)) {
+        datosProtocolo.bienInmuebleDescripcion = formProtocolo.bienInmuebleDescripcion || null;
+        datosProtocolo.bienInmuebleUbicacion = formProtocolo.bienInmuebleUbicacion || null;
+      }
+
+      if (TIPOS_VEHICULO.includes(formProtocolo.actoContrato)) {
+        datosProtocolo.vehiculoPlaca = formProtocolo.vehiculoPlaca || null;
+        datosProtocolo.vehiculoMarca = formProtocolo.vehiculoMarca || null;
+        datosProtocolo.vehiculoModelo = formProtocolo.vehiculoModelo || null;
+        datosProtocolo.vehiculoAnio = formProtocolo.vehiculoAnio || null;
+      }
+
+      const response = await apiClient.post('/formulario-uafe/protocolo', datosProtocolo);
 
       if (response.data.success) {
         mostrarSnackbar('Protocolo creado exitosamente', 'success');
@@ -424,6 +481,13 @@ const FormulariosUAFE = () => {
       numeroProtocolo: '',
       fecha: new Date().toISOString().split('T')[0],
       actoContrato: '',
+      tipoActoOtro: '',
+      bienInmuebleDescripcion: '',
+      bienInmuebleUbicacion: '',
+      vehiculoPlaca: '',
+      vehiculoMarca: '',
+      vehiculoModelo: '',
+      vehiculoAnio: '',
       avaluoMunicipal: '',
       valorContrato: ''
     });
@@ -951,15 +1015,32 @@ const FormulariosUAFE = () => {
                                     }
                                   />
                                   <ListItemSecondaryAction>
-                                    <Button
-                                      variant="outlined"
-                                      size="small"
-                                      color={persona.completado ? 'success' : 'primary'}
-                                      startIcon={<PictureAsPdfIcon />}
-                                      onClick={() => descargarPDFIndividual(protocolo.id, persona.id)}
-                                    >
-                                      PDF
-                                    </Button>
+                                    <Stack direction="row" spacing={1}>
+                                      <Tooltip title="Vista previa del formulario">
+                                        <Button
+                                          variant="outlined"
+                                          size="small"
+                                          color="info"
+                                          startIcon={<VisibilityIcon />}
+                                          onClick={() => {
+                                            setPreviewPersona({ ...persona, protocolId: protocolo.id });
+                                            setProtocoloSeleccionado(protocolo);
+                                            setOpenPreview(true);
+                                          }}
+                                        >
+                                          Vista
+                                        </Button>
+                                      </Tooltip>
+                                      <Button
+                                        variant="outlined"
+                                        size="small"
+                                        color={persona.completado ? 'success' : 'primary'}
+                                        startIcon={<PictureAsPdfIcon />}
+                                        onClick={() => descargarPDFIndividual(protocolo.id, persona.id)}
+                                      >
+                                        PDF
+                                      </Button>
+                                    </Stack>
                                   </ListItemSecondaryAction>
                                 </ListItem>
                               ))}
@@ -1019,16 +1100,129 @@ const FormulariosUAFE = () => {
                     InputLabelProps={{ shrink: true }}
                   />
                 </Grid>
-                <Grid item xs={12}>
-                  <TextField
-                    fullWidth
-                    required
-                    label="Acto / Contrato"
-                    value={formProtocolo.actoContrato}
-                    onChange={(e) => setFormProtocolo({ ...formProtocolo, actoContrato: e.target.value })}
-                    placeholder="Ej: Compraventa de Inmueble"
-                  />
+                <Grid item xs={12} sm={6}>
+                  <FormControl fullWidth required>
+                    <InputLabel>Acto / Contrato</InputLabel>
+                    <Select
+                      value={formProtocolo.actoContrato}
+                      label="Acto / Contrato"
+                      onChange={(e) => setFormProtocolo({
+                        ...formProtocolo,
+                        actoContrato: e.target.value,
+                        // Reset conditional fields when type changes
+                        tipoActoOtro: '',
+                        bienInmuebleDescripcion: '',
+                        bienInmuebleUbicacion: '',
+                        vehiculoPlaca: '',
+                        vehiculoMarca: '',
+                        vehiculoModelo: '',
+                        vehiculoAnio: ''
+                      })}
+                    >
+                      {TIPOS_ACTO_CONTRATO.map((tipo) => (
+                        <MenuItem key={tipo.value} value={tipo.value}>
+                          {tipo.label}
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
                 </Grid>
+
+                {/* Campo "Otros" - especificar */}
+                {formProtocolo.actoContrato === 'OTROS' && (
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      required
+                      label="Especifique el tipo de acto"
+                      value={formProtocolo.tipoActoOtro}
+                      onChange={(e) => setFormProtocolo({ ...formProtocolo, tipoActoOtro: e.target.value })}
+                      placeholder="Ej: Constitución de Hipoteca"
+                    />
+                  </Grid>
+                )}
+
+                {/* Campos para Bien Inmueble */}
+                {TIPOS_BIEN_INMUEBLE.includes(formProtocolo.actoContrato) && (
+                  <>
+                    <Grid item xs={12}>
+                      <Alert severity="info" sx={{ mb: 1 }}>
+                        🏠 Datos del Bien Inmueble
+                      </Alert>
+                    </Grid>
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        multiline
+                        rows={2}
+                        label="Descripción del Bien Inmueble"
+                        value={formProtocolo.bienInmuebleDescripcion}
+                        onChange={(e) => setFormProtocolo({ ...formProtocolo, bienInmuebleDescripcion: e.target.value })}
+                        placeholder="Ej: Casa de dos pisos con terreno de 200m², linderos..."
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <TextField
+                        fullWidth
+                        label="Ubicación del Inmueble"
+                        value={formProtocolo.bienInmuebleUbicacion}
+                        onChange={(e) => setFormProtocolo({ ...formProtocolo, bienInmuebleUbicacion: e.target.value })}
+                        placeholder="Ej: Av. República E7-123 y Diego de Almagro, Quito"
+                      />
+                    </Grid>
+                  </>
+                )}
+
+                {/* Campos para Vehículo */}
+                {TIPOS_VEHICULO.includes(formProtocolo.actoContrato) && (
+                  <>
+                    <Grid item xs={12}>
+                      <Alert severity="info" sx={{ mb: 1 }}>
+                        🚗 Datos del Vehículo
+                      </Alert>
+                    </Grid>
+                    <Grid item xs={12} sm={3}>
+                      <TextField
+                        fullWidth
+                        label="Placa"
+                        value={formProtocolo.vehiculoPlaca}
+                        onChange={(e) => setFormProtocolo({ ...formProtocolo, vehiculoPlaca: e.target.value.toUpperCase() })}
+                        placeholder="AAA-1234"
+                        inputProps={{ style: { textTransform: 'uppercase' } }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={3}>
+                      <TextField
+                        fullWidth
+                        label="Marca"
+                        value={formProtocolo.vehiculoMarca}
+                        onChange={(e) => setFormProtocolo({ ...formProtocolo, vehiculoMarca: e.target.value })}
+                        placeholder="Ej: Toyota"
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={3}>
+                      <TextField
+                        fullWidth
+                        label="Modelo"
+                        value={formProtocolo.vehiculoModelo}
+                        onChange={(e) => setFormProtocolo({ ...formProtocolo, vehiculoModelo: e.target.value })}
+                        placeholder="Ej: Corolla"
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={3}>
+                      <TextField
+                        fullWidth
+                        label="Año"
+                        value={formProtocolo.vehiculoAnio}
+                        onChange={(e) => setFormProtocolo({ ...formProtocolo, vehiculoAnio: e.target.value })}
+                        placeholder="Ej: 2020"
+                        type="number"
+                        inputProps={{ min: 1900, max: 2099 }}
+                      />
+                    </Grid>
+                  </>
+                )}
+
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
@@ -1773,6 +1967,49 @@ const FormulariosUAFE = () => {
       </Dialog>
 
       {/* Diálogo de resetear PIN */}
+      {/* Dialog: Vista Previa Formulario */}
+      <VistaPreviewFormulario
+        open={openPreview}
+        onClose={() => {
+          setOpenPreview(false);
+          setPreviewPersona(null);
+        }}
+        protocolo={protocoloSeleccionado}
+        persona={previewPersona}
+        loading={loading}
+        onRefresh={async () => {
+          // Refresh protocol data from server
+          if (protocoloSeleccionado?.id) {
+            setLoading(true);
+            try {
+              const response = await apiClient.get(`/formulario-uafe/protocolo/${protocoloSeleccionado.id}`);
+              if (response.data.success) {
+                setProtocoloSeleccionado(response.data.data);
+                // Update the person data in the preview
+                const updatedPersona = response.data.data.personas?.find(
+                  p => p.id === previewPersona?.id
+                );
+                if (updatedPersona) {
+                  setPreviewPersona({ ...updatedPersona, protocolId: protocoloSeleccionado.id });
+                }
+                mostrarSnackbar('Datos actualizados', 'success');
+              }
+            } catch (error) {
+              mostrarSnackbar('Error al actualizar datos', 'error');
+            } finally {
+              setLoading(false);
+            }
+          }
+        }}
+        onGeneratePDF={() => {
+          if (previewPersona?.id && protocoloSeleccionado?.id) {
+            descargarPDFIndividual(protocoloSeleccionado.id, previewPersona.id);
+            setOpenPreview(false);
+          }
+        }}
+      />
+
+      {/* Dialog: Resetear PIN */}
       <ResetearPinDialog
         open={openResetearPin}
         onClose={() => setOpenResetearPin(false)}
