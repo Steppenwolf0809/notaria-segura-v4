@@ -1655,6 +1655,99 @@ const FormulariosUAFE = ({ adminMode = false }) => {
                         </Select>
                       </FormControl>
                     </Grid>
+
+                    {/* SECCIÓN INLINE DATOS REPRESENTADO */}
+                    {formPersona.actuaPor === 'REPRESENTANDO_A' && (
+                      <Grid item xs={12}>
+                        <Box sx={{ mt: 2, p: 2, border: '1px dashed #bdbdbd', borderRadius: 1, backgroundColor: '#f5f5f5' }}>
+                          <Typography variant="subtitle2" color="primary" gutterBottom>
+                            👤 Datos del Representado
+                          </Typography>
+                          <Grid container spacing={2}>
+                            <Grid item xs={12} sm={6}>
+                              <TextField
+                                select
+                                fullWidth
+                                label="Tipo Persona"
+                                value={formRepresentado.tipoPersona}
+                                onChange={(e) => setFormRepresentado({ ...formRepresentado, tipoPersona: e.target.value })}
+                                size="small"
+                                sx={{ backgroundColor: 'white' }}
+                              >
+                                <MenuItem value="NATURAL">Persona Natural</MenuItem>
+                                <MenuItem value="JURIDICA">Persona Jurídica</MenuItem>
+                              </TextField>
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <TextField
+                                fullWidth
+                                label="Identificación (Cédula/RUC)"
+                                value={formRepresentado.identificacion}
+                                onChange={(e) => setFormRepresentado({ ...formRepresentado, identificacion: e.target.value })}
+                                size="small"
+                                sx={{ backgroundColor: 'white' }}
+                                InputProps={{
+                                  endAdornment: (
+                                    <InputAdornment position="end">
+                                      <IconButton onClick={buscarRepresentado} edge="end" disabled={buscandoRepresentado}>
+                                        {buscandoRepresentado ? <CircularProgress size={20} /> : <SearchIcon />}
+                                      </IconButton>
+                                    </InputAdornment>
+                                  ),
+                                }}
+                              />
+                            </Grid>
+
+                            {formRepresentado.tipoPersona === 'NATURAL' ? (
+                              <>
+                                <Grid item xs={12} sm={6}>
+                                  <TextField
+                                    fullWidth
+                                    label="Nombres"
+                                    value={formRepresentado.nombres}
+                                    onChange={(e) => setFormRepresentado({ ...formRepresentado, nombres: e.target.value })}
+                                    size="small"
+                                    sx={{ backgroundColor: 'white' }}
+                                  />
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                  <TextField
+                                    fullWidth
+                                    label="Apellidos"
+                                    value={formRepresentado.apellidos}
+                                    onChange={(e) => setFormRepresentado({ ...formRepresentado, apellidos: e.target.value })}
+                                    size="small"
+                                    sx={{ backgroundColor: 'white' }}
+                                  />
+                                </Grid>
+                              </>
+                            ) : (
+                              <Grid item xs={12}>
+                                <TextField
+                                  fullWidth
+                                  label="Razón Social"
+                                  value={formRepresentado.razonSocial}
+                                  onChange={(e) => setFormRepresentado({ ...formRepresentado, razonSocial: e.target.value })}
+                                  size="small"
+                                  sx={{ backgroundColor: 'white' }}
+                                />
+                              </Grid>
+                            )}
+                            <Grid item xs={12} sm={12}>
+                              <TextField
+                                fullWidth
+                                label="Nacionalidad"
+                                value={formRepresentado.nacionalidad}
+                                onChange={(e) => setFormRepresentado({ ...formRepresentado, nacionalidad: e.target.value })}
+                                size="small"
+                                sx={{ backgroundColor: 'white' }}
+                              />
+                            </Grid>
+                          </Grid>
+                        </Box>
+                      </Grid>
+                    )}
+
                   </Grid>
                 </Box>
               </>
