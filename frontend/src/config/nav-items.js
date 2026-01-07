@@ -24,6 +24,7 @@ export const navItemsByRole = {
     { id: 'users', label: 'Gestión de Usuarios', view: 'users', icon: 'Person' },
     { id: 'documents', label: 'Supervisión Documentos', view: 'documents', icon: 'Description' },
     { id: 'formularios-uafe', label: 'Gestión Formularios UAFE', view: 'formularios-uafe', icon: 'Description' },
+    { id: 'analisis-uafe', label: 'Análisis UAFE', view: 'analisis-uafe', icon: 'Analytics' },
     { id: 'notifications', label: 'Notificaciones', view: 'notifications', icon: 'Notifications' },
     { id: 'settings', label: 'Configuración', view: 'settings', icon: 'Settings' },
     { id: 'whatsapp-templates', label: 'Templates WhatsApp', view: 'whatsapp-templates', icon: 'WhatsApp' }

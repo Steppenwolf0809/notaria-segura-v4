@@ -34,7 +34,8 @@ import {
   WhatsApp as WhatsAppIcon,
   ExpandMore as ExpandMoreIcon,
   ChevronRight as ChevronRightIcon,
-  Description as DescriptionIcon
+  Description as DescriptionIcon,
+  Analytics as AnalyticsIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import useThemeStore from '../store/theme-store';
@@ -122,7 +123,8 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
     Description: <DescriptionIcon />,
     Notifications: <NotificationsIcon />,
     Settings: <SettingsIcon />,
-    WhatsApp: <WhatsAppIcon />
+    WhatsApp: <WhatsAppIcon />,
+    Analytics: <AnalyticsIcon />
   };
   const allItems = (navItemsByRole[role] || []);
   const navigationItems = React.useMemo(() => {
@@ -156,17 +158,17 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
    * Contenido del drawer
    */
   const drawer = (
-    <Box sx={{ 
-      height: '100%', 
-      display: 'flex', 
+    <Box sx={{
+      height: '100%',
+      display: 'flex',
       flexDirection: 'column',
       bgcolor: isDarkMode ? 'background.paper' : '#1e40af', // Fondo azul en modo claro
       color: isDarkMode ? 'text.primary' : 'white', // Texto blanco en modo claro
       transition: 'all 0.3s ease'
     }}>
       {/* Header del sidebar con botón de colapso */}
-      <Box sx={{ 
-        p: 2, 
+      <Box sx={{
+        p: 2,
         bgcolor: isDarkMode ? 'grey.900' : 'rgba(0, 0, 0, 0.1)', // Ligeramente más oscuro en modo claro
         color: 'inherit',
         minHeight: '64px',
@@ -178,13 +180,13 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
       }}>
         {!sidebarCollapsed && (
           <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-            <Avatar sx={{ 
-              bgcolor: 'white', 
-              color: '#1e40af', 
-              mr: 1, 
+            <Avatar sx={{
+              bgcolor: 'white',
+              color: '#1e40af',
+              mr: 1,
               fontSize: '1rem',
               width: 32,
-              height: 32 
+              height: 32
             }}>
               <SecurityIcon />
             </Avatar>
@@ -199,12 +201,12 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
           </Box>
         )}
         {sidebarCollapsed && (
-          <Avatar sx={{ 
-            bgcolor: 'white', 
-            color: '#1e40af', 
+          <Avatar sx={{
+            bgcolor: 'white',
+            color: '#1e40af',
             fontSize: '1rem',
             width: 32,
-            height: 32 
+            height: 32
           }}>
             <SecurityIcon />
           </Avatar>
@@ -240,13 +242,13 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
                     minHeight: 48,
                     justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
                     px: sidebarCollapsed ? 1 : 2,
-                    backgroundColor: item.active 
-                      ? (isDarkMode ? 'primary.dark' : 'rgba(255, 255, 255, 0.25)') 
+                    backgroundColor: item.active
+                      ? (isDarkMode ? 'primary.dark' : 'rgba(255, 255, 255, 0.25)')
                       : 'transparent',
                     color: 'inherit', // Heredar el color del contenedor padre
                     '&:hover': {
-                      backgroundColor: item.active 
-                        ? (isDarkMode ? 'primary.main' : 'rgba(255, 255, 255, 0.35)') 
+                      backgroundColor: item.active
+                        ? (isDarkMode ? 'primary.main' : 'rgba(255, 255, 255, 0.35)')
                         : (isDarkMode ? 'action.hover' : 'rgba(255, 255, 255, 0.15)'),
                     },
                     transition: 'all 0.2s ease',
@@ -262,7 +264,7 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
                     {item.icon}
                   </ListItemIcon>
                   {!sidebarCollapsed && (
-                    <ListItemText 
+                    <ListItemText
                       primary={item.text}
                       primaryTypographyProps={{
                         fontSize: '0.875rem',
@@ -288,12 +290,12 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
                   justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
                   px: sidebarCollapsed ? 1 : 2,
                   backgroundColor: (currentView === 'settings' || currentView === 'whatsapp-templates')
-                    ? (isDarkMode ? 'primary.dark' : 'rgba(255, 255, 255, 0.25)') 
+                    ? (isDarkMode ? 'primary.dark' : 'rgba(255, 255, 255, 0.25)')
                     : 'transparent',
                   color: 'inherit',
                   '&:hover': {
                     backgroundColor: (currentView === 'settings' || currentView === 'whatsapp-templates')
-                      ? (isDarkMode ? 'primary.main' : 'rgba(255, 255, 255, 0.35)') 
+                      ? (isDarkMode ? 'primary.main' : 'rgba(255, 255, 255, 0.35)')
                       : (isDarkMode ? 'action.hover' : 'rgba(255, 255, 255, 0.15)'),
                   },
                   transition: 'all 0.2s ease',
@@ -311,7 +313,7 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
                 </ListItemIcon>
                 {!sidebarCollapsed && (
                   <>
-                    <ListItemText 
+                    <ListItemText
                       primary="Configuración"
                       primaryTypographyProps={{
                         fontSize: '0.875rem',
@@ -338,19 +340,19 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
                         borderRadius: 1,
                         minHeight: 40,
                         px: 2,
-                        backgroundColor: subItem.active 
-                          ? (isDarkMode ? 'primary.main' : 'rgba(255, 255, 255, 0.35)') 
+                        backgroundColor: subItem.active
+                          ? (isDarkMode ? 'primary.main' : 'rgba(255, 255, 255, 0.35)')
                           : 'transparent',
                         color: 'inherit',
                         '&:hover': {
-                          backgroundColor: subItem.active 
-                            ? (isDarkMode ? 'primary.light' : 'rgba(255, 255, 255, 0.45)') 
+                          backgroundColor: subItem.active
+                            ? (isDarkMode ? 'primary.light' : 'rgba(255, 255, 255, 0.45)')
                             : (isDarkMode ? 'action.hover' : 'rgba(255, 255, 255, 0.25)'),
                         },
                         transition: 'all 0.2s ease',
                       }}
                     >
-                      <ListItemText 
+                      <ListItemText
                         primary={subItem.text}
                         primaryTypographyProps={{
                           fontSize: '0.8rem',
@@ -397,11 +399,11 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
         )}
 
         {/* Control de tema */}
-        <Box sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: sidebarCollapsed ? 'center' : 'space-between', 
-          mb: 1 
+        <Box sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: sidebarCollapsed ? 'center' : 'space-between',
+          mb: 1
         }}>
           {!sidebarCollapsed && (
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -432,9 +434,9 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
               onClick={() => setShowChangePassword(true)}
               size="small"
               fullWidth={!sidebarCollapsed}
-              sx={{ 
+              sx={{
                 minWidth: sidebarCollapsed ? 36 : 'auto',
-                px: sidebarCollapsed ? 0 : undefined 
+                px: sidebarCollapsed ? 0 : undefined
               }}
             >
               {sidebarCollapsed ? <SettingsIcon /> : 'Cambiar Contraseña'}
@@ -448,9 +450,9 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
               size="small"
               fullWidth={!sidebarCollapsed}
               color="error"
-              sx={{ 
+              sx={{
                 minWidth: sidebarCollapsed ? 36 : 'auto',
-                px: sidebarCollapsed ? 0 : undefined 
+                px: sidebarCollapsed ? 0 : undefined
               }}
             >
               {sidebarCollapsed ? <LogoutIcon /> : 'Cerrar Sesión'}
@@ -506,22 +508,22 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
           }}
           sx={{
             display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': { 
-              boxSizing: 'border-box', 
-              width: DRAWER_WIDTH 
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
+              width: DRAWER_WIDTH
             },
           }}
         >
           {drawer}
         </Drawer>
-        
+
         {/* Drawer permanente */}
         <Drawer
           variant="permanent"
           sx={{
             display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': { 
-              boxSizing: 'border-box', 
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
               width: currentDrawerWidth,
               transition: 'width 0.3s ease'
             },
@@ -550,7 +552,7 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
       </Box>
 
       {/* Modal de cambio de contraseña */}
-      <ChangePassword 
+      <ChangePassword
         open={showChangePassword}
         onClose={() => setShowChangePassword(false)}
       />
