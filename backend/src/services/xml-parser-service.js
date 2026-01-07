@@ -20,7 +20,7 @@ const TIPOS_POR_CODIGO = {
 // 3. LISTA DE EXCLUSIÓN (Solo para P, D, A, O)
 const ITEMS_A_IGNORAR = [
   'CONSULTA DATOS BIOMETRICOS',
-  'SISTEMA NACIONAL DE IDENTIFICACIÓN', 
+  'SISTEMA NACIONAL DE IDENTIFICACIÓN',
   'REGISTRO CIVIL',
   'CERTIFICACIÓN DE DOCUMENTOS',
   'MATERIALIZADOS',
@@ -42,7 +42,7 @@ async function parseXmlDocument(xmlContent) {
     // Parse del XML
     const result = await parseXML(xmlContent);
     const factura = result.factura;
-    
+
     if (!factura) {
       throw new Error('XML no válido: falta elemento factura');
     }
@@ -55,16 +55,16 @@ async function parseXmlDocument(xmlContent) {
 
     // 2. Identificar tipo por letra del código
     const documentType = classifyDocumentByCode(protocolNumber);
-    
+
     // 3. Extraer información del cliente y matrizador
     const clientData = extractClientDataFromXml(factura);
-    
+
     // 4. Extraer información de la factura
     const totalFactura = parseFloat(factura.infoFactura[0].importeTotal[0]) || 0;
-    
+
     // 5. Procesar detalles según tipo de documento
     const detalles = factura.detalles?.[0]?.detalle || [];
-    
+
     // ⭐ AGREGAR DEBUG
     console.log(`🔍 Procesando documento tipo: ${documentType}`);
     console.log(`📋 Items en factura: ${detalles.length}`);
@@ -72,14 +72,17 @@ async function parseXmlDocument(xmlContent) {
       const desc = detalle.descripcion?.[0]?.substring(0, 60) || 'Sin descripción';
       console.log(`  ${index + 1}. ${desc}...`);
     });
-    
+
     const processedDetails = processDocumentByType(documentType, detalles);
-    
+
     console.log(`✅ Acto principal seleccionado: ${processedDetails.actoPrincipalDescripcion}`);
     console.log(`💰 Valor asignado: Total factura $${totalFactura} (en lugar del acto principal $${processedDetails.actoPrincipalValor})`);
 
     // 6. Extraer nombre del matrizador
     const matrizadorName = extractMatrizadorName(factura);
+
+    // 7. Extraer fecha de emisión de la factura
+    const fechaEmision = extractFechaEmision(factura);
 
     return {
       protocolNumber,
@@ -92,10 +95,11 @@ async function parseXmlDocument(xmlContent) {
       actoPrincipalValor: totalFactura, // ⭐ CAMBIO: Usar valor total de factura en lugar del acto principal
       totalFactura,
       matrizadorName,
+      fechaEmision, // ⭐ NUEVO: Fecha de emisión de la factura
       itemsSecundarios: JSON.stringify(processedDetails.itemsSecundarios), // ⭐ FIX: Convertir a JSON string
       xmlOriginal: xmlContent // Guardar XML completo
     };
-    
+
   } catch (error) {
     console.error('Error procesando XML:', error);
     throw new Error(`Error al procesar XML: ${error.message}`);
@@ -110,38 +114,38 @@ async function parseXmlDocument(xmlContent) {
 function extractClientDataFromXml(factura) {
   const infoFactura = factura.infoFactura?.[0] || {};
   const infoAdicional = factura.infoAdicional?.[0]?.campoAdicional || [];
-  
+
   // Extraer nombre del cliente (razonSocialComprador)
   const clientName = infoFactura.razonSocialComprador?.[0] || 'Sin nombre';
-  
+
   // ⭐ NUEVO: Extraer ID del cliente (cualquier tipo de identificación: cédula, RUC, pasaporte, etc.)
   const clientId = infoFactura.identificacionComprador?.[0] || null;
-  
+
   // Buscar email en infoAdicional
   let clientEmail = null;
-  const emailField = infoAdicional.find(campo => 
+  const emailField = infoAdicional.find(campo =>
     campo.$.nombre === 'Email Cliente'
   );
   if (emailField && emailField._) {
     clientEmail = emailField._;
   }
-  
+
   // Buscar CELULAR (NO teléfono) en infoAdicional para WhatsApp
   let clientPhone = null;
-  const celularField = infoAdicional.find(campo => 
+  const celularField = infoAdicional.find(campo =>
     campo.$.nombre === 'CELULAR'
   );
   if (celularField && celularField._) {
     clientPhone = celularField._;
   }
-  
+
   console.log('🔍 XML Parser: Datos del cliente extraídos:', {
     clientName,
     clientId: clientId || 'Sin identificación',
     clientEmail: clientEmail || 'Sin email',
     clientPhone: clientPhone || 'Sin celular'
   });
-  
+
   return {
     clientName,
     clientId,
@@ -157,11 +161,11 @@ function extractClientDataFromXml(factura) {
  */
 function extractProtocolNumber(factura) {
   const infoAdicional = factura.infoAdicional?.[0]?.campoAdicional || [];
-  
-  const protocolField = infoAdicional.find(campo => 
+
+  const protocolField = infoAdicional.find(campo =>
     campo.$.nombre === 'NÚMERO DE LIBRO'
   );
-  
+
   return protocolField && protocolField._ ? protocolField._ : null;
 }
 
@@ -172,12 +176,50 @@ function extractProtocolNumber(factura) {
  */
 function extractMatrizadorName(factura) {
   const infoAdicional = factura.infoAdicional?.[0]?.campoAdicional || [];
-  
-  const matrizadorField = infoAdicional.find(campo => 
+
+  const matrizadorField = infoAdicional.find(campo =>
     campo.$.nombre === 'Matrizador'
   );
-  
+
   return matrizadorField && matrizadorField._ ? matrizadorField._ : 'Sin asignar';
+}
+
+/**
+ * Extrae la fecha de emisión de la factura del XML
+ * @param {Object} factura - Objeto factura del XML parseado
+ * @returns {Date|null} Fecha de emisión como objeto Date, o null si no se encuentra
+ */
+function extractFechaEmision(factura) {
+  try {
+    // Buscar en infoFactura.fechaEmision
+    const fechaStr = factura.infoFactura?.[0]?.fechaEmision?.[0];
+
+    if (!fechaStr) {
+      console.log('⚠️ No se encontró fechaEmision en el XML');
+      return null;
+    }
+
+    // Parsear formato DD/MM/YYYY
+    const parts = fechaStr.split('/');
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1; // Meses en JS son 0-indexed
+      const year = parseInt(parts[2], 10);
+
+      const fecha = new Date(year, month, day, 12, 0, 0); // Mediodía para evitar problemas de timezone
+
+      if (!isNaN(fecha.getTime())) {
+        console.log(`📅 Fecha de emisión extraída: ${fechaStr} -> ${fecha.toISOString()}`);
+        return fecha;
+      }
+    }
+
+    console.log(`⚠️ No se pudo parsear la fecha: ${fechaStr}`);
+    return null;
+  } catch (error) {
+    console.error('Error extrayendo fecha de emisión:', error);
+    return null;
+  }
 }
 
 /**
@@ -191,7 +233,7 @@ function classifyDocumentByCode(codigo) {
   if (!match) {
     return 'OTROS'; // Default si no se encuentra letra
   }
-  
+
   const letra = match[0];
   return TIPOS_POR_CODIGO[letra] || 'OTROS';
 }
@@ -207,12 +249,12 @@ function processDocumentByType(tipo, detalles) {
     // 2. LÓGICA ESPECIAL PARA CERTIFICACIONES
     // Si código indica C → Agrupar TODOS los items como "CERTIFICACIONES"
     // No aplicar filtros, no buscar acto principal
-    
+
     const totalValor = detalles.reduce((sum, detalle) => {
       const valor = parseFloat(detalle.precioTotalSinImpuesto?.[0]) || 0;
       return sum + valor;
     }, 0);
-    
+
     return {
       actoPrincipalDescripcion: 'CERTIFICACIONES',
       actoPrincipalValor: totalValor,
@@ -237,33 +279,33 @@ function processDocumentByType(tipo, detalles) {
 function processNormalDocument(detalles, tipo) {
   const itemsSecundarios = [];
   const itemsPrincipales = [];
-  
+
   // Clasificar items
   detalles.forEach(detalle => {
     const descripcion = detalle.descripcion?.[0] || '';
     const valor = parseFloat(detalle.precioTotalSinImpuesto?.[0]) || 0;
-    
+
     const item = {
       descripcion,
       valor,
       detalleCompleto: detalle // Guardar referencia completa
     };
-    
+
     // Verificar si es item a ignorar
-    const esSecundario = ITEMS_A_IGNORAR.some(itemIgnorar => 
+    const esSecundario = ITEMS_A_IGNORAR.some(itemIgnorar =>
       descripcion.toUpperCase().includes(itemIgnorar.toUpperCase())
     );
-    
+
     if (esSecundario) {
       itemsSecundarios.push(item);
     } else {
       itemsPrincipales.push(item);
     }
   });
-  
+
   // Seleccionar acto principal según tipo de documento
   const actoPrincipal = seleccionarActoPrincipalPorTipo(itemsPrincipales, tipo);
-  
+
   return {
     actoPrincipalDescripcion: actoPrincipal.descripcion,
     actoPrincipalValor: actoPrincipal.valor,
@@ -281,11 +323,11 @@ function seleccionarActoPrincipalPorTipo(items, tipo) {
   if (items.length === 0) {
     return { descripcion: 'Sin acto principal', valor: 0 };
   }
-  
+
   if (items.length === 1) {
     return items[0];
   }
-  
+
   switch (tipo) {
     case 'OTROS':
       return seleccionarEnOtros(items);
@@ -308,38 +350,38 @@ function seleccionarEnOtros(items) {
   // Prioridad 1: OTORGAMIENTO DE COPIAS DE ARCHIVO
   const copiaArchivo = items.find(item => {
     const desc = item.descripcion.toUpperCase();
-    return desc.includes('OTORGAMIENTO') && 
-           desc.includes('COPIAS') && 
-           desc.includes('ARCHIVO');
+    return desc.includes('OTORGAMIENTO') &&
+      desc.includes('COPIAS') &&
+      desc.includes('ARCHIVO');
   });
-  
+
   if (copiaArchivo) {
     console.log('✅ OTROS: Seleccionado OTORGAMIENTO DE COPIAS DE ARCHIVO');
     return copiaArchivo;
   }
-  
+
   // Prioridad 2: RAZÓN MARGINAL (TU CASO ESPECÍFICO)
   const razonMarginal = items.find(item => {
     const desc = item.descripcion.toUpperCase();
     return desc.includes('RAZÓN') && desc.includes('MARGINAL');
   });
-  
+
   if (razonMarginal) {
     console.log('✅ OTROS: Seleccionado RAZÓN MARGINAL');
     return razonMarginal;
   }
-  
+
   // Prioridad 3: OFICIO
   const oficio = items.find(item => {
     const desc = item.descripcion.toUpperCase();
     return desc.includes('OFICIO');
   });
-  
+
   if (oficio) {
     console.log('✅ OTROS: Seleccionado OFICIO');
     return oficio;
   }
-  
+
   // Prioridad 4: Cualquier otro (tomar el primero)
   console.log('✅ OTROS: Seleccionado primer item disponible');
   return items[0];
@@ -353,15 +395,15 @@ function seleccionarEnDiligencias(items) {
   // Buscar items que NO sean certificaciones
   const noCertificaciones = items.filter(item => {
     const desc = item.descripcion.toUpperCase();
-    return !desc.includes('CERTIFICACIÓN') && 
-           !desc.includes('CERTIFICACION');
+    return !desc.includes('CERTIFICACIÓN') &&
+      !desc.includes('CERTIFICACION');
   });
-  
+
   if (noCertificaciones.length > 0) {
     console.log('✅ DILIGENCIAS: Seleccionado item que no es certificación');
     return noCertificaciones[0];
   }
-  
+
   console.log('✅ DILIGENCIAS: Seleccionado primer item disponible');
   return items[0];
 }
@@ -378,31 +420,31 @@ function seleccionarEnProtocolo(items) {
     'CANCELACIÓN',
     'HIPOTECA'
   ];
-  
+
   for (const prioridad of prioridades) {
     const encontrado = items.find(item => {
       const desc = item.descripcion.toUpperCase();
       return desc.includes(prioridad);
     });
-    
+
     if (encontrado) {
       console.log(`✅ PROTOCOLO: Seleccionado ${prioridad}`);
       return encontrado;
     }
   }
-  
+
   // Si no encuentra prioridades específicas, tomar el que no sea certificación
   const noCertificaciones = items.filter(item => {
     const desc = item.descripcion.toUpperCase();
-    return !desc.includes('CERTIFICACIÓN') && 
-           !desc.includes('CERTIFICACION');
+    return !desc.includes('CERTIFICACIÓN') &&
+      !desc.includes('CERTIFICACION');
   });
-  
+
   if (noCertificaciones.length > 0) {
     console.log('✅ PROTOCOLO: Seleccionado item que no es certificación');
     return noCertificaciones[0];
   }
-  
+
   console.log('✅ PROTOCOLO: Seleccionado primer item disponible');
   return items[0];
 }
@@ -415,27 +457,27 @@ function seleccionarEnArrendamiento(items) {
   // Buscar específicamente arrendamientos o contratos
   const arrendamiento = items.find(item => {
     const desc = item.descripcion.toUpperCase();
-    return desc.includes('ARRENDAMIENTO') || 
-           desc.includes('CONTRATO');
+    return desc.includes('ARRENDAMIENTO') ||
+      desc.includes('CONTRATO');
   });
-  
+
   if (arrendamiento) {
     console.log('✅ ARRENDAMIENTO: Seleccionado contrato/arrendamiento');
     return arrendamiento;
   }
-  
+
   // Si no encuentra, tomar el que no sea certificación
   const noCertificaciones = items.filter(item => {
     const desc = item.descripcion.toUpperCase();
-    return !desc.includes('CERTIFICACIÓN') && 
-           !desc.includes('CERTIFICACION');
+    return !desc.includes('CERTIFICACIÓN') &&
+      !desc.includes('CERTIFICACION');
   });
-  
+
   if (noCertificaciones.length > 0) {
     console.log('✅ ARRENDAMIENTO: Seleccionado item que no es certificación');
     return noCertificaciones[0];
   }
-  
+
   console.log('✅ ARRENDAMIENTO: Seleccionado primer item disponible');
   return items[0];
 }

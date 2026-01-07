@@ -81,6 +81,7 @@ model Document {
   matrizadorName           String                  // Nombre del matrizador del XML
   itemsSecundarios         String?                   // Array de items ignorados para auditoría (JSON string)
   xmlOriginal              String?                 // XML completo opcional
+  fechaFactura             DateTime?               // Fecha de emisión de la factura (del XML)
 
   // Agrupación de documentos
   documentGroupId       String?    // ID del grupo (compartido entre documentos agrupados)

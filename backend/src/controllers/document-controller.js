@@ -79,6 +79,7 @@ async function uploadXmlDocument(req, res) {
         matrizadorName: parsedData.matrizadorName,
         itemsSecundarios: parsedData.itemsSecundarios,
         xmlOriginal: parsedData.xmlOriginal,
+        fechaFactura: parsedData.fechaEmision, // ⭐ NUEVO: Fecha de emisión de la factura
         createdById: req.user.id
         // assignedToId será null inicialmente, se asignará automáticamente después
       },
@@ -1649,6 +1650,7 @@ async function uploadXmlDocumentsBatch(req, res) {
             matrizadorName: parsedData.matrizadorName,
             itemsSecundarios: parsedData.itemsSecundarios,
             xmlOriginal: parsedData.xmlOriginal,
+            fechaFactura: parsedData.fechaEmision, // ⭐ NUEVO: Fecha de emisión de la factura
             createdById: req.user.id
           },
           include: {
