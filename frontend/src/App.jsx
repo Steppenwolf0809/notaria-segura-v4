@@ -24,11 +24,11 @@ function App() {
     try {
       const zustandData = localStorage.getItem('notaria-auth-storage');
       const directToken = localStorage.getItem('token');
-      
+
       if (zustandData) {
         const parsed = JSON.parse(zustandData);
         const zustandToken = parsed?.state?.token;
-        
+
         // Si hay token en Zustand pero no coincide con localStorage directo, sincronizar
         if (zustandToken && zustandToken !== directToken) {
           console.warn('[AUTH-FIX] Sincronizando tokens desincronizados');
@@ -49,9 +49,9 @@ function App() {
         localStorage.removeItem('refreshToken');
         localStorage.removeItem('notaria-auth-storage');
         clearAuth();
-      } catch {}
+      } catch { }
     }
-    
+
     // Verificar autenticación al cargar la aplicación
     checkAuth();
   }, [checkAuth, clearAuth]);
@@ -256,11 +256,11 @@ function App() {
       MuiPaper: {
         styleOverrides: {
           root: {
-            backgroundColor: resolvedIsDark ? '#1e2530 !important' : '#ffffff !important',
+            backgroundColor: resolvedIsDark ? '#1e2530' : '#ffffff',
             borderRadius: 8,
             border: resolvedIsDark ? '1px solid #334155' : '1px solid #e2e8f0',
             '&.MuiTableContainer-root': {
-              backgroundColor: resolvedIsDark ? '#1e2530 !important' : '#ffffff !important',
+              backgroundColor: resolvedIsDark ? '#1e2530' : '#ffffff',
             }
           }
         }
@@ -307,6 +307,19 @@ function App() {
           },
         },
       },
+
+      MuiAlert: {
+        styleOverrides: {
+          filledSuccess: { color: '#fff' },
+          filledError: { color: '#fff' },
+          filledInfo: { color: '#fff' },
+          filledWarning: { color: '#fff' },
+          standardSuccess: { color: resolvedIsDark ? '#86efac' : '#166534' },
+          standardError: { color: resolvedIsDark ? '#fca5a5' : '#991b1b' },
+          standardWarning: { color: resolvedIsDark ? '#fcd34d' : '#92400e' },
+          standardInfo: { color: resolvedIsDark ? '#67e8f9' : '#164e63' },
+        },
+      },
     }
   });
 
@@ -330,7 +343,7 @@ function App() {
         theme="colored"
         style={{ zIndex: 20000 }}
       />
-      
+
       {/* Ruta pública de verificación */}
       {isVerificationRoute ? (
         <VerificacionPublica />
