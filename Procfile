@@ -1,2 +1,2 @@
-web: bash -lc "cd backend && npx prisma migrate deploy && node server.js"
+web: bash -lc "cd backend && npx prisma generate && npx prisma migrate deploy && node server.js"
 
