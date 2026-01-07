@@ -10,7 +10,8 @@ cmds = [
 [phases.build]
 cmds = [
     "npm run build:frontend",
-    "cd backend && npx prisma generate"
+    "cd backend && npx prisma generate",
+    "cd backend && npx prisma db push --accept-data-loss"
 ]
 
 [start]
