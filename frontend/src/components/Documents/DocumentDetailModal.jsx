@@ -562,7 +562,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
                         : 'none'
                     }}>
                       <Typography variant="body2" color="text.secondary">
-                        <strong>Documento creado:</strong> {formatDate(document.createdAt)}
+                        <strong>Fecha Factura:</strong> {formatDate(document.fechaFactura || document.createdAt)}
                       </Typography>
                     </Box>
                   </CardContent>
