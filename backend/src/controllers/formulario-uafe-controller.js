@@ -1441,16 +1441,31 @@ export async function generarPDFIndividual(req, res) {
       }
     });
 
-    // 4. Crear filename y enviar PDF
+    // 4. Validar que el buffer tenga contenido válido
+    console.log(`[PDF] Buffer generado: ${pdfBuffer?.length || 0} bytes para persona ${persona.numeroIdentificacion}`);
+
+    if (!pdfBuffer || pdfBuffer.length < 1000) {
+      console.error(`[PDF] ERROR: Buffer demasiado pequeño (${pdfBuffer?.length || 0} bytes). El PDF no se generó correctamente.`);
+      return res.status(500).json({
+        success: false,
+        message: 'Error: El PDF generado está vacío o corrupto. Verifique que la persona tiene datos completos.'
+      });
+    }
+
+    // 5. Crear filename y enviar PDF
     const apellidos = datos.datosPersonales?.apellidos || datos.compania?.razonSocial || 'SinNombre';
     const filename = `UAFE_${persona.numeroIdentificacion}_${apellidos.replace(/\s+/g, '_')}.pdf`;
 
+    console.log(`[PDF] Enviando PDF: ${filename} (${pdfBuffer.length} bytes)`);
+
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
     return res.send(pdfBuffer);
 
   } catch (error) {
-    console.error('Error generando PDF individual:', error);
+    console.error('[PDF] Error generando PDF individual:', error);
+    console.error('[PDF] Stack:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Error al generar PDF individual',
