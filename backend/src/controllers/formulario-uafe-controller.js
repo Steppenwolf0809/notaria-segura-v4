@@ -38,6 +38,13 @@ export async function crearProtocolo(req, res) {
       numeroProtocolo,
       fecha,
       actoContrato,
+      tipoActoOtro,            // Para "OTROS" especificar
+      bienInmuebleDescripcion, // Para transacciones de bienes raíces
+      bienInmuebleUbicacion,
+      vehiculoPlaca,            // Para venta de vehículos
+      vehiculoMarca,
+      vehiculoModelo,
+      vehiculoAnio,
       avaluoMunicipal,
       valorContrato,
       formasPago
@@ -48,6 +55,14 @@ export async function crearProtocolo(req, res) {
       return res.status(400).json({
         success: false,
         message: 'Campos obligatorios: numeroProtocolo, fecha, actoContrato, valorContrato'
+      });
+    }
+
+    // Validar que si es "OTROS" tenga especificación
+    if (actoContrato === 'OTROS' && !tipoActoOtro?.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Debe especificar el tipo de acto cuando selecciona "Otros"'
       });
     }
 
@@ -89,12 +104,19 @@ export async function crearProtocolo(req, res) {
       });
     }
 
-    // Crear protocolo
+    // Crear protocolo con todos los campos
     const protocolo = await prisma.protocoloUAFE.create({
       data: {
         numeroProtocolo,
         fecha: new Date(fecha),
         actoContrato,
+        tipoActoOtro: tipoActoOtro || null,
+        bienInmuebleDescripcion: bienInmuebleDescripcion || null,
+        bienInmuebleUbicacion: bienInmuebleUbicacion || null,
+        vehiculoPlaca: vehiculoPlaca || null,
+        vehiculoMarca: vehiculoMarca || null,
+        vehiculoModelo: vehiculoModelo || null,
+        vehiculoAnio: vehiculoAnio || null,
         avaluoMunicipal: avaluoMunicipal ? parseFloat(avaluoMunicipal) : null,
         valorContrato: parseFloat(valorContrato),
         formasPago: formasPago || [],

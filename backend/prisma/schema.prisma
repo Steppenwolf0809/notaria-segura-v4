@@ -593,7 +593,19 @@ model ProtocoloUAFE {
 
   // DATOS DEL TRÁMITE (llenados por matrizador UNA SOLA VEZ)
   fecha                 DateTime
-  actoContrato          String
+  actoContrato          String   // COMPRAVENTA, VENTA_VEHICULO, DONACION, CESION_DERECHOS, PROMESA_COMPRAVENTA, OTROS
+  tipoActoOtro          String?  // Solo cuando actoContrato = 'OTROS'
+  
+  // DATOS DE BIEN INMUEBLE (para transacciones de bienes raíces)
+  bienInmuebleDescripcion String?  // Descripción del bien inmueble
+  bienInmuebleUbicacion   String?  // Ubicación/dirección del inmueble
+  
+  // DATOS DE VEHÍCULO (para venta de vehículos)
+  vehiculoPlaca         String?  // Placa del vehículo
+  vehiculoMarca         String?  // Marca (Toyota, Honda, etc.)
+  vehiculoModelo        String?  // Modelo del vehículo
+  vehiculoAnio          String?  // Año del vehículo
+  
   avaluoMunicipal       Decimal? @db.Decimal(12, 2)
   valorContrato         Decimal  @db.Decimal(12, 2)
 
