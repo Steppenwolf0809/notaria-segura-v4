@@ -112,8 +112,14 @@ console.log(`✅ Trust Proxy configurado: ${TRUST_PROXY ? 'Habilitado (producci�
 // Configuración CORS mejorada para desarrollo y producción
 const corsOptions = {
   origin: function (origin, callback) {
+    // Orígenes base permitidos (siempre incluir dominios de la notaría)
+    const baseOrigins = [
+      'https://www.notaria18quito.com.ec',
+      'https://notaria18quito.com.ec'
+    ];
+
     // En producción, usar orígenes específicos del .env
-    if (process.env.NODE_ENV === 'production') {
+    if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
       const productionOrigins = process.env.ALLOWED_ORIGINS
         ? process.env.ALLOWED_ORIGINS.split(',').map(url => url.trim())
         : [process.env.FRONTEND_URL || 'https://notaria-segura.com'];
@@ -126,23 +132,14 @@ const corsOptions = {
         }
       }
 
-      // Agregar dominio personalizado de la notaría (con y sin www)
-      const notariaOrigins = [
-        'https://www.notaria18quito.com.ec',
-        'https://notaria18quito.com.ec'
-      ];
-      notariaOrigins.forEach(url => {
-        if (!productionOrigins.includes(url)) {
-          productionOrigins.push(url);
-        }
-      });
+      const allOrigins = Array.from(new Set([...productionOrigins, ...baseOrigins]));
 
       // Permitir requests sin origin (API calls) o desde orígenes permitidos
-      if (!origin || productionOrigins.includes(origin)) {
+      if (!origin || allOrigins.includes(origin)) {
         callback(null, true);
       } else {
-        console.warn(`🚫 CORS: Origin no permitido en producción: ${origin}`);
-        console.warn(`📋 Orígenes permitidos: ${productionOrigins.join(', ')}`);
+        console.warn(`🚫 CORS: Origin no permitido en ${process.env.NODE_ENV}: ${origin}`);
+        console.warn(`📋 Orígenes permitidos: ${allOrigins.join(', ')}`);
         callback(new Error('No permitido por CORS'));
       }
     } else {
@@ -161,12 +158,14 @@ const corsOptions = {
         developmentOrigins.push(process.env.FRONTEND_URL);
       }
 
+      const allOrigins = Array.from(new Set([...developmentOrigins, ...baseOrigins]));
+
       // En desarrollo, permitir sin origin (herramientas como Postman/curl) o orígenes permitidos
-      if (!origin || developmentOrigins.includes(origin)) {
+      if (!origin || allOrigins.includes(origin)) {
         callback(null, true);
       } else {
         console.warn(`⚠️  CORS: Origin no permitido en desarrollo: ${origin}`);
-        console.log(`📋 Orígenes permitidos: ${developmentOrigins.join(', ')}`);
+        console.log(`📋 Orígenes permitidos: ${allOrigins.join(', ')}`);
         callback(new Error('No permitido por CORS'));
       }
     }
@@ -464,7 +463,7 @@ app.use((error, req, res, next) => {
   res.status(500).json({
     success: false,
     error: 'Error interno del servidor',
-    message: process.env.NODE_ENV === 'development' ? error.message : 'Error interno'
+    message: (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'staging') ? error.message : 'Error interno'
   })
 })
 

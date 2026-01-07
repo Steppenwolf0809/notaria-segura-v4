@@ -129,7 +129,8 @@ export async function verificarCedula(req, res) {
     logger.error('Error verificando cédula:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al verificar cédula'
+      message: 'Error al verificar cédula',
+      error: process.env.NODE_ENV !== 'production' ? error.message : undefined
     });
   }
 }
@@ -306,7 +307,8 @@ export async function registrarPersona(req, res) {
     logger.error('Error registrando persona:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al crear cuenta'
+      message: 'Error al crear cuenta',
+      error: process.env.NODE_ENV !== 'production' ? error.message : undefined
     });
   }
 }
