@@ -801,7 +801,7 @@ const DocumentOversight = () => {
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">
-                          {new Date(document.createdAt).toLocaleDateString('es-ES')}
+                          {new Date(document.fechaFactura || document.createdAt).toLocaleDateString('es-ES')}
                         </Typography>
                       </TableCell>
                       <TableCell align="center">

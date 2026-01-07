@@ -61,7 +61,7 @@ const DocumentsList = () => {
   const [dateRange, setDateRange] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
-  const [sortField, setSortField] = useState('createdAt');
+  const [sortField, setSortField] = useState('fechaFactura');
   const [sortDirection, setSortDirection] = useState('desc');
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -119,7 +119,7 @@ const DocumentsList = () => {
       }
 
       if (startDate) {
-        filtered = filtered.filter(doc => new Date(doc.createdAt) >= startDate);
+        filtered = filtered.filter(doc => new Date(doc.fechaFactura || doc.createdAt) >= startDate);
       }
     }
 
@@ -129,9 +129,9 @@ const DocumentsList = () => {
       let bValue = b[sortField];
 
       // Manejar diferentes tipos de datos
-      if (sortField === 'createdAt') {
-        aValue = new Date(aValue);
-        bValue = new Date(bValue);
+      if (sortField === 'fechaFactura' || sortField === 'createdAt') {
+        aValue = new Date(a.fechaFactura || a.createdAt);
+        bValue = new Date(b.fechaFactura || b.createdAt);
       } else if (typeof aValue === 'string') {
         aValue = aValue.toLowerCase();
         bValue = bValue.toLowerCase();
@@ -519,7 +519,7 @@ const DocumentsList = () => {
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
                       <CalendarIcon sx={{ fontSize: 16, color: 'text.secondary', mr: 0.5 }} />
                       <Typography variant="caption">
-                        {formatDate(document.createdAt)}
+                        {formatDate(document.fechaFactura || document.createdAt)}
                       </Typography>
                     </Box>
                   </TableCell>
