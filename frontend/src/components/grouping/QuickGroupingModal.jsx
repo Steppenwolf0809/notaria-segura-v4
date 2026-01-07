@@ -403,7 +403,7 @@ const QuickGroupingModal = ({
                             color="info"
                           />
                           <Typography variant="caption" color="textSecondary">
-                            {new Date(doc.createdAt).toLocaleDateString('es-EC')}
+                            {new Date(doc.fechaFactura || doc.createdAt).toLocaleDateString('es-EC')}
                           </Typography>
                         </Box>
                       </Box>

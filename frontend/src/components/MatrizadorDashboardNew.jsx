@@ -136,7 +136,7 @@ const MatrizadorDashboardNew = () => {
                 </ListItemAvatar>
                 <ListItemText
                   primary={doc.clientName}
-                  secondary={`${doc.documentType} - ${Math.floor((new Date() - new Date(doc.createdAt)) / (1000 * 60 * 60 * 24))} días`}
+                  secondary={`${doc.documentType} - ${Math.floor((new Date() - new Date(doc.fechaFactura || doc.createdAt)) / (1000 * 60 * 60 * 24))} días`}
                   primaryTypographyProps={{ variant: 'body2', fontWeight: 'medium' }}
                   secondaryTypographyProps={{ variant: 'caption' }}
                 />

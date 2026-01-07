@@ -327,7 +327,7 @@ const GroupingAlert = ({
                 </Typography>
               </Box>
               <Typography variant="caption" color="text.secondary">
-                📅 {new Date(doc.createdAt).toLocaleDateString('es-EC')} • 
+                📅 {new Date(doc.fechaFactura || doc.createdAt).toLocaleDateString('es-EC')} •
                 🔄 {doc.status}
               </Typography>
             </Box>
