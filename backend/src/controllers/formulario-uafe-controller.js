@@ -1992,3 +1992,168 @@ export async function eliminarProtocolo(req, res) {
   }
 }
 
+/**
+ * Listar todas las personas registradas con estadísticas de actividad
+ * GET /api/formulario-uafe/admin/personas-registradas
+ * Requiere: authenticateToken + role ADMIN
+ * 
+ * Funcionalidad de análisis UAFE:
+ * - Muestra todas las personas registradas
+ * - Incluye conteo de protocolos y montos totales
+ * - Indicadores de alerta para actividad inusual
+ */
+export async function listarPersonasRegistradas(req, res) {
+  try {
+    const { page = 1, limit = 20, search = '', soloAlertas = 'false' } = req.query;
+    const offset = (parseInt(page) - 1) * parseInt(limit);
+
+    // Construir filtro de búsqueda
+    const where = search ? {
+      OR: [
+        { numeroIdentificacion: { contains: search, mode: 'insensitive' } },
+        { datosPersonaNatural: { path: ['datosPersonales', 'nombres'], string_contains: search } },
+        { datosPersonaNatural: { path: ['datosPersonales', 'apellidos'], string_contains: search } }
+      ]
+    } : {};
+
+    // Obtener personas con sus protocolos
+    const personas = await prisma.personaRegistrada.findMany({
+      where,
+      include: {
+        protocolos: {
+          include: {
+            protocolo: {
+              select: {
+                id: true,
+                numeroProtocolo: true,
+                actoContrato: true,
+                valorContrato: true,
+                fecha: true,
+                createdAt: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      skip: offset,
+      take: parseInt(limit)
+    });
+
+    // Procesar datos y calcular estadísticas
+    const personasConStats = personas.map(persona => {
+      const protocolosData = persona.protocolos || [];
+      const totalProtocolos = protocolosData.length;
+
+      // Calcular monto total de todos los protocolos
+      const montoTotal = protocolosData.reduce((sum, pp) => {
+        const valor = parseFloat(pp.protocolo?.valorContrato) || 0;
+        return sum + valor;
+      }, 0);
+
+      // Obtener última actividad
+      const ultimaActividad = protocolosData.length > 0
+        ? protocolosData.sort((a, b) => new Date(b.protocolo?.createdAt) - new Date(a.protocolo?.createdAt))[0]?.protocolo?.createdAt
+        : persona.createdAt;
+
+      // Extraer datos personales
+      const datosNatural = persona.datosPersonaNatural || {};
+      const datosJuridica = persona.datosPersonaJuridica || {};
+
+      let nombre = 'Sin nombre';
+      let email = 'N/A';
+      let telefono = 'N/A';
+      let ingresoMensual = 0;
+      let profesion = 'N/A';
+
+      if (persona.tipoPersona === 'NATURAL') {
+        const dp = datosNatural.datosPersonales || {};
+        const contacto = datosNatural.contacto || {};
+        const laboral = datosNatural.informacionLaboral || {};
+
+        nombre = `${dp.nombres || ''} ${dp.apellidos || ''}`.trim() || 'Sin nombre';
+        email = contacto.email || 'N/A';
+        telefono = contacto.celular || contacto.telefono || 'N/A';
+        ingresoMensual = parseFloat(laboral.ingresoMensual) || 0;
+        profesion = laboral.profesionOcupacion || laboral.profesion || 'N/A';
+      } else {
+        const comp = datosJuridica.compania || {};
+        const contacto = datosJuridica.contacto || {};
+
+        nombre = comp.razonSocial || 'Sin nombre';
+        email = contacto.email || 'N/A';
+        telefono = contacto.telefono || 'N/A';
+      }
+
+      // Determinar si tiene alerta (>3 protocolos o monto alto vs ingreso)
+      const tieneAlertaProtocolos = totalProtocolos > 3;
+      const tieneAlertaMonto = ingresoMensual > 0 && montoTotal > (ingresoMensual * 12); // Monto mayor a ingreso anual
+      const tieneAlerta = tieneAlertaProtocolos || tieneAlertaMonto;
+
+      return {
+        id: persona.id,
+        numeroIdentificacion: persona.numeroIdentificacion,
+        tipoPersona: persona.tipoPersona,
+        nombre,
+        email,
+        telefono,
+        profesion,
+        ingresoMensual,
+        totalProtocolos,
+        montoTotal,
+        ultimaActividad,
+        fechaRegistro: persona.createdAt,
+        completado: persona.completado,
+        tieneAlerta,
+        motivoAlerta: tieneAlerta
+          ? (tieneAlertaProtocolos ? `${totalProtocolos} protocolos` : 'Monto alto vs ingreso')
+          : null,
+        // Lista resumida de protocolos para detalle
+        protocolosResumen: protocolosData.slice(0, 10).map(pp => ({
+          id: pp.protocolo?.id,
+          numeroProtocolo: pp.protocolo?.numeroProtocolo,
+          actoContrato: pp.protocolo?.actoContrato,
+          valorContrato: pp.protocolo?.valorContrato,
+          fecha: pp.protocolo?.fecha,
+          calidad: pp.calidad
+        }))
+      };
+    });
+
+    // Filtrar solo alertas si se solicita
+    const personasFiltradas = soloAlertas === 'true'
+      ? personasConStats.filter(p => p.tieneAlerta)
+      : personasConStats;
+
+    // Obtener total para paginación
+    const total = await prisma.personaRegistrada.count({ where });
+
+    // Calcular KPIs
+    const kpis = {
+      totalPersonas: total,
+      personasConAlerta: personasConStats.filter(p => p.tieneAlerta).length,
+      montoTotalProcesado: personasConStats.reduce((sum, p) => sum + p.montoTotal, 0)
+    };
+
+    res.json({
+      success: true,
+      data: personasFiltradas,
+      kpis,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages: Math.ceil(total / parseInt(limit)),
+        hasMore: offset + personasFiltradas.length < total
+      }
+    });
+
+  } catch (error) {
+    console.error('Error listando personas registradas:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al obtener personas registradas',
+      error: error.message
+    });
+  }
+}

@@ -49,6 +49,7 @@ import WhatsAppTemplates from './admin/WhatsAppTemplates';
 import AdminSettings from './admin/AdminSettings';
 // import AdminFormulariosUAFE from './admin/AdminFormulariosUAFE';
 import FormulariosUAFE from './FormulariosUAFE';
+import AnalisisUAFE from './admin/AnalisisUAFE';
 import { getSupervisionStats, getMatrizadores } from '../services/admin-supervision-service';
 
 /**
@@ -71,6 +72,8 @@ const AdminCenter = () => {
         return <DocumentOversight />;
       case 'formularios-uafe':
         return <FormulariosUAFE adminMode={true} />;
+      case 'analisis-uafe':
+        return <AnalisisUAFE />;
       case 'notifications':
         return <NotificationHistory />;
       case 'notification-templates':

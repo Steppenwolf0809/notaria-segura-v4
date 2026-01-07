@@ -17,7 +17,8 @@ import {
   descargarArchivo,
   buscarRepresentado,
   listarTodosProtocolos,
-  eliminarProtocolo
+  eliminarProtocolo,
+  listarPersonasRegistradas
 } from '../controllers/formulario-uafe-controller.js';
 
 const router = express.Router();
@@ -251,6 +252,24 @@ router.delete(
   requireRoles(['ADMIN']),
   csrfProtection,
   eliminarProtocolo
+);
+
+/**
+ * Listar personas registradas con estadísticas de actividad (Análisis UAFE)
+ * GET /api/formulario-uafe/admin/personas-registradas
+ * Requiere: JWT + role ADMIN
+ * 
+ * Query params:
+ * - page: número de página (default: 1)
+ * - limit: registros por página (default: 20)
+ * - search: búsqueda por cédula o nombre
+ * - soloAlertas: 'true' para filtrar solo personas con alertas
+ */
+router.get(
+  '/admin/personas-registradas',
+  authenticateToken,
+  requireRoles(['ADMIN']),
+  listarPersonasRegistradas
 );
 
 // ========================================
