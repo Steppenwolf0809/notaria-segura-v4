@@ -87,7 +87,7 @@ const TIPOS_BIEN_INMUEBLE = ['COMPRAVENTA', 'DONACION', 'CESION_DERECHOS', 'PROM
 // Tipos que requieren datos de vehículo
 const TIPOS_VEHICULO = ['VENTA_VEHICULO'];
 
-const FormulariosUAFE = () => {
+const FormulariosUAFE = ({ adminMode = false }) => {
   // Estados principales
   const [protocolos, setProtocolos] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -101,6 +101,7 @@ const FormulariosUAFE = () => {
   const [openEditarPersona, setOpenEditarPersona] = useState(false);
   const [personaEditar, setPersonaEditar] = useState(null);
   const [openConfirmarEliminar, setOpenConfirmarEliminar] = useState(false);
+  const [openConfirmarEliminarProtocolo, setOpenConfirmarEliminarProtocolo] = useState(false);
   const [personaEliminar, setPersonaEliminar] = useState(null);
   const [openResetearPin, setOpenResetearPin] = useState(false);
 
@@ -166,7 +167,11 @@ const FormulariosUAFE = () => {
       const params = new URLSearchParams();
       if (filtroProtocolo) params.append('search', filtroProtocolo);
 
-      const response = await apiClient.get(`/formulario-uafe/protocolos?${params}`);
+      const url = adminMode
+        ? `/formulario-uafe/admin/protocolos?${params}`
+        : `/formulario-uafe/protocolos?${params}`;
+
+      const response = await apiClient.get(url);
 
       if (response.data.success) {
         setProtocolos(response.data.data);
@@ -182,9 +187,9 @@ const FormulariosUAFE = () => {
   };
 
   /**
-   * Crear nuevo protocolo
+   * Guardar protocolo (Crear o Editar)
    */
-  const crearProtocolo = async () => {
+  const guardarProtocolo = async () => {
     // Validaciones básicas
     if (!formProtocolo.numeroProtocolo || !formProtocolo.actoContrato || !formProtocolo.valorContrato) {
       mostrarSnackbar('Completa los campos obligatorios: Número de Protocolo, Acto/Contrato y Valor del Contrato', 'warning');
@@ -248,20 +253,27 @@ const FormulariosUAFE = () => {
         datosProtocolo.vehiculoAnio = formProtocolo.vehiculoAnio || null;
       }
 
-      const response = await apiClient.post('/formulario-uafe/protocolo', datosProtocolo);
+      let response;
+      if (modoEditarProtocolo && protocoloSeleccionado) {
+        // UPDATE
+        response = await apiClient.put(`/formulario-uafe/protocolo/${protocoloSeleccionado.id}`, datosProtocolo);
+      } else {
+        // CREATE
+        response = await apiClient.post('/formulario-uafe/protocolo', datosProtocolo);
+      }
 
       if (response.data.success) {
-        mostrarSnackbar('Protocolo creado exitosamente', 'success');
+        mostrarSnackbar(modoEditarProtocolo ? 'Protocolo actualizado exitosamente' : 'Protocolo creado exitosamente', 'success');
         setOpenNuevoProtocolo(false);
         resetFormProtocolo();
         cargarProtocolos();
       } else {
-        mostrarSnackbar(response.data.message || 'Error al crear protocolo', 'error');
+        mostrarSnackbar(response.data.message || 'Error al guardar protocolo', 'error');
       }
     } catch (error) {
-      const errorMsg = error.response?.data?.message || 'Error al crear protocolo';
+      const errorMsg = error.response?.data?.message || 'Error al guardar protocolo';
       mostrarSnackbar(errorMsg, 'error');
-      console.error('Error creando protocolo:', error);
+      console.error('Error guardando protocolo:', error);
     } finally {
       setLoading(false);
     }
@@ -476,6 +488,9 @@ const FormulariosUAFE = () => {
   /**
    * Resetear formulario de protocolo
    */
+  /**
+   * Resetear formulario de protocolo
+   */
   const resetFormProtocolo = () => {
     setFormProtocolo({
       numeroProtocolo: '',
@@ -492,6 +507,78 @@ const FormulariosUAFE = () => {
       valorContrato: ''
     });
     setFormasPago([{ tipo: 'EFECTIVO', monto: '', banco: '' }]);
+    setModoEditarProtocolo(false);
+    if (!openVerProtocolo) {
+      setProtocoloSeleccionado(null);
+    }
+  };
+
+  /**
+   * Abrir dialog para editar protocolo
+   */
+  const abrirEditarProtocolo = (protocolo) => {
+    setFormProtocolo({
+      numeroProtocolo: protocolo.numeroProtocolo,
+      fecha: protocolo.fecha ? protocolo.fecha.split('T')[0] : '',
+      actoContrato: protocolo.actoContrato || '',
+      tipoActoOtro: protocolo.tipoActoOtro || '',
+      bienInmuebleDescripcion: protocolo.bienInmuebleDescripcion || '',
+      bienInmuebleUbicacion: protocolo.bienInmuebleUbicacion || '',
+      vehiculoPlaca: protocolo.vehiculoPlaca || '',
+      vehiculoMarca: protocolo.vehiculoMarca || '',
+      vehiculoModelo: protocolo.vehiculoModelo || '',
+      vehiculoAnio: protocolo.vehiculoAnio || '',
+      avaluoMunicipal: protocolo.avaluoMunicipal || '',
+      valorContrato: protocolo.valorContrato || ''
+    });
+
+    if (Array.isArray(protocolo.formasPago) && protocolo.formasPago.length > 0) {
+      setFormasPago(protocolo.formasPago.map(fp => ({
+        ...fp,
+        monto: fp.monto ? fp.monto.toString() : '',
+        banco: fp.banco || ''
+      })));
+    } else {
+      setFormasPago([{ tipo: 'EFECTIVO', monto: '', banco: '' }]);
+    }
+
+    setProtocoloSeleccionado(protocolo);
+    setModoEditarProtocolo(true);
+    setOpenNuevoProtocolo(true);
+  };
+
+  /**
+   * Confirmar eliminación de protocolo
+   */
+  const confirmarEliminarProtocolo = (protocolo) => {
+    setProtocoloSeleccionado(protocolo);
+    setOpenConfirmarEliminarProtocolo(true);
+  };
+
+  /**
+   * Eliminar protocolo
+   */
+  const eliminarProtocolo = async () => {
+    if (!protocoloSeleccionado) return;
+
+    setLoading(true);
+    try {
+      const response = await apiClient.delete(`/formulario-uafe/protocolo/${protocoloSeleccionado.id}`);
+      if (response.data.success) {
+        mostrarSnackbar('Protocolo eliminado exitosamente', 'success');
+        setOpenConfirmarEliminarProtocolo(false);
+        setProtocoloSeleccionado(null);
+        cargarProtocolos();
+      } else {
+        mostrarSnackbar(response.data.message || 'Error al eliminar protocolo', 'error');
+      }
+    } catch (error) {
+      const errorMsg = error.response?.data?.message || 'Error eliminando protocolo';
+      mostrarSnackbar(errorMsg, 'error');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   /**
@@ -711,14 +798,29 @@ const FormulariosUAFE = () => {
         { responseType: 'blob' }
       );
 
+      // Verificar que la respuesta sea válida (los PDFs son mayores a 1KB)
+      if (response.data.size < 1000) {
+        // Probablemente es un error JSON, intentar leerlo
+        const text = await response.data.text();
+        try {
+          const errorData = JSON.parse(text);
+          mostrarSnackbar(errorData.message || 'Error al generar PDF', 'error');
+          return;
+        } catch {
+          // No es JSON, pero aún así es muy pequeño
+          mostrarSnackbar('El PDF generado está vacío o corrupto', 'error');
+          return;
+        }
+      }
+
       // Obtener filename del header Content-Disposition
       const contentDisposition = response.headers['content-disposition'];
       const filename = contentDisposition
         ? contentDisposition.split('filename=')[1].replace(/"/g, '')
         : 'formulario_uafe.pdf';
 
-      // Descargar archivo
-      const blob = new Blob([response.data]);
+      // Descargar archivo con content-type correcto
+      const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -730,13 +832,28 @@ const FormulariosUAFE = () => {
 
       mostrarSnackbar('PDF descargado exitosamente', 'success');
     } catch (error) {
-      const errorMsg = error.response?.data?.message || 'Error al descargar PDF';
+      // Intentar extraer mensaje de error del blob
+      let errorMsg = 'Error al descargar PDF';
+      if (error.response?.data) {
+        if (error.response.data instanceof Blob) {
+          try {
+            const text = await error.response.data.text();
+            const errorData = JSON.parse(text);
+            errorMsg = errorData.message || errorMsg;
+          } catch {
+            // Mantener mensaje por defecto
+          }
+        } else {
+          errorMsg = error.response.data.message || errorMsg;
+        }
+      }
       mostrarSnackbar(errorMsg, 'error');
       console.error('Error descargando PDF:', error);
     } finally {
       setLoading(false);
     }
   };
+
 
   /**
    * Obtener nombre de persona al buscar (endpoint verificar-cedula)
@@ -768,14 +885,32 @@ const FormulariosUAFE = () => {
         { responseType: 'blob' }
       );
 
+      // Verificar que la respuesta sea válida (los PDFs/ZIPs son mayores a 1KB)
+      if (response.data.size < 1000) {
+        const text = await response.data.text();
+        try {
+          const errorData = JSON.parse(text);
+          mostrarSnackbar(errorData.message || 'Error al generar PDFs', 'error');
+          return;
+        } catch {
+          mostrarSnackbar('Los PDFs generados están vacíos o corruptos', 'error');
+          return;
+        }
+      }
+
       // Obtener filename del header Content-Disposition
       const contentDisposition = response.headers['content-disposition'];
       const filename = contentDisposition
         ? contentDisposition.split('filename=')[1].replace(/"/g, '')
         : 'formularios_uafe.pdf';
 
-      // Descargar archivo
-      const blob = new Blob([response.data]);
+      // Determinar content-type basado en el filename
+      const contentType = filename.endsWith('.zip')
+        ? 'application/zip'
+        : 'application/pdf';
+
+      // Descargar archivo con content-type correcto
+      const blob = new Blob([response.data], { type: contentType });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -787,13 +922,28 @@ const FormulariosUAFE = () => {
 
       mostrarSnackbar('PDFs descargados exitosamente', 'success');
     } catch (error) {
-      const errorMsg = error.response?.data?.message || 'Error al descargar PDFs';
+      // Intentar extraer mensaje de error del blob
+      let errorMsg = 'Error al descargar PDFs';
+      if (error.response?.data) {
+        if (error.response.data instanceof Blob) {
+          try {
+            const text = await error.response.data.text();
+            const errorData = JSON.parse(text);
+            errorMsg = errorData.message || errorMsg;
+          } catch {
+            // Mantener mensaje por defecto
+          }
+        } else {
+          errorMsg = error.response.data.message || errorMsg;
+        }
+      }
       mostrarSnackbar(errorMsg, 'error');
       console.error('Error descargando PDFs:', error);
     } finally {
       setLoading(false);
     }
   };
+
 
   /**
    * Calcular progreso de personas completadas
@@ -810,10 +960,10 @@ const FormulariosUAFE = () => {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-            Formularios UAFE - Sistema de Protocolos
+            {adminMode ? 'Gestión de Formularios UAFE (Admin)' : 'Formularios UAFE - Sistema de Protocolos'}
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Crea protocolos y agrega personas. Acceso con: Protocolo + Cédula + PIN
+            {adminMode ? 'Administración de todos los protocolos' : 'Crea protocolos y agrega personas. Acceso con: Protocolo + Cédula + PIN'}
           </Typography>
         </Box>
         <Stack direction="row" spacing={2}>
@@ -843,14 +993,20 @@ const FormulariosUAFE = () => {
           >
             Link Registro
           </Button>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setOpenNuevoProtocolo(true)}
-            sx={{ borderRadius: 2 }}
-          >
-            Nuevo Protocolo
-          </Button>
+          {!adminMode && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setModoEditarProtocolo(false);
+                resetFormProtocolo();
+                setOpenNuevoProtocolo(true);
+              }}
+              sx={{ borderRadius: 2 }}
+            >
+              Nuevo Protocolo
+            </Button>
+          )}
         </Stack>
       </Box>
 
@@ -891,6 +1047,7 @@ const FormulariosUAFE = () => {
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>No. Protocolo</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Fecha</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Acto/Contrato</TableCell>
+              {adminMode && <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Matrizador</TableCell>}
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Valor</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Personas</TableCell>
               <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Progreso</TableCell>
@@ -935,6 +1092,13 @@ const FormulariosUAFE = () => {
                       {formatDateES(protocolo.fecha)}
                     </TableCell>
                     <TableCell>{protocolo.actoContrato}</TableCell>
+                    {adminMode && (
+                      <TableCell>
+                        <Tooltip title={protocolo.creador?.email || ''}>
+                          <Typography variant="body2">{protocolo.creador?.nombre || 'Desconocido'}</Typography>
+                        </Tooltip>
+                      </TableCell>
+                    )}
                     <TableCell>${parseFloat(protocolo.valorContrato).toFixed(2)}</TableCell>
                     <TableCell>
                       <Chip
@@ -960,15 +1124,6 @@ const FormulariosUAFE = () => {
                     </TableCell>
                     <TableCell align="center">
                       <Stack direction="row" spacing={1} justifyContent="center">
-                        <Tooltip title="Agregar Persona">
-                          <IconButton
-                            size="small"
-                            color="primary"
-                            onClick={() => abrirAgregarPersona(protocolo)}
-                          >
-                            <PersonAddIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
                         <Tooltip title="Ver Detalles">
                           <IconButton
                             size="small"
@@ -976,6 +1131,24 @@ const FormulariosUAFE = () => {
                             onClick={() => verDetallesProtocolo(protocolo.id)}
                           >
                             <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Editar Protocolo">
+                          <IconButton
+                            size="small"
+                            color="secondary"
+                            onClick={() => abrirEditarProtocolo(protocolo)}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Agregar Persona">
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() => abrirAgregarPersona(protocolo)}
+                          >
+                            <PersonAddIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Descargar PDFs">
@@ -986,6 +1159,15 @@ const FormulariosUAFE = () => {
                             disabled={!protocolo.personas || protocolo.personas.length === 0}
                           >
                             <PictureAsPdfIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Eliminar Protocolo">
+                          <IconButton
+                            size="small"
+                            color="error" // Red
+                            onClick={() => confirmarEliminarProtocolo(protocolo)}
+                          >
+                            <DeleteIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                       </Stack>
@@ -1069,7 +1251,7 @@ const FormulariosUAFE = () => {
         fullWidth
       >
         <DialogTitle sx={{ backgroundColor: 'primary.main', color: 'white' }}>
-          Crear Nuevo Protocolo UAFE
+          {modoEditarProtocolo ? 'Editar Protocolo UAFE' : 'Crear Nuevo Protocolo UAFE'}
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
           <Stack spacing={3}>
@@ -1089,7 +1271,7 @@ const FormulariosUAFE = () => {
                     placeholder="Ej: 2024-1234"
                   />
                 </Grid>
-                <Grid item xs={12} sm={6}>
+                <Grid item xs={6} sm={4}>
                   <TextField
                     fullWidth
                     required
@@ -1100,10 +1282,11 @@ const FormulariosUAFE = () => {
                     InputLabelProps={{ shrink: true }}
                   />
                 </Grid>
-                <Grid item xs={12} sm={6}>
+                <Grid item xs={6} sm={8}>
                   <FormControl fullWidth required>
                     <InputLabel>Acto / Contrato</InputLabel>
                     <Select
+                      fullWidth
                       value={formProtocolo.actoContrato}
                       label="Acto / Contrato"
                       onChange={(e) => setFormProtocolo({
@@ -1353,11 +1536,11 @@ const FormulariosUAFE = () => {
           </Button>
           <Button
             variant="contained"
-            onClick={crearProtocolo}
+            onClick={guardarProtocolo}
             disabled={loading}
             startIcon={<DescriptionIcon />}
           >
-            {loading ? 'Creando...' : 'Crear Protocolo'}
+            {loading ? (modoEditarProtocolo ? 'Guardando...' : 'Creando...') : (modoEditarProtocolo ? 'Guardar Cambios' : 'Crear Protocolo')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -2008,6 +2191,46 @@ const FormulariosUAFE = () => {
           }
         }}
       />
+
+      {/* Dialog: Confirmar Eliminación Protocolo */}
+      <Dialog
+        open={openConfirmarEliminarProtocolo}
+        onClose={() => { setOpenConfirmarEliminarProtocolo(false); setProtocoloSeleccionado(null); }}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle sx={{ backgroundColor: 'error.main', color: 'white' }}>
+          Confirmar Eliminación de Protocolo
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          {protocoloSeleccionado && (
+            <Stack spacing={2}>
+              <Alert severity="error">
+                ¿Estás seguro de que deseas eliminar el Protocolo <strong>{protocoloSeleccionado.numeroProtocolo}</strong>?
+              </Alert>
+              <Typography variant="body2">
+                Esta acción eliminará el protocolo y <strong>TODAS</strong> las personas/formularios asociados.
+                <br />
+                <strong>Esta acción no se puede deshacer.</strong>
+              </Typography>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => { setOpenConfirmarEliminarProtocolo(false); setProtocoloSeleccionado(null); }}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={eliminarProtocolo}
+            disabled={loading}
+            startIcon={<DeleteIcon />}
+          >
+            {loading ? 'Eliminando...' : 'Eliminar Protocolo'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* Dialog: Resetear PIN */}
       <ResetearPinDialog
