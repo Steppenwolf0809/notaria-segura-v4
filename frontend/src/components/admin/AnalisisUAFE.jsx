@@ -263,16 +263,16 @@ const AnalisisUAFE = () => {
             <TableContainer component={Paper}>
                 <Table size="small">
                     <TableHead>
-                        <TableRow sx={{ backgroundColor: 'primary.main' }}>
-                            <TableCell sx={{ color: 'white', width: 40 }}></TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Cédula/RUC</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Nombre</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Tipo</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="center">Protocolos</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="right">Monto Total</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="right">Ingreso Mensual</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Última Actividad</TableCell>
-                            <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="center">Alerta</TableCell>
+                        <TableRow sx={{ backgroundColor: 'grey.200' }}>
+                            <TableCell sx={{ width: 40 }}></TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>Cédula/RUC</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>Nombre</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>Tipo</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }} align="center">Protocolos</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }} align="right">Monto Total</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }} align="right">Ingreso Mensual</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }}>Última Actividad</TableCell>
+                            <TableCell sx={{ fontWeight: 'bold', color: 'text.primary' }} align="center">Alerta</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
