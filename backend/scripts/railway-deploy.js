@@ -231,9 +231,9 @@ async function safeMigrate() {
       }
     }
 
-    // Aplicar migraciones
-    log('📦 Aplicando migraciones...');
-    execSync('npx prisma migrate deploy', {
+    // Aplicar migraciones con db push (más robusto para cambios rápidos sin archivos de migración)
+    log('📦 Sincronizando esquema de base de datos (db push)...');
+    execSync('npx prisma db push --accept-data-loss', {
       cwd: path.join(__dirname, '..'),
       stdio: 'inherit'
     });
