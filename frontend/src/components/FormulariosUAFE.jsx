@@ -1668,7 +1668,7 @@ const FormulariosUAFE = ({ adminMode = false }) => {
           <Button
             variant="contained"
             color="success"
-            onClick={agregarPersonaAProtocolo}
+            onClick={() => agregarPersonaAProtocolo()}
             disabled={loading || !personaEncontrada}
             startIcon={<PersonAddIcon />}
           >

@@ -1537,7 +1537,7 @@ export async function generarPDFIndividual(req, res) {
         // FIRMA - Posición relativa al contenido, agregar página si no hay espacio
         currentY = checkAndAddPage(doc, currentY, 100);
         const nombreCompleto = getNombreCompleto(datos);
-        drawSignature(doc, currentY + 30, nombreCompleto, persona.numeroIdentificacion);
+        drawSignature(doc, currentY + 10, nombreCompleto, persona.numeroIdentificacion);
 
         // FOOTER
         drawFooter(doc);

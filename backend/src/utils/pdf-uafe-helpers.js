@@ -210,7 +210,7 @@ export function drawDisclaimer(doc, y) {
  * Dibujar caja con información del protocolo (VERSIÓN COMPACTA)
  */
 export function drawProtocolBox(doc, y, protocolo, rol, calidad) {
-  const boxHeight = 65; // Reducido de 90 a 65
+  const boxHeight = 85; // Aumentado para dar espacio a la última línea
 
   // Fondo azul claro
   doc.rect(40, y, 520, boxHeight)
@@ -375,7 +375,7 @@ export function drawTextAreaField(doc, x, y, label, value, width = 480, height =
  * Dibujar sección de firma
  */
 export function drawSignature(doc, y, nombre, cedula) {
-  const signatureY = y + 40;
+  const signatureY = y + 20; // Reducido margen superior de 40 a 20
 
   // Línea para firma
   doc.moveTo(200, signatureY)
