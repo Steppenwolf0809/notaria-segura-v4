@@ -57,7 +57,40 @@ import {
 import { csrfProtection } from '../middleware/csrf-protection.js';
 import cache from '../services/cache-service.js';
 
+import { exec } from 'child_process';
 const router = express.Router();
+
+// ============================================================================
+// RUTA DE EMERGENCIA PARA MIGRACIÓN (Bypass Auth)
+// ============================================================================
+router.get('/system/emergency-migrate', (req, res) => {
+  const { key } = req.query;
+  // Clave simple para evitar ejecución accidental pública
+  if (key !== 'notaria18_emergency') {
+    return res.status(403).json({ success: false, message: 'Acceso denegado' });
+  }
+
+  console.log('⚡ EJECUTANDO MIGRACIÓN DE EMERGENCIA...');
+
+  exec('npx prisma migrate deploy', (error, stdout, stderr) => {
+    if (error) {
+      console.error('❌ Error en migración:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Error ejecutando migración',
+        error: error.message,
+        stderr: stderr
+      });
+    }
+
+    console.log('✅ Migración exitosa:', stdout);
+    res.json({
+      success: true,
+      message: 'Migración ejecutada correctamente',
+      output: stdout
+    });
+  });
+});
 
 // Aplicar headers de rate limiting a todas las rutas
 router.use(addRateLimitHeaders);
