@@ -1183,7 +1183,8 @@ export async function generarPDFs(req, res) {
           // === GENERAR CONTENIDO DEL PDF ===
 
           // Ruta del logo (si existe)
-          const logoPath = path.join(__dirname, '../../assets/images/logo-notaria18.png');
+          // const logoPath = path.join(__dirname, '../../assets/images/logo-notaria18.png');
+          const logoPath = null;
 
           // HEADER
           let currentY = drawHeader(doc, logoPath);
@@ -1390,7 +1391,8 @@ export async function generarPDFIndividual(req, res) {
         // === GENERAR CONTENIDO DEL PDF ===
 
         // Ruta del logo (si existe)
-        const logoPath = path.join(__dirname, '../../assets/images/logo-notaria18.png');
+        // const logoPath = path.join(__dirname, '../../assets/images/logo-notaria18.png');
+        const logoPath = null;
 
         // HEADER
         let currentY = drawHeader(doc, logoPath);
