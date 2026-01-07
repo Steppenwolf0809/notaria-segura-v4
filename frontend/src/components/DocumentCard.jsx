@@ -375,7 +375,7 @@ const DocumentCard = ({ document, onStatusChange }) => {
               </Typography>
               
               <Typography variant="body2" color="text.secondary" gutterBottom>
-                <strong>Creado:</strong> {formatDate(document.createdAt)}
+                <strong>Fecha Factura:</strong> {formatDate(document.fechaFactura || document.createdAt)}
               </Typography>
               
               {document.verificationCode && (
