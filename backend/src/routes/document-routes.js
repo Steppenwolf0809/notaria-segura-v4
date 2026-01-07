@@ -63,9 +63,9 @@ router.use(documentsRateLimit);
 const upload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'text/xml' || 
-        file.mimetype === 'application/xml' || 
-        file.originalname.toLowerCase().endsWith('.xml')) {
+    if (file.mimetype === 'text/xml' ||
+      file.mimetype === 'application/xml' ||
+      file.originalname.toLowerCase().endsWith('.xml')) {
       cb(null, true);
     } else {
       cb(new Error('Solo se permiten archivos XML'), false);
@@ -81,9 +81,9 @@ const upload = multer({
 const uploadBatch = multer({
   storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'text/xml' || 
-        file.mimetype === 'application/xml' || 
-        file.originalname.toLowerCase().endsWith('.xml')) {
+    if (file.mimetype === 'text/xml' ||
+      file.mimetype === 'application/xml' ||
+      file.originalname.toLowerCase().endsWith('.xml')) {
       cb(null, true);
     } else {
       cb(new Error('Solo se permiten archivos XML'), false);
@@ -99,11 +99,11 @@ const uploadBatch = multer({
  * RUTAS PROTEGIDAS - Todas requieren autenticación
  */
 
-// POST /api/documents/upload-xml - CAJA: Subir y procesar XML automáticamente (CSRF Protected)
-router.post('/upload-xml', authenticateToken, csrfProtection, upload.single('xmlFile'), uploadXmlDocument);
+// POST /api/documents/upload-xml - CAJA: Subir y procesar XML automáticamente (JWT only - M2M compatible)
+router.post('/upload-xml', authenticateToken, upload.single('xmlFile'), uploadXmlDocument);
 
-// POST /api/documents/upload-xml-batch - CAJA: Subir y procesar múltiples XML en lote (CSRF Protected)
-router.post('/upload-xml-batch', authenticateToken, csrfProtection, uploadBatch.array('xmlFiles', 20), uploadXmlDocumentsBatch);
+// POST /api/documents/upload-xml-batch - CAJA: Subir y procesar múltiples XML en lote (JWT only - M2M compatible)
+router.post('/upload-xml-batch', authenticateToken, uploadBatch.array('xmlFiles', 20), uploadXmlDocumentsBatch);
 
 // GET /api/documents/all - CAJA/ADMIN: Ver todos los documentos
 router.get('/all', authenticateToken, getAllDocuments);
@@ -239,7 +239,7 @@ router.use((error, req, res, next) => {
       });
     }
   }
-  
+
   if (error.message === 'Solo se permiten archivos XML') {
     return res.status(400).json({
       success: false,

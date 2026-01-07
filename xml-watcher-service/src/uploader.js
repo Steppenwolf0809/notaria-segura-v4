@@ -9,7 +9,49 @@ export class XmlUploader {
     this.auth = auth; // AuthClient
     this.config = config;
     this.logger = logger;
-    this.http = axios.create({ baseURL: this.apiUrl, timeout: 60000 });
+    this.http = axios.create({ baseURL: this.apiUrl, timeout: 180000 });
+  }
+
+  /**
+   * Verifica si el archivo XML es una factura válida.
+   * Retorna false si es una Nota de Crédito u otro tipo de documento.
+   */
+  async isInvoiceXml(filePath) {
+    try {
+      const content = await fs.readFile(filePath, 'utf8');
+      // Detectar etiquetas de factura vs nota de crédito
+      const hasInvoiceTag = /<factura\b/i.test(content);
+      const hasCreditNote = /<notaCredito\b/i.test(content) || /<notaDebito\b/i.test(content);
+
+      if (hasCreditNote) {
+        this.logger.info(`Archivo ignorado (Nota de Crédito/Débito): ${path.basename(filePath)}`);
+        return false;
+      }
+
+      if (!hasInvoiceTag) {
+        this.logger.info(`Archivo ignorado (no contiene etiqueta <factura>): ${path.basename(filePath)}`);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      this.logger.error(`Error leyendo archivo para validación: ${filePath}: ${err.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Mueve un archivo a la carpeta de ignorados
+   */
+  async moveToIgnored(filePath) {
+    const ignoredBase = this.config.folders.ignored || path.join(this.config.folders.watch, 'ignored');
+    const dateDir = new Date().toISOString().slice(0, 10);
+    const ignoredDir = path.join(ignoredBase, dateDir);
+    await fs.ensureDir(ignoredDir);
+    const dest = path.join(ignoredDir, path.basename(filePath));
+    await fs.move(filePath, dest, { overwrite: true });
+    this.logger.info(`Archivo movido a ignorados: ${dest}`);
+    return dest;
   }
 
   async uploadSingle(filePath) {
@@ -44,7 +86,7 @@ export class XmlUploader {
       const headers = await this.auth.getAuthHeader();
       const res = await this.http.post('/documents/upload-xml-batch', form, {
         headers: { ...headers, ...form.getHeaders() },
-        timeout: 120000
+        timeout: 180000
       });
       return res.data;
     }, `batch:${filePaths.length}`);
@@ -59,8 +101,34 @@ export class XmlUploader {
     await fs.ensureDir(processedDir);
     await fs.ensureDir(errorsDir);
 
+    // Pre-filtrar: separar facturas de archivos ignorados
+    const invoiceFiles = [];
+    const ignoredFiles = [];
+
+    for (const filePath of filePaths) {
+      const isInvoice = await this.isInvoiceXml(filePath);
+      if (isInvoice) {
+        invoiceFiles.push(filePath);
+      } else {
+        ignoredFiles.push(filePath);
+      }
+    }
+
+    // Mover archivos ignorados a su carpeta
+    for (const filePath of ignoredFiles) {
+      try {
+        await this.moveToIgnored(filePath);
+      } catch (err) {
+        this.logger.error(`Error moviendo archivo ignorado: ${filePath}: ${err.message}`);
+      }
+    }
+
+    if (ignoredFiles.length > 0) {
+      this.logger.info(`${ignoredFiles.length} archivo(s) ignorado(s) (no son facturas)`);
+    }
+
     const results = [];
-    const toProcess = [...filePaths];
+    const toProcess = [...invoiceFiles];
     while (toProcess.length) {
       const chunk = toProcess.splice(0, this.config.settings.batchSize);
       try {
@@ -70,7 +138,14 @@ export class XmlUploader {
         this.logger.info(`Upload exitoso: ${chunk.length} archivo(s)`);
         for (const src of chunk) {
           const dest = path.join(processedDir, path.basename(src));
-          await fs.move(src, dest, { overwrite: true });
+          try {
+            const exists = await fs.pathExists(src);
+            if (exists) {
+              await fs.move(src, dest, { overwrite: true });
+            }
+          } catch (moveErr) {
+            this.logger.warn(`No se pudo mover a processed: ${path.basename(src)}: ${moveErr.message}`);
+          }
         }
         results.push({ files: chunk, success: true, data });
       } catch (err) {
@@ -78,7 +153,13 @@ export class XmlUploader {
         for (const src of chunk) {
           const dest = path.join(errorsDir, path.basename(src));
           try {
-            await fs.move(src, dest, { overwrite: true });
+            // Verificar si el archivo existe antes de intentar moverlo
+            const exists = await fs.pathExists(src);
+            if (exists) {
+              await fs.move(src, dest, { overwrite: true });
+            } else {
+              this.logger.warn(`Archivo ya no existe (posiblemente ya procesado): ${path.basename(src)}`);
+            }
           } catch (moveErr) {
             this.logger.error(`No se pudo mover a errors: ${src} -> ${dest}: ${moveErr.message}`);
           }

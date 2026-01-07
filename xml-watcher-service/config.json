@@ -8,7 +8,8 @@
     "watch": "C:\\Users\\admlocal\\Desktop\\xmlcopiados",
     "processed": "C:\\Users\\admlocal\\Desktop\\xmlcopiados\\processed",
     "errors": "C:\\Users\\admlocal\\Desktop\\xmlcopiados\\errors",
-    "archived": "C:\\Users\\admlocal\\Desktop\\xmlcopiados\\archived"
+    "archived": "C:\\Users\\admlocal\\Desktop\\xmlcopiados\\archived",
+    "ignored": "C:\\Users\\admlocal\\Desktop\\xmlcopiados\\ignored"
   },
   "settings": {
     "watchDelay": 5000,
@@ -27,5 +28,3 @@
     }
   }
 }
-
-
