@@ -16,34 +16,64 @@ import useAuth from '../hooks/use-auth';
  * Solo usa vista de lista (similar a Recepción)
  */
 const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
-  const [documentos, setDocumentos] = useState([]);
-  const [loadingDocuments, setLoadingDocuments] = useState(false);
-  const [error, setError] = useState(null);
-  const { token } = useAuth();
+  // Estados para paginación y filtros en servidor
+  const [page, setPage] = useState(0); // backend espera 1-indexed, frontend usa 0-indexed para UI
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [totalDocuments, setTotalDocuments] = useState(0);
 
-  /**
-   * Cargar documentos al montar
-   */
-  useEffect(() => {
-    cargarDocumentos();
-  }, [token]);
+  // Filtros iniciales persistidos
+  const [filtros, setFiltros] = useState(() => {
+    try {
+      const saved = sessionStorage.getItem('archivo_lista_filtros');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Migramos estructura vieja a nueva si hace falta
+        return {
+          search: parsed.search ?? '',
+          estado: parsed.estado ?? 'TODOS',
+          tipo: parsed.tipo ?? 'TODOS',
+          mostrarEntregados: parsed.mostrarEntregados ?? false
+        };
+      }
+    } catch (_) { }
+    return { search: '', estado: 'TODOS', tipo: 'TODOS', mostrarEntregados: false };
+  });
+
+  const [orderBy, setOrderBy] = useState('updatedAt');
+  const [order, setOrder] = useState('desc');
 
   /**
    * Cargar documentos propios
    */
-  const cargarDocumentos = async () => {
+  const cargarDocumentos = async (customParams = {}) => {
     if (!token) return;
 
     setLoadingDocuments(true);
     setError(null);
 
+    // Fusionar estado actual con parámetros custom
+    const rPage = customParams.page !== undefined ? customParams.page + 1 : page + 1; // backend 1-based
+    const rLimit = customParams.rowsPerPage || rowsPerPage;
+    const rFiltros = customParams.filtros || filtros;
+    const rOrderBy = customParams.orderBy || orderBy;
+    const rOrder = customParams.order || order;
+
     try {
       const response = await archivoService.getMisDocumentos(token, {
-        limit: 500 // Cargar todos los documentos del usuario
+        page: rPage,
+        limit: rLimit,
+        search: rFiltros.search,
+        estado: rFiltros.estado === 'TODOS' ? undefined : rFiltros.estado,
+        tipo: rFiltros.tipo === 'TODOS' ? undefined : rFiltros.tipo,
+        orderBy: rOrderBy,
+        orderDirection: rOrder
       });
 
       if (response.success) {
         setDocumentos(response.data.documentos);
+        if (response.data.pagination) {
+          setTotalDocuments(response.data.pagination.totalDocuments);
+        }
       } else {
         setError(response.message || 'Error cargando documentos');
       }
@@ -55,62 +85,54 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
   };
 
   /**
-   * Manejar cambio de estado de documento
+   * Cargar documentos al montar o cambiar dependencias
+   * Usamos useEffect para simplificar la carga inicial, 
+   * pero los cambios de página/filtro llamarán directamente a cargarDocumentos 
+   * para evitar loops o race conditions complejos.
    */
-  const handleEstadoChange = async (documentoId, nuevoEstado) => {
-    if (!token) return;
-
-    try {
-      const response = await archivoService.cambiarEstadoDocumento(token, documentoId, nuevoEstado);
-
-      if (response.success) {
-        // Usar documento actualizado del backend si viene en la respuesta
-        const updated = response.data?.documento;
-        if (updated) {
-          setDocumentos(prev => prev.map(doc => (doc.id === documentoId ? { ...doc, ...updated } : doc)));
-        } else {
-          // Fallback mínimo: solo estado
-          setDocumentos(prev => prev.map(doc => (doc.id === documentoId ? { ...doc, status: nuevoEstado } : doc)));
-        }
-
-        // Actualizar dashboard si está disponible
-        if (onDataUpdate) {
-          onDataUpdate();
-        }
-
-        return { success: true };
-      } else {
-        setError(response.message || 'Error cambiando estado');
-        return { success: false, message: response.message };
-      }
-    } catch (error) {
-      setError('Error de conexión');
-      return { success: false, message: 'Error de conexión' };
-    }
-  };
-
-  /**
-   * Refrescar documentos (callback para componentes hijos)
-   */
-  const handleRefresh = () => {
+  useEffect(() => {
     cargarDocumentos();
-    if (onDataUpdate) {
-      onDataUpdate();
-    }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]); // Solo cargar inicial al tener token, el resto es controlado
 
   /**
-   * Limpiar error
+   * Manejadores de cambios
    */
-  const clearError = () => {
-    setError(null);
+  const handlePageChange = (event, newPage) => {
+    setPage(newPage);
+    cargarDocumentos({ page: newPage });
+  };
+
+  const handleRowsPerPageChange = (event) => {
+    const newRows = parseInt(event.target.value, 10);
+    setRowsPerPage(newRows);
+    setPage(0);
+    cargarDocumentos({ rowsPerPage: newRows, page: 0 });
+  };
+
+  const handleFilterChange = (newFiltros) => {
+    setFiltros(newFiltros);
+    // Persistencia
+    try {
+      sessionStorage.setItem('archivo_lista_filtros', JSON.stringify(newFiltros));
+    } catch (_) { }
+
+    setPage(0);
+    cargarDocumentos({ filtros: newFiltros, page: 0 });
+  };
+
+  const handleSortChange = (property, direction) => {
+    setOrderBy(property);
+    setOrder(direction);
+    cargarDocumentos({ orderBy: property, order: direction });
   };
 
   /**
    * Renderizar contenido principal
    */
   const renderContent = () => {
-    if (loadingDocuments) {
+    if (loadingDocuments && documentos.length === 0) {
+      // Solo mostrar loader full si no hay documentos previos (carga inicial)
       return (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 400 }}>
           <CircularProgress />
@@ -119,7 +141,7 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
       );
     }
 
-    if (error) {
+    if (error && documents.length === 0) {
       return (
         <Alert
           severity="error"
@@ -127,7 +149,7 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
             <Button
               color="inherit"
               size="small"
-              onClick={cargarDocumentos}
+              onClick={() => cargarDocumentos()}
             >
               Reintentar
             </Button>
@@ -138,12 +160,27 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
       );
     }
 
-    // Solo vista de lista (similar a Recepción)
+    // Solo vista de lista con server-side pagination
     return (
       <ListaArchivo
         documentos={documentos}
         onEstadoChange={handleEstadoChange}
         onRefresh={handleRefresh}
+        // Server side props
+        serverSide={true}
+        totalDocuments={totalDocuments}
+        loading={loadingDocuments}
+        // Props de estado
+        pageProp={page}
+        rowsPerPageProp={rowsPerPage}
+        filtrosProp={filtros}
+        orderByProp={orderBy}
+        orderProp={order}
+        // Handlers
+        onPageChange={handlePageChange}
+        onRowsPerPageChange={handleRowsPerPageChange}
+        onFilterChange={handleFilterChange}
+        onSortChange={handleSortChange}
       />
     );
   };

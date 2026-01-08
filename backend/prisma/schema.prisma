@@ -8,257 +8,177 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Enumeraciones convertidas a String para compatibilidad con SQLite
-// UserRole: ADMIN, CAJA, MATRIZADOR, RECEPCION, ARCHIVO
-
-// Enum de roles para PostgreSQL
-enum UserRole {
-  ADMIN
-  CAJA
-  MATRIZADOR
-  RECEPCION
-  ARCHIVO
-}
-// DocumentType: PROTOCOLO, DILIGENCIA, ARRENDAMIENTO, CERTIFICACION, OTROS
-// DocumentStatus: PENDIENTE, EN_PROCESO, LISTO, ENTREGADO, ANULADO_NOTA_CREDITO
-// DocumentEventType: DOCUMENT_CREATED, DOCUMENT_ASSIGNED, STATUS_CHANGED, VERIFICATION_GENERATED, WHATSAPP_SENT, EXTRACTION_SNAPSHOT, EXTRACTION_APPLIED, STATUS_UNDO, NOTE_ADDED, UNKNOWN
-
-// Modelo principal de usuarios
 model User {
-  id          Int      @id @default(autoincrement())
-  email       String   @unique
-  password    String
-  firstName   String
-  lastName    String
-  role        UserRole
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  lastLogin   DateTime?
-
-  // Relaciones con documentos
-  documents         Document[] @relation("AssignedDocuments")   // Documentos asignados (matrizador)
-  createdDocuments  Document[] @relation("CreatedDocuments")    // Documentos creados (caja)
-  deliveredDocuments Document[] @relation("DeliveredDocuments") // Documentos entregados (recepción)
-  
-  // Relación de auditoría - NUEVA FUNCIONALIDAD
-  documentEvents    DocumentEvent[]                            // Eventos de auditoría realizados por el usuario
-  escriturasQR      EscrituraQR[]                              // Escrituras QR creadas por el usuario
-  auditoriaPersonas AuditoriaPersona[]                         // Auditoría de reseteos de PIN de personas
-  formularioUAFEAsignaciones FormularioUAFEAsignacion[]        // Formularios UAFE asignados por el matrizador
-  protocolosUAFE    ProtocoloUAFE[]                            // Protocolos UAFE creados por el matrizador
+  id                         Int                        @id @default(autoincrement())
+  email                      String                     @unique
+  password                   String
+  firstName                  String
+  lastName                   String
+  role                       UserRole
+  isActive                   Boolean                    @default(true)
+  createdAt                  DateTime                   @default(now())
+  updatedAt                  DateTime                   @updatedAt
+  lastLogin                  DateTime?
+  auditoriaPersonas          AuditoriaPersona[]
+  documentEvents             DocumentEvent[]
+  documents                  Document[]                 @relation("AssignedDocuments")
+  createdDocuments           Document[]                 @relation("CreatedDocuments")
+  deliveredDocuments         Document[]                 @relation("DeliveredDocuments")
+  escriturasQR               EscrituraQR[]
+  formularioUAFEAsignaciones FormularioUAFEAsignacion[]
+  protocolosUAFE             ProtocoloUAFE[]
 
   @@map("users")
 }
 
-// Modelo de documentos
 model Document {
-  id                      String         @id @default(uuid())
-  protocolNumber          String         @unique   // Código notarial extraído del XML
-  clientName              String                   // Nombre del cliente
-  clientPhone             String?                  // CELULAR del cliente para WhatsApp
-  clientEmail             String?                  // Email del cliente
-  clientId                String?                  // Cédula, RUC, pasaporte o cualquier ID del cliente
-  
-  // CAMPOS EDITABLES - Agregados para funcionalidad de edición
-  detalle_documento       String?                  // Descripción específica del trámite
-  comentarios_recepcion   String?                  // Notas especiales para recepción
-  
-  documentType            String        // Tipo de documento detectado
-  status                  String @default("PENDIENTE")
-  verificationCode        String?                  // Código de 4 dígitos para entrega
-  
-  // Relaciones
-  assignedToId            Int?                     // FK al matrizador asignado
-  assignedTo              User?          @relation("AssignedDocuments", fields: [assignedToId], references: [id])
-  createdById             Int                      // FK al usuario de caja que creó
-  createdBy               User           @relation("CreatedDocuments", fields: [createdById], references: [id])
-  
-  // Información extraída del XML
-  actoPrincipalDescripcion String                  // Descripción del acto principal detectado
-  actoPrincipalValor       Float                   // Valor del acto principal
-  totalFactura             Float                   // Total de la factura XML
-  matrizadorName           String                  // Nombre del matrizador del XML
-  itemsSecundarios         String?                   // Array de items ignorados para auditoría (JSON string)
-  xmlOriginal              String?                 // XML completo opcional
-  fechaFactura             DateTime?               // Fecha de emisión de la factura (del XML)
+  id                       String                 @id @default(uuid())
+  protocolNumber           String                 @unique
+  clientName               String
+  clientPhone              String?
+  clientEmail              String?
+  clientId                 String?
+  detalle_documento        String?
+  comentarios_recepcion    String?
+  documentType             String
+  status                   String                 @default("PENDIENTE")
+  verificationCode         String?
+  assignedToId             Int?
+  createdById              Int
+  actoPrincipalDescripcion String
+  actoPrincipalValor       Float
+  totalFactura             Float
+  matrizadorName           String
+  itemsSecundarios         String?
+  xmlOriginal              String?
+  documentGroupId          String?
+  isGrouped                Boolean                @default(false)
+  groupLeaderId            String?
+  groupPosition            Int?
+  groupVerificationCode    String?
+  groupCreatedAt           DateTime?
+  groupCreatedBy           String?
+  groupDeliveredAt         DateTime?
+  groupDeliveredTo         String?
+  individualDelivered      Boolean                @default(false)
+  notificationPolicy       String                 @default("automatica")
+  codigoRetiro             String?
+  entregadoA               String?
+  cedulaReceptor           String?
+  relacionTitular          String?
+  verificacionManual       Boolean                @default(false)
+  facturaPresenta          Boolean                @default(false)
+  fechaEntrega             DateTime?
+  usuarioEntregaId         Int?
+  observacionesEntrega     String?
+  notaCreditoMotivo        String?
+  notaCreditoEstadoPrevio  String?
+  notaCreditoFecha         DateTime?
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+  fechaFactura             DateTime?
+  events                   DocumentEvent[]
+  assignedTo               User?                  @relation("AssignedDocuments", fields: [assignedToId], references: [id])
+  createdBy                User                   @relation("CreatedDocuments", fields: [createdById], references: [id])
+  documentGroup            DocumentGroup?         @relation(fields: [documentGroupId], references: [id])
+  usuarioEntrega           User?                  @relation("DeliveredDocuments", fields: [usuarioEntregaId], references: [id])
+  notifications            WhatsAppNotification[]
 
-  // Agrupación de documentos
-  documentGroupId       String?    // ID del grupo (compartido entre documentos agrupados)
-  isGrouped            Boolean @default(false)
-  groupLeaderId        String?    // ID del documento "líder" del grupo
-  groupPosition        Int?       // Posición en el grupo (1=líder, 2,3,4...)
-  
-  // Código de verificación grupal
-  groupVerificationCode String?   // MISMO código para todos los del grupo
-  
-  // Estados de agrupación
-  groupCreatedAt       DateTime?
-  groupCreatedBy       String?    // ID del matrizador que creó el grupo
-  
-  // Control de entrega grupal
-  groupDeliveredAt     DateTime?  // Cuando se entregó el grupo completo
-  groupDeliveredTo     String?    // Quien recibió el grupo
-  individualDelivered  Boolean @default(false) // Si se entregó individualmente
-
-  // CONFIGURACIÓN DE NOTIFICACIONES
-  notificationPolicy   String  @default("automatica") // "automatica", "no_notificar", "entrega_inmediata"
-
-  // CAMPOS ESPECÍFICOS DE RECEPCIÓN
-  codigoRetiro         String?    // Código de 4 dígitos para retiro (individual o grupal)
-  entregadoA           String?    // Nombre de quien retira el documento
-  cedulaReceptor       String?    // Cédula/Pasaporte de quien retira (opcional)
-  relacionTitular      String?    // Relación con titular: titular, abogado, empleado, tercero
-  verificacionManual   Boolean @default(false) // Cliente validado sin código
-  facturaPresenta      Boolean @default(false) // Cliente presentó factura de pago
-  fechaEntrega         DateTime?  // Fecha y hora de entrega
-  usuarioEntregaId     Int?       // ID del usuario de recepción que entregó
-  usuarioEntrega       User?      @relation("DeliveredDocuments", fields: [usuarioEntregaId], references: [id])
-  observacionesEntrega String?    // Observaciones adicionales de la entrega
-
-  // Nota de crédito (anulación)
-  notaCreditoMotivo       String?          // Motivo obligatorio al aplicar nota de crédito
-  notaCreditoEstadoPrevio String?  // Estado previo para permitir reversión
-  notaCreditoFecha        DateTime?        // Fecha en que se aplicó la nota de crédito
-
-  documentGroup         DocumentGroup? @relation(fields: [documentGroupId], references: [id])
-  
-  // Relación de auditoría - NUEVA FUNCIONALIDAD
-  events                DocumentEvent[]        // Historial de eventos del documento
-  notifications         WhatsAppNotification[] // Notificaciones enviadas para este documento
-
-  createdAt               DateTime       @default(now())
-  updatedAt               DateTime       @updatedAt
-  
-  @@map("documents")
-  // Índices simples para filtros comunes
   @@index([status])
   @@index([createdAt])
   @@index([updatedAt])
-  @@index([clientPhone])  // Performance: búsqueda por teléfono del cliente
-  @@index([clientName])   // Performance: búsqueda por nombre del cliente
-  @@index([documentGroupId])  // Performance: búsqueda de documentos agrupados
-  // Índices compuestos para queries más complejas
-  @@index([assignedToId, status])  // Performance: documentos por matrizador y estado
-  @@index([documentGroupId, status])  // Performance: grupos de documentos por estado
+  @@index([clientPhone])
+  @@index([clientName])
+  @@index([documentGroupId])
+  @@index([assignedToId, status])
+  @@index([documentGroupId, status])
+  @@map("documents")
 }
 
-// Modelo para gestionar grupos
 model DocumentGroup {
-  id                   String @id @default(uuid())
-  groupCode           String @unique // Código único del grupo
-  verificationCode    String @unique // Código de 4 dígitos compartido
-  
-  // Información del cliente
-  clientName          String
-  clientPhone         String
-  clientEmail         String?
-  
-  // Estados del grupo
-  status              String @default("IN_PROCESS") // IN_PROCESS, READY, DELIVERED
-  documentsCount      Int
-  
-  // Control de notificaciones
-  notificationSent    Boolean @default(false)
-  notificationSentAt  DateTime?
-  
-  // Metadatos
-  createdBy           String    // ID del matrizador
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-  
-  // Relación con documentos
+  id                 String                 @id @default(uuid())
+  groupCode          String                 @unique
+  verificationCode   String                 @unique
+  clientName         String
+  clientPhone        String
+  clientEmail        String?
+  status             String                 @default("IN_PROCESS")
+  documentsCount     Int
+  notificationSent   Boolean                @default(false)
+  notificationSentAt DateTime?
+  createdBy          String
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
   documents          Document[]
   notifications      WhatsAppNotification[]
 }
 
-// enum GroupStatus (SQLite compatible)
-
-// MODELO DE AUDITORÍA - Registro de eventos de documentos
 model DocumentEvent {
-  id              String            @id @default(uuid())
-  documentId      String?                         // FK al documento (opcional para eventos globales del sistema)
-  userId          Int                             // FK al usuario que realizó la acción
-  eventType       String @default("UNKNOWN") // Tipo de evento (string)
-  description     String                         // Descripción del evento
-  details         String?                          // Detalles adicionales del evento (JSON string)
-  // Detalles enriquecidos de entrega (compatibles hacia atrás)
-  personaRetiro        String?    // Nombre completo de quien retira
-  cedulaRetiro         String?    // Cédula/identificación de quien retira
-  metodoVerificacion   String?    // codigo_whatsapp | cedula | telefono | manual
-  observacionesRetiro  String?    // Observaciones del retiro
-  ipAddress       String?                        // IP desde donde se realizó la acción
-  userAgent       String?                        // User agent del navegador
-  createdAt       DateTime  @default(now())
+  id                  String    @id @default(uuid())
+  documentId          String?
+  userId              Int
+  eventType           String    @default("UNKNOWN")
+  description         String
+  details             String?
+  personaRetiro       String?
+  cedulaRetiro        String?
+  metodoVerificacion  String?
+  observacionesRetiro String?
+  ipAddress           String?
+  userAgent           String?
+  createdAt           DateTime  @default(now())
+  document            Document? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  user                User      @relation(fields: [userId], references: [id])
 
-  // Relaciones
-  document        Document?  @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  user            User      @relation(fields: [userId], references: [id])
-
-  @@map("document_events")
-  // Índices para timelines por documento y auditoría por usuario
   @@index([documentId, createdAt])
   @@index([userId])
   @@index([eventType])
+  @@map("document_events")
 }
 
-// Tipos de eventos para auditoría (SQLite compatible)
-
-// Modelo para historial de notificaciones WhatsApp
 model WhatsAppNotification {
-  id            String              @id @default(uuid())
-  documentId    String?                                 // FK al documento (opcional para notificaciones grupales)
-  groupId       String?                                 // FK al grupo (opcional)
-  clientName    String                                  // Nombre del cliente
-  clientPhone   String                                  // Número de teléfono
-  messageType   String                       // Tipo de notificación
-  messageBody   String                                  // Contenido del mensaje
-  status        String  @default("PENDING")  // Estado de la notificación
-  messageId     String?                                 // ID del mensaje de Twilio (si se envió)
-  errorMessage  String?                                 // Error si falló
-  sentAt        DateTime?                               // Fecha de envío exitoso
-  createdAt     DateTime            @default(now())
-  
-  // Relaciones opcionales
-  document      Document?  @relation(fields: [documentId], references: [id])
-  group         DocumentGroup? @relation(fields: [groupId], references: [id])
-  
-  @@map("whatsapp_notifications")
-  // Índices para métricas y búsquedas
+  id           String         @id @default(uuid())
+  documentId   String?
+  groupId      String?
+  clientName   String
+  clientPhone  String
+  messageType  String
+  messageBody  String
+  status       String         @default("PENDING")
+  messageId    String?
+  errorMessage String?
+  sentAt       DateTime?
+  createdAt    DateTime       @default(now())
+  document     Document?      @relation(fields: [documentId], references: [id])
+  group        DocumentGroup? @relation(fields: [groupId], references: [id])
+
   @@index([status])
   @@index([documentId])
   @@index([groupId])
   @@index([createdAt])
+  @@map("whatsapp_notifications")
 }
 
-// Tipos de notificación (SQLite compatible)
-// Estados de notificación (SQLite compatible)
-
-// Modelo para templates WhatsApp personalizables por admin
 model WhatsAppTemplate {
-  id        String              @id @default(uuid())
-  tipo      String        // Tipo de template
-  titulo    String              // Título descriptivo para el admin
-  mensaje   String              // Contenido del mensaje con variables {cliente}, {documento}, etc.
-  activo    Boolean             @default(true)
-  createdAt DateTime            @default(now())
-  updatedAt DateTime            @updatedAt
-  
+  id        String   @id @default(uuid())
+  tipo      String
+  titulo    String
+  mensaje   String
+  activo    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@map("whatsapp_templates")
 }
 
-// Tipos de templates disponibles (SQLite compatible)
-
-// Modelo básico para verificar conexión
 model TestConnection {
   id        Int      @id @default(autoincrement())
   message   String   @default("Conexión exitosa")
   createdAt DateTime @default(now())
-  
+
   @@map("test_connection")
 }
 
-// Configuración del sistema (clave-valor) para toggles administrables
 model SystemSetting {
   id        String   @id @default(uuid())
   key       String   @unique
@@ -266,425 +186,298 @@ model SystemSetting {
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
 
-  @@map("system_settings")
   @@index([key])
+  @@map("system_settings")
 }
 
-
-// MODELO PARA ESCRITURAS QR - Módulo de verificación de escrituras notariales
 model EscrituraQR {
-  id                      Int      @id @default(autoincrement())
-  token                   String   @unique // Token único de 8 caracteres alfanuméricos
-  numeroEscritura         String?  // Número de escritura extraído (ej: "20251701018P02183")
-  datosCompletos          String?  // JSON con todos los datos extraídos del PDF
-  archivoOriginal         String?  // Nombre del archivo PDF original
-  extractoTextoCompleto   String?  @db.Text // Texto completo del extracto (opcional, para consulta)
-  fotoURL                 String?  // URL pública de la foto (opcional)
-  origenDatos             String   @default("PDF") // "PDF" | "MANUAL" - cómo se ingresó
-  estado                  String   @default("activo") // "activo", "revision_requerida", "inactivo"
-  activo                  Boolean  @default(true) // Flag de activación/desactivación
-  createdBy               Int?     // FK al usuario matrizador que creó la escritura
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
-  
-  // Campos para PDF completo (verificación pública)
-  pdfFileName             String?  // Nombre del archivo PDF en FTP (TOKEN.pdf)
-  pdfUploadedAt           DateTime? // Fecha de subida del PDF
-  pdfUploadedBy           Int?     // ID del usuario que subió el PDF
-  pdfFileSize             Int?     // Tamaño del archivo en bytes
-  pdfViewCount            Int      @default(0) // Contador de visualizaciones públicas
-  pdfHiddenPages          String?  // Array JSON de páginas ocultas (ej: "[2,5,7]") por privacidad
+  id                    Int       @id @default(autoincrement())
+  token                 String    @unique
+  numeroEscritura       String?
+  datosCompletos        String?
+  archivoOriginal       String?
+  estado                String    @default("activo")
+  activo                Boolean   @default(true)
+  createdBy             Int?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  extractoTextoCompleto String?
+  origenDatos           String    @default("PDF")
+  fotoURL               String?
+  pdfFileName           String?
+  pdfUploadedAt         DateTime?
+  pdfUploadedBy         Int?
+  pdfFileSize           Int?
+  pdfViewCount          Int       @default(0)
+  pdfHiddenPages        String?
+  creador               User?     @relation(fields: [createdBy], references: [id])
 
-  // Relaciones
-  creador                 User?    @relation(fields: [createdBy], references: [id])
-
-  @@map("escrituras_qr")
-  // Índices para performance
   @@index([token])
   @@index([estado])
   @@index([createdAt])
   @@index([createdBy])
   @@index([origenDatos])
+  @@map("escrituras_qr")
 }
 
-// ============================================================================
-// SISTEMA DE PERSONAS - AUTENTICACIÓN CON PIN (SUBSISTEMA 1)
-// ============================================================================
-
-// Modelo principal de personas registradas con PIN
 model PersonaRegistrada {
-  id                    String   @id @default(uuid())
-  numeroIdentificacion  String   @unique
-  tipoPersona           String   // "NATURAL" o "JURIDICA"
+  id                         String                     @id @default(uuid())
+  numeroIdentificacion       String                     @unique
+  tipoPersona                String
+  pinHash                    String
+  pinCreado                  Boolean                    @default(false)
+  pinResetCount              Int                        @default(0)
+  intentosFallidos           Int                        @default(0)
+  bloqueadoHasta             DateTime?
+  ultimoAcceso               DateTime?
+  ultimoIntentoFallido       DateTime?
+  datosPersonaNatural        Json?
+  datosPersonaJuridica       Json?
+  completado                 Boolean                    @default(false)
+  createdAt                  DateTime                   @default(now())
+  updatedAt                  DateTime                   @updatedAt
+  auditoria                  AuditoriaPersona[]
+  formularioAsignaciones     FormularioUAFEAsignacion[]
+  formularioRespuestas       FormularioUAFERespuesta[]
+  protocolos                 PersonaProtocolo[]         @relation("Compareciente")
+  protocolosComoRepresentado PersonaProtocolo[]         @relation("Representado")
+  sesiones                   SesionPersonal[]
 
-  // 🔐 AUTENTICACIÓN
-  pinHash               String   // Hash bcrypt del PIN (NUNCA el PIN en texto plano)
-  pinCreado             Boolean  @default(false)
-  pinResetCount         Int      @default(0)  // Contador de veces que se reseteo
-
-  // 🛡️ SEGURIDAD
-  intentosFallidos      Int      @default(0)
-  bloqueadoHasta        DateTime? // NULL = no bloqueado, DateTime = bloqueado hasta...
-  ultimoAcceso          DateTime?
-  ultimoIntentoFallido  DateTime?
-
-  // 📄 DATOS DEL FORMULARIO UAFE
-  // JSON porque P. Natural y P. Jurídica tienen estructuras MUY diferentes
-  datosPersonaNatural   Json?
-  datosPersonaJuridica  Json?
-  completado            Boolean  @default(false)  // true = formulario completo
-
-  // 📅 METADATA
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-
-  // 🔗 RELACIONES
-  sesiones              SesionPersonal[]
-  auditoria             AuditoriaPersona[]
-  formularioAsignaciones FormularioUAFEAsignacion[]
-  formularioRespuestas  FormularioUAFERespuesta[]
-  protocolos            PersonaProtocolo[]         @relation("Compareciente") // Protocolos donde esta persona es compareciente
-  protocolosComoRepresentado PersonaProtocolo[]    @relation("Representado")  // Protocolos donde esta persona es representada
-
+  @@index([numeroIdentificacion])
+  @@index([bloqueadoHasta])
   @@map("personas_registradas")
-  @@index([numeroIdentificacion])  // Búsqueda rápida por cédula
-  @@index([bloqueadoHasta])         // Consulta eficiente de bloqueados
 }
 
-// Modelo para gestionar sesiones temporales de personas
 model SesionPersonal {
-  id              String   @id @default(uuid())
+  id              String            @id @default(uuid())
   personaId       String
-  token           String   @unique  // Token de sesión (UUID)
-
-  // ⏰ EXPIRACIÓN
-  expiraEn        DateTime  // Timestamp absoluto de expiración
-  ultimaActividad DateTime @default(now())  // Se actualiza en cada request
-
-  // 🌐 TRACKING (para auditoría y seguridad)
+  token           String            @unique
+  expiraEn        DateTime
+  ultimaActividad DateTime          @default(now())
   ipAddress       String?
   userAgent       String?
-
-  createdAt       DateTime @default(now())
-
-  // 🔗 RELACIÓN
+  createdAt       DateTime          @default(now())
   persona         PersonaRegistrada @relation(fields: [personaId], references: [id], onDelete: Cascade)
 
+  @@index([token])
+  @@index([personaId])
+  @@index([expiraEn])
   @@map("sesiones_personales")
-  @@index([token])       // Búsqueda ultra-rápida por token
-  @@index([personaId])   // Ver sesiones de una persona
-  @@index([expiraEn])    // Cleanup de sesiones expiradas
 }
 
-// Modelo para auditoría de acciones de personas
 model AuditoriaPersona {
-  id              String   @id @default(uuid())
-  personaId       String
+  id           String            @id @default(uuid())
+  personaId    String
+  tipo         String
+  descripcion  String
+  matrizadorId Int?
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime          @default(now())
+  matrizador   User?             @relation(fields: [matrizadorId], references: [id])
+  persona      PersonaRegistrada @relation(fields: [personaId], references: [id], onDelete: Cascade)
 
-  // 📝 EVENTO
-  tipo            String   // "REGISTRO", "LOGIN", "PIN_FALLIDO", "PIN_RESET", "BLOQUEO", "DESBLOQUEO", "ACTUALIZACION"
-  descripcion     String   // Descripción legible del evento
-
-  // 👤 RESPONSABLE
-  matrizadorId    Int?     // NULL = acción del propio usuario, INT = matrizador que hizo el reseteo
-  matrizador      User?    @relation(fields: [matrizadorId], references: [id])
-
-  // 🌐 TRACKING
-  ipAddress       String?
-  userAgent       String?
-
-  createdAt       DateTime @default(now())
-
-  // 🔗 RELACIÓN
-  persona         PersonaRegistrada @relation(fields: [personaId], references: [id], onDelete: Cascade)
-
+  @@index([personaId])
+  @@index([tipo])
+  @@index([createdAt])
   @@map("auditoria_personas")
-  @@index([personaId])    // Historial de una persona
-  @@index([tipo])         // Filtrar por tipo de evento
-  @@index([createdAt])    // Orden cronológico
 }
 
-// ============================================================================
-// SISTEMA DE FORMULARIOS UAFE - MATRIZADOR (SUBSISTEMA 2)
-// ============================================================================
-
-// Asignación de formulario UAFE a una persona específica
 model FormularioUAFEAsignacion {
-  id                String   @id @default(uuid())
+  id             String                   @id @default(uuid())
+  personaId      String
+  numeroMatriz   String
+  actoContrato   String
+  calidadPersona String
+  actuaPor       String
+  token          String                   @unique
+  estado         String                   @default("PENDIENTE")
+  expiraEn       DateTime?
+  matrizadorId   Int
+  respuestaId    String?                  @unique
+  createdAt      DateTime                 @default(now())
+  completadoEn   DateTime?
+  matrizador     User                     @relation(fields: [matrizadorId], references: [id])
+  persona        PersonaRegistrada        @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  respuesta      FormularioUAFERespuesta? @relation(fields: [respuestaId], references: [id])
 
-  // 🎯 ASIGNACIÓN
-  personaId         String
-  persona           PersonaRegistrada @relation(fields: [personaId], references: [id], onDelete: Cascade)
-
-  // 📋 INFORMACIÓN DEL TRÁMITE
-  numeroMatriz      String   // No. Matriz
-  actoContrato      String   // Acto / Contrato Diligencia
-
-  // 👤 CALIDAD EN EL ACTO
-  calidadPersona    String   // "COMPRADOR" | "VENDEDOR" | "OTRO"
-  actuaPor          String   // "PROPIOS_DERECHOS" | "REPRESENTANDO_A"
-
-  // 🔗 LINK ÚNICO Y ESTADO
-  token             String   @unique  // Token único para acceder al formulario
-  estado            String   @default("PENDIENTE")  // "PENDIENTE" | "COMPLETADO" | "EXPIRADO"
-  expiraEn          DateTime?  // Opcional: fecha de expiración
-
-  // 👤 MATRIZADOR RESPONSABLE
-  matrizadorId      Int
-  matrizador        User     @relation(fields: [matrizadorId], references: [id])
-
-  // 📝 RESPUESTA (cuando se complete)
-  respuestaId       String?  @unique
-  respuesta         FormularioUAFERespuesta? @relation(fields: [respuestaId], references: [id])
-
-  // 📅 METADATA
-  createdAt         DateTime @default(now())
-  completadoEn      DateTime?
-
-  @@map("formulario_uafe_asignaciones")
   @@index([token])
   @@index([personaId])
   @@index([matrizadorId])
   @@index([estado])
   @@index([numeroMatriz])
+  @@map("formulario_uafe_asignaciones")
 }
 
-// Respuesta completa de un formulario UAFE
 model FormularioUAFERespuesta {
-  id                String   @id @default(uuid())
-
-  asignacionId      String   @unique
-  asignacion        FormularioUAFEAsignacion?
-
-  personaId         String
-  persona           PersonaRegistrada @relation(fields: [personaId], references: [id], onDelete: Cascade)
-
-  // =====================================================
-  // SECCIÓN 1: INFORMACIÓN DEL TRÁMITE
-  // =====================================================
-  fecha             DateTime
-  numeroMatriz      String
-  actoContrato      String
-  avaluoMunicipal   Float?
-  valorContrato     Float?
-
-  // Forma de Pago
-  formaPagoCheque   Boolean  @default(false)
-  formaPagoEfectivo Boolean  @default(false)
-  formaPagoTransferencia Boolean @default(false)
-  formaPagoTarjeta  Boolean  @default(false)
-  montoCheque       Float?
-  montoEfectivo     Float?
-  montoTransferencia Float?
-  montoTarjeta      Float?
-  bancoCheque       String?
-  bancoTransferencia String?
-  bancoTarjeta      String?
-
-  // =====================================================
-  // SECCIÓN 2: PERSONA QUE REALIZA EL ACTO
-  // =====================================================
-  calidad           String   // "COMPRADOR" | "VENDEDOR"
-  actuaPor          String   // "PROPIOS_DERECHOS" | "REPRESENTANDO_A"
-
-  // Tipo de Identificación (usa los datos de PersonaRegistrada)
-  tipoIdentificacion String  // "CEDULA" | "RUC" | "PASAPORTE"
-  numeroIdentificacion String
-  nacionalidad      String
-  estadoCivil       String   // "SOLTERO" | "CASADO" | "UNION_LIBRE" | "DIVORCIADO" | "VIUDO" | "DISOLUCION_SOCIEDAD"
-  genero            String   // "MASCULINO" | "FEMENINO"
-  nivelEstudio      String   // "BACHILLER" | "UNIVERSITARIO" | "MAESTRIA" | "POSTGRADO"
-
-  // Dirección
-  callePrincipal    String
-  numeroDomicilio   String?
-  calleSecundaria   String?
-
-  // =====================================================
-  // SECCIÓN 3: INFORMACIÓN LABORAL
-  // =====================================================
-  situacionLaboral  String   // "PUBLICO" | "PRIVADO" | "JUBILADO" | "NO_APLICA"
-  relacionDependencia Boolean?
-  nombreEntidad     String?
-  fechaIngreso      DateTime?
-  direccionLaboral  String?
-  provinciaLaboral  String?
-  cantonLaboral     String?
-  profesionOcupacion String?
-  cargo             String?
-  ingresoMensual    Float?
-
-  // =====================================================
-  // SECCIÓN 4: DATOS DEL CÓNYUGE (si aplica)
-  // =====================================================
-  tieneConyugue     Boolean  @default(false)
-  conyugeApellidos  String?
-  conyugeNombres    String?
-  conyugeTipoId     String?  // "CEDULA" | "RUC" | "PASAPORTE"
-  conyugeNumeroId   String?
-  conyugeNacionalidad String?
-  conyugeEstadoCivil String?
-  conyugeGenero     String?
-  conyugeNivelEstudio String?
-  conyugeCorreo     String?
-  conyugeCelular    String?
-  conyugeCallePrincipal String?
-  conyugeNumero     String?
-  conyugeCalleSecundaria String?
-  conyugeProfesion  String?
-
-  // Información laboral del cónyuge
-  conyugeSituacionLaboral String?
+  id                         String                    @id @default(uuid())
+  asignacionId               String                    @unique
+  personaId                  String
+  fecha                      DateTime
+  numeroMatriz               String
+  actoContrato               String
+  avaluoMunicipal            Float?
+  valorContrato              Float?
+  formaPagoCheque            Boolean                   @default(false)
+  formaPagoEfectivo          Boolean                   @default(false)
+  formaPagoTransferencia     Boolean                   @default(false)
+  formaPagoTarjeta           Boolean                   @default(false)
+  montoCheque                Float?
+  montoEfectivo              Float?
+  montoTransferencia         Float?
+  montoTarjeta               Float?
+  bancoCheque                String?
+  bancoTransferencia         String?
+  bancoTarjeta               String?
+  calidad                    String
+  actuaPor                   String
+  tipoIdentificacion         String
+  numeroIdentificacion       String
+  nacionalidad               String
+  estadoCivil                String
+  genero                     String
+  nivelEstudio               String
+  callePrincipal             String
+  numeroDomicilio            String?
+  calleSecundaria            String?
+  situacionLaboral           String
+  relacionDependencia        Boolean?
+  nombreEntidad              String?
+  fechaIngreso               DateTime?
+  direccionLaboral           String?
+  provinciaLaboral           String?
+  cantonLaboral              String?
+  profesionOcupacion         String?
+  cargo                      String?
+  ingresoMensual             Float?
+  tieneConyugue              Boolean                   @default(false)
+  conyugeApellidos           String?
+  conyugeNombres             String?
+  conyugeTipoId              String?
+  conyugeNumeroId            String?
+  conyugeNacionalidad        String?
+  conyugeEstadoCivil         String?
+  conyugeGenero              String?
+  conyugeNivelEstudio        String?
+  conyugeCorreo              String?
+  conyugeCelular             String?
+  conyugeCallePrincipal      String?
+  conyugeNumero              String?
+  conyugeCalleSecundaria     String?
+  conyugeProfesion           String?
+  conyugeSituacionLaboral    String?
   conyugeRelacionDependencia Boolean?
-  conyugeNombreEntidad String?
-  conyugeFechaIngreso DateTime?
-  conyugeDireccionLaboral String?
-  conyugeProvinciaLaboral String?
-  conyugeCantonLaboral String?
+  conyugeNombreEntidad       String?
+  conyugeFechaIngreso        DateTime?
+  conyugeDireccionLaboral    String?
+  conyugeProvinciaLaboral    String?
+  conyugeCantonLaboral       String?
+  tieneBeneficiario          Boolean                   @default(false)
+  beneficiarioApellidos      String?
+  beneficiarioNombres        String?
+  beneficiarioTipoId         String?
+  beneficiarioNumeroId       String?
+  beneficiarioNacionalidad   String?
+  beneficiarioEstadoCivil    String?
+  beneficiarioGenero         String?
+  beneficiarioNivelEstudio   String?
+  beneficiarioProfesion      String?
+  beneficiarioDireccion      String?
+  beneficiarioCorreo         String?
+  beneficiarioTelefono       String?
+  beneficiarioCelular        String?
+  esPEP                      Boolean                   @default(false)
+  esFamiliarPEP              Boolean                   @default(false)
+  relacionPEP                String?
+  esColaboradorPEP           Boolean                   @default(false)
+  tipoColaborador            String?
+  completadoEn               DateTime                  @default(now())
+  ipAddress                  String?
+  userAgent                  String?
+  asignacion                 FormularioUAFEAsignacion?
+  persona                    PersonaRegistrada         @relation(fields: [personaId], references: [id], onDelete: Cascade)
 
-  // =====================================================
-  // SECCIÓN 5: BENEFICIARIO FINAL / APODERADO (si aplica)
-  // =====================================================
-  tieneBeneficiario Boolean  @default(false)
-  beneficiarioApellidos String?
-  beneficiarioNombres String?
-  beneficiarioTipoId String?
-  beneficiarioNumeroId String?
-  beneficiarioNacionalidad String?
-  beneficiarioEstadoCivil String?
-  beneficiarioGenero String?
-  beneficiarioNivelEstudio String?
-  beneficiarioProfesion String?
-  beneficiarioDireccion String?
-  beneficiarioCorreo String?
-  beneficiarioTelefono String?
-  beneficiarioCelular String?
-
-  // =====================================================
-  // SECCIÓN 6: PERSONAS EXPUESTAS POLÍTICAMENTE (PEP)
-  // =====================================================
-  esPEP             Boolean  @default(false)
-  esFamiliarPEP     Boolean  @default(false)
-  relacionPEP       String?  // "CONYUGE" | "PADRE_MADRE" | "HIJO" | "ABUELO" | "HERMANO" | "NIETO" | "SUEGRO" | "CUÑADO"
-  esColaboradorPEP  Boolean  @default(false)
-  tipoColaborador   String?  // "ASISTENTE" | "ASESOR" | "OTRA_PERSONA_CONFIANZA"
-
-  // =====================================================
-  // METADATA
-  // =====================================================
-  completadoEn      DateTime @default(now())
-  ipAddress         String?
-  userAgent         String?
-
-  @@map("formulario_uafe_respuestas")
   @@index([personaId])
   @@index([asignacionId])
   @@index([numeroMatriz])
   @@index([completadoEn])
+  @@map("formulario_uafe_respuestas")
 }
 
-// ============================================================================
-// SISTEMA DE PROTOCOLOS UAFE - NUEVO FLUJO (Protocolo + Cédula + PIN)
-// ============================================================================
-
-// Modelo de Protocolo UAFE (información del trámite)
 model ProtocoloUAFE {
-  id                    String   @id @default(uuid())
-  numeroProtocolo       String   @unique
+  id                      String             @id @default(uuid())
+  numeroProtocolo         String             @unique
+  fecha                   DateTime
+  actoContrato            String
+  avaluoMunicipal         Decimal?           @db.Decimal(12, 2)
+  valorContrato           Decimal            @db.Decimal(12, 2)
+  createdBy               Int
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+  formasPago              Json?
+  bienInmuebleDescripcion String?
+  bienInmuebleUbicacion   String?
+  tipoActoOtro            String?
+  vehiculoAnio            String?
+  vehiculoMarca           String?
+  vehiculoModelo          String?
+  vehiculoPlaca           String?
+  personas                PersonaProtocolo[]
+  creador                 User               @relation(fields: [createdBy], references: [id])
 
-  // DATOS DEL TRÁMITE (llenados por matrizador UNA SOLA VEZ)
-  fecha                 DateTime
-  actoContrato          String   // COMPRAVENTA, VENTA_VEHICULO, DONACION, CESION_DERECHOS, PROMESA_COMPRAVENTA, OTROS
-  tipoActoOtro          String?  // Solo cuando actoContrato = 'OTROS'
-  
-  // DATOS DE BIEN INMUEBLE (para transacciones de bienes raíces)
-  bienInmuebleDescripcion String?  // Descripción del bien inmueble
-  bienInmuebleUbicacion   String?  // Ubicación/dirección del inmueble
-  
-  // DATOS DE VEHÍCULO (para venta de vehículos)
-  vehiculoPlaca         String?  // Placa del vehículo
-  vehiculoMarca         String?  // Marca (Toyota, Honda, etc.)
-  vehiculoModelo        String?  // Modelo del vehículo
-  vehiculoAnio          String?  // Año del vehículo
-  
-  avaluoMunicipal       Decimal? @db.Decimal(12, 2)
-  valorContrato         Decimal  @db.Decimal(12, 2)
-
-  // FORMAS DE PAGO (JSON array para flexibilidad)
-  // Ejemplo: [{ tipo: "EFECTIVO", monto: 5000.00 }, { tipo: "CHEQUE", monto: 80000.00, banco: "PICHINCHA" }]
-  formasPago            Json?    // Array de objetos { tipo, monto, banco? }
-
-  // METADATA
-  createdBy             Int
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-
-  // RELACIONES
-  creador               User     @relation(fields: [createdBy], references: [id])
-  personas              PersonaProtocolo[]
-
-  @@map("protocolos_uafe")
   @@index([numeroProtocolo])
   @@index([createdBy])
   @@index([createdAt])
+  @@map("protocolos_uafe")
 }
 
-// Modelo de PersonaProtocolo (relación N:N entre personas y protocolos)
 model PersonaProtocolo {
-  id                    String   @id @default(uuid())
-  protocoloId           String
-  personaCedula         String
+  id                  String                 @id @default(uuid())
+  protocoloId         String
+  personaCedula       String
+  calidad             String
+  actuaPor            String
+  completado          Boolean                @default(false)
+  completadoAt        DateTime?
+  respuestaFormulario Json?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  representadoId      String?
+  datosRepresentado   Json?
+  persona             PersonaRegistrada      @relation("Compareciente", fields: [personaCedula], references: [numeroIdentificacion])
+  protocolo           ProtocoloUAFE          @relation(fields: [protocoloId], references: [id], onDelete: Cascade)
+  representado        PersonaRegistrada?     @relation("Representado", fields: [representadoId], references: [numeroIdentificacion])
+  sesiones            SesionFormularioUAFE[]
 
-  // ROL EN ESTE TRÁMITE
-  calidad               String   // "COMPRADOR", "VENDEDOR"
-  actuaPor              String   // "PROPIOS_DERECHOS", "REPRESENTANDO_A"
-
-  // REPRESENTADO (si actuaPor = "REPRESENTANDO_A")
-  representadoId        String?  // FK a PersonaRegistrada (si existe en BD)
-  datosRepresentado     Json?    // Datos manuales del representado (si no existe en BD)
-
-  // ESTADO
-  completado            Boolean  @default(false)
-  completadoAt          DateTime?
-
-  // RESPUESTA DEL FORMULARIO (cuando completa)
-  respuestaFormulario   Json?
-
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-
-  // RELACIONES
-  protocolo             ProtocoloUAFE      @relation(fields: [protocoloId], references: [id], onDelete: Cascade)
-  persona               PersonaRegistrada  @relation("Compareciente", fields: [personaCedula], references: [numeroIdentificacion])
-  representado          PersonaRegistrada? @relation("Representado", fields: [representadoId], references: [numeroIdentificacion])
-  sesiones              SesionFormularioUAFE[]
-
-  @@unique([protocoloId, personaCedula, calidad, actuaPor])
-  @@map("personas_protocolo")
+  @@unique([protocoloId, personaCedula])
   @@index([protocoloId])
   @@index([personaCedula])
   @@index([completado])
   @@index([representadoId])
+  @@map("personas_protocolo")
 }
 
-// Modelo de Sesión de Formulario UAFE (sesiones temporales)
 model SesionFormularioUAFE {
-  id                    String   @id @default(uuid())
-  personaProtocoloId    String
-  token                 String   @unique
+  id                 String           @id @default(uuid())
+  personaProtocoloId String
+  token              String           @unique
+  expiraEn           DateTime
+  ultimaActividad    DateTime         @default(now())
+  ipAddress          String?
+  userAgent          String?
+  createdAt          DateTime         @default(now())
+  personaProtocolo   PersonaProtocolo @relation(fields: [personaProtocoloId], references: [id], onDelete: Cascade)
 
-  expiraEn              DateTime
-  ultimaActividad       DateTime @default(now())
-
-  ipAddress             String?
-  userAgent             String?
-
-  createdAt             DateTime @default(now())
-
-  personaProtocolo      PersonaProtocolo @relation(fields: [personaProtocoloId], references: [id], onDelete: Cascade)
-
-  @@map("sesiones_formulario_uafe")
   @@index([token])
   @@index([personaProtocoloId])
   @@index([expiraEn])
+  @@map("sesiones_formulario_uafe")
+}
+
+enum UserRole {
+  ADMIN
+  CAJA
+  MATRIZADOR
+  RECEPCION
+  ARCHIVO
 }
