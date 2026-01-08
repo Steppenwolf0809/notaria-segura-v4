@@ -11,6 +11,7 @@ const useDocumentStore = create((set, get) => ({
   documents: [],
   totalDocuments: 0,
   pagination: { currentPage: 1, pageSize: 50, totalPages: 1 },
+  stats: null, // Estadísticas globales (counts by status)
   matrizadores: [],
   loading: false,
   error: null,
@@ -29,9 +30,9 @@ const useDocumentStore = create((set, get) => ({
    * @param {string} errorMessage - Mensaje de error
    */
   setError: (errorMessage) => {
-    set({ 
-      error: errorMessage, 
-      loading: false 
+    set({
+      error: errorMessage,
+      loading: false
     });
   },
 
@@ -49,48 +50,48 @@ const useDocumentStore = create((set, get) => ({
    */
   uploadXmlDocument: async (xmlFile) => {
     set({ loading: true, error: null, uploadProgress: 0 });
-    
+
     try {
       // Simular progreso de upload
       set({ uploadProgress: 25 });
-      
+
       const result = await documentService.uploadXmlDocument(xmlFile);
-      
+
       set({ uploadProgress: 75 });
-      
+
       if (result.success) {
         // Actualizar lista de documentos si tenemos documentos cargados
         const currentDocuments = get().documents;
         if (currentDocuments.length > 0) {
-          set({ 
+          set({
             documents: [result.data.document, ...currentDocuments],
             loading: false,
             uploadProgress: 100
           });
         } else {
-          set({ 
+          set({
             loading: false,
             uploadProgress: 100
           });
         }
-        
+
         // Limpiar progreso después de un tiempo
         setTimeout(() => {
           set({ uploadProgress: null });
         }, 2000);
-        
+
         return result;
       } else {
-        set({ 
-          error: result.error, 
+        set({
+          error: result.error,
           loading: false,
           uploadProgress: null
         });
         return result;
       }
     } catch (error) {
-      set({ 
-        error: 'Error inesperado al subir XML', 
+      set({
+        error: 'Error inesperado al subir XML',
         loading: false,
         uploadProgress: null
       });
@@ -105,12 +106,12 @@ const useDocumentStore = create((set, get) => ({
    */
   uploadXmlDocumentsBatch: async (xmlFiles) => {
     set({ loading: true, error: null, uploadProgress: 0 });
-    
+
     try {
       const result = await documentService.uploadXmlDocumentsBatch(xmlFiles, (progress) => {
         set({ uploadProgress: progress });
       });
-      
+
       if (result.success) {
         // Recargar documentos después del procesamiento en lote
         const currentDocuments = get().documents;
@@ -118,29 +119,29 @@ const useDocumentStore = create((set, get) => ({
           // Recargar todos los documentos para mostrar los nuevos
           await get().fetchAllDocuments();
         }
-        
-        set({ 
+
+        set({
           loading: false,
           uploadProgress: 100
         });
-        
+
         // Limpiar progreso después de un tiempo
         setTimeout(() => {
           set({ uploadProgress: null });
         }, 3000);
-        
+
         return result;
       } else {
-        set({ 
-          error: result.error, 
+        set({
+          error: result.error,
           loading: false,
           uploadProgress: null
         });
         return result;
       }
     } catch (error) {
-      set({ 
-        error: 'Error inesperado al subir archivos XML en lote', 
+      set({
+        error: 'Error inesperado al subir archivos XML en lote',
         loading: false,
         uploadProgress: null
       });
@@ -183,33 +184,33 @@ const useDocumentStore = create((set, get) => ({
    */
   assignDocument: async (documentId, matrizadorId) => {
     set({ loading: true, error: null });
-    
+
     try {
       const result = await documentService.assignDocument(documentId, matrizadorId);
-      
+
       if (result.success) {
         // Actualizar documento en la lista local
         const currentDocuments = get().documents;
-        const updatedDocuments = currentDocuments.map(doc => 
+        const updatedDocuments = currentDocuments.map(doc =>
           doc.id === documentId ? result.data.document : doc
         );
-        
-        set({ 
+
+        set({
           documents: updatedDocuments,
-          loading: false 
+          loading: false
         });
         return true;
       } else {
-        set({ 
-          error: result.error, 
-          loading: false 
+        set({
+          error: result.error,
+          loading: false
         });
         return false;
       }
     } catch (error) {
-      set({ 
-        error: 'Error inesperado al asignar documento', 
-        loading: false 
+      set({
+        error: 'Error inesperado al asignar documento',
+        loading: false
       });
       return false;
     }
@@ -217,31 +218,44 @@ const useDocumentStore = create((set, get) => ({
 
   /**
    * MATRIZADOR: Cargar documentos del usuario
+   * @param {Object} params - Parámetros de paginación/filtro
    * @returns {Promise<boolean>} True si se cargaron exitosamente
    */
-  fetchMyDocuments: async () => {
+  fetchMyDocuments: async (params = {}) => {
     set({ loading: true, error: null });
-    
+
     try {
-      const result = await documentService.getMyDocuments();
-      
+      const result = await documentService.getMyDocuments(params);
+
       if (result.success) {
-        set({ 
-          documents: result.data.documents || [],
-          loading: false 
+        // Backend devuelve { documents, total, pagination, byStatus }
+        const data = result.data || {};
+        const docs = Array.isArray(data) ? data : (data.documents || []);
+        const total = data.total || docs.length;
+        const pagination = data.pagination || { currentPage: 1, pageSize: docs.length || 10, totalPages: 1 };
+
+        // Actualizar stats solo si vienen en la respuesta, si no mantener los anteriores
+        const newStats = data.byStatus || get().stats;
+
+        set({
+          documents: docs,
+          totalDocuments: total,
+          pagination: pagination,
+          stats: newStats,
+          loading: false
         });
         return true;
       } else {
-        set({ 
-          error: result.error, 
-          loading: false 
+        set({
+          error: result.error,
+          loading: false
         });
         return false;
       }
     } catch (error) {
-      set({ 
-        error: 'Error inesperado al cargar mis documentos', 
-        loading: false 
+      set({
+        error: 'Error inesperado al cargar mis documentos',
+        loading: false
       });
       return false;
     }
@@ -255,10 +269,10 @@ const useDocumentStore = create((set, get) => ({
    */
   updateDocumentStatus: async (documentId, newStatus) => {
     set({ loading: true, error: null });
-    
+
     try {
       const result = await documentService.updateDocumentStatus(documentId, newStatus);
-      
+
       if (result.success && result.data && result.data.document) {
         const currentDocuments = get().documents;
 
@@ -283,7 +297,7 @@ const useDocumentStore = create((set, get) => ({
           });
         } else {
           // Actualización individual (comportamiento existente)
-          updatedDocuments = currentDocuments.map(doc => 
+          updatedDocuments = currentDocuments.map(doc =>
             doc.id === documentId ? { ...doc, ...result.data.document } : doc
           );
         }
@@ -301,20 +315,20 @@ const useDocumentStore = create((set, get) => ({
         // Devolver el resultado completo para que el modal pueda usarlo
         return result;
       } else {
-        set({ 
-          error: result.error || result.message || 'Error desconocido', 
-          loading: false 
+        set({
+          error: result.error || result.message || 'Error desconocido',
+          loading: false
         });
-        
+
         // Devolver el resultado con error para que el modal pueda manejarlo
         return result;
       }
     } catch (error) {
-      set({ 
-        error: 'Error inesperado al actualizar estado', 
-        loading: false 
+      set({
+        error: 'Error inesperado al actualizar estado',
+        loading: false
       });
-      
+
       // Devolver un objeto de error estructurado
       return {
         success: false,
@@ -334,7 +348,7 @@ const useDocumentStore = create((set, get) => ({
     try {
       const currentDocuments = get().documents;
       const targetDoc = currentDocuments.find(doc => doc.id === documentId);
-      
+
       // 🔗 NUEVA FUNCIONALIDAD: Si el documento está agrupado y se actualizan campos compartidos
       if (targetDoc?.isGrouped && targetDoc?.documentGroupId) {
         const sharedFields = ['clientPhone', 'clientEmail', 'clientName'];
@@ -349,15 +363,15 @@ const useDocumentStore = create((set, get) => ({
                 sharedData[field] = documentData[field];
               }
             });
-            
+
             // Llamar al servicio para actualizar todo el grupo
             const result = await documentService.updateDocumentGroupInfo(
-              targetDoc.documentGroupId, 
+              targetDoc.documentGroupId,
               sharedData
             );
-            
+
             if (result.success) {
-              
+
               // Actualizar todos los documentos del grupo en el store
               const updatedDocuments = currentDocuments.map(doc => {
                 if (doc.documentGroupId === targetDoc.documentGroupId && doc.isGrouped) {
@@ -365,7 +379,7 @@ const useDocumentStore = create((set, get) => ({
                 }
                 return doc.id === documentId ? { ...doc, ...documentData } : doc;
               });
-              
+
               set({ documents: updatedDocuments });
               return true;
             } else {
@@ -376,16 +390,16 @@ const useDocumentStore = create((set, get) => ({
           }
         }
       }
-      
+
       // Actualización local estándar (para documentos individuales o como fallback)
-      const updatedDocuments = currentDocuments.map(doc => 
+      const updatedDocuments = currentDocuments.map(doc =>
         doc.id === documentId ? { ...doc, ...documentData } : doc
       );
-      
-      set({ 
+
+      set({
         documents: updatedDocuments
       });
-      
+
       return true;
     } catch (error) {
       return false;
@@ -399,7 +413,7 @@ const useDocumentStore = create((set, get) => ({
   fetchMatrizadores: async () => {
     try {
       const result = await documentService.getAvailableMatrizadores();
-      
+
       if (result.success) {
         set({ matrizadores: result.data.matrizadores || [] });
         return true;
@@ -444,9 +458,9 @@ const useDocumentStore = create((set, get) => ({
   searchDocuments: (searchTerm) => {
     const documents = get().documents;
     if (!searchTerm.trim()) return documents;
-    
+
     const term = searchTerm.toLowerCase();
-    return documents.filter(doc => 
+    return documents.filter(doc =>
       doc.clientName?.toLowerCase().includes(term) ||
       doc.protocolNumber?.toLowerCase().includes(term) ||
       doc.actoPrincipalDescripcion?.toLowerCase().includes(term) ||
@@ -474,9 +488,9 @@ const useDocumentStore = create((set, get) => ({
 
     try {
       const result = await documentService.updateDocumentStatus(documentId, newStatus, options);
-      
+
       if (result.success) {
-        
+
         const currentDocuments = get().documents;
         let updatedDocuments = currentDocuments;
         const groupInfo = result.data?.groupOperation;
@@ -495,16 +509,16 @@ const useDocumentStore = create((set, get) => ({
             return doc;
           });
         } else {
-          updatedDocuments = currentDocuments.map(doc => 
+          updatedDocuments = currentDocuments.map(doc =>
             doc.id === documentId ? { ...doc, ...result.data.document } : doc
           );
         }
 
-        set({ 
+        set({
           documents: updatedDocuments,
-          loading: false 
+          loading: false
         });
-        
+
         // Forzar re-render para asegurar actualización visual
         setTimeout(() => {
           set({ documents: [...updatedDocuments] });
@@ -521,24 +535,24 @@ const useDocumentStore = create((set, get) => ({
           changeId: null, // Se puede agregar si el backend lo retorna
           timestamp: new Date().toISOString()
         };
-        
-        
+
+
         return {
           success: true,
           document: result.data.document,
           changeInfo
         };
       } else {
-        set({ 
-          error: result.error, 
-          loading: false 
+        set({
+          error: result.error,
+          loading: false
         });
         return { success: false, error: result.error };
       }
     } catch (error) {
-      set({ 
-        error: 'Error inesperado al actualizar estado', 
-        loading: false 
+      set({
+        error: 'Error inesperado al actualizar estado',
+        loading: false
       });
       return { success: false, error: 'Error inesperado al actualizar estado' };
     }
@@ -551,23 +565,23 @@ const useDocumentStore = create((set, get) => ({
    */
   undoDocumentStatusChange: async (changeInfo) => {
     set({ loading: true, error: null });
-    
+
     try {
       const result = await documentService.undoDocumentStatusChange({
         documentId: changeInfo.documentId,
         changeId: changeInfo.changeId
       });
-      
+
       if (result.success) {
         // Actualizar documento en la lista local
         const currentDocuments = get().documents;
-        const updatedDocuments = currentDocuments.map(doc => 
+        const updatedDocuments = currentDocuments.map(doc =>
           doc.id === changeInfo.documentId ? result.data.document : doc
         );
-        
-        set({ 
+
+        set({
           documents: updatedDocuments,
-          loading: false 
+          loading: false
         });
 
         return {
@@ -576,16 +590,16 @@ const useDocumentStore = create((set, get) => ({
           undoInfo: result.data.undo
         };
       } else {
-        set({ 
-          error: result.error, 
-          loading: false 
+        set({
+          error: result.error,
+          loading: false
         });
         return { success: false, error: result.error };
       }
     } catch (error) {
-      set({ 
-        error: 'Error inesperado al deshacer cambio', 
-        loading: false 
+      set({
+        error: 'Error inesperado al deshacer cambio',
+        loading: false
       });
       return { success: false, error: 'Error inesperado al deshacer cambio' };
     }
@@ -599,7 +613,7 @@ const useDocumentStore = create((set, get) => ({
   getUndoableChanges: async (documentId) => {
     try {
       const result = await documentService.getUndoableChanges(documentId);
-      
+
       if (result.success) {
         return {
           success: true,
@@ -642,8 +656,8 @@ const useDocumentStore = create((set, get) => ({
     const isReversion = fromIndex > toIndex;
 
     // NUEVA LÓGICA: Para MATRIZADOR y ARCHIVO, entrega directa simplificada
-    if ((userRole === 'MATRIZADOR' || userRole === 'ARCHIVO') && 
-        fromStatus === 'LISTO' && toStatus === 'ENTREGADO') {
+    if ((userRole === 'MATRIZADOR' || userRole === 'ARCHIVO') &&
+      fromStatus === 'LISTO' && toStatus === 'ENTREGADO') {
       return {
         requiresConfirmation: true,
         isCritical: false,
@@ -661,11 +675,11 @@ const useDocumentStore = create((set, get) => ({
       isReversion,
       isDirectDelivery: false,
       type: isCritical ? 'critical' : isReversion ? 'reversion' : 'normal',
-      reason: isCritical ? 
+      reason: isCritical ?
         'Este cambio enviará notificaciones automáticas al cliente' :
-        isReversion ? 
-        'Esta es una reversión que puede confundir al cliente' :
-        'Cambio normal',
+        isReversion ?
+          'Esta es una reversión que puede confundir al cliente' :
+          'Cambio normal',
       userRole: userRole
     };
   },
@@ -684,21 +698,21 @@ const useDocumentStore = create((set, get) => ({
    */
   createDocumentGroup: async (documentIds) => {
     set({ loading: true, error: null });
-    
+
     try {
-      
+
       const result = await documentService.createDocumentGroup({
         documentIds,
         sendNotification: true // Enviar notificación automáticamente
       });
-      
+
       if (result.success) {
         // Recargar documentos para mostrar los cambios
         await get().fetchMyDocuments();
-        
+
         set({ loading: false });
-        
-        
+
+
         return {
           success: true,
           group: result.group,
@@ -707,17 +721,17 @@ const useDocumentStore = create((set, get) => ({
           whatsapp: result.whatsapp || null
         };
       } else {
-        set({ 
-          error: result.message, 
-          loading: false 
+        set({
+          error: result.message,
+          loading: false
         });
         return { success: false, error: result.message };
       }
     } catch (error) {
       const errorMessage = error.message || 'Error inesperado al crear grupo';
-      set({ 
-        error: errorMessage, 
-        loading: false 
+      set({
+        error: errorMessage,
+        loading: false
       });
       return { success: false, error: errorMessage };
     }

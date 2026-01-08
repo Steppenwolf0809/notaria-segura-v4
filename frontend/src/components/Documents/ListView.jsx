@@ -48,7 +48,11 @@ import { toast } from 'react-toastify';
  * Vista Lista - EXACTA AL PROTOTIPO + SELECCIÓN MÚLTIPLE
  * Tabla completa con todas las funcionalidades + checkboxes para cambios masivos
  */
-const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = false, onSearchByClient }) => {
+const ListView = ({
+  searchTerm, statusFilter, typeFilter, mostrarEntregados = false, onSearchByClient,
+  serverSide = false, pageProp = 0, rowsPerPageProp = 10, totalDocuments = 0, loadingProp = false,
+  onPageChange, onRowsPerPageChange, onSortChange
+}) => {
   const { documents, updateDocumentStatus, updateDocument, createDocumentGroup, detectGroupableDocuments, fetchMyDocuments } = useDocumentStore();
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
@@ -56,6 +60,11 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [orderBy, setOrderBy] = useState('createdAt');
   const [order, setOrder] = useState('desc');
+
+  // Determinar página y filas activas (server o local)
+  const activePage = serverSide ? pageProp : page;
+  const activeRowsPerPage = serverSide ? rowsPerPageProp : rowsPerPage;
+
   // Estados para modales y acciones
   const [confirmListoOpen, setConfirmListoOpen] = useState(false);
   const [entregaOpen, setEntregaOpen] = useState(false);
@@ -78,6 +87,9 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
    * Filtrar y ordenar documentos
    */
   const filteredAndSortedDocuments = useMemo(() => {
+    // Si es server-side, asumimos que 'documents' ya viene filtrado y paginado del store
+    if (serverSide) return documents;
+
     let filtered = documents.filter(doc => {
       // CORRECCIÓN: Solo buscar si el término tiene al menos 2 caracteres
       const matchesSearch = !searchTerm || searchTerm.length < 2 ||
@@ -135,7 +147,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
     });
 
     return filtered;
-  }, [documents, searchTerm, statusFilter, typeFilter, orderBy, order, mostrarEntregados]);
+  }, [documents, searchTerm, statusFilter, typeFilter, orderBy, order, mostrarEntregados, serverSide]);
 
   /**
    * Obtener color del estado
@@ -155,20 +167,34 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
    */
   const handleSort = (property) => {
     const isAsc = orderBy === property && order === 'asc';
-    setOrder(isAsc ? 'desc' : 'asc');
+    const newOrder = isAsc ? 'desc' : 'asc';
+    setOrder(newOrder);
     setOrderBy(property);
+
+    if (serverSide && onSortChange) {
+      onSortChange(property, newOrder);
+    }
   };
 
   /**
    * Manejar paginación
    */
   const handleChangePage = (event, newPage) => {
-    setPage(newPage);
+    if (serverSide && onPageChange) {
+      onPageChange(newPage);
+    } else {
+      setPage(newPage);
+    }
   };
 
   const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
+    const newRows = parseInt(event.target.value, 10);
+    if (serverSide && onRowsPerPageChange) {
+      onRowsPerPageChange(newRows);
+    } else {
+      setRowsPerPage(newRows);
+      setPage(0);
+    }
   };
 
   /**
@@ -300,10 +326,13 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
   // 🎯 NUEVAS FUNCIONES PARA SELECCIÓN MÚLTIPLE
 
   // Documentos de la página actual - DEBE IR ANTES de los useMemo
-  const paginatedDocuments = filteredAndSortedDocuments.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
+  const paginatedDocuments = useMemo(() => {
+    if (serverSide) return filteredAndSortedDocuments;
+    return filteredAndSortedDocuments.slice(
+      activePage * activeRowsPerPage,
+      activePage * activeRowsPerPage + activeRowsPerPage
+    );
+  }, [filteredAndSortedDocuments, activePage, activeRowsPerPage, serverSide]);
 
   /**
    * Manejar selección de todos los documentos visibles
@@ -630,9 +659,9 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
         <TablePagination
           rowsPerPageOptions={[5, 10, 25, 50]}
           component="div"
-          count={filteredAndSortedDocuments.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
+          count={serverSide ? totalDocuments : filteredAndSortedDocuments.length}
+          rowsPerPage={activeRowsPerPage}
+          page={activePage}
           onPageChange={handleChangePage}
           onRowsPerPageChange={handleChangeRowsPerPage}
           labelRowsPerPage="Filas por página:"

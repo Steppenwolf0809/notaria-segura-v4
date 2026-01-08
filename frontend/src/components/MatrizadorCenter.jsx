@@ -28,9 +28,13 @@ const MatrizadorCenter = () => {
   /**
    * Cargar datos al montar el componente
    */
-  useEffect(() => {
-    fetchMyDocuments();
-  }, [fetchMyDocuments]);
+  /**
+   * Cargar datos al montar el componente
+   * Eliminado: GestionDocumentos maneja su propio fetch
+   */
+  // useEffect(() => {
+  //   fetchMyDocuments();
+  // }, [fetchMyDocuments]);
 
   /**
    * Manejar cambios de vista
