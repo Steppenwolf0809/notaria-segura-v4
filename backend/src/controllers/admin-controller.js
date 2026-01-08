@@ -667,7 +667,8 @@ async function getDashboardStats(req, res) {
       status, // Nuevo filtro de estado
       page = 1, // Paginación
       limit = 20, // Paginación
-      billedTimeRange = 'current_month' // Filtro para KPI de facturación
+      billedTimeRange = 'current_month', // Filtro para KPI de facturación
+      performanceTimeRange = 'current_month' // Filtro para productividad
     } = req.query;
 
     const today = new Date();
@@ -688,15 +689,35 @@ async function getDashboardStats(req, res) {
     }
 
     // Filtros de fecha para PERFORMANCE (por defecto mes actual si no hay filtros)
+    // Filtros de fecha para PERFORMANCE
+    // Se aplican independientemente de los filtros globales de fecha
     const performanceDateFilter = {};
-    if (startDate || endDate) {
-      if (startDate) performanceDateFilter.gte = new Date(startDate);
-      if (endDate) performanceDateFilter.lte = new Date(endDate);
-    } else {
-      const startOfMonth = new Date();
-      startOfMonth.setDate(1);
-      startOfMonth.setHours(0, 0, 0, 0);
-      performanceDateFilter.gte = startOfMonth;
+    const perfNow = new Date();
+    let startPerfDate = new Date();
+
+    switch (performanceTimeRange) {
+      case 'current_week':
+        const day = perfNow.getDay();
+        const diff = perfNow.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+        startPerfDate = new Date(perfNow.setDate(diff));
+        startPerfDate.setHours(0, 0, 0, 0);
+        performanceDateFilter.gte = startPerfDate;
+        break;
+      case 'current_month':
+        startPerfDate = new Date(perfNow.getFullYear(), perfNow.getMonth(), 1);
+        performanceDateFilter.gte = startPerfDate;
+        break;
+      case 'year_to_date':
+        startPerfDate = new Date(perfNow.getFullYear(), 0, 1);
+        performanceDateFilter.gte = startPerfDate;
+        break;
+      case 'all_time':
+        // No filter
+        break;
+      default:
+        // Por defecto mes actual
+        startPerfDate = new Date(perfNow.getFullYear(), perfNow.getMonth(), 1);
+        performanceDateFilter.gte = startPerfDate;
     }
 
     // Filtro de matrizador

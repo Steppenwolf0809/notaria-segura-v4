@@ -111,8 +111,9 @@ const AdminDashboard = () => {
   const [selectedMatrixer, setSelectedMatrixer] = useState('');
   const [statusFilter, setStatusFilter] = useState(''); // Filtro de estado
   const [billedTimeRange, setBilledTimeRange] = useState('current_month'); // Filtro Facturación
-  const [startDate, setStartDate] = useState(''); // Filtro fecha inicio
-  const [endDate, setEndDate] = useState(''); // Filtro fecha fin
+  // const [startDate, setStartDate] = useState(''); // Filtro fecha inicio (Removido por solicitud)
+  // const [endDate, setEndDate] = useState(''); // Filtro fecha fin
+  const [performanceTimeRange, setPerformanceTimeRange] = useState('current_month');
   const [matrizadores, setMatrizadores] = useState([]);
 
   // Paginación
@@ -123,6 +124,7 @@ const AdminDashboard = () => {
 
   // Menu para filtro de facturación
   const [billingAnchorEl, setBillingAnchorEl] = useState(null);
+  const [performanceAnchorEl, setPerformanceAnchorEl] = useState(null);
 
   useEffect(() => {
     loadMatrizadores();
@@ -132,7 +134,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     setPage(1);
     loadStats(1, false);
-  }, [thresholdDays, selectedMatrixer, statusFilter, billedTimeRange, startDate, endDate]);
+  }, [thresholdDays, selectedMatrixer, statusFilter, billedTimeRange, performanceTimeRange]);
 
   const loadMatrizadores = async () => {
     try {
@@ -152,9 +154,10 @@ const AdminDashboard = () => {
         thresholdDays,
         matrixerId: selectedMatrixer,
         status: statusFilter,
-        startDate,
-        endDate,
+        // startDate,
+        // endDate,
         billedTimeRange,
+        performanceTimeRange,
         page: pageNum,
         limit: 20
       });
@@ -191,7 +194,13 @@ const AdminDashboard = () => {
     setBillingAnchorEl(null);
   };
 
-  if (loading && page === 1) {
+  const handlePerformanceIntervalChange = (interval) => {
+    setPerformanceTimeRange(interval);
+    setPerformanceAnchorEl(null);
+  };
+
+  // Solo mostrar spinner completo si es la carga inicial y no tenemos datos
+  if (loading && page === 1 && !stats) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
         <CircularProgress />
@@ -207,6 +216,10 @@ const AdminDashboard = () => {
 
   // Mapping para textos de intervalos
   const billingIntervals = {
+    'current_month': 'Mes Actual',
+    'last_month': 'Mes Anterior',
+    'year_to_date': 'Año Actual',
+    'current_week': 'Esta Semana',
     'current_month': 'Mes Actual',
     'last_month': 'Mes Anterior',
     'year_to_date': 'Año Actual',
@@ -267,7 +280,7 @@ const AdminDashboard = () => {
             </Select>
           </FormControl>
 
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+          {/* <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
             <Typography variant="body2" color="text.secondary">Desde:</Typography>
             <input
               type="date"
@@ -282,7 +295,7 @@ const AdminDashboard = () => {
               onChange={(e) => setEndDate(e.target.value)}
               style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
             />
-          </Box>
+          </Box> */}
 
           <Tooltip title="Actualizar">
             <IconButton onClick={() => loadStats(1, false)} color="primary">
@@ -475,7 +488,29 @@ const AdminDashboard = () => {
       {/* Rendimiento de Equipo */}
       <Card variant="outlined">
         <CardContent>
-          <Typography variant="h6" gutterBottom>Rendimiento de Equipo</Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Typography variant="h6">Rendimiento de Equipo</Typography>
+            <Box>
+              <Button
+                size="small"
+                onClick={(e) => setPerformanceAnchorEl(e.currentTarget)}
+                endIcon={<RefreshIcon />}
+                sx={{ textTransform: 'none' }}
+              >
+                {billingIntervals[performanceTimeRange] || 'Filtro'}
+              </Button>
+              <Menu
+                anchorEl={performanceAnchorEl}
+                open={Boolean(performanceAnchorEl)}
+                onClose={() => setPerformanceAnchorEl(null)}
+              >
+                <MenuItem onClick={() => handlePerformanceIntervalChange('current_month')}>Mes Actual</MenuItem>
+                <MenuItem onClick={() => handlePerformanceIntervalChange('current_week')}>Esta Semana</MenuItem>
+                <MenuItem onClick={() => handlePerformanceIntervalChange('year_to_date')}>Año Actual</MenuItem>
+                <MenuItem onClick={() => handlePerformanceIntervalChange('all_time')}>Histórico</MenuItem>
+              </Menu>
+            </Box>
+          </Box>
           <TableContainer>
             <Table>
               <TableHead>
@@ -483,7 +518,7 @@ const AdminDashboard = () => {
                   <TableCell>Matrizador</TableCell>
                   <TableCell align="center">Carga Activa</TableCell>
                   <TableCell align="center">Críticos</TableCell>
-                  <TableCell align="center">Entregas (Mes)</TableCell>
+                  <TableCell align="center">Entregas ({billingIntervals[performanceTimeRange]})</TableCell>
                   <TableCell align="center">Velocidad Prom.</TableCell>
                 </TableRow>
               </TableHead>
