@@ -46,7 +46,9 @@ const QROversight = () => {
 
             // Obtener escrituras recientes
             const qrData = await getEscrituras({ limit: 10 });
-            setRecentQRs(qrData.data || []);
+            // La respuesta viene como { success: true, data: { data: [...], meta: ... } }
+            // O a veces directamente data si el servicio lo maneja distinto, pero sendPaginated usa data.data
+            setRecentQRs(qrData.data?.data || qrData.data || []);
 
             setError(null);
         } catch (err) {
