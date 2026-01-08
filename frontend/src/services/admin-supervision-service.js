@@ -29,6 +29,7 @@ export const getSupervisionStats = async (filters = {}) => {
         if (filters.page) params.append('page', filters.page);
         if (filters.limit) params.append('limit', filters.limit);
         if (filters.billedTimeRange) params.append('billedTimeRange', filters.billedTimeRange);
+        if (filters.performanceTimeRange) params.append('performanceTimeRange', filters.performanceTimeRange);
 
         const response = await axios.get(`${API_URL}/admin/dashboard/stats?${params.toString()}`, {
             headers: { Authorization: `Bearer ${token}` }
