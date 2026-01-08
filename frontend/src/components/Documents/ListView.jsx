@@ -433,7 +433,7 @@ const ListView = ({ searchTerm, statusFilter, typeFilter, mostrarEntregados = fa
                     direction={orderBy === 'createdAt' ? order : 'asc'}
                     onClick={() => handleSort('createdAt')}
                   >
-                    Fecha Ingreso
+                    Fecha Factura
                   </TableSortLabel>
                 </TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>

@@ -147,7 +147,7 @@ const DocumentOversight = () => {
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         setDocuments(data.data.documents);
         setTotalCount(data.data.pagination.totalCount);
@@ -226,7 +226,7 @@ const DocumentOversight = () => {
    * Seleccionar/deseleccionar documento
    */
   const toggleDocumentSelection = (documentId) => {
-    setSelectedDocuments(prev => 
+    setSelectedDocuments(prev =>
       prev.includes(documentId)
         ? prev.filter(id => id !== documentId)
         : [...prev, documentId]
@@ -250,7 +250,7 @@ const DocumentOversight = () => {
   const getStatusColor = (status) => {
     const colors = {
       PENDIENTE: '#f59e0b',
-      EN_PROCESO: '#3b82f6', 
+      EN_PROCESO: '#3b82f6',
       LISTO: '#22c55e',
       ENTREGADO: '#6b7280'
     };
@@ -280,7 +280,7 @@ const DocumentOversight = () => {
     const now = new Date();
     const statusDate = new Date(document.statusChangedAt || document.createdAt);
     const daysDiff = Math.floor((now - statusDate) / (1000 * 60 * 60 * 24));
-    
+
     return daysDiff > threshold;
   };
 
@@ -291,7 +291,7 @@ const DocumentOversight = () => {
     const now = new Date();
     const statusDate = new Date(document.statusChangedAt || document.createdAt);
     const daysDiff = Math.floor((now - statusDate) / (1000 * 60 * 60 * 24));
-    
+
     if (daysDiff === 0) return 'Hoy';
     if (daysDiff === 1) return '1 día';
     return `${daysDiff} días`;
@@ -673,7 +673,7 @@ const DocumentOversight = () => {
                 <TableCell>Estado</TableCell>
                 <TableCell>Matrizador</TableCell>
                 <TableCell>Tiempo en Estado</TableCell>
-                <TableCell>Creado</TableCell>
+                <TableCell>Fecha Factura</TableCell>
                 <TableCell align="center">Acciones</TableCell>
               </TableRow>
             </TableHead>
@@ -705,12 +705,12 @@ const DocumentOversight = () => {
                 documents.map((document) => {
                   const isOverdue = isDocumentOverdue(document);
                   const timeInStatus = getTimeInStatus(document);
-                  
+
                   return (
-                    <TableRow 
-                      key={document.id} 
-                      hover 
-                      sx={{ 
+                    <TableRow
+                      key={document.id}
+                      hover
+                      sx={{
                         bgcolor: isOverdue ? 'error.light' : 'inherit',
                         opacity: isOverdue ? 0.9 : 1
                       }}
@@ -778,11 +778,11 @@ const DocumentOversight = () => {
                               </Typography>
                             </>
                           ) : (
-                            <Chip 
-                              label="Sin asignar" 
-                              size="small" 
+                            <Chip
+                              label="Sin asignar"
+                              size="small"
                               color="warning"
-                              variant="outlined" 
+                              variant="outlined"
                             />
                           )}
                         </Box>
@@ -790,7 +790,7 @@ const DocumentOversight = () => {
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <TimeIcon fontSize="small" color="action" />
-                          <Typography 
+                          <Typography
                             variant="body2"
                             color={isOverdue ? 'error.main' : 'inherit'}
                             fontWeight={isOverdue ? 'bold' : 'normal'}
@@ -842,7 +842,7 @@ const DocumentOversight = () => {
           rowsPerPage={rowsPerPage}
           onRowsPerPageChange={handleChangeRowsPerPage}
           labelRowsPerPage="Filas por página:"
-          labelDisplayedRows={({ from, to, count }) => 
+          labelDisplayedRows={({ from, to, count }) =>
             `${from}-${to} de ${count !== -1 ? count : `más de ${to}`}`
           }
         />
