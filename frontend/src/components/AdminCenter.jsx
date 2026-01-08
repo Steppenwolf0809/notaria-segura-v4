@@ -50,6 +50,7 @@ import AdminSettings from './admin/AdminSettings';
 // import AdminFormulariosUAFE from './admin/AdminFormulariosUAFE';
 import FormulariosUAFE from './FormulariosUAFE';
 import AnalisisUAFE from './admin/AnalisisUAFE';
+import QROversight from './admin/QROversight';
 import { getSupervisionStats, getMatrizadores } from '../services/admin-supervision-service';
 
 /**
@@ -80,6 +81,8 @@ const AdminCenter = () => {
         return <NotificationTemplates />;
       case 'whatsapp-templates':
         return <WhatsAppTemplates />;
+      case 'qr-management':
+        return <QROversight />;
       case 'settings':
         return <AdminSettings />;
       default:
@@ -108,6 +111,8 @@ const AdminDashboard = () => {
   const [selectedMatrixer, setSelectedMatrixer] = useState('');
   const [statusFilter, setStatusFilter] = useState(''); // Filtro de estado
   const [billedTimeRange, setBilledTimeRange] = useState('current_month'); // Filtro Facturación
+  const [startDate, setStartDate] = useState(''); // Filtro fecha inicio
+  const [endDate, setEndDate] = useState(''); // Filtro fecha fin
   const [matrizadores, setMatrizadores] = useState([]);
 
   // Paginación
@@ -127,7 +132,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     setPage(1);
     loadStats(1, false);
-  }, [thresholdDays, selectedMatrixer, statusFilter, billedTimeRange]);
+  }, [thresholdDays, selectedMatrixer, statusFilter, billedTimeRange, startDate, endDate]);
 
   const loadMatrizadores = async () => {
     try {
@@ -147,6 +152,8 @@ const AdminDashboard = () => {
         thresholdDays,
         matrixerId: selectedMatrixer,
         status: statusFilter,
+        startDate,
+        endDate,
         billedTimeRange,
         page: pageNum,
         limit: 20
@@ -259,6 +266,23 @@ const AdminDashboard = () => {
               ))}
             </Select>
           </FormControl>
+
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            <Typography variant="body2" color="text.secondary">Desde:</Typography>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+            />
+            <Typography variant="body2" color="text.secondary">Hasta:</Typography>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              style={{ padding: '8px', borderRadius: '4px', border: '1px solid #ccc' }}
+            />
+          </Box>
 
           <Tooltip title="Actualizar">
             <IconButton onClick={() => loadStats(1, false)} color="primary">

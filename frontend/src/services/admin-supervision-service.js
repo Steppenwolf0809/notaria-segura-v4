@@ -15,8 +15,14 @@ export const getSupervisionStats = async (filters = {}) => {
         const params = new URLSearchParams();
         if (filters.thresholdDays) params.append('thresholdDays', filters.thresholdDays);
         if (filters.matrixerId) params.append('matrixerId', filters.matrixerId);
-        if (filters.startDate) params.append('startDate', filters.startDate.toISOString());
-        if (filters.endDate) params.append('endDate', filters.endDate.toISOString());
+        if (filters.startDate) {
+            const date = typeof filters.startDate === 'string' ? filters.startDate : filters.startDate.toISOString();
+            params.append('startDate', date);
+        }
+        if (filters.endDate) {
+            const date = typeof filters.endDate === 'string' ? filters.endDate : filters.endDate.toISOString();
+            params.append('endDate', date);
+        }
 
         // Nuevos filtros
         if (filters.status) params.append('status', filters.status);

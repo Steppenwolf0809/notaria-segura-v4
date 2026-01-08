@@ -183,7 +183,9 @@ const DocumentOversight = () => {
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          setMatrizadores(data.data.users);
+          // Filter to show only Matrizadores and Archivo as per user request
+          const filtered = data.data.filter(u => ['MATRIZADOR', 'ARCHIVO'].includes(u.role));
+          setMatrizadores(filtered);
         }
       }
     } catch (error) {
@@ -586,7 +588,7 @@ const DocumentOversight = () => {
                   </MenuItem>
                   {matrizadores?.map((matrizador) => (
                     <MenuItem key={matrizador.id} value={matrizador.id}>
-                      {matrizador.firstName} {matrizador.lastName}
+                      {matrizador.firstName} {matrizador.lastName} ({matrizador.role})
                     </MenuItem>
                   ))}
                 </Select>

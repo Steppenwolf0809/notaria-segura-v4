@@ -139,6 +139,7 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
     return allItems
       .filter(i => !exclude.has(i.id))
       .map(i => ({
+        id: i.id,
         text: i.label,
         icon: iconMap[i.icon] || <DashboardIcon />,
         view: i.view,
@@ -238,50 +239,84 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
       {/* Navegación principal */}
       <Box sx={{ flex: 1, overflow: 'auto' }}>
         <List sx={{ px: 1, py: 2 }}>
-          {navigationItems.map((item) => (
-            <ListItem key={item.view} disablePadding sx={{ mb: 0.5 }}>
-              <Tooltip title={sidebarCollapsed ? item.text : ''} placement="right">
-                <ListItemButton
-                  onClick={() => handleNavigation(item.view)}
+          {/* Grupos de Navegación */}
+          {[
+            {
+              title: 'PRINCIPAL',
+              items: navigationItems.filter(i => ['dashboard', 'users', 'documents', 'qr-management'].includes(i.id))
+            },
+            {
+              title: 'SUPERVISIÓN UAFE',
+              items: navigationItems.filter(i => ['formularios-uafe', 'analisis-uafe'].includes(i.id))
+            },
+            {
+              title: 'OPCIONES',
+              items: navigationItems.filter(i => ['notifications'].includes(i.id))
+            }
+          ].map((group, groupIdx) => (
+            <React.Fragment key={groupIdx}>
+              {!sidebarCollapsed && group.items.length > 0 && (
+                <Typography
+                  variant="caption"
                   sx={{
-                    borderRadius: 1,
-                    minHeight: 48,
-                    justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                    px: sidebarCollapsed ? 1 : 2,
-                    backgroundColor: item.active
-                      ? (isDarkMode ? 'primary.dark' : 'rgba(255, 255, 255, 0.25)')
-                      : 'transparent',
-                    color: 'inherit', // Heredar el color del contenedor padre
-                    '&:hover': {
-                      backgroundColor: item.active
-                        ? (isDarkMode ? 'primary.main' : 'rgba(255, 255, 255, 0.35)')
-                        : (isDarkMode ? 'action.hover' : 'rgba(255, 255, 255, 0.15)'),
-                    },
-                    transition: 'all 0.2s ease',
+                    px: 3,
+                    py: 1,
+                    display: 'block',
+                    fontWeight: 700,
+                    color: 'rgba(255, 255, 255, 0.5)',
+                    letterSpacing: '0.05rem',
+                    mt: groupIdx === 0 ? 0 : 2
                   }}
                 >
-                  <ListItemIcon
-                    sx={{
-                      color: 'inherit',
-                      minWidth: sidebarCollapsed ? 'auto' : 40,
-                      justifyContent: 'center',
-                    }}
-                  >
-                    {item.icon}
-                  </ListItemIcon>
-                  {!sidebarCollapsed && (
-                    <ListItemText
-                      primary={item.text}
-                      primaryTypographyProps={{
-                        fontSize: '0.875rem',
-                        fontWeight: item.active ? 600 : 400,
-                        color: 'inherit'
+                  {group.title}
+                </Typography>
+              )}
+              {group.items.map((item) => (
+                <ListItem key={item.id || item.view} disablePadding sx={{ mb: 0.5 }}>
+                  <Tooltip title={sidebarCollapsed ? item.text : ''} placement="right">
+                    <ListItemButton
+                      onClick={() => handleNavigation(item.view)}
+                      sx={{
+                        borderRadius: 1,
+                        minHeight: 48,
+                        justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                        px: sidebarCollapsed ? 1 : 2,
+                        backgroundColor: item.active
+                          ? (isDarkMode ? 'primary.dark' : 'rgba(255, 255, 255, 0.25)')
+                          : 'transparent',
+                        color: 'inherit',
+                        '&:hover': {
+                          backgroundColor: item.active
+                            ? (isDarkMode ? 'primary.main' : 'rgba(255, 255, 255, 0.35)')
+                            : (isDarkMode ? 'action.hover' : 'rgba(255, 255, 255, 0.15)'),
+                        },
+                        transition: 'all 0.2s ease',
                       }}
-                    />
-                  )}
-                </ListItemButton>
-              </Tooltip>
-            </ListItem>
+                    >
+                      <ListItemIcon
+                        sx={{
+                          color: 'inherit',
+                          minWidth: sidebarCollapsed ? 'auto' : 40,
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {item.icon}
+                      </ListItemIcon>
+                      {!sidebarCollapsed && (
+                        <ListItemText
+                          primary={item.text}
+                          primaryTypographyProps={{
+                            fontSize: '0.875rem',
+                            fontWeight: item.active ? 600 : 400,
+                            color: 'inherit'
+                          }}
+                        />
+                      )}
+                    </ListItemButton>
+                  </Tooltip>
+                </ListItem>
+              ))}
+            </React.Fragment>
           ))}
 
           {/* Configuración con submenu */}
