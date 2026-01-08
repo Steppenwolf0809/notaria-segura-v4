@@ -34,7 +34,7 @@ const PATTERNS = {
     // Variante con separadores no alfanuméricos entre grupos
     /([0-9]{4}[^A-Za-z0-9]?[0-9]{7}[^A-Za-z0-9]?[A-Z][^A-Za-z0-9]?[0-9]{5})/i
   ],
-  
+
   // Acto/contrato
   acto: [
     // "ACTO O CONTRATO:" | "ACTO/CONTRATO:" | "ACTO – CONTRATO:" etc.
@@ -43,43 +43,43 @@ const PATTERNS = {
     /CONTRATO\s*:?\s*([A-ZÁÉÍÓÚÑÜ0-9\s,.;:-]+?)(?=\n{1,}|\n[A-ZÁÉÍÓÚÑÜ/ \t]{3,}:|OTORGADO|FECHA|$)/i,
     /AUTORIZACI[ÓO]N\s+DE\s+([A-ZÁÉÍÓÚÑÜ0-9\s,.;:-]+?)(?=\n{1,}|\n[A-ZÁÉÍÓÚÑÜ/ \t]{3,}:|OTORGADO|FECHA|$)/i
   ],
-  
+
   // Fecha de otorgamiento (con hora opcional entre paréntesis)
   fecha: [
     /FECHA\s+DE\s+OTORGAMIENTO\s*:?\s*([0-9]{1,2}\s+DE\s+[A-ZÁÉÍÓÚÑÜ]+\s+DEL?\s+[0-9]{4}(?:\s*,\s*\([0-9]{1,2}:[0-9]{2}\))?)/i,
     /OTORGADO\s+EL\s*:?\s*([0-9]{1,2}\s+DE\s+[A-ZÁÉÍÓÚÑÜ]+\s+DEL?\s+[0-9]{4}(?:\s*,\s*\([0-9]{1,2}:[0-9]{2}\))?)/i
   ],
-  
+
   // Notario
   notario: [
     /NOTARIO\s*:?\s*([A-ZÁÉÍÓÚÑÜ\s,.-]+?)(?:\n|NOTARÍA|$)/i,
     /ANTE\s+MÍ\s*:?\s*([A-ZÁÉÍÓÚÑÜ\s,.-]+?)(?:\n|NOTARIO|$)/i
   ],
-  
+
   // Notaría
   notaria: [
     /NOTARÍA\s*:?\s*([A-ZÁÉÍÓÚÑÜ0-9\s,.-]+?)(?:\n|OTORGADO|$)/i,
     /(DÉCIMA\s+OCTAVA\s+DEL\s+CANTÓN\s+QUITO)/i
   ],
-  
+
   // Otorgantes - OTORGADO POR
   otorgadoPor: [
     /OTORGADO\s+POR\s*:?\s*((?:[A-ZÁÉÍÓÚÑÜ\s,.-]+(?:\n|$))+?)(?=OTORGADO\s+A\s+FAVOR|A\s+FAVOR\s+DE|BENEFICIARIO|UBICACIÓN|CUANTÍA|$)/i,
     /COMPARECIENTE\s*:?\s*((?:[A-ZÁÉÍÓÚÑÜ\s,.-]+(?:\n|$))+?)(?=A\s+FAVOR\s+DE|BENEFICIARIO|UBICACIÓN|CUANTÍA|$)/i
   ],
-  
+
   // Beneficiarios - A FAVOR DE
   aFavorDe: [
     /A\s+FAVOR\s+DE\s*:?\s*((?:[A-ZÁÉÍÓÚÑÜ\s,.-]+(?:\n|$))+?)(?=UBICACIÓN|CUANTÍA|OBSERVACIONES|$)/i,
     /BENEFICIARIO\(?A?\)?\s*:?\s*((?:[A-ZÁÉÍÓÚÑÜ\s,.-]+(?:\n|$))+?)(?=UBICACIÓN|CUANTÍA|OBSERVACIONES|$)/i
   ],
-  
+
   // Ubicación
   ubicacion: [
     /UBICACIÓN\s*:?\s*PROVINCIA\s*:?\s*([A-ZÁÉÍÓÚÑÜ\s]+)\s*CANTÓN\s*:?\s*([A-ZÁÉÍÓÚÑÜ\s]+)\s*PARROQUIA\s*:?\s*([A-ZÁÉÍÓÚÑÜ\s]+)/i,
     /PROVINCIA\s*:?\s*([A-ZÁÉÍÓÚÑÜ\s]+).*?CANTÓN\s*:?\s*([A-ZÁÉÍÓÚÑÜ\s]+).*?PARROQUIA\s*:?\s*([A-ZÁÉÍÓÚÑÜ\s]+)/i
   ],
-  
+
   // Cuantía
   cuantia: [
     /CUANTÍA\s*:?\s*([A-ZÁÉÍÓÚÑÜ0-9\s,.$-]+?)(?:\n|OBSERVACIONES|$)/i,
@@ -92,7 +92,7 @@ const PATTERNS = {
     /OBSERVACIONES\s*:?\s*([\s\S]+?)(?=\n{2,}|\n[A-ZÁÉÍÓÚÑÜ/() \t]{3,}:|$)/i,
     /OBJETO\s*:?\s*([\s\S]+?)(?=\n{2,}|\n[A-ZÁÉÍÓÚÑÜ/() \t]{3,}:|$)/i
   ],
-  
+
   // Datos de personas (cédula, nacionalidad)
   cedula: /CÉDULA\s*:?\s*([0-9-]+)/gi,
   nacionalidad: /NACIONALIDAD\s*:?\s*([A-ZÁÉÍÓÚÑÜ]+)/gi
@@ -105,28 +105,28 @@ const PATTERNS = {
  */
 function cleanCuantia(cuantiaRaw) {
   if (!cuantiaRaw) return null;
-  
+
   const cuantiaStr = String(cuantiaRaw).trim().toUpperCase();
-  
+
   // Si solo contiene palabras clave sin valor numérico, retornar null
   const palabrasClave = ['CUANTIA', 'CUANTÍA', 'DEL ACTO', 'VALOR', 'O.', 'O', 'CONTRATO'];
-  const soloClaves = palabrasClave.some(palabra => cuantiaStr.includes(palabra)) 
-                     && !/\d/.test(cuantiaStr); // No contiene dígitos
-  
+  const soloClaves = palabrasClave.some(palabra => cuantiaStr.includes(palabra))
+    && !/\d/.test(cuantiaStr); // No contiene dígitos
+
   if (soloClaves) {
     return null;
   }
-  
+
   // Si es muy corto (menos de 2 caracteres) o solo tiene letras sin sentido
   if (cuantiaStr.length < 2) {
     return null;
   }
-  
+
   // Si ya dice "INDETERMINADA" o variantes, retornar null para usar el default
   if (cuantiaStr.includes('INDETERMINAD') || cuantiaStr === 'N/A' || cuantiaStr === 'S/N') {
     return null;
   }
-  
+
   return cuantiaStr;
 }
 
@@ -137,9 +137,9 @@ function cleanCuantia(cuantiaRaw) {
  */
 function cleanObservaciones(obsRaw) {
   if (!obsRaw) return null;
-  
+
   let texto = String(obsRaw).trim();
-  
+
   // Remover encabezados de otras secciones que pueden haberse colado (al inicio y al final)
   const encabezadosBasura = [
     // Al inicio del texto
@@ -155,12 +155,12 @@ function cleanObservaciones(obsRaw) {
     /\s*UBICACIÓN\s*:?\s*$/gi,
     /\s*UBICACION\s*:?\s*$/gi
   ];
-  
+
   // Aplicar todos los patrones
   for (const patron of encabezadosBasura) {
     texto = texto.replace(patron, '');
   }
-  
+
   // Limpiar líneas que solo contienen estos encabezados
   texto = texto
     .split('\n')
@@ -168,28 +168,28 @@ function cleanObservaciones(obsRaw) {
       const lineaLimpia = linea.trim().toUpperCase();
       // Filtrar líneas que solo son encabezados basura
       if (!lineaLimpia) return false;
-      if (lineaLimpia === 'CUANTÍA DEL ACTO O' || 
-          lineaLimpia === 'CUANTIA DEL ACTO O' ||
-          lineaLimpia === 'CUANTÍA DEL ACTO' ||
-          lineaLimpia === 'CUANTIA DEL ACTO' ||
-          lineaLimpia === 'CUANTÍA' ||
-          lineaLimpia === 'CUANTIA' ||
-          lineaLimpia === 'VALOR' ||
-          lineaLimpia === 'UBICACIÓN' ||
-          lineaLimpia === 'UBICACION') {
+      if (lineaLimpia === 'CUANTÍA DEL ACTO O' ||
+        lineaLimpia === 'CUANTIA DEL ACTO O' ||
+        lineaLimpia === 'CUANTÍA DEL ACTO' ||
+        lineaLimpia === 'CUANTIA DEL ACTO' ||
+        lineaLimpia === 'CUANTÍA' ||
+        lineaLimpia === 'CUANTIA' ||
+        lineaLimpia === 'VALOR' ||
+        lineaLimpia === 'UBICACIÓN' ||
+        lineaLimpia === 'UBICACION') {
         return false;
       }
       return true;
     })
     .join('\n');
-  
+
   texto = texto.trim();
-  
+
   // Si después de limpiar queda muy poco texto o vacío, retornar null
   if (texto.length < 5) {
     return null;
   }
-  
+
   return texto;
 }
 
@@ -228,14 +228,14 @@ function extractNumeroEscritura(text) {
  */
 function extractPersonas(text) {
   if (!text) return [];
-  
+
   const personas = [];
   const lines = text.split('\n').filter(line => line.trim());
-  
+
   for (const line of lines) {
     const trimmedLine = line.trim();
     if (trimmedLine.length < 3) continue;
-    
+
     const persona = {
       nombre: trimmedLine,
       documento: 'CÉDULA',
@@ -244,17 +244,17 @@ function extractPersonas(text) {
       calidad: 'COMPARECIENTE',
       representadoPor: null
     };
-    
+
     // Buscar patrón de representación: "NOMBRE representado/a por REPRESENTANTE"
     const representadoMatch = trimmedLine.match(
       /^(.+?)\s+representad[oa]\s+por[:\s]+(.+?)(?:\s*[,.]|$)/i
     );
-    
+
     if (representadoMatch) {
       // Hay un representante
       const nombrePrincipal = representadoMatch[1].trim();
       const nombreRepresentante = representadoMatch[2].trim();
-      
+
       // Buscar cédula en el nombre principal
       const cedulaPrincipalMatch = nombrePrincipal.match(/([0-9]{10})/);
       if (cedulaPrincipalMatch) {
@@ -263,7 +263,7 @@ function extractPersonas(text) {
       } else {
         persona.nombre = nombrePrincipal;
       }
-      
+
       // Buscar cédula en el nombre del representante
       const cedulaRepresentanteMatch = nombreRepresentante.match(/([0-9]{10})/);
       if (cedulaRepresentanteMatch) {
@@ -282,19 +282,19 @@ function extractPersonas(text) {
         persona.nombre = trimmedLine.replace(/[0-9]{10}/, '').trim();
       }
     }
-    
+
     // Buscar nacionalidad
     const nacionalidadMatch = trimmedLine.match(/NACIONALIDAD\s*:?\s*([A-ZÁÉÍÓÚÑÜ]+)/i);
     if (nacionalidadMatch) {
       persona.nacionalidad = nacionalidadMatch[1].toUpperCase();
     }
-    
+
     // Solo agregar si hay información útil del nombre
     if (persona.nombre && persona.nombre.length > 2) {
       personas.push(persona);
     }
   }
-  
+
   return personas;
 }
 
@@ -383,7 +383,7 @@ function parsePersonsTableFromSection(sectionText) {
     if (cells.length >= 2) {
       const normCells = cells.map(normalizeLabel);
       const hasNameCol = normCells.some(c => c.includes('NOMBRES') || c.includes('RAZON SOCIAL'));
-      const hasIdCol = normCells.some(c => c.includes('CEDULA') || c.includes('RUC') || c.includes('PASAPORTE') || c.includes('NUMERO'));
+      const hasIdCol = normCells.some(c => c.includes('CEDULA') || c.includes('RUC') || c.includes('PASAPORTE') || c.includes('NUMERO') || c.includes('IDENTIFICACION'));
       if (hasNameCol && hasIdCol) {
         headerIndex = i;
         headerCells = cells;
@@ -400,7 +400,7 @@ function parsePersonsTableFromSection(sectionText) {
     const n = normalizeLabel(h);
     if (n.includes('NOMBRES') || n.includes('RAZON SOCIAL')) headerMap[idx] = 'nombre';
     else if (n.includes('DOCUMENTO') || n.includes('TIPO')) headerMap[idx] = 'documento';
-    else if (n.includes('CEDULA') || n.includes('RUC') || n.includes('PASAPORTE') || n.includes('NUMERO')) headerMap[idx] = 'numero';
+    else if (n.includes('CEDULA') || n.includes('RUC') || n.includes('PASAPORTE') || n.includes('IDENTIFICACION') || (n.includes('NO') && n.includes('NUMERO'))) headerMap[idx] = 'numero';
     else if (n.includes('NACIONALIDAD')) headerMap[idx] = 'nacionalidad';
     else if (n.includes('CALIDAD') || n.includes('INTERVINIENTE') || n.includes('INTERV')) headerMap[idx] = 'calidad';
   });
@@ -610,7 +610,7 @@ export async function parseEscrituraPDF(pdfBuffer, filename) {
       const preview = String(text || '').slice(0, 1200).replace(/\s+/g, ' ').trim();
       console.info('[PDF-PARSER] textLength=', text?.length || 0, 'preview=', preview);
     }
-    
+
     if (!text || text.trim().length < 100) {
       return {
         success: false,
@@ -619,7 +619,7 @@ export async function parseEscrituraPDF(pdfBuffer, filename) {
         datosCompletos: null
       };
     }
-    
+
     // Extraer datos usando patrones
     const numeroEscritura = extractNumeroEscritura(text);
     if (DEBUG) console.info('[PDF-PARSER] numeroEscritura:', numeroEscritura || '(no-match)');
@@ -627,46 +627,113 @@ export async function parseEscrituraPDF(pdfBuffer, filename) {
     const fecha = extractWithPatterns(text, PATTERNS.fecha);
     const notario = extractWithPatterns(text, PATTERNS.notario);
     const notaria = extractWithPatterns(text, PATTERNS.notaria);
-    
+
     // Extraer y limpiar cuantía
     const cuantiaRaw = extractWithPatterns(text, PATTERNS.cuantia);
     const cuantia = cleanCuantia(cuantiaRaw);
-    
+
     if (DEBUG) {
       console.info('[PDF-PARSER] acto:', !!acto, 'fecha:', !!fecha, 'notario:', !!notario, 'notaria:', !!notaria, 'cuantiaRaw:', cuantiaRaw, 'cuantiaLimpia:', cuantia);
     }
-    
+
     // Extraer bloque de OBJETO/OBSERVACIONES (preferir sección explícita si existe)
     const objetoObsRaw = extractWithPatterns(text, PATTERNS.objetoObservaciones)
       || (extractSectionText(text, /(OBJETO\s*(?:\/|\s*[OY]\s+|\s*[–-]\s*)\s*OBSERVACIONES|OBSERVACIONES|OBJETO)\s*:?/i) || '')
-          .replace(/^.*?\b(OBJETO|OBSERVACIONES)\b\s*:?[ \t]*/i, '')
-          .trim() || null;
-    
+        .replace(/^.*?\b(OBJETO|OBSERVACIONES)\b\s*:?[ \t]*/i, '')
+        .trim() || null;
+
     // Limpiar observaciones
     const objetoObs = cleanObservaciones(objetoObsRaw);
-    
+
     if (DEBUG) {
       console.info('[PDF-PARSER] objetoObsRaw:', objetoObsRaw?.substring(0, 100), 'objetoObsLimpio:', objetoObs?.substring(0, 100));
     }
-    
+
     const ubicacion = extractUbicacion(text);
 
-    // OTORGANTES: Se dejan en blanco por defecto para ingreso manual
-    // La extracción automática de nombres genera muchos errores y requiere limpieza
-    // Es más confiable que el matrizador los agregue manualmente si es necesario
-    
-    // ⚠️ Código de extracción deshabilitado (descomentar solo si se necesita en el futuro):
-    // const otorgadoPorPersons = extractNamesForLabeledSection(text, /OTORGADO\s+POR/i);
-    // const aFavorDePersons = extractNamesForLabeledSection(text, /(OTORGADO\s+A\s+FAVOR|A\s+FAVOR\s+DE|BENEFICIARIO)/i);
-    
+    // OTORGANTES: Extracción automática habilitada
+    // Se extraen otorgantes y beneficiarios de las secciones tabulares del extracto
+    const otorgadoPorPersons = extractNamesForLabeledSection(text, /OTORGADO\s+POR/i);
+    const aFavorDePersons = extractNamesForLabeledSection(text, /(A\s+FAVOR\s+DE|BENEFICIARIO)/i);
+
+    // Limpiar personas extraídas: remover entradas sin nombre válido o con datos basura
+    const cleanPersonsList = (persons) => {
+      if (!Array.isArray(persons)) return [];
+
+      // Tokens y patrones que NO son nombres de personas
+      const invalidExact = new Set([
+        'PERSONA', 'NATURAL', 'JURIDICA', 'DOCUMENTO', 'TIPO', 'INTERVINIENTE',
+        'OTORGADO POR', 'A FAVOR DE', 'BENEFICIARIO', 'COMPARECIENTE',
+        'POR SUS PROPIOS', 'POR SUS PROPIOS DERECHOS', 'DERECHOS',
+        'DOCUMENTO DE', 'PERSONA QUE LE', 'PERSONA QUE', 'QUE REPRESENTA',
+        'NACIONALIDAD', 'CALIDAD', 'ECUATORIANA', 'COLOMBIANA',
+        'CÉDULA', 'CEDULA', 'RUC', 'PASAPORTE', 'IDENTIFICACIÓN', 'IDENTIFICACION',
+        'NO IDENTIFICACIÓN', 'NO IDENTIFICACION', 'CUANTÍA DEL ACTO',
+        'CUANTÍA DEL ACTO O', 'ACTO O CONTRATO', 'OBJETO', 'OBSERVACIONES',
+        'UBICACIÓN', 'PROVINCIA', 'CANTÓN', 'PARROQUIA',
+        'REPRESENTADO POR', 'REPRESENTADO PORRUC', 'REPRESENTANTE LEGAL'
+      ]);
+
+      // Patrones regex que indican basura
+      const garbagePatterns = [
+        /^Documento/i, /^Persona/i, /^Tipo/i, /^No\s+/i, /^Nombres/i,
+        /^Razón/i, /^Social/i, /^Interviniente/i, /^Nacionalidad/i,
+        /^Calidad/i, /^Representa/i, /^Cuantía/i, /^Ubicación/i,
+        /CalidadPersona/i, /NacionalidadCalidad/i, /socialTipo/i
+      ];
+
+      return persons.filter(p => {
+        if (!p || !p.nombre) return false;
+        const name = String(p.nombre).trim().toUpperCase();
+
+        // Filtrar nombres muy cortos
+        if (name.length < 5) return false;
+
+        // Filtrar coincidencias exactas con tokens inválidos
+        if (invalidExact.has(name)) return false;
+
+        // Filtrar si comienza con patrón basura
+        if (garbagePatterns.some(pat => pat.test(name))) return false;
+
+        // Filtrar nombres que contienen encabezados concatenados
+        if (name.includes('TIPO INTERVINIENTE') || name.includes('RAZÓN SOCIAL') ||
+          name.includes('NOMBRES/') || name.includes('CALIDAD') ||
+          name.includes('REPRESENTADO POR') || name.includes('REPRESENTADOPOR')) return false;
+
+        // Filtrar cadenas con mezcla anormal de mayúsculas/minúsculas (garbage concatenado)
+        // Ejemplo: "JurídicaCORPORACION" tiene minúscula seguida de mayúscula en el medio
+        const originalName = String(p.nombre).trim();
+        if (/[a-záéíóúñ][A-ZÁÉÍÓÚÑ]/.test(originalName)) return false;
+
+        // El nombre debe ser formato: APELLIDO1 APELLIDO2 NOMBRE1 NOMBRE2
+        // o NOMBRE1 NOMBRE2 APELLIDO1 APELLIDO2
+        // Mínimo 2 palabras, cada una de al menos 2 letras
+        const words = name.split(/\s+/).filter(w => /^[A-ZÁÉÍÓÚÑÜ]{2,}$/.test(w));
+        if (words.length < 2) return false;
+
+        // No debe contener números (excepto si es RUC de empresa)
+        if (/\d/.test(name) && !name.includes('S.A.') && !name.includes('CIA') && !name.includes('LTDA')) return false;
+
+        return true;
+      }).map(p => ({
+        nombre: String(p.nombre).trim(),
+        documento: p.documento || 'CÉDULA',
+        numero: p.numero ? String(p.numero).replace(/[^0-9]/g, '') : null,
+        nacionalidad: p.nacionalidad || 'ECUATORIANA',
+        calidad: p.calidad || 'COMPARECIENTE',
+        representadoPor: p.representadoPor || null
+      }));
+    };
+
+
     const otorgantes = {
-      otorgado_por: [],
-      a_favor_de: []
+      otorgado_por: cleanPersonsList(otorgadoPorPersons),
+      a_favor_de: cleanPersonsList(aFavorDePersons)
     };
 
     // Extraer pares etiqueta:valor genéricos
     const extraCampos = extractGenericLabelValues(text);
-    
+
     // Construir objeto de datos completos
     const datosCompletos = {
       escritura: numeroEscritura,
@@ -686,14 +753,14 @@ export async function parseEscrituraPDF(pdfBuffer, filename) {
       archivo_original: filename,
       fecha_procesamiento: new Date().toISOString()
     };
-    
+
     // Determinar estado basado en campos críticos
     const camposCriticos = [numeroEscritura, acto, fecha];
     const camposCompletos = camposCriticos.filter(campo => campo && campo.trim().length > 0);
-    
+
     const estado = camposCompletos.length >= 2 ? 'activo' : 'revision_requerida';
-    if (DEBUG) console.info('[PDF-PARSER] camposCriticos=', camposCriticos.map(c=>!!c), 'estado=', estado);
-    
+    if (DEBUG) console.info('[PDF-PARSER] camposCriticos=', camposCriticos.map(c => !!c), 'estado=', estado);
+
     return {
       success: true,
       estado: estado,
@@ -702,7 +769,7 @@ export async function parseEscrituraPDF(pdfBuffer, filename) {
       archivoOriginal: filename,
       warnings: camposCompletos.length < 3 ? ['Algunos campos críticos no pudieron ser extraídos'] : []
     };
-    
+
   } catch (error) {
     console.error('Error parsing PDF:', error);
     return {
@@ -726,7 +793,7 @@ export function validatePDFFile(buffer, mimetype) {
   if (!validMimeTypes.includes(mimetype)) {
     return false;
   }
-  
+
   // Verificar magic bytes del PDF
   const pdfHeader = buffer.slice(0, 4).toString();
   return pdfHeader === '%PDF';
@@ -739,7 +806,7 @@ export function validatePDFFile(buffer, mimetype) {
  */
 export function sanitizeFilename(filename) {
   if (!filename) return 'documento.pdf';
-  
+
   // Remover caracteres peligrosos y mantener solo alfanuméricos, guiones y puntos
   return filename
     .replace(/[^a-zA-Z0-9.-]/g, '_')

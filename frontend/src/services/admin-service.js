@@ -1,16 +1,7 @@
-import axios from 'axios';
+import apiClient from './api-client';
 
-// URL base de la API
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
-
-// Instancia de axios configurada
-const api = axios.create({
-  baseURL: `${API_BASE_URL}/admin`,
-  headers: {
-    'Content-Type': 'application/json'
-  },
-  timeout: 10000 // 10 segundos
-});
+// URL base relativa para admin (apiClient ya tiene la base configurada)
+const ADMIN_PATH = '/admin';
 
 /**
  * Servicio de administración de usuarios
@@ -30,7 +21,7 @@ const adminService = {
    */
   getUsers: async (params = {}, token) => {
     try {
-      const response = await api.get('/users', {
+      const response = await apiClient.get(ADMIN_PATH + '/users', {
         params,
         headers: {
           Authorization: `Bearer ${token}`
@@ -49,7 +40,7 @@ const adminService = {
    */
   getUserStats: async (token) => {
     try {
-      const response = await api.get('/users/stats', {
+      const response = await apiClient.get(ADMIN_PATH + '/users/stats', {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -68,7 +59,7 @@ const adminService = {
    */
   getUserById: async (userId, token) => {
     try {
-      const response = await api.get(`/users/${userId}`, {
+      const response = await apiClient.get(`${ADMIN_PATH}/users/${userId}`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -92,7 +83,7 @@ const adminService = {
    */
   createUser: async (userData, token) => {
     try {
-      const response = await api.post('/users', userData, {
+      const response = await apiClient.post(ADMIN_PATH + '/users', userData, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -117,7 +108,7 @@ const adminService = {
    */
   updateUser: async (userId, userData, token) => {
     try {
-      const response = await api.put(`/users/${userId}`, userData, {
+      const response = await apiClient.put(`${ADMIN_PATH}/users/${userId}`, userData, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -137,8 +128,8 @@ const adminService = {
    */
   toggleUserStatus: async (userId, isActive, token) => {
     try {
-      const response = await api.patch(`/users/${userId}/status`, 
-        { isActive }, 
+      const response = await apiClient.patch(`${ADMIN_PATH}/users/${userId}/status`,
+        { isActive },
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -159,7 +150,7 @@ const adminService = {
    */
   deleteUser: async (userId, token) => {
     try {
-      const response = await api.delete(`/users/${userId}`, {
+      const response = await apiClient.delete(`${ADMIN_PATH}/users/${userId}`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -263,7 +254,7 @@ const adminService = {
    */
   getDocumentsOversight: async (filters = {}, token) => {
     try {
-      const response = await api.get('/documents/oversight', {
+      const response = await apiClient.get(ADMIN_PATH + '/documents/oversight', {
         params: filters,
         headers: {
           Authorization: `Bearer ${token}`
@@ -283,7 +274,7 @@ const adminService = {
    */
   getDocumentTimeline: async (documentId, token) => {
     try {
-      const response = await api.get(`/documents/${documentId}/events`, {
+      const response = await apiClient.get(`${ADMIN_PATH}/documents/${documentId}/events`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -302,8 +293,8 @@ const adminService = {
    */
   getBulkDocumentsInfo: async (documentIds, token) => {
     try {
-      const response = await api.post('/documents/bulk-info', 
-        { documentIds }, 
+      const response = await apiClient.post(ADMIN_PATH + '/documents/bulk-info',
+        { documentIds },
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -328,8 +319,8 @@ const adminService = {
    */
   executeBulkOperation: async (operationData, token) => {
     try {
-      const response = await api.post('/documents/bulk-operation', 
-        operationData, 
+      const response = await apiClient.post(ADMIN_PATH + '/documents/bulk-operation',
+        operationData,
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -356,7 +347,7 @@ const adminService = {
         format
       });
 
-      const response = await api.get(`/documents/export?${params}`, {
+      const response = await apiClient.get(`${ADMIN_PATH}/documents/export?${params}`, {
         headers: {
           Authorization: `Bearer ${token}`
         },
@@ -378,8 +369,8 @@ const adminService = {
    */
   reassignDocument: async (documentId, newMatrizadorId, token) => {
     try {
-      const response = await api.patch(`/documents/${documentId}/reassign`, 
-        { newMatrizadorId }, 
+      const response = await apiClient.patch(`${ADMIN_PATH}/documents/${documentId}/reassign`,
+        { newMatrizadorId },
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -402,8 +393,8 @@ const adminService = {
    */
   changeDocumentStatus: async (documentId, newStatus, reason, token) => {
     try {
-      const response = await api.patch(`/documents/${documentId}/status`, 
-        { newStatus, reason }, 
+      const response = await apiClient.patch(`${ADMIN_PATH}/documents/${documentId}/status`,
+        { newStatus, reason },
         {
           headers: {
             Authorization: `Bearer ${token}`
@@ -424,7 +415,7 @@ const adminService = {
    */
   getDocumentStatistics: async (filters = {}, token) => {
     try {
-      const response = await api.get('/documents/statistics', {
+      const response = await apiClient.get(ADMIN_PATH + '/documents/statistics', {
         params: filters,
         headers: {
           Authorization: `Bearer ${token}`
@@ -466,7 +457,7 @@ const adminService = {
    */
   deleteDocument: async (documentId, token) => {
     try {
-      const response = await api.delete(`/documents/${documentId}`, {
+      const response = await apiClient.delete(`${ADMIN_PATH}/documents/${documentId}`, {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -485,7 +476,7 @@ const adminService = {
    */
   bulkDeleteDocuments: async (documentIds, token) => {
     try {
-      const response = await api.post('/documents/bulk-delete',
+      const response = await apiClient.post(ADMIN_PATH + '/documents/bulk-delete',
         { documentIds },
         {
           headers: {
@@ -510,7 +501,7 @@ const adminService = {
    */
   getWhatsAppTemplates: async (token) => {
     try {
-      const response = await api.get('/whatsapp-templates', {
+      const response = await apiClient.get(ADMIN_PATH + '/whatsapp-templates', {
         headers: {
           Authorization: `Bearer ${token || localStorage.getItem('token')}`
         }
@@ -529,7 +520,7 @@ const adminService = {
    */
   getWhatsAppTemplate: async (templateId, token) => {
     try {
-      const response = await api.get(`/whatsapp-templates/${templateId}`, {
+      const response = await apiClient.get(`${ADMIN_PATH}/whatsapp-templates/${templateId}`, {
         headers: {
           Authorization: `Bearer ${token || localStorage.getItem('token')}`
         }
@@ -548,7 +539,7 @@ const adminService = {
    */
   createWhatsAppTemplate: async (templateData, token) => {
     try {
-      const response = await api.post('/whatsapp-templates', templateData, {
+      const response = await apiClient.post(ADMIN_PATH + '/whatsapp-templates', templateData, {
         headers: {
           Authorization: `Bearer ${token || localStorage.getItem('token')}`
         }
@@ -568,7 +559,7 @@ const adminService = {
    */
   updateWhatsAppTemplate: async (templateId, templateData, token) => {
     try {
-      const response = await api.put(`/whatsapp-templates/${templateId}`, templateData, {
+      const response = await apiClient.put(`${ADMIN_PATH}/whatsapp-templates/${templateId}`, templateData, {
         headers: {
           Authorization: `Bearer ${token || localStorage.getItem('token')}`
         }
@@ -587,7 +578,7 @@ const adminService = {
    */
   deleteWhatsAppTemplate: async (templateId, token) => {
     try {
-      const response = await api.delete(`/whatsapp-templates/${templateId}`, {
+      const response = await apiClient.delete(`${ADMIN_PATH}/whatsapp-templates/${templateId}`, {
         headers: {
           Authorization: `Bearer ${token || localStorage.getItem('token')}`
         }
@@ -607,8 +598,8 @@ const adminService = {
    */
   toggleWhatsAppTemplate: async (templateId, activo, token) => {
     try {
-      const response = await api.patch(`/whatsapp-templates/${templateId}/toggle`, 
-        { activo }, 
+      const response = await apiClient.patch(`${ADMIN_PATH}/whatsapp-templates/${templateId}/toggle`,
+        { activo },
         {
           headers: {
             Authorization: `Bearer ${token || localStorage.getItem('token')}`
@@ -629,7 +620,7 @@ const adminService = {
    */
   previewWhatsAppTemplate: async (templateData, token) => {
     try {
-      const response = await api.post('/whatsapp-templates/preview', templateData, {
+      const response = await apiClient.post(ADMIN_PATH + '/whatsapp-templates/preview', templateData, {
         headers: {
           Authorization: `Bearer ${token || localStorage.getItem('token')}`
         }
@@ -647,7 +638,7 @@ const adminService = {
    */
   initializeWhatsAppTemplates: async (token) => {
     try {
-      const response = await api.post('/whatsapp-templates/initialize', {}, {
+      const response = await apiClient.post(ADMIN_PATH + '/whatsapp-templates/initialize', {}, {
         headers: {
           Authorization: `Bearer ${token || localStorage.getItem('token')}`
         }
