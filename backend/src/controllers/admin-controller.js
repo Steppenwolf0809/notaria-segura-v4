@@ -945,7 +945,7 @@ async function getDashboardStats(req, res) {
         where: {
           assignedToId: m.id,
           status: 'ENTREGADO',
-          updatedAt: performanceDateFilter
+          ...(Object.keys(performanceDateFilter).length > 0 ? { updatedAt: performanceDateFilter } : {})
         }
       });
 
@@ -953,7 +953,7 @@ async function getDashboardStats(req, res) {
         where: {
           assignedToId: m.id,
           status: 'ENTREGADO',
-          updatedAt: performanceDateFilter
+          ...(Object.keys(performanceDateFilter).length > 0 ? { updatedAt: performanceDateFilter } : {})
         },
         select: { createdAt: true, updatedAt: true },
         take: 20, // Aumentar muestra para mejor promedio si hay filtros largos

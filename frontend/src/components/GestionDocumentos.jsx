@@ -6,11 +6,17 @@ import {
 import ListView from './Documents/ListView';
 import SearchAndFilters from './Documents/SearchAndFilters';
 import useDebounce from '../hooks/useDebounce';
+import useDocumentStore from '../store/document-store';
 
 /**
  * Componente principal de Gestión de Documentos
   */
 const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
+
+  const [inputValue, setInputValue] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [mostrarEntregados, setMostrarEntregados] = useState(false);
 
   // Estado para paginación y ordenamiento Server-Side
   const [page, setPage] = useState(0);
