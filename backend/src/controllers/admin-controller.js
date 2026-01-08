@@ -681,6 +681,22 @@ async function getDashboardStats(req, res) {
         gte: new Date(startDate),
         lte: new Date(endDate)
       };
+    } else if (startDate) {
+      dateFilter.createdAt = { gte: new Date(startDate) };
+    } else if (endDate) {
+      dateFilter.createdAt = { lte: new Date(endDate) };
+    }
+
+    // Filtros de fecha para PERFORMANCE (por defecto mes actual si no hay filtros)
+    const performanceDateFilter = {};
+    if (startDate || endDate) {
+      if (startDate) performanceDateFilter.gte = new Date(startDate);
+      if (endDate) performanceDateFilter.lte = new Date(endDate);
+    } else {
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0);
+      performanceDateFilter.gte = startOfMonth;
     }
 
     // Filtro de matrizador
@@ -789,6 +805,41 @@ async function getDashboardStats(req, res) {
       }
     });
 
+    // KPI: Estadísticas de QR
+    const startOfCurrentMonth = new Date();
+    startOfCurrentMonth.setDate(1);
+    startOfCurrentMonth.setHours(0, 0, 0, 0);
+
+    const qrMonthlyCount = await prisma.escrituraQR.count({
+      where: {
+        createdAt: { gte: startOfCurrentMonth }
+      }
+    });
+
+    const qrByMatrixer = await prisma.escrituraQR.groupBy({
+      by: ['createdBy'],
+      where: {
+        createdAt: { gte: startOfCurrentMonth }
+      },
+      _count: { _all: true }
+    });
+
+    // Mapear nombres de matrizadores para QR
+    const matrixersForQR = await prisma.user.findMany({
+      where: { id: { in: qrByMatrixer.map(q => q.createdBy).filter(id => id !== null) } },
+      select: { id: true, firstName: true, lastName: true }
+    });
+
+    const qrStats = {
+      totalMonthly: qrMonthlyCount,
+      limit: 50,
+      byMatrixer: qrByMatrixer.map(q => ({
+        matrixerId: q.createdBy,
+        name: matrixersForQR.find(m => m.id === q.createdBy)?.firstName + ' ' + matrixersForQR.find(m => m.id === q.createdBy)?.lastName || 'Desconocido',
+        count: q._count._all
+      }))
+    };
+
     // 2. Lista de Alertas / Documentos con filtros
     // Filtro base: activos (no entregados, no anulados) y warnngThreshold para atrás
     // PERO el usuario pidió filtro por ESTADO, así que si hay status param, respetamos ese status
@@ -873,7 +924,7 @@ async function getDashboardStats(req, res) {
         where: {
           assignedToId: m.id,
           status: 'ENTREGADO',
-          updatedAt: { gte: startOfMonth }
+          updatedAt: performanceDateFilter
         }
       });
 
@@ -881,10 +932,10 @@ async function getDashboardStats(req, res) {
         where: {
           assignedToId: m.id,
           status: 'ENTREGADO',
-          updatedAt: { gte: startOfMonth }
+          updatedAt: performanceDateFilter
         },
         select: { createdAt: true, updatedAt: true },
-        take: 10,
+        take: 20, // Aumentar muestra para mejor promedio si hay filtros largos
         orderBy: { updatedAt: 'desc' }
       });
 
@@ -928,7 +979,8 @@ async function getDashboardStats(req, res) {
           pendingCount,
           readyCount,
           totalBilled,
-          weeklyEfficiency
+          weeklyEfficiency,
+          qrStats
         },
         criticalList: criticalDocs.map(doc => ({
           id: doc.id,
