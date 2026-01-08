@@ -70,14 +70,33 @@ import { toast } from 'react-toastify';
  * Vista Lista para documentos de archivo
  * Tabla completa con filtros y paginación
  */
-const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
+const ListaArchivo = ({
+  documentos,
+  onEstadoChange,
+  onRefresh,
+  // Props para server-side pagination
+  serverSide = false,
+  totalDocuments = 0,
+  loading = false,
+  onPageChange,
+  onRowsPerPageChange,
+  onFilterChange,
+  onSortChange,
+  // Props controladas (opcionales, si no se usan usa estado local)
+  pageProp,
+  rowsPerPageProp,
+  filtrosProp,
+  orderByProp,
+  orderProp
+}) => {
   const { requiresConfirmation, createDocumentGroup, detectGroupableDocuments } = useDocumentStore();
   // Cache de conteos por cliente (igual a Recepción)
   const [groupableCountCache, setGroupableCountCache] = useState(new Map());
 
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [filtros, setFiltros] = useState(() => {
+  // Estado local (usado si no se pasan props controladas)
+  const [internalPage, setInternalPage] = useState(0);
+  const [internalRowsPerPage, setInternalRowsPerPage] = useState(10);
+  const [internalFiltros, setInternalFiltros] = useState(() => {
     try {
       const saved = sessionStorage.getItem('archivo_lista_filtros');
       if (saved) {
@@ -86,14 +105,22 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
           search: parsed.search ?? '',
           estado: parsed.estado ?? 'TODOS',
           tipo: parsed.tipo ?? 'TODOS',
-          mostrarEntregados: parsed.mostrarEntregados ?? false // 🆕 Por defecto NO mostrar entregados
+          mostrarEntregados: parsed.mostrarEntregados ?? false
         };
       }
     } catch (_) { }
     return { search: '', estado: 'TODOS', tipo: 'TODOS', mostrarEntregados: false };
   });
-  const [orderBy, setOrderBy] = useState('createdAt');
-  const [order, setOrder] = useState('desc');
+  const [internalOrderBy, setInternalOrderBy] = useState('updatedAt'); // Default backend sort
+  const [internalOrder, setInternalOrder] = useState('desc');
+
+  // Determinar valores efectivos (prop o local)
+  const page = pageProp !== undefined ? pageProp : internalPage;
+  const rowsPerPage = rowsPerPageProp !== undefined ? rowsPerPageProp : internalRowsPerPage;
+  const filtros = filtrosProp || internalFiltros;
+  const orderBy = orderByProp || internalOrderBy;
+  const order = orderProp || internalOrder;
+
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [selectedDocument, setSelectedDocument] = useState(null);
 
@@ -127,130 +154,176 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
 
   /**
    * Filtrar y ordenar documentos (igual que ListView de Matrizador)
+   * Si es serverSide, simplemente retorna los documentos ya que el filtrado/ordenamiento
+   * ya fue aplicado en el servidor.
    */
-  const documentosFiltrados = React.useMemo(() => documentos.filter(doc => {
-    // Filtro de búsqueda mejorado
-    const searchTerm = filtros.search.toLowerCase();
-    const matchesSearch = !searchTerm || searchTerm.length < 2 ||
-      doc.clientName?.toLowerCase().includes(searchTerm) ||
-      doc.protocolNumber?.toLowerCase().includes(searchTerm) ||
-      doc.documentType?.toLowerCase().includes(searchTerm) ||
-      doc.clientPhone?.includes(searchTerm);
+  const documentosFiltrados = React.useMemo(() => {
+    if (serverSide) return documentos;
 
-    // Filtro de estado
-    const matchesEstado = filtros.estado === 'TODOS' || doc.status === filtros.estado;
+    return documentos.filter(doc => {
+      // Filtro de búsqueda mejorado
+      const searchTerm = filtros.search.toLowerCase();
+      const matchesSearch = !searchTerm || searchTerm.length < 2 ||
+        doc.clientName?.toLowerCase().includes(searchTerm) ||
+        doc.protocolNumber?.toLowerCase().includes(searchTerm) ||
+        doc.documentType?.toLowerCase().includes(searchTerm) ||
+        doc.clientPhone?.includes(searchTerm);
 
-    // Filtro de tipo
-    const matchesTipo = filtros.tipo === 'TODOS' || doc.documentType === filtros.tipo;
+      // Filtro de estado
+      const matchesEstado = filtros.estado === 'TODOS' || doc.status === filtros.estado;
 
-    // 🆕 Filtro para ocultar ENTREGADOS si el toggle está desactivado
-    // PERO: Si el usuario selecciona explícitamente ENTREGADO en el filtro, mostrarlos
-    const matchesEntregados = filtros.mostrarEntregados || filtros.estado === 'ENTREGADO' || doc.status !== 'ENTREGADO';
+      // Filtro de tipo
+      const matchesTipo = filtros.tipo === 'TODOS' || doc.documentType === filtros.tipo;
 
-    return matchesSearch && matchesEstado && matchesTipo && matchesEntregados;
-  }).sort((a, b) => {
-    // 🆕 PRIORIDAD POR ESTADO: EN_PROCESO > LISTO > OTROS > ENTREGADO
-    const prioridad = {
-      'EN_PROCESO': 1,
-      'LISTO': 2,
-      'PENDIENTE': 3,
-      'CANCELADO': 4,
-      'ENTREGADO': 5
-    };
+      // 🆕 Filtro para ocultar ENTREGADOS si el toggle está desactivado
+      // PERO: Si el usuario selecciona explícitamente ENTREGADO en el filtro, mostrarlos
+      const matchesEntregados = filtros.mostrarEntregados || filtros.estado === 'ENTREGADO' || doc.status !== 'ENTREGADO';
 
-    const prioA = prioridad[a.status] || 99;
-    const prioB = prioridad[b.status] || 99;
+      return matchesSearch && matchesEstado && matchesTipo && matchesEntregados;
+    }).sort((a, b) => {
+      // 🆕 PRIORIDAD POR ESTADO: EN_PROCESO > LISTO > OTROS > ENTREGADO
+      const prioridad = {
+        'EN_PROCESO': 1,
+        'LISTO': 2,
+        'PENDIENTE': 3,
+        'CANCELADO': 4,
+        'ENTREGADO': 5
+      };
 
-    // Si tienen diferente prioridad, ordenar por prioridad (menor número = mayor prioridad)
-    if (prioA !== prioB) {
-      return prioA - prioB;
-    }
+      const prioA = prioridad[a.status] || 99;
+      const prioB = prioridad[b.status] || 99;
 
-    // Si tienen misma prioridad, aplicar ordenamiento dinámico
-    let aValue = a[orderBy];
-    let bValue = b[orderBy];
+      // Si tienen diferente prioridad, ordenar por prioridad (menor número = mayor prioridad)
+      if (prioA !== prioB) {
+        return prioA - prioB;
+      }
 
-    if (orderBy === 'createdAt') {
-      aValue = new Date(aValue).getTime();
-      bValue = new Date(bValue).getTime();
-    }
+      // Si tienen misma prioridad, aplicar ordenamiento dinámico
+      let aValue = a[orderBy];
+      let bValue = b[orderBy];
 
-    if (typeof aValue === 'string') {
-      aValue = aValue.toLowerCase();
-      bValue = bValue.toLowerCase();
-    }
+      if (orderBy === 'createdAt') {
+        aValue = new Date(aValue).getTime();
+        bValue = new Date(bValue).getTime();
+      }
 
-    if (order === 'desc') {
-      return bValue > aValue ? 1 : -1;
-    }
-    return aValue > bValue ? 1 : -1;
-  }), [documentos, filtros, orderBy, order]);
+      if (typeof aValue === 'string') {
+        aValue = aValue.toLowerCase();
+        bValue = bValue.toLowerCase();
+      }
+
+      if (order === 'desc') {
+        return bValue > aValue ? 1 : -1;
+      }
+      return aValue > bValue ? 1 : -1;
+    });
+  }, [documentos, filtros, orderBy, order, serverSide]);
 
   /**
    * Documentos de la página actual
    */
-  const documentosPagina = React.useMemo(() => documentosFiltrados.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  ), [documentosFiltrados, page, rowsPerPage]);
+  const documentosPagina = React.useMemo(() => {
+    if (serverSide) return documentosFiltrados;
+
+    return documentosFiltrados.slice(
+      page * rowsPerPage,
+      page * rowsPerPage + rowsPerPage
+    );
+  }, [documentosFiltrados, page, rowsPerPage, serverSide]);
 
   // Prefetch de conteos de agrupación por cliente (global, no solo página)
   useEffect(() => {
     const fetchCounts = async () => {
       const candidates = documentosPagina.filter(d => ['EN_PROCESO', 'LISTO'].includes(d.status) && !d.isGrouped);
-      for (const doc of candidates) {
-        const key = `${doc.clientName}|${doc.clientId || ''}`;
-        if (groupableCountCache.has(key)) continue;
+      if (candidates.length === 0) return;
+
+      const newCounts = new Map(groupableCountCache);
+      let changed = false;
+
+      // Agrupar candidatos por cliente para consulta eficiente
+      const candidatesByClient = {};
+      candidates.forEach(doc => {
+        if (!doc.clientId && !doc.clientName) return;
+        const key = doc.clientId || doc.clientName;
+        // Solo consultar si no tenemos el dato en caché
+        if (!newCounts.has(key)) {
+          if (!candidatesByClient[key]) candidatesByClient[key] = [];
+          candidatesByClient[key].push(doc);
+        }
+      });
+
+      // Si no hay nuevos clientes que consultar, terminar
+      if (Object.keys(candidatesByClient).length === 0) return;
+
+      // Realizar consultas
+      await Promise.all(Object.entries(candidatesByClient).map(async ([key, docs]) => {
+        const doc = docs[0];
         try {
-          const result = await detectGroupableDocuments({ clientName: doc.clientName, clientId: doc.clientId || '' });
-          const uniqueCount = (result.groupableDocuments || []).reduce((acc, d) => {
-            const k = d.protocolNumber || d.id;
-            if (!acc.has(k)) acc.add(k);
-            return acc;
-          }, new Set()).size; // backend ya incluye principal
-          setGroupableCountCache(prev => {
-            const next = new Map(prev);
-            next.set(key, uniqueCount);
-            return next;
-          });
-        } catch { }
+          const hasMore = await documentService.checkGroupableDocuments(doc.id, doc.clientId, doc.clientName);
+          newCounts.set(key, hasMore);
+          changed = true;
+        } catch (err) {
+          // Silencioso
+        }
+      }));
+
+      if (changed) {
+        setGroupableCountCache(newCounts);
       }
     };
+
     fetchCounts();
-  }, [documentosPagina, page, rowsPerPage]);
+  }, [documentosPagina]);
 
   /**
    * Manejar cambio de página
    */
   const handleChangePage = (event, newPage) => {
-    setPage(newPage);
+    if (serverSide && onPageChange) {
+      onPageChange(event, newPage);
+    } else {
+      setInternalPage(newPage);
+    }
   };
 
   /**
    * Manejar cambio de filas por página
    */
   const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
+    const newRows = parseInt(event.target.value, 10);
+    if (serverSide && onRowsPerPageChange) {
+      onRowsPerPageChange(event);
+    } else {
+      setInternalRowsPerPage(newRows);
+      setInternalPage(0);
+    }
   };
 
   /**
    * Manejar cambio de filtros
    */
   const handleFilterChange = (field, value) => {
-    setFiltros(prev => ({
-      ...prev,
+    const newFiltros = {
+      ...filtros,
       [field]: value
-    }));
-    setPage(0); // Resetear a primera página
+    };
+
+    if (serverSide && onFilterChange) {
+      onFilterChange(newFiltros);
+    } else {
+      setInternalFiltros(newFiltros);
+      setInternalPage(0); // Resetear a primera página
+    }
   };
 
-  // Persistir filtros de la lista de archivo durante la sesión
+  // Persistir filtros de la lista de archivo durante la sesión (solo si local)
   useEffect(() => {
     try {
-      sessionStorage.setItem('archivo_lista_filtros', JSON.stringify(filtros));
+      if (!serverSide) {
+        sessionStorage.setItem('archivo_lista_filtros', JSON.stringify(filtros));
+      }
     } catch (_) { }
-  }, [filtros]);
+  }, [filtros, serverSide]);
 
   /**
    * Verificar si hay más de un documento del mismo cliente disponible para agrupar
@@ -258,6 +331,12 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
    */
   const hasMoreThanOneForClient = (doc) => {
     if (!doc) return false;
+    // Si Server-side, dependemos de la caché del prefetch ya que no tenemos todos los docs
+    if (serverSide) {
+      const key = doc.clientId || doc.clientName;
+      return groupableCountCache.get(key) || false;
+    }
+
     const sameClientDocs = documentos.filter(d => {
       if (d.id === doc.id) return false; // Excluir el documento actual
       if (!['EN_PROCESO', 'LISTO'].includes(d.status)) return false; // Solo documentos en proceso o listos
@@ -301,8 +380,14 @@ const ListaArchivo = ({ documentos, onEstadoChange, onRefresh }) => {
    */
   const handleSort = (property) => {
     const isAsc = orderBy === property && order === 'asc';
-    setOrder(isAsc ? 'desc' : 'asc');
-    setOrderBy(property);
+    const newOrder = isAsc ? 'desc' : 'asc';
+
+    if (serverSide && onSortChange) {
+      onSortChange(property, newOrder);
+    } else {
+      setInternalOrder(newOrder);
+      setInternalOrderBy(property);
+    }
   };
 
   /**

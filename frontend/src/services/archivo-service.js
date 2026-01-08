@@ -36,6 +36,9 @@ const getMisDocumentos = async (token, params = {}) => {
 
     if (params.search) queryParams.append('search', params.search);
     if (params.estado) queryParams.append('estado', params.estado);
+    if (params.tipo) queryParams.append('tipo', params.tipo);
+    if (params.orderBy) queryParams.append('orderBy', params.orderBy);
+    if (params.orderDirection) queryParams.append('orderDirection', params.orderDirection);
     if (params.page) queryParams.append('page', params.page);
     if (params.limit) queryParams.append('limit', params.limit);
 

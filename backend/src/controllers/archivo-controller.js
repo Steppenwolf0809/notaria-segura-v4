@@ -83,7 +83,15 @@ async function dashboardArchivo(req, res) {
 async function listarMisDocumentos(req, res) {
   try {
     const userId = req.user.id;
-    const { search, estado, page = 1, limit = 10 } = req.query;
+    const {
+      search,
+      estado,
+      tipo,
+      orderBy = 'updatedAt',
+      orderDirection = 'desc',
+      page = 1,
+      limit = 10
+    } = req.query;
 
     // Filtros base
     const where = {
@@ -91,35 +99,92 @@ async function listarMisDocumentos(req, res) {
     };
 
     // Caché por usuario + filtros
-    const cacheKey = cache.key({ scope: 'archivo:mis-documentos', userId, page: parseInt(page), limit: parseInt(limit), search, estado });
+    const cacheKey = cache.key({
+      scope: 'archivo:mis-documentos',
+      userId,
+      page: parseInt(page),
+      limit: parseInt(limit),
+      search,
+      estado,
+      tipo,
+      orderBy,
+      orderDirection
+    });
+
     const cached = await cache.get(cacheKey);
     if (cached) {
       return res.json({ success: true, data: cached });
     }
 
+    // Configuración de ordenamiento
+    let prismaOrderBy = {};
+    if (orderBy === 'prioridad') {
+      // Ordenamiento por prioridad de estado (custom) - solo soportado en memoria o raw query complejo
+      // Por simplicidad, si piden prioridad usamos updatedAt como fallback en Prisma
+      // y el ordenamiento real se haría si usáramos raw query siempre.
+      // DADO QUE PRISMA NO SOPORTA ORDENAMIENTO CONDICIONAL FÁCIL, 
+      // usaremos updatedAt por defecto si piden prioridad
+      prismaOrderBy = { updatedAt: 'desc' };
+    } else {
+      prismaOrderBy = { [orderBy]: orderDirection.toLowerCase() };
+    }
+
     // Aplicar filtros adicionales
     const searchTerm = (search || '').trim();
+
+    // CASO 1: BÚSQUEDA POR TEXTO (Raw Query para unaccent)
     if (searchTerm) {
       const supportsUnaccent = await supportsUnaccentFn();
       if (supportsUnaccent) {
-        // Consulta por raw para acentos
+        // Construcción dinámica de filtros SQL
+        let typeFilter = Prisma.sql``;
+        if (tipo && tipo !== 'TODOS') {
+          typeFilter = Prisma.sql`AND d."documentType" = ${tipo}`;
+        }
+
+        let statusFilter = Prisma.sql``;
+        if (estado && estado !== 'TODOS') {
+          statusFilter = Prisma.sql`AND d."status" = ${estado}`;
+        }
+
+        // Construcción dinámica de ORDER BY SQL
+        let orderSql = Prisma.sql`d."updatedAt" DESC`;
+        if (orderBy !== 'prioridad') { // Si es prioridad, mantenemos updatedAt por ahora en búsqueda
+          // Mapeo seguro de columnas para evitar inyección
+          const allowedCols = ['createdAt', 'updatedAt', 'clientName', 'protocolNumber', 'totalFactura', 'status'];
+          const safeCol = allowedCols.includes(orderBy) ? orderBy : 'updatedAt';
+          const safeDir = orderDirection.toLowerCase() === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+
+          // Construcción manual segura ya que Prisma.sql no acepta identificadores dinámicos fácilmente en ORDER BY
+          // Usamos raw string concatenado SOLO para el nombre de columna que ya validamos con allowedCols
+          orderSql = Prisma.sql([`d."${safeCol}" ${safeDir === Prisma.sql`ASC` ? 'ASC' : 'DESC'}`]);
+        }
+
         const pattern = `%${searchTerm}%`;
+
         const documents = await prisma.$queryRaw`
           SELECT d.*
           FROM "documents" d
-          WHERE d."assignedToId" = ${req.user.id} AND (
+          WHERE d."assignedToId" = ${req.user.id} 
+          ${statusFilter}
+          ${typeFilter}
+          AND (
             unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
             unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
             unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
             d."clientPhone" ILIKE ${pattern}
           )
-          ORDER BY d."updatedAt" DESC
+          ORDER BY ${orderSql}
           OFFSET ${(parseInt(page) - 1) * parseInt(limit)} LIMIT ${parseInt(limit)}
         `;
+
         const countRows = await prisma.$queryRaw`
           SELECT COUNT(*)::int AS count
           FROM "documents" d
-          WHERE d."assignedToId" = ${req.user.id} AND (
+          WHERE d."assignedToId" = ${req.user.id} 
+          ${statusFilter}
+          ${typeFilter}
+          AND (
             unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
             unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
             unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
@@ -140,6 +205,7 @@ async function listarMisDocumentos(req, res) {
         await cache.set(cacheKey, payload, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'search:archivo:mis-documentos', `user:${userId}`] });
         return res.json({ success: true, data: payload });
       } else {
+        // Fallback si no hay unaccent (Postgres sin extensión o SQLite)
         where.OR = [
           { clientName: { contains: searchTerm, mode: 'insensitive' } },
           { clientPhone: { contains: searchTerm } },
@@ -149,8 +215,13 @@ async function listarMisDocumentos(req, res) {
       }
     }
 
+    // CASO 2: LISTADO ESTÁNDAR (Sin búsqueda o fallback)
     if (estado && estado !== 'TODOS') {
       where.status = estado;
+    }
+
+    if (tipo && tipo !== 'TODOS') {
+      where.documentType = tipo;
     }
 
     // Paginación
@@ -164,7 +235,7 @@ async function listarMisDocumentos(req, res) {
             select: { firstName: true, lastName: true }
           }
         },
-        orderBy: { updatedAt: 'desc' },
+        orderBy: prismaOrderBy,
         skip,
         take: parseInt(limit)
       }),
