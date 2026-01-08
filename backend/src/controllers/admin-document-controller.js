@@ -1,10 +1,10 @@
 import prisma from '../db.js';
 import cache from '../services/cache-service.js';
 import { Prisma } from '@prisma/client';
-import { 
+import {
   logAdminAction,
   logUserListAccess,
-  extractRequestInfo 
+  extractRequestInfo
 } from '../utils/audit-logger.js';
 
 /**
@@ -22,6 +22,8 @@ async function getAllDocumentsOversight(req, res) {
       type,
       matrizador,
       overdueOnly,
+      startDate,
+      endDate,
       sortBy = 'createdAt',
       sortOrder = 'desc'
     } = req.query;
@@ -34,6 +36,20 @@ async function getAllDocumentsOversight(req, res) {
     const where = {};
 
     const searchTerm = (search || '').trim();
+
+    // Filtro por fecha (rango)
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) {
+        where.createdAt.gte = new Date(startDate); // Inicio del día
+      }
+      if (endDate) {
+        // Fin del día para incluir todo el día seleccionado
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
+    }
 
     // Filtro por estado
     if (status) {
@@ -155,7 +171,7 @@ async function getAllDocumentsOversight(req, res) {
               orderBy,
               include: {
                 assignedTo: { select: { id: true, firstName: true, lastName: true, email: true } },
-                createdBy:  { select: { id: true, firstName: true, lastName: true, email: true } }
+                createdBy: { select: { id: true, firstName: true, lastName: true, email: true } }
               }
             }),
             prisma.document.count({ where })
@@ -171,7 +187,7 @@ async function getAllDocumentsOversight(req, res) {
             orderBy,
             include: {
               assignedTo: { select: { id: true, firstName: true, lastName: true, email: true } },
-              createdBy:  { select: { id: true, firstName: true, lastName: true, email: true } }
+              createdBy: { select: { id: true, firstName: true, lastName: true, email: true } }
             }
           }),
           prisma.document.count({ where })
@@ -401,13 +417,13 @@ async function executeBulkDocumentOperation(req, res) {
           case 'reassign':
             if (newMatrizadorId && newMatrizadorId !== 'null') {
               const newMatrizador = await prisma.user.findFirst({
-                where: { 
-                  id: parseInt(newMatrizadorId), 
-                  role: 'MATRIZADOR', 
-                  isActive: true 
+                where: {
+                  id: parseInt(newMatrizadorId),
+                  role: 'MATRIZADOR',
+                  isActive: true
                 }
               });
-              
+
               if (!newMatrizador) {
                 results.errors.push({
                   documentId,
@@ -511,10 +527,10 @@ async function exportDocuments(req, res) {
   try {
     const { format = 'csv' } = req.query;
     const { search, status, type, matrizador } = req.query;
-    
+
     // Construir filtros
     const where = {};
-    
+
     const searchTerm = (search || '').trim();
     if (searchTerm) {
       const supportsUnaccent = await supportsUnaccentFn();
@@ -576,7 +592,7 @@ async function exportDocuments(req, res) {
         where,
         include: {
           assignedTo: { select: { firstName: true, lastName: true } },
-          createdBy:  { select: { firstName: true, lastName: true } }
+          createdBy: { select: { firstName: true, lastName: true } }
         },
         orderBy: { createdAt: 'desc' }
       });
@@ -589,15 +605,15 @@ async function exportDocuments(req, res) {
       'Teléfono': doc.clientPhone || '',
       'Tipo Documento': doc.documentType || '',
       'Estado': doc.status || '',
-      'Matrizador Asignado': doc.assignedTo 
+      'Matrizador Asignado': doc.assignedTo
         ? `${doc.assignedTo.firstName} ${doc.assignedTo.lastName}`
         : (doc._assignedToFirstName ? `${doc._assignedToFirstName} ${doc._assignedToLastName}` : 'Sin asignar'),
-      'Creado Por': doc.createdBy 
+      'Creado Por': doc.createdBy
         ? `${doc.createdBy.firstName} ${doc.createdBy.lastName}`
         : (doc._createdByFirstName ? `${doc._createdByFirstName} ${doc._createdByLastName}` : 'N/A'),
-      'Fecha Creación': doc.createdAt ? 
+      'Fecha Creación': doc.createdAt ?
         new Date(doc.createdAt).toLocaleDateString('es-ES') : '',
-      'Última Actualización': doc.updatedAt ? 
+      'Última Actualización': doc.updatedAt ?
         new Date(doc.updatedAt).toLocaleDateString('es-ES') : '',
       'Valor Acto Principal': doc.totalFactura || 0, // ⭐ CAMBIO: Usar valor total de factura
       'Total Factura': doc.totalFactura || 0,
@@ -610,10 +626,10 @@ async function exportDocuments(req, res) {
     if (format === 'csv') {
       // Generar CSV
       const headers = Object.keys(exportData[0] || {}).join(',');
-      const rows = exportData.map(row => 
+      const rows = exportData.map(row =>
         Object.values(row).map(val => `"${val}"`).join(',')
       ).join('\n');
-      
+
       const csvContent = [headers, rows].join('\n');
 
       res.setHeader('Content-Type', 'text/csv');

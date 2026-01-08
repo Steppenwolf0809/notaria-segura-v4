@@ -270,7 +270,7 @@ const AdminDashboard = () => {
 
       {/* KPIs */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={4}>
           <SummaryCard
             title="Total Activos"
             value={kpis?.activeCount || 0}
@@ -279,7 +279,7 @@ const AdminDashboard = () => {
             subtext="Trámites en curso"
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={4}>
           <SummaryCard
             title={`Críticos (> ${thresholdDays}d)`}
             value={kpis?.criticalCount || 0}
@@ -288,8 +288,26 @@ const AdminDashboard = () => {
             subtext="Requieren atención"
           />
         </Grid>
+        <Grid item xs={12} sm={6} md={4}>
+          <SummaryCard
+            title="Pendientes"
+            value={kpis?.pendingCount || 0}
+            icon={<DocumentIcon />}
+            color="warning"
+            subtext="Por iniciar"
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={4}>
+          <SummaryCard
+            title="Listos"
+            value={kpis?.readyCount || 0}
+            icon={<CheckCircleIcon />}
+            color="success"
+            subtext="Para entregar"
+          />
+        </Grid>
         {/* Nueva Tarjeta Facturación */}
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={4}>
           <Card sx={{ height: '100%' }}>
             <CardContent>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -326,7 +344,7 @@ const AdminDashboard = () => {
             </CardContent>
           </Card>
         </Grid>
-        <Grid item xs={12} sm={6} md={3}>
+        <Grid item xs={12} sm={6} md={4}>
           <SummaryCard
             title="Eficiencia Semanal"
             value={`${kpis?.weeklyEfficiency || 0}%`}
