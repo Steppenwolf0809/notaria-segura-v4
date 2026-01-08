@@ -24,13 +24,13 @@ const documentService = {
       // Crear FormData para upload de archivo
       const formData = new FormData();
       formData.append('xmlFile', xmlFile);
-      
+
       const response = await api.post('/documents/upload-xml', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
       });
-      
+
       return {
         success: true,
         data: response.data.data,
@@ -39,8 +39,8 @@ const documentService = {
     } catch (error) {
       // Error uploading XML document
       const errorMessage = error.response?.data?.message ||
-                          error.message ||
-                          'Error al subir archivo XML';
+        error.message ||
+        'Error al subir archivo XML';
 
       return {
         success: false,
@@ -94,18 +94,18 @@ const documentService = {
       });
 
       if (onProgress) onProgress(100);
-      
+
       return {
         success: true,
         data: response.data.data,
         message: response.data.message
       };
     } catch (error) {
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          'Error al subir archivos XML en lote';
-      
+
+      const errorMessage = error.response?.data?.message ||
+        error.message ||
+        'Error al subir archivos XML en lote';
+
       return {
         success: false,
         error: errorMessage
@@ -157,7 +157,7 @@ const documentService = {
     try {
       const params = new URLSearchParams({ page: String(page), limit: String(limit) });
       const response = await api.get(`/documents/all?${params.toString()}`);
-      
+
       return {
         success: true,
         data: {
@@ -171,11 +171,11 @@ const documentService = {
         }
       };
     } catch (error) {
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          'Error al obtener documentos';
-      
+
+      const errorMessage = error.response?.data?.message ||
+        error.message ||
+        'Error al obtener documentos';
+
       return {
         success: false,
         error: errorMessage
@@ -194,18 +194,18 @@ const documentService = {
       const response = await api.put(`/documents/${documentId}/assign`, {
         matrizadorId
       });
-      
+
       return {
         success: true,
         data: response.data.data,
         message: response.data.message
       };
     } catch (error) {
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          'Error al asignar documento';
-      
+
+      const errorMessage = error.response?.data?.message ||
+        error.message ||
+        'Error al asignar documento';
+
       return {
         success: false,
         error: errorMessage
@@ -215,22 +215,33 @@ const documentService = {
 
   /**
    * MATRIZADOR: GET my-documents con token
+   * @param {Object} params - Parámetros de paginación y filtro
    * @returns {Promise<Object>} Documentos del matrizador
    */
-  async getMyDocuments() {
+  async getMyDocuments(params = {}) {
     try {
-      const response = await api.get('/documents/my-documents');
-      
+      const queryParams = new URLSearchParams();
+
+      if (params.page) queryParams.append('page', params.page);
+      if (params.limit) queryParams.append('limit', params.limit);
+      if (params.search) queryParams.append('search', params.search);
+      if (params.status) queryParams.append('status', params.status);
+      if (params.tipo) queryParams.append('tipo', params.tipo);
+      if (params.orderBy) queryParams.append('orderBy', params.orderBy);
+      if (params.orderDirection) queryParams.append('orderDirection', params.orderDirection);
+
+      const response = await api.get(`/documents/my-documents?${queryParams.toString()}`);
+
       return {
         success: true,
         data: response.data.data
       };
     } catch (error) {
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          'Error al obtener mis documentos';
-      
+
+      const errorMessage = error.response?.data?.message ||
+        error.message ||
+        'Error al obtener mis documentos';
+
       return {
         success: false,
         error: errorMessage
@@ -247,7 +258,7 @@ const documentService = {
   async updateDocumentStatus(documentId, newStatus, options = {}) {
     try {
       // Preparar el cuerpo de la petición
-      const requestBody = { 
+      const requestBody = {
         status: newStatus,
         ...options
       };
@@ -262,7 +273,7 @@ const documentService = {
             const statusOrder = ['PENDIENTE', 'EN_PROCESO', 'LISTO', 'ENTREGADO'];
             const currentIndex = statusOrder.indexOf(currentStatus);
             const newIndex = statusOrder.indexOf(newStatus);
-            
+
             // Si es una reversión, agregar una razón por defecto
             if (newIndex < currentIndex && newIndex >= 0) {
               requestBody.reversionReason = 'Cambio de estado desde interfaz de usuario (drag & drop)';
@@ -272,9 +283,9 @@ const documentService = {
         }
       }
 
-      
+
       const response = await api.put(`/documents/${documentId}/status`, requestBody);
-      
+
       return {
         success: true,
         data: response.data.data,
@@ -282,8 +293,8 @@ const documentService = {
       };
     } catch (error) {
       const errorMessage = error.response?.data?.message ||
-                          error.message ||
-                          'Error al actualizar estado del documento';
+        error.message ||
+        'Error al actualizar estado del documento';
 
       return {
         success: false,
@@ -333,17 +344,17 @@ const documentService = {
   async getDocumentById(documentId) {
     try {
       const response = await api.get(`/documents/${documentId}`);
-      
+
       return {
         success: true,
         data: response.data.data
       };
     } catch (error) {
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          'Error al obtener detalle del documento';
-      
+
+      const errorMessage = error.response?.data?.message ||
+        error.message ||
+        'Error al obtener detalle del documento';
+
       return {
         success: false,
         error: errorMessage
@@ -358,17 +369,17 @@ const documentService = {
   async getAvailableMatrizadores() {
     try {
       const response = await api.get('/documents/matrizadores');
-      
+
       return {
         success: true,
         data: response.data.data
       };
     } catch (error) {
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          'Error al obtener matrizadores';
-      
+
+      const errorMessage = error.response?.data?.message ||
+        error.message ||
+        'Error al obtener matrizadores';
+
       return {
         success: false,
         error: errorMessage
@@ -458,7 +469,7 @@ const documentService = {
   },
 
   // --- MÉTODO DE ENTREGA COMPLETA ---
-  
+
   /**
    * Entregar documento con información completa
    * @param {string} documentId - ID del documento
@@ -468,18 +479,18 @@ const documentService = {
   async deliverDocument(documentId, deliveryData) {
     try {
       const response = await api.post(`/documents/${documentId}/deliver`, deliveryData);
-      
+
       return {
         success: true,
         data: response.data.data,
         message: response.data.message
       };
     } catch (error) {
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          'Error al entregar documento';
-      
+
+      const errorMessage = error.response?.data?.message ||
+        error.message ||
+        'Error al entregar documento';
+
       return {
         success: false,
         error: errorMessage,
@@ -499,18 +510,18 @@ const documentService = {
   createSmartGroup: async (groupData) => {
     try {
       const response = await api.post('/documents/create-smart-group', groupData);
-      
+
       return {
         success: true,
         data: response.data.data,
         message: response.data.message
       };
     } catch (error) {
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          'Error creando grupo inteligente';
-      
+
+      const errorMessage = error.response?.data?.message ||
+        error.message ||
+        'Error creando grupo inteligente';
+
       return {
         success: false,
         message: errorMessage,
@@ -530,18 +541,18 @@ const documentService = {
   async undoDocumentStatusChange(undoData) {
     try {
       const response = await api.post('/documents/undo-status-change', undoData);
-      
+
       return {
         success: true,
         data: response.data.data,
         message: response.data.message
       };
     } catch (error) {
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          'Error al deshacer cambio de estado';
-      
+
+      const errorMessage = error.response?.data?.message ||
+        error.message ||
+        'Error al deshacer cambio de estado';
+
       return {
         success: false,
         error: errorMessage,
@@ -558,18 +569,18 @@ const documentService = {
   async getUndoableChanges(documentId) {
     try {
       const response = await api.get(`/documents/${documentId}/undoable-changes`);
-      
+
       return {
         success: true,
         data: response.data.data,
         message: response.data.message
       };
     } catch (error) {
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          'Error al obtener cambios deshacibles';
-      
+
+      const errorMessage = error.response?.data?.message ||
+        error.message ||
+        'Error al obtener cambios deshacibles';
+
       return {
         success: false,
         error: errorMessage,
@@ -588,23 +599,23 @@ const documentService = {
   async updateDocumentGroupStatus(documentGroupId, newStatus, options = {}) {
     try {
       // 🔧 CORRECCIÓN: Estructurar correctamente el body según lo que espera el backend
-      const requestBody = { 
+      const requestBody = {
         documentGroupId,
         newStatus,  // El backend espera exactamente este campo
         deliveredTo: options.deliveredTo,
         reversionReason: options.reversionReason
       };
-      
+
       // Limpiar campos undefined
       Object.keys(requestBody).forEach(key => {
         if (requestBody[key] === undefined) {
           delete requestBody[key];
         }
       });
-      
-      
+
+
       const response = await api.put('/documents/group/status', requestBody);
-      
+
       return {
         success: true,
         data: response.data.data,
@@ -612,8 +623,8 @@ const documentService = {
       };
     } catch (error) {
       const errorMessage = error.response?.data?.message ||
-                          error.message ||
-                          'Error al actualizar estado del grupo';
+        error.message ||
+        'Error al actualizar estado del grupo';
 
       return {
         success: false,
@@ -646,14 +657,14 @@ const documentService = {
    */
   async updateDocumentGroupInfo(documentGroupId, sharedData) {
     try {
-      const requestBody = { 
+      const requestBody = {
         documentGroupId,
         sharedData
       };
-      
-      
+
+
       const response = await api.put('/documents/group/info', requestBody);
-      
+
       return {
         success: true,
         data: response.data.data,
@@ -661,8 +672,8 @@ const documentService = {
       };
     } catch (error) {
       const errorMessage = error.response?.data?.message ||
-                          error.message ||
-                          'Error al actualizar información del grupo';
+        error.message ||
+        'Error al actualizar información del grupo';
 
       return {
         success: false,
@@ -681,16 +692,16 @@ const documentService = {
   async getDocumentHistory(documentId, params = {}) {
     try {
       const queryParams = new URLSearchParams();
-      
+
       if (params.limit) queryParams.append('limit', params.limit);
       if (params.offset) queryParams.append('offset', params.offset);
       if (params.eventType) queryParams.append('eventType', params.eventType);
-      
+
       const url = `/documents/${documentId}/history${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-      
-      
+
+
       const response = await api.get(url);
-      
+
       return {
         success: true,
         data: response.data.data,
@@ -698,8 +709,8 @@ const documentService = {
       };
     } catch (error) {
       const errorMessage = error.response?.data?.message ||
-                          error.message ||
-                          'Error al obtener historial del documento';
+        error.message ||
+        'Error al obtener historial del documento';
 
       return {
         success: false,
@@ -717,7 +728,7 @@ const documentService = {
   async bulkStatusChange(bulkData) {
     try {
       const response = await api.post('/documents/bulk-status-change', bulkData);
-      
+
       return {
         success: true,
         data: response.data.data,
@@ -725,8 +736,8 @@ const documentService = {
       };
     } catch (error) {
       const errorMessage = error.response?.data?.message ||
-                          error.message ||
-                          'Error al realizar cambio masivo de estado';
+        error.message ||
+        'Error al realizar cambio masivo de estado';
 
       return {
         success: false,
@@ -751,11 +762,11 @@ const documentService = {
         message: response.data.message || 'Documentos del grupo obtenidos exitosamente'
       };
     } catch (error) {
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          'Error al obtener documentos del grupo';
-      
+
+      const errorMessage = error.response?.data?.message ||
+        error.message ||
+        'Error al obtener documentos del grupo';
+
       return {
         success: false,
         error: errorMessage,
@@ -774,24 +785,24 @@ const documentService = {
    */
   async revertDocumentStatus(documentId, newStatus, reversionReason) {
     try {
-      
+
       const response = await api.post(`/documents/${documentId}/revert`, {
         newStatus,
         reversionReason
       });
-      
-      
+
+
       return {
         success: true,
         data: response.data.data || response.data,
         message: response.data.message || 'Documento revertido exitosamente'
       };
     } catch (error) {
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          'Error al revertir el estado del documento';
-      
+
+      const errorMessage = error.response?.data?.message ||
+        error.message ||
+        'Error al revertir el estado del documento';
+
       return {
         success: false,
         error: errorMessage,
@@ -808,27 +819,27 @@ const documentService = {
    */
   async updateNotificationPolicy(documentId, policy) {
     try {
-      
+
       const response = await api.put(`/documents/${documentId}/notification-policy`, {
         notificationPolicy: policy
       });
-      
-      
+
+
       // Manejar respuesta de migración pendiente
       if (response.status === 202 && response.data.data?.migrationPending) {
       }
-      
+
       return {
         success: true,
         data: response.data.data || response.data,
         message: response.data.message || 'Política de notificación actualizada exitosamente'
       };
     } catch (error) {
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          'Error al actualizar la política de notificación';
-      
+
+      const errorMessage = error.response?.data?.message ||
+        error.message ||
+        'Error al actualizar la política de notificación';
+
       return {
         success: false,
         error: errorMessage,
@@ -845,27 +856,27 @@ const documentService = {
    */
   async updateGroupNotificationPolicy(groupId, policy) {
     try {
-      
+
       const response = await api.put(`/documents/group/${groupId}/notification-policy`, {
         notificationPolicy: policy
       });
-      
-      
+
+
       // Manejar respuesta de migración pendiente
       if (response.status === 202 && response.data.data?.migrationPending) {
       }
-      
+
       return {
         success: true,
         data: response.data.data || response.data,
         message: response.data.message || 'Política de notificación del grupo actualizada exitosamente'
       };
     } catch (error) {
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          'Error al actualizar la política de notificación del grupo';
-      
+
+      const errorMessage = error.response?.data?.message ||
+        error.message ||
+        'Error al actualizar la política de notificación del grupo';
+
       return {
         success: false,
         error: errorMessage,
@@ -885,19 +896,19 @@ const documentService = {
       const response = await api.put(`/documents/${documentId}/nota-credito`, {
         motivo
       });
-      
-      
+
+
       return {
         success: true,
         data: response.data.data,
         message: response.data.message || 'Documento marcado como Nota de Crédito exitosamente'
       };
     } catch (error) {
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          'Error al marcar documento como Nota de Crédito';
-      
+
+      const errorMessage = error.response?.data?.message ||
+        error.message ||
+        'Error al marcar documento como Nota de Crédito';
+
       return {
         success: false,
         error: errorMessage,
@@ -914,7 +925,7 @@ const documentService = {
    */
   async markAsDeliveredImmediate(documentId, deliveryData = {}) {
     try {
-      
+
       const immediateDeliveryData = {
         entregadoA: deliveryData.entregadoA || 'Cliente',
         relacionTitular: 'titular',
@@ -926,19 +937,19 @@ const documentService = {
       };
 
       const response = await api.post(`/documents/${documentId}/deliver`, immediateDeliveryData);
-      
-      
+
+
       return {
         success: true,
         data: response.data.data || response.data,
         message: response.data.message || 'Documento entregado inmediatamente'
       };
     } catch (error) {
-      
-      const errorMessage = error.response?.data?.message || 
-                          error.message || 
-                          'Error al marcar documento como entregado';
-      
+
+      const errorMessage = error.response?.data?.message ||
+        error.message ||
+        'Error al marcar documento como entregado';
+
       return {
         success: false,
         error: errorMessage,
@@ -962,8 +973,8 @@ const documentService = {
     } catch (error) {
 
       const errorMessage = error.response?.data?.message ||
-                          error.message ||
-                          'Error al cargar estadísticas';
+        error.message ||
+        'Error al cargar estadísticas';
 
       return {
         success: false,

@@ -6,12 +6,29 @@ import useDocumentStore from '../store/document-store';
  * Proporciona métricas avanzadas y KPIs para el rol Matrizador
  */
 const useStats = () => {
-  const { documents, getDocumentsByStatus } = useDocumentStore();
+  const { documents, getDocumentsByStatus, stats: storedStats, totalDocuments } = useDocumentStore();
 
   /**
-   * Métricas básicas calculadas en tiempo real
+   * Métricas básicas calculadas en tiempo real o desde backend
    */
   const basicStats = useMemo(() => {
+    // Si tenemos stats del backend (server-side pagination active)
+    if (storedStats && Array.isArray(storedStats)) {
+      const statsMap = storedStats.reduce((acc, curr) => {
+        acc[curr.status] = curr._count.id;
+        return acc;
+      }, {});
+
+      return {
+        total: totalDocuments || documents.length, // Prefer store total
+        PENDIENTE: statsMap['PENDIENTE'] || 0,
+        EN_PROCESO: statsMap['EN_PROCESO'] || 0,
+        LISTO: statsMap['LISTO'] || 0,
+        ENTREGADO: statsMap['ENTREGADO'] || 0
+      };
+    }
+
+    // Fallback: cálculo local (solo correcto si todos los docs están cargados)
     const stats = {
       total: documents.length,
       PENDIENTE: documents.filter(d => d.status === 'PENDIENTE').length,
@@ -21,7 +38,7 @@ const useStats = () => {
     };
 
     return stats;
-  }, [documents]);
+  }, [documents, storedStats, totalDocuments]);
 
   /**
    * Métricas avanzadas para el dashboard ejecutivo
@@ -70,8 +87,8 @@ const useStats = () => {
     const productivity = Math.round((delivered.length / Math.max(basicStats.total, 1)) * 100);
 
     // Eficiencia (documentos listos vs en proceso)
-    const efficiency = inProgress.length > 0 ? 
-      Math.round((ready.length / (ready.length + inProgress.length)) * 100) : 
+    const efficiency = inProgress.length > 0 ?
+      Math.round((ready.length / (ready.length + inProgress.length)) * 100) :
       100;
 
     // Tendencias (comparación con períodos anteriores)
@@ -229,16 +246,16 @@ const useStats = () => {
   return {
     // Estadísticas básicas
     basicStats,
-    
+
     // Métricas avanzadas
     advancedMetrics,
-    
+
     // KPIs para dashboard
     kpiMetrics,
-    
+
     // Alertas importantes
     alerts,
-    
+
     // Datos para gráficos
     chartData,
 
@@ -247,18 +264,18 @@ const useStats = () => {
       getStatusColor: (status) => {
         const colors = {
           PENDIENTE: '#f59e0b',
-          EN_PROCESO: '#3b82f6', 
+          EN_PROCESO: '#3b82f6',
           LISTO: '#10b981',
           ENTREGADO: '#6b7280'
         };
         return colors[status] || '#6b7280';
       },
-      
+
       formatDaysAgo: (date) => {
         const now = new Date();
         const docDate = new Date(date);
         const daysDiff = Math.floor((now - docDate) / (1000 * 60 * 60 * 24));
-        
+
         if (daysDiff === 0) return 'Hoy';
         if (daysDiff === 1) return 'Ayer';
         return `Hace ${daysDiff} días`;
@@ -266,7 +283,7 @@ const useStats = () => {
 
       getUrgencyLevel: (document) => {
         const daysDiff = Math.floor((new Date() - new Date(document.createdAt)) / (1000 * 60 * 60 * 24));
-        
+
         if (daysDiff > 3) return 'urgent';
         if (daysDiff > 1) return 'medium';
         return 'normal';

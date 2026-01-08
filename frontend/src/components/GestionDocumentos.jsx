@@ -11,37 +11,73 @@ import useDebounce from '../hooks/useDebounce';
  * Componente principal de Gestión de Documentos
   */
 const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
-  
-  // SEPARACIÓN DE ESTADOS: inputValue (inmediato) vs searchTerm (debounced)
-  const [inputValue, setInputValue] = useState(''); // Estado local del input
-  const [statusFilter, setStatusFilter] = useState('');
-  const [typeFilter, setTypeFilter] = useState('');
-  const [mostrarEntregados, setMostrarEntregados] = useState(false); // 🆕 Por defecto NO mostrar entregados
+
+  // Estado para paginación y ordenamiento Server-Side
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [orderBy, setOrderBy] = useState('createdAt');
+  const [orderDirection, setOrderDirection] = useState('desc');
+
+  const { fetchMyDocuments, totalDocuments, loading } = useDocumentStore();
 
   // DEBOUNCING: Solo buscar después de que el usuario pause por 400ms
   const debouncedSearchTerm = useDebounce(inputValue, 400);
+
+  /**
+   * Efecto principal para cargar documentos con paginación server-side
+   */
+  useEffect(() => {
+    fetchMyDocuments({
+      page: page + 1, // API usa 1-based index
+      limit: rowsPerPage,
+      search: debouncedSearchTerm,
+      status: statusFilter,
+      tipo: typeFilter,
+      orderBy: orderBy,
+      orderDirection: orderDirection
+    });
+  }, [page, rowsPerPage, debouncedSearchTerm, statusFilter, typeFilter, orderBy, orderDirection]);
 
   /**
    * Handlers memoizados para evitar re-renders
    */
   const handleInputChange = useCallback((e) => {
     setInputValue(e.target.value);
+    setPage(0); // Reset página al buscar
   }, []);
 
   const handleClearInput = useCallback(() => {
     setInputValue('');
+    setPage(0);
   }, []);
 
   const handleStatusFilterChange = useCallback((e) => {
     setStatusFilter(e.target.value);
+    setPage(0); // Reset página al filtrar
   }, []);
 
   const handleTypeFilterChange = useCallback((e) => {
     setTypeFilter(e.target.value);
+    setPage(0); // Reset página al filtrar
   }, []);
 
   const handleMostrarEntregadosChange = useCallback((e) => {
     setMostrarEntregados(e.target.checked);
+    // No reseteamos página necesariamente, pero si cambia el set de datos visible
+  }, []);
+
+  const handlePageChange = useCallback((newPage) => {
+    setPage(newPage);
+  }, []);
+
+  const handleRowsPerPageChange = useCallback((newRows) => {
+    setRowsPerPage(newRows);
+    setPage(0);
+  }, []);
+
+  const handleSortChange = useCallback((property, direction) => {
+    setOrderBy(property);
+    setOrderDirection(direction);
   }, []);
 
   /**
@@ -49,6 +85,7 @@ const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
    */
   const handleSearchByClient = useCallback((clientName) => {
     setInputValue(clientName);
+    setPage(0);
     // Scroll suave al inicio para ver los resultados
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
@@ -98,6 +135,16 @@ const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
           onDocumentoFound={onDocumentoFound}
           mostrarEntregados={mostrarEntregados}
           onSearchByClient={handleSearchByClient}
+
+          // Props para Server-Side Pagination
+          serverSide={true}
+          totalDocuments={totalDocuments}
+          pageProp={page}
+          rowsPerPageProp={rowsPerPage}
+          loadingProp={loading}
+          onPageChange={handlePageChange}
+          onRowsPerPageChange={handleRowsPerPageChange}
+          onSortChange={handleSortChange}
         />
       </Box>
     </Box>

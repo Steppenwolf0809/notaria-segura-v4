@@ -1,4 +1,5 @@
 import prisma from '../db.js';
+import { Prisma } from '@prisma/client';
 import { getReversionCleanupData, isValidStatus, isReversion as isReversionFn } from '../utils/status-transitions.js';
 import { parseXmlDocument, generateVerificationCode } from '../services/xml-parser-service.js';
 import DocumentGroupingService from '../services/document-grouping-service.js';
@@ -575,6 +576,22 @@ async function assignDocument(req, res) {
  * @param {Object} req - Request object
  * @param {Object} res - Response object
  */
+// Helper para verificar soporte de unaccent (copiado de otros controladores para consistencia)
+async function supportsUnaccentFn() {
+  try {
+    await prisma.$queryRaw`SELECT unaccent('test')`;
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
+ * Obtener documentos del matrizador autenticado
+ * Función para MATRIZADOR: Ver solo documentos asignados a él con paginación
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
 async function getMyDocuments(req, res) {
   try {
     // Verificar que el usuario sea MATRIZADOR o ARCHIVO
@@ -585,36 +602,189 @@ async function getMyDocuments(req, res) {
       });
     }
 
-    const documents = await prisma.document.findMany({
-      where: {
-        assignedToId: req.user.id
-      },
-      include: {
-        createdBy: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true
-          }
+    const {
+      search,
+      status, // Estado específico
+      tipo, // Tipo de documento
+      orderBy = 'updatedAt',
+      orderDirection = 'desc',
+      page = 1,
+      limit = 10
+    } = req.query;
+
+    const userId = req.user.id;
+
+    // Filtros base
+    const where = {
+      assignedToId: userId
+    };
+
+    // Configuración de ordenamiento
+    let prismaOrderBy = {};
+    if (orderBy === 'prioridad') {
+      prismaOrderBy = { updatedAt: 'desc' }; // Fallback simple para Prisma
+    } else {
+      prismaOrderBy = { [orderBy]: orderDirection.toLowerCase() };
+    }
+
+    // Aplicar filtros adicionales
+    const searchTerm = (search || '').trim();
+
+    // CASO 1: BÚSQUEDA POR TEXTO (Raw Query para unaccent)
+    if (searchTerm) {
+      const supportsUnaccent = await supportsUnaccentFn();
+      if (supportsUnaccent) {
+        // Construcción dinámica de filtros SQL
+        let typeFilter = Prisma.sql``;
+        if (tipo && tipo !== 'TODOS') {
+          typeFilter = Prisma.sql`AND d."documentType" = ${tipo}`;
         }
-      },
-      orderBy: {
-        createdAt: 'desc'
+
+        let statusFilter = Prisma.sql``;
+        if (status && status !== 'TODOS') {
+          statusFilter = Prisma.sql`AND d."status" = ${status}`;
+        }
+
+        // Construcción dinámica de ORDER BY SQL
+        let orderSql = Prisma.sql`d."updatedAt" DESC`;
+        if (orderBy !== 'prioridad') {
+          const allowedCols = ['createdAt', 'updatedAt', 'clientName', 'protocolNumber', 'totalFactura', 'status'];
+          const safeCol = allowedCols.includes(orderBy) ? orderBy : 'updatedAt';
+          const safeDir = orderDirection.toLowerCase() === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+          orderSql = Prisma.sql([`d."${safeCol}" ${safeDir === Prisma.sql`ASC` ? 'ASC' : 'DESC'}`]);
+        }
+
+        const pattern = `%${searchTerm}%`;
+
+        const documents = await prisma.$queryRaw`
+          SELECT d.*
+          FROM "documents" d
+          WHERE d."assignedToId" = ${req.user.id} 
+          ${statusFilter}
+          ${typeFilter}
+          AND (
+            unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
+            unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
+            unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
+            d."clientPhone" ILIKE ${pattern}
+          )
+          ORDER BY ${orderSql}
+          OFFSET ${(parseInt(page) - 1) * parseInt(limit)} LIMIT ${parseInt(limit)}
+        `;
+
+        const countRows = await prisma.$queryRaw`
+          SELECT COUNT(*)::int AS count
+          FROM "documents" d
+          WHERE d."assignedToId" = ${req.user.id} 
+          ${statusFilter}
+          ${typeFilter}
+          AND (
+            unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
+            unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
+            unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
+            d."clientPhone" ILIKE ${pattern}
+          )
+        `;
+        const total = Array.isArray(countRows) ? (countRows[0]?.count || 0) : (countRows?.count || 0);
+
+        // Enriquecer documentos con relaciones mínimas si es necesario (el frontend las espera)
+        // Nota: QueryRaw no trae relaciones. Si se necesitan, habría que hacer un fetch adicional o JOINs manuales.
+        // Por simplicidad y rendimiento, si el frontend solo muestra datos planos, esto basta.
+        // Pero ListView.jsx espera `createdBy`. Vamos a hacer un "hydration" rápido de IDs.
+        // O mejor: Haremos el query normal de Prisma para búsqueda si no usamos raw complejo, 
+        // pero unaccent requiere raw.
+        // SOLUCIÓN: Hydrate authors
+        const authorIds = [...new Set(documents.map(d => d.createdById).filter(Boolean))];
+        const authors = await prisma.user.findMany({
+          where: { id: { in: authorIds } },
+          select: { id: true, firstName: true, lastName: true, email: true }
+        });
+        const authorMap = new Map(authors.map(a => [a.id, a]));
+
+        const hydratedDocs = documents.map(d => ({
+          ...d,
+          createdBy: d.createdById ? authorMap.get(d.createdById) : null
+        }));
+
+        return res.json({
+          success: true,
+          data: {
+            documents: hydratedDocs,
+            total: Number(total),
+            pagination: {
+              page: parseInt(page),
+              limit: parseInt(limit),
+              totalPages: Math.ceil(Number(total) / parseInt(limit))
+            }
+          }
+        });
+      } else {
+        // Fallback si no hay unaccent
+        where.OR = [
+          { clientName: { contains: searchTerm, mode: 'insensitive' } },
+          { clientPhone: { contains: searchTerm } },
+          { protocolNumber: { contains: searchTerm, mode: 'insensitive' } },
+          { detalle_documento: { contains: searchTerm, mode: 'insensitive' } }
+        ];
       }
-    });
+    }
+
+    // CASO 2: LISTADO ESTÁNDAR (Sin búsqueda por texto o fallback)
+    if (status && status !== 'TODOS') {
+      where.status = status;
+    }
+
+    if (tipo && tipo !== 'TODOS') {
+      where.documentType = tipo;
+    }
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [documents, total] = await Promise.all([
+      prisma.document.findMany({
+        where,
+        include: {
+          createdBy: {
+            select: { id: true, firstName: true, lastName: true, email: true }
+          }
+        },
+        orderBy: prismaOrderBy,
+        skip,
+        take: parseInt(limit)
+      }),
+      prisma.document.count({ where })
+    ]);
+
+    // También necesitamos los conteos por estado para el dashboard rápido (opcional, o en otra llamada)
+    // El frontend actualmente los usa en "byStatus".
+    // Para no romper compatibilidad, podemos devolverlos calculados globalmente (sin filtros).
+    // Esto es un poco costoso, quizá deberíamos cachearlo o hacerlo en endpoint separado.
+    // Por ahora, mantengamos el conteo global simple.
+
+    let byStatus = {};
+    // Solo calcular conteos globales si es la primera página para ahorrar recursos
+    if (parseInt(page) === 1 && !search) {
+      const counts = await prisma.document.groupBy({
+        by: ['status'],
+        where: { assignedToId: userId },
+        _count: { status: true }
+      });
+      counts.forEach(c => {
+        byStatus[c.status] = c._count.status;
+      });
+    }
 
     res.json({
       success: true,
       data: {
         documents,
-        total: documents.length,
-        byStatus: {
-          PENDIENTE: documents.filter(d => d.status === 'PENDIENTE').length,
-          EN_PROCESO: documents.filter(d => d.status === 'EN_PROCESO').length,
-          LISTO: documents.filter(d => d.status === 'LISTO').length,
-          ENTREGADO: documents.filter(d => d.status === 'ENTREGADO').length
-        }
+        total,
+        pagination: {
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(total / parseInt(limit))
+        },
+        byStatus // Puede venir vacío en paginación profunda o búsquedas
       }
     });
 
