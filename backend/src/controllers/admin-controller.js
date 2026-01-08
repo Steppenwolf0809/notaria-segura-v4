@@ -772,6 +772,23 @@ async function getDashboardStats(req, res) {
       ? Math.round((deliveredThisWeek / createdThisWeek) * 100)
       : 0;
 
+    // KPI: Pendientes y Listos
+    const pendingCount = await prisma.document.count({
+      where: {
+        status: 'PENDIENTE',
+        ...dateFilter,
+        ...matrixerFilter
+      }
+    });
+
+    const readyCount = await prisma.document.count({
+      where: {
+        status: 'LISTO',
+        ...dateFilter,
+        ...matrixerFilter
+      }
+    });
+
     // 2. Lista de Alertas / Documentos con filtros
     // Filtro base: activos (no entregados, no anulados) y warnngThreshold para atrás
     // PERO el usuario pidió filtro por ESTADO, así que si hay status param, respetamos ese status
@@ -908,23 +925,25 @@ async function getDashboardStats(req, res) {
         kpis: {
           activeCount,
           criticalCount,
-          weeklyEfficiency,
-          totalBilled // Nuevo KPI
+          pendingCount,
+          readyCount,
+          totalBilled,
+          weeklyEfficiency
         },
         criticalList: criticalDocs.map(doc => ({
           id: doc.id,
           protocol: doc.protocolNumber,
           client: doc.clientName,
           type: doc.documentType,
+          status: doc.status,
           matrixer: doc.assignedTo ? `${doc.assignedTo.firstName} ${doc.assignedTo.lastName}` : 'Sin asignar',
-          createdAt: doc.createdAt,
-          daysDelayed: Math.floor((new Date() - new Date(doc.createdAt)) / (1000 * 60 * 60 * 24)),
-          status: doc.status
+          daysDelayed: Math.floor((new Date() - new Date(doc.createdAt)) / (1000 * 60 * 60 * 24))
         })),
         pagination: {
-          page: parseInt(page),
-          hasMore,
-          total: totalDocs
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(totalDocs / parseInt(limit)),
+          totalCount: totalDocs,
+          hasMore: parseInt(page) < Math.ceil(totalDocs / parseInt(limit))
         },
         teamPerformance
       }

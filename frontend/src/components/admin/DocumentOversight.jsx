@@ -55,7 +55,8 @@ import {
   Timeline as TimelineIcon,
   Group as GroupIcon,
   Clear as ClearIcon,
-  Delete as DeleteIcon
+  Delete as DeleteIcon,
+  Sort as SortIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { useDebounce } from '../../hooks/useDebounce';
@@ -86,6 +87,8 @@ const DocumentOversight = () => {
   const [typeFilter, setTypeFilter] = useState('');
   const [matrizadorFilter, setMatrizadorFilter] = useState('');
   const [overdueOnly, setOverdueOnly] = useState(false);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState('desc');
 
@@ -133,6 +136,8 @@ const DocumentOversight = () => {
       if (typeFilter) params.append('type', typeFilter);
       if (matrizadorFilter) params.append('matrizador', matrizadorFilter);
       if (overdueOnly) params.append('overdueOnly', 'true');
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
 
       const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
       const response = await fetch(`${API_BASE_URL}/admin/documents/oversight?${params}`, {
@@ -159,7 +164,7 @@ const DocumentOversight = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, rowsPerPage, debouncedSearch, statusFilter, typeFilter, matrizadorFilter, overdueOnly, sortBy, sortOrder, token]);
+  }, [page, rowsPerPage, debouncedSearch, statusFilter, typeFilter, matrizadorFilter, overdueOnly, sortBy, sortOrder, startDate, endDate, token]);
 
   /**
    * Cargar lista de matrizadores para filtro
@@ -167,7 +172,8 @@ const DocumentOversight = () => {
   const loadMatrizadores = useCallback(async () => {
     try {
       const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
-      const response = await fetch(`${API_BASE_URL}/admin/users?role=MATRIZADOR&limit=100`, {
+      // Fetch all users to ensure we capture everyone who might have a document assigned (including admins acting as matrixers)
+      const response = await fetch(`${API_BASE_URL}/admin/users?limit=200`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -214,9 +220,10 @@ const DocumentOversight = () => {
   const clearFilters = () => {
     setSearch('');
     setStatusFilter('');
-    setTypeFilter('');
     setMatrizadorFilter('');
     setOverdueOnly(false);
+    setStartDate('');
+    setEndDate('');
     setSortBy('createdAt');
     setSortOrder('desc');
     setPage(0);
@@ -598,13 +605,7 @@ const DocumentOversight = () => {
                     size="small"
                   />
                 </Tooltip>
-                <Button
-                  size="small"
-                  startIcon={<ClearIcon />}
-                  onClick={clearFilters}
-                >
-                  Limpiar
-                </Button>
+
                 <Button
                   size="small"
                   startIcon={<RefreshIcon />}
@@ -619,40 +620,120 @@ const DocumentOversight = () => {
         </CardContent>
       </Card>
 
+      {/* Grid secundaria: Fechas + Orden */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Grid container spacing={2} alignItems="center">
+
+            {/* Filtro por Fechas */}
+            <Grid item xs={12} md={4}>
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                <TextField
+                  label="Fecha Desde"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  size="small"
+                  fullWidth={false}
+                  sx={{ minWidth: 150 }}
+                />
+                <TextField
+                  label="Fecha Hasta"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  size="small"
+                  fullWidth={false}
+                  sx={{ minWidth: 150 }}
+                />
+              </Box>
+            </Grid>
+
+            {/* Ordenar Por + Toggle Orden */}
+            <Grid item xs={12} md={5}>
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                <FormControl size="small" sx={{ minWidth: 150 }}>
+                  <InputLabel>Ordenar por</InputLabel>
+                  <Select
+                    value={sortBy}
+                    label="Ordenar por"
+                    onChange={(e) => setSortBy(e.target.value)}
+                  >
+                    <MenuItem value="createdAt">Fecha Creación</MenuItem>
+                    <MenuItem value="updatedAt">Última Actualización</MenuItem>
+                    <MenuItem value="statusChangedAt">Cambio Estado</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <Tooltip title={`Orden: ${sortOrder === 'asc' ? 'Más antiguos primero' : 'Más recientes primero'}`}>
+                  <IconButton
+                    onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+                    color="primary"
+                    sx={{ border: '1px solid', borderColor: 'divider' }}
+                  >
+                    {sortOrder === 'asc' ? <SortIcon sx={{ transform: 'scaleY(-1)' }} /> : <SortIcon />}
+                  </IconButton>
+                </Tooltip>
+                <Typography variant="caption" color="text.secondary">
+                  {sortOrder === 'asc' ? 'Antiguos → Nuevos' : 'Nuevos → Antiguos'}
+                </Typography>
+              </Box>
+            </Grid>
+
+            <Grid item xs={12} md={3} sx={{ textAlign: 'right' }}>
+              <Button
+                size="small"
+                startIcon={<ClearIcon />}
+                onClick={clearFilters}
+              >
+                Limpiar todos
+              </Button>
+            </Grid>
+
+          </Grid>
+        </CardContent>
+      </Card>
+
       {/* Operaciones en lote */}
-      {selectedDocuments.length > 0 && (
-        <Alert
-          severity="info"
-          sx={{ mb: 2 }}
-          action={
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button
-                size="small"
-                onClick={() => setShowBulkOperations(true)}
-              >
-                Acciones en Lote
-              </Button>
-              <Button
-                size="small"
-                color="error"
-                startIcon={<DeleteIcon />}
-                onClick={openBulkDeleteDialog}
-              >
-                Eliminar Seleccionados
-              </Button>
-            </Box>
-          }
-        >
-          {selectedDocuments.length} documento(s) seleccionado(s)
-        </Alert>
-      )}
+      {
+        selectedDocuments.length > 0 && (
+          <Alert
+            severity="info"
+            sx={{ mb: 2 }}
+            action={
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button
+                  size="small"
+                  onClick={() => setShowBulkOperations(true)}
+                >
+                  Acciones en Lote
+                </Button>
+                <Button
+                  size="small"
+                  color="error"
+                  startIcon={<DeleteIcon />}
+                  onClick={openBulkDeleteDialog}
+                >
+                  Eliminar Seleccionados
+                </Button>
+              </Box>
+            }
+          >
+            {selectedDocuments.length} documento(s) seleccionado(s)
+          </Alert>
+        )
+      }
 
       {/* Error */}
-      {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          {error}
-        </Alert>
-      )}
+      {
+        error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )
+      }
 
       {/* Tabla de documentos */}
       <Card>
@@ -964,7 +1045,7 @@ const DocumentOversight = () => {
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </Box >
   );
 };
 
