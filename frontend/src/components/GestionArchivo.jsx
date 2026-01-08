@@ -39,7 +39,7 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
 
     try {
       const response = await archivoService.getMisDocumentos(token, {
-        limit: 50 // Cargar más documentos para vista completa
+        limit: 500 // Cargar todos los documentos del usuario
       });
 
       if (response.success) {
@@ -121,12 +121,12 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
 
     if (error) {
       return (
-        <Alert 
-          severity="error" 
+        <Alert
+          severity="error"
           action={
-            <Button 
-              color="inherit" 
-              size="small" 
+            <Button
+              color="inherit"
+              size="small"
               onClick={cargarDocumentos}
             >
               Reintentar
@@ -140,7 +140,7 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
 
     // Solo vista de lista (similar a Recepción)
     return (
-      <ListaArchivo 
+      <ListaArchivo
         documentos={documentos}
         onEstadoChange={handleEstadoChange}
         onRefresh={handleRefresh}
@@ -150,12 +150,12 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
 
   if (loading) {
     return (
-      <Box 
-        sx={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center', 
-          height: '50vh' 
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '50vh'
         }}
       >
         <CircularProgress />
@@ -177,8 +177,8 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
 
       {/* Error Global */}
       {error && (
-        <Alert 
-          severity="error" 
+        <Alert
+          severity="error"
           onClose={clearError}
           sx={{ mb: 3 }}
         >
