@@ -128,6 +128,24 @@ const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
     }
   }, [documentoEspecifico]);
 
+  /**
+   * Handler para refrescar documentos manteniendo filtros
+   * (Pasado a ListView para recargar después de acciones)
+   */
+  const handleRefresh = useCallback(() => {
+    fetchMyDocuments({
+      page: page + 1, // API usa 1-based index
+      limit: rowsPerPage,
+      search: debouncedSearchTerm,
+      status: statusFilter,
+      tipo: typeFilter,
+      orderBy: orderBy,
+      orderDirection: orderDirection,
+      fechaDesde: fechaDesde || undefined,
+      fechaHasta: fechaHasta || undefined
+    });
+  }, [page, rowsPerPage, debouncedSearchTerm, statusFilter, typeFilter, orderBy, orderDirection, fechaDesde, fechaHasta, fetchMyDocuments]);
+
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Header simplificado */}
@@ -182,6 +200,7 @@ const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
           onPageChange={handlePageChange}
           onRowsPerPageChange={handleRowsPerPageChange}
           onSortChange={handleSortChange}
+          onRefresh={handleRefresh}
         />
       </Box>
     </Box>
