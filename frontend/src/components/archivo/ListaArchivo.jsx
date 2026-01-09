@@ -180,7 +180,27 @@ const ListaArchivo = ({
       // PERO: Si el usuario selecciona explícitamente ENTREGADO en el filtro, mostrarlos
       const matchesEntregados = filtros.mostrarEntregados || filtros.estado === 'ENTREGADO' || doc.status !== 'ENTREGADO';
 
-      return matchesSearch && matchesEstado && matchesTipo && matchesEntregados;
+      // 🆕 Filtro por rango de fechas (fechaFactura o createdAt)
+      let matchesFecha = true;
+      const docDate = doc.fechaFactura || doc.createdAt;
+      if (docDate && (filtros.fechaDesde || filtros.fechaHasta)) {
+        const docDateObj = new Date(docDate);
+        // Normalizar a inicio del día para comparación
+        const docDateNorm = new Date(docDateObj.getFullYear(), docDateObj.getMonth(), docDateObj.getDate());
+
+        if (filtros.fechaDesde) {
+          const [year, month, day] = filtros.fechaDesde.split('-').map(Number);
+          const desde = new Date(year, month - 1, day);
+          if (docDateNorm < desde) matchesFecha = false;
+        }
+        if (filtros.fechaHasta && matchesFecha) {
+          const [year, month, day] = filtros.fechaHasta.split('-').map(Number);
+          const hasta = new Date(year, month - 1, day);
+          if (docDateNorm > hasta) matchesFecha = false;
+        }
+      }
+
+      return matchesSearch && matchesEstado && matchesTipo && matchesEntregados && matchesFecha;
     }).sort((a, b) => {
       // 🆕 PRIORIDAD POR ESTADO: EN_PROCESO > LISTO > OTROS > ENTREGADO
       const prioridad = {
