@@ -43,6 +43,7 @@ import {
 } from '@mui/icons-material';
 import archivoService from '../../services/archivo-service';
 import DocumentDetailModal from '../Documents/DocumentDetailModal';
+import DateRangeFilter from '../shared/DateRangeFilter';
 import useAuth from '../../hooks/use-auth';
 import useDebounce from '../../hooks/useDebounce';
 
@@ -73,7 +74,9 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
           matrizador: parsed.matrizador ?? 'TODOS',
           estado: parsed.estado ?? 'TODOS',
           alerta: parsed.alerta ?? 'TODAS',
-          sortDias: parsed.sortDias ?? undefined
+          sortDias: parsed.sortDias ?? undefined,
+          fechaDesde: parsed.fechaDesde ?? '',
+          fechaHasta: parsed.fechaHasta ?? ''
         };
       }
     } catch (_) {
@@ -84,7 +87,9 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
       matrizador: 'TODOS',
       estado: 'TODOS',
       alerta: 'TODAS',
-      sortDias: undefined
+      sortDias: undefined,
+      fechaDesde: '',
+      fechaHasta: ''
     };
   });
 
@@ -508,6 +513,19 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
           >
             {filtros.sortDias === 'desc' ? 'Días: Mayor a menor' : filtros.sortDias === 'asc' ? 'Días: Menor a mayor' : 'Ordenar por días'}
           </Button>
+
+          {/* Filtro por rango de fechas */}
+          <DateRangeFilter
+            fechaDesde={filtros.fechaDesde || ''}
+            fechaHasta={filtros.fechaHasta || ''}
+            onFechaDesdeChange={(value) => handleFilterChange('fechaDesde', value)}
+            onFechaHastaChange={(value) => handleFilterChange('fechaHasta', value)}
+            onClear={() => {
+              handleFilterChange('fechaDesde', '');
+              handleFilterChange('fechaHasta', '');
+            }}
+            label=""
+          />
         </Box>
 
         {/* Resumen de filtros activos */}

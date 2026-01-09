@@ -21,6 +21,7 @@ import {
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon
 } from '@mui/icons-material';
+import DateRangeFilter from '../shared/DateRangeFilter';
 
 /**
  * Componente SearchAndFilters completamente separado y memoizado
@@ -36,7 +37,13 @@ const SearchAndFilters = memo(({
   onTypeFilterChange,
   debouncedSearchTerm,
   mostrarEntregados,
-  onMostrarEntregadosChange
+  onMostrarEntregadosChange,
+  // Props para filtro de fechas
+  fechaDesde,
+  fechaHasta,
+  onFechaDesdeChange,
+  onFechaHastaChange,
+  onClearDateFilter
 }) => {
   const statusLabelMap = {
     'EN_PROCESO': 'En Proceso',
@@ -47,8 +54,8 @@ const SearchAndFilters = memo(({
   return (
     <Card sx={{ mb: 1.5 }}>
       <CardContent sx={{ pb: 2 }}>
-        <Box sx={{ 
-          display: 'flex', 
+        <Box sx={{
+          display: 'flex',
           flexDirection: { xs: 'column', md: 'row' },
           gap: 2,
           alignItems: { md: 'center' }
@@ -92,7 +99,7 @@ const SearchAndFilters = memo(({
               }}
             >
               <ToggleButton value="">Todos</ToggleButton>
-              <ToggleButton 
+              <ToggleButton
                 value="EN_PROCESO"
                 sx={{
                   '&.Mui-selected': {
@@ -104,7 +111,7 @@ const SearchAndFilters = memo(({
               >
                 En Proceso
               </ToggleButton>
-              <ToggleButton 
+              <ToggleButton
                 value="LISTO"
                 sx={{
                   '&.Mui-selected': {
@@ -116,7 +123,7 @@ const SearchAndFilters = memo(({
               >
                 Listo
               </ToggleButton>
-              <ToggleButton 
+              <ToggleButton
                 value="ENTREGADO"
                 sx={{
                   '&.Mui-selected': {
@@ -169,6 +176,20 @@ const SearchAndFilters = memo(({
             sx={{ ml: { md: 'auto' } }}
           />
         </Box>
+
+        {/* Filtro por rango de fechas */}
+        {onFechaDesdeChange && onFechaHastaChange && (
+          <Box sx={{ mt: 2 }}>
+            <DateRangeFilter
+              fechaDesde={fechaDesde}
+              fechaHasta={fechaHasta}
+              onFechaDesdeChange={onFechaDesdeChange}
+              onFechaHastaChange={onFechaHastaChange}
+              onClear={onClearDateFilter}
+              label="Filtrar por fecha de factura"
+            />
+          </Box>
+        )}
 
         {/* Filtros activos */}
         {(statusFilter || typeFilter || (debouncedSearchTerm && debouncedSearchTerm.length >= 2)) && (

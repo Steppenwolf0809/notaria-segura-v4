@@ -18,6 +18,10 @@ const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
   const [typeFilter, setTypeFilter] = useState('');
   const [mostrarEntregados, setMostrarEntregados] = useState(false);
 
+  // Estado para filtros de fecha
+  const [fechaDesde, setFechaDesde] = useState('');
+  const [fechaHasta, setFechaHasta] = useState('');
+
   // Estado para paginación y ordenamiento Server-Side
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -40,9 +44,11 @@ const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
       status: statusFilter,
       tipo: typeFilter,
       orderBy: orderBy,
-      orderDirection: orderDirection
+      orderDirection: orderDirection,
+      fechaDesde: fechaDesde || undefined,
+      fechaHasta: fechaHasta || undefined
     });
-  }, [page, rowsPerPage, debouncedSearchTerm, statusFilter, typeFilter, orderBy, orderDirection]);
+  }, [page, rowsPerPage, debouncedSearchTerm, statusFilter, typeFilter, orderBy, orderDirection, fechaDesde, fechaHasta]);
 
   /**
    * Handlers memoizados para evitar re-renders
@@ -96,6 +102,25 @@ const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
+  /**
+   * Handlers para filtros de fecha
+   */
+  const handleFechaDesdeChange = useCallback((value) => {
+    setFechaDesde(value);
+    setPage(0);
+  }, []);
+
+  const handleFechaHastaChange = useCallback((value) => {
+    setFechaHasta(value);
+    setPage(0);
+  }, []);
+
+  const handleClearDateFilter = useCallback(() => {
+    setFechaDesde('');
+    setFechaHasta('');
+    setPage(0);
+  }, []);
+
   // Efecto para manejar navegación específica desde alertas
   useEffect(() => {
     if (documentoEspecifico && documentoEspecifico.autoSearch) {
@@ -128,6 +153,12 @@ const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
           debouncedSearchTerm={debouncedSearchTerm}
           mostrarEntregados={mostrarEntregados}
           onMostrarEntregadosChange={handleMostrarEntregadosChange}
+          // Props para filtro de fechas
+          fechaDesde={fechaDesde}
+          fechaHasta={fechaHasta}
+          onFechaDesdeChange={handleFechaDesdeChange}
+          onFechaHastaChange={handleFechaHastaChange}
+          onClearDateFilter={handleClearDateFilter}
         />
       </Box>
 

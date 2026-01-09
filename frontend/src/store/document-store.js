@@ -655,9 +655,23 @@ const useDocumentStore = create((set, get) => ({
     const toIndex = statusOrder.indexOf(toStatus);
     const isReversion = fromIndex > toIndex;
 
-    // NUEVA LÓGICA: Para MATRIZADOR y ARCHIVO, entrega directa simplificada
+    // NUEVA LÓGICA: Para MATRIZADOR y ARCHIVO, marcar LISTO sin confirmación
     if ((userRole === 'MATRIZADOR' || userRole === 'ARCHIVO') &&
-      fromStatus === 'LISTO' && toStatus === 'ENTREGADO') {
+      fromStatus === 'EN_PROCESO' && toStatus === 'LISTO') {
+      return {
+        requiresConfirmation: false,
+        isCritical: false,
+        isReversion: false,
+        isDirectDelivery: false,
+        type: 'normal',
+        reason: 'Cambio directo a LISTO por matrizador/archivo',
+        userRole: userRole
+      };
+    }
+
+    // NUEVA LÓGICA: Para MATRIZADOR y ARCHIVO, entrega directa simplificada (desde LISTO o EN_PROCESO)
+    if ((userRole === 'MATRIZADOR' || userRole === 'ARCHIVO') &&
+      (fromStatus === 'LISTO' || fromStatus === 'EN_PROCESO') && toStatus === 'ENTREGADO') {
       return {
         requiresConfirmation: true,
         isCritical: false,
