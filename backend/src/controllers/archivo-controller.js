@@ -123,7 +123,9 @@ async function listarMisDocumentos(req, res) {
       estado,
       tipo,
       orderBy,
-      orderDirection
+      orderDirection,
+      fechaDesde,
+      fechaHasta
     });
 
     const cached = await cache.get(cacheKey);
