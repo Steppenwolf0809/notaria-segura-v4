@@ -1,24 +1,36 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Button, Typography } from '@mui/material';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { es } from 'date-fns/locale';
-import { Clear as ClearIcon } from '@mui/icons-material';
+import { Clear as ClearIcon, Search as SearchIcon } from '@mui/icons-material';
 
 /**
  * Componente reutilizable de filtro de rango de fechas
  * Utiliza MUI X Date Pickers con estilo dark mode compatible
+ * Requiere clic en "Aplicar" para ejecutar el filtro
  */
 const DateRangeFilter = ({
     fechaDesde,
     fechaHasta,
     onFechaDesdeChange,
     onFechaHastaChange,
+    onApply,
     onClear,
     label = 'Filtrar por fecha',
     size = 'small'
 }) => {
+    // Estado interno para manejar las fechas antes de aplicar
+    const [localDesde, setLocalDesde] = useState(fechaDesde || '');
+    const [localHasta, setLocalHasta] = useState(fechaHasta || '');
+
+    // Sincronizar con props externas cuando cambian
+    useEffect(() => {
+        setLocalDesde(fechaDesde || '');
+        setLocalHasta(fechaHasta || '');
+    }, [fechaDesde, fechaHasta]);
+
     // Convertir string ISO a Date para el DatePicker
     const parseDate = (dateStr) => {
         if (!dateStr) return null;
@@ -32,7 +44,32 @@ const DateRangeFilter = ({
         return date.toISOString().split('T')[0];
     };
 
-    const hasFilters = fechaDesde || fechaHasta;
+    const hasLocalFilters = localDesde || localHasta;
+    const hasAppliedFilters = fechaDesde || fechaHasta;
+
+    // Verificar si hay cambios pendientes de aplicar
+    const hasPendingChanges = localDesde !== (fechaDesde || '') || localHasta !== (fechaHasta || '');
+
+    const handleApply = () => {
+        if (onApply) {
+            onApply(localDesde, localHasta);
+        } else {
+            // Fallback: llamar a los handlers individuales
+            if (onFechaDesdeChange) onFechaDesdeChange(localDesde);
+            if (onFechaHastaChange) onFechaHastaChange(localHasta);
+        }
+    };
+
+    const handleClear = () => {
+        setLocalDesde('');
+        setLocalHasta('');
+        if (onClear) {
+            onClear();
+        } else {
+            if (onFechaDesdeChange) onFechaDesdeChange('');
+            if (onFechaHastaChange) onFechaHastaChange('');
+        }
+    };
 
     return (
         <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
@@ -45,8 +82,8 @@ const DateRangeFilter = ({
 
                 <DatePicker
                     label="Fecha Desde"
-                    value={parseDate(fechaDesde)}
-                    onChange={(newValue) => onFechaDesdeChange(formatDate(newValue))}
+                    value={parseDate(localDesde)}
+                    onChange={(newValue) => setLocalDesde(formatDate(newValue))}
                     slotProps={{
                         textField: {
                             size,
@@ -61,9 +98,9 @@ const DateRangeFilter = ({
 
                 <DatePicker
                     label="Fecha Hasta"
-                    value={parseDate(fechaHasta)}
-                    onChange={(newValue) => onFechaHastaChange(formatDate(newValue))}
-                    minDate={parseDate(fechaDesde)}
+                    value={parseDate(localHasta)}
+                    onChange={(newValue) => setLocalHasta(formatDate(newValue))}
+                    minDate={parseDate(localDesde)}
                     slotProps={{
                         textField: {
                             size,
@@ -76,12 +113,32 @@ const DateRangeFilter = ({
                     format="dd/MM/yyyy"
                 />
 
-                {hasFilters && onClear && (
+                {/* Botón Aplicar - visible cuando hay cambios pendientes */}
+                {hasLocalFilters && (
+                    <Button
+                        size="small"
+                        variant="contained"
+                        color="primary"
+                        onClick={handleApply}
+                        startIcon={<SearchIcon />}
+                        disabled={!hasPendingChanges && hasAppliedFilters}
+                        sx={{
+                            textTransform: 'none',
+                            minWidth: 'auto',
+                            px: 2
+                        }}
+                    >
+                        Aplicar
+                    </Button>
+                )}
+
+                {/* Botón Limpiar - visible cuando hay filtros aplicados */}
+                {(hasLocalFilters || hasAppliedFilters) && (
                     <Button
                         size="small"
                         variant="outlined"
                         color="secondary"
-                        onClick={onClear}
+                        onClick={handleClear}
                         startIcon={<ClearIcon />}
                         sx={{
                             textTransform: 'none',
@@ -98,3 +155,4 @@ const DateRangeFilter = ({
 };
 
 export default DateRangeFilter;
+
