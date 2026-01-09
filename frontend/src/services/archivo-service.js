@@ -41,6 +41,8 @@ const getMisDocumentos = async (token, params = {}) => {
     if (params.orderDirection) queryParams.append('orderDirection', params.orderDirection);
     if (params.page) queryParams.append('page', params.page);
     if (params.limit) queryParams.append('limit', params.limit);
+    if (params.fechaDesde) queryParams.append('fechaDesde', params.fechaDesde);
+    if (params.fechaHasta) queryParams.append('fechaHasta', params.fechaHasta);
 
     const response = await apiClient.get(`/archivo/mis-documentos?${queryParams.toString()}`);
     return response.data;

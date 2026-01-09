@@ -957,11 +957,21 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                 <DateRangeFilter
                   fechaDesde={filters.fechaDesde}
                   fechaHasta={filters.fechaHasta}
-                  onFechaDesdeChange={(value) => handleFilterChange('fechaDesde', value)}
-                  onFechaHastaChange={(value) => handleFilterChange('fechaHasta', value)}
+                  onApply={(desde, hasta) => {
+                    setFilters(prev => ({
+                      ...prev,
+                      fechaDesde: desde,
+                      fechaHasta: hasta
+                    }));
+                    setPage(0);
+                  }}
                   onClear={() => {
-                    handleFilterChange('fechaDesde', '');
-                    handleFilterChange('fechaHasta', '');
+                    setFilters(prev => ({
+                      ...prev,
+                      fechaDesde: '',
+                      fechaHasta: ''
+                    }));
+                    setPage(0);
                   }}
                   label=""
                 />

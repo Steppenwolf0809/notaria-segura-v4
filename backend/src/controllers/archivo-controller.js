@@ -90,13 +90,28 @@ async function listarMisDocumentos(req, res) {
       orderBy = 'updatedAt',
       orderDirection = 'desc',
       page = 1,
-      limit = 10
+      limit = 10,
+      fechaDesde,
+      fechaHasta
     } = req.query;
 
     // Filtros base
     const where = {
       assignedToId: userId
     };
+
+    // Filtro por rango de fechas (fechaFactura)
+    if (fechaDesde || fechaHasta) {
+      where.fechaFactura = {};
+      if (fechaDesde) {
+        where.fechaFactura.gte = new Date(fechaDesde);
+      }
+      if (fechaHasta) {
+        const endDate = new Date(fechaHasta);
+        endDate.setDate(endDate.getDate() + 1);
+        where.fechaFactura.lt = endDate;
+      }
+    }
 
     // Caché por usuario + filtros
     const cacheKey = cache.key({
@@ -147,11 +162,25 @@ async function listarMisDocumentos(req, res) {
           statusFilter = Prisma.sql`AND d."status" = ${estado}`;
         }
 
+        // Filtro por rango de fechas (fechaFactura) para raw SQL
+        let dateFilter = Prisma.sql``;
+        if (fechaDesde && fechaHasta) {
+          const endDate = new Date(fechaHasta);
+          endDate.setDate(endDate.getDate() + 1);
+          dateFilter = Prisma.sql`AND d."fechaFactura" >= ${new Date(fechaDesde)} AND d."fechaFactura" < ${endDate}`;
+        } else if (fechaDesde) {
+          dateFilter = Prisma.sql`AND d."fechaFactura" >= ${new Date(fechaDesde)}`;
+        } else if (fechaHasta) {
+          const endDate = new Date(fechaHasta);
+          endDate.setDate(endDate.getDate() + 1);
+          dateFilter = Prisma.sql`AND d."fechaFactura" < ${endDate}`;
+        }
+
         // Construcción dinámica de ORDER BY SQL
         let orderSql = Prisma.sql`d."updatedAt" DESC`;
         if (orderBy !== 'prioridad') { // Si es prioridad, mantenemos updatedAt por ahora en búsqueda
           // Mapeo seguro de columnas para evitar inyección
-          const allowedCols = ['createdAt', 'updatedAt', 'clientName', 'protocolNumber', 'totalFactura', 'status'];
+          const allowedCols = ['createdAt', 'updatedAt', 'clientName', 'protocolNumber', 'totalFactura', 'status', 'fechaFactura'];
           const safeCol = allowedCols.includes(orderBy) ? orderBy : 'updatedAt';
           const safeDir = orderDirection.toLowerCase() === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
 
@@ -168,6 +197,7 @@ async function listarMisDocumentos(req, res) {
           WHERE d."assignedToId" = ${req.user.id} 
           ${statusFilter}
           ${typeFilter}
+          ${dateFilter}
           AND (
             unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
             unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
@@ -184,6 +214,7 @@ async function listarMisDocumentos(req, res) {
           WHERE d."assignedToId" = ${req.user.id} 
           ${statusFilter}
           ${typeFilter}
+          ${dateFilter}
           AND (
             unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
             unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR

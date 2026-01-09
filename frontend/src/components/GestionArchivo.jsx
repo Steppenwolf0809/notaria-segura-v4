@@ -74,7 +74,9 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
         estado: rFiltros.estado === 'TODOS' ? undefined : rFiltros.estado,
         tipo: rFiltros.tipo === 'TODOS' ? undefined : rFiltros.tipo,
         orderBy: rOrderBy,
-        orderDirection: rOrder
+        orderDirection: rOrder,
+        fechaDesde: rFiltros.fechaDesde || undefined,
+        fechaHasta: rFiltros.fechaHasta || undefined
       });
 
       if (response.success) {
