@@ -21,6 +21,14 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalDocuments, setTotalDocuments] = useState(0);
 
+  // Auth token
+  const { token } = useAuth();
+
+  // Local state for documents
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [error, setError] = useState(null);
+  const [documentos, setDocumentos] = useState([]);
+
   // Filtros iniciales persistidos
   const [filtros, setFiltros] = useState(() => {
     try {
@@ -126,6 +134,17 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
     setOrder(direction);
     cargarDocumentos({ orderBy: property, order: direction });
   };
+
+  const handleRefresh = () => {
+    cargarDocumentos();
+    if (onDataUpdate) onDataUpdate();
+  };
+
+  const handleEstadoChange = (nuevoEstado) => {
+    handleFilterChange({ ...filtros, estado: nuevoEstado });
+  };
+
+  const clearError = () => setError(null);
 
   /**
    * Renderizar contenido principal
