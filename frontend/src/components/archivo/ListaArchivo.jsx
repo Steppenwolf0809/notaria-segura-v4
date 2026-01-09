@@ -64,6 +64,7 @@ import GroupingDetector from '../grouping/GroupingDetector';
 import useBulkActions from '../../hooks/useBulkActions';
 import BulkActionToolbar from '../bulk/BulkActionToolbar';
 import BulkStatusChangeModal from '../bulk/BulkStatusChangeModal';
+import DateRangeFilter from '../shared/DateRangeFilter';
 import { toast } from 'react-toastify';
 
 /**
@@ -1073,6 +1074,19 @@ const ListaArchivo = ({
           >
             Refrescar
           </Button>
+
+          {/* Filtro por rango de fechas */}
+          <DateRangeFilter
+            fechaDesde={filtros.fechaDesde || ''}
+            fechaHasta={filtros.fechaHasta || ''}
+            onFechaDesdeChange={(value) => handleFilterChange('fechaDesde', value)}
+            onFechaHastaChange={(value) => handleFilterChange('fechaHasta', value)}
+            onClear={() => {
+              handleFilterChange('fechaDesde', '');
+              handleFilterChange('fechaHasta', '');
+            }}
+            label=""
+          />
 
           {/* 🆕 Toggle para mostrar/ocultar ENTREGADOS */}
           <FormControlLabel

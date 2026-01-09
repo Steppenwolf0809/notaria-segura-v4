@@ -294,7 +294,7 @@ async function cambiarEstadoDocumento(req, res) {
     // Validar transición de estado
     const transicionesValidas = {
       'PENDIENTE': ['EN_PROCESO'],
-      'EN_PROCESO': ['PENDIENTE', 'LISTO'],
+      'EN_PROCESO': ['PENDIENTE', 'LISTO', 'ENTREGADO'],  // Permitir entrega directa
       'LISTO': ['EN_PROCESO', 'ENTREGADO']
     };
 

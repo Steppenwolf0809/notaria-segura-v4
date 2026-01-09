@@ -609,7 +609,9 @@ async function getMyDocuments(req, res) {
       orderBy = 'updatedAt',
       orderDirection = 'desc',
       page = 1,
-      limit = 10
+      limit = 10,
+      fechaDesde, // Filtro por fecha desde (fechaFactura)
+      fechaHasta  // Filtro por fecha hasta (fechaFactura)
     } = req.query;
 
     const userId = req.user.id;
@@ -645,10 +647,24 @@ async function getMyDocuments(req, res) {
           statusFilter = Prisma.sql`AND d."status" = ${status}`;
         }
 
+        // Filtro por rango de fechas (fechaFactura)
+        let dateFilter = Prisma.sql``;
+        if (fechaDesde && fechaHasta) {
+          const endDate = new Date(fechaHasta);
+          endDate.setDate(endDate.getDate() + 1);
+          dateFilter = Prisma.sql`AND d."fechaFactura" >= ${new Date(fechaDesde)} AND d."fechaFactura" < ${endDate}`;
+        } else if (fechaDesde) {
+          dateFilter = Prisma.sql`AND d."fechaFactura" >= ${new Date(fechaDesde)}`;
+        } else if (fechaHasta) {
+          const endDate = new Date(fechaHasta);
+          endDate.setDate(endDate.getDate() + 1);
+          dateFilter = Prisma.sql`AND d."fechaFactura" < ${endDate}`;
+        }
+
         // Construcción dinámica de ORDER BY SQL
         let orderSql = Prisma.sql`d."updatedAt" DESC`;
         if (orderBy !== 'prioridad') {
-          const allowedCols = ['createdAt', 'updatedAt', 'clientName', 'protocolNumber', 'totalFactura', 'status'];
+          const allowedCols = ['createdAt', 'updatedAt', 'clientName', 'protocolNumber', 'totalFactura', 'status', 'fechaFactura'];
           const safeCol = allowedCols.includes(orderBy) ? orderBy : 'updatedAt';
           const safeDir = orderDirection.toLowerCase() === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
           orderSql = Prisma.sql([`d."${safeCol}" ${safeDir === Prisma.sql`ASC` ? 'ASC' : 'DESC'}`]);
@@ -662,6 +678,7 @@ async function getMyDocuments(req, res) {
           WHERE d."assignedToId" = ${req.user.id} 
           ${statusFilter}
           ${typeFilter}
+          ${dateFilter}
           AND (
             unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
             unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
@@ -678,6 +695,7 @@ async function getMyDocuments(req, res) {
           WHERE d."assignedToId" = ${req.user.id} 
           ${statusFilter}
           ${typeFilter}
+          ${dateFilter}
           AND (
             unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
             unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
@@ -736,6 +754,20 @@ async function getMyDocuments(req, res) {
 
     if (tipo && tipo !== 'TODOS') {
       where.documentType = tipo;
+    }
+
+    // Filtro por rango de fechas (fechaFactura)
+    if (fechaDesde || fechaHasta) {
+      where.fechaFactura = {};
+      if (fechaDesde) {
+        where.fechaFactura.gte = new Date(fechaDesde);
+      }
+      if (fechaHasta) {
+        // Agregar 1 día para incluir todo el día final
+        const endDate = new Date(fechaHasta);
+        endDate.setDate(endDate.getDate() + 1);
+        where.fechaFactura.lt = endDate;
+      }
     }
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -884,12 +916,12 @@ async function updateDocumentStatus(req, res) {
           message: 'Solo puedes modificar documentos asignados a ti'
         });
       }
-      // Matrizadores pueden marcar como ENTREGADO sus documentos LISTO
+      // Matrizadores pueden marcar como ENTREGADO sus documentos LISTO o EN_PROCESO (entrega directa)
       if (status === 'ENTREGADO') {
-        if (document.status !== 'LISTO') {
+        if (!['LISTO', 'EN_PROCESO'].includes(document.status)) {
           return res.status(403).json({
             success: false,
-            message: 'Solo se pueden entregar documentos que estén LISTO'
+            message: 'Solo se pueden entregar documentos que estén LISTO o EN PROCESO'
           });
         }
         updateData.usuarioEntregaId = req.user.id;
@@ -905,12 +937,12 @@ async function updateDocumentStatus(req, res) {
           message: 'Solo puedes modificar documentos asignados a ti'
         });
       }
-      // Puede entregar documentos directamente como MATRIZADOR sobre sus propios documentos
+      // Puede entregar documentos directamente como MATRIZADOR sobre sus propios documentos (LISTO o EN_PROCESO)
       if (status === 'ENTREGADO') {
-        if (document.status !== 'LISTO') {
+        if (!['LISTO', 'EN_PROCESO'].includes(document.status)) {
           return res.status(403).json({
             success: false,
-            message: 'Solo se pueden entregar documentos que estén LISTO'
+            message: 'Solo se pueden entregar documentos que estén LISTO o EN PROCESO'
           });
         }
         updateData.usuarioEntregaId = req.user.id;
