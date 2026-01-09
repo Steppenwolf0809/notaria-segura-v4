@@ -5042,6 +5042,241 @@ async function getCajaStats(req, res) {
   }
 }
 
+/**
+ * 📱 NUEVA FUNCIONALIDAD: Notificación masiva WhatsApp con agrupación por cliente
+ * PUT /api/documents/bulk-notify
+ * - Agrupa documentos por clientPhone (anti-spam: 1 mensaje por cliente)
+ * - Genera código de retiro único para el lote
+ * - Actualiza ultimoRecordatorio timestamp
+ * @param {Object} req - Request object
+ * @param {Object} res - Response object
+ */
+async function bulkNotify(req, res) {
+  try {
+    const { documentIds, sendWhatsApp = true } = req.body;
+
+    console.log('📱 bulkNotify iniciado:', {
+      documentIds,
+      sendWhatsApp,
+      user: `${req.user.firstName} ${req.user.lastName} (${req.user.role})`
+    });
+
+    // Validar permisos
+    if (!['ADMIN', 'RECEPCION', 'ARCHIVO', 'MATRIZADOR'].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para enviar notificaciones'
+      });
+    }
+
+    // Validar documentIds
+    if (!documentIds || !Array.isArray(documentIds) || documentIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Debe proporcionar al menos un ID de documento'
+      });
+    }
+
+    // Obtener documentos con información necesaria
+    const documents = await prisma.document.findMany({
+      where: {
+        id: { in: documentIds },
+        status: { in: ['LISTO', 'EN_PROCESO'] } // Solo documentos que pueden notificarse
+      },
+      include: {
+        assignedTo: {
+          select: { firstName: true, lastName: true }
+        }
+      }
+    });
+
+    if (documents.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No se encontraron documentos válidos para notificar'
+      });
+    }
+
+    // Agrupar documentos por cliente (clientPhone) para anti-spam
+    const groupedByClient = {};
+    const documentsWithoutPhone = [];
+
+    for (const doc of documents) {
+      if (doc.clientPhone && doc.clientPhone.trim()) {
+        const phone = doc.clientPhone.trim();
+        if (!groupedByClient[phone]) {
+          groupedByClient[phone] = {
+            clientName: doc.clientName,
+            clientPhone: phone,
+            documents: []
+          };
+        }
+        groupedByClient[phone].documents.push(doc);
+      } else {
+        documentsWithoutPhone.push(doc);
+      }
+    }
+
+    // Importar servicio de código de retiro
+    const CodigoRetiroService = (await import('../utils/codigo-retiro.js')).default;
+
+    const results = {
+      notificados: [],
+      sinTelefono: [],
+      errores: []
+    };
+
+    const now = new Date();
+
+    // Procesar cada grupo de cliente
+    for (const [phone, clientGroup] of Object.entries(groupedByClient)) {
+      try {
+        // Generar código único para el lote de este cliente
+        const codigoRetiro = await CodigoRetiroService.generarUnico();
+
+        // Actualizar todos los documentos del grupo con el código y timestamp
+        const documentIdsToUpdate = clientGroup.documents.map(d => d.id);
+
+        await prisma.document.updateMany({
+          where: { id: { in: documentIdsToUpdate } },
+          data: {
+            codigoRetiro: codigoRetiro,
+            ultimoRecordatorio: now,
+            fechaListo: { set: now } // Solo si es la primera vez
+          }
+        });
+
+        // Registrar evento de auditoría para cada documento
+        for (const doc of clientGroup.documents) {
+          await prisma.documentEvent.create({
+            data: {
+              documentId: doc.id,
+              userId: req.user.id,
+              eventType: 'WHATSAPP_NOTIFICATION',
+              description: `Notificación WhatsApp preparada. Código: ${codigoRetiro}`,
+              details: JSON.stringify({
+                codigoRetiro,
+                clientPhone: phone,
+                documentosEnLote: documentIdsToUpdate.length,
+                timestamp: now.toISOString()
+              })
+            }
+          });
+        }
+
+        // Generar URL wa.me si se solicita envío
+        let waUrl = null;
+        if (sendWhatsApp) {
+          // Formatear teléfono para WhatsApp (Ecuador: 593...)
+          let formattedPhone = phone.replace(/[\s\-\(\)]/g, '');
+          if (formattedPhone.startsWith('0')) {
+            formattedPhone = '593' + formattedPhone.substring(1);
+          } else if (!formattedPhone.startsWith('593') && !formattedPhone.startsWith('+593')) {
+            formattedPhone = '593' + formattedPhone;
+          }
+          formattedPhone = formattedPhone.replace('+', '');
+
+          // Construir mensaje
+          const docList = clientGroup.documents.map(d =>
+            `• ${d.documentType} - ${d.protocolNumber}`
+          ).join('\n');
+
+          const message = `🏛️ *NOTARÍA DÉCIMO OCTAVA*\n\nEstimado/a ${clientGroup.clientName},\n\n` +
+            `Sus documentos están listos para retiro:\n${docList}\n\n` +
+            `🔢 *Código de retiro:* ${codigoRetiro}\n\n` +
+            `⚠️ Presente este código en ventanilla.\n📍 Azuay E2-231 y Av Amazonas, Quito`;
+
+          waUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
+        }
+
+        results.notificados.push({
+          clientName: clientGroup.clientName,
+          clientPhone: phone,
+          codigoRetiro,
+          documentCount: clientGroup.documents.length,
+          documentIds: documentIdsToUpdate,
+          waUrl
+        });
+
+        console.log(`✅ Cliente ${clientGroup.clientName} notificado con código ${codigoRetiro}`);
+
+      } catch (error) {
+        console.error(`❌ Error procesando cliente ${clientGroup.clientName}:`, error);
+        results.errores.push({
+          clientName: clientGroup.clientName,
+          clientPhone: phone,
+          error: error.message
+        });
+      }
+    }
+
+    // Procesar documentos sin teléfono (generar código interno)
+    for (const doc of documentsWithoutPhone) {
+      try {
+        const codigoRetiro = await CodigoRetiroService.generarUnico();
+
+        await prisma.document.update({
+          where: { id: doc.id },
+          data: {
+            codigoRetiro,
+            fechaListo: now
+            // No actualizar ultimoRecordatorio porque no se envió notificación
+          }
+        });
+
+        await prisma.documentEvent.create({
+          data: {
+            documentId: doc.id,
+            userId: req.user.id,
+            eventType: 'CODIGO_GENERADO',
+            description: `Código interno generado (sin WhatsApp): ${codigoRetiro}`,
+            details: JSON.stringify({
+              codigoRetiro,
+              sinTelefono: true,
+              timestamp: now.toISOString()
+            })
+          }
+        });
+
+        results.sinTelefono.push({
+          id: doc.id,
+          protocolNumber: doc.protocolNumber,
+          clientName: doc.clientName,
+          codigoRetiro,
+          mensaje: 'Código generado internamente. Cliente sin teléfono - requiere verificación manual.'
+        });
+
+      } catch (error) {
+        results.errores.push({
+          documentId: doc.id,
+          protocolNumber: doc.protocolNumber,
+          error: error.message
+        });
+      }
+    }
+
+    console.log('📱 bulkNotify completado:', {
+      notificados: results.notificados.length,
+      sinTelefono: results.sinTelefono.length,
+      errores: results.errores.length
+    });
+
+    res.json({
+      success: true,
+      message: `Notificación procesada: ${results.notificados.length} clientes notificados, ${results.sinTelefono.length} sin teléfono`,
+      data: results
+    });
+
+  } catch (error) {
+    console.error('❌ Error en bulkNotify:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor al procesar notificaciones',
+      error: error.message
+    });
+  }
+}
+
 export {
   uploadXmlDocument,
   uploadXmlDocumentsBatch,
@@ -5088,5 +5323,7 @@ export {
   // 💳 NUEVA FUNCIONALIDAD: Nota de Crédito
   markAsNotaCredito,
   // 📊 NUEVA FUNCIONALIDAD: Estadísticas de CAJA
-  getCajaStats
+  getCajaStats,
+  // 📱 NUEVA FUNCIONALIDAD: Notificaciones WhatsApp masivas
+  bulkNotify
 };

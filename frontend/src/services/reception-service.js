@@ -347,7 +347,7 @@ const receptionService = {
         newStatus,
         reversionReason
       });
-      
+
 
       if (response.data.success === true) {
         return {
@@ -395,11 +395,36 @@ const receptionService = {
   async getNotificationHistory(params = {}) {
     try {
       const response = await api.get('/reception/notificaciones', { params });
-      
-      
+
+
       return {
         success: true,
         data: response.data.data
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: receptionService.handleError(error)
+      };
+    }
+  },
+
+  /**
+   * Notificación masiva WhatsApp
+   * @param {Array} documentIds - IDs de documentos a notificar
+   * @param {boolean} sendWhatsApp - Si se debe generar URL de WhatsApp
+   * @returns {Promise<Object>} Resultado de la notificación
+   */
+  async bulkNotify(documentIds, sendWhatsApp = true) {
+    try {
+      const response = await api.put('/documents/bulk-notify', {
+        documentIds,
+        sendWhatsApp
+      });
+      return {
+        success: true,
+        data: response.data.data,
+        message: response.data.message
       };
     } catch (error) {
       return {

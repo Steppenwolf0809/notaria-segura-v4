@@ -179,27 +179,58 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
           </Alert>
         )}
 
+        {/* 🔐 ZONA DE CÓDIGO DE RETIRO - Prominente */}
+        <Box sx={{
+          p: 3,
+          bgcolor: (theme) => documento.codigoRetiro
+            ? (theme.palette.mode === 'dark' ? 'rgba(46, 125, 50, 0.15)' : '#E8F5E9')
+            : (theme.palette.mode === 'dark' ? 'rgba(237, 108, 2, 0.15)' : '#FFF3E0'),
+          border: (theme) => `2px solid ${documento.codigoRetiro ? theme.palette.success.main : theme.palette.warning.main}`,
+          borderRadius: 2,
+          textAlign: 'center',
+          mb: 3
+        }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            🔢 Código de Retiro
+          </Typography>
+          <Typography
+            variant="h2"
+            sx={{
+              fontFamily: 'monospace',
+              fontWeight: 'bold',
+              color: (theme) => documento.codigoRetiro ? theme.palette.success.main : theme.palette.warning.main,
+              letterSpacing: '0.15em'
+            }}
+          >
+            {documento.codigoRetiro || '----'}
+          </Typography>
+          {documento.codigoRetiro ? (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              👆 Solicite este código al cliente antes de entregar
+            </Typography>
+          ) : (
+            <Alert severity="warning" sx={{ mt: 2, textAlign: 'left' }}>
+              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                ⚠️ No se generó código de retiro
+              </Typography>
+              <Typography variant="body2">
+                Este documento no fue notificado por WhatsApp. Use "Verificación Manual" abajo.
+              </Typography>
+            </Alert>
+          )}
+        </Box>
+
+        {/* Información del documento */}
         <Box sx={{ p: 2, bgcolor: (theme) => theme.palette.background.default, borderRadius: 2, mb: 3 }}>
           <Typography variant="h6" sx={{ mb: 1 }}>
             📄 {documento.clientName}
           </Typography>
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}>
+            <Grid item xs={12} sm={6}>
               <Typography variant="body2"><strong>Protocolo:</strong> {documento.protocolNumber}</Typography>
             </Grid>
-            <Grid item xs={12} sm={4}>
+            <Grid item xs={12} sm={6}>
               <Typography variant="body2"><strong>Tipo:</strong> {documento.documentType}</Typography>
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <Typography variant="body2">
-                <strong>Código:</strong>
-                <Chip
-                  label={documento.codigoRetiro || documento.verificationCode || 'N/A'}
-                  size="small"
-                  color="success"
-                  sx={{ ml: 1, fontFamily: 'monospace', fontWeight: 'bold' }}
-                />
-              </Typography>
             </Grid>
           </Grid>
         </Box>
@@ -269,15 +300,54 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
               />
             </Grid>
 
+            {/* 🔐 Checkbox de Verificación Manual (Fallback) */}
+            <Grid item xs={12}>
+              <Box sx={{
+                p: 2,
+                border: '1px dashed',
+                borderColor: formData.verificacionManual ? 'warning.main' : 'grey.400',
+                borderRadius: 1,
+                bgcolor: formData.verificacionManual ? 'warning.light' : 'transparent'
+              }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.verificacionManual}
+                      onChange={handleChange}
+                      name="verificacionManual"
+                      color="warning"
+                    />
+                  }
+                  label={
+                    <Typography variant="body2" fontWeight="bold">
+                      Verificación Alternativa (Sin Código)
+                    </Typography>
+                  }
+                />
+
+                {formData.verificacionManual && (
+                  <Alert severity="warning" size="small" sx={{ mt: 1 }}>
+                    <Typography variant="caption">
+                      ⚠️ Está autorizando una entrega manual. Es obligatorio verificar la identidad física y registrar el motivo.
+                    </Typography>
+                  </Alert>
+                )}
+              </Box>
+            </Grid>
+
             <Grid item xs={12}>
               <TextField
                 fullWidth
                 multiline
                 rows={3}
-                label="Observaciones (opcional)"
+                required={formData.verificacionManual}
+                label={formData.verificacionManual ? "Observación obligatoria (Motivo entrega manual)" : "Observaciones (opcional)"}
                 name="observaciones"
                 value={formData.observaciones}
                 onChange={handleChange}
+                placeholder={formData.verificacionManual ? "Ej: Cliente perdió celular, verifiqué cédula física..." : ""}
+                error={formData.verificacionManual && !formData.observaciones}
+                helperText={formData.verificacionManual && !formData.observaciones ? "Debe explicar el motivo de la entrega manual" : ""}
               />
             </Grid>
           </Grid>
@@ -290,11 +360,11 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
         <Button
           onClick={handleSubmit}
           variant="contained"
-          color="primary"
-          disabled={loading}
+          disabled={loading || (formData.verificacionManual && !formData.observaciones)}
+          color={formData.verificacionManual ? "warning" : "primary"}
           startIcon={loading ? <CircularProgress size={20} /> : null}
         >
-          {loading ? 'Procesando...' : 'Confirmar Entrega'}
+          {loading ? 'Procesando...' : (formData.verificacionManual ? '⚠️ Confirmar Entrega Manual' : 'Confirmar Entrega')}
         </Button>
       </DialogActions>
     </Dialog>

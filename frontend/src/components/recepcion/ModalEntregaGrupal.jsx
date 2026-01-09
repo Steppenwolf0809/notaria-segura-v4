@@ -184,14 +184,51 @@ function ModalEntregaGrupal({ documentos, onClose, onEntregaExitosa, serviceType
                 </Grid>
 
                 <Grid item xs={12}>
+                  <Box sx={{
+                    p: 2,
+                    border: '1px dashed',
+                    borderColor: formData.verificacionManual ? 'warning.main' : 'grey.400',
+                    borderRadius: 1,
+                    bgcolor: formData.verificacionManual ? 'warning.light' : 'transparent',
+                    mb: 2
+                  }}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={formData.verificacionManual}
+                          onChange={handleChange}
+                          name="verificacionManual"
+                          color="warning"
+                        />
+                      }
+                      label={
+                        <Typography variant="body2" fontWeight="bold">
+                          Verificación Alternativa (Sin Código)
+                        </Typography>
+                      }
+                    />
+
+                    {formData.verificacionManual && (
+                      <Alert severity="warning" size="small" sx={{ mt: 1 }}>
+                        <Typography variant="caption">
+                          ⚠️ Está autorizando una entrega manual. Es obligatorio verificar la identidad física y registrar el motivo.
+                        </Typography>
+                      </Alert>
+                    )}
+                  </Box>
+
                   <TextField
                     fullWidth
                     multiline
                     rows={3}
-                    label="Observaciones (opcional)"
+                    required={formData.verificacionManual}
+                    label={formData.verificacionManual ? "Observación obligatoria (Motivo entrega manual)" : "Observaciones (opcional)"}
                     name="observaciones"
                     value={formData.observaciones}
                     onChange={handleChange}
+                    placeholder={formData.verificacionManual ? "Ej: Cliente perdió celular, verifiqué cédula física..." : ""}
+                    error={formData.verificacionManual && !formData.observaciones}
+                    helperText={formData.verificacionManual && !formData.observaciones ? "Debe explicar el motivo de la entrega manual" : ""}
                   />
                 </Grid>
               </Grid>
@@ -201,18 +238,40 @@ function ModalEntregaGrupal({ documentos, onClose, onEntregaExitosa, serviceType
           {/* Columna Derecha: Resumen de Documentos */}
           <Grid item xs={12} md={6}>
             <Box sx={{ p: 2, bgcolor: (theme) => theme.palette.background.default, borderRadius: 2, height: '100%' }}>
-              <Typography variant="h6" sx={{ mb: 1 }}>
+              <Typography variant="h6" sx={{ mb: 2 }}>
                 Documentos para {clienteNombre}
               </Typography>
-              <Typography variant="body2" sx={{ mb: 2 }}>
-                <strong>Código Grupal:</strong>
-                <Chip
-                  label={documentos[0]?.codigoRetiro || 'N/A'}
-                  size="small"
-                  color="success"
-                  sx={{ ml: 1, fontFamily: 'monospace', fontWeight: 'bold' }}
-                />
-              </Typography>
+
+              {/* 🔐 ZONA DE CÓDIGO - Prominente Simplificada */}
+              <Box sx={{
+                p: 2,
+                bgcolor: (theme) => documentos[0]?.codigoRetiro
+                  ? (theme.palette.mode === 'dark' ? 'rgba(46, 125, 50, 0.15)' : '#E8F5E9')
+                  : (theme.palette.mode === 'dark' ? 'rgba(237, 108, 2, 0.15)' : '#FFF3E0'),
+                border: (theme) => `2px solid ${documentos[0]?.codigoRetiro ? theme.palette.success.main : theme.palette.warning.main}`,
+                borderRadius: 2,
+                textAlign: 'center',
+                mb: 3
+              }}>
+                <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                  CÓDIGO DE RETIRO GRUPAL
+                </Typography>
+                <Typography
+                  variant="h3"
+                  sx={{
+                    fontFamily: 'monospace',
+                    fontWeight: 'bold',
+                    color: (theme) => documentos[0]?.codigoRetiro ? theme.palette.success.main : theme.palette.warning.main
+                  }}
+                >
+                  {documentos[0]?.codigoRetiro || '----'}
+                </Typography>
+                {!documentos[0]?.codigoRetiro && (
+                  <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 1 }}>
+                    (No generado)
+                  </Typography>
+                )}
+              </Box>
               <List dense>
                 {documentos.map(doc => (
                   <ListItem key={doc.id}>
@@ -237,11 +296,11 @@ function ModalEntregaGrupal({ documentos, onClose, onEntregaExitosa, serviceType
         <Button
           onClick={handleSubmit}
           variant="contained"
-          color="primary"
-          disabled={loading}
+          disabled={loading || (formData.verificacionManual && !formData.observaciones)}
+          color={formData.verificacionManual ? "warning" : "primary"}
           startIcon={loading ? <CircularProgress size={20} /> : null}
         >
-          {loading ? 'Procesando...' : 'Confirmar Entrega Grupal'}
+          {loading ? 'Procesando...' : (formData.verificacionManual ? '⚠️ Confirmar Entrega Manual' : 'Confirmar Entrega Grupal')}
         </Button>
       </DialogActions>
     </Dialog>

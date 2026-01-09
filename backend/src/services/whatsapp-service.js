@@ -17,7 +17,7 @@ class WhatsAppService {
         // Compatibilidad: aceptar TWILIO_PHONE_NUMBER si TWILIO_WHATSAPP_FROM no está definido
         this.fromNumber = process.env.TWILIO_WHATSAPP_FROM || process.env.TWILIO_PHONE_NUMBER;
         this.isDevelopment = process.env.NODE_ENV === 'development';
-        
+
         // Configuración de la notaría
         this.notariaConfig = {
             nombre: process.env.NOTARIA_NOMBRE || "NOTARÍA DECIMO OCTAVA DEL CANTÓN QUITO",
@@ -103,15 +103,16 @@ class WhatsAppService {
      * Soporta números ecuatorianos con/sin código de país
      */
     formatPhoneNumber(phoneNumber, countryCode = 'EC') {
+        if (!phoneNumber) return null;
         try {
             // Limpiar el número (remover espacios, guiones, paréntesis)
             let cleanNumber = phoneNumber.toString().replace(/[\s\-\(\)]/g, '');
-            
+
             // Si ya tiene el prefijo whatsapp:, devolverlo tal como está
             if (cleanNumber.startsWith('whatsapp:')) {
                 return cleanNumber;
             }
-            
+
             // Si ya tiene +, intentar parsear directamente
             if (cleanNumber.startsWith('+')) {
                 const parsed = parsePhoneNumber(cleanNumber);
@@ -119,7 +120,7 @@ class WhatsAppService {
                     return `whatsapp:${parsed.number}`;
                 }
             }
-            
+
             // Para números ecuatorianos sin +593
             if (cleanNumber.length === 10 && cleanNumber.startsWith('0')) {
                 // Remover el 0 inicial y agregar código de país
@@ -128,17 +129,17 @@ class WhatsAppService {
                 // Número celular sin 0 inicial
                 cleanNumber = '593' + cleanNumber;
             }
-            
+
             // Agregar + si no lo tiene
             if (!cleanNumber.startsWith('+')) {
                 cleanNumber = '+' + cleanNumber;
             }
-            
+
             const parsed = parsePhoneNumber(cleanNumber, countryCode);
             if (parsed && parsed.isValid()) {
                 return `whatsapp:${parsed.number}`;
             }
-            
+
             console.warn(`⚠️ Número inválido: ${phoneNumber}`);
             return null;
         } catch (error) {
@@ -195,21 +196,21 @@ class WhatsAppService {
             return await this._sendAndUpdate({ pendingId: pending?.id, numeroWhatsApp, mensaje });
         } catch (error) {
             console.error('❌ Error enviando WhatsApp:', error);
-            
+
             // En desarrollo, hacer fallback a simulación en lugar de fallar
             if (this.isDevelopment) {
                 console.log('🔄 Fallback a simulación en desarrollo debido a:', error.message);
-                
+
                 // Crear resultado de simulación
                 const simulationResult = this.simularEnvio(cliente, documento, codigo, 'documento_listo');
-                
+
                 if (pending?.id) await this.updateNotification(pending.id, { status: 'SIMULATED', messageId: simulationResult.messageId, errorMessage: `Fallback a simulación por error: ${error.message}`, sentAt: new Date() });
-                
+
                 return simulationResult;
             }
-            
+
             if (pending?.id) await this.updateNotification(pending.id, { status: 'FAILED', errorMessage: error.message });
-            
+
             throw error;
         }
     }
@@ -233,7 +234,7 @@ class WhatsAppService {
         const pending = await this.saveNotification(notificationData);
 
         if (!this.isEnabled || !this.client) {
-            const simulationResult = this.simularEnvio(documento, datosEntrega, 'documento_entregado');
+            const simulationResult = this.simularEnvio(cliente, documento, datosEntrega, 'documento_entregado');
             if (pending?.id) await this.updateNotification(pending.id, { status: 'SIMULATED', messageId: simulationResult.messageId, sentAt: new Date() });
             return simulationResult;
         }
@@ -259,21 +260,21 @@ class WhatsAppService {
             return await this._sendAndUpdate({ pendingId: pending?.id, numeroWhatsApp, mensaje });
         } catch (error) {
             console.error('❌ Error enviando WhatsApp de entrega:', error);
-            
+
             // En desarrollo, hacer fallback a simulación en lugar de fallar
             if (this.isDevelopment) {
                 console.log('🔄 Fallback a simulación en desarrollo debido a:', error.message);
-                
+
                 // Crear resultado de simulación
                 const simulationResult = this.simularEnvio(cliente, documento, datosEntrega, 'documento_entregado');
-                
+
                 if (pending?.id) await this.updateNotification(pending.id, { status: 'SIMULATED', messageId: simulationResult.messageId, errorMessage: `Fallback a simulación por error: ${error.message}`, sentAt: new Date() });
-                
+
                 return simulationResult;
             }
-            
+
             if (pending?.id) await this.updateNotification(pending.id, { status: 'FAILED', errorMessage: error.message });
-            
+
             throw error;
         }
     }
@@ -325,7 +326,7 @@ class WhatsAppService {
     async enviarGrupoDocumentosListo(cliente, documentos, codigo) {
         const clientName = cliente.clientName || cliente.nombre;
         const clientPhone = cliente.clientPhone || cliente.telefono;
-        
+
         const mensaje = await this.generarMensajeGrupoListo(cliente, documentos, codigo);
 
         // Preparar datos para guardar en BD (igual que documentos individuales)
@@ -353,14 +354,14 @@ class WhatsAppService {
             console.log(`Para: ${simulationResult.to}`);
             console.log(`Mensaje: ${mensaje}`);
             console.log('════════════════════════════════════════════════\n');
-            
+
             // Guardar como simulada en BD
             await this.saveNotification({
                 ...notificationData,
                 status: 'SIMULATED',
                 messageId: simulationResult.messageId
             });
-            
+
             return simulationResult;
         }
 
@@ -395,10 +396,10 @@ class WhatsAppService {
             return { success: true, messageId: result.sid, to: numeroWhatsApp, message: mensaje, timestamp: new Date().toISOString() };
         } catch (error) {
             console.error('❌ Error enviando WhatsApp de grupo:', error);
-            
+
             if (this.isDevelopment) {
                 console.log('🔄 Fallback a simulación en desarrollo debido a:', error.message);
-                
+
                 // En desarrollo, simular después del error
                 const simulationResult = {
                     success: true,
@@ -408,7 +409,7 @@ class WhatsAppService {
                     simulated: true,
                     timestamp: new Date().toISOString()
                 };
-                
+
                 // Guardar SOLO como simulada (no como fallida)
                 await this.saveNotification({
                     ...notificationData,
@@ -416,17 +417,17 @@ class WhatsAppService {
                     messageId: simulationResult.messageId,
                     errorMessage: `Fallback a simulación por error: ${error.message}`
                 });
-                
+
                 return simulationResult;
             }
-            
+
             // En producción, guardar como error y fallar
             await this.saveNotification({
                 ...notificationData,
                 status: 'FAILED',
                 errorMessage: error.message
             });
-            
+
             throw error;
         }
     }
@@ -445,17 +446,17 @@ class WhatsAppService {
         if (!Array.isArray(documentos) || documentos.length === 0) {
             return '';
         }
-        
+
         // Si es un solo documento, mostrar código individual
         if (documentos.length === 1) {
             const codigo = this.extraerCodigoEscritura(documentos[0]);
             return codigo ? `📋 *Código de escritura:* ${codigo}` : '';
         }
-        
+
         // Múltiples documentos - mostrar lista
         const codigos = documentos.map(doc => this.extraerCodigoEscritura(doc)).filter(Boolean);
         if (codigos.length === 0) return '';
-        
+
         return '📋 *Códigos de escritura:*\n' + codigos.map((codigo, index) => `${index + 1}. ${codigo}`).join('\n');
     }
 
@@ -464,11 +465,11 @@ class WhatsAppService {
      */
     extraerCodigoEscritura(documento) {
         // Intentar obtener código de diferentes campos
-        return documento.codigoEscritura || 
-               documento.protocolNumber || 
-               documento.numero_documento ||
-               documento.numeroProtocolo ||
-               null;
+        return documento.codigoEscritura ||
+            documento.protocolNumber ||
+            documento.numero_documento ||
+            documento.numeroProtocolo ||
+            null;
     }
 
     /**
@@ -487,11 +488,11 @@ class WhatsAppService {
             ].filter(Boolean);
             return partes.join('\n');
         }
-        
+
         if (documentos.length === 1) {
             return this.generarDocumentosDetalle(documentos[0], false);
         }
-        
+
         // Múltiples documentos
         return documentos.map((doc, index) => {
             const tipoDoc = doc.documentType || doc.tipo_documento || doc.tipoDocumento || 'Documento';
@@ -511,11 +512,11 @@ class WhatsAppService {
      */
     replaceTemplateVariables(templateMessage, variables) {
         let mensaje = templateMessage;
-        
+
         // Determinar si es entrega individual o múltiple
         const esEntregaMultiple = variables.cantidadDocumentos > 1 || (variables.documentos && Array.isArray(variables.documentos) && variables.documentos.length > 1);
         const tipoEntrega = esEntregaMultiple ? 'sus documentos' : 'su documento';
-        
+
         // Detectar acto principal desde diferentes fuentes
         const firstDoc = Array.isArray(variables.documentos) && variables.documentos.length > 0
             ? variables.documentos[0]
@@ -529,9 +530,9 @@ class WhatsAppService {
             || '';
 
         // Generar sección de cédula condicional
-        const seccionCedula = (variables.receptor_cedula || variables.cedulaReceptor) ? 
+        const seccionCedula = (variables.receptor_cedula || variables.cedulaReceptor) ?
             `🆔 *Cédula:* ${variables.receptor_cedula || variables.cedulaReceptor}` : '';
-        
+
         // Variables disponibles (expandidas)
         const availableVariables = {
             // Variables básicas (compatibilidad)
@@ -540,7 +541,7 @@ class WhatsAppService {
             codigo: variables.codigo || 'XXXX',
             notaria: this.notariaConfig.nombre,
             fecha: variables.fecha || formatDateTime(new Date()),
-            
+
             // Variables mejoradas
             nombreCompareciente: variables.nombreCompareciente || variables.cliente || 'Cliente',
             nombreNotariaCompleto: this.notariaConfig.nombre,
@@ -549,11 +550,11 @@ class WhatsAppService {
             contactoConsultas: process.env.NOTARIA_CONTACTO || 'Tel: (02) 2234-567',
             actoPrincipal: actoPrincipalDetectado,
             actoPrincipalValor: actoPrincipalValorDetectado,
-            
+
             // Variables de códigos
             codigosEscritura: this.generarCodigosEscritura(variables.documentos || [variables]),
             cantidadDocumentos: variables.cantidadDocumentos || (variables.documentos ? variables.documentos.length : 1),
-            listaDocumentosCompleta: variables.documentos ? 
+            listaDocumentosCompleta: variables.documentos ?
                 variables.documentos.map((doc, i) => {
                     const tipo = doc.documentType || doc.tipo_documento || 'Documento';
                     const codEscritura = this.extraerCodigoEscritura(doc);
@@ -576,16 +577,16 @@ class WhatsAppService {
                     ].filter(Boolean);
                     return partes.join(' - ');
                 })(),
-            
+
             // Variables condicionales
             nombreRetirador: variables.receptor_nombre || variables.nombreRetirador || variables.entregado_a || variables.deliveredTo || variables.cliente || 'Cliente',
             cedulaRetirador: variables.receptor_cedula || variables.cedulaReceptor || '',
             seccionCedula: seccionCedula,
             tipoEntrega: tipoEntrega,
-            
+
             // Variables de formato para entrega
             documentosDetalle: this.generarDocumentosDetalle(variables.documentos || variables, esEntregaMultiple),
-            
+
             // Variables para templates de entrega (compatibilidad)
             receptor_nombre: variables.receptor_nombre || variables.nombreRetirador || variables.entregado_a || variables.deliveredTo || '',
             receptor_cedula: variables.receptor_cedula || variables.cedulaReceptor || '',
@@ -607,13 +608,13 @@ class WhatsAppService {
     async generarMensajeDocumentoListoFromTemplate(cliente, documento, codigo) {
         try {
             const template = await getActiveTemplateByType('DOCUMENTO_LISTO');
-            
+
             const variables = {
                 // Variables básicas
                 cliente: cliente.nombre || cliente.clientName || 'Cliente',
                 documento: documento.tipo_documento || documento.tipoDocumento || documento.documentType || 'Documento',
                 codigo: codigo,
-                
+
                 // Variables mejoradas
                 nombreCompareciente: cliente.nombre || cliente.clientName || 'Cliente',
                 documentos: [documento], // Para generar códigos de escritura
@@ -637,16 +638,16 @@ class WhatsAppService {
     async generarMensajeDocumentoEntregadoFromTemplate(cliente, documento, datosEntrega) {
         try {
             const template = await getActiveTemplateByType('DOCUMENTO_ENTREGADO');
-            
+
             const fechaEntrega = datosEntrega.fechaEntrega || datosEntrega.fecha || new Date();
-            
+
             const variables = {
                 // Variables básicas
                 cliente: cliente.nombre || cliente.clientName || 'Cliente',
                 documento: documento.tipo_documento || documento.tipoDocumento || documento.documentType || 'Documento',
                 codigo: datosEntrega.codigo || '',
                 fecha: formatDateTime(fechaEntrega),
-                
+
                 // Variables mejoradas
                 nombreCompareciente: cliente.nombre || cliente.clientName || 'Cliente',
                 fechaEntrega: fechaEntrega,
@@ -659,7 +660,7 @@ class WhatsAppService {
                 // Acto principal (individual o primer doc del grupo)
                 actoPrincipal: documento.actoPrincipalDescripcion || (Array.isArray(datosEntrega.documentos) && datosEntrega.documentos[0]?.actoPrincipalDescripcion) || '',
                 actoPrincipalValor: documento.actoPrincipalValor || (Array.isArray(datosEntrega.documentos) && datosEntrega.documentos[0]?.actoPrincipalValor) || '',
-                
+
                 // Variables de entrega
                 receptor_nombre: datosEntrega.entregadoA || datosEntrega.entregado_a || datosEntrega.deliveredTo || '',
                 receptor_cedula: datosEntrega.cedulaReceptor || datosEntrega.cedula_receptor || '',
@@ -729,18 +730,18 @@ Estimado/a ${nombreCliente},
         try {
             // Intentar usar template de BD si está disponible
             const template = await getActiveTemplateByType('DOCUMENTO_LISTO');
-            
+
             const variables = {
                 // Variables básicas
                 cliente: cliente.nombre || cliente.clientName || 'Cliente',
                 codigo: codigo,
-                
+
                 // Variables mejoradas para grupo
                 nombreCompareciente: cliente.nombre || cliente.clientName || 'Cliente',
                 documentos: Array.isArray(documentos) ? documentos : [documentos],
                 cantidadDocumentos: Array.isArray(documentos) ? documentos.length : 1
             };
-            
+
             return this.replaceTemplateVariables(template.mensaje, variables);
         } catch (error) {
             console.error('Error usando template de BD para grupo, usando fallback:', error);
@@ -804,21 +805,29 @@ Para consultas: ${process.env.NOTARIA_CONTACTO || 'Tel: (02) 2234-567'}
     /**
      * Simular envío para desarrollo/testing
      */
-    simularEnvio(documento, datos, tipo) {
-        const numeroSimulado = this.formatPhoneNumber(documento.clientPhone) || 
-                              `whatsapp:+593987654321`;
-        
+    simularEnvio(cliente, documento, datos, tipo) {
+        // En caso de firma vieja (3 args), reajustar
+        if (arguments.length === 3 && typeof datos === 'string') {
+            tipo = datos;
+            datos = documento;
+            documento = cliente;
+            cliente = { clientName: documento.clientName, clientPhone: documento.clientPhone };
+        }
+
+        const numeroSimulado = this.formatPhoneNumber(cliente?.clientPhone || cliente?.telefono) ||
+            `whatsapp:+593987654321`;
+
         let mensaje;
-        let cliente = { clientName: documento.clientName };
+        const clientData = { clientName: cliente?.clientName || cliente?.nombre || 'Cliente' };
         switch (tipo) {
             case 'documento_listo':
-                mensaje = this.generarMensajeDocumentoListo(cliente, documento, datos);
+                mensaje = this.generarMensajeDocumentoListo(clientData, documento, datos);
                 break;
             case 'documento_entregado':
-                mensaje = this.generarMensajeDocumentoEntregado(cliente, documento, datos);
+                mensaje = this.generarMensajeDocumentoEntregado(clientData, documento, datos);
                 break;
             case 'grupo_listo':
-                mensaje = this.generarMensajeGrupoListo(cliente, documento, datos);
+                mensaje = this.generarMensajeGrupoListo(clientData, documento, datos);
                 break;
             default:
                 mensaje = 'Mensaje de prueba';
@@ -848,8 +857,8 @@ Para consultas: ${process.env.NOTARIA_CONTACTO || 'Tel: (02) 2234-567'}
      */
     async verificarConfiguracion() {
         if (!this.isEnabled) {
-            return { 
-                status: 'disabled', 
+            return {
+                status: 'disabled',
                 message: 'WhatsApp deshabilitado en configuración',
                 config: {
                     enabled: false,
@@ -873,7 +882,7 @@ Para consultas: ${process.env.NOTARIA_CONTACTO || 'Tel: (02) 2234-567'}
 
         if (!this.client) {
             return {
-                status: 'error', 
+                status: 'error',
                 message: 'Cliente Twilio no inicializado',
                 config: {
                     enabled: true,
