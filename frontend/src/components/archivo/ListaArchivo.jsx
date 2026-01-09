@@ -1558,12 +1558,12 @@ const ListaArchivo = ({
         {/* Paginación */}
         <TablePagination
           component="div"
-          count={documentosFiltrados.length}
+          count={serverSide ? totalDocuments : documentosFiltrados.length}
           page={page}
           onPageChange={handleChangePage}
           rowsPerPage={rowsPerPage}
           onRowsPerPageChange={handleChangeRowsPerPage}
-          rowsPerPageOptions={[5, 10, 25, 50]}
+          rowsPerPageOptions={[10, 25, 50, 100, 200]}
           labelRowsPerPage="Filas por página:"
           labelDisplayedRows={({ from, to, count }) =>
             `${from}-${to} de ${count !== -1 ? count : `más de ${to}`}`
