@@ -775,7 +775,9 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   };
 
   // Calcular documentos paginados
-  const documentosPaginados = documentos.slice(page * rowsPerPage, (page + 1) * rowsPerPage);
+  // CORRECCIÓN: Si es paginación server-side, los documentos ya vienen paginados y corresponden a la página actual.
+  // No debemos hacer slice usando page * rowsPerPage porque el array solo contiene los elementos de la página.
+  const documentosPaginados = documentosOrdenados;
 
   // Prefetch de conteos por cliente para los documentos visibles
   useEffect(() => {

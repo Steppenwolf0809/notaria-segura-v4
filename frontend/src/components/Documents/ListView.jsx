@@ -51,9 +51,9 @@ import { toast } from 'react-toastify';
 const ListView = ({
   searchTerm, statusFilter, typeFilter, mostrarEntregados = false, onSearchByClient,
   serverSide = false, pageProp = 0, rowsPerPageProp = 10, totalDocuments = 0, loadingProp = false,
-  onPageChange, onRowsPerPageChange, onSortChange
+  onPageChange, onRowsPerPageChange, onSortChange, onRefresh
 }) => {
-  const { documents, updateDocumentStatus, updateDocument, createDocumentGroup, detectGroupableDocuments, fetchMyDocuments } = useDocumentStore();
+  const { documents, updateDocumentStatus, updateDocument, createDocumentGroup, detectGroupableDocuments } = useDocumentStore();
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [page, setPage] = useState(0);
@@ -262,7 +262,7 @@ const ListView = ({
         toast.success('Documento marcado como LISTO.');
       }
       // 🔄 Refrescar lista para ver cambios inmediatamente
-      await fetchMyDocuments();
+      if (onRefresh) onRefresh();
     } else {
       toast.error(result.error || 'Error al marcar como LISTO');
     }
@@ -284,7 +284,7 @@ const ListView = ({
         toast.success('Documento marcado como ENTREGADO.');
       }
       // 🔄 Refrescar lista para ver cambios inmediatamente
-      await fetchMyDocuments();
+      if (onRefresh) onRefresh();
     } else {
       toast.error(result.error || 'Error al marcar como ENTREGADO');
     }
@@ -391,8 +391,8 @@ const ListView = ({
       );
 
       // Refrescar la lista para reflejar estados actualizados
-      if (result && result.success && typeof fetchMyDocuments === 'function') {
-        await fetchMyDocuments();
+      if (result && result.success && onRefresh) {
+        onRefresh();
       }
     } catch (error) {
       // TODO: Mostrar notificación de error
@@ -727,7 +727,7 @@ const ListView = ({
           onConfirm={async ({ documentId, newStatus, reversionReason }) => {
             await updateDocumentStatus(documentId, newStatus, { reversionReason });
             // 🔄 Refrescar lista para ver cambios inmediatamente
-            await fetchMyDocuments();
+            if (onRefresh) onRefresh();
             closeReversion();
           }}
         />
