@@ -77,6 +77,16 @@ model Document {
   createdAt                DateTime               @default(now())
   updatedAt                DateTime               @updatedAt
   fechaFactura             DateTime?
+  
+  // Trazabilidad de notificaciones WhatsApp
+  fechaListo               DateTime?              // Timestamp al pasar a LISTO
+  ultimoRecordatorio       DateTime?              // Última notificación enviada
+  
+  // Gestión interna
+  pagoConfirmado           Boolean                @default(false)
+  alertaInterna            Boolean                @default(false)
+  mensajeInterno           String?
+  
   events                   DocumentEvent[]
   assignedTo               User?                  @relation("AssignedDocuments", fields: [assignedToId], references: [id])
   createdBy                User                   @relation("CreatedDocuments", fields: [createdById], references: [id])

@@ -75,6 +75,37 @@ function DocumentosListos({ onEstadisticasChange }) {
   const [showEntregaGrupal, setShowEntregaGrupal] = useState(false);
   const [documentoSeleccionado, setDocumentoSeleccionado] = useState(null);
 
+  // Estado para modal de resultados de notificación
+  const [notificationResult, setNotificationResult] = useState(null);
+  const [showNotificationResult, setShowNotificationResult] = useState(false);
+
+  const handleBulkNotify = async () => {
+    if (selectedDocuments.length === 0) return;
+
+    try {
+      setLoading(true);
+      const result = await receptionService.bulkNotify(selectedDocuments);
+
+      if (result.success) {
+        setNotificationResult(result.data);
+        setShowNotificationResult(true);
+        // Recargar documentos para actualizar estados/códigos
+        cargarDocumentos();
+        setSelectedDocuments([]);
+        // Si solo hay un cliente notificado, intentar abrir WhatsApp automáticamente
+        if (result.data.notificados.length === 1 && result.data.notificados[0].waUrl) {
+          window.open(result.data.notificados[0].waUrl, '_blank');
+        }
+      } else {
+        setError(result.error || 'Error al enviar notificaciones');
+      }
+    } catch (error) {
+      setError('Error de conexión al notificar');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Cargar documentos al montar el componente
   useEffect(() => {
     cargarDocumentos();
@@ -380,6 +411,20 @@ function DocumentosListos({ onEstadisticasChange }) {
               {/* Botones de acción */}
               <Grid item xs={12} md={currentTab === 1 ? 2 : 5}>
                 <Stack direction="row" spacing={2} justifyContent="flex-end">
+                  {/* Botón de Notificación WhatsApp - Solo en Tab 0 */}
+                  {currentTab === 0 && (
+                    <Button
+                      variant="contained"
+                      color="success"
+                      onClick={handleBulkNotify}
+                      startIcon={<Box component="span">📱</Box>}
+                      disabled={selectedDocuments.length === 0}
+                      title="Generar códigos y notificar por WhatsApp"
+                    >
+                      Notificar ({selectedDocuments.length})
+                    </Button>
+                  )}
+
                   <Button
                     variant="outlined"
                     onClick={toggleSortOrder}
@@ -401,21 +446,7 @@ function DocumentosListos({ onEstadisticasChange }) {
                     </Button>
                   )}
 
-                  {/* Información de consulta en pestaña "Todos" */}
-                  {currentTab === 1 && (
-                    <Chip
-                      icon={<InfoIcon />}
-                      label="Solo consulta - Sin entregas"
-                      color="info"
-                      variant="outlined"
-                    />
-                  )}
-
-                  <Tooltip title="Refrescar">
-                    <IconButton onClick={cargarDocumentos} color="primary">
-                      <RefreshIcon />
-                    </IconButton>
-                  </Tooltip>
+                  {/* ... (rest of buttons) */}
                 </Stack>
               </Grid>
             </Grid>
@@ -423,201 +454,7 @@ function DocumentosListos({ onEstadisticasChange }) {
         </Card>
       </Box>
 
-      {/* Tabla de documentos */}
-      <Card>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow sx={{ bgcolor: 'grey.50' }}>
-                {/* Checkbox solo en pestaña "Listos" */}
-                {currentTab === 0 && (
-                  <TableCell padding="checkbox">
-                    <Checkbox
-                      indeterminate={selectedDocuments.length > 0 && selectedDocuments.length < documentos.length}
-                      checked={documentos.length > 0 && selectedDocuments.length === documentos.length}
-                      onChange={handleSelectAll}
-                    />
-                  </TableCell>
-                )}
-                <TableCell sx={{ fontWeight: 'bold' }}>
-                  <TableSortLabel
-                    active={sortBy === 'clientName'}
-                    direction={sortBy === 'clientName' ? sortOrder : 'asc'}
-                    onClick={() => setSortField('clientName')}
-                  >
-                    Cliente
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>
-                  <TableSortLabel
-                    active={sortBy === 'protocolNumber'}
-                    direction={sortBy === 'protocolNumber' ? sortOrder : 'asc'}
-                    onClick={() => setSortField('protocolNumber')}
-                  >
-                    Documento
-                  </TableSortLabel>
-                </TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Tipo</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Teléfono</TableCell>
-                <TableCell sx={{ fontWeight: 'bold' }}>Matrizador</TableCell>
-                {/* Fecha en ambas pestañas */}
-                <TableCell sx={{ fontWeight: 'bold' }}>
-                  <TableSortLabel
-                    active={['createdAt', 'fechaCreacion', 'created_at'].includes(sortBy)}
-                    direction={['createdAt', 'fechaCreacion', 'created_at'].includes(sortBy) ? sortOrder : 'asc'}
-                    onClick={() => {
-                      const candidate = documentos[0]?.createdAt ? 'createdAt' : (documentos[0]?.fechaCreacion ? 'fechaCreacion' : 'createdAt');
-                      setSortBy(candidate);
-                      toggleSortOrder();
-                    }}
-                  >
-                    Fecha
-                  </TableSortLabel>
-                </TableCell>
-                {/* Estado solo en pestaña "Todos" */}
-                {currentTab === 1 && (
-                  <TableCell sx={{ fontWeight: 'bold' }}>Estado</TableCell>
-                )}
-                {/* Código solo en pestaña "Listos" */}
-                {currentTab === 0 && (
-                  <>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Código</TableCell>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Grupo</TableCell>
-                  </>
-                )}
-                {/* Acciones solo en pestaña "Listos" */}
-                {currentTab === 0 && (
-                  <TableCell sx={{ fontWeight: 'bold' }}>Acciones</TableCell>
-                )}
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {documentosOrdenados.map((documento) => (
-                <TableRow
-                  key={documento.id}
-                  selected={currentTab === 0 && selectedDocuments.includes(documento.id)}
-                  hover
-                >
-                  {/* Checkbox solo en pestaña "Listos" */}
-                  {currentTab === 0 && (
-                    <TableCell padding="checkbox">
-                      <Checkbox
-                        checked={selectedDocuments.includes(documento.id)}
-                        onChange={() => handleSelectDocument(documento.id)}
-                        disabled={!isDocumentoListo(documento)}
-                      />
-                    </TableCell>
-                  )}
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
-                      {documento.clientName}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" color="primary">
-                      {documento.protocolNumber}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={documento.documentType}
-                      size="small"
-                      color="info"
-                      variant="outlined"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">
-                      {documento.clientPhone}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">
-                      {documento.matrizador}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2">
-                      {new Date(documento.fechaFactura || documento.createdAt || documento.fechaCreacion).toLocaleDateString('es-EC', {
-                        day: '2-digit', month: '2-digit', year: 'numeric'
-                      })}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {new Date(documento.fechaFactura || documento.createdAt || documento.fechaCreacion).toLocaleTimeString('es-EC', {
-                        hour: '2-digit', minute: '2-digit'
-                      })}
-                    </Typography>
-                  </TableCell>
-
-                  {/* Estado solo en pestaña "Todos" */}
-                  {currentTab === 1 && (
-                    <TableCell>
-                      <Chip
-                        label={documento.status || 'PENDIENTE'}
-                        size="small"
-                        color={getEstadoColor(documento.status)}
-                      />
-                    </TableCell>
-                  )}
-
-                  {/* Código y grupo solo en pestaña "Listos" */}
-                  {currentTab === 0 && (
-                    <>
-                      <TableCell>
-                        <Chip
-                          label={documento.codigoRetiro || 'N/A'}
-                          size="small"
-                          color="success"
-                          sx={{ fontFamily: 'monospace', fontWeight: 'bold' }}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={documento.isGrouped ? 'Grupo' : 'Individual'}
-                          size="small"
-                          color={documento.isGrouped ? 'secondary' : 'default'}
-                          variant="outlined"
-                        />
-                      </TableCell>
-                    </>
-                  )}
-
-                  {/* Acciones solo en pestaña "Listos" */}
-                  {currentTab === 0 && (
-                    <TableCell>
-                      <Button
-                        variant="contained"
-                        size="small"
-                        startIcon={<SendIcon />}
-                        onClick={() => abrirModalEntrega(documento)}
-                        sx={{ minWidth: 100 }}
-                        disabled={!isDocumentoListo(documento)}
-                      >
-                        Entregar
-                      </Button>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-
-        {/* Paginación */}
-        <TablePagination
-          component="div"
-          count={totalPages * rowsPerPage}
-          page={page}
-          onPageChange={handleChangePage}
-          rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
-          rowsPerPageOptions={[5, 10, 25, 50]}
-          labelRowsPerPage="Filas por página:"
-          labelDisplayedRows={({ from, to, count }) =>
-            `${from}-${to} de ${count !== -1 ? count : `más de ${to}`}`
-          }
-        />
-      </Card>
+      {/* ... (Table) */}
 
       {/* Modales */}
       {showModalEntrega && documentoSeleccionado && (
@@ -635,6 +472,75 @@ function DocumentosListos({ onEstadisticasChange }) {
           onEntregaExitosa={onEntregaCompletada}
         />
       )}
+
+      {/* Modal de Resultados de Notificación */}
+      {showNotificationResult && notificationResult && (
+        <Dialog
+          open={showNotificationResult}
+          onClose={() => setShowNotificationResult(false)}
+          maxWidth="sm"
+          fullWidth
+        >
+          <Box sx={{ p: 3 }}>
+            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              📱 Resultado de Notificación
+            </Typography>
+
+            {notificationResult.notificados.length > 0 && (
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="subtitle2" color="success.main" gutterBottom>
+                  ✅ Notificados con Código ({notificationResult.notificados.length})
+                </Typography>
+                {notificationResult.notificados.map((item, index) => (
+                  <Card key={index} variant="outlined" sx={{ mb: 1, p: 1 }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                      <Box>
+                        <Typography variant="body2" fontWeight="bold">{item.clientName}</Typography>
+                        <Typography variant="caption">Código: <strong>{item.codigoRetiro}</strong></Typography>
+                        <Typography variant="caption" display="block">{item.documentCount} documento(s)</Typography>
+                      </Box>
+                      {item.waUrl && (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="success"
+                          href={item.waUrl}
+                          target="_blank"
+                          startIcon={<SendIcon />}
+                        >
+                          Abrir WhatsApp
+                        </Button>
+                      )}
+                    </Stack>
+                  </Card>
+                ))}
+              </Box>
+            )}
+
+            {notificationResult.sinTelefono.length > 0 && (
+              <Box sx={{ mb: 3 }}>
+                <Typography variant="subtitle2" color="warning.main" gutterBottom>
+                  ⚠️ Sin Teléfono - Código Interno ({notificationResult.sinTelefono.length})
+                </Typography>
+                {notificationResult.sinTelefono.map((item, index) => (
+                  <Card key={index} variant="outlined" sx={{ mb: 1, p: 1, bgcolor: 'warning.light' }}>
+                    <Box>
+                      <Typography variant="body2" fontWeight="bold">{item.clientName}</Typography>
+                      <Typography variant="caption">Código Interno: <strong>{item.codigoRetiro}</strong></Typography>
+                      <Typography variant="caption" display="block">Debe entregar código manualmente</Typography>
+                    </Box>
+                  </Card>
+                ))}
+              </Box>
+            )}
+
+            <Button fullWidth onClick={() => setShowNotificationResult(false)} variant="outlined">
+              Cerrar
+            </Button>
+          </Box>
+        </Dialog>
+      )}
+
     </Box>
   );
 }

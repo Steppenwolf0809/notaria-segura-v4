@@ -46,7 +46,9 @@ import {
   // 💳 NUEVA FUNCIONALIDAD: Nota de Crédito
   markAsNotaCredito,
   // 📊 NUEVA FUNCIONALIDAD: Estadísticas de CAJA
-  getCajaStats
+  getCajaStats,
+  // 📱 NUEVA FUNCIONALIDAD: Notificaciones WhatsApp masivas
+  bulkNotify
 } from '../controllers/document-controller.js';
 
 // 🔄 NUEVAS IMPORTACIONES: Operaciones masivas
@@ -190,6 +192,9 @@ router.post('/group/mark-ready', authenticateToken, markDocumentGroupAsReady);
 
 // 🔄 POST /api/documents/bulk-status-change - Cambio de estado masivo
 router.post('/bulk-status-change', authenticateToken, bulkStatusChange);
+
+// 📱 PUT /api/documents/bulk-notify - Notificación masiva WhatsApp (CSRF Protected)
+router.put('/bulk-notify', authenticateToken, csrfProtection, bulkNotify);
 
 // Obtener todos los documentos de un grupo
 router.get('/group/:groupId',
