@@ -140,8 +140,20 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
     if (onDataUpdate) onDataUpdate();
   };
 
-  const handleEstadoChange = (nuevoEstado) => {
-    handleFilterChange({ ...filtros, estado: nuevoEstado });
+  /**
+   * Cambiar estado de un documento (Prop pasada a ListaArchivo)
+   */
+  const handleEstadoChange = async (documentoId, nuevoEstado, options = {}) => {
+    try {
+      const response = await archivoService.cambiarEstadoDocumento(token, documentoId, nuevoEstado, options);
+      if (response.success) {
+        // Recargar o actualizar localmente
+        cargarDocumentos();
+      }
+      return response;
+    } catch (error) {
+      return { success: false, message: error.message };
+    }
   };
 
   const clearError = () => setError(null);
