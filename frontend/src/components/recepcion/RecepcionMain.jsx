@@ -51,7 +51,7 @@ import { toast } from 'react-toastify';
 import receptionService from '../../services/reception-service';
 import ModalEntrega from './ModalEntrega';
 import ModalEntregaGrupal from './ModalEntregaGrupal';
-
+import DateRangeFilter from '../shared/DateRangeFilter';
 
 import DocumentDetailModal from '../Documents/DocumentDetailModal';
 import ReversionModal from './ReversionModal';
@@ -686,35 +686,30 @@ function RecepcionMain() {
               </FormControl>
             </Grid>
 
-            {/* Filtro Fecha Inicio - Solo visible en pestaña Entregados */}
-            {tabValue === 1 && (
-              <Grid item xs={12} sm={6} md={2}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="date"
-                  label="Desde"
-                  value={filters.fechaInicio}
-                  onChange={(e) => setFilters(prev => ({ ...prev, fechaInicio: e.target.value }))}
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
-            )}
-
-            {/* Filtro Fecha Fin - Solo visible en pestaña Entregados */}
-            {tabValue === 1 && (
-              <Grid item xs={12} sm={6} md={2}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  type="date"
-                  label="Hasta"
-                  value={filters.fechaFin}
-                  onChange={(e) => setFilters(prev => ({ ...prev, fechaFin: e.target.value }))}
-                  InputLabelProps={{ shrink: true }}
-                />
-              </Grid>
-            )}
+            {/* Filtro de Rango de Fechas - Visible en todas las pestañas */}
+            <Grid item xs={12} sm={12} md={4}>
+              <DateRangeFilter
+                fechaDesde={filters.fechaInicio}
+                fechaHasta={filters.fechaFin}
+                onApply={(desde, hasta) => {
+                  setFilters(prev => ({
+                    ...prev,
+                    fechaInicio: desde,
+                    fechaFin: hasta
+                  }));
+                  setPage(0);
+                }}
+                onClear={() => {
+                  setFilters(prev => ({
+                    ...prev,
+                    fechaInicio: '',
+                    fechaFin: ''
+                  }));
+                  setPage(0);
+                }}
+                label=""
+              />
+            </Grid>
 
             {/* Botones de acción */}
             <Grid item xs={12} sm={6} md={2}>
