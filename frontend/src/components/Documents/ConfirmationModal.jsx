@@ -123,7 +123,9 @@ const ConfirmationModal = ({
     });
   };
 
-  const isConfirmDisabled = !confirmed ||
+  // Deshabilitar si no ha confirmado (excepto entrega directa que no requiere check)
+  // O si es reversión y no puso motivo
+  const isConfirmDisabled = (!changeInfo.isDirectDelivery && !confirmed) ||
     (showReversionField && !reversionReason.trim()) ||
     isLoading;
 
@@ -322,23 +324,23 @@ const ConfirmationModal = ({
 
         <Divider sx={{ my: 2 }} />
 
-        {/* Checkbox de confirmación */}
-        <FormControlLabel
-          control={
-            <Checkbox
-              checked={confirmed}
-              onChange={(e) => setConfirmed(e.target.checked)}
-              color="primary"
-            />
-          }
-          label={
-            <Typography variant="body2" fontWeight={600}>
-              {changeInfo.isDirectDelivery ?
-                'Confirmo que he entregado este documento directamente' :
-                'Entiendo las consecuencias y deseo continuar'}
-            </Typography>
-          }
-        />
+        {/* Checkbox de confirmación - Solo mostrar si NO es entrega directa */}
+        {!changeInfo.isDirectDelivery && (
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={confirmed}
+                onChange={(e) => setConfirmed(e.target.checked)}
+                color="primary"
+              />
+            }
+            label={
+              <Typography variant="body2" fontWeight={600}>
+                'Entiendo las consecuencias y deseo continuar'
+              </Typography>
+            }
+          />
+        )}
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
