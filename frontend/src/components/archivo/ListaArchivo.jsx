@@ -1079,11 +1079,31 @@ const ListaArchivo = ({
           <DateRangeFilter
             fechaDesde={filtros.fechaDesde || ''}
             fechaHasta={filtros.fechaHasta || ''}
-            onFechaDesdeChange={(value) => handleFilterChange('fechaDesde', value)}
-            onFechaHastaChange={(value) => handleFilterChange('fechaHasta', value)}
+            onApply={(desde, hasta) => {
+              const newFiltros = {
+                ...filtros,
+                fechaDesde: desde,
+                fechaHasta: hasta
+              };
+              if (serverSide && onFilterChange) {
+                onFilterChange(newFiltros);
+              } else {
+                setInternalFiltros(newFiltros);
+                setInternalPage(0);
+              }
+            }}
             onClear={() => {
-              handleFilterChange('fechaDesde', '');
-              handleFilterChange('fechaHasta', '');
+              const newFiltros = {
+                ...filtros,
+                fechaDesde: '',
+                fechaHasta: ''
+              };
+              if (serverSide && onFilterChange) {
+                onFilterChange(newFiltros);
+              } else {
+                setInternalFiltros(newFiltros);
+                setInternalPage(0);
+              }
             }}
             label=""
           />
