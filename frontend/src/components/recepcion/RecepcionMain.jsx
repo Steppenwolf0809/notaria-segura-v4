@@ -1049,16 +1049,7 @@ function RecepcionMain() {
         )
       }
 
-      {/* Modal de Entrega Grupal */}
-      {
-        showEntregaGrupal && selectedDocuments.size > 0 && (
-          <ModalEntregaGrupal
-            documentos={documentos.filter(doc => selectedDocuments.has(doc.id))}
-            onClose={handleCloseModalEntrega}
-            onEntregaExitosa={handleEntregaExitosa}
-          />
-        )
-      }
+
 
       {/* Modal de Detalle */}
       {
