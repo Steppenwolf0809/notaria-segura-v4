@@ -13,10 +13,10 @@ router.get('/', authenticateToken, async (req, res) => {
     const { page = 0, limit = 25, search, status, type, documentId, dateFrom, dateTo, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
     const userRole = req.user.role;
     const userId = req.user.id;
-    
+
     // Construir filtros
     const where = {};
-    
+
     // 🔒 CONTROL DE ACCESO POR ROL - Construir filtro base de documento
     let documentFilter = {};
     if (userRole === 'MATRIZADOR') {
@@ -31,14 +31,14 @@ router.get('/', authenticateToken, async (req, res) => {
       // desde EN_PROCESO hacia adelante (cuando comienzan a ser relevantes para recepción)
       documentFilter.status = { in: ['EN_PROCESO', 'LISTO', 'ENTREGADO'] };
     }
-    
+
     // Aplicar filtro de documento solo si hay restricciones por rol
     if (Object.keys(documentFilter).length > 0) {
       where.document = documentFilter;
     }
-    
+
     console.log('🔍 DEBUG: Filtro aplicado para', userRole, ':', where);
-    
+
     // Filtros adicionales
     if (search) {
       where.OR = [
@@ -47,15 +47,15 @@ router.get('/', authenticateToken, async (req, res) => {
         { messageBody: { contains: search, mode: 'insensitive' } }
       ];
     }
-    
+
     if (status) {
       where.status = status;
     }
-    
+
     if (type) {
       where.messageType = type;
     }
-    
+
     // Filtro específico por documento
     if (documentId) {
       where.documentId = documentId;
@@ -142,6 +142,87 @@ router.get('/', authenticateToken, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor'
+    });
+  }
+});
+
+/**
+ * Obtener cola de notificaciones pendientes (para Notification Center)
+ * GET /notifications/queue
+ * @param {string} tab - 'pending' (LISTO no notificados) | 'reminders' (notificados hace +X días)
+ * @param {number} reminderDays - Días para considerar recordatorio (default: 3)
+ */
+router.get('/queue', authenticateToken, async (req, res) => {
+  try {
+    const { tab = 'pending', reminderDays = 3 } = req.query;
+    const userRole = req.user.role;
+    const userId = req.user.id;
+
+    // Construir filtro base
+    let whereClause = {};
+
+    if (tab === 'pending') {
+      // Por Notificar: LISTO o LISTO_ENTREGA (nunca notificados o sin código)
+      whereClause.status = { in: ['LISTO', 'LISTO_ENTREGA'] };
+      whereClause.codigoRetiro = null; // Sin código = nunca notificado
+    } else if (tab === 'reminders') {
+      // Para Recordar: CLIENTE_NOTIFICADO + más de X días desde última notificación
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - parseInt(reminderDays));
+
+      whereClause.status = 'CLIENTE_NOTIFICADO';
+      whereClause.ultimoRecordatorio = { lt: cutoffDate };
+    }
+
+    // Filtro por rol: MATRIZADOR y ARCHIVO solo ven sus documentos
+    if (userRole === 'MATRIZADOR' || userRole === 'ARCHIVO') {
+      whereClause.assignedToId = userId;
+    }
+    // ADMIN y RECEPCION ven todos
+    // CAJA no debería acceder a esta ruta (handled by frontend)
+
+    const documents = await prisma.document.findMany({
+      where: whereClause,
+      orderBy: { fechaListo: 'asc' }, // FIFO: más antiguos primero
+      select: {
+        id: true,
+        protocolNumber: true,
+        documentType: true,
+        actoPrincipalDescripcion: true,
+        status: true,
+        clientName: true,
+        clientPhone: true,
+        clientId: true,
+        clientEmail: true,
+        codigoRetiro: true,
+        fechaListo: true,
+        ultimoRecordatorio: true,
+        createdAt: true,
+        assignedToId: true,
+        assignedTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true
+          }
+        }
+      }
+    });
+
+    console.log(`📱 Queue (${tab}): ${documents.length} documents found for ${userRole}`);
+
+    res.json({
+      success: true,
+      data: documents,
+      count: documents.length,
+      tab
+    });
+
+  } catch (error) {
+    console.error('Error obteniendo cola de notificaciones:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al cargar cola de notificaciones'
     });
   }
 });

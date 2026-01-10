@@ -51,17 +51,6 @@ model Document {
   matrizadorName           String
   itemsSecundarios         String?
   xmlOriginal              String?
-  documentGroupId          String?
-  isGrouped                Boolean                @default(false)
-  groupLeaderId            String?
-  groupPosition            Int?
-  groupVerificationCode    String?
-  groupCreatedAt           DateTime?
-  groupCreatedBy           String?
-  groupDeliveredAt         DateTime?
-  groupDeliveredTo         String?
-  individualDelivered      Boolean                @default(false)
-  notificationPolicy       String                 @default("automatica")
   codigoRetiro             String?
   entregadoA               String?
   cedulaReceptor           String?
@@ -90,7 +79,6 @@ model Document {
   events                   DocumentEvent[]
   assignedTo               User?                  @relation("AssignedDocuments", fields: [assignedToId], references: [id])
   createdBy                User                   @relation("CreatedDocuments", fields: [createdById], references: [id])
-  documentGroup            DocumentGroup?         @relation(fields: [documentGroupId], references: [id])
   usuarioEntrega           User?                  @relation("DeliveredDocuments", fields: [usuarioEntregaId], references: [id])
   notifications            WhatsAppNotification[]
 
@@ -99,28 +87,9 @@ model Document {
   @@index([updatedAt])
   @@index([clientPhone])
   @@index([clientName])
-  @@index([documentGroupId])
+  @@index([clientId])
   @@index([assignedToId, status])
-  @@index([documentGroupId, status])
   @@map("documents")
-}
-
-model DocumentGroup {
-  id                 String                 @id @default(uuid())
-  groupCode          String                 @unique
-  verificationCode   String                 @unique
-  clientName         String
-  clientPhone        String
-  clientEmail        String?
-  status             String                 @default("IN_PROCESS")
-  documentsCount     Int
-  notificationSent   Boolean                @default(false)
-  notificationSentAt DateTime?
-  createdBy          String
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
-  documents          Document[]
-  notifications      WhatsAppNotification[]
 }
 
 model DocumentEvent {
@@ -149,7 +118,6 @@ model DocumentEvent {
 model WhatsAppNotification {
   id           String         @id @default(uuid())
   documentId   String?
-  groupId      String?
   clientName   String
   clientPhone  String
   messageType  String
@@ -160,11 +128,9 @@ model WhatsAppNotification {
   sentAt       DateTime?
   createdAt    DateTime       @default(now())
   document     Document?      @relation(fields: [documentId], references: [id])
-  group        DocumentGroup? @relation(fields: [groupId], references: [id])
 
   @@index([status])
   @@index([documentId])
-  @@index([groupId])
   @@index([createdAt])
   @@map("whatsapp_notifications")
 }

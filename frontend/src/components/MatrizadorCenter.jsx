@@ -4,7 +4,7 @@ import MatrizadorLayout from './MatrizadorLayout';
 import MatrizadorDashboard from './MatrizadorDashboard';
 import GeneradorQR from './matrizador/GeneradorQR';
 import GestionDocumentos from './GestionDocumentos';
-import NotificationsHistory from './Documents/NotificationsHistory';
+import NotificationCenter from './notifications/NotificationCenter';
 import FormulariosUAFE from './FormulariosUAFE';
 import useDocumentStore from '../store/document-store';
 
@@ -83,7 +83,8 @@ const MatrizadorCenter = () => {
         );
 
       case 'history':
-        return <NotificationsHistory />;
+      case 'notifications':
+        return <NotificationCenter />;
 
       case 'formularios-uafe':
         return <FormulariosUAFE />;

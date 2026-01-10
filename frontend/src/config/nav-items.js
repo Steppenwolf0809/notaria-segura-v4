@@ -8,14 +8,14 @@ export const navItemsByRole = {
     { id: 'subir-xml', label: 'Subir XML', view: 'uploads', icon: 'CloudUpload' }
   ],
   RECEPCION: [
-    // Dashboard removido - Las estadísticas están integradas en la vista principal
-    // Historial WhatsApp removido - Funcionalidad no implementada
-    { id: 'documentos', label: 'Gestión de Documentos', view: 'documentos', icon: 'Assignment' }
+    { id: 'dashboard', label: 'Dashboard', view: 'dashboard', icon: 'Dashboard' },
+    { id: 'documentos', label: 'Gestión de Documentos', view: 'documentos', icon: 'Assignment' },
+    { id: 'notificaciones', label: 'Notificaciones', view: 'notificaciones', icon: 'WhatsApp' }
   ],
   MATRIZADOR: [
     { id: 'dashboard', label: 'Dashboard', view: 'dashboard', icon: 'Dashboard' },
     { id: 'documents', label: 'Documentos', view: 'documents', icon: 'Assignment' },
-    { id: 'history', label: 'Historial', view: 'history', icon: 'History' },
+    { id: 'notifications', label: 'Notificaciones', view: 'notifications', icon: 'WhatsApp' },
     { id: 'formularios-uafe', label: 'Formularios UAFE', view: 'formularios-uafe', icon: 'Description' },
     { id: 'generador-qr', label: 'Generador QR', view: 'generador-qr', icon: 'QrCode' }
   ],
@@ -26,7 +26,7 @@ export const navItemsByRole = {
     { id: 'qr-management', label: 'Gestor QR', view: 'qr-management', icon: 'QrCode' },
     { id: 'formularios-uafe', label: 'Gestión Formularios UAFE', view: 'formularios-uafe', icon: 'Description' },
     { id: 'analisis-uafe', label: 'Análisis UAFE', view: 'analisis-uafe', icon: 'Analytics' },
-    { id: 'notifications', label: 'Notificaciones', view: 'notifications', icon: 'Notifications' },
+    { id: 'notifications', label: 'Notificaciones', view: 'notifications', icon: 'WhatsApp' },
     { id: 'settings', label: 'Configuración', view: 'settings', icon: 'Settings' },
     { id: 'whatsapp-templates', label: 'Templates WhatsApp', view: 'whatsapp-templates', icon: 'WhatsApp' }
   ],

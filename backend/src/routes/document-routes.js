@@ -12,34 +12,20 @@ import {
   updateDocumentStatus,
   getDocumentById,
   getAvailableMatrizadores,
-  detectGroupableDocuments,
-  createDocumentGroup,
-  deliverDocumentGroup,
   // Función de entrega completa
   deliverDocument,
   // Funciones de edición
   getEditableDocumentInfo,
   updateDocumentInfo,
-  // 🔗 Nueva función para agrupación inteligente
-  createSmartDocumentGroup,
   // 🔄 Sistema de confirmaciones y deshacer
   undoDocumentStatusChange,
   getUndoableChanges,
   // 📈 Sistema de historial universal
   getDocumentHistory,
-  // 🔗 Funciones de grupos
-  updateDocumentGroupStatus,
-  updateDocumentGroupInfo,
-  markDocumentGroupAsReady,
-  getGroupDocuments,
-  // 🔓 Desagrupar documento
-  ungroupDocument,
-  ungroupAllDocuments,
   // 🔄 Reversión de estado
   revertDocumentStatus,
   // 🔔 Políticas de notificación
   updateNotificationPolicy,
-  updateGroupNotificationPolicy,
   // 🎯 NUEVA FUNCIONALIDAD: UI Activos/Entregados
   getDocumentsUnified,
   getDocumentsCounts,
@@ -125,8 +111,6 @@ router.put('/:id/nota-credito', authenticateToken, markAsNotaCredito);
 // PUT /api/documents/:id/assign - CAJA: Asignar documento a matrizador (CSRF Protected)
 router.put('/:id/assign', authenticateToken, csrfProtection, assignDocument);
 
-// 🔗 PUT /api/documents/group/status - Actualizar estado de grupo de documentos (CSRF Protected)
-router.put('/group/status', authenticateToken, csrfProtection, updateDocumentGroupStatus);
 
 // PUT /api/documents/:id/status - MATRIZADOR: Actualizar estado (CSRF Protected)
 router.put('/:id/status', authenticateToken, csrfProtection, updateDocumentStatus);
@@ -134,11 +118,6 @@ router.put('/:id/status', authenticateToken, csrfProtection, updateDocumentStatu
 // 🔄 POST /api/documents/:id/revert - Revertir estado de documento con razón
 router.post('/:id/revert', authenticateToken, revertDocumentStatus);
 
-// 🔓 PUT /api/documents/:id/ungroup - Desagrupar documento del grupo
-router.put('/:id/ungroup', authenticateToken, ungroupDocument);
-
-// 🔓 POST /api/documents/ungroup-all - ADMIN ONLY: Desagrupar TODOS los documentos
-router.post('/ungroup-all', authenticateToken, ungroupAllDocuments);
 
 // POST /api/documents/:id/deliver - RECEPCION: Entregar documento con información completa
 router.post('/:id/deliver', authenticateToken, deliverDocument);
@@ -158,19 +137,6 @@ router.get('/:id/editable-info', authenticateToken, getEditableDocumentInfo);
 // PUT /api/documents/:id/update-info - Actualizar información editable del documento
 router.put('/:id/update-info', authenticateToken, updateDocumentInfo);
 
-// --- RUTAS DE AGRUPACIÓN DE DOCUMENTOS ---
-
-// Detectar documentos agrupables para un cliente específico
-router.post('/detect-groupable', authenticateToken, detectGroupableDocuments);
-
-// Crear un nuevo grupo de documentos
-router.post('/create-group', authenticateToken, createDocumentGroup);
-
-// Entregar un grupo completo de documentos
-router.post('/deliver-group', authenticateToken, deliverDocumentGroup);
-
-// 🔗 NUEVA RUTA: Crear grupo inteligente basado en detección automática
-router.post('/create-smart-group', authenticateToken, createSmartDocumentGroup);
 
 // --- RUTAS DEL SISTEMA DE CONFIRMACIONES Y DESHACER ---
 // CONSERVADOR: Nuevas funcionalidades que mantienen compatibilidad total
@@ -184,11 +150,6 @@ router.get('/:id/undoable-changes', authenticateToken, getUndoableChanges);
 // 📈 GET /api/documents/:id/history - Obtener historial completo de un documento
 router.get('/:id/history', authenticateToken, getDocumentHistory);
 
-// 🔗 PUT /api/documents/group/info - Actualizar información compartida de grupo
-router.put('/group/info', authenticateToken, updateDocumentGroupInfo);
-
-// 🆕 POST /api/documents/group/mark-ready - Marcar grupo como listo para entrega
-router.post('/group/mark-ready', authenticateToken, markDocumentGroupAsReady);
 
 // 🔄 POST /api/documents/bulk-status-change - Cambio de estado masivo
 router.post('/bulk-status-change', authenticateToken, bulkStatusChange);
@@ -196,18 +157,11 @@ router.post('/bulk-status-change', authenticateToken, bulkStatusChange);
 // 📱 PUT /api/documents/bulk-notify - Notificación masiva WhatsApp (CSRF Protected)
 router.put('/bulk-notify', authenticateToken, csrfProtection, bulkNotify);
 
-// Obtener todos los documentos de un grupo
-router.get('/group/:groupId',
-  authenticateToken,
-  getGroupDocuments
-);
 
 // 🔔 RUTAS DE POLÍTICAS DE NOTIFICACIÓN
 // PUT /api/documents/:id/notification-policy - Actualizar política de notificación de documento
 router.put('/:id/notification-policy', authenticateToken, updateNotificationPolicy);
 
-// PUT /api/documents/group/:groupId/notification-policy - Actualizar política de notificación de grupo
-router.put('/group/:groupId/notification-policy', authenticateToken, updateGroupNotificationPolicy);
 
 // 🧪 Extracción avanzada (detrás de flag): actos y comparecientes desde texto
 router.post('/:id/extract-acts', authenticateToken, async (req, res, next) => {

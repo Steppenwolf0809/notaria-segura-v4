@@ -312,9 +312,6 @@ async function cambiarEstadoDocumento(req, res) {
         id,
         assignedToId: userId
       },
-      include: {
-        documentGroup: true
-      }
     });
 
     if (!documento) {
@@ -344,10 +341,7 @@ async function cambiarEstadoDocumento(req, res) {
     // Si se marca como LISTO, generar código de retiro
     let codigoGenerado = null;
     if (nuevoEstado === 'LISTO' && !documento.codigoRetiro) {
-      // Para documentos agrupados, usar el código del grupo si existe
-      if (documento.isGrouped && documento.documentGroup?.verificationCode) {
-        updateData.codigoRetiro = documento.documentGroup.verificationCode;
-      } else {
+      if (true) {
         codigoGenerado = await CodigoRetiroService.generarUnico();
         updateData.codigoRetiro = codigoGenerado;
 
@@ -385,88 +379,16 @@ async function cambiarEstadoDocumento(req, res) {
       updateData.relacionTitular = 'directo';
     }
 
-    // 🔗 NUEVA FUNCIONALIDAD: Sincronización grupal
+    // Actualizar solo el documento individual
     let documentosActualizados = [];
-
-    if (documento.isGrouped && documento.documentGroupId) {
-      logger.debug('Documento es parte de un grupo, sincronizando cambio de estado');
-
-      if (nuevoEstado === 'LISTO') {
-        // Marcar como LISTO todos los documentos del grupo asignados al mismo usuario
-        // y garantizar código de retiro individual por documento
-        const groupDocs = await prisma.document.findMany({
-          where: {
-            documentGroupId: documento.documentGroupId,
-            isGrouped: true,
-            assignedToId: userId,
-            status: { not: 'ENTREGADO' }
-          }
-        });
-
-        const updatesPlan = [];
-        for (const doc of groupDocs) {
-          let codigoParaDoc = doc.codigoRetiro;
-          if (!codigoParaDoc) {
-            // Generar código único por documento
-            // Nota: usamos el mismo generador que para individuales
-            // para asegurar unicidad a nivel sistema
-            // (4 dígitos según lineamientos)
-            codigoParaDoc = await CodigoRetiroService.generarUnico();
-          }
-          updatesPlan.push({ id: doc.id, codigo: codigoParaDoc });
-        }
-
-        documentosActualizados = await prisma.$transaction(async (tx) => {
-          const result = [];
-          for (const up of updatesPlan) {
-            const updated = await tx.document.update({
-              where: { id: up.id },
-              data: {
-                status: 'LISTO',
-                codigoRetiro: up.codigo,
-                updatedAt: new Date()
-              }
-            });
-            result.push(updated);
-          }
-          return result;
-        });
-
-        logger.debug(`${documentosActualizados.length} documentos del grupo marcados como LISTO`);
-      } else {
-        // Para otros estados (EN_PROCESO, ENTREGADO), propagar sin tocar códigos
-        const dataGroupSync = { ...updateData };
-        if (codigoGenerado) delete dataGroupSync.codigoRetiro;
-
-        await prisma.document.updateMany({
-          where: {
-            documentGroupId: documento.documentGroupId,
-            isGrouped: true,
-            assignedToId: userId
-          },
-          data: dataGroupSync
-        });
-
-        documentosActualizados = await prisma.document.findMany({
-          where: {
-            documentGroupId: documento.documentGroupId,
-            isGrouped: true,
-            assignedToId: userId
-          }
-        });
-        logger.debug(`Sincronizados ${documentosActualizados.length} documentos del grupo`);
-      }
-    } else {
-      // Actualizar solo el documento individual
-      const documentoActualizado = await prisma.document.update({
-        where: { id },
-        data: updateData
-      });
-      documentosActualizados = [documentoActualizado];
-    }
+    const documentoActualizado = await prisma.document.update({
+      where: { id },
+      data: updateData
+    });
+    documentosActualizados = [documentoActualizado];
 
     // Usar el primer documento para las notificaciones (en grupos, todos son iguales)
-    const documentoActualizado = documentosActualizados[0];
+    const docPrincipal = documentosActualizados[0];
 
     // 📱 ENVIAR NOTIFICACIÓN WHATSAPP si se marca como LISTO
     let whatsappSent = false;
@@ -483,16 +405,7 @@ async function cambiarEstadoDocumento(req, res) {
             clientPhone: documento.clientPhone
           };
 
-          if (documento.isGrouped && documento.documentGroupId) {
-            // Notificación grupal con TODOS los documentos del grupo y sus códigos individuales
-            await whatsappService.enviarGrupoDocumentosListo(
-              clienteData,
-              documentosActualizados,
-              documentosActualizados[0]?.codigoRetiro || null
-            );
-            logger.debug('Notificación WhatsApp GRUPAL enviada');
-            whatsappSent = true;
-          } else if (codigoGenerado || updateData.codigoRetiro) {
+          if (codigoGenerado || updateData.codigoRetiro) {
             // Notificación individual
             const documentoData = {
               tipoDocumento: documento.documentType,
@@ -566,7 +479,7 @@ async function cambiarEstadoDocumento(req, res) {
     res.json({
       success: true,
       data: {
-        documento: documentoActualizado,
+        documento: docPrincipal,
         documentos: documentosActualizados,
         documentosSincronizados: totalSincronizados,
         esGrupo: totalSincronizados > 1,
@@ -581,10 +494,10 @@ async function cambiarEstadoDocumento(req, res) {
     });
 
   } catch (error) {
-    logger.error('Error cambiando estado:', error);
+    logger.error('Error changing document status in archivo:', error);
     res.status(500).json({
       success: false,
-      message: 'Error interno del servidor'
+      message: 'Error interno al cambiar estado'
     });
   }
 }
@@ -640,12 +553,6 @@ async function procesarEntregaDocumento(req, res) {
       include: {
         assignedTo: {
           select: { firstName: true, lastName: true }
-        },
-        // 🔗 NUEVA FUNCIONALIDAD: Incluir información de grupo
-        documentGroup: {
-          include: {
-            documents: true
-          }
         }
       }
     });
@@ -668,7 +575,7 @@ async function procesarEntregaDocumento(req, res) {
     // 🆕 MEJORA: Código de verificación es OPCIONAL para archivo
     // Si se proporciona un código, se valida; si no, se acepta como verificación manual
     if (codigoVerificacion && !isManualVerification) {
-      const expectedCode = documento.codigoRetiro || documento.verificationCode || documento.groupVerificationCode;
+      const expectedCode = documento.codigoRetiro || documento.verificationCode;
       if (!expectedCode || expectedCode !== codigoVerificacion) {
         return res.status(400).json({
           success: false,
@@ -677,71 +584,6 @@ async function procesarEntregaDocumento(req, res) {
       }
     }
 
-    // 🔗 NUEVA FUNCIONALIDAD: Si el documento está agrupado, entregar todos los documentos del grupo
-    let groupDocuments = [];
-    if (documento.isGrouped && documento.documentGroupId) {
-      logger.debug('Documento agrupado, entregando grupo completo');
-
-      // Buscar todos los documentos del grupo que estén LISTO o EN_PROCESO
-      const groupDocsToDeliver = await prisma.document.findMany({
-        where: {
-          documentGroupId: documento.documentGroupId,
-          status: { in: ['LISTO', 'EN_PROCESO'] },
-          id: { not: id }, // Excluir el documento actual
-          isGrouped: true
-        }
-      });
-
-      if (groupDocsToDeliver.length > 0) {
-        logger.debug(`Entregando ${groupDocsToDeliver.length + 1} documentos del grupo`);
-
-        // Actualizar todos los documentos del grupo
-        await prisma.document.updateMany({
-          where: {
-            id: { in: groupDocsToDeliver.map(doc => doc.id) }
-          },
-          data: {
-            status: 'ENTREGADO',
-            entregadoA,
-            cedulaReceptor,
-            relacionTitular,
-            verificacionManual: isManualVerification,
-            facturaPresenta: facturaPresenta || false,
-            fechaEntrega: new Date(),
-            usuarioEntregaId: userId,
-            observacionesEntrega: observaciones || `Entregado grupalmente junto con ${documento.protocolNumber} por ARCHIVO`
-          }
-        });
-
-        // Registrar eventos para todos los documentos del grupo
-        for (const doc of groupDocsToDeliver) {
-          await prisma.documentEvent.create({
-            data: {
-              documentId: doc.id,
-              userId: userId,
-              eventType: 'STATUS_CHANGED',
-              description: `Documento entregado grupalmente por ARCHIVO a ${entregadoA}`,
-              details: JSON.stringify({
-                entregadoA,
-                cedulaReceptor,
-                relacionTitular,
-                verificacionManual: isManualVerification,
-                facturaPresenta: facturaPresenta || false,
-                deliveredWith: documento.protocolNumber,
-                groupDelivery: true,
-                deliveredBy: 'ARCHIVO'
-              }),
-              personaRetiro: entregadoA,
-              cedulaRetiro: cedulaReceptor || undefined,
-              metodoVerificacion: computedVerificationMethod,
-              observacionesRetiro: (observaciones || `Entregado grupalmente junto con ${documento.protocolNumber} por ARCHIVO`)
-            }
-          });
-        }
-
-        groupDocuments = groupDocsToDeliver;
-      }
-    }
 
     // Actualizar documento principal con información de entrega
     const documentoActualizado = await prisma.document.update({
@@ -773,10 +615,8 @@ async function procesarEntregaDocumento(req, res) {
 
     if (documentoActualizado.clientPhone) {
       try {
-        // Preparar lista de documentos para el template (individual o grupal)
-        const documentosParaMensaje = groupDocuments.length > 0
-          ? [documentoActualizado, ...groupDocuments]
-          : [documentoActualizado];
+        // Preparar lista de documentos para el template (solo individual)
+        const documentosParaMensaje = [documentoActualizado];
 
         const datosEntrega = {
           entregado_a: entregadoA,

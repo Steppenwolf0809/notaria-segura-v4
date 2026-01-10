@@ -7,8 +7,6 @@ import {
   listarTodosDocumentos,
   getDocumentosEnProceso,
   marcarComoListo,
-  marcarGrupoListo,
-  desagruparDocumentos,
   getDashboardStats,
   getAlertasRecepcion,
   revertirEstadoDocumento,
@@ -81,14 +79,6 @@ router.get('/documentos/en-proceso', authenticateToken, requireRecepcion, getDoc
  */
 router.post('/documentos/:id/marcar-listo', authenticateToken, requireRecepcion, csrfProtection, marcarComoListo);
 
-/**
- * @route POST /api/reception/documentos/marcar-grupo-listo
- * @desc Marcar múltiples documentos del mismo cliente como listos con código compartido
- * @body documentIds - Array de IDs de documentos (obligatorio, mismo cliente)
- * @access Private (RECEPCION only)
- * @csrf Protected - Requiere token CSRF
- */
-router.post('/documentos/marcar-grupo-listo', authenticateToken, requireRecepcion, csrfProtection, marcarGrupoListo);
 
 /**
  * @route POST /api/reception/documentos/marcar-listos
@@ -100,14 +90,6 @@ router.post('/documentos/marcar-grupo-listo', authenticateToken, requireRecepcio
  */
 router.post('/documentos/marcar-listos', authenticateToken, requireRecepcion, csrfProtection, marcarVariosListos);
 
-/**
- * @route POST /api/reception/documentos/desagrupar
- * @desc Desagrupar documentos que están agrupados, asignando códigos individuales
- * @body documentIds - Array de IDs de documentos agrupados
- * @access Private (RECEPCION only)
- * @csrf Protected - Requiere token CSRF
- */
-router.post('/documentos/desagrupar', authenticateToken, requireRecepcion, csrfProtection, desagruparDocumentos);
 
 /**
  * @route POST /api/reception/bulk-delivery
