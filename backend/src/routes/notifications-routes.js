@@ -149,7 +149,7 @@ router.get('/', authenticateToken, async (req, res) => {
 /**
  * Obtener cola de notificaciones pendientes (para Notification Center)
  * GET /notifications/queue
- * @param {string} tab - 'pending' (LISTO no notificados) | 'reminders' (notificados hace +X días)
+ * @param {string} tab - 'pending' (LISTO no notificados) | 'reminders' (notificados hace +X días) | 'sent' (enviados)
  * @param {number} reminderDays - Días para considerar recordatorio (default: 3)
  */
 router.get('/queue', authenticateToken, async (req, res) => {
@@ -172,6 +172,11 @@ router.get('/queue', authenticateToken, async (req, res) => {
 
       whereClause.status = 'CLIENTE_NOTIFICADO';
       whereClause.ultimoRecordatorio = { lt: cutoffDate };
+    } else if (tab === 'sent') {
+      // Enviados: Documentos con código de retiro generado (notificados recientemente)
+      whereClause.status = { in: ['LISTO', 'EN_PROCESO', 'CLIENTE_NOTIFICADO'] };
+      whereClause.codigoRetiro = { not: null };
+      whereClause.ultimoRecordatorio = { not: null };
     }
 
     // Filtro por rol: MATRIZADOR y ARCHIVO solo ven sus documentos
@@ -183,7 +188,9 @@ router.get('/queue', authenticateToken, async (req, res) => {
 
     const documents = await prisma.document.findMany({
       where: whereClause,
-      orderBy: { fechaListo: 'asc' }, // FIFO: más antiguos primero
+      orderBy: tab === 'sent'
+        ? { ultimoRecordatorio: 'desc' } // Más recientes primero para enviados
+        : { fechaListo: 'asc' }, // FIFO: más antiguos primero para pendientes
       select: {
         id: true,
         protocolNumber: true,
@@ -223,6 +230,91 @@ router.get('/queue', authenticateToken, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error al cargar cola de notificaciones'
+    });
+  }
+});
+
+/**
+ * Actualizar teléfono de cliente en documentos
+ * PUT /notifications/update-phone
+ * @body {string[]} documentIds - IDs de documentos a actualizar
+ * @body {string} clientPhone - Nuevo teléfono
+ */
+router.put('/update-phone', authenticateToken, async (req, res) => {
+  try {
+    const { documentIds, clientPhone } = req.body;
+    const userId = req.user.id;
+    const userName = `${req.user.firstName} ${req.user.lastName}`;
+
+    // Validaciones
+    if (!documentIds || !Array.isArray(documentIds) || documentIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Debe proporcionar al menos un ID de documento'
+      });
+    }
+
+    if (!clientPhone || !clientPhone.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'El teléfono es obligatorio'
+      });
+    }
+
+    const cleanPhone = clientPhone.trim();
+
+    // Obtener documentos antes de actualizar (para auditoría)
+    const documents = await prisma.document.findMany({
+      where: { id: { in: documentIds } },
+      select: { id: true, clientPhone: true, protocolNumber: true }
+    });
+
+    if (documents.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'No se encontraron documentos'
+      });
+    }
+
+    // Actualizar teléfono
+    await prisma.document.updateMany({
+      where: { id: { in: documentIds } },
+      data: { clientPhone: cleanPhone }
+    });
+
+    // Registrar evento de auditoría para cada documento
+    for (const doc of documents) {
+      await prisma.documentEvent.create({
+        data: {
+          documentId: doc.id,
+          userId: userId,
+          eventType: 'PHONE_UPDATED',
+          description: `Teléfono actualizado por ${userName}`,
+          details: JSON.stringify({
+            telefonoAnterior: doc.clientPhone || '(vacío)',
+            telefonoNuevo: cleanPhone,
+            timestamp: new Date().toISOString()
+          })
+        }
+      });
+    }
+
+    console.log(`📱 Teléfono actualizado para ${documents.length} documentos: ${cleanPhone}`);
+
+    res.json({
+      success: true,
+      message: `Teléfono actualizado para ${documents.length} documento(s)`,
+      data: {
+        updatedCount: documents.length,
+        newPhone: cleanPhone
+      }
+    });
+
+  } catch (error) {
+    console.error('Error actualizando teléfono:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al actualizar teléfono'
     });
   }
 });

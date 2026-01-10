@@ -22,7 +22,8 @@ import {
     Search as SearchIcon,
     Refresh as RefreshIcon,
     Warning as WarningIcon,
-    AccessTime as AccessTimeIcon
+    AccessTime as AccessTimeIcon,
+    Send as SendIcon
 } from '@mui/icons-material';
 import ClientNotificationCard from './ClientNotificationCard';
 import WhatsAppNotificationModal from './WhatsAppNotificationModal';
@@ -38,7 +39,7 @@ import useAuth from '../../hooks/use-auth';
  */
 const NotificationCenter = () => {
     const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState(0); // 0: Por Notificar, 1: Para Recordar
+    const [activeTab, setActiveTab] = useState(0); // 0: Por Notificar, 1: Para Recordar, 2: Enviados
     const [documents, setDocuments] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
@@ -58,7 +59,7 @@ const NotificationCenter = () => {
         setLoading(true);
         setError(null);
         try {
-            const tab = activeTab === 0 ? 'pending' : 'reminders';
+            const tab = activeTab === 0 ? 'pending' : activeTab === 1 ? 'reminders' : 'sent';
             const result = await notificationService.getQueue(tab, reminderDays);
 
             if (result.success) {
@@ -167,6 +168,11 @@ const NotificationCenter = () => {
                         label="Para Recordar"
                         iconPosition="start"
                     />
+                    <Tab
+                        icon={<Badge badgeContent={activeTab === 2 ? stats.totalDocs : 0} color="info"><SendIcon /></Badge>}
+                        label="Enviados"
+                        iconPosition="start"
+                    />
                 </Tabs>
             </Paper>
 
@@ -223,12 +229,16 @@ const NotificationCenter = () => {
                         <Typography variant="h6" color="text.secondary">
                             {activeTab === 0
                                 ? 'No hay documentos pendientes de notificación'
-                                : 'No hay recordatorios pendientes'}
+                                : activeTab === 1
+                                    ? 'No hay recordatorios pendientes'
+                                    : 'No hay notificaciones enviadas'}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
                             {activeTab === 0
                                 ? 'Los documentos aparecerán aquí cuando estén listos para notificar'
-                                : `Los clientes notificados hace más de ${reminderDays} días aparecerán aquí`}
+                                : activeTab === 1
+                                    ? `Los clientes notificados hace más de ${reminderDays} días aparecerán aquí`
+                                    : 'Las notificaciones enviadas aparecerán aquí para poder reenviar'}
                         </Typography>
                     </CardContent>
                 </Card>
@@ -239,7 +249,8 @@ const NotificationCenter = () => {
                             key={group.cliente.identificacion || index}
                             group={group}
                             onNotify={handleNotify}
-                            isReminder={activeTab === 1}
+                            isReminder={activeTab === 1 || activeTab === 2}
+                            onPhoneUpdated={() => loadQueue()}
                         />
                     ))}
                 </Box>

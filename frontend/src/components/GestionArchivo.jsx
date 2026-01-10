@@ -18,7 +18,7 @@ import useAuth from '../hooks/use-auth';
 const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
   // Estados para paginación y filtros en servidor
   const [page, setPage] = useState(0); // backend espera 1-indexed, frontend usa 0-indexed para UI
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [totalDocuments, setTotalDocuments] = useState(0);
 
   // Auth token

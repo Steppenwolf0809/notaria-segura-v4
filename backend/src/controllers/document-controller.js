@@ -3378,15 +3378,55 @@ async function bulkNotify(req, res) {
           }
           formattedPhone = formattedPhone.replace('+', '');
 
-          // Construir mensaje
+          // Obtener plantilla activa de la base de datos
+          const { getActiveTemplateByType } = await import('./admin-whatsapp-templates-controller.js');
+          const template = await getActiveTemplateByType('DOCUMENTO_LISTO');
+
+          // Construir lista de documentos formateada
           const docList = clientGroup.documents.map(d =>
             `• ${d.documentType} - ${d.protocolNumber}`
           ).join('\n');
 
-          const message = `🏛️ *NOTARÍA DÉCIMO OCTAVA*\n\nEstimado/a ${clientGroup.clientName},\n\n` +
-            `Sus documentos están listos para retiro:\n${docList}\n\n` +
-            `🔢 *Código de retiro:* ${codigoRetiro}\n\n` +
-            `⚠️ Presente este código en ventanilla.\n📍 Azuay E2-231 y Av Amazonas, Quito`;
+          // Construir lista de códigos de escritura
+          const codigosEscritura = clientGroup.documents.length === 1
+            ? `📋 *Código de escritura:* ${clientGroup.documents[0].protocolNumber}`
+            : clientGroup.documents.map(d => `📋 ${d.protocolNumber}`).join('\n');
+
+          // Obtener primer documento para datos adicionales
+          const firstDoc = clientGroup.documents[0];
+
+          // Reemplazar variables en la plantilla
+          let message = template.mensaje
+            // Variables de cliente
+            .replace(/\{nombreCompareciente\}/g, clientGroup.clientName)
+            .replace(/\{cliente\}/g, clientGroup.clientName)
+            .replace(/\{NOMBRE_CLIENTE\}/g, clientGroup.clientName)
+            // Variables de código
+            .replace(/\{codigo\}/g, codigoRetiro)
+            .replace(/\{CODIGO_RETIRO\}/g, codigoRetiro)
+            // Variables de documentos
+            .replace(/\{documento\}/g, firstDoc.documentType || 'Documento')
+            .replace(/\{TIPO_DOCUMENTO\}/g, firstDoc.documentType || 'Documento')
+            .replace(/\{actoPrincipal\}/g, firstDoc.actoPrincipalDescripcion || firstDoc.documentType || '')
+            .replace(/\{TIPO_ACTO\}/g, firstDoc.actoPrincipalDescripcion || '')
+            .replace(/\{codigosEscritura\}/g, codigosEscritura)
+            .replace(/\{CODIGO_DOCUMENTO\}/g, firstDoc.protocolNumber || '')
+            .replace(/\{listaDocumentosCompleta\}/g, docList)
+            // Variables de cantidad
+            .replace(/\{cantidadDocumentos\}/g, clientGroup.documents.length.toString())
+            .replace(/\{NUM_DOCUMENTOS\}/g, clientGroup.documents.length.toString())
+            // Variables de notaría
+            .replace(/\{notaria\}/g, 'NOTARÍA DÉCIMO OCTAVA DEL CANTÓN QUITO')
+            .replace(/\{nombreNotariaCompleto\}/g, 'NOTARÍA DÉCIMO OCTAVA DEL CANTÓN QUITO')
+            // Variables de contacto
+            .replace(/\{contactoConsultas\}/g, 'Tel: (02) 2234-567')
+            // Variables de fecha
+            .replace(/\{fecha\}/g, new Date().toLocaleDateString('es-EC'))
+            .replace(/\{fechaFormateada\}/g, new Date().toLocaleDateString('es-EC', {
+              day: 'numeric',
+              month: 'long',
+              year: 'numeric'
+            }));
 
           waUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
         }
