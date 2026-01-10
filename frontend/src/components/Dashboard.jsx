@@ -27,28 +27,15 @@ import DocumentCenter from './DocumentCenter';
 import MatrizadorCenter from './MatrizadorCenter';
 import RecepcionCenter from './RecepcionCenter';
 import ReceptionCenter from './ReceptionCenter';
-import RecepcionMain from './recepcion/RecepcionMain';
 import ArchivoCenter from './ArchivoCenter';
 import AdminCenter from './AdminCenter';
 import ChangePassword from './ChangePassword';
 import CajaLayout from './layout/CajaLayout';
-import RecepcionLayout from './RecepcionLayout';
 
 /**
  * Componente Dashboard principal
  * Muestra información del usuario y acciones según su rol
  */
-const readFlag = (key, defaultVal = false) => {
-  try {
-    const env = import.meta.env || {};
-    const raw = env[key];
-    if (typeof raw === 'string') return raw === 'true' || raw === '1';
-    if (typeof raw === 'boolean') return raw;
-    return defaultVal;
-  } catch {
-    return defaultVal;
-  }
-};
 
 const Dashboard = () => {
   const {
@@ -67,7 +54,7 @@ const Dashboard = () => {
   const getWelcomeMessage = () => {
     const roleMessages = {
       ADMIN: 'Panel de Administración',
-      CAJA: 'Gestión Financiera y Documentos', 
+      CAJA: 'Gestión Financiera y Documentos',
       MATRIZADOR: 'Creación y Gestión de Documentos',
       RECEPCION: 'Entrega de Documentos',
       ARCHIVO: 'Gestión de Archivo y Supervisión'
@@ -137,16 +124,7 @@ const Dashboard = () => {
   }
 
   if (user.role === 'RECEPCION') {
-    const uiV2 = readFlag('VITE_UI_ACTIVOS_ENTREGADOS', true);
-    if (uiV2) {
-      return (
-        <RecepcionLayout currentView="documentos" onViewChange={() => {}}>
-          <RecepcionMain />
-        </RecepcionLayout>
-      );
-    } else {
-      return <RecepcionCenter />;
-    }
+    return <RecepcionCenter />;
   }
 
   if (user.role === 'ARCHIVO') {
@@ -161,20 +139,20 @@ const Dashboard = () => {
   return (
     <Box sx={{ flexGrow: 1 }}>
       {/* App Bar */}
-      <AppBar 
-        position="static" 
+      <AppBar
+        position="static"
         color="default"
       >
         <Toolbar>
           <DashboardIcon sx={{ mr: 2 }} />
-          <Typography 
-            variant="h6" 
-            component="div" 
+          <Typography
+            variant="h6"
+            component="div"
             sx={{ flexGrow: 1 }}
           >
             Notaría Segura
           </Typography>
-          
+
           {/* User Info */}
           <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
             <Avatar
@@ -197,7 +175,7 @@ const Dashboard = () => {
           <IconButton
             onClick={() => setShowChangePassword(true)}
             title="Cambiar Contraseña"
-            sx={{ 
+            sx={{
               ml: 1,
               color: 'text.primary',
               '&:hover': {
@@ -215,7 +193,7 @@ const Dashboard = () => {
           <IconButton
             onClick={handleLogout}
             title="Cerrar Sesión"
-            sx={{ 
+            sx={{
               ml: 1,
               color: 'text.primary',
               '&:hover': {
@@ -233,14 +211,14 @@ const Dashboard = () => {
         <Grid container spacing={3}>
           {/* Welcome Section */}
           <Grid item xs={12}>
-                          <Paper 
-                sx={{ 
-                  p: 3, 
-                  bgcolor: 'background.paper',
-                  borderRadius: 2,
-                  boxShadow: 1
-                }}
-              >
+            <Paper
+              sx={{
+                p: 3,
+                bgcolor: 'background.paper',
+                borderRadius: 2,
+                boxShadow: 1
+              }}
+            >
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                 <Avatar
                   sx={{
@@ -262,7 +240,7 @@ const Dashboard = () => {
                   </Typography>
                 </Box>
               </Box>
-              
+
               <Chip
                 label={user.role}
                 color="primary"
@@ -281,7 +259,7 @@ const Dashboard = () => {
                   <PersonIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
                   Información Personal
                 </Typography>
-                
+
                 <Box sx={{ mt: 2 }}>
                   <Typography variant="body2" color="text.secondary" gutterBottom>
                     Nombre Completo
@@ -317,7 +295,7 @@ const Dashboard = () => {
                 <Typography variant="h6" gutterBottom sx={{ color: 'primary.main' }}>
                   Funcionalidades Disponibles
                 </Typography>
-                
+
                 <Box sx={{ mt: 2 }}>
                   {getRoleFeatures().map((feature, index) => (
                     <Box key={index} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -363,7 +341,7 @@ const Dashboard = () => {
       </Box>
 
       {/* Modal de cambio de contraseña */}
-      <ChangePassword 
+      <ChangePassword
         open={showChangePassword}
         onClose={() => setShowChangePassword(false)}
       />

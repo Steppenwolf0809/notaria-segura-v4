@@ -1158,74 +1158,9 @@ async function updateDocumentStatus(req, res) {
       }
     }
 
-    if (status === 'ENTREGADO' && ['MATRIZADOR', 'ARCHIVO'].includes(req.user.role) && updatedDocument.clientPhone) {
-      try {
-        // Importar el servicio de WhatsApp
-        const whatsappService = await import('../services/whatsapp-service.js');
 
-        // Preparar datos de entrega
-        const datosEntrega = {
-          entregado_a: updateData.entregadoA,
-          deliveredTo: updateData.entregadoA,
-          fecha: updateData.fechaEntrega,
-          usuario_entrega: `${req.user.firstName} ${req.user.lastName} (${req.user.role})`
-        };
-
-        // Enviar notificación de documento entregado
-        const whatsappResult = await whatsappService.default.enviarDocumentoEntregado(
-          {
-            nombre: updatedDocument.clientName,
-            clientName: updatedDocument.clientName,
-            telefono: updatedDocument.clientPhone,
-            clientPhone: updatedDocument.clientPhone
-          },
-          {
-            tipo_documento: updatedDocument.documentType,
-            tipoDocumento: updatedDocument.documentType,
-            numero_documento: updatedDocument.protocolNumber,
-            protocolNumber: updatedDocument.protocolNumber
-          },
-          datosEntrega
-        );
-
-        whatsappSent = whatsappResult.success;
-
-        if (!whatsappResult.success) {
-          whatsappError = whatsappResult.error;
-          console.error('Error enviando WhatsApp de entrega directa:', whatsappResult.error);
-        } else {
-          console.log('📱 Notificación WhatsApp de entrega directa enviada exitosamente');
-
-          // 📈 Registrar evento de notificación WhatsApp de entrega directa
-          try {
-            await prisma.documentEvent.create({
-              data: {
-                documentId: id,
-                userId: req.user.id,
-                eventType: 'WHATSAPP_SENT',
-                description: `Notificación WhatsApp de entrega directa enviada a ${updatedDocument.clientPhone}`,
-                details: JSON.stringify({
-                  phoneNumber: updatedDocument.clientPhone,
-                  messageType: 'DOCUMENT_DELIVERED',
-                  deliveredTo: updateData.entregadoA,
-                  deliveredBy: `${req.user.firstName} ${req.user.lastName}`,
-                  deliveredByRole: req.user.role,
-                  deliveryType: 'DIRECT_DELIVERY',
-                  timestamp: new Date().toISOString()
-                }),
-                ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
-                userAgent: req.get('User-Agent') || 'unknown'
-              }
-            });
-          } catch (auditError) {
-            console.error('Error registrando evento de notificación WhatsApp de entrega:', auditError);
-          }
-        }
-      } catch (error) {
-        console.error('Error en servicio WhatsApp para entrega directa:', error);
-        whatsappError = error.message;
-      }
-    }
+    // NOTE: WhatsApp notifications for delivered documents are not yet implemented
+    // The enviarDocumentoEntregado function does not exist in whatsapp-service.js
 
     // Registrar evento de auditoría
     try {
