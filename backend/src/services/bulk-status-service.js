@@ -41,9 +41,6 @@ export async function bulkMarkReady({ documentIds, actor, sendNotifications = tr
       clientEmail: true,
       clientId: true,
       assignedToId: true,
-      isGrouped: true,
-      documentGroupId: true,
-      groupVerificationCode: true,
       notificationPolicy: true,
       actoPrincipalDescripcion: true,
       actoPrincipalValor: true
@@ -117,8 +114,6 @@ export async function bulkMarkReady({ documentIds, actor, sendNotifications = tr
         status: 'LISTO',
         codigoRetiro: code,
         updatedAt: new Date(),
-        // Si es grupo por cliente, marcar agrupado y setear el mismo código grupal.
-        ...(isGroup ? { isGrouped: true, groupVerificationCode: code } : {})
       };
 
       const ud = await tx.document.update({ where: { id: d.id }, data });

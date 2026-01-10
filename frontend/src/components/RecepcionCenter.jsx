@@ -3,7 +3,7 @@ import { Box, Alert } from '@mui/material';
 import RecepcionLayout from './RecepcionLayout';
 import RecepcionDashboard from './RecepcionDashboard';
 import DocumentosUnificados from './recepcion/DocumentosUnificados';
-import NotificationHistory from './recepcion/NotificationHistory';
+import NotificationCenter from './notifications/NotificationCenter';
 import receptionService from '../services/reception-service';
 
 /**
@@ -25,7 +25,7 @@ const RecepcionCenter = () => {
   const cargarEstadisticas = async () => {
     try {
       const result = await receptionService.getDashboardStats();
-      
+
       if (result.success) {
         setEstadisticas(result.data.stats);
         setError(null);
@@ -59,7 +59,7 @@ const RecepcionCenter = () => {
    * Función para navegar a un documento desde alertas
    */
   const handleDocumentClick = (alerta) => {
-    
+
     // Preparar información del documento específico
     const documentoTarget = {
       id: alerta.id,
@@ -72,7 +72,7 @@ const RecepcionCenter = () => {
 
     // Setear el documento específico para navegación
     setDocumentoEspecifico(documentoTarget);
-    
+
     // Cambiar a la vista de documentos
     setCurrentView('documentos');
   };
@@ -84,16 +84,16 @@ const RecepcionCenter = () => {
     switch (currentView) {
       case 'dashboard':
         return (
-          <RecepcionDashboard 
-            estadisticas={estadisticas} 
+          <RecepcionDashboard
+            estadisticas={estadisticas}
             onEstadisticasChange={onEstadisticasChange}
             onDocumentClick={handleDocumentClick}
           />
         );
-      
+
       case 'documentos':
         return (
-          <DocumentosUnificados 
+          <DocumentosUnificados
             onEstadisticasChange={onEstadisticasChange}
             documentoEspecifico={documentoEspecifico}
             onDocumentoFound={() => setDocumentoEspecifico(null)} // Limpiar después de encontrarlo
@@ -101,12 +101,12 @@ const RecepcionCenter = () => {
         );
 
       case 'notificaciones':
-        return <NotificationHistory />;
-      
+        return <NotificationCenter />;
+
       default:
         return (
-          <RecepcionDashboard 
-            estadisticas={estadisticas} 
+          <RecepcionDashboard
+            estadisticas={estadisticas}
             onEstadisticasChange={onEstadisticasChange}
             onDocumentClick={handleDocumentClick}
           />
@@ -115,14 +115,14 @@ const RecepcionCenter = () => {
   };
 
   return (
-    <RecepcionLayout 
-      currentView={currentView} 
+    <RecepcionLayout
+      currentView={currentView}
       onViewChange={handleViewChange}
     >
       {/* Error Global */}
       {error && (
-        <Alert 
-          severity="error" 
+        <Alert
+          severity="error"
           onClose={() => setError(null)}
           sx={{ mb: 3 }}
         >

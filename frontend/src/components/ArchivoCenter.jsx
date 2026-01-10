@@ -4,7 +4,7 @@ import ArchivoLayout from './ArchivoLayout';
 import ArchivoDashboard from './ArchivoDashboard';
 import GestionArchivo from './GestionArchivo';
 import SupervisionGeneral from './archivo/SupervisionGeneral';
-import NotificationHistory from './archivo/NotificationHistory';
+import NotificationCenter from './notifications/NotificationCenter';
 import archivoService from '../services/archivo-service';
 import useAuth from '../hooks/use-auth';
 
@@ -39,7 +39,7 @@ const ArchivoCenter = () => {
     setLoading(true);
     try {
       const response = await archivoService.getDashboard(token);
-      
+
       if (response.success) {
         setDashboardData(response.data);
         setError(null);
@@ -84,35 +84,35 @@ const ArchivoCenter = () => {
     switch (currentView) {
       case 'dashboard':
         return (
-          <ArchivoDashboard 
+          <ArchivoDashboard
             data={dashboardData}
             loading={loading}
             onDataUpdate={handleDataUpdate}
           />
         );
-      
+
       case 'documentos':
         return (
-          <GestionArchivo 
+          <GestionArchivo
             dashboardData={dashboardData}
             loading={loading}
             onDataUpdate={handleDataUpdate}
           />
         );
-      
+
       case 'notificaciones':
-        return <NotificationHistory />;
-      
+        return <NotificationCenter />;
+
       case 'supervision':
         return (
-          <SupervisionGeneral 
+          <SupervisionGeneral
             onDataUpdate={handleDataUpdate}
           />
         );
-      
+
       default:
         return (
-          <GestionArchivo 
+          <GestionArchivo
             dashboardData={dashboardData}
             loading={loading}
             onDataUpdate={handleDataUpdate}
@@ -122,14 +122,14 @@ const ArchivoCenter = () => {
   };
 
   return (
-    <ArchivoLayout 
-      currentView={currentView} 
+    <ArchivoLayout
+      currentView={currentView}
       onViewChange={handleViewChange}
     >
       {/* Error Global */}
       {error && (
-        <Alert 
-          severity="error" 
+        <Alert
+          severity="error"
           onClose={clearError}
           sx={{ mb: 3 }}
         >

@@ -618,7 +618,8 @@ async function exportDocuments(req, res) {
       'Valor Acto Principal': doc.totalFactura || 0, // ⭐ CAMBIO: Usar valor total de factura
       'Total Factura': doc.totalFactura || 0,
       'Código Verificación': doc.verificationCode || '',
-      'Agrupado': doc.isGrouped ? 'Sí' : 'No'
+      'Total Factura': doc.totalFactura || 0,
+      'Código Verificación': doc.verificationCode || ''
     }));
 
     const filename = `documentos_${new Date().toISOString().split('T')[0]}`;

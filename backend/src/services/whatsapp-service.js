@@ -49,7 +49,6 @@ class WhatsAppService {
             const notification = await prisma.whatsAppNotification.create({
                 data: {
                     documentId: data.documentId || null,
-                    groupId: data.groupId || null,
                     clientName: data.clientName,
                     clientPhone: data.clientPhone,
                     messageType: data.messageType,
@@ -331,7 +330,6 @@ class WhatsAppService {
 
         // Preparar datos para guardar en BD (igual que documentos individuales)
         const notificationData = {
-            groupId: documentos[0]?.documentGroupId || null,
             clientName: clientName,
             clientPhone: clientPhone,
             messageType: 'GROUP_READY',

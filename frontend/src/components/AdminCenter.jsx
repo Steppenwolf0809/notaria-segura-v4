@@ -42,7 +42,7 @@ import useAuth from '../hooks/use-auth';
 import AdminLayout from './AdminLayout';
 import UserManagement from './admin/UserManagement';
 import DocumentOversight from './admin/DocumentOversight';
-import NotificationHistory from './admin/NotificationHistory';
+import NotificationCenter from './notifications/NotificationCenter';
 import NotificationSettings from './admin/NotificationSettings';
 import NotificationTemplates from './admin/NotificationTemplates';
 import WhatsAppTemplates from './admin/WhatsAppTemplates';
@@ -76,7 +76,7 @@ const AdminCenter = () => {
       case 'analisis-uafe':
         return <AnalisisUAFE />;
       case 'notifications':
-        return <NotificationHistory />;
+        return <NotificationCenter />;
       case 'notification-templates':
         return <NotificationTemplates />;
       case 'whatsapp-templates':

@@ -357,9 +357,6 @@ async function listarTodosDocumentos(req, res) {
           clientId: doc.clientId,
           documentType: doc.documentType,
           status: doc.status,
-          isGrouped: doc.isGrouped,
-          documentGroupId: doc.documentGroupId,
-          groupVerificationCode: doc.groupVerificationCode,
           matrizador: doc._assignedToFirstName ? `${doc._assignedToFirstName} ${doc._assignedToLastName}` : 'No asignado',
           matrizadorId: doc.assignedToId,
           codigoRetiro: doc.codigoRetiro,
@@ -474,10 +471,6 @@ async function listarTodosDocumentos(req, res) {
       clientId: doc.clientId,
       documentType: doc.documentType,
       status: doc.status,
-      // 🔗 Campos de agrupación para que el frontend muestre chips e info de grupo
-      isGrouped: doc.isGrouped,
-      documentGroupId: doc.documentGroupId,
-      groupVerificationCode: doc.groupVerificationCode,
       matrizador: doc.assignedTo ? `${doc.assignedTo.firstName} ${doc.assignedTo.lastName}` : 'No asignado',
       matrizadorId: doc.assignedToId,
       codigoRetiro: doc.codigoRetiro,
@@ -721,180 +714,81 @@ async function marcarComoListo(req, res) {
       return res.status(400).json({ success: false, message: `El documento no está en proceso. Estado actual: ${document.status}` });
     }
 
-    // NUEVA FUNCIONALIDAD: Manejar propagación de estado en documentos agrupados
+    // Generar código de retiro para documento individual
+    logger.debug('Generando código de retiro para documento individual');
+    const nuevoCodigo = await CodigoRetiroService.generarUnico();
+
     let updatedDocuments = [];
-    let groupAffected = false;
+    let updatedDocument;
 
-    // Verificar si el documento pertenece a un grupo y propagar el cambio
-    if (document.documentGroupId) {
-      logger.debug('Documento agrupado - iniciando propagación de estado');
+    // Usar transacción para evitar condiciones de carrera
+    updatedDocument = await prisma.$transaction(async (tx) => {
+      const currentDoc = await tx.document.findUnique({ where: { id } });
 
-      try {
-        // Obtener todos los documentos del mismo grupo
-        const groupDocuments = await prisma.document.findMany({
-          where: {
-            documentGroupId: document.documentGroupId,
-            status: { not: 'ENTREGADO' } // Solo documentos no entregados
-          },
-          include: {
-            assignedTo: {
-              select: { id: true, firstName: true, lastName: true, email: true }
-            }
-          }
-        });
-
-        logger.debug(`Encontrados ${groupDocuments.length} documentos en el grupo`);
-
-        // Generar códigos únicos para cada documento si no los tienen
-        const documentsToUpdate = [];
-        for (const doc of groupDocuments) {
-          let codigoRetiro;
-          if (doc.verificationCode) {
-            codigoRetiro = doc.verificationCode;
-          } else {
-            codigoRetiro = await CodigoRetiroService.generarUnico();
-          }
-
-          documentsToUpdate.push({
-            docId: doc.id,
-            originalStatus: doc.status,
-            codigoRetiro: codigoRetiro
-          });
-        }
-
-        // Actualizar todos los documentos del grupo en una transacción
-        updatedDocuments = await prisma.$transaction(async (tx) => {
-          const updates = [];
-          for (const { docId, codigoRetiro } of documentsToUpdate) {
-            const updated = await tx.document.update({
-              where: { id: docId },
-              data: {
-                status: 'LISTO',
-                codigoRetiro: codigoRetiro,
-                updatedAt: new Date()
-              },
-              include: {
-                assignedTo: {
-                  select: { id: true, firstName: true, lastName: true, email: true }
-                }
-              }
-            });
-            updates.push(updated);
-          }
-          return updates;
-        });
-
-        groupAffected = true;
-        logger.debug(`${updatedDocuments.length} documentos del grupo actualizados`);
-
-        // Registrar eventos de auditoría para todos los documentos afectados
-        for (let i = 0; i < updatedDocuments.length; i++) {
-          const doc = updatedDocuments[i];
-          const originalStatus = documentsToUpdate[i].originalStatus;
-
-          try {
-            await prisma.documentEvent.create({
-              data: {
-                documentId: doc.id,
-                userId: req.user.id,
-                eventType: 'STATUS_CHANGED',
-                description: `Estado cambiado de ${originalStatus} a LISTO por propagación grupal - ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
-                details: JSON.stringify({
-                  previousStatus: originalStatus,
-                  newStatus: 'LISTO',
-                  codigoRetiro: doc.codigoRetiro,
-                  groupPropagation: true,
-                  triggeredBy: id,
-                  changedBy: `${req.user.firstName} ${req.user.lastName}`,
-                  userRole: req.user.role,
-                  timestamp: new Date().toISOString()
-                }),
-                ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
-                userAgent: req.get('User-Agent') || 'unknown'
-              }
-            });
-          } catch (auditError) {
-            logger.error('Error registrando evento de auditoría:', auditError);
-          }
-        }
-
-      } catch (error) {
-        logger.error('Error en propagación grupal:', error);
-        return res.status(500).json({
-          success: false,
-          message: 'Error propagando cambio de estado a documentos agrupados',
-          error: error.message
-        });
+      if (!currentDoc || currentDoc.status !== 'EN_PROCESO') {
+        throw new Error(`El documento ya no está en proceso. Estado actual: ${currentDoc?.status || 'NO_ENCONTRADO'}`);
       }
-    } else {
-      // Documento individual - comportamiento original
-      logger.debug('Generando código de retiro para documento individual');
-      const nuevoCodigo = await CodigoRetiroService.generarUnico();
-      // Usar transacción para evitar condiciones de carrera
-      const updatedDocument = await prisma.$transaction(async (tx) => {
-        // Verificar nuevamente el estado dentro de la transacción
-        const currentDoc = await tx.document.findUnique({ where: { id } });
 
-        if (!currentDoc || currentDoc.status !== 'EN_PROCESO') {
-          throw new Error(`El documento ya no está en proceso. Estado actual: ${currentDoc?.status || 'NO_ENCONTRADO'}`);
+      // Registro de evento
+      await tx.documentEvent.create({
+        data: {
+          documentId: id,
+          userId: req.user.id,
+          eventType: 'STATUS_CHANGED',
+          description: `Estado cambiado de EN_PROCESO a LISTO - ${req.user.firstName} ${req.user.lastName}`,
+          details: JSON.stringify({
+            previousStatus: 'EN_PROCESO',
+            newStatus: 'LISTO',
+            codigoRetiro: nuevoCodigo,
+            timestamp: new Date().toISOString()
+          })
         }
-
-        return await tx.document.update({
-          where: { id },
-          data: { status: 'LISTO', codigoRetiro: nuevoCodigo, updatedAt: new Date() }
-        });
       });
 
-      updatedDocuments = [updatedDocument];
-      logger.debug('Documento actualizado exitosamente');
-    }
+      return await tx.document.update({
+        where: { id },
+        data: { status: 'LISTO', codigoRetiro: nuevoCodigo, updatedAt: new Date() },
+        include: {
+          assignedTo: {
+            select: { id: true, firstName: true, lastName: true, email: true }
+          }
+        }
+      });
+    });
 
-    // 📱 ENVIAR NOTIFICACIÓN WHATSAPP (respetar política no_notificar)
+    updatedDocuments = [updatedDocument];
+    logger.debug('Documento actualizado exitosamente');
+
+    // 📱 ENVIAR NOTIFICACIÓN WHATSAPP
     try {
-      if (document.notificationPolicy === 'no_notificar') {
-        logger.debug('Política no_notificar activa, omitiendo WhatsApp');
-      } else {
+      if (document.clientPhone && document.notificationPolicy !== 'no_notificar') {
         const clienteData = {
           clientName: document.clientName,
           clientPhone: document.clientPhone
         };
+        const documentoData = {
+          tipoDocumento: document.tipoDocumento,
+          protocolNumber: document.protocolNumber,
+          actoPrincipalDescripcion: document.actoPrincipalDescripcion,
+          actoPrincipalValor: document.actoPrincipalValor
+        };
 
-        if (groupAffected) {
-          // Notificación grupal - enviar información de todos los documentos
-          await whatsappService.enviarGrupoDocumentosListo(
-            clienteData,
-            updatedDocuments,
-            updatedDocuments[0].codigoRetiro // Usar el código del primer documento como referencia
-          );
-
-          logger.debug('Notificación WhatsApp grupal enviada');
-        } else {
-          // Notificación individual
-          const documentoData = {
-            tipoDocumento: document.tipoDocumento,
-            protocolNumber: document.protocolNumber,
-            actoPrincipalDescripcion: document.actoPrincipalDescripcion,
-            actoPrincipalValor: document.actoPrincipalValor
-          };
-
-          await whatsappService.enviarDocumentoListo(
-            clienteData,
-            documentoData,
-            updatedDocuments[0].codigoRetiro
-          );
-
-          logger.debug('Notificación WhatsApp enviada');
-        }
+        await whatsappService.enviarDocumentoListo(
+          clienteData,
+          documentoData,
+          updatedDocument.codigoRetiro
+        );
+        logger.debug('Notificación WhatsApp enviada');
       }
     } catch (whatsappError) {
-      // No fallar la operación principal si WhatsApp falla
-      logger.warn('Error enviando WhatsApp (operación continúa):', whatsappError.message);
+      logger.warn('Error enviando WhatsApp:', whatsappError.message);
     }
 
-    const mainDocument = updatedDocuments.find(doc => doc.id === id) || updatedDocuments[0];
-    const responseMessage = groupAffected
-      ? `${updatedDocuments.length} documentos del grupo marcados como listos exitosamente`
-      : `Documento ${mainDocument.protocolNumber} marcado como listo exitosamente`;
+    // Variables para la respuesta
+    const mainDocument = updatedDocument;
+    const groupAffected = false;
+    const responseMessage = `Documento ${mainDocument.protocolNumber} marcado como listo exitosamente`;
+
 
     logger.debug('Proceso completado exitosamente');
 
@@ -923,137 +817,6 @@ async function marcarComoListo(req, res) {
   }
 }
 
-async function marcarGrupoListo(req, res) {
-  try {
-    const { documentIds } = req.body;
-    if (!documentIds || !Array.isArray(documentIds) || documentIds.length === 0) {
-      return res.status(400).json({ success: false, message: 'Se requiere una lista de IDs de documentos.' });
-    }
-
-    const documents = await prisma.document.findMany({
-      where: { id: { in: documentIds }, status: 'EN_PROCESO' }
-    });
-
-    if (documents.length !== documentIds.length) {
-      return res.status(400).json({ success: false, message: 'Algunos documentos no se pudieron procesar o no están en proceso.' });
-    }
-
-    const clientNames = [...new Set(documents.map(doc => doc.clientName))];
-    const clientIds = [...new Set(documents.map(doc => doc.clientId).filter(Boolean))];
-
-    if (clientNames.length > 1) {
-      return res.status(400).json({ success: false, message: 'Todos los documentos deben ser del mismo cliente.' });
-    }
-
-    // Si hay clientIds, deben ser todos iguales
-    if (clientIds.length > 1) {
-      return res.status(400).json({ success: false, message: 'Los documentos deben tener la misma identificación del cliente.' });
-    }
-
-    // Generar código único para grupo usando el servicio mejorado
-    const nuevoCodigo = await CodigoRetiroService.generarUnicoGrupo();
-
-    const updatedDocuments = await prisma.$transaction(async (tx) => {
-      // Verificar nuevamente que todos los documentos estén EN_PROCESO
-      const currentDocs = await tx.document.findMany({
-        where: { id: { in: documentIds } }
-      });
-
-      const invalidDocs = currentDocs.filter(doc => doc.status !== 'EN_PROCESO');
-      if (invalidDocs.length > 0) {
-        throw new Error(`Algunos documentos ya no están en proceso: ${invalidDocs.map(d => `${d.protocolNumber}(${d.status})`).join(', ')}`);
-      }
-
-      return await Promise.all(
-        documentIds.map(id => tx.document.update({
-          where: { id },
-          data: { status: 'LISTO', codigoRetiro: nuevoCodigo, isGrouped: true, groupVerificationCode: nuevoCodigo, updatedAt: new Date() }
-        }))
-      );
-    });
-
-    // 📱 ENVIAR NOTIFICACIÓN WHATSAPP GRUPAL
-    try {
-      // Tomar datos del primer documento (todos son del mismo cliente)
-      const primerDocumento = documents[0];
-      if (primerDocumento.notificationPolicy === 'no_notificar') {
-        logger.debug('Política no_notificar activa, omitiendo WhatsApp grupal');
-      } else {
-        const clienteData = {
-          clientName: primerDocumento.clientName,
-          clientPhone: primerDocumento.clientPhone
-        };
-
-        await whatsappService.enviarGrupoDocumentosListo(
-          clienteData,
-          updatedDocuments, // Array de documentos actualizados
-          nuevoCodigo
-        );
-
-        logger.debug('Notificación WhatsApp grupal enviada');
-      }
-    } catch (whatsappError) {
-      // No fallar la operación principal si WhatsApp falla
-      logger.warn('Error enviando WhatsApp grupal (operación continúa):', whatsappError.message);
-    }
-
-    // 📈 Registrar eventos de auditoría para cada documento del grupo
-    try {
-      for (const doc of updatedDocuments) {
-        await prisma.documentEvent.create({
-          data: {
-            documentId: doc.id,
-            userId: req.user.id,
-            eventType: 'STATUS_CHANGED',
-            description: `Marcado como LISTO (grupo de ${updatedDocuments.length}) por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
-            details: JSON.stringify({
-              previousStatus: 'EN_PROCESO',
-              newStatus: 'LISTO',
-              codigoRetiro: nuevoCodigo,
-              bulk: true,
-              groupSize: updatedDocuments.length,
-              changedBy: `${req.user.firstName} ${req.user.lastName}`,
-              userRole: req.user.role,
-              timestamp: new Date().toISOString()
-            }),
-            ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
-            userAgent: req.get('User-Agent') || 'unknown'
-          }
-        });
-      }
-      logger.debug(`Registrados ${updatedDocuments.length} eventos de auditoría para grupo LISTO`);
-    } catch (auditError) {
-      logger.error('Error registrando eventos de auditoría grupal:', auditError);
-      // No fallar la operación principal
-    }
-
-    // Headers para evitar cache del navegador
-    res.set({
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Pragma': 'no-cache',
-      'Expires': '0'
-    });
-
-    res.json({
-      success: true,
-      message: `${updatedDocuments.length} documentos marcados como listos`,
-      data: {
-        codigoRetiro: nuevoCodigo,
-        documentsCount: updatedDocuments.length,
-        whatsappSent: true // Siempre true para no exponer errores al frontend
-      }
-    });
-  } catch (error) {
-    logger.error('Error marcando grupo como listo:', error);
-    res.status(500).json({ success: false, error: 'Error interno del servidor' });
-  }
-}
-
-/**
- * Obtener alertas de recepción (documentos LISTO sin entregar)
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- */
 async function getAlertasRecepcion(req, res) {
   try {
     const alertas = await AlertasService.getAlertasRecepcion();
@@ -1071,121 +834,6 @@ async function getAlertasRecepcion(req, res) {
   }
 }
 
-async function desagruparDocumentos(req, res) {
-  try {
-    const { documentIds } = req.body;
-
-    if (!documentIds || !Array.isArray(documentIds) || documentIds.length === 0) {
-      return res.status(400).json({ success: false, message: 'Se requiere una lista de IDs de documentos.' });
-    }
-
-    // Verificar que los documentos existen y están agrupados
-    const documents = await prisma.document.findMany({
-      where: {
-        id: { in: documentIds },
-        isGrouped: true
-      }
-    });
-
-    if (documents.length === 0) {
-      return res.status(400).json({ success: false, message: 'No se encontraron documentos agrupados para desagrupar.' });
-    }
-
-    // Generar códigos individuales para cada documento
-    const codigosIndividuales = await Promise.all(
-      documents.map(() => CodigoRetiroService.generarUnico())
-    );
-
-    // Desagrupar documentos - asignar códigos individuales
-    const updatedDocuments = await prisma.$transaction(
-      documents.map((doc, index) => prisma.document.update({
-        where: { id: doc.id },
-        data: {
-          isGrouped: false,
-          documentGroupId: null,
-          groupVerificationCode: null,
-          codigoRetiro: codigosIndividuales[index],
-          updatedAt: new Date()
-        }
-      }))
-    );
-
-    // Registrar evento de desagrupación
-    try {
-      await Promise.all(
-        documents.map(doc =>
-          prisma.documentEvent.create({
-            data: {
-              documentId: doc.id,
-              userId: req.user.id,
-              eventType: 'STATUS_CHANGED',
-              description: `Documento desagrupado. Nuevo código: ${codigosIndividuales[documents.findIndex(d => d.id === doc.id)]}`,
-              details: JSON.stringify({
-                previousGroupCode: doc.groupVerificationCode,
-                newIndividualCode: codigosIndividuales[documents.findIndex(d => d.id === doc.id)],
-                ungroupedBy: `${req.user.firstName || 'Sistema'} ${req.user.lastName || ''}`,
-                userRole: req.user.role || 'RECEPCION',
-                timestamp: new Date().toISOString()
-              }),
-              ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
-              userAgent: req.get('User-Agent') || 'unknown'
-            }
-          })
-        )
-      );
-    } catch (auditError) {
-      logger.error('Error registrando eventos de desagrupación:', auditError);
-    }
-
-    // Enviar notificaciones WhatsApp individuales
-    try {
-      const clienteData = {
-        clientName: documents[0].clientName,
-        clientPhone: documents[0].clientPhone
-      };
-
-      for (let i = 0; i < updatedDocuments.length; i++) {
-        const doc = updatedDocuments[i];
-        const documentoData = {
-          tipoDocumento: doc.documentType,
-          protocolNumber: doc.protocolNumber,
-          actoPrincipalDescripcion: doc.actoPrincipalDescripcion,
-          actoPrincipalValor: doc.actoPrincipalValor
-        };
-
-        await whatsappService.enviarDocumentoListo(
-          clienteData,
-          documentoData,
-          codigosIndividuales[i]
-        );
-      }
-
-      logger.debug(`${updatedDocuments.length} notificaciones WhatsApp individuales enviadas`);
-    } catch (whatsappError) {
-      logger.warn('Error enviando notificaciones WhatsApp de desagrupación:', whatsappError.message);
-    }
-
-    res.json({
-      success: true,
-      message: `${updatedDocuments.length} documentos desagrupados exitosamente`,
-      data: {
-        documentsCount: updatedDocuments.length,
-        individualCodes: codigosIndividuales,
-        whatsappSent: true
-      }
-    });
-  } catch (error) {
-    logger.error('Error desagrupando documentos:', error);
-    res.status(500).json({ success: false, error: 'Error interno del servidor' });
-  }
-}
-
-/**
- * Revertir estado de documento con razón obligatoria
- * Delega a la función central de revertDocumentStatus que maneja grupos automáticamente
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- */
 async function revertirEstadoDocumento(req, res) {
   try {
     // Importar la función central de reversión
@@ -1837,7 +1485,7 @@ async function entregaGrupal(req, res) {
     const anyReady = documents.some(d => d.status === 'LISTO');
     if (anyReady && !verificacionManual && !codigoVerificacion) {
       // Intentar obtener código del grupo o individual
-      const groupCode = documents[0].groupVerificationCode || documents[0].codigoRetiro || documents[0].verificationCode;
+      const groupCode = documents[0].codigoRetiro || documents[0].verificationCode;
       if (!groupCode) {
         return res.status(400).json({ success: false, message: 'Se requiere código de verificación para documentos listos' });
       }
@@ -1909,8 +1557,6 @@ export {
   listarTodosDocumentos,
   getDocumentosEnProceso,
   marcarComoListo,
-  marcarGrupoListo,
-  desagruparDocumentos,
   getAlertasRecepcion,
   revertirEstadoDocumento,
   getNotificationHistoryReception,
