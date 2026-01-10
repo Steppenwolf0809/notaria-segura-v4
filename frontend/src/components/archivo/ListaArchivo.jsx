@@ -53,7 +53,7 @@ import EditDocumentModal from '../Documents/EditDocumentModal';
 import ConfirmationModal from '../Documents/ConfirmationModal';
 import ReversionModal from '../recepcion/ReversionModal';
 import ModalEntrega from '../recepcion/ModalEntrega';
-import ModalEntregaGrupal from '../recepcion/ModalEntregaGrupal';
+
 
 
 import useDocumentStore from '../../store/document-store';
@@ -136,7 +136,7 @@ const ListaArchivo = ({
 
   // Estados para entrega
   const [showSingleDeliveryModal, setShowSingleDeliveryModal] = useState(false);
-  const [showGroupDeliveryModal, setShowGroupDeliveryModal] = useState(false);
+
 
   // 🎯 NUEVOS ESTADOS PARA SELECCIÓN MÚLTIPLE
   const bulkActions = useBulkActions();
@@ -1270,21 +1270,7 @@ const ListaArchivo = ({
         />
       )}
 
-      {/* Modal de entrega grupal */}
-      {showGroupDeliveryModal && (
-        <ModalEntregaGrupal
-          documentos={getSelectedDocumentsForDelivery()}
-          onClose={() => setShowGroupDeliveryModal(false)}
-          onEntregaExitosa={() => {
-            setShowGroupDeliveryModal(false);
-            bulkActions.clearSelection();
-            if (onRefresh) {
-              onRefresh();
-            }
-          }}
-          serviceType="archivo"
-        />
-      )}
+
 
 
 

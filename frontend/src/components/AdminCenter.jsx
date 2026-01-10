@@ -216,9 +216,6 @@ const AdminDashboard = () => {
 
   // Mapping para textos de intervalos
   const billingIntervals = {
-    'current_month': 'Mes Actual',
-    'last_month': 'Mes Anterior',
-    'year_to_date': 'Año Actual',
     'current_week': 'Esta Semana',
     'current_month': 'Mes Actual',
     'last_month': 'Mes Anterior',
