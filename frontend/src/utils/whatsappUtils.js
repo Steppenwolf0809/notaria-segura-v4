@@ -44,29 +44,58 @@ export function formatPhoneForWhatsApp(phone) {
  */
 export function groupDocumentsByClient(documents) {
     if (!documents || !Array.isArray(documents)) {
-        return { byClient: {}, withoutPhone: [] };
+        return [];
     }
 
-    const byClient = {};
+    const byPhone = {};
     const withoutPhone = [];
 
     for (const doc of documents) {
         if (doc.clientPhone && doc.clientPhone.trim()) {
             const phone = doc.clientPhone.trim();
-            if (!byClient[phone]) {
-                byClient[phone] = {
-                    clientName: doc.clientName,
-                    clientPhone: phone,
-                    documents: []
+            if (!byPhone[phone]) {
+                byPhone[phone] = {
+                    cliente: {
+                        nombre: doc.clientName,
+                        identificacion: doc.clientId,
+                        telefono: phone
+                    },
+                    documentos: [],
+                    stats: {
+                        total: 0,
+                        ready: 0
+                    }
                 };
             }
-            byClient[phone].documents.push(doc);
+            byPhone[phone].documentos.push(doc);
         } else {
             withoutPhone.push(doc);
         }
     }
 
-    return { byClient, withoutPhone };
+    // Convert object to array
+    const groups = Object.values(byPhone);
+
+    // Add documents without phone as individual groups or a special group
+    if (withoutPhone.length > 0) {
+        // Option A: Individual groups for those without phone (better for searching)
+        for (const doc of withoutPhone) {
+            groups.push({
+                cliente: {
+                    nombre: doc.clientName,
+                    identificacion: doc.clientId,
+                    telefono: null
+                },
+                documentos: [doc],
+                stats: {
+                    total: 1,
+                    ready: doc.status === 'LISTO' || doc.status === 'LISTO_ENTREGA' ? 1 : 0
+                }
+            });
+        }
+    }
+
+    return groups;
 }
 
 /**

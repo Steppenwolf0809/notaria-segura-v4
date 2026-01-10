@@ -3416,6 +3416,19 @@ async function bulkNotify(req, res) {
               })
             }
           });
+
+          // Registrar en tabla WhatsAppNotification para historial
+          await prisma.whatsAppNotification.create({
+            data: {
+              documentId: doc.id,
+              clientName: clientGroup.clientName,
+              clientPhone: phone,
+              messageType: 'DOCUMENTO_LISTO',
+              messageBody: `Código de retiro: ${codigoRetiro}. Documentos en lote: ${documentIdsToUpdate.length}`,
+              status: sendWhatsApp ? 'PREPARED' : 'PENDING',
+              sentAt: sendWhatsApp ? now : null
+            }
+          });
         }
 
         // Generar URL wa.me si se solicita envío
