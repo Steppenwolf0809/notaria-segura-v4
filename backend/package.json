@@ -5,7 +5,7 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest --detectOpenHandles --forceExit",
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest --detectOpenHandles --forceExit",
     "test:watch": "NODE_OPTIONS=--experimental-vm-modules jest --watch",
     "test:ci": "NODE_OPTIONS=--experimental-vm-modules jest --ci --coverage --watchAll=false",
     "prebuild": "npm run test:ci",
@@ -22,9 +22,6 @@
     "db:migrate:deploy": "prisma migrate deploy",
     "setup:prod": "node scripts/setup-production-data.js",
     "verify:prod": "node scripts/verify-production.js",
-    "fix:enum": "node scripts/fix-agrupado-enum.js",
-    "fix:grouped": "node scripts/fix-grouped-documents-status.js smart",
-    "fix:grouped-force": "node scripts/fix-grouped-documents-status.js force EN_PROCESO",
     "db:sync": "npx prisma db push --accept-data-loss",
     "db:baseline": "node scripts/db-baseline.js",
     "prestart-disabled": "node scripts/run-migrations.js",
@@ -79,6 +76,7 @@
     "zod": "^4.0.17"
   },
   "devDependencies": {
+    "cross-env": "^10.1.0",
     "jest": "^30.1.1",
     "nodemon": "^3.0.0",
     "prisma": "^5.7.0",

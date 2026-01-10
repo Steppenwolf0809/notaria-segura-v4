@@ -32,10 +32,10 @@ import {
 } from '@mui/icons-material';
 import useDocumentStore from '../../store/document-store';
 import DocumentDetailModal from './DocumentDetailModal';
-import GroupingAlert from '../grouping/GroupingAlert';
+
 import { formatCurrency } from '../../utils/currencyUtils';
-import QuickGroupingModal from '../grouping/QuickGroupingModal';
-import GroupInfoModal from '../shared/GroupInfoModal';
+
+
 // NUEVOS COMPONENTES PARA SELECCIÓN MÚLTIPLE
 import useBulkActions from '../../hooks/useBulkActions';
 import BulkActionToolbar from '../bulk/BulkActionToolbar';
@@ -71,12 +71,8 @@ const ListView = ({
   const [reversionOpen, setReversionOpen] = useState(false);
   const [currentDocumento, setCurrentDocumento] = useState(null);
 
-  // 🔗 Estados para agrupación rápida reutilizando modal existente
-  const [showQuickGroupingModal, setShowQuickGroupingModal] = useState(false);
-  const [pendingGroupData, setPendingGroupData] = useState({ main: null, related: [] });
-  const [groupingLoading, setGroupingLoading] = useState(false);
-  const [groupInfoModalOpen, setGroupInfoModalOpen] = useState(false);
-  const [selectedGroupDocument, setSelectedGroupDocument] = useState(null);
+
+
 
   // 🆕 NUEVOS ESTADOS PARA SELECCIÓN MÚLTIPLE
   const bulkActions = useBulkActions();
@@ -254,8 +250,6 @@ const ListView = ({
       const sentLike = !!(w.sent || ['sent', 'queued', 'delivered'].includes(w.status) || w.sid || w.messageId);
       if (sentLike) {
         toast.success('Documento marcado como LISTO. WhatsApp enviado.');
-      } else if (w.skipped || currentDocumento?.notificationPolicy === 'no_notificar') {
-        toast.info('Documento marcado como LISTO. No se envió WhatsApp (preferencia no notificar).');
       } else if (w.error) {
         toast.error(`Documento LISTO, pero WhatsApp falló: ${w.error}`);
       } else {
@@ -290,38 +284,7 @@ const ListView = ({
     }
   };
 
-  /**
-   * Abrir flujo de agrupación rápida desde un documento
-   */
-  const handleOpenGroupingFromDocument = async (document) => {
-    try {
-      // Detectar documentos agrupables para el cliente
-      const result = await detectGroupableDocuments({
-        clientName: document.clientName,
-        clientId: document.clientId || ''
-      });
 
-      const related = (result.groupableDocuments || []).filter(d => d.id !== document.id);
-      if (result.success && related.length > 0) {
-        setPendingGroupData({ main: document, related });
-        setShowQuickGroupingModal(true);
-      } else {
-        // Silencioso: cerrar menú sin ruido si no hay agrupables
-      }
-    } catch (e) {
-      // Silencioso para no ensuciar la vista lista
-    } finally {
-      // No menu to close; keep UX silent
-    }
-  };
-
-  /**
-   * Callback para chip/alerta de agrupación
-   */
-  const handleGroupDocuments = (groupableDocuments, mainDocument) => {
-    setPendingGroupData({ main: mainDocument, related: groupableDocuments });
-    setShowQuickGroupingModal(true);
-  };
 
   // 🎯 NUEVAS FUNCIONES PARA SELECCIÓN MÚLTIPLE
 
@@ -640,7 +603,7 @@ const ListView = ({
                         )}
                         {/* Revertir estado: visible para LISTO o ENTREGADO */}
                         {['LISTO', 'ENTREGADO'].includes(document.status) && (
-                          <Tooltip title={document.isGrouped ? 'Revertir (afectará al grupo)' : 'Revertir estado'}>
+                          <Tooltip title="Revertir estado">
                             <IconButton size="small" color="warning" onClick={(e) => { e.stopPropagation(); openReversion(document); }}>
                               <UndoIcon fontSize="small" />
                             </IconButton>
@@ -678,11 +641,7 @@ const ListView = ({
           <Typography variant="body2">
             ¿Confirmas marcar el documento como LISTO para entrega?
           </Typography>
-          {currentDocumento?.isGrouped && (
-            <Alert severity="info" sx={{ mt: 2 }}>
-              Documento agrupado: este cambio puede propagarse a su grupo.
-            </Alert>
-          )}
+
         </DialogContent>
         <DialogActions sx={{ justifyContent: 'space-between' }}>
           <Button onClick={closeConfirmListo} color="inherit">Cancelar</Button>
@@ -741,38 +700,9 @@ const ListView = ({
         onDocumentUpdated={handleDocumentUpdated}
       />
 
-      {/* Modal de información de grupo (reutilizado) */}
-      {groupInfoModalOpen && selectedGroupDocument && (
-        <GroupInfoModal
-          open={groupInfoModalOpen}
-          onClose={() => { setGroupInfoModalOpen(false); setSelectedGroupDocument(null); }}
-          document={selectedGroupDocument}
-        />
-      )}
 
-      {/* Modal de agrupación rápida (reutilizado sin duplicar lógica) */}
-      <QuickGroupingModal
-        open={showQuickGroupingModal}
-        onClose={() => setShowQuickGroupingModal(false)}
-        mainDocument={pendingGroupData.main}
-        relatedDocuments={pendingGroupData.related}
-        loading={groupingLoading}
-        onDocumentUpdated={handleDocumentUpdated}
-        onConfirm={async (selectedDocumentIds) => {
-          if (pendingGroupData.main && selectedDocumentIds.length > 0) {
-            setGroupingLoading(true);
-            try {
-              const documentIds = [pendingGroupData.main.id, ...selectedDocumentIds];
-              await createDocumentGroup(documentIds);
-            } finally {
-              setGroupingLoading(false);
-              setShowQuickGroupingModal(false);
-            }
-          } else {
-            setShowQuickGroupingModal(false);
-          }
-        }}
-      />
+
+
 
       {/* 🎯 NUEVOS COMPONENTES: Selección múltiple */}
 

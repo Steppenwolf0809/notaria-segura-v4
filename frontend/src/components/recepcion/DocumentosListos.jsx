@@ -45,7 +45,7 @@ import {
   Info as InfoIcon
 } from '@mui/icons-material';
 import ModalEntrega from './ModalEntrega';
-import ModalEntregaGrupal from './ModalEntregaGrupal';
+
 import receptionService from '../../services/reception-service';
 
 /**
@@ -72,7 +72,7 @@ function DocumentosListos({ onEstadisticasChange }) {
 
   // Estados para modales
   const [showModalEntrega, setShowModalEntrega] = useState(false);
-  const [showEntregaGrupal, setShowEntregaGrupal] = useState(false);
+
   const [documentoSeleccionado, setDocumentoSeleccionado] = useState(null);
 
   // Estado para modal de resultados de notificación
@@ -192,7 +192,7 @@ function DocumentosListos({ onEstadisticasChange }) {
 
   const cerrarModales = () => {
     setShowModalEntrega(false);
-    setShowEntregaGrupal(false);
+
     setDocumentoSeleccionado(null);
   };
 
@@ -433,18 +433,7 @@ function DocumentosListos({ onEstadisticasChange }) {
                   >
                     {sortOrder === 'asc' ? 'Fecha ↑' : 'Fecha ↓'}
                   </Button>
-                  {/* Solo mostrar botón de entrega grupal en pestaña "Listos" */}
-                  {currentTab === 0 && (
-                    <Button
-                      variant={showEntregaGrupal ? "contained" : "outlined"}
-                      color={showEntregaGrupal ? "success" : "primary"}
-                      onClick={() => setShowEntregaGrupal(!showEntregaGrupal)}
-                      startIcon={<GroupsIcon />}
-                      disabled={selectedDocuments.length === 0}
-                    >
-                      Entrega Grupal ({selectedDocuments.length})
-                    </Button>
-                  )}
+
 
                   {/* ... (rest of buttons) */}
                 </Stack>
@@ -465,13 +454,7 @@ function DocumentosListos({ onEstadisticasChange }) {
         />
       )}
 
-      {showEntregaGrupal && selectedDocuments.length > 0 && (
-        <ModalEntregaGrupal
-          documentos={documentos.filter(doc => selectedDocuments.includes(doc.id))}
-          onClose={cerrarModales}
-          onEntregaExitosa={onEntregaCompletada}
-        />
-      )}
+
 
       {/* Modal de Resultados de Notificación */}
       {showNotificationResult && notificationResult && (

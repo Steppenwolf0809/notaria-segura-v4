@@ -1,6 +1,6 @@
 import prisma from '../db.js';
 import { Prisma } from '@prisma/client';
-import whatsappService from '../services/whatsapp-service.js';
+
 import CodigoRetiroService from '../utils/codigo-retiro.js';
 import { getReversionCleanupData, STATUS_ORDER_LIST } from '../utils/status-transitions.js';
 import cache from '../services/cache-service.js';
@@ -390,85 +390,7 @@ async function cambiarEstadoDocumento(req, res) {
     // Usar el primer documento para las notificaciones (en grupos, todos son iguales)
     const docPrincipal = documentosActualizados[0];
 
-    // 📱 ENVIAR NOTIFICACIÓN WHATSAPP si se marca como LISTO
-    let whatsappSent = false;
-    let whatsappError = null;
 
-    if (nuevoEstado === 'LISTO') {
-      // Respetar política de no notificar
-      if (documento.notificationPolicy === 'no_notificar') {
-        logger.debug('Política no_notificar activa, omitiendo WhatsApp');
-      } else {
-        try {
-          const clienteData = {
-            clientName: documento.clientName,
-            clientPhone: documento.clientPhone
-          };
-
-          if (codigoGenerado || updateData.codigoRetiro) {
-            // Notificación individual
-            const documentoData = {
-              tipoDocumento: documento.documentType,
-              protocolNumber: documento.protocolNumber
-            };
-            await whatsappService.enviarDocumentoListo(
-              clienteData,
-              documentoData,
-              codigoGenerado || updateData.codigoRetiro
-            );
-            logger.debug('Notificación WhatsApp enviada');
-            whatsappSent = true;
-          } else {
-            logger.debug('LISTO sin código de retiro disponible para WhatsApp');
-          }
-        } catch (error) {
-          // No fallar la operación principal si WhatsApp falla
-          logger.warn('Error enviando WhatsApp desde archivo (operación continúa):', error.message);
-          whatsappError = error.message;
-        }
-      }
-    }
-    // 📱 ENVIAR NOTIFICACIÓN WHATSAPP si se marca como ENTREGADO
-    if (nuevoEstado === 'ENTREGADO' && documento.clientPhone && documento.notificationPolicy !== 'no_notificar') {
-      try {
-        // Preparar datos de entrega
-        const datosEntrega = {
-          entregado_a: updateData.entregadoA,
-          deliveredTo: updateData.entregadoA,
-          fecha: updateData.fechaEntrega,
-          usuario_entrega: `${req.user.firstName} ${req.user.lastName} (ARCHIVO)`
-        };
-
-        // Enviar notificación de documento entregado
-        const whatsappResult = await whatsappService.enviarDocumentoEntregado(
-          {
-            nombre: documento.clientName,
-            clientName: documento.clientName,
-            telefono: documento.clientPhone,
-            clientPhone: documento.clientPhone
-          },
-          {
-            tipo_documento: documento.documentType,
-            tipoDocumento: documento.documentType,
-            numero_documento: documento.protocolNumber,
-            protocolNumber: documento.protocolNumber
-          },
-          datosEntrega
-        );
-
-        whatsappSent = whatsappResult.success;
-
-        if (!whatsappResult.success) {
-          whatsappError = whatsappResult.error;
-          logger.error('Error enviando WhatsApp de entrega directa:', whatsappResult.error);
-        } else {
-          logger.debug('Notificación WhatsApp de entrega directa enviada');
-        }
-      } catch (error) {
-        logger.error('Error en servicio WhatsApp para entrega directa:', error);
-        whatsappError = error.message;
-      }
-    }
 
     // Preparar respuesta con información de sincronización
     const totalSincronizados = documentosActualizados.length;
@@ -483,12 +405,7 @@ async function cambiarEstadoDocumento(req, res) {
         documentos: documentosActualizados,
         documentosSincronizados: totalSincronizados,
         esGrupo: totalSincronizados > 1,
-        codigoGenerado,
-        whatsapp: {
-          sent: whatsappSent,
-          error: whatsappError,
-          phone: documento.clientPhone
-        }
+        codigoGenerado
       },
       message: `${mensajeBase}${codigoGenerado ? ` - Código: ${codigoGenerado}` : ''}`
     });
@@ -609,71 +526,12 @@ async function procesarEntregaDocumento(req, res) {
       }
     });
 
-    // 📱 ENVIAR NOTIFICACIÓN WHATSAPP
-    let whatsappSent = false;
-    let whatsappError = null;
 
-    if (documentoActualizado.clientPhone) {
-      try {
-        // Preparar lista de documentos para el template (solo individual)
-        const documentosParaMensaje = [documentoActualizado];
-
-        const datosEntrega = {
-          entregado_a: entregadoA,
-          deliveredTo: entregadoA,
-          fecha: new Date(),
-          usuario_entrega: `${req.user.firstName} ${req.user.lastName} (ARCHIVO)`,
-          // Campos opcionales y condicionales
-          cedulaReceptor,
-          cedula_receptor: cedulaReceptor,
-          relacionTitular,
-          relacion_titular: relacionTitular,
-          documentos: documentosParaMensaje,
-          cantidadDocumentos: documentosParaMensaje.length
-        };
-
-        const whatsappResult = await whatsappService.enviarDocumentoEntregado(
-          {
-            nombre: documentoActualizado.clientName,
-            clientName: documentoActualizado.clientName,
-            telefono: documentoActualizado.clientPhone,
-            clientPhone: documentoActualizado.clientPhone
-          },
-          {
-            tipo_documento: documentoActualizado.documentType,
-            tipoDocumento: documentoActualizado.documentType,
-            numero_documento: documentoActualizado.protocolNumber,
-            protocolNumber: documentoActualizado.protocolNumber,
-            actoPrincipalDescripcion: documentoActualizado.actoPrincipalDescripcion,
-            actoPrincipalValor: documentoActualizado.actoPrincipalValor
-          },
-          datosEntrega
-        );
-
-        whatsappSent = whatsappResult.success;
-
-        if (!whatsappResult.success) {
-          whatsappError = whatsappResult.error;
-          logger.error('Error enviando WhatsApp de entrega:', whatsappResult.error);
-        } else {
-          logger.debug('Notificación WhatsApp de entrega enviada');
-        }
-      } catch (error) {
-        logger.error('Error en servicio WhatsApp para entrega:', error);
-        whatsappError = error.message;
-      }
-    }
 
     // Preparar mensaje de respuesta (incluir información de grupo)
-    let message = groupDocuments.length > 0
+    const message = groupDocuments.length > 0
       ? `Grupo de ${groupDocuments.length + 1} documentos entregado exitosamente`
       : 'Documento entregado exitosamente';
-
-    if (whatsappSent) {
-      message += ' y notificación WhatsApp enviada';
-    } else if (documentoActualizado.clientPhone && whatsappError) {
-      message += ', pero falló la notificación WhatsApp';
-    }
 
     res.json({
       success: true,
@@ -700,11 +558,7 @@ async function procesarEntregaDocumento(req, res) {
           usuarioEntrega: `${req.user.firstName} ${req.user.lastName}`,
           observacionesEntrega: observaciones
         },
-        whatsapp: {
-          sent: whatsappSent,
-          error: whatsappError,
-          phone: documentoActualizado.clientPhone
-        }
+
       }
     });
 
@@ -810,61 +664,13 @@ async function procesarEntregaGrupal(req, res) {
       });
     });
 
-    // Agrupar por cliente para notificaciones
-    const docsByClient = updatedDocuments.reduce((acc, doc) => {
-      const key = doc.clientPhone || 'no-phone';
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(doc);
-      return acc;
-    }, {});
 
-    // Enviar notificaciones (una por cliente)
-    let whatsappSentCount = 0;
-
-    for (const [phone, clientDocs] of Object.entries(docsByClient)) {
-      if (phone === 'no-phone' || clientDocs[0].notificationPolicy === 'no_notificar') continue;
-
-      try {
-        const doc = clientDocs[0];
-        const datosEntrega = {
-          entregado_a: entregadoA,
-          deliveredTo: entregadoA,
-          fecha: new Date(),
-          usuario_entrega: `${req.user.firstName} ${req.user.lastName} (ARCHIVO)`,
-          cedulaReceptor,
-          relacionTitular,
-          documentos: clientDocs,
-          cantidadDocumentos: clientDocs.length
-        };
-
-        const result = await whatsappService.enviarDocumentoEntregado(
-          {
-            nombre: doc.clientName,
-            clientName: doc.clientName,
-            telefono: doc.clientPhone,
-            clientPhone: doc.clientPhone
-          },
-          {
-            tipo_documento: doc.documentType, // Referencia del primero
-            tipoDocumento: doc.documentType,
-            numero_documento: doc.protocolNumber,
-            protocolNumber: doc.protocolNumber
-          },
-          datosEntrega
-        );
-
-        if (result.success) whatsappSentCount++;
-      } catch (error) {
-        logger.warn(`Error enviando notificación grupal a ${phone}:`, error.message);
-      }
-    }
 
     res.json({
       success: true,
       message: `${updatedDocuments.length} documentos entregados exitosamente`,
       data: {
-        documentsCount: updatedDocuments.length,
-        whatsappSentCount
+        documentsCount: updatedDocuments.length
       }
     });
 

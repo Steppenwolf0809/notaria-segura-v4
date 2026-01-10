@@ -1,5 +1,5 @@
 import { getPrismaClient } from '../db.js';
-import whatsappService from './whatsapp-service.js';
+
 import CodigoRetiroService from '../utils/codigo-retiro.js';
 
 const prisma = getPrismaClient();
@@ -41,7 +41,6 @@ export async function bulkMarkReady({ documentIds, actor, sendNotifications = tr
       clientEmail: true,
       clientId: true,
       assignedToId: true,
-      notificationPolicy: true,
       actoPrincipalDescripcion: true,
       actoPrincipalValor: true
     }
@@ -140,63 +139,14 @@ export async function bulkMarkReady({ documentIds, actor, sendNotifications = tr
     return updatedDocs;
   });
 
-  // Notificaciones: 1 por cliente (grupal si >1, individual si 1)
-  let notifications = [];
-  if (sendNotifications) {
-    for (const [key, docs] of byClient.entries()) {
-      const firstDoc = docs[0];
-      const clienteData = {
-        clientName: firstDoc.clientName,
-        clientPhone: firstDoc.clientPhone
-      };
 
-      // Respetar política por cliente (tomar del primer doc)
-      if (firstDoc.notificationPolicy === 'no_notificar') {
-        continue;
-      }
-
-      try {
-        if (docs.length > 1) {
-          // Envío grupal
-          const code = perClientGroupCode.get(key);
-          const result = await whatsappService.enviarGrupoDocumentosListo(
-            clienteData,
-            docs,
-            code
-          );
-          notifications.push({ status: 'fulfilled', value: result });
-        } else {
-          // Envío individual
-          const only = docs[0];
-          const code = perDocCode.get(only.id);
-          const documentoData = {
-            id: only.id,
-            tipoDocumento: only.documentType,
-            protocolNumber: only.protocolNumber,
-            actoPrincipalDescripcion: only.actoPrincipalDescripcion,
-            actoPrincipalValor: only.actoPrincipalValor
-          };
-          const result = await whatsappService.enviarDocumentoListo(
-            clienteData,
-            documentoData,
-            code
-          );
-          notifications.push({ status: 'fulfilled', value: result });
-        }
-      } catch (error) {
-        notifications.push({ status: 'rejected', reason: error.message });
-      }
-    }
-  }
 
   return {
     success: true,
     status: 200,
-    message: `${updated.length} documento(s) marcado(s) como LISTO` + (sendNotifications ? ' y notificados por cliente' : ''),
+    message: `${updated.length} documento(s) marcado(s) como LISTO`,
     data: {
-      updatedCount: updated.length,
-      clientsNotified: notifications.length,
-      notifications
+      updatedCount: updated.length
     }
   };
 }
@@ -234,8 +184,6 @@ export async function bulkDeliverDocuments({ documentIds, actor, deliveryData, s
       clientPhone: true,
       clientId: true,
       assignedToId: true,
-      notificationPolicy: true,
-      actoPrincipalDescripcion: true,
       actoPrincipalValor: true,
       // Campos para notificación
       verificationCode: true,
@@ -313,47 +261,14 @@ export async function bulkDeliverDocuments({ documentIds, actor, deliveryData, s
     return updatedDocs;
   });
 
-  // Notificaciones (1 por cliente, agrupando documentos)
-  let notifications = [];
-  if (sendNotifications) {
-    for (const [key, docs] of byClient.entries()) {
-      const firstDoc = docs[0];
 
-      if (firstDoc.notificationPolicy === 'no_notificar') continue;
-
-      const clienteData = {
-        clientName: firstDoc.clientName,
-        clientPhone: firstDoc.clientPhone
-      };
-
-      const datosEntregaFull = {
-        ...deliveryData,
-        fechaEntrega: new Date(),
-        documentos: docs // Pasar array para mensaje agrupado
-      };
-
-      try {
-        // Aprovechar método existente que soporta grupos (revisamos implementación)
-        // Se asume que enviarDocumentoEntregado maneja el array 'documentos' en datosEntrega
-        const result = await whatsappService.enviarDocumentoEntregado(
-          clienteData,
-          firstDoc,
-          datosEntregaFull
-        );
-        notifications.push({ status: 'fulfilled', value: result });
-      } catch (error) {
-        notifications.push({ status: 'rejected', reason: error.message });
-      }
-    }
-  }
 
   return {
     success: true,
     status: 200,
     message: `Se registraron ${updated.length} entregas exitosamente`,
     data: {
-      updatedCount: updated.length,
-      clientsNotified: notifications.length
+      updatedCount: updated.length
     }
   };
 }

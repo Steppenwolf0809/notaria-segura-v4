@@ -24,8 +24,7 @@ import {
   getDocumentHistory,
   // 🔄 Reversión de estado
   revertDocumentStatus,
-  // 🔔 Políticas de notificación
-  updateNotificationPolicy,
+
   // 🎯 NUEVA FUNCIONALIDAD: UI Activos/Entregados
   getDocumentsUnified,
   getDocumentsCounts,
@@ -158,9 +157,7 @@ router.post('/bulk-status-change', authenticateToken, bulkStatusChange);
 router.put('/bulk-notify', authenticateToken, csrfProtection, bulkNotify);
 
 
-// 🔔 RUTAS DE POLÍTICAS DE NOTIFICACIÓN
-// PUT /api/documents/:id/notification-policy - Actualizar política de notificación de documento
-router.put('/:id/notification-policy', authenticateToken, updateNotificationPolicy);
+
 
 
 // 🧪 Extracción avanzada (detrás de flag): actos y comparecientes desde texto

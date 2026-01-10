@@ -50,7 +50,6 @@ import {
 import { toast } from 'react-toastify';
 import receptionService from '../../services/reception-service';
 import ModalEntrega from './ModalEntrega';
-import ModalEntregaGrupal from './ModalEntregaGrupal';
 import DateRangeFilter from '../shared/DateRangeFilter';
 
 import DocumentDetailModal from '../Documents/DocumentDetailModal';
@@ -102,7 +101,7 @@ function RecepcionMain() {
 
   // Estados de modales
   const [showModalEntrega, setShowModalEntrega] = useState(false);
-  const [showEntregaGrupal, setShowEntregaGrupal] = useState(false);
+
   const [documentoSeleccionado, setDocumentoSeleccionado] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
@@ -416,7 +415,7 @@ function RecepcionMain() {
    */
   const handleCloseModalEntrega = () => {
     setShowModalEntrega(false);
-    setShowEntregaGrupal(false);
+
     setDocumentoSeleccionado(null);
     setShowDetailModal(false);
     setDocumentForDetail(null);
@@ -793,9 +792,7 @@ function RecepcionMain() {
                       transition: 'all 0.2s',
                       '&:hover': {
                         transform: 'translateY(-2px)',
-                        boxShadow: 2,
-                        borderLeft: '4px solid',
-                        borderLeftColor: 'primary.main'
+                        boxShadow: 2
                       }
                     }}
                   >

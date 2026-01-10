@@ -276,31 +276,10 @@ const useDocumentStore = create((set, get) => ({
       if (result.success && result.data && result.data.document) {
         const currentDocuments = get().documents;
 
-        // Si la operación fue grupal, actualizar todos los documentos del grupo
-        const groupInfo = result.data.groupOperation;
-        let updatedDocuments = currentDocuments;
-
-        if (groupInfo?.isGroupOperation && groupInfo?.groupId && Array.isArray(groupInfo?.allDocuments)) {
-          const groupId = groupInfo.groupId;
-          const docsById = new Map(groupInfo.allDocuments.map(d => [d.id, d]));
-
-          updatedDocuments = currentDocuments.map(doc => {
-            if (doc.documentGroupId === groupId) {
-              const updated = docsById.get(doc.id);
-              return updated ? { ...doc, ...updated } : doc;
-            }
-            // También actualizar el documento disparador por si no trae documentGroupId
-            if (doc.id === documentId) {
-              return { ...doc, ...result.data.document };
-            }
-            return doc;
-          });
-        } else {
-          // Actualización individual (comportamiento existente)
-          updatedDocuments = currentDocuments.map(doc =>
-            doc.id === documentId ? { ...doc, ...result.data.document } : doc
-          );
-        }
+        // Actualización individual (comportamiento estándar sin agrupaciones)
+        const updatedDocuments = currentDocuments.map(doc =>
+          doc.id === documentId ? { ...doc, ...result.data.document } : doc
+        );
 
         set({
           documents: updatedDocuments,
@@ -349,47 +328,7 @@ const useDocumentStore = create((set, get) => ({
       const currentDocuments = get().documents;
       const targetDoc = currentDocuments.find(doc => doc.id === documentId);
 
-      // 🔗 NUEVA FUNCIONALIDAD: Si el documento está agrupado y se actualizan campos compartidos
-      if (targetDoc?.isGrouped && targetDoc?.documentGroupId) {
-        const sharedFields = ['clientPhone', 'clientEmail', 'clientName'];
-        const hasSharedUpdate = sharedFields.some(field => documentData[field] !== undefined);
 
-        if (hasSharedUpdate) {
-          try {
-            // Preparar datos compartidos para actualizar
-            const sharedData = {};
-            sharedFields.forEach(field => {
-              if (documentData[field] !== undefined) {
-                sharedData[field] = documentData[field];
-              }
-            });
-
-            // Llamar al servicio para actualizar todo el grupo
-            const result = await documentService.updateDocumentGroupInfo(
-              targetDoc.documentGroupId,
-              sharedData
-            );
-
-            if (result.success) {
-
-              // Actualizar todos los documentos del grupo en el store
-              const updatedDocuments = currentDocuments.map(doc => {
-                if (doc.documentGroupId === targetDoc.documentGroupId && doc.isGrouped) {
-                  return { ...doc, ...sharedData, ...documentData };
-                }
-                return doc.id === documentId ? { ...doc, ...documentData } : doc;
-              });
-
-              set({ documents: updatedDocuments });
-              return true;
-            } else {
-              // Continuar con actualización local como fallback
-            }
-          } catch (error) {
-            // Continuar con actualización local como fallback
-          }
-        }
-      }
 
       // Actualización local estándar (para documentos individuales o como fallback)
       const updatedDocuments = currentDocuments.map(doc =>
@@ -493,26 +432,9 @@ const useDocumentStore = create((set, get) => ({
 
         const currentDocuments = get().documents;
         let updatedDocuments = currentDocuments;
-        const groupInfo = result.data?.groupOperation;
-
-        if (groupInfo?.isGroupOperation && groupInfo?.groupId && Array.isArray(groupInfo?.allDocuments)) {
-          const groupId = groupInfo.groupId;
-          const docsById = new Map(groupInfo.allDocuments.map(d => [d.id, d]));
-          updatedDocuments = currentDocuments.map(doc => {
-            if (doc.documentGroupId === groupId) {
-              const updated = docsById.get(doc.id);
-              return updated ? { ...doc, ...updated } : doc;
-            }
-            if (doc.id === documentId) {
-              return { ...doc, ...result.data.document };
-            }
-            return doc;
-          });
-        } else {
-          updatedDocuments = currentDocuments.map(doc =>
-            doc.id === documentId ? { ...doc, ...result.data.document } : doc
-          );
-        }
+        updatedDocuments = currentDocuments.map(doc =>
+          doc.id === documentId ? { ...doc, ...result.data.document } : doc
+        );
 
         set({
           documents: updatedDocuments,
@@ -669,19 +591,7 @@ const useDocumentStore = create((set, get) => ({
       };
     }
 
-    // NUEVA LÓGICA: Para MATRIZADOR y ARCHIVO, entrega directa simplificada (desde LISTO o EN_PROCESO)
-    if ((userRole === 'MATRIZADOR' || userRole === 'ARCHIVO') &&
-      (fromStatus === 'LISTO' || fromStatus === 'EN_PROCESO') && toStatus === 'ENTREGADO') {
-      return {
-        requiresConfirmation: true,
-        isCritical: false,
-        isReversion: false,
-        isDirectDelivery: true,
-        type: 'direct_delivery',
-        reason: 'Confirmar entrega directa por matrizador/archivo',
-        userRole: userRole
-      };
-    }
+
 
     return {
       requiresConfirmation: isCritical || isReversion,
@@ -698,110 +608,7 @@ const useDocumentStore = create((set, get) => ({
     };
   },
 
-  /**
-   * ============================================================================
-   * SISTEMA DE AGRUPACIÓN DE DOCUMENTOS
-   * Funciones para manejar agrupación y entrega grupal
-   * ============================================================================
-   */
 
-  /**
-   * Crear grupo de documentos
-   * @param {Array} documentIds - IDs de documentos a agrupar
-   * @returns {Promise<Object>} Resultado de la operación
-   */
-  createDocumentGroup: async (documentIds) => {
-    set({ loading: true, error: null });
-
-    try {
-
-      const result = await documentService.createDocumentGroup({
-        documentIds,
-        sendNotification: true // Enviar notificación automáticamente
-      });
-
-      if (result.success) {
-        // Recargar documentos para mostrar los cambios
-        await get().fetchMyDocuments();
-
-        set({ loading: false });
-
-
-        return {
-          success: true,
-          group: result.group,
-          verificationCode: result.verificationCode,
-          message: result.message,
-          whatsapp: result.whatsapp || null
-        };
-      } else {
-        set({
-          error: result.message,
-          loading: false
-        });
-        return { success: false, error: result.message };
-      }
-    } catch (error) {
-      const errorMessage = error.message || 'Error inesperado al crear grupo';
-      set({
-        error: errorMessage,
-        loading: false
-      });
-      return { success: false, error: errorMessage };
-    }
-  },
-
-  /**
-   * 🔓 Desagrupar documento
-   * @param {string} documentId - ID del documento a desagrupar
-   * @returns {Promise<Object>} Resultado de la operación
-   */
-  ungroupDocument: async (documentId) => {
-    set({ loading: true, error: null });
-    try {
-      // Optimistic update: quitar flags de grupo del documento mientras se llama al backend
-      const currentDocs = get().documents;
-      const optimisticDocs = currentDocs.map(doc => doc.id === documentId ? { ...doc, isGrouped: false, documentGroupId: null, groupCode: null } : doc);
-      set({ documents: optimisticDocs });
-
-      const result = await documentService.ungroupDocument(documentId);
-      if (result.success) {
-        // Refrescar lista de documentos del usuario si aplica
-        const currentUser = useAuthStore.getState().user;
-        if (currentUser?.role === 'MATRIZADOR' || currentUser?.role === 'ARCHIVO') {
-          await useDocumentStore.getState().fetchMyDocuments();
-        } else {
-          await useDocumentStore.getState().fetchAllDocuments();
-        }
-        set({ loading: false });
-        return { success: true, message: result.message, data: result.data };
-      }
-      // Rollback si falla
-      set({ documents: currentDocs });
-      set({ loading: false, error: result.message || 'Error al desagrupar documento' });
-      return { success: false, error: result.message };
-    } catch (error) {
-      // Rollback
-      const originalDocs = get().documents;
-      set({ documents: originalDocs });
-      set({ loading: false, error: 'Error inesperado al desagrupar documento' });
-      return { success: false, error: 'Error inesperado al desagrupar documento' };
-    }
-  },
-
-  /**
-   * Detectar documentos agrupables
-   * @param {Object} clientData - Datos del cliente
-   * @returns {Promise<Object>} Documentos agrupables
-   */
-  detectGroupableDocuments: async (clientData) => {
-    try {
-      const result = await documentService.detectGroupableDocuments(clientData);
-      return result;
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  },
 
   /**
    * Limpiar todos los datos del store

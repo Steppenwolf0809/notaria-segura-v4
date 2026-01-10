@@ -45,16 +45,15 @@ import {
   MoreVert as MoreVertIcon,
   Phone as PhoneIcon,
   Clear as ClearIcon,
-  GroupWork as GroupWorkIcon,
   Undo as UndoIcon
 } from '@mui/icons-material';
 import ModalEntrega from './ModalEntrega';
-import ModalEntregaGrupal from './ModalEntregaGrupal';
+
 import ReversionModal from './ReversionModal';
-import QuickGroupingModal from '../grouping/QuickGroupingModal';
-import GroupInfoModal from '../shared/GroupInfoModal';
+
+
 import DocumentDetailModal from '../Documents/DocumentDetailModal';
-import GroupingDetector from '../grouping/GroupingDetector';
+
 import BulkDeliveryDialog from './BulkDeliveryDialog';
 import receptionService from '../../services/reception-service';
 import documentService from '../../services/document-service';
@@ -115,7 +114,7 @@ function formatLocalDate(dateString) {
 }
 
 function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDocumentoFound }) {
-  const { createDocumentGroup, detectGroupableDocuments } = useDocumentStore();
+  const { documents } = useDocumentStore();
   const [documentos, setDocumentos] = useState([]);
   const [selectedDocuments, setSelectedDocuments] = useState([]); // Solo para visualización
   const [visualSelection, setVisualSelection] = useState(new Set()); // 🎯 NUEVA: Selección visual sin funcionalidad
@@ -146,7 +145,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   const [sortOrder, setSortOrder] = useState('desc');
 
   const [showModalEntrega, setShowModalEntrega] = useState(false);
-  const [showEntregaGrupal, setShowEntregaGrupal] = useState(false);
+
   const [documentoSeleccionado, setDocumentoSeleccionado] = useState(null);
 
   const [menuAnchorEl, setMenuAnchorEl] = useState(null);
@@ -159,23 +158,16 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [detailDocument, setDetailDocument] = useState(null);
 
-  // Estados para funcionalidad de agrupación
-  const [showQuickGroupingModal, setShowQuickGroupingModal] = useState(false);
-  const [pendingGroupData, setPendingGroupData] = useState({ main: null, related: [] });
-  const [groupingLoading, setGroupingLoading] = useState(false);
-  const [groupingSuccess, setGroupingSuccess] = useState(null);
 
-  // Estados para modal de información de grupo
-  const [groupInfoModalOpen, setGroupInfoModalOpen] = useState(false);
-  const [selectedGroupDocument, setSelectedGroupDocument] = useState(null);
+
+
 
   // Estados para modal de reversión
   const [reversionModalOpen, setReversionModalOpen] = useState(false);
   const [reversionLoading, setReversionLoading] = useState(false);
 
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-  // Cache de conteos de agrupables por cliente (clave: name|id)
-  const [groupableCountCache, setGroupableCountCache] = useState(new Map());
+
 
   // Estados para navegación específica desde alertas
   const [highlightedDocument, setHighlightedDocument] = useState(null);
@@ -555,7 +547,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
       if (!['EN_PROCESO', 'LISTO'].includes(d.status)) return false;
       const sameName = d.clientName === doc.clientName;
       const sameId = doc.clientId ? d.clientId === doc.clientId : true;
-      return sameName && sameId && !d.isGrouped;
+      return sameName && sameId;
     });
     // ✅ Deduplicar por protocolo para evitar contar duplicados y excluir principal
     const seen = new Set();
@@ -583,95 +575,9 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
     return { action: 'mixto', text: 'Estados mixtos', color: 'warning', disabled: true };
   };
 
-  // 🔗 FUNCIONES DE AGRUPACIÓN PARA RECEPCIÓN
-
-  /**
-   * Manejar agrupación inteligente detectada automáticamente
-   */
-  const handleGroupDocuments = async (groupableDocuments, mainDocument) => {
-    setPendingGroupData({
-      main: mainDocument,
-      related: groupableDocuments
-    });
-    setShowQuickGroupingModal(true);
-  };
-
-  /**
-   * Crear grupo desde modal de confirmación
-   */
-  const handleCreateDocumentGroup = async (selectedDocumentIds) => {
-    if (!pendingGroupData.main || selectedDocumentIds.length === 0) {
-      setShowQuickGroupingModal(false);
-      return;
-    }
-
-    setGroupingLoading(true);
-
-    try {
-      const documentIds = [pendingGroupData.main.id, ...selectedDocumentIds];
-
-      const result = await createDocumentGroup(documentIds);
-
-      if (result.success) {
-        // Mostrar mensaje de éxito
-        setGroupingSuccess({
-          message: result.message || `Grupo creado exitosamente con ${documentIds.length} documentos`,
-          verificationCode: result.verificationCode,
-          documentCount: documentIds.length,
-          whatsappSent: result.whatsapp?.sent || false,
-          whatsappError: result.whatsapp?.error || null,
-          clientPhone: result.whatsapp?.phone || null
-        });
-
-        // Refrescar documentos para mostrar los cambios
-        await cargarDocumentos();
-
-        // Mostrar notificación
-        setSnackbar({
-          open: true,
-          message: `Grupo creado exitosamente con ${documentIds.length} documentos`,
-          severity: 'success'
-        });
 
 
-        // Auto-ocultar después de 5 segundos
-        setTimeout(() => {
-          setGroupingSuccess(null);
-        }, 5000);
-      } else {
-        setSnackbar({
-          open: true,
-          message: result.error || 'Error al crear el grupo',
-          severity: 'error'
-        });
-      }
-    } catch (error) {
-      setSnackbar({
-        open: true,
-        message: 'Error inesperado al crear el grupo',
-        severity: 'error'
-      });
-    } finally {
-      setGroupingLoading(false);
-      setShowQuickGroupingModal(false);
-    }
-  };
 
-  /**
-   * Abrir modal de información de grupo
-   */
-  const handleOpenGroupInfo = (documento) => {
-    setSelectedGroupDocument(documento);
-    setGroupInfoModalOpen(true);
-  };
-
-  /**
-   * Cerrar modal de información de grupo
-   */
-  const handleCloseGroupInfo = () => {
-    setGroupInfoModalOpen(false);
-    setSelectedGroupDocument(null);
-  };
 
   // 🎯 NUEVAS FUNCIONES PARA SELECCIÓN VISUAL (SOLO INFORMATIVA)
 
@@ -779,32 +685,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   // No debemos hacer slice usando page * rowsPerPage porque el array solo contiene los elementos de la página.
   const documentosPaginados = documentosOrdenados;
 
-  // Prefetch de conteos por cliente para los documentos visibles
-  useEffect(() => {
-    const fetchCounts = async () => {
-      const candidates = documentosPaginados.filter(d => ['EN_PROCESO', 'LISTO'].includes(d.status) && !d.isGrouped);
-      for (const doc of candidates) {
-        const key = `${doc.clientName}|${doc.clientId || ''}`;
-        if (groupableCountCache.has(key)) continue;
-        try {
-          const result = await detectGroupableDocuments({ clientName: doc.clientName, clientId: doc.clientId || '' });
-          const uniqueCount = (result.groupableDocuments || []).reduce((acc, d) => {
-            const k = d.protocolNumber || d.id;
-            if (!acc.has(k)) acc.add(k);
-            return acc;
-          }, new Set()).size; // el backend ya incluye al principal
-          setGroupableCountCache(prev => {
-            const next = new Map(prev);
-            next.set(key, uniqueCount);
-            return next;
-          });
-        } catch (e) {
-          // silencioso
-        }
-      }
-    };
-    fetchCounts();
-  }, [documentosPaginados, page, rowsPerPage]);
+
 
   // Verificar estado de selección para checkbox master
   const allVisualSelected = documentosPaginados.length > 0 && documentosPaginados.every(doc => visualSelection.has(doc.id));
@@ -992,7 +873,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                   startIcon={selectedAction.action === 'marcar-listo' ? <CheckCircleIcon /> : <SendIcon />}
                   onClick={() => {
                     if (selectedAction.action === 'marcar-listo') abrirConfirmacionGrupal();
-                    else if (selectedAction.action === 'entregar') setShowEntregaGrupal(true);
+                    // else if (selectedAction.action === 'entregar') ... // Manejado por BulkDelivery Mode
                   }}
                 >{selectedAction.text} ({selectedDocuments.length})</Button>
               </Box>
@@ -1174,7 +1055,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                             </Typography>
                           </Box>
                         )}
-                        {/* 🚫 Indicador de grupo ELIMINADO */}
 
                         {/* 🎯 NUEVO: Botón para seleccionar todos del cliente en modo entrega en bloque */}
                         {bulkDeliveryMode && documento.status === 'LISTO' && (
@@ -1257,11 +1137,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
 
                         {/* Botón de revertir estado (directo) - SIEMPRE VISIBLE para LISTO/ENTREGADO */}
                         {['LISTO', 'ENTREGADO'].includes(documento.status) && (
-                          <Tooltip title={
-                            documento.isGrouped
-                              ? "Revertir estado (afectará todo el grupo)"
-                              : "Revertir al estado anterior"
-                          }>
+                          <Tooltip title="Revertir al estado anterior">
                             <IconButton
                               size="small"
                               color="warning"
@@ -1271,12 +1147,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                               }}
                               sx={{
                                 ml: 1, // Margen izquierdo para separarlo
-                                // Indicador visual para documentos agrupados
-                                ...(documento.isGrouped && {
-                                  border: '2px solid',
-                                  borderColor: 'warning.main',
-                                  borderRadius: '50%'
-                                })
                               }}
                             >
                               <UndoIcon fontSize="small" />
@@ -1310,7 +1180,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
           <ListItemText>Ver Detalles</ListItemText>
         </MenuItem>
 
-        {/* 🚫 Opción de grupo ELIMINADA */}
+
 
         {/* Separador visual para opciones de reversión */}
         {currentDocumento && ['LISTO', 'ENTREGADO'].includes(currentDocumento.status) && (
@@ -1340,7 +1210,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                 <Typography variant="body2"><strong>Documentos:</strong> {selectedDocuments.length}</Typography>
                 <Typography variant="body2"><strong>Cliente:</strong> {documentos.find(d => selectedDocuments.includes(d.id))?.clientName}</Typography>
               </Box>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>Se generará un código único para el grupo.</Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>Se generarán códigos para cada documento.</Typography>
             </Box>
           )}
         </DialogContent>
@@ -1359,24 +1229,11 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
       </Dialog>
 
       {showModalEntrega && documentoSeleccionado && <ModalEntrega documento={documentoSeleccionado} onClose={cerrarModales} onEntregaExitosa={onEntregaCompletada} />}
-      {showEntregaGrupal && selectedDocuments.length > 0 && <ModalEntregaGrupal documentos={documentos.filter(doc => selectedDocuments.includes(doc.id))} onClose={cerrarModales} onEntregaExitosa={onEntregaCompletada} />}
 
-      {/* Modal de agrupación rápida */}
-      <QuickGroupingModal
-        open={showQuickGroupingModal}
-        onClose={() => setShowQuickGroupingModal(false)}
-        mainDocument={pendingGroupData.main}
-        relatedDocuments={pendingGroupData.related}
-        loading={groupingLoading}
-        onConfirm={handleCreateDocumentGroup}
-      />
 
-      {/* Modal de información de grupo */}
-      <GroupInfoModal
-        open={groupInfoModalOpen}
-        onClose={handleCloseGroupInfo}
-        document={selectedGroupDocument}
-      />
+
+
+
 
       <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={cerrarSnackbar}>
         <Alert onClose={cerrarSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>{snackbar.message}</Alert>

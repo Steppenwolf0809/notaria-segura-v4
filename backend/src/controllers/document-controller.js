@@ -1014,42 +1014,38 @@ async function updateDocumentStatus(req, res) {
 
     // Verificar si el documento pertenece a un grupo y si el cambio debe propagarse
     // Ahora: si el usuario es MATRIZADOR y el documento está agrupado, propagamos SIEMPRE
-      // Actualización individual (comportamiento original)
-      const updatedDocument = await prisma.document.update({
-        where: { id },
-        data: updateData,
-        include: {
-          createdBy: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true
-            }
-          },
-          assignedTo: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true
-            }
+    // Actualización individual (comportamiento original)
+    const updatedDocument = await prisma.document.update({
+      where: { id },
+      data: updateData,
+      include: {
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        },
+        assignedTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true
           }
         }
-      });
-      updatedDocuments = [updatedDocument];
+      }
+    });
+    updatedDocuments = [updatedDocument];
 
-    // Usar el primer documento como principal para compatibilidad
-    const updatedDocument = updatedDocuments[0];
 
     // NUEVA FUNCIONALIDAD: Enviar notificación WhatsApp si se marca como LISTO
     let whatsappSent = false;
     let whatsappError = null;
     let whatsappResults = [];
 
-    if (status === 'LISTO' && updatedDocument?.notificationPolicy === 'no_notificar') {
-      console.log('🔕 Política de notificación: no_notificar. Se omite envío de WhatsApp (LISTO).');
-    } else if (status === 'LISTO') {
+    if (status === 'LISTO') {
       try {
         // Importar el servicio de WhatsApp
         const whatsappService = await import('../services/whatsapp-service.js');
@@ -1162,8 +1158,7 @@ async function updateDocumentStatus(req, res) {
       }
     }
 
-    // NUEVA FUNCIONALIDAD: Enviar notificación WhatsApp para entrega directa de MATRIZADOR/ARCHIVO
-    if (status === 'ENTREGADO' && ['MATRIZADOR', 'ARCHIVO'].includes(req.user.role) && updatedDocument.clientPhone && updatedDocument.notificationPolicy !== 'no_notificar') {
+    if (status === 'ENTREGADO' && ['MATRIZADOR', 'ARCHIVO'].includes(req.user.role) && updatedDocument.clientPhone) {
       try {
         // Importar el servicio de WhatsApp
         const whatsappService = await import('../services/whatsapp-service.js');
@@ -2093,134 +2088,7 @@ async function deliverDocument(req, res) {
       }
     });
 
-    // Enviar notificación WhatsApp de entrega
-    let whatsappSent = false;
-    let whatsappError = null;
 
-    if (updatedDocument.clientPhone) {
-      try {
-        const whatsappService = await import('../services/whatsapp-service.js');
-
-        const fechaEntrega = new Date();
-        const datosEntrega = {
-          // Variables básicas (compatibilidad)
-          entregado_a: entregadoA,
-          deliveredTo: entregadoA,
-          fecha: fechaEntrega,
-          usuario_entrega: `${req.user.firstName} ${req.user.lastName}`,
-
-          // Claves adicionales que esperan los templates del servicio
-          entregadoA,
-          cedulaReceptor,
-          relacionTitular,
-
-          // Variables mejoradas para template
-          fechaEntrega: fechaEntrega,
-          nombreRetirador: entregadoA,
-          cedulaReceptor: cedulaReceptor,
-          cedula_receptor: cedulaReceptor,
-          relacionTitular: relacionTitular,
-          relacion_titular: relacionTitular,
-
-          // Variables adicionales
-          verificacionManual: verificacionManual || false,
-          facturaPresenta: facturaPresenta || false,
-          observacionesEntrega: observacionesEntrega || '',
-          usuarioEntrega: `${req.user.firstName} ${req.user.lastName}`,
-          roleEntrega: req.user.role
-        };
-
-        // Preparar información de documento/grupo para el template
-        let documentoData;
-        if (groupDocuments.length > 0) {
-          // Es una entrega grupal - incluir información de todos los documentos
-          const allDocuments = [updatedDocument, ...groupDocuments];
-          documentoData = {
-            // Compatibilidad
-            tipo_documento: `Grupo de ${allDocuments.length} documentos`,
-            tipoDocumento: `Grupo de ${allDocuments.length} documentos`,
-            numero_documento: updatedDocument.protocolNumber,
-            protocolNumber: updatedDocument.protocolNumber,
-
-            // Para template mejorado
-            documentType: `Grupo de ${allDocuments.length} documentos`,
-            esGrupo: true,
-            cantidadDocumentos: allDocuments.length,
-            documentos: allDocuments.map(doc => ({
-              documentType: doc.documentType,
-              protocolNumber: doc.protocolNumber,
-              codigoEscritura: doc.protocolNumber, // Usar protocolNumber como código
-              actoPrincipalDescripcion: doc.actoPrincipalDescripcion,
-              actoPrincipalValor: doc.actoPrincipalValor
-            }))
-          };
-        } else {
-          // Entrega individual
-          documentoData = {
-            // Compatibilidad
-            tipo_documento: updatedDocument.documentType,
-            tipoDocumento: updatedDocument.documentType,
-            numero_documento: updatedDocument.protocolNumber,
-            protocolNumber: updatedDocument.protocolNumber,
-
-            // Para template mejorado
-            documentType: updatedDocument.documentType,
-            esGrupo: false,
-            cantidadDocumentos: 1,
-            codigoEscritura: updatedDocument.protocolNumber, // Usar protocolNumber como código
-            actoPrincipalDescripcion: updatedDocument.actoPrincipalDescripcion,
-            actoPrincipalValor: updatedDocument.actoPrincipalValor
-          };
-        }
-
-        const whatsappResult = await whatsappService.default.enviarDocumentoEntregado(
-          {
-            nombre: updatedDocument.clientName,
-            clientName: updatedDocument.clientName,
-            telefono: updatedDocument.clientPhone,
-            clientPhone: updatedDocument.clientPhone
-          },
-          documentoData,
-          datosEntrega
-        );
-
-        whatsappSent = whatsappResult.success;
-        if (!whatsappResult.success) {
-          whatsappError = whatsappResult.error;
-        } else {
-          // 📈 Registrar evento de notificación WhatsApp de entrega individual
-          try {
-            await prisma.documentEvent.create({
-              data: {
-                documentId: id,
-                userId: req.user.id,
-                eventType: 'WHATSAPP_SENT',
-                description: `Notificación WhatsApp de entrega enviada a ${updatedDocument.clientPhone}`,
-                details: JSON.stringify({
-                  phoneNumber: updatedDocument.clientPhone,
-                  messageType: 'DOCUMENT_DELIVERED',
-                  deliveredTo: entregadoA,
-                  deliveredBy: `${req.user.firstName} ${req.user.lastName}`,
-                  deliveredByRole: req.user.role,
-                  deliveryType: 'INDIVIDUAL_DELIVERY',
-                  cedulaReceptor,
-                  relacionTitular,
-                  messageId: whatsappResult.messageId || 'simulado',
-                  timestamp: new Date().toISOString()
-                }),
-                ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
-                userAgent: req.get('User-Agent') || 'unknown'
-              }
-            });
-          } catch (auditError) {
-            console.error('Error registrando evento de notificación WhatsApp de entrega:', auditError);
-          }
-        }
-      } catch (error) {
-        console.error('Error enviando WhatsApp de entrega:', error);
-        whatsappError = error.message;
-      }
-    }
 
     // Registrar evento de auditoría
     try {
@@ -2246,8 +2114,6 @@ async function deliverDocument(req, res) {
             observacionesEntrega,
             metodoVerificacion: computedVerificationMethod,
             verificationCode: verificacionManual ? undefined : (codigoVerificacion || updatedDocument.codigoRetiro || updatedDocument.verificationCode || updatedDocument.groupVerificationCode),
-            whatsappSent,
-            whatsappError,
             timestamp: new Date().toISOString()
           }),
           personaRetiro: entregadoA,
@@ -2264,17 +2130,11 @@ async function deliverDocument(req, res) {
 
     // Preparar mensaje de respuesta
     const totalDelivered = 1 + groupDocuments.length;
-    let message = immediateDelivery
-      ? 'Documento entregado inmediatamente (sin notificación previa)'
+    const message = immediateDelivery
+      ? 'Documento entregado inmediatamente'
       : totalDelivered > 1
         ? `${totalDelivered} documentos entregados exitosamente (entrega grupal)`
         : 'Documento entregado exitosamente';
-
-    if (whatsappSent) {
-      message += ' y notificación WhatsApp enviada';
-    } else if (updatedDocument.clientPhone && whatsappError) {
-      message += ', pero falló la notificación WhatsApp';
-    }
 
     res.json({
       success: true,
@@ -2291,11 +2151,7 @@ async function deliverDocument(req, res) {
           usuarioEntrega: `${req.user.firstName} ${req.user.lastName}`,
           observacionesEntrega
         },
-        whatsapp: {
-          sent: whatsappSent,
-          error: whatsappError,
-          phone: updatedDocument.clientPhone
-        },
+
         groupDelivery: {
           isGroupDelivery: groupDocuments.length > 0,
           totalDocuments: totalDelivered,
@@ -2866,45 +2722,45 @@ async function revertDocumentStatus(req, res) {
 
     // Si el documento está agrupado y el rol permite operaciones grupales,
     // propagar la reversión a todo el grupo. Ahora incluye RECEPCION.
-      // Reversión individual (documento no agrupado o usuario MATRIZADOR/RECEPCION)
-      updatedDocuments = [await prisma.document.update({
-        where: { id },
-        data: {
-          status: newStatus,
-          // Limpiar campos específicos según el nuevo estado
-          ...(newStatus === 'EN_PROCESO' && {
-            verificationCode: null,
-            codigoRetiro: null,
-            entregadoA: null,
-            fechaEntrega: null,
-            usuarioEntregaId: null
-          })
-        },
-        include: {
-          assignedTo: {
-            select: { firstName: true, lastName: true }
-          }
+    // Reversión individual (documento no agrupado o usuario MATRIZADOR/RECEPCION)
+    updatedDocuments = [await prisma.document.update({
+      where: { id },
+      data: {
+        status: newStatus,
+        // Limpiar campos específicos según el nuevo estado
+        ...(newStatus === 'EN_PROCESO' && {
+          verificationCode: null,
+          codigoRetiro: null,
+          entregadoA: null,
+          fechaEntrega: null,
+          usuarioEntregaId: null
+        })
+      },
+      include: {
+        assignedTo: {
+          select: { firstName: true, lastName: true }
         }
-      })];
+      }
+    })];
 
-      // Registrar evento de auditoría
-      await prisma.documentEvent.create({
-        data: {
-          documentId: id,
-          userId: req.user.id,
-          eventType: 'STATUS_CHANGED',
-          description: `Estado revertido de ${document.status} a ${newStatus} por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
-          details: JSON.stringify({
-            previousStatus: document.status,
-            newStatus,
-            reversionReason: reversionReason.trim(),
-            groupReversion: false,
-            timestamp: new Date().toISOString()
-          }),
-          ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
-          userAgent: req.get('User-Agent') || 'unknown'
-        }
-      });
+    // Registrar evento de auditoría
+    await prisma.documentEvent.create({
+      data: {
+        documentId: id,
+        userId: req.user.id,
+        eventType: 'STATUS_CHANGED',
+        description: `Estado revertido de ${document.status} a ${newStatus} por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`,
+        details: JSON.stringify({
+          previousStatus: document.status,
+          newStatus,
+          reversionReason: reversionReason.trim(),
+          groupReversion: false,
+          timestamp: new Date().toISOString()
+        }),
+        ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+        userAgent: req.get('User-Agent') || 'unknown'
+      }
+    });
 
     // Preparar mensaje de respuesta
     const message = groupAffected
@@ -2936,117 +2792,7 @@ async function revertDocumentStatus(req, res) {
   }
 }
 
-/**
- * 🔔 ACTUALIZAR POLÍTICA DE NOTIFICACIÓN DE DOCUMENTO INDIVIDUAL
- * Permite cambiar la política de notificación de un documento específico
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- */
-async function updateNotificationPolicy(req, res) {
-  try {
-    const { id } = req.params;
-    const { notificationPolicy } = req.body;
 
-    // Validar política
-    const validPolicies = ['automatica', 'no_notificar', 'entrega_inmediata'];
-    if (!validPolicies.includes(notificationPolicy)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Política de notificación no válida'
-      });
-    }
-
-    // Verificar que el documento existe y el usuario tiene permisos
-    const document = await prisma.document.findUnique({
-      where: { id },
-      include: {
-        assignedTo: true
-      }
-    });
-
-    if (!document) {
-      return res.status(404).json({
-        success: false,
-        message: 'Documento no encontrado'
-      });
-    }
-
-    // Verificar permisos según rol
-    const userRole = req.user.role;
-    if (!['ADMIN', 'MATRIZADOR', 'RECEPCION', 'ARCHIVO', 'CAJA'].includes(userRole)) {
-      return res.status(403).json({
-        success: false,
-        message: 'No tienes permisos para actualizar políticas de notificación'
-      });
-    }
-
-    // Si es matrizador, solo puede modificar sus propios documentos o sin asignar
-    if (userRole === 'MATRIZADOR' && document.assignedToId && document.assignedToId !== req.user.id) {
-      return res.status(403).json({
-        success: false,
-        message: 'Solo puedes modificar la política de tus documentos asignados'
-      });
-    }
-
-    // Actualizar la política de notificación
-    // Nota: Usar try/catch en caso de que el campo no exista aún en la BD
-    let updatedDocument;
-    try {
-      updatedDocument = await prisma.document.update({
-        where: { id },
-        data: { notificationPolicy },
-        include: {
-          assignedTo: {
-            select: { firstName: true, lastName: true }
-          }
-        }
-      });
-
-      console.log(`🔔 Política de notificación actualizada: ${document.protocolNumber} -> ${notificationPolicy}`);
-
-    } catch (updateError) {
-      // Si el campo no existe aún (migración pendiente), devolver respuesta simulada
-      if (updateError.message.includes('notificationPolicy') || updateError.message.includes('column')) {
-        console.log('⚠️ Campo notificationPolicy no existe aún en BD, simulando respuesta');
-        return res.status(202).json({
-          success: true,
-          message: `Política de notificación será actualizada a: ${notificationPolicy} (migración pendiente)`,
-          data: {
-            document: { ...document, notificationPolicy },
-            previousPolicy: document.notificationPolicy || 'automatica',
-            newPolicy: notificationPolicy,
-            migrationPending: true
-          }
-        });
-      }
-      throw updateError; // Re-lanzar si es otro error
-    }
-
-    res.json({
-      success: true,
-      message: `Política de notificación actualizada a: ${notificationPolicy}`,
-      data: {
-        document: updatedDocument,
-        previousPolicy: document.notificationPolicy || 'automatica',
-        newPolicy: notificationPolicy
-      }
-    });
-
-  } catch (error) {
-    console.error('Error actualizando política de notificación:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error interno del servidor'
-    });
-  }
-}
-
-/**
- * 🔔 ACTUALIZAR POLÍTICA DE NOTIFICACIÓN DE GRUPO
- * Permite cambiar la política de notificación de todos los documentos de un grupo
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- */
 /**
  * 🎯 NUEVA FUNCIONALIDAD: Obtener documentos con filtros unificados para UI Activos/Entregados
  * Endpoint principal para la nueva interfaz con pestañas y búsqueda global
@@ -3806,8 +3552,7 @@ export {
   getDocumentHistory,
   // 🔄 Reversión de estado
   revertDocumentStatus,
-  // 🔔 Políticas de notificación
-  updateNotificationPolicy,
+
   // 🧪 Extracción avanzada (flag)
   extractDocumentActs,
   applyExtractionSuggestions,

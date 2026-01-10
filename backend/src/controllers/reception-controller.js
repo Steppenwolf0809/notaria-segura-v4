@@ -4,7 +4,7 @@ import { getReversionCleanupData, isValidStatus, isReversion as isReversionFn, S
 import logger from '../utils/logger.js';
 
 const prisma = getPrismaClient();
-import whatsappService from '../services/whatsapp-service.js';
+
 import CodigoRetiroService from '../utils/codigo-retiro.js';
 import AlertasService from '../services/alertas-service.js';
 import cache from '../services/cache-service.js';
@@ -759,31 +759,6 @@ async function marcarComoListo(req, res) {
     updatedDocuments = [updatedDocument];
     logger.debug('Documento actualizado exitosamente');
 
-    // 📱 ENVIAR NOTIFICACIÓN WHATSAPP
-    try {
-      if (document.clientPhone && document.notificationPolicy !== 'no_notificar') {
-        const clienteData = {
-          clientName: document.clientName,
-          clientPhone: document.clientPhone
-        };
-        const documentoData = {
-          tipoDocumento: document.tipoDocumento,
-          protocolNumber: document.protocolNumber,
-          actoPrincipalDescripcion: document.actoPrincipalDescripcion,
-          actoPrincipalValor: document.actoPrincipalValor
-        };
-
-        await whatsappService.enviarDocumentoListo(
-          clienteData,
-          documentoData,
-          updatedDocument.codigoRetiro
-        );
-        logger.debug('Notificación WhatsApp enviada');
-      }
-    } catch (whatsappError) {
-      logger.warn('Error enviando WhatsApp:', whatsappError.message);
-    }
-
     // Variables para la respuesta
     const mainDocument = updatedDocument;
     const groupAffected = false;
@@ -807,8 +782,7 @@ async function marcarComoListo(req, res) {
         documents: updatedDocuments,
         codigoRetiro: mainDocument.codigoRetiro,
         groupAffected: groupAffected,
-        documentsUpdated: updatedDocuments.length,
-        whatsappSent: true // Siempre true para no exponer errores al frontend
+        documentsUpdated: updatedDocuments.length
       }
     });
   } catch (error) {
