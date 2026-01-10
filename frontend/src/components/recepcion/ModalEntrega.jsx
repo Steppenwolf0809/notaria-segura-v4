@@ -125,10 +125,7 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
       const result = await service.procesarEntrega(documento.id, formData);
 
       if (result.success) {
-        // 🔗 NUEVA FUNCIONALIDAD: Mostrar información de entrega grupal si aplica
-        const groupInfo = result.data?.groupDelivery;
-        if (groupInfo?.wasGroupDelivery) {
-        }
+
         // Notificación global según WhatsApp
         const w = result.data?.whatsapp || {};
         if (w.sent) {
@@ -162,22 +159,7 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
       <DialogContent dividers>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-        {/* 🔗 NUEVA FUNCIONALIDAD: Alerta de entrega grupal */}
-        {documento.isGrouped && (
-          <Alert
-            severity="info"
-            sx={{ mb: 2 }}
-            icon={<Box component="span">📦</Box>}
-          >
-            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-              ⚡ Entrega Grupal Automática
-            </Typography>
-            <Typography variant="body2">
-              Este documento es parte de un grupo. Al procesarlo, se entregarán automáticamente
-              TODOS los documentos del grupo que estén listos.
-            </Typography>
-          </Alert>
-        )}
+
 
         {/* 🔐 ZONA DE CÓDIGO DE RETIRO - Prominente */}
         <Box sx={{
