@@ -116,17 +116,17 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
    * Contenido del drawer con funcionalidad de colapso
    */
   const drawer = (
-    <Box sx={{ 
-      height: '100%', 
-      display: 'flex', 
+    <Box sx={{
+      height: '100%',
+      display: 'flex',
       flexDirection: 'column',
       backgroundColor: !isDarkMode ? '#1e40af' : undefined,
       color: !isDarkMode ? '#ffffff' : undefined,
       transition: 'all 0.3s ease',
     }}>
       {/* Header del sidebar con botón de colapso */}
-      <Box sx={{ 
-        p: 2, 
+      <Box sx={{
+        p: 2,
         bgcolor: !isDarkMode ? '#1e40af' : 'primary.main',
         color: 'white',
         minHeight: '64px',
@@ -175,14 +175,14 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
       </Box>
 
       <Divider sx={{ borderColor: !isDarkMode ? 'rgba(255, 255, 255, 0.2)' : undefined }} />
-      
+
       {/* Navegación Principal */}
       <Box sx={{ flex: 1, overflow: 'auto' }}>
         <List sx={{ px: 1, py: 2 }}>
           {navigationItems.map((item) => (
             <ListItem key={item.view} disablePadding sx={{ mb: 0.5 }}>
-              <Tooltip 
-                title={sidebarCollapsed ? item.text : ''} 
+              <Tooltip
+                title={sidebarCollapsed ? item.text : ''}
                 placement="right"
                 disableHoverListener={!sidebarCollapsed}
               >
@@ -192,14 +192,14 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
                     borderRadius: 1,
                     py: 1.5,
                     px: sidebarCollapsed ? 1.5 : 2,
-                    bgcolor: item.active 
+                    bgcolor: item.active
                       ? (!isDarkMode ? '#468BE6' : 'primary.main')
                       : 'transparent',
-                    color: item.active 
-                      ? 'white' 
+                    color: item.active
+                      ? 'white'
                       : (!isDarkMode ? '#ffffff' : 'text.primary'),
                     '&:hover': {
-                      bgcolor: item.active 
+                      bgcolor: item.active
                         ? (!isDarkMode ? '#1e40af' : 'primary.dark')
                         : (!isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'action.hover')
                     },
@@ -207,9 +207,9 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
                     transition: 'all 0.2s ease',
                   }}
                 >
-                  <ListItemIcon sx={{ 
-                    color: item.active 
-                      ? 'white' 
+                  <ListItemIcon sx={{
+                    color: item.active
+                      ? 'white'
                       : (!isDarkMode ? '#93BFEF' : 'primary.main'),
                     minWidth: sidebarCollapsed ? 'unset' : 40,
                     justifyContent: 'center'
@@ -217,13 +217,13 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
                     {item.icon}
                   </ListItemIcon>
                   {!sidebarCollapsed && (
-                    <ListItemText 
+                    <ListItemText
                       primary={item.text}
                       primaryTypographyProps={{
                         variant: 'body2',
                         fontWeight: item.active ? 'bold' : 'medium',
-                        color: item.active 
-                          ? 'white' 
+                        color: item.active
+                          ? 'white'
                           : (!isDarkMode ? '#ffffff' : 'inherit')
                       }}
                     />
@@ -239,8 +239,8 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
 
       {/* Toggle de modo oscuro */}
       <Box sx={{ px: 1, py: 1, flexShrink: 0 }}>
-        <Tooltip 
-          title={sidebarCollapsed ? (isDarkMode ? 'Modo Claro' : 'Modo Oscuro') : ''} 
+        <Tooltip
+          title={sidebarCollapsed ? (isDarkMode ? 'Modo Claro' : 'Modo Oscuro') : ''}
           placement="right"
           disableHoverListener={!sidebarCollapsed}
         >
@@ -308,18 +308,18 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
                 {getUserInitials()}
               </Avatar>
               <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography 
-                  variant="body2" 
-                  sx={{ 
+                <Typography
+                  variant="body2"
+                  sx={{
                     fontWeight: 'medium',
                     color: !isDarkMode ? '#ffffff' : 'inherit'
-                  }} 
+                  }}
                   noWrap
                 >
                   {user?.firstName}
                 </Typography>
-                <Typography 
-                  variant="caption" 
+                <Typography
+                  variant="caption"
                   sx={{
                     color: !isDarkMode ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary'
                   }}
@@ -329,14 +329,14 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
                 </Typography>
               </Box>
             </Box>
-            
+
             <Box sx={{ display: 'flex', gap: 1 }}>
               <Button
                 variant="outlined"
                 size="small"
                 startIcon={<SettingsIcon />}
                 onClick={() => setShowChangePassword(true)}
-                sx={{ 
+                sx={{
                   fontSize: '0.75rem',
                   borderColor: !isDarkMode ? 'rgba(255, 255, 255, 0.5)' : 'inherit',
                   color: !isDarkMode ? '#ffffff' : 'inherit',
@@ -355,7 +355,7 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
                 size="small"
                 startIcon={<LogoutIcon />}
                 onClick={logout}
-                sx={{ 
+                sx={{
                   fontSize: '0.75rem',
                   borderColor: !isDarkMode ? 'rgba(255, 255, 255, 0.5)' : 'inherit',
                   color: !isDarkMode ? '#ffffff' : 'inherit',
@@ -387,12 +387,12 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
                 {getUserInitials()}
               </Avatar>
             </Tooltip>
-            
+
             <Tooltip title="Configuración" placement="right">
               <IconButton
                 onClick={() => setShowChangePassword(true)}
                 size="small"
-                sx={{ 
+                sx={{
                   color: !isDarkMode ? '#ffffff' : 'inherit',
                   border: `1px solid ${!isDarkMode ? 'rgba(255, 255, 255, 0.5)' : 'currentColor'}`,
                   '&:hover': {
@@ -404,12 +404,12 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
                 <SettingsIcon fontSize="small" />
               </IconButton>
             </Tooltip>
-            
+
             <Tooltip title="Cerrar Sesión" placement="right">
               <IconButton
                 onClick={logout}
                 size="small"
-                sx={{ 
+                sx={{
                   color: !isDarkMode ? '#ffffff' : 'inherit',
                   border: `1px solid ${!isDarkMode ? 'rgba(255, 255, 255, 0.5)' : 'currentColor'}`,
                   '&:hover': {
@@ -433,11 +433,11 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
       <AppBar
         position="fixed"
         sx={{
-          width: { 
-            sm: `calc(100% - ${sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH}px)` 
+          width: {
+            sm: `calc(100% - ${sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH}px)`
           },
-          ml: { 
-            sm: `${sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH}px` 
+          ml: {
+            sm: `${sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH}px`
           },
           zIndex: (theme) => theme.zIndex.drawer + 1,
           transition: 'width 0.3s ease, margin-left 0.3s ease',
@@ -453,11 +453,11 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
           >
             <MenuIcon />
           </IconButton>
-          
+
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Centro de Control - Recepción
           </Typography>
-          
+
           {/* Usuario info en header */}
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
             <Typography variant="body2" sx={{ mr: 1, display: { xs: 'none', md: 'block' } }}>
@@ -480,8 +480,8 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
       {/* Sidebar Navigation */}
       <Box
         component="nav"
-        sx={{ 
-          width: { sm: sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH }, 
+        sx={{
+          width: { sm: sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH },
           flexShrink: { sm: 0 },
           transition: 'width 0.3s ease'
         }}
@@ -496,8 +496,8 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
           }}
           sx={{
             display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': { 
-              boxSizing: 'border-box', 
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
               width: DRAWER_WIDTH,
               backgroundColor: !isDarkMode ? '#1e40af' : undefined,
             },
@@ -505,14 +505,14 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
         >
           {drawer}
         </Drawer>
-        
+
         {/* Drawer permanente desktop */}
         <Drawer
           variant="permanent"
           sx={{
             display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': { 
-              boxSizing: 'border-box', 
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
               width: sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH,
               backgroundColor: !isDarkMode ? '#1e40af' : undefined,
               height: '100vh',
@@ -532,8 +532,8 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
         component="main"
         sx={{
           flexGrow: 1,
-          width: { 
-            sm: `calc(100% - ${sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH}px)` 
+          width: {
+            sm: `calc(100% - ${sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH}px)`
           },
           minHeight: '100vh',
           bgcolor: 'background.default',
@@ -541,7 +541,7 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
         }}
       >
         <Toolbar />
-        
+
         {/* Área de contenido */}
         <Container maxWidth="xl" sx={{ py: 3 }}>
           {children}
@@ -549,7 +549,7 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
       </Box>
 
       {/* Modal de cambio de contraseña */}
-      <ChangePassword 
+      <ChangePassword
         open={showChangePassword}
         onClose={() => setShowChangePassword(false)}
       />
