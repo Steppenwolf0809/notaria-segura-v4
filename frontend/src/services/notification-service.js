@@ -6,7 +6,7 @@ import apiClient from './api-client';
 const notificationService = {
     /**
      * Obtener cola de notificaciones pendientes
-     * @param {string} tab - 'pending' | 'reminders'
+     * @param {string} tab - 'pending' | 'reminders' | 'sent'
      * @param {number} reminderDays - Días para considerar recordatorio
      */
     async getQueue(tab = 'pending', reminderDays = 3) {
@@ -38,6 +38,23 @@ const notificationService = {
             return {
                 success: false,
                 message: error.response?.data?.message || 'Error al enviar notificación'
+            };
+        }
+    },
+
+    /**
+     * Actualizar teléfono de cliente en documentos
+     * @param {Object} data - { documentIds: string[], clientPhone: string }
+     */
+    async updateClientPhone(data) {
+        try {
+            const response = await apiClient.put('/notifications/update-phone', data);
+            return response.data;
+        } catch (error) {
+            console.error('Error updating client phone:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Error al actualizar teléfono'
             };
         }
     }

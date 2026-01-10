@@ -64,7 +64,7 @@ function DocumentosListos({ onEstadisticasChange }) {
     estado: '' // Para filtrar por estado en la pestaña "Todos"
   });
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [totalPages, setTotalPages] = useState(1);
   // Orden
   const [sortBy, setSortBy] = useState('createdAt');

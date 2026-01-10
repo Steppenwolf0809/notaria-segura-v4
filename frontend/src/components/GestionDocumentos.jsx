@@ -24,7 +24,7 @@ const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
 
   // Estado para paginación y ordenamiento Server-Side
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [orderBy, setOrderBy] = useState('createdAt');
   const [orderDirection, setOrderDirection] = useState('desc');
 

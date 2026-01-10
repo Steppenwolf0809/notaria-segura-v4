@@ -15,7 +15,7 @@ const AVAILABLE_VARIABLES = {
   codigo: 'Código de verificación 4 dígitos',
   notaria: 'Nombre de la notaría (alias: nombreNotariaCompleto)',
   fecha: 'Fecha actual formateada (alias: fechaFormateada)',
-  
+
   // Variables mejoradas y nuevas
   nombreCompareciente: 'Nombre completo del compareciente/cliente',
   nombreNotariaCompleto: 'Nombre oficial completo de la notaría',
@@ -24,21 +24,21 @@ const AVAILABLE_VARIABLES = {
   contactoConsultas: 'Teléfono/email para consultas',
   actoPrincipal: 'Descripción del acto principal del trámite',
   actoPrincipalValor: 'Valor del acto principal (monto)',
-  
+
   // Variables para códigos de escritura
   codigosEscritura: 'Lista de códigos de escritura de documentos',
   cantidadDocumentos: 'Número total de documentos',
   listaDocumentosCompleta: 'Lista detallada con códigos específicos',
-  
+
   // Variables condicionales
   nombreRetirador: 'Nombre de quien retira el documento',
   cedulaRetirador: 'Cédula de quien retira (solo si existe)',
   seccionCedula: 'Línea completa "🆔 Cédula: XXXX" o vacía si no hay cédula',
   tipoEntrega: 'Individual o múltiple (afecta formato)',
-  
+
   // Variables de formato para entrega
   documentosDetalle: 'Lista formateada de documentos entregados',
-  
+
   // Variables para templates de entrega
   receptor_nombre: 'Nombre de quien recibió el documento',
   receptor_cedula: 'Cédula del receptor (opcional)',
@@ -57,8 +57,10 @@ Estimado/a {nombreCompareciente},
 
 Su documento está listo para retiro:
 📄 *Documento:* {documento}
+📝 *Acto:* {actoPrincipal}
 🔢 *Código de retiro:* {codigo}
 {codigosEscritura}
+📊 *Documentos:* {cantidadDocumentos}
 
 ⚠️ *IMPORTANTE:* Presente este código al momento del retiro.
 
@@ -67,6 +69,27 @@ Su documento está listo para retiro:
 
 Para consultas: {contactoConsultas}
 ¡Gracias por confiar en nosotros!`
+  },
+  RECORDATORIO_RETIRO: {
+    titulo: 'Recordatorio de Retiro de Documento',
+    mensaje: `🏛️ *{nombreNotariaCompleto}*
+
+Estimado/a {nombreCompareciente},
+
+⏰ *RECORDATORIO:* Su(s) documento(s) está(n) listo(s) para retiro desde hace varios días.
+
+📄 *Documento:* {documento}
+📝 *Acto:* {actoPrincipal}
+🔢 *Código de retiro:* {codigo}
+{codigosEscritura}
+
+⚠️ Le recordamos que puede retirar su documentación en nuestras oficinas.
+
+📍 *Dirección:* Azuay E2-231 y Av Amazonas, Quito
+⏰ *Horario:* Lunes a Viernes 8:00-17:00
+
+Para consultas: {contactoConsultas}
+¡Esperamos su visita!`
   },
   DOCUMENTO_ENTREGADO: {
     titulo: 'Confirmación de Entrega (Mejorado)',
@@ -117,7 +140,7 @@ export const getTemplates = async (req, res) => {
 export const getTemplate = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const template = await prisma.whatsAppTemplate.findUnique({
       where: { id }
     });
@@ -157,7 +180,7 @@ export const createTemplate = async (req, res) => {
       });
     }
 
-    if (!['DOCUMENTO_LISTO', 'DOCUMENTO_ENTREGADO'].includes(tipo)) {
+    if (!['DOCUMENTO_LISTO', 'DOCUMENTO_ENTREGADO', 'RECORDATORIO_RETIRO'].includes(tipo)) {
       return res.status(400).json({
         success: false,
         error: 'Tipo de template inválido'
@@ -330,12 +353,12 @@ export const previewTemplate = async (req, res) => {
       notaria: 'NOTARÍA DÉCIMO OCTAVA DEL CANTÓN QUITO',
       fecha: new Date().toLocaleDateString('es-EC', {
         day: '2-digit',
-        month: '2-digit', 
+        month: '2-digit',
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
       }),
-      
+
       // Variables mejoradas
       nombreCompareciente: 'María García Pérez',
       nombreNotariaCompleto: 'NOTARÍA DÉCIMO OCTAVA DEL CANTÓN QUITO',
@@ -344,19 +367,19 @@ export const previewTemplate = async (req, res) => {
       contactoConsultas: 'Tel: (02) 2234-567 | email@notaria18.gob.ec',
       actoPrincipal: 'Compraventa de inmueble',
       actoPrincipalValor: '150.00',
-      
+
       // Variables de códigos
       codigosEscritura: '📋 *Código de escritura:* 20251701018D00919',
       cantidadDocumentos: '1',
       listaDocumentosCompleta: '• Protocolo de Compraventa - Código: 20251701018D00919',
-      
+
       // Variables condicionales (ejemplo con cédula)
       nombreRetirador: 'María García Pérez',
       cedulaRetirador: '1234567890',
       seccionCedula: '🆔 *Cédula:* 1234567890',
       tipoEntrega: 'su documento',
       documentosDetalle: '📄 *Protocolo de Compraventa*\n📋 *Código:* 20251701018D00919',
-      
+
       // Variables de entrega
       receptor_nombre: 'María García Pérez',
       receptor_cedula: '1234567890',
@@ -375,7 +398,7 @@ export const previewTemplate = async (req, res) => {
       data: {
         preview,
         datosEjemplo,
-        variablesEncontradas: Object.keys(datosEjemplo).filter(variable => 
+        variablesEncontradas: Object.keys(datosEjemplo).filter(variable =>
           mensaje.includes(`{${variable}}`)
         )
       }
@@ -395,9 +418,9 @@ export const previewTemplate = async (req, res) => {
 export const getActiveTemplateByType = async (tipo) => {
   try {
     const template = await prisma.whatsAppTemplate.findFirst({
-      where: { 
+      where: {
         tipo: tipo,
-        activo: true 
+        activo: true
       },
       orderBy: { updatedAt: 'desc' }
     });
@@ -427,7 +450,7 @@ export const getActiveTemplateByType = async (tipo) => {
 export const initializeDefaultTemplates = async (req, res) => {
   try {
     const existingTemplates = await prisma.whatsAppTemplate.count();
-    
+
     if (existingTemplates > 0) {
       return res.json({
         success: true,

@@ -92,7 +92,7 @@ const ListaArchivo = ({
 
   // Estado local (usado si no se pasan props controladas)
   const [internalPage, setInternalPage] = useState(0);
-  const [internalRowsPerPage, setInternalRowsPerPage] = useState(10);
+  const [internalRowsPerPage, setInternalRowsPerPage] = useState(25);
   const [internalFiltros, setInternalFiltros] = useState(() => {
     try {
       const saved = sessionStorage.getItem('archivo_lista_filtros');

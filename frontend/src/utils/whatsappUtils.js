@@ -37,6 +37,80 @@ export function formatPhoneForWhatsApp(phone) {
 }
 
 /**
+ * Validar teléfono para WhatsApp con información detallada
+ * @param {string} phone - Número a validar
+ * @returns {Object} { valid: boolean, reason?: string, formatted?: string, severity?: 'error'|'warning' }
+ */
+export function validatePhoneForWhatsApp(phone) {
+    // Caso: número vacío
+    if (!phone || !phone.toString().trim()) {
+        return {
+            valid: false,
+            reason: 'Sin teléfono registrado',
+            severity: 'warning'
+        };
+    }
+
+    const rawPhone = phone.toString().trim();
+
+    // Limpiar caracteres permitidos
+    const cleaned = rawPhone.replace(/[\s\-\(\)\+]/g, '');
+
+    // Validar que solo contenga dígitos
+    if (!/^\d+$/.test(cleaned)) {
+        return {
+            valid: false,
+            reason: 'Contiene caracteres no válidos',
+            severity: 'error'
+        };
+    }
+
+    // Validar longitud mínima (números muy cortos)
+    if (cleaned.length < 7) {
+        return {
+            valid: false,
+            reason: 'Número muy corto',
+            severity: 'error'
+        };
+    }
+
+    // Validar longitud máxima razonable
+    if (cleaned.length > 15) {
+        return {
+            valid: false,
+            reason: 'Número muy largo',
+            severity: 'error'
+        };
+    }
+
+    // Intentar formatear para WhatsApp
+    const formatted = formatPhoneForWhatsApp(rawPhone);
+
+    if (!formatted) {
+        return {
+            valid: false,
+            reason: 'Formato de número inválido para Ecuador',
+            severity: 'error'
+        };
+    }
+
+    // Validar que sea un celular ecuatoriano (debe empezar con 9 después del 593)
+    if (!formatted.startsWith('5939')) {
+        return {
+            valid: true,
+            formatted,
+            reason: 'Posible número fijo (no celular)',
+            severity: 'warning'
+        };
+    }
+
+    return {
+        valid: true,
+        formatted
+    };
+}
+
+/**
  * Agrupar documentos por cliente de forma inteligente
  * Separa documentos listos de pendientes para anti-spam
  * @param {Array} documents - Lista de documentos
@@ -223,6 +297,7 @@ export function canNotifyDocument(document) {
 
 export default {
     formatPhoneForWhatsApp,
+    validatePhoneForWhatsApp,
     groupDocumentsByClient,
     separateReadyDocuments,
     generateDocumentListText,

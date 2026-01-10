@@ -138,7 +138,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
   const [searchQuery, setSearchQuery] = useState('');
 
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [totalPages, setTotalPages] = useState(1);
   // Orden
   const [sortBy, setSortBy] = useState('createdAt');
