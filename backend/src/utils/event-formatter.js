@@ -14,7 +14,7 @@ import { formatLongDateTime } from './timezone.js';
  */
 function formatEventDescription(event) {
   const { eventType, details = {}, user, personaRetiro, cedulaRetiro, metodoVerificacion, observacionesRetiro } = event;
-  
+
   // Nombre del usuario que ejecutó la acción
   const userName = user ? `${user.firstName} ${user.lastName}` : 'Sistema';
   const userRole = user?.role || 'SISTEMA';
@@ -38,7 +38,7 @@ function formatEventDescription(event) {
     case 'DOCUMENT_ASSIGNED':
       const matrizadorName = details.matrizadorName || 'un matrizador';
       const assignmentType = details.assignmentType;
-      
+
       if (assignmentType === 'AUTOMATIC') {
         return `Asignado automáticamente a ${matrizadorName}`;
       } else if (assignmentType === 'MANUAL') {
@@ -51,7 +51,7 @@ function formatEventDescription(event) {
 
     case 'STATUS_CHANGED':
       const { previousStatus, newStatus } = details;
-      
+
       switch (newStatus) {
         case 'EN_PROCESO':
           return `Documento en proceso de matrizarización`;
@@ -65,7 +65,7 @@ function formatEventDescription(event) {
         case 'ENTREGADO':
           const deliveredTo = personaRetiro || details.entregadoA || details.deliveredTo || details.clientName || 'cliente';
           const deliveredBy = details.deliveredBy || userName;
-          const metodo = metodoVerificacion || details.metodoVerificacion || (details.verificacionManual ? 'verificación manual' : (details.verificationCode || details.codigoRetiro || details.groupVerificationCode) ? 'código WhatsApp' : 'verificación');
+          const metodo = metodoVerificacion || details.metodoVerificacion || (details.verificacionManual ? 'verificación manual' : (details.verificationCode || details.codigoRetiro) ? 'código WhatsApp' : 'verificación');
           if (details.migration) {
             return `Documento entregado a ${deliveredTo} (método: ${metodo})`;
           } else {
@@ -105,7 +105,7 @@ function formatEventDescription(event) {
     case 'WHATSAPP_SENT':
       const messageType = details.messageType;
       const phoneNumber = details.phoneNumber || 'cliente';
-      
+
       switch (messageType) {
         case 'DOCUMENT_READY':
           return `Notificación de documento listo enviada a ${phoneNumber}`;
@@ -204,7 +204,7 @@ function getEventContextInfo(event) {
         const idnum = cedulaRetiro || details.cedulaReceptor || details.cedula_receptor;
         if (idnum) contextInfo.push(`Cédula: ${idnum}`);
         // Método de verificación
-        const metodo = metodoVerificacion || details.metodoVerificacion || (details.verificacionManual ? 'manual' : (details.verificationCode || details.codigoRetiro || details.groupVerificationCode) ? 'código WhatsApp' : null);
+        const metodo = metodoVerificacion || details.metodoVerificacion || (details.verificacionManual ? 'manual' : (details.verificationCode || details.codigoRetiro) ? 'código WhatsApp' : null);
         if (metodo) contextInfo.push(`Método: ${normalizeVerificationMethod(metodo)}`);
         // Relación con titular
         const rel = details.relacionTitular || details.relationship;
@@ -289,7 +289,7 @@ function truncate(text, max) {
  */
 function formatEventDate(date) {
   if (!date) return '';
-  
+
   const eventDate = new Date(date);
   const now = new Date();
   const diffMs = now - eventDate;
@@ -301,22 +301,22 @@ function formatEventDate(date) {
   if (diffMinutes < 1) {
     return 'Hace unos segundos';
   }
-  
+
   // Si fue hace menos de 1 hora
   if (diffMinutes < 60) {
     return `Hace ${diffMinutes} minuto${diffMinutes !== 1 ? 's' : ''}`;
   }
-  
+
   // Si fue hace menos de 24 horas
   if (diffHours < 24) {
     return `Hace ${diffHours} hora${diffHours !== 1 ? 's' : ''}`;
   }
-  
+
   // Si fue hace menos de 7 días
   if (diffDays < 7) {
     return `Hace ${diffDays} día${diffDays !== 1 ? 's' : ''}`;
   }
-  
+
   // Si fue hace más de una semana, mostrar fecha completa
   // Mostrar en timezone local de la app (Ecuador por defecto)
   return formatLongDateTime(eventDate);

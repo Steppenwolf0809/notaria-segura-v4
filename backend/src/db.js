@@ -37,17 +37,15 @@ export function getPrismaClient() {
       try {
         const action = params?.action;
         const model = (params?.model || '').toString();
-        const isMutation = ['create','update','delete','upsert','createMany','updateMany','deleteMany'].includes(action);
+        const isMutation = ['create', 'update', 'delete', 'upsert', 'createMany', 'updateMany', 'deleteMany'].includes(action);
         const modelsToWatch = new Set([
-          'Document','document',
-          'DocumentEvent','documentEvent',
-          'DocumentGroup','documentGroup',
-          'GroupMember','groupMember',
-          'WhatsAppNotification','whatsAppNotification'
+          'Document', 'document',
+          'DocumentEvent', 'documentEvent',
+          'WhatsAppNotification', 'whatsAppNotification'
         ]);
         if (isMutation && modelsToWatch.has(model)) {
           // Invalidar todas las búsquedas de documentos
-          cache.invalidateByTag('documents').catch(() => {});
+          cache.invalidateByTag('documents').catch(() => { });
         }
       } catch (e) {
         // No romper la request si falla la invalidación
@@ -55,7 +53,7 @@ export function getPrismaClient() {
       return result;
     });
     // Intentar asegurar extensiones útiles en segundo plano (no bloquear)
-    ensureExtensions(prisma).catch(() => {});
+    ensureExtensions(prisma).catch(() => { });
   }
   return prisma;
 }

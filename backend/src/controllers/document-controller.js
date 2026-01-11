@@ -1848,11 +1848,6 @@ async function deliverDocument(req, res) {
       include: {
         assignedTo: {
           select: { firstName: true, lastName: true }
-        },
-        documentGroup: {
-          include: {
-            documents: true
-          }
         }
       }
     });
@@ -1904,7 +1899,7 @@ async function deliverDocument(req, res) {
       // ⚡ FIX: Si está EN_PROCESO, es posible que no tenga código aún.
       // En ese caso, requerimos que el usuario confirme "Verificación Manual" en el frontend,
       // O generamos uno al vuelo si fuera necesario (pero aquí validamos contra lo que hay).
-      if (document.status === 'EN_PROCESO' && !document.verificationCode && !document.codigoRetiro && !document.groupVerificationCode) {
+      if (document.status === 'EN_PROCESO' && !document.verificationCode && !document.codigoRetiro) {
         return res.status(400).json({
           success: false,
           message: 'Documento en proceso sin código. Debe seleccionar "Verificación Manual" para entregar directamente.'
@@ -1920,7 +1915,7 @@ async function deliverDocument(req, res) {
 
       // Preferir el código que ve recepción en el frontend: codigoRetiro
       // Fallback a verificationCode (flujo antiguo) y groupVerificationCode
-      const expectedCode = document.codigoRetiro || document.verificationCode || document.groupVerificationCode;
+      const expectedCode = document.codigoRetiro || document.verificationCode;
       if (!expectedCode || expectedCode !== codigoVerificacion) {
         return res.status(400).json({
           success: false,
@@ -1935,69 +1930,7 @@ async function deliverDocument(req, res) {
       : 'codigo_whatsapp';
 
     // Si el documento está agrupado, entregar todos los documentos del grupo
-    let groupDocuments = [];
-    if (document.documentGroup && Array.isArray(document.documentGroup.documents)) {
-      const allGroupDocuments = document.documentGroup.documents;
-
-      // Entregar todos los documentos del grupo que estén LISTO (excepto el actual)
-      const documentsToDeliver = allGroupDocuments.filter(doc =>
-        doc.status === 'LISTO' && doc.id !== id
-      );
-
-      if (documentsToDeliver.length > 0) {
-        console.log(`🚚 Entregando ${documentsToDeliver.length + 1} documentos del grupo automáticamente`);
-
-        // Actualizar todos los documentos del grupo
-        await prisma.document.updateMany({
-          where: {
-            id: { in: documentsToDeliver.map(doc => doc.id) }
-          },
-          data: {
-            status: 'ENTREGADO',
-            entregadoA,
-            cedulaReceptor,
-            relacionTitular,
-            verificacionManual: verificacionManual || false,
-            facturaPresenta: facturaPresenta || false,
-            fechaEntrega: new Date(),
-            usuarioEntregaId: req.user.id,
-            observacionesEntrega: observacionesEntrega || `Entregado grupalmente junto con ${document.protocolNumber}`
-          }
-        });
-
-        // Registrar eventos para todos los documentos del grupo
-        for (const doc of documentsToDeliver) {
-          await prisma.documentEvent.create({
-            data: {
-              documentId: doc.id,
-              userId: req.user.id,
-              eventType: 'STATUS_CHANGED',
-              description: `Documento entregado grupalmente a ${entregadoA}`,
-              details: JSON.stringify({
-                previousStatus: 'LISTO',
-                newStatus: 'ENTREGADO',
-                entregadoA,
-                cedulaReceptor,
-                relacionTitular,
-                verificacionManual: verificacionManual || false,
-                facturaPresenta: facturaPresenta || false,
-                metodoVerificacion: computedVerificationMethod,
-                verificationCode: verificacionManual ? undefined : (codigoVerificacion || document.codigoRetiro || document.verificationCode || document.groupVerificationCode),
-                deliveredWith: document.protocolNumber,
-                groupDelivery: true,
-                timestamp: new Date().toISOString()
-              }),
-              personaRetiro: entregadoA,
-              cedulaRetiro: cedulaReceptor || undefined,
-              metodoVerificacion: computedVerificationMethod,
-              observacionesRetiro: (observacionesEntrega || `Entregado grupalmente junto con ${document.protocolNumber}`)
-            }
-          });
-        }
-
-        groupDocuments = documentsToDeliver;
-      }
-    }
+    // let groupDocuments = []; // REMOVED: Group delivery logic
 
     // Actualizar documento principal con información de entrega
     const updatedDocument = await prisma.document.update({
@@ -2048,7 +1981,7 @@ async function deliverDocument(req, res) {
             facturaPresenta,
             observacionesEntrega,
             metodoVerificacion: computedVerificationMethod,
-            verificationCode: verificacionManual ? undefined : (codigoVerificacion || updatedDocument.codigoRetiro || updatedDocument.verificationCode || updatedDocument.groupVerificationCode),
+            verificationCode: verificacionManual ? undefined : (codigoVerificacion || updatedDocument.codigoRetiro || updatedDocument.verificationCode),
             timestamp: new Date().toISOString()
           }),
           personaRetiro: entregadoA,
@@ -2064,19 +1997,12 @@ async function deliverDocument(req, res) {
     }
 
     // Preparar mensaje de respuesta
-    const totalDelivered = 1 + groupDocuments.length;
-    const message = immediateDelivery
-      ? 'Documento entregado inmediatamente'
-      : totalDelivered > 1
-        ? `${totalDelivered} documentos entregados exitosamente (entrega grupal)`
-        : 'Documento entregado exitosamente';
-
     res.json({
       success: true,
-      message,
+      message: 'Documento entregado exitosamente',
       data: {
-        document: updatedDocument,
-        delivery: {
+        documento: updatedDocument,
+        entrega: {
           entregadoA,
           cedulaReceptor,
           relacionTitular,
@@ -2085,17 +2011,6 @@ async function deliverDocument(req, res) {
           fechaEntrega: updatedDocument.fechaEntrega,
           usuarioEntrega: `${req.user.firstName} ${req.user.lastName}`,
           observacionesEntrega
-        },
-
-        groupDelivery: {
-          isGroupDelivery: groupDocuments.length > 0,
-          totalDocuments: totalDelivered,
-          groupDocuments: groupDocuments.map(doc => ({
-            id: doc.id,
-            protocolNumber: doc.protocolNumber,
-            documentType: doc.documentType,
-            status: 'ENTREGADO'
-          }))
         }
       }
     });
@@ -2613,7 +2528,6 @@ async function revertDocumentStatus(req, res) {
     const document = await prisma.document.findUnique({
       where: { id },
       include: {
-        documentGroup: true,
         assignedTo: {
           select: { firstName: true, lastName: true }
         }
