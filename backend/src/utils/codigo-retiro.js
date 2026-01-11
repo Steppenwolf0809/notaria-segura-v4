@@ -7,7 +7,7 @@ const prisma = getPrismaClient();
  * Implementa algoritmos seguros y verificación de unicidad
  */
 class CodigoRetiroService {
-    
+
     /**
      * Generar código numérico de 4 dígitos
      * Evita códigos fáciles de adivinar (0000, 1111, 1234, etc.)
@@ -17,7 +17,7 @@ class CodigoRetiroService {
         do {
             codigo = Math.floor(1000 + Math.random() * 9000).toString();
         } while (this.esCodigoDebil(codigo));
-        
+
         return codigo;
     }
 
@@ -41,9 +41,9 @@ class CodigoRetiroService {
         }
 
         // Códigos comunes débiles
-        const codigosDebiles = ['0000', '1111', '2222', '3333', '4444', '5555', 
-                               '6666', '7777', '8888', '9999', '1234', '4321', 
-                               '0123', '3210', '1010', '2020'];
+        const codigosDebiles = ['0000', '1111', '2222', '3333', '4444', '5555',
+            '6666', '7777', '8888', '9999', '1234', '4321',
+            '0123', '3210', '1010', '2020'];
         if (codigosDebiles.includes(codigo)) {
             return true;
         }
@@ -93,11 +93,11 @@ class CodigoRetiroService {
 
         while (existe && intentos < maxIntentos) {
             codigo = this.generar();
-            
+
             try {
                 // Verificar si el código ya existe en documentos activos
                 const documentoExistente = await prisma.document.findFirst({
-                    where: { 
+                    where: {
                         codigoRetiro: codigo,
                         // Solo verificar contra documentos que aún no han sido entregados
                         status: {
@@ -105,10 +105,10 @@ class CodigoRetiroService {
                         }
                     }
                 });
-                
+
                 existe = !!documentoExistente;
                 intentos++;
-                
+
                 if (existe) {
                     console.log(`⚠️ Código ${codigo} ya existe, generando nuevo... (intento ${intentos})`);
                 }
@@ -128,52 +128,11 @@ class CodigoRetiroService {
     }
 
     /**
-     * Generar código único para grupos de documentos
-     * Utiliza verificación adicional para evitar conflictos con códigos individuales
+     * Generar código único para grupos de documentos (Obsoleto)
+     * Redirigido a generarUnico para compatibilidad
      */
     static async generarUnicoGrupo(maxIntentos = 10) {
-        let codigo;
-        let existe = true;
-        let intentos = 0;
-
-        while (existe && intentos < maxIntentos) {
-            codigo = this.generar();
-            
-            try {
-                // Verificar contra códigos individuales y grupales
-                const [codigoIndividual, codigoGrupal] = await Promise.all([
-                    prisma.document.findFirst({
-                        where: { 
-                            codigoRetiro: codigo,
-                            status: 'LISTO'
-                        }
-                    }),
-                    prisma.document.findFirst({
-                        where: { 
-                            groupVerificationCode: codigo,
-                            status: 'LISTO'
-                        }
-                    })
-                ]);
-                
-                existe = !!(codigoIndividual || codigoGrupal);
-                intentos++;
-                
-                if (existe) {
-                    console.log(`⚠️ Código grupo ${codigo} ya existe, generando nuevo... (intento ${intentos})`);
-                }
-            } catch (error) {
-                console.error('Error verificando unicidad del código grupal:', error);
-                existe = false;
-            }
-        }
-
-        if (intentos >= maxIntentos) {
-            throw new Error(`No se pudo generar código único grupal después de ${maxIntentos} intentos`);
-        }
-
-        console.log(`✅ Código único grupal generado: ${codigo} (${intentos} intentos)`);
-        return codigo;
+        return this.generarUnico(maxIntentos);
     }
 
     /**
@@ -182,16 +141,16 @@ class CodigoRetiroService {
      */
     static async validarCodigo(codigo) {
         if (!this.validar(codigo)) {
-            return { 
-                valido: false, 
-                error: 'Formato de código inválido' 
+            return {
+                valido: false,
+                error: 'Formato de código inválido'
             };
         }
 
         try {
             // Buscar documento con este código
             const documento = await prisma.document.findFirst({
-                where: { 
+                where: {
                     codigoRetiro: codigo,
                     status: 'LISTO'
                 },
@@ -207,9 +166,9 @@ class CodigoRetiroService {
             });
 
             if (!documento) {
-                return { 
-                    valido: false, 
-                    error: 'Código no encontrado o documento no disponible para retiro' 
+                return {
+                    valido: false,
+                    error: 'Código no encontrado o documento no disponible para retiro'
                 };
             }
 
@@ -227,9 +186,9 @@ class CodigoRetiroService {
             };
         } catch (error) {
             console.error('Error validando código:', error);
-            return { 
-                valido: false, 
-                error: 'Error interno validando código' 
+            return {
+                valido: false,
+                error: 'Error interno validando código'
             };
         }
     }
@@ -241,19 +200,17 @@ class CodigoRetiroService {
         try {
             const [individuales, grupales, entregados] = await Promise.all([
                 prisma.document.count({
-                    where: { 
-                        status: 'LISTO',
-                        isGrouped: false
+                    where: {
+                        status: 'LISTO'
                     }
                 }),
                 prisma.document.count({
-                    where: { 
-                        status: 'LISTO',
-                        isGrouped: true
+                    where: {
+                        status: 'LISTO'
                     }
                 }),
                 prisma.document.count({
-                    where: { 
+                    where: {
                         status: 'ENTREGADO'
                     }
                 })

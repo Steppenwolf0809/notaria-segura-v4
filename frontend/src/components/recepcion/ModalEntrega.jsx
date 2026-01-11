@@ -289,7 +289,9 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
                 border: '1px dashed',
                 borderColor: formData.verificacionManual ? 'warning.main' : 'grey.400',
                 borderRadius: 1,
-                bgcolor: formData.verificacionManual ? 'warning.light' : 'transparent'
+                bgcolor: (theme) => formData.verificacionManual
+                  ? (theme.palette.mode === 'dark' ? 'rgba(237, 108, 2, 0.15)' : 'rgba(237, 108, 2, 0.05)')
+                  : 'transparent'
               }}>
                 <FormControlLabel
                   control={
@@ -308,9 +310,20 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
                 />
 
                 {formData.verificacionManual && (
-                  <Alert severity="warning" size="small" sx={{ mt: 1 }}>
-                    <Typography variant="caption">
-                      ⚠️ Está autorizando una entrega manual. Es obligatorio verificar la identidad física y registrar el motivo.
+                  <Alert
+                    severity="warning"
+                    variant="outlined"
+                    sx={{
+                      mt: 1,
+                      py: 0.5,
+                      border: 'none',
+                      bgcolor: 'transparent',
+                      color: 'warning.main',
+                      '& .MuiAlert-icon': { color: 'warning.main' }
+                    }}
+                  >
+                    <Typography variant="caption" sx={{ fontWeight: 'medium' }}>
+                      ℹ️ Entrega sin código. Por seguridad, verifique la identidad física del receptor.
                     </Typography>
                   </Alert>
                 )}
@@ -322,14 +335,11 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
                 fullWidth
                 multiline
                 rows={3}
-                required={formData.verificacionManual}
-                label={formData.verificacionManual ? "Observación obligatoria (Motivo entrega manual)" : "Observaciones (opcional)"}
+                label="Observaciones (opcional)"
                 name="observaciones"
                 value={formData.observaciones}
                 onChange={handleChange}
-                placeholder={formData.verificacionManual ? "Ej: Cliente perdió celular, verifiqué cédula física..." : ""}
-                error={formData.verificacionManual && !formData.observaciones}
-                helperText={formData.verificacionManual && !formData.observaciones ? "Debe explicar el motivo de la entrega manual" : ""}
+                placeholder={formData.verificacionManual ? "Ej: Perdió celular, verifiqué cédula..." : ""}
               />
             </Grid>
           </Grid>
