@@ -352,7 +352,7 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
         <Button
           onClick={handleSubmit}
           variant="contained"
-          disabled={loading || (formData.verificacionManual && !formData.observaciones)}
+          disabled={loading}
           color={formData.verificacionManual ? "warning" : "primary"}
           startIcon={loading ? <CircularProgress size={20} /> : null}
         >

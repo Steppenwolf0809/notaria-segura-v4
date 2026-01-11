@@ -460,7 +460,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
 
   const cerrarModales = () => {
     setShowModalEntrega(false);
-    setShowEntregaGrupal(false);
+    setShowBulkDeliveryDialog(false);
     setDocumentoSeleccionado(null);
   };
 
