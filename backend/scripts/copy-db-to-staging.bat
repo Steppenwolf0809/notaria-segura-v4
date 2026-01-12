@@ -4,23 +4,23 @@ setlocal enabledelayedexpansion
 REM ===================================================
 REM CONFIGURATION
 REM ===================================================
-set PROD_URL=postgresql://postgres:ymGXjRwwZshJaTEwyIpyztWqAZogkzSG@gondola.proxy.rlwy.net:41960/railway
-set STAGING_URL=postgresql://postgres:OKnaNWpLlLqHZQeJnMPeXysEOVNguMYJ@turntable.proxy.rlwy.net:31783/railway
+set PROD_URL=postgresql://postgres:uXwrkbpPDVXrEngsRCMHdIKkOUDXipic@switchback.proxy.rlwy.net:25513/railway
+set STAGING_URL=postgresql://postgres:vzdzHHIVerdjgzWlmfARWiSsbTBSJfvw@gondola.proxy.rlwy.net:39316/railway
 
 echo ===================================================
 echo  NOTARIA SEGURA - DB SYNC
 echo  Production to Staging (Postgres Copy)
 echo ===================================================
 echo.
-echo  SOURCE (Production): gondola.proxy.rlwy.net:41960
-echo  TARGET (Staging):    turntable.proxy.rlwy.net:31783
+echo  SOURCE (Production): switchback.proxy.rlwy.net:25513
+echo  TARGET (Staging):    gondola.proxy.rlwy.net:39316
 echo.
 echo  ONE-WAY SYNC WARNING:
 echo  This will completely ERASE the Staging database and
 echo  replace it with a fresh copy of Production data.
 echo.
 echo  Press Ctrl+C to cancel or any key to continue...
-pause > nul
+REM pause > nul
 
 echo.
 echo [1/3] Dumping Production database...
@@ -60,7 +60,7 @@ echo  You can now connect to your Staging environment.
 echo  Make sure to update your Staging .env or Railway variables
 echo  to point to the new Staging database URL.
 echo.
-pause
+REM pause
 exit /b 0
 
 :error
@@ -69,5 +69,5 @@ echo ===================================================
 echo  PROCESS FAILED
 echo ===================================================
 echo.
-pause
+REM pause
 exit /b 1
