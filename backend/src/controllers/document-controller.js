@@ -3337,6 +3337,15 @@ async function bulkNotify(req, res) {
             .replace(/\{nombreNotariaCompleto\}/g, 'NOTARÍA DÉCIMO OCTAVA DEL CANTÓN QUITO')
             // Variables de contacto
             .replace(/\{contactoConsultas\}/g, 'Tel: (02) 2234-567')
+            // 🛡️ Variables de Emojis Seguros (Hardcoded para evitar problemas de encoding db)
+            .replace(/\{emoji_notaria\}/g, '🏛️')
+            .replace(/\{emoji_documento\}/g, '📄')
+            .replace(/\{emoji_codigo\}/g, '🔢')
+            .replace(/\{emoji_escritura\}/g, '📋')
+            .replace(/\{emoji_importante\}/g, '⚠️')
+            .replace(/\{emoji_direccion\}/g, '📍')
+            .replace(/\{emoji_horario\}/g, '⏰')
+            .replace(/\{emoji_reloj\}/g, '⏰')
             // Variables de fecha
             .replace(/\{fecha\}/g, new Date().toLocaleDateString('es-EC'))
             .replace(/\{fechaFormateada\}/g, new Date().toLocaleDateString('es-EC', {
