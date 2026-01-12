@@ -102,12 +102,11 @@ const ListaArchivo = ({
         return {
           search: parsed.search ?? '',
           estado: parsed.estado ?? 'TODOS',
-          tipo: parsed.tipo ?? 'TODOS',
-          mostrarEntregados: parsed.mostrarEntregados ?? false
+          tipo: parsed.tipo ?? 'TODOS'
         };
       }
     } catch (_) { }
-    return { search: '', estado: 'TODOS', tipo: 'TODOS', mostrarEntregados: false };
+    return { search: '', estado: 'TODOS', tipo: 'TODOS' };
   });
   const [internalOrderBy, setInternalOrderBy] = useState('updatedAt'); // Default backend sort
   const [internalOrder, setInternalOrder] = useState('desc');
@@ -168,9 +167,9 @@ const ListaArchivo = ({
       // Filtro de tipo
       const matchesTipo = filtros.tipo === 'TODOS' || doc.documentType === filtros.tipo;
 
-      // 🆕 Filtro para ocultar ENTREGADOS si el toggle está desactivado
-      // PERO: Si el usuario selecciona explícitamente ENTREGADO en el filtro, mostrarlos
-      const matchesEntregados = filtros.mostrarEntregados || filtros.estado === 'ENTREGADO' || doc.status !== 'ENTREGADO';
+      // 🆕 Filtro para ocultar ENTREGADOS por defecto
+      // Solo mostrar ENTREGADOS si el usuario selecciona explícitamente ese estado
+      const matchesEntregados = filtros.estado === 'ENTREGADO' || doc.status !== 'ENTREGADO';
 
       // 🆕 Filtro por rango de fechas (fechaFactura o createdAt)
       let matchesFecha = true;
@@ -797,7 +796,7 @@ const ListaArchivo = ({
             color="secondary"
             startIcon={<FilterListOffIcon />}
             onClick={() => {
-              const defaultFiltros = { search: '', estado: 'TODOS', tipo: 'TODOS', mostrarEntregados: false, fechaDesde: '', fechaHasta: '' };
+              const defaultFiltros = { search: '', estado: 'TODOS', tipo: 'TODOS', fechaDesde: '', fechaHasta: '' };
               if (serverSide && onFilterChange) {
                 onFilterChange(defaultFiltros);
               } else {
@@ -843,26 +842,6 @@ const ListaArchivo = ({
             label=""
           />
 
-          {/* 🆕 Toggle para mostrar/ocultar ENTREGADOS */}
-          <FormControlLabel
-            control={
-              <Switch
-                checked={filtros.mostrarEntregados}
-                onChange={(e) => handleFilterChange('mostrarEntregados', e.target.checked)}
-                color="primary"
-                size="small"
-              />
-            }
-            label={
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                {filtros.mostrarEntregados ? <ViewIcon fontSize="small" /> : <VisibilityOffIcon fontSize="small" />}
-                <Typography variant="body2">
-                  Mostrar entregados
-                </Typography>
-              </Box>
-            }
-            sx={{ ml: 'auto' }}
-          />
         </Box>
 
         {/* Resumen de resultados */}
@@ -870,17 +849,6 @@ const ListaArchivo = ({
           <Typography variant="body2" color="text.secondary">
             Mostrando {documentosPagina.length} de {documentosFiltrados.length} documentos
           </Typography>
-
-          {/* 🆕 Contador de entregados ocultos */}
-          {!filtros.mostrarEntregados && (
-            <Chip
-              label={`${documentos.filter(d => d.status === 'ENTREGADO').length} entregados ocultos`}
-              size="small"
-              variant="outlined"
-              color="default"
-              icon={<VisibilityOffIcon />}
-            />
-          )}
 
           {filtros.search && (
             <Chip

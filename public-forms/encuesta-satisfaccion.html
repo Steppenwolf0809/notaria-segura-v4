@@ -514,6 +514,13 @@
             if (ref) {
                 formData.tramiteId = ref;
                 console.log('Trámite ID capturado:', ref);
+
+                // MEJORA: Limpiar la URL visualmente para que la encuesta parezca anónima
+                // Mantenemos el ID internamente pero lo borramos de la barra de direcciones
+                if (window.history && window.history.replaceState) {
+                    const cleanUrl = window.location.pathname;
+                    window.history.replaceState(null, '', cleanUrl);
+                }
             }
         });
 
