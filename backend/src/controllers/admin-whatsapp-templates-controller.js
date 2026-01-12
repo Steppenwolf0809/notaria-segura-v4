@@ -371,7 +371,7 @@ export const previewTemplate = async (req, res) => {
       nombreNotariaCompleto: 'NOTARÍA DÉCIMO OCTAVA DEL CANTÓN QUITO',
       fechaFormateada: '23 de agosto de 2025, 12:54 PM',
       horaEntrega: '12:54 PM',
-      contactoConsultas: 'Tel: (02) 2247787 
+      contactoConsultas: 'Tel: (02) 2247787',
       actoPrincipal: 'Compraventa de inmueble',
       actoPrincipalValor: '150.00',
 
