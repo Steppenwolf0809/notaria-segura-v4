@@ -1906,21 +1906,24 @@ async function deliverDocument(req, res) {
         });
       }
 
-      if (!codigoVerificacion) {
-        return res.status(400).json({
-          success: false,
-          message: 'Código de verificación es obligatorio'
-        });
-      }
+      // ⚡ FIX: Código de verificación ahora es OPCIONAL siempre.
+      // Solo validamos si el usuario PROVEE un código.
+      if (codigoVerificacion && codigoVerificacion.trim().length > 0) {
+        // Preferir el código que ve recepción en el frontend: codigoRetiro
+        // Fallback a verificationCode (flujo antiguo) y groupVerificationCode
+        const expectedCode = document.codigoRetiro || document.verificationCode;
 
-      // Preferir el código que ve recepción en el frontend: codigoRetiro
-      // Fallback a verificationCode (flujo antiguo) y groupVerificationCode
-      const expectedCode = document.codigoRetiro || document.verificationCode;
-      if (!expectedCode || expectedCode !== codigoVerificacion) {
-        return res.status(400).json({
-          success: false,
-          message: 'Código de verificación incorrecto'
-        });
+        // Si el documento NO tiene código (ej. entrega directa en proceso), no podemos validar contra nada.
+        // En ese caso, si el usuario envió un código, asumimos que intenta validar algo que no existe -> Error o Warning.
+        // Pero para ser permisivos: si expectedCode es null, y mandan código, ¿qué hacemos?
+        // Lógica actual: Si hay expectedCode, lo comparamos.
+
+        if (expectedCode && expectedCode !== codigoVerificacion) {
+          return res.status(400).json({
+            success: false,
+            message: 'Código de verificación incorrecto'
+          });
+        }
       }
     }
 

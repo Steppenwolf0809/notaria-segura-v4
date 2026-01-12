@@ -106,7 +106,8 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
 
     // 🆕 Solo validar código de verificación para RECEPCIÓN si se requiere explícitamente (ahora simplificado)
     // El usuario pidió quitar el código para recepción también.
-    // if (serviceType !== 'archivo') { ... } -> Lo comentamos    // 🆕 Validación de código relax para recepción también
+    // if (serviceType !== 'archivo') { ... } -> Lo comentamos    // 🆕 Validación de código: YA NO ES OBLIGATORIO.
+    // Se elimina la validación del lado del cliente.
     /*
     if (serviceType !== 'archivo') {
        if (!formData.verificacionManual && !formData.codigoVerificacion.trim()) {
