@@ -3354,8 +3354,8 @@ async function bulkNotify(req, res) {
               month: 'long',
               year: 'numeric'
             }))
-            // Variable de encuesta de satisfacción (con código de retiro como referencia)
-            .replace(/\{urlEncuesta\}/g, `https://notaria18quito.com.ec/encuesta-satisfaccion.html?ref=${codigoRetiro}`);
+            // Variable de encuesta de satisfacción (con número de protocolo como referencia)
+            .replace(/\{urlEncuesta\}/g, `https://notaria18quito.com.ec/encuesta-satisfaccion.html?ref=${encodeURIComponent(firstDoc.protocolNumber || '')}`);
 
           waUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
         }

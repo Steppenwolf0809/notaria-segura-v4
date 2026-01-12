@@ -168,9 +168,13 @@ async function listarMisDocumentos(req, res) {
           typeFilter = Prisma.sql`AND d."documentType" = ${tipo}`;
         }
 
+        // 🆕 Filtro de estado mejorado: incluye ocultarEntregados
         let statusFilter = Prisma.sql``;
         if (estado && estado !== 'TODOS') {
           statusFilter = Prisma.sql`AND d."status" = ${estado}`;
+        } else if (ocultarEntregados === 'true') {
+          // Si no hay filtro de estado específico, ocultar ENTREGADO
+          statusFilter = Prisma.sql`AND d."status" != 'ENTREGADO'`;
         }
 
         // Filtro por rango de fechas (fechaFactura) para raw SQL
@@ -187,18 +191,27 @@ async function listarMisDocumentos(req, res) {
           dateFilter = Prisma.sql`AND d."fechaFactura" < ${endDate}`;
         }
 
-        // Construcción dinámica de ORDER BY SQL
-        let orderSql = Prisma.sql`d."updatedAt" DESC`;
-        if (orderBy !== 'prioridad') { // Si es prioridad, mantenemos updatedAt por ahora en búsqueda
-          // Mapeo seguro de columnas para evitar inyección
-          const allowedCols = ['createdAt', 'updatedAt', 'clientName', 'protocolNumber', 'totalFactura', 'status', 'fechaFactura'];
-          const safeCol = allowedCols.includes(orderBy) ? orderBy : 'updatedAt';
-          const safeDir = orderDirection.toLowerCase() === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+        // 🆕 Ordenamiento por PRIORIDAD DE ESTADO por defecto
+        // Prioridad: EN_PROCESO > LISTO > otros > ENTREGADO
+        // Luego ordenamiento secundario por updatedAt
+        const statusPriorityOrder = Prisma.sql`
+          CASE d."status"
+            WHEN 'EN_PROCESO' THEN 1
+            WHEN 'LISTO' THEN 2
+            WHEN 'PENDIENTE' THEN 3
+            WHEN 'CANCELADO' THEN 4
+            WHEN 'ENTREGADO' THEN 5
+            ELSE 6
+          END`;
 
-          // Construcción manual segura ya que Prisma.sql no acepta identificadores dinámicos fácilmente en ORDER BY
-          // Usamos raw string concatenado SOLO para el nombre de columna que ya validamos con allowedCols
-          orderSql = Prisma.sql([`d."${safeCol}" ${safeDir === Prisma.sql`ASC` ? 'ASC' : 'DESC'}`]);
-        }
+        // Construcción dinámica de ORDER BY SQL
+        // Siempre ordenamos primero por prioridad de estado, luego por el campo seleccionado
+        let orderSql;
+        const allowedCols = ['createdAt', 'updatedAt', 'clientName', 'protocolNumber', 'totalFactura', 'status', 'fechaFactura'];
+        const safeCol = allowedCols.includes(orderBy) ? orderBy : 'updatedAt';
+        const safeDirStr = orderDirection.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+
+        orderSql = Prisma.sql([`${statusPriorityOrder.strings[0]} ASC, d."${safeCol}" ${safeDirStr}`]);
 
         const pattern = `%${searchTerm}%`;
 
@@ -258,7 +271,8 @@ async function listarMisDocumentos(req, res) {
     }
 
     // CASO 2: LISTADO ESTÁNDAR (Sin búsqueda o fallback)
-    if (estado && estado !== 'TODOS') {
+    // Aplicar filtro de estado si no fue aplicado ya por ocultarEntregados
+    if (estado && estado !== 'TODOS' && !where.status) {
       where.status = estado;
     }
 
@@ -269,7 +283,9 @@ async function listarMisDocumentos(req, res) {
     // Paginación
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    const [documentos, total] = await Promise.all([
+    // 🆕 Para ordenamiento por prioridad de estado, necesitamos obtener más documentos
+    // y ordenar en memoria, luego paginar
+    const [allDocumentos, total] = await Promise.all([
       prisma.document.findMany({
         where,
         include: {
@@ -277,12 +293,51 @@ async function listarMisDocumentos(req, res) {
             select: { firstName: true, lastName: true }
           }
         },
-        orderBy: prismaOrderBy,
-        skip,
-        take: parseInt(limit)
+        orderBy: prismaOrderBy
       }),
       prisma.document.count({ where })
     ]);
+
+    // 🆕 Ordenamiento en memoria por PRIORIDAD DE ESTADO
+    const prioridad = {
+      'EN_PROCESO': 1,
+      'LISTO': 2,
+      'PENDIENTE': 3,
+      'CANCELADO': 4,
+      'ENTREGADO': 5
+    };
+
+    const documentosOrdenados = allDocumentos.sort((a, b) => {
+      const prioA = prioridad[a.status] || 99;
+      const prioB = prioridad[b.status] || 99;
+
+      // Si tienen diferente prioridad, ordenar por prioridad
+      if (prioA !== prioB) {
+        return prioA - prioB;
+      }
+
+      // Misma prioridad: aplicar ordenamiento secundario
+      let aValue = a[orderBy];
+      let bValue = b[orderBy];
+
+      if (orderBy === 'createdAt' || orderBy === 'updatedAt' || orderBy === 'fechaFactura') {
+        aValue = new Date(aValue).getTime();
+        bValue = new Date(bValue).getTime();
+      }
+
+      if (typeof aValue === 'string') {
+        aValue = aValue?.toLowerCase() || '';
+        bValue = bValue?.toLowerCase() || '';
+      }
+
+      if (orderDirection.toLowerCase() === 'desc') {
+        return bValue > aValue ? 1 : (bValue < aValue ? -1 : 0);
+      }
+      return aValue > bValue ? 1 : (aValue < bValue ? -1 : 0);
+    });
+
+    // Aplicar paginación sobre los documentos ordenados
+    const documentos = documentosOrdenados.slice(skip, skip + parseInt(limit));
 
     const payload = {
       documentos,
