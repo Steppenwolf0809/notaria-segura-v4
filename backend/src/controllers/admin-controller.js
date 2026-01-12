@@ -908,13 +908,13 @@ async function getDashboardStats(req, res) {
 
     const hasMore = skip + take < totalDocs;
 
-    // 3. Rendimiento de Equipo
-    const teamWhere = { role: 'MATRIZADOR', isActive: true };
+    // 3. Rendimiento de Equipo (incluye MATRIZADOR y ARCHIVO)
+    const teamWhere = { role: { in: ['MATRIZADOR', 'ARCHIVO'] }, isActive: true };
     if (matrixerId) teamWhere.id = parseInt(matrixerId);
 
     const matrizadores = await prisma.user.findMany({
       where: teamWhere,
-      select: { id: true, firstName: true, lastName: true }
+      select: { id: true, firstName: true, lastName: true, role: true }
     });
 
     const loadGroup = await prisma.document.groupBy({
