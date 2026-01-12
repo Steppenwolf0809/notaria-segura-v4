@@ -39,7 +39,7 @@ async function getDashboardStats(req, res) {
 
     const stats = await Promise.all([
       // Total de documentos (sin NC)
-      prisma.document.count({ where: baseFilter }),
+      prisma.document.count({ where: { status: { not: 'ANULADO_NOTA_CREDITO' } } }),
       // Documentos en proceso
       prisma.document.count({ where: { status: 'EN_PROCESO' } }),
       // Documentos listos para entrega
@@ -49,7 +49,7 @@ async function getDashboardStats(req, res) {
       // Documentos creados hoy (sin NC)
       prisma.document.count({
         where: {
-          ...baseFilter,
+          status: { not: 'ANULADO_NOTA_CREDITO' },
           createdAt: {
             gte: hoy
           }
