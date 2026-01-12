@@ -21,6 +21,19 @@ async function ensureExtensions(client) {
   }
 }
 
+/**
+ * Forzar codificación UTF-8 para evitar problemas con emojis y caracteres especiales
+ * Este es un fix crítico para Railway donde la conexión puede no usar UTF-8 por defecto
+ */
+async function ensureUTF8Encoding(client) {
+  try {
+    await client.$executeRaw`SET client_encoding = 'UTF8'`;
+    console.log('✅ Client encoding establecido a UTF8');
+  } catch (e) {
+    console.warn('⚠️ No se pudo establecer client_encoding:', e.message);
+  }
+}
+
 function createPrismaClient() {
   return new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
@@ -54,6 +67,8 @@ export function getPrismaClient() {
     });
     // Intentar asegurar extensiones útiles en segundo plano (no bloquear)
     ensureExtensions(prisma).catch(() => { });
+    // Forzar UTF-8 para emojis y caracteres especiales
+    ensureUTF8Encoding(prisma).catch(() => { });
   }
   return prisma;
 }
