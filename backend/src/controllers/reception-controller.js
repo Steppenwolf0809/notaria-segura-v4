@@ -106,7 +106,7 @@ async function getDashboardStats(req, res) {
         by: ['codigoRetiro'],
         where: {
           status: 'LISTO',
-          codigoRetiro: { not: null }
+          codigoRetiro: { isNot: null }
         },
         _count: true
       })
@@ -130,14 +130,13 @@ async function getDashboardStats(req, res) {
     const gruposListos = gruposListosData.length;
 
     // Calcular tiempo promedio de entrega (documentos entregados en la última semana)
+    // Nota: El filtro gte ya excluye valores null, no es necesario agregar isNot: null
     const documentosEntregadosRecientes = await prisma.document.findMany({
       where: {
         status: 'ENTREGADO',
         fechaEntrega: {
           gte: inicioSemana
-        },
-        createdAt: { not: null },
-        fechaEntrega: { not: null }
+        }
       },
       select: {
         createdAt: true,
