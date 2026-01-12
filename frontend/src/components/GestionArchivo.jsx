@@ -76,7 +76,9 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
         orderBy: rOrderBy,
         orderDirection: rOrder,
         fechaDesde: rFiltros.fechaDesde || undefined,
-        fechaHasta: rFiltros.fechaHasta || undefined
+        fechaHasta: rFiltros.fechaHasta || undefined,
+        // 🆕 Ocultar entregados cuando el toggle está apagado
+        ocultarEntregados: !rFiltros.mostrarEntregados
       });
 
       if (response.success) {

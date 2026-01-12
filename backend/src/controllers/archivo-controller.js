@@ -92,13 +92,21 @@ async function listarMisDocumentos(req, res) {
       page = 1,
       limit = 10,
       fechaDesde,
-      fechaHasta
+      fechaHasta,
+      // 🆕 Parámetro para ocultar entregados
+      ocultarEntregados
     } = req.query;
 
     // Filtros base
     const where = {
       assignedToId: userId
     };
+
+    // 🆕 Si ocultarEntregados es true, excluir documentos ENTREGADO
+    // A menos que el filtro de estado sea específicamente ENTREGADO
+    if (ocultarEntregados === 'true' && estado !== 'ENTREGADO') {
+      where.status = { notIn: ['ENTREGADO'] };
+    }
 
     // Filtro por rango de fechas (fechaFactura)
     if (fechaDesde || fechaHasta) {
@@ -125,7 +133,8 @@ async function listarMisDocumentos(req, res) {
       orderBy,
       orderDirection,
       fechaDesde,
-      fechaHasta
+      fechaHasta,
+      ocultarEntregados
     });
 
     const cached = await cache.get(cacheKey);
