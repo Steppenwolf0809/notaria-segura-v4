@@ -403,7 +403,7 @@ export const previewTemplate = async (req, res) => {
       emoji_reloj: EMOJIS.RELOJ,
 
       // Variable de encuesta
-      urlEncuesta: 'https://notaria18quito.com.ec/encuesta-satisfaccion.html?ref=ABC123'
+      urlEncuesta: 'https://notaria18quito.com.ec/encuesta-satisfaccion.html?ref=20251701018D00919'
     };
 
     // Reemplazar variables
