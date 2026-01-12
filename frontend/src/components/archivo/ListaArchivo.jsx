@@ -37,6 +37,7 @@ import {
   Search as SearchIcon,
   Refresh as RefreshIcon,
   FilterList as FilterIcon,
+  FilterListOff as FilterListOffIcon,
   LocalShipping as DeliveryIcon,
   ChangeCircle as StatusIcon,
   Link as LinkIcon,
@@ -158,6 +159,7 @@ const ListaArchivo = ({
         doc.clientName?.toLowerCase().includes(searchTerm) ||
         doc.protocolNumber?.toLowerCase().includes(searchTerm) ||
         doc.documentType?.toLowerCase().includes(searchTerm) ||
+        doc.actoPrincipalDescripcion?.toLowerCase().includes(searchTerm) ||
         doc.clientPhone?.includes(searchTerm);
 
       // Filtro de estado
@@ -719,7 +721,7 @@ const ListaArchivo = ({
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
           {/* Búsqueda */}
           <TextField
-            placeholder="Buscar por cliente, protocolo o teléfono..."
+            placeholder="Buscar por cliente, protocolo, acto o teléfono..."
             value={filtros.search}
             onChange={(e) => handleFilterChange('search', e.target.value)}
             InputProps={{
@@ -787,6 +789,25 @@ const ListaArchivo = ({
             size="small"
           >
             Refrescar
+          </Button>
+
+          {/* Botón Borrar Filtros */}
+          <Button
+            variant="outlined"
+            color="secondary"
+            startIcon={<FilterListOffIcon />}
+            onClick={() => {
+              const defaultFiltros = { search: '', estado: 'TODOS', tipo: 'TODOS', mostrarEntregados: false, fechaDesde: '', fechaHasta: '' };
+              if (serverSide && onFilterChange) {
+                onFilterChange(defaultFiltros);
+              } else {
+                setInternalFiltros(defaultFiltros);
+                setInternalPage(0);
+              }
+            }}
+            size="small"
+          >
+            Borrar Filtros
           </Button>
 
           {/* Filtro por rango de fechas */}

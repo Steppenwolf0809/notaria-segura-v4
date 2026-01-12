@@ -34,7 +34,7 @@ import {
   Brightness7 as LightModeIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
-import useThemeStore from '../store/theme-store';
+import { useThemeCtx } from '../contexts/theme-ctx';
 import ChangePassword from './ChangePassword';
 import { navItemsByRole } from '../config/nav-items';
 
@@ -51,7 +51,7 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
-  const { isDarkMode, toggleTheme } = useThemeStore();
+  const { resolvedIsDark: isDarkMode, cycleMode: toggleTheme } = useThemeCtx();
 
   // Trazas de verificación del layout
   useEffect(() => {
