@@ -282,7 +282,7 @@ Su documento está listo para retiro:
 📍 *Dirección:* Azuay E2-231 y Av Amazonas, Quito
 ⏰ *Horario:* Lunes a Viernes 8:00-17:00
 
-Para consultas: {contactoConsultas}
+Para consultas: Tel: (02) 2234-567
 ¡Gracias por confiar en nosotros!`
     },
     {
@@ -304,7 +304,7 @@ Estimado/a {nombreCompareciente},
 📍 *Dirección:* Azuay E2-231 y Av Amazonas, Quito
 ⏰ *Horario:* Lunes a Viernes 8:00-17:00
 
-Para consultas: {contactoConsultas}
+Para consultas: Tel: (02) 2234-567
 ¡Esperamos su visita!`
     },
     {
@@ -320,7 +320,7 @@ Estimado/a {nombreCompareciente},
 {seccionCedula}
 📅 *Fecha:* {fechaFormateada}
 
-Para consultas: {contactoConsultas}
+Para consultas: Tel: (02) 2234-567
 ¡Gracias por confiar en nuestros servicios!`
     }
   ];
