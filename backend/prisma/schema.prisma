@@ -450,6 +450,20 @@ model SesionFormularioUAFE {
   @@map("sesiones_formulario_uafe")
 }
 
+model EncuestaSatisfaccion {
+  id           Int      @id @default(autoincrement())
+  createdAt    DateTime @default(now())
+  tramiteId    String?  // ID proveniente de URL param (?ref=...)
+  calificacion Int      // 1 a 5
+  infoClara    Boolean
+  tratoCordial Boolean
+  sugerencia   String?  @db.Text
+
+  @@index([createdAt])
+  @@index([calificacion])
+  @@map("encuestas_satisfaccion")
+}
+
 enum UserRole {
   ADMIN
   CAJA

@@ -174,7 +174,7 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
       );
     }
 
-    if (error && documents.length === 0) {
+    if (error && documentos.length === 0) {
       return (
         <Alert
           severity="error"
