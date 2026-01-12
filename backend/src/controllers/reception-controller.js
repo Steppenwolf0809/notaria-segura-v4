@@ -106,7 +106,7 @@ async function getDashboardStats(req, res) {
         by: ['codigoRetiro'],
         where: {
           status: 'LISTO',
-          codigoRetiro: { isNot: null }
+          codigoRetiro: { not: null }
         },
         _count: true
       })

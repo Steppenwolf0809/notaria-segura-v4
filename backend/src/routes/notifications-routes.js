@@ -175,8 +175,8 @@ router.get('/queue', authenticateToken, async (req, res) => {
     } else if (tab === 'sent') {
       // Enviados: Documentos con código de retiro generado (notificados recientemente)
       whereClause.status = { in: ['LISTO', 'EN_PROCESO', 'CLIENTE_NOTIFICADO'] };
-      whereClause.codigoRetiro = { isNot: null };
-      whereClause.ultimoRecordatorio = { isNot: null };
+      whereClause.codigoRetiro = { not: null };
+      whereClause.ultimoRecordatorio = { not: null };
     }
 
     // Filtro por rol: MATRIZADOR y ARCHIVO solo ven sus documentos
