@@ -51,6 +51,7 @@ import AdminSettings from './admin/AdminSettings';
 import FormulariosUAFE from './FormulariosUAFE';
 import AnalisisUAFE from './admin/AnalisisUAFE';
 import QROversight from './admin/QROversight';
+import EncuestasSatisfaccion from './admin/EncuestasSatisfaccion';
 import { getSupervisionStats, getMatrizadores } from '../services/admin-supervision-service';
 
 /**
@@ -83,6 +84,8 @@ const AdminCenter = () => {
         return <WhatsAppTemplates />;
       case 'qr-management':
         return <QROversight />;
+      case 'encuestas-satisfaccion':
+        return <EncuestasSatisfaccion />;
       case 'settings':
         return <AdminSettings />;
       default:
