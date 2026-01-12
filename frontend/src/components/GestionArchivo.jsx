@@ -39,12 +39,11 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
         return {
           search: parsed.search ?? '',
           estado: parsed.estado ?? 'TODOS',
-          tipo: parsed.tipo ?? 'TODOS',
-          mostrarEntregados: parsed.mostrarEntregados ?? false
+          tipo: parsed.tipo ?? 'TODOS'
         };
       }
     } catch (_) { }
-    return { search: '', estado: 'TODOS', tipo: 'TODOS', mostrarEntregados: false };
+    return { search: '', estado: 'TODOS', tipo: 'TODOS' };
   });
 
   const [orderBy, setOrderBy] = useState('updatedAt');
@@ -77,8 +76,8 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
         orderDirection: rOrder,
         fechaDesde: rFiltros.fechaDesde || undefined,
         fechaHasta: rFiltros.fechaHasta || undefined,
-        // 🆕 Ocultar entregados cuando el toggle está apagado
-        ocultarEntregados: !rFiltros.mostrarEntregados
+        // 🆕 Siempre ocultar entregados por defecto (el backend los muestra si filtramos por ENTREGADO)
+        ocultarEntregados: true
       });
 
       if (response.success) {
