@@ -526,7 +526,8 @@ async function procesarEntregaDocumento(req, res) {
       }
     });
 
-
+    // Como la funcionalidad de agrupación fue removida, definimos array vacío
+    const groupDocuments = [];
 
     // Preparar mensaje de respuesta (incluir información de grupo)
     const message = groupDocuments.length > 0
