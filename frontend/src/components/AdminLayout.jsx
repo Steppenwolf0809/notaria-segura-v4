@@ -35,7 +35,9 @@ import {
   ExpandMore as ExpandMoreIcon,
   ChevronRight as ChevronRightIcon,
   Description as DescriptionIcon,
-  Analytics as AnalyticsIcon
+  Analytics as AnalyticsIcon,
+  Poll as PollIcon,
+  QrCode as QrCodeIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import { useThemeCtx } from '../contexts/theme-ctx';
@@ -130,7 +132,9 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
     Notifications: <NotificationsIcon />,
     Settings: <SettingsIcon />,
     WhatsApp: <WhatsAppIcon />,
-    Analytics: <AnalyticsIcon />
+    Analytics: <AnalyticsIcon />,
+    Poll: <PollIcon />,
+    QrCode: <QrCodeIcon />
   };
   const allItems = (navItemsByRole[role] || []);
   const navigationItems = React.useMemo(() => {
@@ -251,7 +255,7 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
             },
             {
               title: 'OPCIONES',
-              items: navigationItems.filter(i => ['notifications'].includes(i.id))
+              items: navigationItems.filter(i => ['notifications', 'encuestas-satisfaccion'].includes(i.id))
             }
           ].map((group, groupIdx) => (
             <React.Fragment key={groupIdx}>

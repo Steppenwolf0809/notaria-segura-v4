@@ -1,7 +1,7 @@
 // Rutas para Encuestas de Satisfacción
 import express from 'express';
 import { submitEncuesta, getEncuestas, getEstadisticas } from '../controllers/encuesta-controller.js';
-import { authenticateToken, requireRole } from '../middleware/auth.js';
+import { authenticateToken, requireRoles } from '../middleware/auth-middleware.js';
 
 const router = express.Router();
 
@@ -25,13 +25,13 @@ router.post('/', submitEncuesta);
  * Lista todas las encuestas con paginación
  * Acceso: Solo ADMIN
  */
-router.get('/admin', authenticateToken, requireRole(['ADMIN']), getEncuestas);
+router.get('/admin', authenticateToken, requireRoles(['ADMIN']), getEncuestas);
 
 /**
  * GET /api/encuesta/admin/estadisticas
  * Obtiene estadísticas agregadas de las encuestas
  * Acceso: Solo ADMIN
  */
-router.get('/admin/estadisticas', authenticateToken, requireRole(['ADMIN']), getEstadisticas);
+router.get('/admin/estadisticas', authenticateToken, requireRoles(['ADMIN']), getEstadisticas);
 
 export default router;
