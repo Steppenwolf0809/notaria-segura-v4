@@ -383,7 +383,17 @@ export const previewTemplate = async (req, res) => {
       // Variables de entrega
       receptor_nombre: 'María García Pérez',
       receptor_cedula: '1234567890',
-      receptor_relacion: 'Titular'
+      receptor_relacion: 'Titular',
+
+      // 🛡️ Variables de Emojis Seguros
+      emoji_notaria: '🏛️',
+      emoji_documento: '📄',
+      emoji_codigo: '🔢',
+      emoji_escritura: '📋',
+      emoji_importante: '⚠️',
+      emoji_direccion: '📍',
+      emoji_horario: '⏰',
+      emoji_reloj: '⏰'
     };
 
     // Reemplazar variables
