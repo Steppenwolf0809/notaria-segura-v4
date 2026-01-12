@@ -43,7 +43,10 @@ const AVAILABLE_VARIABLES = {
   // Variables para templates de entrega
   receptor_nombre: 'Nombre de quien recibió el documento',
   receptor_cedula: 'Cédula del receptor (opcional)',
-  receptor_relacion: 'Relación con el titular'
+  receptor_relacion: 'Relación con el titular',
+
+  // Variable de encuesta de satisfacción
+  urlEncuesta: 'URL de la encuesta de satisfacción con ID de trámite'
 };
 
 /**
@@ -69,7 +72,10 @@ Su documento está listo para retiro:
 ⏰ *Horario:* Lunes a Viernes 8:00-17:00
 
 Para consultas: {contactoConsultas}
-¡Gracias por confiar en nosotros!`
+¡Gracias por confiar en nosotros!
+
+📣 ¿Cómo fue su experiencia? Cuéntenos aquí:
+{urlEncuesta}`
   },
   RECORDATORIO_RETIRO: {
     titulo: 'Recordatorio de Retiro de Documento',
@@ -365,7 +371,7 @@ export const previewTemplate = async (req, res) => {
       nombreNotariaCompleto: 'NOTARÍA DÉCIMO OCTAVA DEL CANTÓN QUITO',
       fechaFormateada: '23 de agosto de 2025, 12:54 PM',
       horaEntrega: '12:54 PM',
-      contactoConsultas: 'Tel: (02) 2234-567 | email@notaria18.gob.ec',
+      contactoConsultas: 'Tel: (02) 2247787 
       actoPrincipal: 'Compraventa de inmueble',
       actoPrincipalValor: '150.00',
 
@@ -394,7 +400,10 @@ export const previewTemplate = async (req, res) => {
       emoji_importante: EMOJIS.IMPORTANTE,
       emoji_direccion: EMOJIS.DIRECCION,
       emoji_horario: EMOJIS.HORARIO,
-      emoji_reloj: EMOJIS.RELOJ
+      emoji_reloj: EMOJIS.RELOJ,
+
+      // Variable de encuesta
+      urlEncuesta: 'https://notaria18quito.com.ec/encuesta-satisfaccion.html?ref=ABC123'
     };
 
     // Reemplazar variables

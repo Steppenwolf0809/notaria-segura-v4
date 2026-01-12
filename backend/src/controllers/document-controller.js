@@ -3337,7 +3337,7 @@ async function bulkNotify(req, res) {
             .replace(/\{notaria\}/g, 'NOTARÍA DÉCIMO OCTAVA DEL CANTÓN QUITO')
             .replace(/\{nombreNotariaCompleto\}/g, 'NOTARÍA DÉCIMO OCTAVA DEL CANTÓN QUITO')
             // Variables de contacto
-            .replace(/\{contactoConsultas\}/g, 'Tel: (02) 2234-567')
+            .replace(/\{contactoConsultas\}/g, 'Tel: (02) 2247787')
             // 🛡️ Variables de Emojis Seguros (Usando constantes Unicode Escapes)
             .replace(/\{emoji_notaria\}/g, EMOJIS.NOTARIA)
             .replace(/\{emoji_documento\}/g, EMOJIS.DOCUMENTO)
@@ -3353,7 +3353,9 @@ async function bulkNotify(req, res) {
               day: 'numeric',
               month: 'long',
               year: 'numeric'
-            }));
+            }))
+            // Variable de encuesta de satisfacción (con código de retiro como referencia)
+            .replace(/\{urlEncuesta\}/g, `https://notaria18quito.com.ec/encuesta-satisfaccion.html?ref=${codigoRetiro}`);
 
           waUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
         }
