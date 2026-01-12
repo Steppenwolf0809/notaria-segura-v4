@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAuthStore } from '../../store/auth-store';
+import useAuthStore from '../../store/auth-store';
 import api from '../../services/api-client';
 
 const EncuestasSatisfaccion = () => {
