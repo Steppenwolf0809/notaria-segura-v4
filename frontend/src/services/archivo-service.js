@@ -43,6 +43,8 @@ const getMisDocumentos = async (token, params = {}) => {
     if (params.limit) queryParams.append('limit', params.limit);
     if (params.fechaDesde) queryParams.append('fechaDesde', params.fechaDesde);
     if (params.fechaHasta) queryParams.append('fechaHasta', params.fechaHasta);
+    // 🆕 Parámetro para ocultar documentos entregados
+    if (params.ocultarEntregados !== undefined) queryParams.append('ocultarEntregados', params.ocultarEntregados);
 
     const response = await apiClient.get(`/archivo/mis-documentos?${queryParams.toString()}`);
     return response.data;
