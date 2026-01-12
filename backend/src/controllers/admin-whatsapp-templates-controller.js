@@ -1,4 +1,5 @@
 import prisma from '../db.js';
+import { EMOJIS } from '../utils/emojis.js';
 
 /**
  * Controller para administración de templates WhatsApp
@@ -386,14 +387,14 @@ export const previewTemplate = async (req, res) => {
       receptor_relacion: 'Titular',
 
       // 🛡️ Variables de Emojis Seguros
-      emoji_notaria: '🏛️',
-      emoji_documento: '📄',
-      emoji_codigo: '🔢',
-      emoji_escritura: '📋',
-      emoji_importante: '⚠️',
-      emoji_direccion: '📍',
-      emoji_horario: '⏰',
-      emoji_reloj: '⏰'
+      emoji_notaria: EMOJIS.NOTARIA,
+      emoji_documento: EMOJIS.DOCUMENTO,
+      emoji_codigo: EMOJIS.CODIGO,
+      emoji_escritura: EMOJIS.ESCRITURA,
+      emoji_importante: EMOJIS.IMPORTANTE,
+      emoji_direccion: EMOJIS.DIRECCION,
+      emoji_horario: EMOJIS.HORARIO,
+      emoji_reloj: EMOJIS.RELOJ
     };
 
     // Reemplazar variables

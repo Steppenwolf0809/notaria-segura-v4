@@ -1,5 +1,6 @@
 import prisma from '../db.js';
 import { Prisma } from '@prisma/client';
+import { EMOJIS } from '../utils/emojis.js';
 import { getReversionCleanupData, isValidStatus, isReversion as isReversionFn } from '../utils/status-transitions.js';
 import { parseXmlDocument, generateVerificationCode } from '../services/xml-parser-service.js';
 import MatrizadorAssignmentService from '../services/matrizador-assignment-service.js';
@@ -3306,8 +3307,8 @@ async function bulkNotify(req, res) {
 
           // Construir lista de códigos de escritura
           const codigosEscritura = clientGroup.documents.length === 1
-            ? `📋 *Código de escritura:* ${clientGroup.documents[0].protocolNumber}`
-            : clientGroup.documents.map(d => `📋 ${d.protocolNumber}`).join('\n');
+            ? `${EMOJIS.ESCRITURA} *Código de escritura:* ${clientGroup.documents[0].protocolNumber}`
+            : clientGroup.documents.map(d => `${EMOJIS.ESCRITURA} ${d.protocolNumber}`).join('\n');
 
           // Obtener primer documento para datos adicionales
           const firstDoc = clientGroup.documents[0];
@@ -3337,15 +3338,15 @@ async function bulkNotify(req, res) {
             .replace(/\{nombreNotariaCompleto\}/g, 'NOTARÍA DÉCIMO OCTAVA DEL CANTÓN QUITO')
             // Variables de contacto
             .replace(/\{contactoConsultas\}/g, 'Tel: (02) 2234-567')
-            // 🛡️ Variables de Emojis Seguros (Hardcoded para evitar problemas de encoding db)
-            .replace(/\{emoji_notaria\}/g, '🏛️')
-            .replace(/\{emoji_documento\}/g, '📄')
-            .replace(/\{emoji_codigo\}/g, '🔢')
-            .replace(/\{emoji_escritura\}/g, '📋')
-            .replace(/\{emoji_importante\}/g, '⚠️')
-            .replace(/\{emoji_direccion\}/g, '📍')
-            .replace(/\{emoji_horario\}/g, '⏰')
-            .replace(/\{emoji_reloj\}/g, '⏰')
+            // 🛡️ Variables de Emojis Seguros (Usando constantes Unicode Escapes)
+            .replace(/\{emoji_notaria\}/g, EMOJIS.NOTARIA)
+            .replace(/\{emoji_documento\}/g, EMOJIS.DOCUMENTO)
+            .replace(/\{emoji_codigo\}/g, EMOJIS.CODIGO)
+            .replace(/\{emoji_escritura\}/g, EMOJIS.ESCRITURA)
+            .replace(/\{emoji_importante\}/g, EMOJIS.IMPORTANTE)
+            .replace(/\{emoji_direccion\}/g, EMOJIS.DIRECCION)
+            .replace(/\{emoji_horario\}/g, EMOJIS.HORARIO)
+            .replace(/\{emoji_reloj\}/g, EMOJIS.RELOJ)
             // Variables de fecha
             .replace(/\{fecha\}/g, new Date().toLocaleDateString('es-EC'))
             .replace(/\{fechaFormateada\}/g, new Date().toLocaleDateString('es-EC', {
