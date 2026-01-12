@@ -1,19 +1,20 @@
 /**
- * Mapa de emojis seguros usando Unicode Escapes
- * Evita problemas de codificación de archivos fuente
+ * Mapa de emojis seguros usando String.fromCodePoint
+ * Esta es la forma más "nuclear" de asegurar que no hay problemas de encoding
+ * ya que generamos el string en tiempo de ejecución desde números.
  */
 export const EMOJIS = {
-    NOTARIA: '\uD83C\uDFDB\uFE0F',   // 🏛️
-    DOCUMENTO: '\uD83D\uDCC4',       // 📄
-    CODIGO: '\uD83D\uDD22',          // 🔢
-    ESCRITURA: '\uD83D\uDCCB',       // 📋
-    IMPORTANTE: '\u26A0\uFE0F',      // ⚠️
-    DIRECCION: '\uD83D\uDCCD',       // 📍
-    HORARIO: '\u23F0',               // ⏰
-    RELOJ: '\u23F0',                 // ⏰
-    CHECK: '\u2705',                 // ✅
-    USUARIO: '\uD83D\uDC64',         // 👤
-    CALENDARIO: '\uD83D\uDCC5'       // 📅
+    NOTARIA: String.fromCodePoint(0x1F3DB, 0xFE0F),   // 🏛️
+    DOCUMENTO: String.fromCodePoint(0x1F4C4),         // 📄
+    CODIGO: String.fromCodePoint(0x1F522),            // 🔢
+    ESCRITURA: String.fromCodePoint(0x1F4CB),         // 📋
+    IMPORTANTE: String.fromCodePoint(0x26A0, 0xFE0F), // ⚠️
+    DIRECCION: String.fromCodePoint(0x1F4CD),         // 📍
+    HORARIO: String.fromCodePoint(0x23F0),            // ⏰
+    RELOJ: String.fromCodePoint(0x23F0),              // ⏰
+    CHECK: String.fromCodePoint(0x2705),              // ✅
+    USUARIO: String.fromCodePoint(0x1F464),           // 👤
+    CALENDARIO: String.fromCodePoint(0x1F4C5)         // 📅
 };
 
 export default EMOJIS;
