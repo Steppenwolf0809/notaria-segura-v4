@@ -27,7 +27,7 @@ async function getDashboardStats(req, res) {
   try {
     // 🔄 CONSERVADOR: Estadísticas básicas para dashboard de recepción
     // 🔥 EXCLUYE Notas de Crédito de todas las estadísticas
-    const baseFilter = { NOT: { status: 'ANULADO_NOTA_CREDITO' } };
+    const baseFilter = { status: { not: 'ANULADO_NOTA_CREDITO' } };
 
     // Fechas de referencia
     const now = new Date();
