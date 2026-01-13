@@ -104,9 +104,10 @@ async function listarMisDocumentos(req, res) {
 
     // 🆕 Si ocultarEntregados es true, excluir documentos ENTREGADO
     // A menos que el filtro de estado sea específicamente ENTREGADO
-    if (ocultarEntregados === 'true' && estado !== 'ENTREGADO') {
+    // ESTO ESTABA CAUSANDO CONFLICTO CON FILTROS ESPECÍFICOS: SE MUEVE ABAJO
+    /* if (ocultarEntregados === 'true' && estado !== 'ENTREGADO') {
       where.status = { notIn: ['ENTREGADO'] };
-    }
+    } */
 
     // Filtro por rango de fechas (fechaFactura)
     if (fechaDesde || fechaHasta) {
@@ -271,9 +272,13 @@ async function listarMisDocumentos(req, res) {
     }
 
     // CASO 2: LISTADO ESTÁNDAR (Sin búsqueda o fallback)
-    // Aplicar filtro de estado si no fue aplicado ya por ocultarEntregados
-    if (estado && estado !== 'TODOS' && !where.status) {
+    // CASO 2: LISTADO ESTÁNDAR (Sin búsqueda o fallback)
+    // Aplicar filtro de estado tiene prioridad sobre ocultarEntregados
+    if (estado && estado !== 'TODOS') {
       where.status = estado;
+    } else if (ocultarEntregados === 'true') {
+      // Si no hay filtro específico, ocultar ENTREGADOS por defecto
+      where.status = { notIn: ['ENTREGADO'] };
     }
 
     if (tipo && tipo !== 'TODOS') {

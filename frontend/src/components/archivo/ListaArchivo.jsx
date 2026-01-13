@@ -59,6 +59,9 @@ import ModalEntrega from '../recepcion/ModalEntrega';
 
 import useDocumentStore from '../../store/document-store';
 
+// Extraer la función requiresConfirmation del store
+const { requiresConfirmation } = useDocumentStore.getState();
+
 // 🎯 NUEVOS IMPORTS PARA SELECCIÓN MÚLTIPLE
 import useBulkActions from '../../hooks/useBulkActions';
 import BulkActionToolbar from '../bulk/BulkActionToolbar';
@@ -136,6 +139,7 @@ const ListaArchivo = ({
 
   // Estados para entrega
   const [showSingleDeliveryModal, setShowSingleDeliveryModal] = useState(false);
+  const [showGroupDeliveryModal, setShowGroupDeliveryModal] = useState(false);
 
 
   // 🎯 NUEVOS ESTADOS PARA SELECCIÓN MÚLTIPLE
