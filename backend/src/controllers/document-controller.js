@@ -1042,121 +1042,15 @@ async function updateDocumentStatus(req, res) {
 
 
     // NUEVA FUNCIONALIDAD: Enviar notificación WhatsApp si se marca como LISTO
+    // ⚠️ LÓGICA LEGADA DE TWILIO REMOVIDA - Se usa el nuevo Centro de Notificaciones
     let whatsappSent = false;
     let whatsappError = null;
     let whatsappResults = [];
 
     if (status === 'LISTO') {
-      try {
-        // Importar el servicio de WhatsApp
-        const whatsappService = await import('../services/whatsapp-service.js');
-
-        if (groupAffected && updatedDocuments.length > 1) {
-          // Enviar notificaciones grupales - una por cada documento con teléfono único
-          const uniqueClients = new Map();
-
-          // Agrupar documentos por teléfono del cliente
-          for (const doc of updatedDocuments) {
-            if (doc.clientPhone) {
-              if (!uniqueClients.has(doc.clientPhone)) {
-                uniqueClients.set(doc.clientPhone, {
-                  clientName: doc.clientName,
-                  clientPhone: doc.clientPhone,
-                  documents: []
-                });
-              }
-              uniqueClients.get(doc.clientPhone).documents.push(doc);
-            }
-          }
-
-          console.log(`📱 Enviando notificaciones grupales a ${uniqueClients.size} cliente(s)`);
-
-          // Enviar notificación a cada cliente único
-          for (const [phone, clientData] of uniqueClients) {
-            try {
-              if (clientData.documents.length === 1) {
-                // Un solo documento - notificación individual
-                const whatsappResult = await whatsappService.default.sendDocumentReadyNotification(clientData.documents[0]);
-                whatsappResults.push({
-                  phone: phone,
-                  success: whatsappResult.success,
-                  error: whatsappResult.error,
-                  documentCount: 1
-                });
-              } else {
-                // Múltiples documentos - notificación grupal
-                const whatsappResult = await whatsappService.default.enviarGrupoDocumentosListo(
-                  {
-                    clientName: clientData.clientName,
-                    clientPhone: clientData.clientPhone
-                  },
-                  clientData.documents,
-                  clientData.documents[0].verificationCode // Usar el código del primer documento
-                );
-                whatsappResults.push({
-                  phone: phone,
-                  success: whatsappResult.success,
-                  error: whatsappResult.error,
-                  documentCount: clientData.documents.length
-                });
-              }
-            } catch (error) {
-              console.error(`Error enviando WhatsApp a ${phone}:`, error);
-              whatsappResults.push({
-                phone: phone,
-                success: false,
-                error: error.message,
-                documentCount: clientData.documents.length
-              });
-            }
-          }
-
-          whatsappSent = whatsappResults.some(result => result.success);
-          const failedNotifications = whatsappResults.filter(result => !result.success);
-          if (failedNotifications.length > 0) {
-            whatsappError = `Falló envío a ${failedNotifications.length} cliente(s)`;
-          }
-
-        } else if (updatedDocument.clientPhone) {
-          // Enviar notificación individual (comportamiento original)
-          const whatsappResult = await whatsappService.default.sendDocumentReadyNotification(updatedDocument);
-          whatsappSent = whatsappResult.success;
-
-          if (!whatsappResult.success) {
-            whatsappError = whatsappResult.error;
-            console.error('Error enviando WhatsApp:', whatsappResult.error);
-          } else {
-            console.log('Notificación WhatsApp enviada exitosamente');
-
-            // 📈 Registrar evento de notificación WhatsApp enviada
-            try {
-              await prisma.documentEvent.create({
-                data: {
-                  documentId: id,
-                  userId: req.user.id,
-                  eventType: 'WHATSAPP_SENT',
-                  description: `Notificación WhatsApp de documento listo enviada a ${updatedDocument.clientPhone}`,
-                  details: JSON.stringify({
-                    phoneNumber: updatedDocument.clientPhone,
-                    messageType: 'DOCUMENT_READY',
-                    verificationCode: updatedDocument.verificationCode,
-                    sentBy: `${req.user.firstName} ${req.user.lastName}`,
-                    userRole: req.user.role,
-                    timestamp: new Date().toISOString()
-                  }),
-                  ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
-                  userAgent: req.get('User-Agent') || 'unknown'
-                }
-              });
-            } catch (auditError) {
-              console.error('Error registrando evento de notificación WhatsApp:', auditError);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error en servicio WhatsApp:', error);
-        whatsappError = error.message;
-      }
+      // La lógica automática anterior ha sido deshabilitada para evitar errores con Twilio.
+      // Las notificaciones deben gestionarse a través del sistema unificado de notificaciones.
+      console.log('ℹ️ Cambio a LISTO: Notificación automática legacy deshabilitada');
     }
 
 
