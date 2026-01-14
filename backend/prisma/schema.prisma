@@ -51,6 +51,7 @@ model Document {
   matrizadorName           String
   itemsSecundarios         String?
   xmlOriginal              String?
+  numeroFactura            String?   // Número de factura del SRI (formato: 001-002-000123676)
   codigoRetiro             String?
   entregadoA               String?
   cedulaReceptor           String?
@@ -382,26 +383,59 @@ model FormularioUAFERespuesta {
 
 model ProtocoloUAFE {
   id                      String             @id @default(uuid())
-  numeroProtocolo         String             @unique
+  
+  // IDENTIFICACIÓN (numeroProtocolo ahora opcional para borradores)
+  numeroProtocolo         String?            @unique
+  identificadorTemporal   String             @unique @default(uuid())
+  
+  // TIPO Y FECHA
   fecha                   DateTime
-  actoContrato            String
-  avaluoMunicipal         Decimal?           @db.Decimal(12, 2)
+  tipoActo                String             // COMPRAVENTA, PROMESA_COMPRAVENTA, DONACION, etc.
+  actoContrato            String?            // Mantenido para retrocompatibilidad
+  
+  // VALORES
   valorContrato           Decimal            @db.Decimal(12, 2)
-  createdBy               Int
-  createdAt               DateTime           @default(now())
-  updatedAt               DateTime           @updatedAt
+  avaluoMunicipal         Decimal?           @db.Decimal(12, 2)
+  multa                   Decimal?           @db.Decimal(12, 2) // Solo para PROMESA_COMPRAVENTA
   formasPago              Json?
+  
+  // UBICACIÓN DEL INMUEBLE (separado en campos individuales)
+  ubicacionDescripcion    String?            @db.Text // Descripción del lote/predio
+  ubicacionParroquia      String?
+  ubicacionCanton         String?            @default("QUITO")
+  ubicacionProvincia      String?            @default("PICHINCHA")
+  
+  // CAMPOS LEGACY (mantener para compatibilidad)
   bienInmuebleDescripcion String?
   bienInmuebleUbicacion   String?
-  tipoActoOtro            String?
+  
+  // DATOS DE VEHÍCULO (para actas de reconocimiento)
   vehiculoAnio            String?
   vehiculoMarca           String?
   vehiculoModelo          String?
   vehiculoPlaca           String?
+  vehiculoCiudadComercializacion String?      // Ciudad donde se comercializa
+  
+  // OTROS
+  tipoActoOtro            String?
+  
+  // CACHE DE TEXTOS GENERADOS
+  textoEncabezadoGenerado    String?         @db.Text
+  textoComparecenciaGenerado String?         @db.Text
+  fechaUltimaGeneracion      DateTime?
+  
+  // AUDITORÍA
+  createdBy               Int
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+  
+  // RELACIONES
   personas                PersonaProtocolo[]
   creador                 User               @relation(fields: [createdBy], references: [id])
 
   @@index([numeroProtocolo])
+  @@index([identificadorTemporal])
+  @@index([tipoActo])
   @@index([createdBy])
   @@index([createdAt])
   @@map("protocolos_uafe")
@@ -411,15 +445,40 @@ model PersonaProtocolo {
   id                  String                 @id @default(uuid())
   protocoloId         String
   personaCedula       String
-  calidad             String
-  actuaPor            String
+  
+  // IDENTIFICACIÓN FLEXIBLE (para personas no registradas aún)
+  nombreTemporal      String?                // Null si persona existe en BD
+  
+  // ROL EN ESTE TRÁMITE
+  calidad             String                 // VENDEDOR, COMPRADOR, DONANTE, etc.
+  actuaPor            String                 // PROPIOS_DERECHOS, REPRESENTANDO_SOCIEDAD_CONYUGAL, COMO_APODERADO
+  
+  // ESTADO DE COMPLETITUD (para semáforo 🔴🟡🟢)
+  estadoCompletitud   String                 @default("pendiente") // pendiente, incompleto, completo
+  porcentajeCompletitud Int                  @default(0) // 0-100%
+  camposFaltantes     Json?                  // Lista de campos que faltan para verde
+  
+  // CAMPOS PARA REDACCIÓN
+  compareceConyugeJunto Boolean              @default(false) // Si comparece con su cónyuge
+  esApoderado         Boolean                @default(false) // Si actúa como apoderado
+  mandanteCedula      String?                // Cédula del mandante si es apoderado
+  mandanteNombre      String?                // Nombre del mandante
+  
+  // ORDEN de aparición en documentos
+  orden               Int                    @default(0)
+  
+  // CAMPOS LEGACY
   completado          Boolean                @default(false)
   completadoAt        DateTime?
   respuestaFormulario Json?
-  createdAt           DateTime               @default(now())
-  updatedAt           DateTime               @updatedAt
   representadoId      String?
   datosRepresentado   Json?
+  
+  // TIMESTAMPS
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  
+  // RELACIONES
   persona             PersonaRegistrada      @relation("Compareciente", fields: [personaCedula], references: [numeroIdentificacion])
   protocolo           ProtocoloUAFE          @relation(fields: [protocoloId], references: [id], onDelete: Cascade)
   representado        PersonaRegistrada?     @relation("Representado", fields: [representadoId], references: [numeroIdentificacion])
@@ -429,6 +488,7 @@ model PersonaProtocolo {
   @@index([protocoloId])
   @@index([personaCedula])
   @@index([completado])
+  @@index([estadoCompletitud])
   @@index([representadoId])
   @@map("personas_protocolo")
 }
