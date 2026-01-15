@@ -35,7 +35,9 @@ import {
   List,
   ListItem,
   ListItemText,
-  ListItemSecondaryAction
+  ListItemSecondaryAction,
+  Checkbox,
+  FormControlLabel
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -149,7 +151,8 @@ const FormulariosUAFE = ({ adminMode = false }) => {
   const [formPersona, setFormPersona] = useState({
     cedula: '',
     calidad: 'COMPRADOR',
-    actuaPor: 'PROPIOS_DERECHOS'
+    actuaPor: 'PROPIOS_DERECHOS',
+    compareceConyugeJunto: false // Solo aplica si la persona es casada/unión libre
   });
 
   // Estado para datos del representado (INLINE)
@@ -411,7 +414,8 @@ const FormulariosUAFE = ({ adminMode = false }) => {
       const payload = {
         cedula: formPersona.cedula,
         calidad: formPersona.calidad,
-        actuaPor: formPersona.actuaPor
+        actuaPor: formPersona.actuaPor,
+        compareceConyugeJunto: formPersona.compareceConyugeJunto || false
       };
 
       if (formPersona.actuaPor === 'REPRESENTANDO_A') {
@@ -807,8 +811,13 @@ const FormulariosUAFE = ({ adminMode = false }) => {
     setPersonaEditar({
       id: persona.id,
       cedula: persona.cedula,
+      nombre: persona.nombre,
       calidad: persona.calidad,
-      actuaPor: persona.actuaPor
+      actuaPor: persona.actuaPor,
+      compareceConyugeJunto: persona.compareceConyugeJunto || false,
+      mandanteCedula: persona.mandanteCedula || '',
+      mandanteNombre: persona.mandanteNombre || '',
+      estadoCivil: persona.estadoCivil || persona.datosPersona?.datosPersonales?.estadoCivil || ''
     });
     setOpenEditarPersona(true);
   };
@@ -828,7 +837,9 @@ const FormulariosUAFE = ({ adminMode = false }) => {
         `/formulario-uafe/protocolos/${protocoloSeleccionado.id}/personas/${personaEditar.id}`,
         {
           calidad: personaEditar.calidad,
-          actuaPor: personaEditar.actuaPor
+          actuaPor: personaEditar.actuaPor,
+          compareceConyugeJunto: personaEditar.compareceConyugeJunto || false,
+          mandanteCedula: personaEditar.mandanteCedula || null
         }
       );
 
@@ -1399,6 +1410,7 @@ const FormulariosUAFE = ({ adminMode = false }) => {
                         vehiculoModelo: '',
                         vehiculoAnio: ''
                       })}
+                      sx={{ backgroundColor: 'background.paper' }}
                     >
                       {TIPOS_ACTO_CONTRATO.map((tipo) => (
                         <MenuItem key={tipo.value} value={tipo.value}>
@@ -1545,7 +1557,7 @@ const FormulariosUAFE = ({ adminMode = false }) => {
 
               <Stack spacing={2}>
                 {formasPago.map((formaPago, index) => (
-                  <Card key={index} variant="outlined" sx={{ p: 2, backgroundColor: '#f9f9f9' }}>
+                  <Card key={index} variant="outlined" sx={{ p: 2, backgroundColor: 'background.default' }}>
                     <Grid container spacing={2} alignItems="center">
                       <Grid item xs={12} sm={3}>
                         <FormControl fullWidth size="small">
@@ -1727,36 +1739,58 @@ const FormulariosUAFE = ({ adminMode = false }) => {
                       </FormControl>
                     </Grid>
 
-                    {/* SECCIÓN INLINE DATOS REPRESENTADO */}
+                    {/* Checkbox para cónyuge compareciendo junto - solo para casados/unión libre */}
+                    {personaEncontrada &&
+                      personaEncontrada.datosPersonaNatural?.datosPersonales?.estadoCivil &&
+                      ['CASADO', 'UNION_LIBRE'].includes(
+                        personaEncontrada.datosPersonaNatural.datosPersonales.estadoCivil
+                      ) && (
+                        <Grid item xs={12}>
+                          <Alert severity="info" sx={{ py: 1 }}>
+                            <FormControlLabel
+                              control={
+                                <Checkbox
+                                  checked={formPersona.compareceConyugeJunto}
+                                  onChange={(e) => setFormPersona({
+                                    ...formPersona,
+                                    compareceConyugeJunto: e.target.checked
+                                  })}
+                                  color="primary"
+                                />
+                              }
+                              label={
+                                <Typography variant="body2">
+                                  <strong>Comparece junto con su cónyuge/pareja</strong>
+                                  <br />
+                                  <span style={{ fontSize: '0.85em', opacity: 0.8 }}>
+                                    Marque esta opción si el cónyuge/pareja también participará en este acto.
+                                    Deberá agregar al cónyuge como otra persona con la misma calidad.
+                                  </span>
+                                </Typography>
+                              }
+                            />
+                          </Alert>
+                        </Grid>
+                      )}
+
+                    {/* SECCIÓN DATOS DEL MANDANTE (cuando representa a otra persona) */}
                     {formPersona.actuaPor === 'REPRESENTANDO_A' && (
                       <Grid item xs={12}>
-                        <Box sx={{ mt: 2, p: 2, border: '1px dashed #bdbdbd', borderRadius: 1, backgroundColor: '#f5f5f5' }}>
+                        <Box sx={{ mt: 2, p: 2, border: '1px dashed', borderColor: 'divider', borderRadius: 1, backgroundColor: 'action.hover' }}>
                           <Typography variant="subtitle2" color="primary" gutterBottom>
-                            👤 Datos del Representado
+                            👤 Datos del Mandante (persona representada)
                           </Typography>
                           <Grid container spacing={2}>
-                            <Grid item xs={12} sm={6}>
-                              <TextField
-                                select
-                                fullWidth
-                                label="Tipo Persona"
-                                value={formRepresentado.tipoPersona}
-                                onChange={(e) => setFormRepresentado({ ...formRepresentado, tipoPersona: e.target.value })}
-                                size="small"
-                                sx={{ backgroundColor: 'white' }}
-                              >
-                                <MenuItem value="NATURAL">Persona Natural</MenuItem>
-                                <MenuItem value="JURIDICA">Persona Jurídica</MenuItem>
-                              </TextField>
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
+                            <Grid item xs={12}>
                               <TextField
                                 fullWidth
-                                label="Identificación (Cédula/RUC)"
+                                required
+                                label="Cédula/RUC del Mandante"
                                 value={formRepresentado.identificacion}
                                 onChange={(e) => setFormRepresentado({ ...formRepresentado, identificacion: e.target.value })}
                                 size="small"
-                                sx={{ backgroundColor: 'white' }}
+                                placeholder="Ingrese la cédula o RUC del mandante"
+                                helperText="El mandante debe estar registrado en el sistema"
                                 InputProps={{
                                   endAdornment: (
                                     <InputAdornment position="end">
@@ -1768,52 +1802,18 @@ const FormulariosUAFE = ({ adminMode = false }) => {
                                 }}
                               />
                             </Grid>
-
-                            {formRepresentado.tipoPersona === 'NATURAL' ? (
-                              <>
-                                <Grid item xs={12} sm={6}>
-                                  <TextField
-                                    fullWidth
-                                    label="Nombres"
-                                    value={formRepresentado.nombres}
-                                    onChange={(e) => setFormRepresentado({ ...formRepresentado, nombres: e.target.value })}
-                                    size="small"
-                                    sx={{ backgroundColor: 'white' }}
-                                  />
-                                </Grid>
-                                <Grid item xs={12} sm={6}>
-                                  <TextField
-                                    fullWidth
-                                    label="Apellidos"
-                                    value={formRepresentado.apellidos}
-                                    onChange={(e) => setFormRepresentado({ ...formRepresentado, apellidos: e.target.value })}
-                                    size="small"
-                                    sx={{ backgroundColor: 'white' }}
-                                  />
-                                </Grid>
-                              </>
-                            ) : (
+                            {formRepresentado.representadoId && (
                               <Grid item xs={12}>
-                                <TextField
-                                  fullWidth
-                                  label="Razón Social"
-                                  value={formRepresentado.razonSocial}
-                                  onChange={(e) => setFormRepresentado({ ...formRepresentado, razonSocial: e.target.value })}
-                                  size="small"
-                                  sx={{ backgroundColor: 'white' }}
-                                />
+                                <Alert severity="success">
+                                  <strong>Mandante encontrado:</strong>{' '}
+                                  {formRepresentado.tipoPersona === 'NATURAL'
+                                    ? `${formRepresentado.nombres} ${formRepresentado.apellidos}`
+                                    : formRepresentado.razonSocial
+                                  }
+                                  {' '}({formRepresentado.identificacion})
+                                </Alert>
                               </Grid>
                             )}
-                            <Grid item xs={12} sm={12}>
-                              <TextField
-                                fullWidth
-                                label="Nacionalidad"
-                                value={formRepresentado.nacionalidad}
-                                onChange={(e) => setFormRepresentado({ ...formRepresentado, nacionalidad: e.target.value })}
-                                size="small"
-                                sx={{ backgroundColor: 'white' }}
-                              />
-                            </Grid>
                           </Grid>
                         </Box>
                       </Grid>
@@ -1927,15 +1927,20 @@ const FormulariosUAFE = ({ adminMode = false }) => {
                       />
                     </Grid>
                     <Grid item xs={12}>
-                      <TextField
-                        fullWidth
-                        label="Acto/Contrato"
-                        value={protocoloEditando?.actoContrato || ''}
-                        onChange={(e) => setProtocoloEditando({ ...protocoloEditando, actoContrato: e.target.value })}
-                        required
-                        multiline
-                        rows={2}
-                      />
+                      <FormControl fullWidth required>
+                        <InputLabel>Acto/Contrato</InputLabel>
+                        <Select
+                          value={protocoloEditando?.actoContrato || ''}
+                          label="Acto/Contrato"
+                          onChange={(e) => setProtocoloEditando({ ...protocoloEditando, actoContrato: e.target.value })}
+                        >
+                          {TIPOS_ACTO_CONTRATO.map((tipo) => (
+                            <MenuItem key={tipo.value} value={tipo.value}>
+                              {tipo.label}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
                     </Grid>
                     <Grid item xs={6}>
                       <TextField
@@ -1974,7 +1979,7 @@ const FormulariosUAFE = ({ adminMode = false }) => {
                     <TableContainer component={Paper} variant="outlined">
                       <Table size="small">
                         <TableHead>
-                          <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                          <TableRow sx={{ backgroundColor: 'action.hover' }}>
                             <TableCell><strong>Tipo</strong></TableCell>
                             <TableCell align="right"><strong>Monto</strong></TableCell>
                             <TableCell><strong>Banco</strong></TableCell>
@@ -2014,7 +2019,7 @@ const FormulariosUAFE = ({ adminMode = false }) => {
 
                     <Stack spacing={2}>
                       {formasPagoEditando.map((formaPago, index) => (
-                        <Card key={index} variant="outlined" sx={{ p: 2, backgroundColor: '#f9f9f9' }}>
+                        <Card key={index} variant="outlined" sx={{ p: 2, backgroundColor: 'background.default' }}>
                           <Grid container spacing={2} alignItems="center">
                             <Grid item xs={12} sm={3}>
                               <FormControl fullWidth size="small">
@@ -2138,15 +2143,27 @@ const FormulariosUAFE = ({ adminMode = false }) => {
                           padding: '16px'
                         }}
                       >
-                        {/* Header con nombre y estado */}
+                        {/* Header con nombre y estado (sistema de semáforos) */}
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', mb: 1 }}>
                           <Typography variant="subtitle1" fontWeight="bold">
                             {persona.nombre}
                           </Typography>
                           <Chip
-                            icon={persona.completado ? <CheckCircleIcon /> : <PendingIcon />}
-                            label={persona.completado ? 'Completado' : 'Pendiente'}
-                            color={persona.completado ? 'success' : 'warning'}
+                            icon={
+                              persona.estadoCompletitud === 'completo' ? <CheckCircleIcon /> :
+                                persona.estadoCompletitud === 'incompleto' ? <PendingIcon /> :
+                                  <PendingIcon />
+                            }
+                            label={
+                              persona.estadoCompletitud === 'completo' ? 'Completo' :
+                                persona.estadoCompletitud === 'incompleto' ? `${persona.porcentajeCompletitud || 0}% Incompleto` :
+                                  'Pendiente'
+                            }
+                            color={
+                              persona.estadoCompletitud === 'completo' ? 'success' :
+                                persona.estadoCompletitud === 'incompleto' ? 'warning' :
+                                  'error'
+                            }
                             size="small"
                           />
                         </Box>
@@ -2212,30 +2229,13 @@ const FormulariosUAFE = ({ adminMode = false }) => {
 
               <Divider />
 
-              {/* Instrucciones de acceso */}
-              <Box>
-                <Typography variant="h6" gutterBottom>Instrucciones de Acceso</Typography>
-                <Alert severity="success">
-                  <Typography variant="body2">
-                    <strong>Las personas pueden acceder al formulario con:</strong>
-                  </Typography>
-                  <ol style={{ margin: '8px 0', paddingLeft: '20px' }}>
-                    <li>Número de Protocolo: <strong>{protocoloSeleccionado.numeroProtocolo}</strong></li>
-                    <li>Su Cédula</li>
-                    <li>Su PIN personal (configurado al registrarse)</li>
-                  </ol>
-                </Alert>
-              </Box>
-
-              <Divider />
-
               {/* Textos Notariales Generados */}
               <Box>
                 <TextosNotarialesPanel
                   protocoloId={protocoloSeleccionado.id}
                   tipoActo={protocoloSeleccionado.actoContrato}
                   participantesCount={protocoloSeleccionado.personas?.length || 0}
-                  participantesCompletados={protocoloSeleccionado.personas?.filter(p => p.completado).length || 0}
+                  participantesCompletados={protocoloSeleccionado.personas?.filter(p => p.estadoCompletitud === 'completo').length || 0}
                   onError={(msg) => mostrarSnackbar(msg, 'error')}
                   onSuccess={(msg) => mostrarSnackbar(msg, 'success')}
                 />
@@ -2282,12 +2282,69 @@ const FormulariosUAFE = ({ adminMode = false }) => {
                 <Select
                   value={personaEditar.actuaPor}
                   label="Actúa Por"
-                  onChange={(e) => setPersonaEditar({ ...personaEditar, actuaPor: e.target.value })}
+                  onChange={(e) => setPersonaEditar({
+                    ...personaEditar,
+                    actuaPor: e.target.value,
+                    // Reset mandante if switching to propios derechos
+                    mandanteCedula: e.target.value === 'PROPIOS_DERECHOS' ? '' : personaEditar.mandanteCedula
+                  })}
                 >
                   <MenuItem value="PROPIOS_DERECHOS">Por sus propios derechos</MenuItem>
                   <MenuItem value="REPRESENTANDO_A">Representando a otra persona</MenuItem>
                 </Select>
               </FormControl>
+
+              {/* Checkbox cónyuge - solo si actúa por propios derechos y es casado/unión libre */}
+              {personaEditar.actuaPor === 'PROPIOS_DERECHOS' &&
+                personaEditar.estadoCivil &&
+                ['CASADO', 'UNION_LIBRE'].includes(personaEditar.estadoCivil) && (
+                  <Alert severity="info" sx={{ py: 1 }}>
+                    <FormControlLabel
+                      control={
+                        <Checkbox
+                          checked={personaEditar.compareceConyugeJunto}
+                          onChange={(e) => setPersonaEditar({
+                            ...personaEditar,
+                            compareceConyugeJunto: e.target.checked
+                          })}
+                          color="primary"
+                        />
+                      }
+                      label={
+                        <Typography variant="body2">
+                          <strong>Comparece junto con su cónyuge/pareja</strong>
+                          <br />
+                          <span style={{ fontSize: '0.85em', opacity: 0.8 }}>
+                            Marque esta opción si el cónyuge/pareja también participará en este acto.
+                          </span>
+                        </Typography>
+                      }
+                    />
+                  </Alert>
+                )}
+
+              {/* Campo mandante - solo si representa a alguien */}
+              {personaEditar.actuaPor === 'REPRESENTANDO_A' && (
+                <Box sx={{ p: 2, border: '1px dashed', borderColor: 'divider', borderRadius: 1, backgroundColor: 'action.hover' }}>
+                  <Typography variant="subtitle2" color="primary" gutterBottom>
+                    👤 Datos del Mandante
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    label="Cédula/RUC del Mandante"
+                    value={personaEditar.mandanteCedula}
+                    onChange={(e) => setPersonaEditar({ ...personaEditar, mandanteCedula: e.target.value })}
+                    size="small"
+                    placeholder="Ingrese la cédula o RUC del mandante"
+                    helperText="El mandante debe estar registrado en el sistema"
+                  />
+                  {personaEditar.mandanteNombre && (
+                    <Alert severity="success" sx={{ mt: 1 }}>
+                      Mandante actual: <strong>{personaEditar.mandanteNombre}</strong>
+                    </Alert>
+                  )}
+                </Box>
+              )}
             </Stack>
           )}
         </DialogContent>

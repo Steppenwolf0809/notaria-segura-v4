@@ -230,7 +230,7 @@ function formatearComparecienteIndividual(participante, formatoHtml = true) {
     const datos = obtenerDatosPersonales(participante);
     const tratamiento = obtenerTratamiento(datos.genero);
 
-    let texto = `${tratamiento} ${negrita(datos.nombre, formatoHtml)}, `;
+    let texto = `${tratamiento} ${negrita(datos.nombre || '[NOMBRE PENDIENTE]', formatoHtml)}, `;
     texto += `de estado civil ${formatearEstadoCivil(datos.estadoCivil, datos.genero)}`;
 
     // Si está casado/unión libre pero comparece solo, mencionar al cónyuge
@@ -238,9 +238,11 @@ function formatearComparecienteIndividual(participante, formatoHtml = true) {
         texto += ` con ${datos.conyuge.nombre}`;
     }
 
-    // Profesión si aplica
+    // Profesión (obligatoria para notarial)
     if (datos.profesion) {
         texto += `, ${datos.profesion}`;
+    } else {
+        texto += `, [PROFESIÓN PENDIENTE]`;
     }
 
     // Cédula en formato notarial
@@ -444,18 +446,22 @@ function generarDomicilios(participantes, formatoHtml = true) {
         const datos = obtenerDatosPersonales(p);
         const tratamiento = obtenerTratamiento(datos.genero);
 
-        let dom = `${tratamiento} ${negrita(datos.nombre, formatoHtml)}`;
+        let dom = `${tratamiento} ${negrita(datos.nombre || '[NOMBRE PENDIENTE]', formatoHtml)}`;
 
         // Dirección
         if (datos.direccion && datos.direccion.callePrincipal) {
             const direccionFormateada = formatearDireccionNotarial(datos.direccion);
             dom += `, ${direccionFormateada}`;
+        } else {
+            dom += `, [DIRECCIÓN PENDIENTE]`;
         }
 
         // Teléfono
         if (datos.telefono) {
             const telefonoFormateado = formatearTelefonoNotarial(datos.telefono);
             dom += `, teléfono ${telefonoFormateado}`;
+        } else {
+            dom += `, teléfono [PENDIENTE]`;
         }
 
         // Email
