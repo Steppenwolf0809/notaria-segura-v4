@@ -20,7 +20,8 @@ import {
   eliminarProtocolo,
   listarPersonasRegistradas,
   eliminarPersonaRegistrada,
-  generarTextos
+  generarTextos,
+  actualizarDatosPersona
 } from '../controllers/formulario-uafe-controller.js';
 
 const router = express.Router();
@@ -224,6 +225,18 @@ router.delete(
   authenticateToken,
   requireRoles(['MATRIZADOR', 'ADMIN']),
   eliminarPersonaDeProtocolo
+);
+
+/**
+ * Actualizar datos UAFE de persona (Matrizador/Admin)
+ * PUT /api/formulario-uafe/persona/:cedula
+ */
+router.put(
+  '/persona/:cedula',
+  authenticateToken,
+  requireRoles(['MATRIZADOR', 'ADMIN']),
+  csrfProtection,
+  actualizarDatosPersona
 );
 
 /**

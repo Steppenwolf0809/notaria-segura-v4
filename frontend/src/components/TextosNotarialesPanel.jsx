@@ -34,17 +34,17 @@ import {
 import apiClient from '../services/api-client';
 
 /**
- * Estilos para el texto de encabezado (monoespaciado para mantener columnas)
+ * Estilos para el texto de encabezado (monoespaciado para mantener columnas) - MODO CLARO
  */
 const encabezadoStyles = {
     fontFamily: '"Courier New", Courier, monospace',
     whiteSpace: 'pre-wrap',
     fontSize: '11px',
-    backgroundColor: '#1e1e1e',
-    color: '#e0e0e0',
+    backgroundColor: '#ffffff',
+    color: '#000000',
     padding: '16px',
     borderRadius: '8px',
-    border: '1px solid #444',
+    border: '1px solid #ccc',
     overflowX: 'auto',
     lineHeight: 1.3,
     maxHeight: '400px',
@@ -52,7 +52,7 @@ const encabezadoStyles = {
 };
 
 /**
- * Estilos para el texto de comparecencia (serif, justificado)
+ * Estilos para el texto de comparecencia (serif, justificado) - MODO CLARO
  */
 const comparecenciaStyles = {
     fontFamily: '"Times New Roman", Times, serif',
@@ -60,12 +60,21 @@ const comparecenciaStyles = {
     lineHeight: 1.8,
     textAlign: 'justify',
     padding: '16px',
-    backgroundColor: '#1e1e1e',
-    color: '#e0e0e0',
-    border: '1px solid #444',
+    backgroundColor: '#ffffff',
+    color: '#000000',
+    border: '1px solid #ccc',
     borderRadius: '8px',
     maxHeight: '400px',
-    overflowY: 'auto'
+    overflowY: 'auto',
+    // Selectores anidados para negritas
+    '& strong': {
+        fontWeight: 'bold !important',
+        color: '#000000'
+    },
+    '& b': {
+        fontWeight: 'bold !important',
+        color: '#000000'
+    }
 };
 
 const TextosNotarialesPanel = ({
@@ -151,28 +160,80 @@ const TextosNotarialesPanel = ({
     };
 
     /**
-     * Copiar HTML con formato rico (para Word)
-     * Esto preserva las negritas al pegar en Word/Google Docs
+     * Copiar HTML con formato rico (para Word) - SOLUCIÓN ROBUSTA CON FALLBACK
+     * Intenta primero con Clipboard API, si falla usa execCommand como fallback.
      */
     const copiarHtmlConFormato = async (html, tipo) => {
+        // Construir HTML completo para Word
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+            <meta charset="utf-8">
+            <style>
+                body { font-family: 'Times New Roman', serif; font-size: 12pt; color: #000000; }
+                strong, b { font-weight: bold; }
+            </style>
+            </head>
+            <body>
+                ${html}
+            </body>
+            </html>
+        `.trim();
+
+        // MÉTODO 1: Intentar Clipboard API moderna
         try {
-            // Crear un blob con el HTML
-            const blob = new Blob([html], { type: 'text/html' });
-            const clipboardItem = new ClipboardItem({
-                'text/html': blob,
-                'text/plain': new Blob([html.replace(/<[^>]*>/g, '')], { type: 'text/plain' })
-            });
-            await navigator.clipboard.write([clipboardItem]);
-            onSuccess(`${tipo} copiado al portapapeles (con formato)`);
-        } catch (err) {
-            // Fallback: copiar como texto plano si falla el HTML
-            console.warn('No se pudo copiar con formato, usando texto plano:', err);
-            try {
-                await navigator.clipboard.writeText(html.replace(/<[^>]*>/g, ''));
-                onSuccess(`${tipo} copiado al portapapeles (texto plano)`);
-            } catch (err2) {
-                onError('Error al copiar al portapapeles');
+            const blobHtml = new Blob([htmlContent], { type: "text/html" });
+            const textoPlano = html.replace(/<[^>]*>/g, '');
+            const blobText = new Blob([textoPlano], { type: "text/plain" });
+
+            const data = [
+                new ClipboardItem({
+                    "text/html": blobHtml,
+                    "text/plain": blobText,
+                }),
+            ];
+
+            await navigator.clipboard.write(data);
+            onSuccess(`${tipo} copiado exitosamente (con formato)`);
+            return;
+        } catch (clipboardErr) {
+            console.warn("Clipboard API falló, usando fallback:", clipboardErr);
+        }
+
+        // MÉTODO 2: Fallback con execCommand (máxima compatibilidad)
+        try {
+            // Crear contenedor temporal invisible
+            const container = document.createElement('div');
+            container.innerHTML = html;
+            container.style.position = 'fixed';
+            container.style.left = '-9999px';
+            container.style.top = '0';
+            container.style.whiteSpace = 'pre-wrap';
+            document.body.appendChild(container);
+
+            // Seleccionar el contenido
+            const range = document.createRange();
+            range.selectNodeContents(container);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+
+            // Ejecutar copia
+            const success = document.execCommand('copy');
+
+            // Limpiar
+            selection.removeAllRanges();
+            document.body.removeChild(container);
+
+            if (success) {
+                onSuccess(`${tipo} copiado exitosamente`);
+            } else {
+                throw new Error('execCommand falló');
             }
+        } catch (execErr) {
+            console.error("Error en fallback:", execErr);
+            onError('Error al copiar. Por favor seleccione el texto manualmente y use Ctrl+C.');
         }
     };
 

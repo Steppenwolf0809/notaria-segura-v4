@@ -12,6 +12,7 @@
  * - Cónyuges compareciendo juntos (sociedad conyugal/bienes)
  * - Apoderados (representación)
  * - Estados civiles diversos
+ * - Agrupación por Calidad (Todos los Vendedores juntos, luego todos los Compradores)
  */
 
 import {
@@ -34,6 +35,7 @@ const NOTARIA_TEXTO = 'DOCTORA GLENDA ZAPATA SILVA, NOTARIA DÉCIMA OCTAVA DEL C
  * @returns {string}
  */
 function negrita(texto, formatoHtml = true) {
+    if (!texto) return '';
     return formatoHtml ? `<strong>${texto}</strong>` : texto;
 }
 
@@ -72,37 +74,51 @@ function formatearEstadoCivil(estadoCivil, genero) {
         'UNION_LIBRE': 'en unión de hecho'
     };
 
-    return estados[estadoCivil] || estadoCivil?.toLowerCase() || 'soltero';
+    return estados[estadoCivil] || (estadoCivil ? estadoCivil.toLowerCase() : 'soltero');
 }
 
 /**
- * Formatea la calidad según género
+ * Formatea la calidad según género y pluralidad
  * @param {string} calidad - Calidad (VENDEDOR, COMPRADOR, etc.)
- * @param {string} genero - Género de la persona
+ * @param {string} genero - Género de la persona (M/F) - Relevante si es singular
+ * @param {boolean} esPlural - Si hay múltiples personas con esta calidad
  * @returns {string}
  */
-function formatearCalidadComparecencia(calidad, genero) {
+function formatearCalidadComparecencia(calidad, genero, esPlural = false) {
     const esFemenino = genero === 'F';
+    const c = calidad || 'COMPARECIENTE';
 
-    const calidades = {
-        'VENDEDOR': esFemenino ? 'vendedora' : 'vendedor',
-        'COMPRADOR': esFemenino ? 'compradora' : 'comprador',
-        'PROMITENTE_VENDEDOR': esFemenino ? 'promitente vendedora' : 'promitente vendedor',
-        'PROMITENTE_COMPRADOR': esFemenino ? 'promitente compradora' : 'promitente comprador',
-        'DONANTE': 'donante',
-        'DONATARIO': esFemenino ? 'donataria' : 'donatario',
-        'DEUDOR': esFemenino ? 'deudora' : 'deudor',
-        'ACREEDOR': esFemenino ? 'acreedora' : 'acreedor',
-        'PERMUTANTE': 'permutante',
-        'PODERDANTE': 'poderdante',
-        'APODERADO': esFemenino ? 'apoderada' : 'apoderado',
-        'GARANTE': 'garante',
-        'FIADOR': esFemenino ? 'fiadora' : 'fiador',
-        'CESIONARIO': esFemenino ? 'cesionaria' : 'cesionario',
-        'CEDENTE': 'cedente'
+    // Diccionario base (singular masculino)
+    const base = {
+        'VENDEDOR': { singF: 'vendedora', plur: 'vendedores' },
+        'COMPRADOR': { singF: 'compradora', plur: 'compradores' },
+        'PROMITENTE_VENDEDOR': { singF: 'promitente vendedora', plur: 'promitentes vendedores' },
+        'PROMITENTE_COMPRADOR': { singF: 'promitente compradora', plur: 'promitentes compradores' },
+        'DONANTE': { singF: 'donante', plur: 'donantes' },
+        'DONATARIO': { singF: 'donataria', plur: 'donatarios' },
+        'DEUDOR': { singF: 'deudora', plur: 'deudores' },
+        'ACREEDOR': { singF: 'acreedora', plur: 'acreedores' },
+        'PERMUTANTE': { singF: 'permutante', plur: 'permutantes' },
+        'PODERDANTE': { singF: 'poderdante', plur: 'poderdantes' },
+        'APODERADO': { singF: 'apoderada', plur: 'apoderados' },
+        'GARANTE': { singF: 'garante', plur: 'garantes' },
+        'FIADOR': { singF: 'fiadora', plur: 'fiadores' },
+        'CESIONARIO': { singF: 'cesionaria', plur: 'cesionarios' },
+        'CEDENTE': { singF: 'cedente', plur: 'cedentes' }
     };
 
-    return calidades[calidad] || calidad?.toLowerCase().replace(/_/g, ' ') || 'compareciente';
+    // Transformar calidad a formato legible (minusculas y espacios) si no está en diccionario
+    const defaultLegible = c.toLowerCase().replace(/_/g, ' ');
+
+    if (!base[c]) {
+        return esPlural ? defaultLegible + 's' : defaultLegible; // Pluralización básica
+    }
+
+    if (esPlural) {
+        return base[c].plur;
+    } else {
+        return esFemenino ? base[c].singF : defaultLegible;
+    }
 }
 
 /**
@@ -123,7 +139,7 @@ function obtenerNombreCompleto(persona) {
 }
 
 /**
- * Obtiene los datos personales de una persona
+ * Obtiene los datos personales de una persona de forma segura
  * @param {Object} participante - PersonaProtocolo
  * @returns {Object}
  */
@@ -131,6 +147,7 @@ function obtenerDatosPersonales(participante) {
     const persona = participante.persona;
 
     if (!persona) {
+        // Fallback si la persona no está populada
         return {
             nombre: participante.nombreTemporal || `CÉDULA: ${participante.personaCedula}`,
             genero: 'M',
@@ -170,7 +187,8 @@ function obtenerDatosPersonales(participante) {
             email: contacto.email,
             conyuge: conyuge.nombres ? {
                 nombre: `${conyuge.nombres || ''} ${conyuge.apellidos || ''}`.trim().toUpperCase(),
-                cedula: conyuge.numeroIdentificacion
+                cedula: conyuge.numeroIdentificacion,
+                profesion: conyuge.profesionOcupacion || null
             } : null
         };
     } else {
@@ -184,6 +202,7 @@ function obtenerDatosPersonales(participante) {
             genero: representante.genero || 'M',
             estadoCivil: representante.estadoCivil || 'SOLTERO',
             cedula: persona.numeroIdentificacion,
+            tipoPersona: 'JURIDICA',
             profesion: null,
             direccion: {
                 callePrincipal: compania.direccion,
@@ -204,9 +223,7 @@ function obtenerDatosPersonales(participante) {
 
 /**
  * Genera el texto de apertura de la comparecencia
- * @param {Date|string} fecha - Fecha del documento
- * @param {boolean} formatoHtml - Si usar HTML
- * @returns {string}
+ * Se asegura de poner negritas a la fecha y al nombre de la notaria
  */
 function generarApertura(fecha, formatoHtml = true) {
     const fechaFormateada = convertirFechaNotarial(fecha);
@@ -221,13 +238,19 @@ function generarApertura(fecha, formatoHtml = true) {
 }
 
 /**
- * Formatea un compareciente individual
- * @param {Object} participante - PersonaProtocolo
- * @param {boolean} formatoHtml - Si usar HTML
- * @returns {string}
+ * Formatea un compareciente individual (Persona Natural o Jurídica)
  */
 function formatearComparecienteIndividual(participante, formatoHtml = true) {
     const datos = obtenerDatosPersonales(participante);
+
+    // CASO PERSONA JURÍDICA
+    if (datos.tipoPersona === 'JURIDICA') {
+        let texto = `la compañía ${negrita(datos.nombre, formatoHtml)}, legalmente representada por el señor(a) ${datos.representanteLegal.nombre}`;
+        texto += `, con RUC número ${conversorRUC(datos.cedula)}`;
+        return texto;
+    }
+
+    // CASO PERSONA NATURAL
     const tratamiento = obtenerTratamiento(datos.genero);
 
     let texto = `${tratamiento} ${negrita(datos.nombre || '[NOMBRE PENDIENTE]', formatoHtml)}, `;
@@ -239,21 +262,27 @@ function formatearComparecienteIndividual(participante, formatoHtml = true) {
     }
 
     // Profesión (obligatoria para notarial)
-    if (datos.profesion) {
-        texto += `, ${datos.profesion}`;
-    } else {
-        texto += `, [PROFESIÓN PENDIENTE]`;
-    }
+    const ocupacion = datos.profesion ? datos.profesion.toLowerCase() : '[PENDIENTE]';
+    texto += `, de ocupación ${ocupacion}`;
 
-    // Cédula en formato notarial
+    // Cédula
     const cedulaLetras = convertirNumeroALetras(datos.cedula, 'cedula');
     texto += `, con cédula de ciudadanía número ${cedulaLetras}`;
 
-    // Tipo de representación
+    // Tipo de representación / derechos
     if (participante.actuaPor === 'REPRESENTANDO_SOCIEDAD_CONYUGAL') {
-        texto += ', por sus propios y personales derechos y por los que representa de la sociedad conyugal';
+        texto += ', por sus propios y personales derechos y por los que representa de la sociedad conyugal que tienen formada';
     } else if (participante.actuaPor === 'REPRESENTANDO_SOCIEDAD_BIENES') {
         texto += ', por sus propios y personales derechos y por los que representa de la sociedad de bienes que tienen formada';
+    } else if (participante.actuaPor === 'REPRESENTANDO_A') {
+        // Representación de otro (mandante)
+        const nombreMandante = participante.mandanteNombre || '[MANDANTE PENDIENTE]';
+        texto += `, en representación de ${negrita(nombreMandante.toUpperCase(), formatoHtml)}`;
+        if (participante.mandanteCedula) {
+            const cedulaMandanteLetras = convertirNumeroALetras(participante.mandanteCedula, 'cedula');
+            texto += `, con cédula de ciudadanía número ${cedulaMandanteLetras}`;
+        }
+        texto += ', según poder que se agrega como habilitante';
     } else {
         texto += ', por sus propios y personales derechos';
     }
@@ -262,11 +291,16 @@ function formatearComparecienteIndividual(participante, formatoHtml = true) {
 }
 
 /**
+ * Helper simple para RUC (no convierte a letras dígito a dígito usualmente, o sí?)
+ * Para consistencia con cedula, si se quiere letras: convertirNumeroALetras(ruc, 'ruc')
+ */
+function conversorRUC(ruc) {
+    if (!ruc) return '[RUC PENDIENTE]';
+    return ruc; // Por ahora retorna números, usualmente RUC se ponen números
+}
+
+/**
  * Formatea una pareja de cónyuges compareciendo juntos
- * @param {Object} p1 - Primer participante
- * @param {Object} p2 - Segundo participante
- * @param {boolean} formatoHtml - Si usar HTML
- * @returns {string}
  */
 function formatearParejaConyuge(p1, p2, formatoHtml = true) {
     const datos1 = obtenerDatosPersonales(p1);
@@ -282,6 +316,12 @@ function formatearParejaConyuge(p1, p2, formatoHtml = true) {
         texto += `${negrita(datos1.nombre, formatoHtml)} y ${negrita(datos2.nombre, formatoHtml)}, `;
         texto += 'de estado civil en unión de hecho, ';
 
+        // Profesiones
+        const o1 = datos1.profesion ? datos1.profesion.toLowerCase() : '[pendiente]';
+        const o2 = datos2.profesion ? datos2.profesion.toLowerCase() : '[pendiente]';
+
+        texto += `de ocupación ${o1} y ${o2} respectivamente, `;
+
         // Cédulas
         texto += `con cédulas de ciudadanía números ${convertirNumeroALetras(datos1.cedula, 'cedula')} `;
         texto += `y ${convertirNumeroALetras(datos2.cedula, 'cedula')}, respectivamente, `;
@@ -291,6 +331,11 @@ function formatearParejaConyuge(p1, p2, formatoHtml = true) {
         texto += `${negrita(datos1.nombre, formatoHtml)} y ${negrita(datos2.nombre, formatoHtml)}, `;
         texto += 'casados entre sí, con disolución de la sociedad conyugal, ';
 
+        // Profesiones
+        const o1 = datos1.profesion ? datos1.profesion.toLowerCase() : '[pendiente]';
+        const o2 = datos2.profesion ? datos2.profesion.toLowerCase() : '[pendiente]';
+        texto += `de ocupación ${o1} y ${o2} respectivamente, `;
+
         // Cédulas
         texto += `con cédulas de ciudadanía números ${convertirNumeroALetras(datos1.cedula, 'cedula')} `;
         texto += `y ${convertirNumeroALetras(datos2.cedula, 'cedula')}, respectivamente, `;
@@ -298,7 +343,13 @@ function formatearParejaConyuge(p1, p2, formatoHtml = true) {
         texto += 'por sus propios y personales derechos';
     } else {
         // Casados sin disolución - sociedad conyugal vigente
-        texto += `cónyuges ${negrita(datos1.nombre, formatoHtml)} y ${negrita(datos2.nombre, formatoHtml)}, `;
+        texto += `cónyuges ${negrita(datos1.nombre, formatoHtml)}`;
+        if (datos1.profesion) texto += `, de ocupación ${datos1.profesion.toLowerCase()}`;
+
+        texto += ` y ${negrita(datos2.nombre, formatoHtml)}`;
+        if (datos2.profesion) texto += `, de ocupación ${datos2.profesion.toLowerCase()}`;
+
+        texto += `, `;
 
         // Cédulas
         texto += `con cédulas de ciudadanía números ${convertirNumeroALetras(datos1.cedula, 'cedula')} `;
@@ -311,51 +362,188 @@ function formatearParejaConyuge(p1, p2, formatoHtml = true) {
 }
 
 /**
- * Formatea un apoderado con su mandante
- * @param {Object} apoderado - Participante que actúa como apoderado
- * @param {boolean} formatoHtml - Si usar HTML
- * @returns {string}
+ * Formatea un compareciente con su cónyuge cuando los datos del cónyuge
+ * vienen de la BD (datosPersonales.conyuge) y no como participante del protocolo
  */
-function formatearApoderado(apoderado, formatoHtml = true) {
-    const datosApoderado = obtenerDatosPersonales(apoderado);
-    const nombreMandante = apoderado.mandanteNombre || 'EL MANDANTE';
-    const cedulaMandante = apoderado.mandanteCedula || '';
+function formatearConConyugeDesdeDB(participante, formatoHtml = true) {
+    const datos = obtenerDatosPersonales(participante);
+    const conyugeData = datos.conyuge;
 
-    let texto = `${obtenerTratamiento(datosApoderado.genero)} ${negrita(nombreMandante.toUpperCase(), formatoHtml)}, `;
-
-    if (cedulaMandante) {
-        texto += `con cédula de ciudadanía número ${convertirNumeroALetras(cedulaMandante, 'cedula')}, `;
+    if (!conyugeData) {
+        return formatearComparecienteIndividual(participante, formatoHtml);
     }
 
-    texto += `debidamente representado por ${negrita(datosApoderado.nombre, formatoHtml)}, `;
-    texto += `con cédula de ciudadanía número ${convertirNumeroALetras(datosApoderado.cedula, 'cedula')}, `;
-    texto += 'según consta en el poder que se agrega como habilitante';
+    const esUnionLibre = datos.estadoCivil === 'UNION_LIBRE';
+    const tieneDisolucion = datos.estadoCivil === 'CASADO_CON_DISOLUCION';
+
+    let texto = `${obtenerTratamientoPlural()} `;
+
+    // Nombre cónyuge
+    const nombreConyuge = conyugeData.nombre || '[CÓNYUGE PENDIENTE]';
+
+    if (esUnionLibre) {
+        texto += `${negrita(datos.nombre, formatoHtml)} y ${negrita(nombreConyuge, formatoHtml)}, `;
+        texto += 'de estado civil en unión de hecho, ';
+    } else if (tieneDisolucion) {
+        texto += `${negrita(datos.nombre, formatoHtml)} y ${negrita(nombreConyuge, formatoHtml)}, `;
+        texto += 'casados entre sí, con disolución de la sociedad conyugal, ';
+    } else {
+        texto += `cónyuges ${negrita(datos.nombre, formatoHtml)} y ${negrita(nombreConyuge, formatoHtml)}, `;
+    }
+
+    // Profesiones - Cónyuge desde DB generalmente no tiene ocupación guardada, poner pendiente si falta
+    const o1 = datos.profesion ? datos.profesion.toLowerCase() : '[pendiente]';
+    const o2 = conyugeData.profesion ? conyugeData.profesion.toLowerCase() : '[pendiente]';
+    texto += `de ocupación ${o1} y ${o2} respectivamente, `;
+
+    // Cédulas
+    const cedula1 = convertirNumeroALetras(datos.cedula, 'cedula');
+    texto += `con cédulas de ciudadanía números ${cedula1} y `;
+
+    if (conyugeData.cedula || conyugeData.numeroIdentificacion) {
+        const c2 = conyugeData.cedula || conyugeData.numeroIdentificacion;
+        texto += `${convertirNumeroALetras(c2, 'cedula')}, respectivamente, `;
+    } else {
+        texto += `[CÉDULA CÓNYUGE PENDIENTE], respectivamente, `;
+    }
+
+    // Derechos
+    if (esUnionLibre) {
+        texto += 'por sus propios y personales derechos y por los que representan de la sociedad de bienes que tienen formada';
+    } else if (tieneDisolucion) {
+        texto += 'por sus propios y personales derechos';
+    } else {
+        texto += 'por sus propios y personales derechos y por los que representan de la sociedad conyugal que tienen formada';
+    }
 
     return texto;
 }
 
 /**
- * Agrupa participantes por rol y detecta parejas de cónyuges
- * @param {Array} participantes - Lista de PersonaProtocolo
- * @returns {Array} Grupos de participantes
+ * Formatea un apoderado con su mandante
  */
-function agruparParticipantes(participantes) {
-    const grupos = [];
-    const procesados = new Set();
+function formatearApoderado(apoderado, formatoHtml = true) {
+    const datosApoderado = obtenerDatosPersonales(apoderado);
+    const tratamiento = obtenerTratamiento(datosApoderado.genero);
+    const nombreMandante = apoderado.mandanteNombre || '[MANDANTE PENDIENTE]';
+    const cedulaMandante = apoderado.mandanteCedula || '';
 
-    // Ordenar por orden y calidad
-    const ordenados = [...participantes].sort((a, b) => {
-        if (a.orden !== b.orden) return a.orden - b.orden;
-        return (a.calidad || '').localeCompare(b.calidad || '');
+    // Primero el compareciente (apoderado)
+    let texto = `${tratamiento} ${negrita(datosApoderado.nombre || '[NOMBRE PENDIENTE]', formatoHtml)}, `;
+    texto += `de estado civil ${formatearEstadoCivil(datosApoderado.estadoCivil, datosApoderado.genero)}`;
+
+    if (datosApoderado.profesion) {
+        texto += `, de ocupación ${datosApoderado.profesion.toLowerCase()}`;
+    } else {
+        texto += `, de ocupación [PENDIENTE]`;
+    }
+
+    // Cédula del apoderado
+    texto += `, con cédula de ciudadanía número ${convertirNumeroALetras(datosApoderado.cedula, 'cedula')}`;
+
+    // Representación
+    texto += `, en representación de ${negrita(nombreMandante.toUpperCase(), formatoHtml)}`;
+
+    if (cedulaMandante) {
+        texto += `, con cédula de ciudadanía número ${convertirNumeroALetras(cedulaMandante, 'cedula')}`;
+    }
+
+    texto += ', según poder que se agrega como habilitante';
+
+    return texto;
+}
+
+/**
+ * Genera la sección de domicilios unificados (agrupa cónyuges)
+ */
+function generarDomicilios(participantes, formatoHtml = true) {
+    let texto = 'Los comparecientes declaran ser de nacionalidad ecuatoriana, mayores de edad, ';
+    texto += 'domiciliados en esta ciudad de Quito de la siguiente manera: ';
+
+    // Usar la misma lógica de agrupación para no repetir domicilios de cónyuges
+    const grupos = agruparSubParticipantes(participantes);
+    const domicilios = [];
+
+    grupos.forEach(grupo => {
+        let dom = '';
+        const p1 = grupo.participantes[0];
+        const datos1 = obtenerDatosPersonales(p1);
+
+        // Si es pareja, formatear juntos
+        if (grupo.tipo === 'PAREJA_CONYUGE' || grupo.tipo === 'CONYUGE_DESDE_BD') {
+            let nombre2 = '';
+            if (grupo.tipo === 'PAREJA_CONYUGE') {
+                nombre2 = obtenerDatosPersonales(grupo.participantes[1]).nombre;
+            } else {
+                nombre2 = datos1.conyuge?.nombre || '[CÓNYUGE]';
+            }
+
+            dom = `los cónyuges ${negrita(datos1.nombre, formatoHtml)} y ${negrita(nombre2, formatoHtml)}`;
+        } else {
+            // Individual o apoderado
+            const tratamiento = obtenerTratamiento(datos1.genero);
+            dom = `${tratamiento} ${negrita(datos1.nombre || '[NOMBRE]', formatoHtml)}`;
+        }
+
+        // Dirección
+        if (datos1.direccion && datos1.direccion.callePrincipal) {
+            dom += `, ${formatearDireccionNotarial(datos1.direccion)}`;
+        } else {
+            dom += `, [DIRECCIÓN PENDIENTE]`;
+        }
+
+        // Teléfono
+        if (datos1.telefono) {
+            dom += `, teléfono ${formatearTelefonoNotarial(datos1.telefono)}`;
+        }
+
+        // Email
+        if (datos1.email) {
+            dom += `, correo electrónico ${datos1.email}`;
+        }
+
+        domicilios.push(dom);
     });
 
-    for (const p of ordenados) {
+    texto += domicilios.join('; ') + '; ';
+    return texto;
+}
+
+
+/**
+ * Estructura de Prioridad para Ordenar los Grupos de Calidad
+ */
+const PRIORIDAD_CALIDAD = {
+    'VENDEDOR': 1,
+    'PROMITENTE_VENDEDOR': 1,
+    'DONANTE': 1,
+    'CEDENTE': 1,
+    'PODERDANTE': 1,
+
+    'COMPRADOR': 2,
+    'PROMITENTE_COMPRADOR': 2,
+    'DONATARIO': 2,
+    'CESIONARIO': 2,
+    'APODERADO': 2,
+
+    // Default 3 para otros
+};
+
+/**
+ * Agrupa participantes en subgrupos lógicos (Parejas vs Individuales)
+ * SIN separar por calidades globalmente aún
+ */
+function agruparSubParticipantes(participantes) {
+    const subgrupos = [];
+    const procesados = new Set();
+    const listaOrdenada = [...participantes].sort((a, b) => (a.orden || 0) - (b.orden || 0));
+
+    for (const p of listaOrdenada) {
         if (procesados.has(p.id)) continue;
 
-        // Verificar si es cónyuge compareciendo junto
+        // Caso PAREJA EN PROTOCOLO
         if (p.compareceConyugeJunto) {
-            // Buscar al cónyuge con la misma calidad
-            const conyuge = ordenados.find(
+            const conyuge = listaOrdenada.find(
                 c => c.id !== p.id &&
                     c.calidad === p.calidad &&
                     c.compareceConyugeJunto &&
@@ -363,123 +551,114 @@ function agruparParticipantes(participantes) {
             );
 
             if (conyuge) {
-                grupos.push({
-                    tipo: 'PAREJA_CONYUGE',
-                    participantes: [p, conyuge],
-                    calidad: p.calidad
-                });
+                subgrupos.push({ tipo: 'PAREJA_CONYUGE', participantes: [p, conyuge], calidad: p.calidad });
                 procesados.add(p.id);
                 procesados.add(conyuge.id);
+                continue;
+            } else {
+                // Caso PAREJA CON DATOS DB
+                subgrupos.push({ tipo: 'CONYUGE_DESDE_BD', participantes: [p], calidad: p.calidad });
+                procesados.add(p.id);
                 continue;
             }
         }
 
-        // Verificar si es apoderado
-        if (p.esApoderado) {
-            grupos.push({
-                tipo: 'APODERADO',
-                participantes: [p],
-                calidad: p.calidad
-            });
+        // Caso APODERADO
+        if (p.actuaPor === 'REPRESENTANDO_A') {
+            subgrupos.push({ tipo: 'APODERADO', participantes: [p], calidad: p.calidad });
             procesados.add(p.id);
             continue;
         }
 
-        // Participante individual
-        grupos.push({
-            tipo: 'INDIVIDUAL',
-            participantes: [p],
-            calidad: p.calidad
-        });
+        // Caso INDIVIDUAL DEFAULT
+        subgrupos.push({ tipo: 'INDIVIDUAL', participantes: [p], calidad: p.calidad });
         procesados.add(p.id);
     }
-
-    return grupos;
+    return subgrupos;
 }
 
 /**
- * Genera la sección de comparecientes
- * @param {Array} participantes - Lista de PersonaProtocolo
- * @param {boolean} formatoHtml - Si usar HTML
- * @returns {string}
+ * Genera la sección completa de comparecientes
+ * Agrupa por CALIDAD para que VENDEDORES salgan juntos, etc.
  */
 function generarSeccionComparecientes(participantes, formatoHtml = true) {
-    const grupos = agruparParticipantes(participantes);
-    const partes = [];
+    // 1. Obtener subgrupos básicos (Parejas, individuos)
+    const subgrupos = agruparSubParticipantes(participantes);
 
-    grupos.forEach((grupo, index) => {
-        const esUltimo = index === grupos.length - 1;
-        const conector = index === 0 ? 'por una parte, ' : 'y por otra parte, ';
+    // 2. Agrupar subgrupos por CALIDAD (Macro-Agrupación)
+    const gruposPorCalidad = {};
 
-        let parteTexto = conector;
-
-        if (grupo.tipo === 'PAREJA_CONYUGE') {
-            parteTexto += formatearParejaConyuge(grupo.participantes[0], grupo.participantes[1], formatoHtml);
-        } else if (grupo.tipo === 'APODERADO') {
-            parteTexto += formatearApoderado(grupo.participantes[0], formatoHtml);
-        } else {
-            parteTexto += formatearComparecienteIndividual(grupo.participantes[0], formatoHtml);
+    subgrupos.forEach(grupo => {
+        const calidad = grupo.calidad || 'COMPARECIENTE';
+        if (!gruposPorCalidad[calidad]) {
+            gruposPorCalidad[calidad] = [];
         }
-
-        // Calidad
-        const datos = obtenerDatosPersonales(grupo.participantes[0]);
-        const calidad = formatearCalidadComparecencia(grupo.calidad, datos.genero);
-        parteTexto += `, en calidad de ${calidad}`;
-
-        partes.push(parteTexto);
+        gruposPorCalidad[calidad].push(grupo);
     });
 
-    return partes.join('; ') + '.- ';
+    // 3. Ordenar las calidades por prioridad (Vendedor > Comprador)
+    const calidadesOrdenadas = Object.keys(gruposPorCalidad).sort((a, b) => {
+        const pA = PRIORIDAD_CALIDAD[a] || 3;
+        const pB = PRIORIDAD_CALIDAD[b] || 3;
+        return pA - pB;
+    });
+
+    // 4. Generar texto por cada bloque de calidad
+    const bloquesTexto = [];
+
+    calidadesOrdenadas.forEach((calidad, index) => {
+        const gruposDeEstaCalidad = gruposPorCalidad[calidad];
+
+        // Conector de inicio de bloque
+        const esPrimero = index === 0;
+        let textoBloque = esPrimero ? 'por una parte, ' : 'y por otra parte, ';
+
+        // Generar texto de nombres
+        const descripciones = gruposDeEstaCalidad.map(grupo => {
+            if (grupo.tipo === 'PAREJA_CONYUGE') {
+                return formatearParejaConyuge(grupo.participantes[0], grupo.participantes[1], formatoHtml);
+            } else if (grupo.tipo === 'CONYUGE_DESDE_BD') {
+                return formatearConConyugeDesdeDB(grupo.participantes[0], formatoHtml);
+            } else if (grupo.tipo === 'APODERADO') {
+                return formatearApoderado(grupo.participantes[0], formatoHtml);
+            } else {
+                return formatearComparecienteIndividual(grupo.participantes[0], formatoHtml);
+            }
+        });
+
+        // Unir nombres con punto y coma si son varios grupos distintos
+        textoBloque += descripciones.join('; ');
+
+        // Agregar la calidad pluralizada al final del bloque
+        // Calcular total de personas en este bloque de calidad para pluralizar
+        let totalPersonas = 0;
+        let generoPrincipal = 'M'; // Default
+
+        gruposDeEstaCalidad.forEach(g => {
+            totalPersonas += (g.tipo === 'PAREJA_CONYUGE') ? 2 :
+                (g.tipo === 'CONYUGE_DESDE_BD') ? 2 : 1;
+
+            // Intentar detectar genero del primero para single singular
+            if (g.participantes[0] && g.participantes[0].persona &&
+                g.participantes[0].persona.datosPersonaNatural &&
+                g.participantes[0].persona.datosPersonaNatural.datosPersonales) {
+                generoPrincipal = g.participantes[0].persona.datosPersonaNatural.datosPersonales.genero || 'M';
+            }
+        });
+
+        const esPlural = totalPersonas > 1;
+        const calidadTexto = formatearCalidadComparecencia(calidad, generoPrincipal, esPlural);
+
+        textoBloque += `, en calidad de ${calidadTexto}`;
+
+        bloquesTexto.push(textoBloque);
+    });
+
+    return bloquesTexto.join('; ') + '.- ';
 }
 
 /**
- * Genera la sección de domicilios
- * @param {Array} participantes - Lista de PersonaProtocolo
- * @param {boolean} formatoHtml - Si usar HTML
- * @returns {string}
- */
-function generarDomicilios(participantes, formatoHtml = true) {
-    let texto = 'Los comparecientes declaran ser de nacionalidad ecuatoriana, mayores de edad, ';
-    texto += 'domiciliados en esta ciudad de Quito de la siguiente manera: ';
-
-    const domicilios = participantes.map(p => {
-        const datos = obtenerDatosPersonales(p);
-        const tratamiento = obtenerTratamiento(datos.genero);
-
-        let dom = `${tratamiento} ${negrita(datos.nombre || '[NOMBRE PENDIENTE]', formatoHtml)}`;
-
-        // Dirección
-        if (datos.direccion && datos.direccion.callePrincipal) {
-            const direccionFormateada = formatearDireccionNotarial(datos.direccion);
-            dom += `, ${direccionFormateada}`;
-        } else {
-            dom += `, [DIRECCIÓN PENDIENTE]`;
-        }
-
-        // Teléfono
-        if (datos.telefono) {
-            const telefonoFormateado = formatearTelefonoNotarial(datos.telefono);
-            dom += `, teléfono ${telefonoFormateado}`;
-        } else {
-            dom += `, teléfono [PENDIENTE]`;
-        }
-
-        // Email
-        if (datos.email) {
-            dom += `, correo electrónico ${datos.email}`;
-        }
-
-        return dom;
-    });
-
-    texto += domicilios.join('; ') + '; ';
-
-    return texto;
-}
-
-/**
- * Genera el texto de cierre de la comparecencia
- * @returns {string}
+ * Genera el cierre
  */
 function generarCierre() {
     return 'hábiles en derecho para contratar y contraer obligaciones; ' +
@@ -497,17 +676,11 @@ function generarCierre() {
 
 /**
  * Genera la comparecencia completa del protocolo
- * 
- * @param {Object} protocolo - Datos del protocolo UAFE
- * @param {Array} participantes - Lista de PersonaProtocolo con datos de persona
- * @param {Object} opciones - { formatoHtml: boolean }
- * @returns {Object} - { success, comparecencia, comparecenciaHtml, error }
  */
 export function generarComparecencia(protocolo, participantes, opciones = {}) {
     const { formatoHtml = true } = opciones;
 
     try {
-        // Verificar si el tipo de acto requiere comparecencia
         if (TIPOS_SIN_COMPARECENCIA.includes(protocolo.tipoActo)) {
             return {
                 success: false,
@@ -517,7 +690,6 @@ export function generarComparecencia(protocolo, participantes, opciones = {}) {
             };
         }
 
-        // Verificar que hay participantes
         if (!participantes || participantes.length === 0) {
             return {
                 success: false,
@@ -527,24 +699,25 @@ export function generarComparecencia(protocolo, participantes, opciones = {}) {
             };
         }
 
-        // Ordenar participantes por orden
-        const participantesOrdenados = [...participantes].sort((a, b) => (a.orden || 0) - (b.orden || 0));
+        // Ya no ordenamos simplemente por orden para generar texto, 
+        // ahora `generarSeccionComparecientes` hace el ordenamiento por calidad.
+        // Pero pasamos lista completa para que la función la procese.
 
         let texto = '';
 
-        // 1. Apertura con fecha
+        // 1. Apertura
         texto += generarApertura(protocolo.fecha, formatoHtml);
 
-        // 2. Sección de comparecientes
-        texto += generarSeccionComparecientes(participantesOrdenados, formatoHtml);
+        // 2. Comparecientes (Agrupados y Ordenados)
+        texto += generarSeccionComparecientes(participantes, formatoHtml);
 
         // 3. Domicilios
-        texto += generarDomicilios(participantesOrdenados, formatoHtml);
+        texto += generarDomicilios(participantes, formatoHtml);
 
         // 4. Cierre
         texto += generarCierre();
 
-        // Generar versión sin HTML para copiar a texto plano
+        // Generar versión sin HTML
         const textoPlano = texto.replace(/<strong>/g, '').replace(/<\/strong>/g, '');
 
         return {

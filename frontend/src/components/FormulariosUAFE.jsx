@@ -35,6 +35,7 @@ import {
   List,
   ListItem,
   ListItemText,
+  ListItemIcon,
   ListItemSecondaryAction,
   Checkbox,
   FormControlLabel
@@ -42,7 +43,6 @@ import {
 import {
   Add as AddIcon,
   PersonAdd as PersonAddIcon,
-  Visibility as VisibilityIcon,
   CheckCircle as CheckCircleIcon,
   HourglassEmpty as PendingIcon,
   Search as SearchIcon,
@@ -57,7 +57,10 @@ import {
   PictureAsPdf as PictureAsPdfIcon,
   Save as SaveIcon,
   LockReset as LockResetIcon,
-  HowToReg as HowToRegIcon
+  HowToReg as HowToRegIcon,
+  Info as InfoIcon,
+  AssignmentInd as AssignmentIndIcon,
+  FiberManualRecord as CircleIcon
 } from '@mui/icons-material';
 import { API_BASE } from '../utils/apiConfig';
 import { formatDateES, formatDateTimeES } from '../utils/dateUtils';
@@ -90,6 +93,30 @@ const TIPOS_ACTO_CONTRATO = [
 const TIPOS_BIEN_INMUEBLE = ['COMPRAVENTA', 'DONACION', 'CESION_DERECHOS', 'PROMESA_COMPRAVENTA'];
 // Tipos que requieren datos de vehículo
 const TIPOS_VEHICULO = ['VENTA_VEHICULO'];
+// Tipos que requieren campo de multa
+const TIPOS_CON_MULTA = ['PROMESA_COMPRAVENTA'];
+
+// Calidades disponibles para los participantes
+const CALIDADES_DISPONIBLES = [
+  // Compraventas y similares
+  { value: 'VENDEDOR', label: 'Vendedor/a' },
+  { value: 'COMPRADOR', label: 'Comprador/a' },
+  // Promesas
+  { value: 'PROMITENTE_VENDEDOR', label: 'Promitente Vendedor/a' },
+  { value: 'PROMITENTE_COMPRADOR', label: 'Promitente Comprador/a' },
+  // Donaciones
+  { value: 'DONANTE', label: 'Donante' },
+  { value: 'DONATARIO', label: 'Donatario/a' },
+  // Cesiones
+  { value: 'CEDENTE', label: 'Cedente' },
+  { value: 'CESIONARIO', label: 'Cesionario/a' },
+  // Poderes
+  { value: 'PODERDANTE', label: 'Poderdante' },
+  { value: 'APODERADO', label: 'Apoderado/a' },
+  // Otros
+  { value: 'COMPARECIENTE', label: 'Compareciente' },
+  { value: 'GARANTE', label: 'Garante' }
+];
 
 
 
@@ -138,7 +165,8 @@ const FormulariosUAFE = ({ adminMode = false }) => {
     vehiculoModelo: '',
     vehiculoAnio: '',
     avaluoMunicipal: '',
-    valorContrato: ''
+    valorContrato: '',
+    multa: ''                   // Campo para promesas de compraventa
   });
 
   // Formas de pago (lista dinámica)
@@ -211,9 +239,9 @@ const FormulariosUAFE = ({ adminMode = false }) => {
    * Guardar protocolo (Crear o Editar)
    */
   const guardarProtocolo = async () => {
-    // Validaciones básicas
-    if (!formProtocolo.numeroProtocolo || !formProtocolo.actoContrato || !formProtocolo.valorContrato) {
-      mostrarSnackbar('Completa los campos obligatorios: Número de Protocolo, Acto/Contrato y Valor del Contrato', 'warning');
+    // Validaciones básicas: Numero de protocolo es opcional inicialmente
+    if (!formProtocolo.actoContrato || !formProtocolo.valorContrato) {
+      mostrarSnackbar('Completa los campos obligatorios: Acto/Contrato y Valor del Contrato', 'warning');
       return;
     }
 
@@ -224,8 +252,14 @@ const FormulariosUAFE = ({ adminMode = false }) => {
     }
 
     // Validar formas de pago
+    // Para promesas, permutas y daciones NO es obligatorio que la forma de pago iguale el valor del contrato
+    const TIPOS_PAGO_FLEXIBLE = ['PROMESA_COMPRAVENTA', 'PERMUTA', 'DACION_EN_PAGO'];
+    const esTipoPagoFlexible = TIPOS_PAGO_FLEXIBLE.includes(formProtocolo.actoContrato);
+
     const formasPagoValidas = formasPago.filter(fp => fp.monto && parseFloat(fp.monto) > 0);
-    if (formasPagoValidas.length === 0) {
+
+    // Solo exigir forma de pago para tipos regulares (compraventas)
+    if (!esTipoPagoFlexible && formasPagoValidas.length === 0) {
       mostrarSnackbar('Debes agregar al menos una forma de pago válida', 'warning');
       return;
     }
@@ -254,6 +288,7 @@ const FormulariosUAFE = ({ adminMode = false }) => {
         actoContrato: formProtocolo.actoContrato,
         avaluoMunicipal: formProtocolo.avaluoMunicipal || null,
         valorContrato: formProtocolo.valorContrato,
+        multa: formProtocolo.multa || null,  // Campo para promesas
         formasPago: formasPagoFinal
       };
 
@@ -437,7 +472,12 @@ const FormulariosUAFE = ({ adminMode = false }) => {
       );
 
       if (response.data.success) {
-        mostrarSnackbar('Persona agregada al protocolo exitosamente', 'success');
+        // Mostrar mensaje diferente si persona fue creada como placeholder
+        if (response.data.personaCreada) {
+          mostrarSnackbar('Persona agregada (pendiente de completar registro)', 'info');
+        } else {
+          mostrarSnackbar('Persona agregada al protocolo exitosamente', 'success');
+        }
         setOpenAgregarPersona(false);
         // Reset forms
         setFormRepresentado({
@@ -522,9 +562,9 @@ const FormulariosUAFE = ({ adminMode = false }) => {
    * Guardar cambios del protocolo
    */
   const guardarCambiosProtocolo = async () => {
-    if (!protocoloEditando.numeroProtocolo || !protocoloEditando.fecha ||
+    if (!protocoloEditando.fecha ||
       !protocoloEditando.actoContrato || !protocoloEditando.valorContrato) {
-      mostrarSnackbar('Todos los campos son obligatorios', 'warning');
+      mostrarSnackbar('Todos los campos obligatorios deben estar completos', 'warning');
       return;
     }
 
@@ -614,7 +654,8 @@ const FormulariosUAFE = ({ adminMode = false }) => {
       vehiculoModelo: '',
       vehiculoAnio: '',
       avaluoMunicipal: '',
-      valorContrato: ''
+      valorContrato: '',
+      multa: ''
     });
     setFormasPago([{ tipo: 'EFECTIVO', monto: '', banco: '' }]);
     setModoEditarProtocolo(false);
@@ -639,7 +680,8 @@ const FormulariosUAFE = ({ adminMode = false }) => {
       vehiculoModelo: protocolo.vehiculoModelo || '',
       vehiculoAnio: protocolo.vehiculoAnio || '',
       avaluoMunicipal: protocolo.avaluoMunicipal || '',
-      valorContrato: protocolo.valorContrato || ''
+      valorContrato: protocolo.valorContrato || '',
+      multa: protocolo.multa || ''
     });
 
     if (Array.isArray(protocolo.formasPago) && protocolo.formasPago.length > 0) {
@@ -1181,20 +1223,34 @@ const FormulariosUAFE = ({ adminMode = false }) => {
             ) : (
               protocolos.map((protocolo) => (
                 <React.Fragment key={protocolo.id}>
-                  <TableRow hover>
+                  <TableRow
+                    hover
+                    onClick={() => setExpandedProtocol(
+                      expandedProtocol === protocolo.id ? null : protocolo.id
+                    )}
+                    selected={expandedProtocol === protocolo.id}
+                    sx={{ cursor: 'pointer' }}
+                  >
                     <TableCell>
                       <IconButton
                         size="small"
-                        onClick={() => setExpandedProtocol(
-                          expandedProtocol === protocolo.id ? null : protocolo.id
-                        )}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedProtocol(
+                            expandedProtocol === protocolo.id ? null : protocolo.id
+                          );
+                        }}
                       >
                         {expandedProtocol === protocolo.id ? <ExpandLessIcon /> : <ExpandMoreIcon />}
                       </IconButton>
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" fontWeight="bold">
-                        {protocolo.numeroProtocolo}
+                        {protocolo.numeroProtocolo || (
+                          <Typography component="span" variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                            (Temp: {protocolo.identificadorTemporal?.substring(0, 8)})
+                          </Typography>
+                        )}
                       </Typography>
                     </TableCell>
                     <TableCell>
@@ -1232,21 +1288,21 @@ const FormulariosUAFE = ({ adminMode = false }) => {
                       </Stack>
                     </TableCell>
                     <TableCell align="center">
-                      <Stack direction="row" spacing={1} justifyContent="center">
+                      <Stack direction="row" spacing={1} justifyContent="center" onClick={(e) => e.stopPropagation()}>
                         <Tooltip title="Ver Detalles">
                           <IconButton
                             size="small"
                             color="info"
-                            onClick={() => verDetallesProtocolo(protocolo.id)}
+                            onClick={(e) => { e.stopPropagation(); verDetallesProtocolo(protocolo.id); }}
                           >
-                            <VisibilityIcon fontSize="small" />
+                            <InfoIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                         <Tooltip title="Editar Protocolo">
                           <IconButton
                             size="small"
                             color="secondary"
-                            onClick={() => abrirEditarProtocolo(protocolo)}
+                            onClick={(e) => { e.stopPropagation(); abrirEditarProtocolo(protocolo); }}
                           >
                             <EditIcon fontSize="small" />
                           </IconButton>
@@ -1255,7 +1311,7 @@ const FormulariosUAFE = ({ adminMode = false }) => {
                           <IconButton
                             size="small"
                             color="primary"
-                            onClick={() => abrirAgregarPersona(protocolo)}
+                            onClick={(e) => { e.stopPropagation(); abrirAgregarPersona(protocolo); }}
                           >
                             <PersonAddIcon fontSize="small" />
                           </IconButton>
@@ -1264,7 +1320,7 @@ const FormulariosUAFE = ({ adminMode = false }) => {
                           <IconButton
                             size="small"
                             color="success"
-                            onClick={() => descargarPDFs(protocolo.id)}
+                            onClick={(e) => { e.stopPropagation(); descargarPDFs(protocolo.id); }}
                             disabled={!protocolo.personas || protocolo.personas.length === 0}
                           >
                             <PictureAsPdfIcon fontSize="small" />
@@ -1274,7 +1330,7 @@ const FormulariosUAFE = ({ adminMode = false }) => {
                           <IconButton
                             size="small"
                             color="error" // Red
-                            onClick={() => confirmarEliminarProtocolo(protocolo)}
+                            onClick={(e) => { e.stopPropagation(); confirmarEliminarProtocolo(protocolo); }}
                           >
                             <DeleteIcon fontSize="small" />
                           </IconButton>
@@ -1283,11 +1339,10 @@ const FormulariosUAFE = ({ adminMode = false }) => {
                     </TableCell>
                   </TableRow>
 
-                  {/* Fila expandible con lista de personas */}
                   <TableRow>
                     <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={8}>
                       <Collapse in={expandedProtocol === protocolo.id} timeout="auto" unmountOnExit>
-                        <Box sx={{ margin: 2 }}>
+                        <Box sx={{ margin: 2, padding: 2, bgcolor: 'background.default', borderRadius: 2, border: '1px solid #e0e0e0' }}>
                           <Typography variant="h6" gutterBottom component="div">
                             Personas en este protocolo
                           </Typography>
@@ -1295,14 +1350,38 @@ const FormulariosUAFE = ({ adminMode = false }) => {
                             <List dense>
                               {protocolo.personas.map((persona) => (
                                 <ListItem key={persona.id}>
+                                  <ListItemIcon sx={{ minWidth: 32 }}>
+                                    <CircleIcon
+                                      sx={{
+                                        fontSize: 16,
+                                        color: persona.estadoCompletitud === 'completo' ? 'success.main' :
+                                          persona.estadoCompletitud === 'incompleto' ? 'warning.main' : 'error.main',
+                                        filter: 'drop-shadow(0px 1px 1px rgba(0,0,0,0.2))'
+                                      }}
+                                    />
+                                  </ListItemIcon>
                                   <ListItemText
-                                    primary={persona.nombre}
-                                    secondary={
-                                      <>
-                                        <Typography component="span" variant="body2">
-                                          {persona.cedula} - {persona.calidad} ({persona.actuaPor})
+                                    primary={
+                                      <Stack direction="row" alignItems="center" spacing={1}>
+                                        <Typography variant="body1" fontWeight="medium">
+                                          {persona.nombre}
                                         </Typography>
-                                      </>
+                                        <Typography variant="caption" sx={{
+                                          color: persona.estadoCompletitud === 'completo' ? 'success.main' :
+                                            persona.estadoCompletitud === 'incompleto' ? 'warning.main' : 'error.main',
+                                          fontWeight: 'bold',
+                                          fontSize: '0.7rem',
+                                          textTransform: 'uppercase'
+                                        }}>
+                                          • {persona.estadoCompletitud === 'completo' ? 'Completo' :
+                                            persona.estadoCompletitud === 'incompleto' ? `${persona.porcentajeCompletitud || 0}%` : 'Pendiente'}
+                                        </Typography>
+                                      </Stack>
+                                    }
+                                    secondary={
+                                      <Typography component="span" variant="body2" color="text.secondary">
+                                        {persona.cedula} - {persona.calidad} ({persona.actuaPor})
+                                      </Typography>
                                     }
                                   />
                                   <ListItemSecondaryAction>
@@ -1312,7 +1391,7 @@ const FormulariosUAFE = ({ adminMode = false }) => {
                                           variant="outlined"
                                           size="small"
                                           color="info"
-                                          startIcon={<VisibilityIcon />}
+                                          startIcon={<AssignmentIndIcon />}
                                           onClick={() => {
                                             setPreviewPersona({ ...persona, protocolId: protocolo.id });
                                             setProtocoloSeleccionado(protocolo);
@@ -1373,11 +1452,11 @@ const FormulariosUAFE = ({ adminMode = false }) => {
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
-                    required
                     label="Número de Protocolo"
-                    value={formProtocolo.numeroProtocolo}
+                    value={formProtocolo.numeroProtocolo || ''}
                     onChange={(e) => setFormProtocolo({ ...formProtocolo, numeroProtocolo: e.target.value })}
-                    placeholder="Ej: 2024-1234"
+                    placeholder="Ej: 2024-1234 (Opcional)"
+                    helperText="Si se deja vacío, se usará un ID temporal"
                   />
                 </Grid>
                 <Grid item xs={6} sm={4}>
@@ -1539,6 +1618,22 @@ const FormulariosUAFE = ({ adminMode = false }) => {
                     InputProps={{ startAdornment: '$' }}
                   />
                 </Grid>
+
+                {/* Campo Multa - Solo para Promesas */}
+                {TIPOS_CON_MULTA.includes(formProtocolo.actoContrato) && (
+                  <Grid item xs={12} sm={6}>
+                    <TextField
+                      fullWidth
+                      type="number"
+                      label="Multa (para incumplimiento)"
+                      value={formProtocolo.multa}
+                      onChange={(e) => setFormProtocolo({ ...formProtocolo, multa: e.target.value })}
+                      placeholder="Ej: 10% del valor"
+                      InputProps={{ startAdornment: '$' }}
+                      helperText="Generalmente es el 10% del valor del contrato"
+                    />
+                  </Grid>
+                )}
               </Grid>
             </Box>
 
@@ -1720,8 +1815,9 @@ const FormulariosUAFE = ({ adminMode = false }) => {
                           label="Calidad"
                           onChange={(e) => setFormPersona({ ...formPersona, calidad: e.target.value })}
                         >
-                          <MenuItem value="COMPRADOR">Comprador</MenuItem>
-                          <MenuItem value="VENDEDOR">Vendedor</MenuItem>
+                          {CALIDADES_DISPONIBLES.map((cal) => (
+                            <MenuItem key={cal.value} value={cal.value}>{cal.label}</MenuItem>
+                          ))}
                         </Select>
                       </FormControl>
                     </Grid>
@@ -2149,11 +2245,7 @@ const FormulariosUAFE = ({ adminMode = false }) => {
                             {persona.nombre}
                           </Typography>
                           <Chip
-                            icon={
-                              persona.estadoCompletitud === 'completo' ? <CheckCircleIcon /> :
-                                persona.estadoCompletitud === 'incompleto' ? <PendingIcon /> :
-                                  <PendingIcon />
-                            }
+                            icon={<CircleIcon sx={{ fontSize: '10px !important', ml: 0.5 }} />}
                             label={
                               persona.estadoCompletitud === 'completo' ? 'Completo' :
                                 persona.estadoCompletitud === 'incompleto' ? `${persona.porcentajeCompletitud || 0}% Incompleto` :
@@ -2165,6 +2257,7 @@ const FormulariosUAFE = ({ adminMode = false }) => {
                                   'error'
                             }
                             size="small"
+                            sx={{ fontWeight: 'bold' }}
                           />
                         </Box>
 
@@ -2514,7 +2607,7 @@ const FormulariosUAFE = ({ adminMode = false }) => {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </Box>
+    </Box >
   );
 };
 
