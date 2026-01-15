@@ -298,10 +298,33 @@ export function formatearDireccionNotarial(direccion) {
 
     const partes = [];
 
+    /**
+     * Capitaliza las primeras letras de cada palabra
+     * y convierte el resto a mayúsculas para ciudad/provincia
+     */
+    function capitalizarUbicacion(texto) {
+        if (!texto) return '';
+        return texto.toUpperCase();
+    }
+
+    /**
+     * Determina si la calle ya tiene prefijo (Avenida, Calle, etc.)
+     */
+    function tienePrefijoCalle(texto) {
+        if (!texto) return false;
+        const prefijos = /^(avenida|calle|av\.|av\s|pasaje|paseo|carrera|diagonal|transversal|urbanización|urb\.|conjunto|conj\.)/i;
+        return prefijos.test(texto.trim());
+    }
+
     // Calle principal
     if (direccion.callePrincipal) {
         let calle = expandirAbreviaturasDireccion(direccion.callePrincipal);
-        partes.push(`en la ${calle}`);
+        // Agregar "calle" si no tiene un prefijo válido
+        if (!tienePrefijoCalle(calle)) {
+            partes.push(`en la calle ${calle}`);
+        } else {
+            partes.push(`en la ${calle}`);
+        }
     }
 
     // Número
@@ -313,14 +336,19 @@ export function formatearDireccionNotarial(direccion) {
     // Calle secundaria
     if (direccion.calleSecundaria) {
         let calleSecundaria = expandirAbreviaturasDireccion(direccion.calleSecundaria);
-        partes.push(`y ${calleSecundaria}`);
+        // Agregar "calle" si no tiene un prefijo válido
+        if (!tienePrefijoCalle(calleSecundaria)) {
+            partes.push(`y calle ${calleSecundaria}`);
+        } else {
+            partes.push(`y ${calleSecundaria}`);
+        }
     }
 
-    // Ubicación geográfica
+    // Ubicación geográfica - siempre en mayúsculas
     const ubicacion = [];
-    if (direccion.parroquia) ubicacion.push(`Parroquia ${direccion.parroquia}`);
-    if (direccion.canton) ubicacion.push(`Cantón ${direccion.canton}`);
-    if (direccion.provincia) ubicacion.push(`Provincia de ${direccion.provincia}`);
+    if (direccion.parroquia) ubicacion.push(`Parroquia ${capitalizarUbicacion(direccion.parroquia)}`);
+    if (direccion.canton) ubicacion.push(`Cantón ${capitalizarUbicacion(direccion.canton)}`);
+    if (direccion.provincia) ubicacion.push(`Provincia de ${capitalizarUbicacion(direccion.provincia)}`);
 
     if (ubicacion.length > 0) {
         partes.push(ubicacion.join(', '));

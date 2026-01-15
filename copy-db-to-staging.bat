@@ -27,11 +27,11 @@ if exist %PG_BIN_17%\pg_dump.exe (
 :: ==========================================
 :: CONFIGURACION DE CONEXION
 :: ==========================================
-set PROD_HOST=gondola.proxy.rlwy.net
-set PROD_PORT=41960
+set PROD_HOST=switchback.proxy.rlwy.net
+set PROD_PORT=25513
 set PROD_USER=postgres
 set PROD_DB=railway
-set PGPASSWORD_PROD=ymGXjRwwZshJaTEwyIpyztWqAZogkzSG
+set PGPASSWORD_PROD=uXwrkbpPDVXrEngsRCMHdIKkOUDXipic
 
 set STAGING_HOST=gondola.proxy.rlwy.net
 set STAGING_PORT=39316

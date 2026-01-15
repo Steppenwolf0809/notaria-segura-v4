@@ -38,7 +38,7 @@ El proyecto sigue una arquitectura cliente-servidor:
   - Prisma (ORM)
   - PostgreSQL
   - JSON Web Tokens (JWT) para autenticación
-  - Twilio (para notificaciones por WhatsApp)
+  
 - **Herramientas de Desarrollo**:
   - Nodemon (para recarga en caliente del servidor)
   - ESLint (linting de código)
@@ -85,7 +85,7 @@ notaria-segura/
    - **Backend**: Copia `backend/.env.example` a `backend/.env` y rellena las variables:
      - `DATABASE_URL`: Cadena de conexión a tu base de datos PostgreSQL.
      - `JWT_SECRET`: Un secreto para firmar los tokens JWT.
-     - `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`: Credenciales de Twilio (remitente WhatsApp en formato `whatsapp:+14155238886`).
+     
    - **Frontend**: Copia `frontend/.env.example` a `frontend/.env` y rellena la variable:
      - `VITE_API_URL`: La URL de tu backend (p. ej., `http://localhost:3001/api`).
 

@@ -1,0 +1,15 @@
+{
+    "name": "limpieza-estados",
+    "version": "1.0.0",
+    "type": "module",
+    "description": "Script para limpiar estados de documentos a ENTREGADO, exceptuando una lista específica",
+    "scripts": {
+        "preview": "node index.js --preview",
+        "ejecutar": "node index.js --ejecutar"
+    },
+    "dependencies": {
+        "pg": "^8.11.0",
+        "exceljs": "^4.4.0",
+        "dotenv": "^16.3.0"
+    }
+}

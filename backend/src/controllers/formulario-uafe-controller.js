@@ -26,7 +26,7 @@ import {
 } from '../utils/pdf-uafe-helpers.js';
 import { generarEncabezado } from '../services/encabezado-generator-service.js';
 import { generarComparecencia } from '../services/comparecencia-generator-service.js';
-import { obtenerEstadoGeneralProtocolo } from '../services/completitud-service.js';
+import { obtenerEstadoGeneralProtocolo, calcularYActualizarCompletitud } from '../services/completitud-service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -52,14 +52,15 @@ export async function crearProtocolo(req, res) {
       vehiculoAnio,
       avaluoMunicipal,
       valorContrato,
+      multa,                    // Para promesas de compraventa
       formasPago
     } = req.body;
 
-    // Validaciones
-    if (!numeroProtocolo || !fecha || !actoContrato || !valorContrato) {
+    // Validaciones: numeroProtocolo ya no es obligatorio al inicio
+    if (!fecha || !actoContrato || !valorContrato) {
       return res.status(400).json({
         success: false,
-        message: 'Campos obligatorios: numeroProtocolo, fecha, actoContrato, valorContrato'
+        message: 'Campos obligatorios: fecha, actoContrato, valorContrato'
       });
     }
 
@@ -97,24 +98,28 @@ export async function crearProtocolo(req, res) {
       }
     }
 
-    // Verificar si ya existe
-    const existente = await prisma.protocoloUAFE.findUnique({
-      where: { numeroProtocolo }
-    });
-
-    if (existente) {
-      return res.status(409).json({
-        success: false,
-        message: 'Ya existe un protocolo con ese número'
+    // Verificar si ya existe, SOLO si se proporcionó numeroProtocolo
+    if (numeroProtocolo) {
+      const existente = await prisma.protocoloUAFE.findUnique({
+        where: { numeroProtocolo }
       });
+
+      if (existente) {
+        return res.status(409).json({
+          success: false,
+          message: 'Ya existe un protocolo con ese número'
+        });
+      }
     }
 
-    // Crear protocolo con todos los campos
+    // Crear protocolo
+    // Si no hay numeroProtocolo, pasar undefined o null (Prisma maneja null si es opcional)
     const protocolo = await prisma.protocoloUAFE.create({
       data: {
-        numeroProtocolo,
+        numeroProtocolo: numeroProtocolo || null,
         fecha: new Date(fecha),
-        actoContrato,
+        tipoActo: actoContrato,  // Campo requerido por el schema
+        actoContrato,            // Mantenido para retrocompatibilidad
         tipoActoOtro: tipoActoOtro || null,
         bienInmuebleDescripcion: bienInmuebleDescripcion || null,
         bienInmuebleUbicacion: bienInmuebleUbicacion || null,
@@ -124,6 +129,7 @@ export async function crearProtocolo(req, res) {
         vehiculoAnio: vehiculoAnio || null,
         avaluoMunicipal: avaluoMunicipal ? parseFloat(avaluoMunicipal) : null,
         valorContrato: parseFloat(valorContrato),
+        multa: multa ? parseFloat(multa) : null,
         formasPago: formasPago || [],
         createdBy: req.user.id
       }
@@ -173,17 +179,37 @@ export async function agregarPersonaAProtocolo(req, res) {
       });
     }
 
-    // Verificar que la persona existe en PersonaRegistrada
-    const persona = await prisma.personaRegistrada.findUnique({
+    // Verificar si la persona existe en PersonaRegistrada
+    let persona = await prisma.personaRegistrada.findUnique({
       where: { numeroIdentificacion: cedula }
     });
 
+    // ITEM 3.1: Si la persona NO existe, crear un registro placeholder
+    // Esto permite agregar personas al protocolo aunque no estén registradas
+    let personaCreada = false;
     if (!persona) {
-      return res.status(404).json({
-        success: false,
-        message: 'Esta cédula no está registrada. La persona debe crear su cuenta primero en /registro-personal',
-        registroUrl: '/registro-personal'
+      console.log(`[UAFE] Creando registro placeholder para cédula ${cedula}`);
+      persona = await prisma.personaRegistrada.create({
+        data: {
+          numeroIdentificacion: cedula,
+          tipoPersona: 'NATURAL',
+          pinHash: 'PENDIENTE_REGISTRO', // No se puede usar para login
+          pinCreado: false,
+          completado: false,
+          datosPersonaNatural: {
+            datosPersonales: {
+              nombres: '',
+              apellidos: '',
+              estadoCivil: 'SOLTERO',
+              genero: 'M'
+            },
+            contacto: {},
+            direccion: {},
+            informacionLaboral: {}
+          }
+        }
       });
+      personaCreada = true;
     }
 
     // Verificar si ya existe esta persona en el protocolo
@@ -235,7 +261,7 @@ export async function agregarPersonaAProtocolo(req, res) {
     }
 
     // Agregar persona al protocolo
-    const personaProtocolo = await prisma.personaProtocolo.create({
+    let personaProtocolo = await prisma.personaProtocolo.create({
       data: dataToCreate,
       include: {
         persona: {
@@ -249,7 +275,6 @@ export async function agregarPersonaAProtocolo(req, res) {
         },
         representado: {
           select: {
-            numeroIdentificacion: true,
             tipoPersona: true,
             datosPersonaNatural: true,
             datosPersonaJuridica: true
@@ -257,6 +282,17 @@ export async function agregarPersonaAProtocolo(req, res) {
         }
       }
     });
+
+    // Calcular completitud inicial (Semáforo)
+    try {
+      const completitud = await calcularYActualizarCompletitud(personaProtocolo.id);
+      // Actualizar objeto en memoria para la respuesta
+      personaProtocolo.estadoCompletitud = completitud.estado;
+      personaProtocolo.porcentajeCompletitud = completitud.porcentaje;
+      personaProtocolo.camposFaltantes = completitud.camposFaltantes;
+    } catch (error) {
+      console.warn('No se pudo calcular la completitud inicial:', error);
+    }
 
     // Extraer nombre de la persona
     let nombre = 'Sin nombre';
@@ -291,7 +327,10 @@ export async function agregarPersonaAProtocolo(req, res) {
 
     res.status(201).json({
       success: true,
-      message: 'Persona agregada al protocolo exitosamente',
+      message: personaCreada
+        ? 'Persona agregada (pendiente de registro completo)'
+        : 'Persona agregada al protocolo exitosamente',
+      personaCreada,  // true si se creó un placeholder
       data: {
         id: personaProtocolo.id,
         cedula: personaProtocolo.persona.numeroIdentificacion,
@@ -418,15 +457,23 @@ export async function loginFormularioUAFE(req, res) {
       });
     }
 
-    // 1. Buscar el protocolo
-    const protocolo = await prisma.protocoloUAFE.findUnique({
-      where: { numeroProtocolo }
+    // 1. Buscar el protocolo (intentar por número o identificación temporal)
+    let protocolo = await prisma.protocoloUAFE.findUnique({
+      where: { numeroProtocolo: numeroProtocolo.toString() }
     });
+
+    if (!protocolo) {
+      // Intentar buscar por identificador temporal
+      // Nota: prisma.protocoloUAFE.findUnique({ where: { identificadorTemporal: ... } })
+      protocolo = await prisma.protocoloUAFE.findUnique({
+        where: { identificadorTemporal: numeroProtocolo.toString() }
+      });
+    }
 
     if (!protocolo) {
       return res.status(404).json({
         success: false,
-        message: 'Número de protocolo no encontrado. Verifica con la notaría.'
+        message: 'Número de protocolo o identificador no encontrado. Verifica con la notaría.'
       });
     }
 
@@ -629,6 +676,72 @@ export async function responderFormulario(req, res) {
 }
 
 /**
+ * Actualizar datos UAFE de una persona registrada (Matrizador)
+ * PUT /api/formulario-uafe/persona/:cedula
+ * Role: MATRIZADOR | ADMIN
+ */
+export async function actualizarDatosPersona(req, res) {
+  try {
+    const { cedula } = req.params;
+    const datosActualizados = req.body;
+
+    const persona = await prisma.personaRegistrada.findUnique({
+      where: { numeroIdentificacion: cedula }
+    });
+
+    if (!persona) {
+      return res.status(404).json({
+        success: false,
+        message: 'Persona no encontrada'
+      });
+    }
+
+    // Determinar campo a actualizar
+    const campoDatos = persona.tipoPersona === 'NATURAL' ? 'datosPersonaNatural' : 'datosPersonaJuridica';
+
+    // Actualizar reemplazando el JSON completo o haciendo merge
+    // Para seguridad, hacemos merge de primer nivel, pero idealmente el frontend envía la estructura completa.
+    const datosExistentes = persona[campoDatos] || {};
+    const nuevosDatos = { ...datosExistentes, ...datosActualizados };
+
+    const updated = await prisma.personaRegistrada.update({
+      where: { numeroIdentificacion: cedula },
+      data: {
+        [campoDatos]: nuevosDatos,
+        completado: true, // Marcar como completado pues es edición manual del funcionario
+        updatedAt: new Date()
+      }
+    });
+
+    // Recalcular completitud en todos los protocolos donde participe esta persona
+    // Esto actualiza el semáforo automáticamente
+    const participaciones = await prisma.personaProtocolo.findMany({
+      where: { personaCedula: cedula }
+    });
+
+    for (const p of participaciones) {
+      await calcularYActualizarCompletitud(p.id).catch(err =>
+        console.warn(`Error actualizando completitud para PP ${p.id}:`, err)
+      );
+    }
+
+    res.json({
+      success: true,
+      message: 'Datos de persona actualizados exitosamente',
+      data: updated
+    });
+
+  } catch (error) {
+    console.error('Error actualizando datos persona:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al actualizar datos de persona',
+      error: error.message
+    });
+  }
+}
+
+/**
  * Listar protocolos UAFE del matrizador
  * GET /api/formulario-uafe/protocolos
  * Requiere: authenticateToken
@@ -723,7 +836,10 @@ export async function listarProtocolos(req, res) {
           // Nuevos campos de completitud (semáforo)
           estadoCompletitud: pp.estadoCompletitud || 'pendiente',
           porcentajeCompletitud: pp.porcentajeCompletitud || 0,
-          createdAt: pp.createdAt
+          createdAt: pp.createdAt,
+          // Datos completos para previsualización y edición
+          datosPersonaNatural: pp.persona.datosPersonaNatural,
+          datosPersonaJuridica: pp.persona.datosPersonaJuridica
         };
       });
 
@@ -2633,10 +2749,12 @@ export async function generarTextos(req, res) {
 
     // 3. Verificar si ya hay textos en cache y no se fuerza regeneración
     if (!forzar && protocolo.textoEncabezadoGenerado && protocolo.textoComparecenciaGenerado) {
-      // Generar versión texto plano del HTML guardado
+      // Generar versión texto plano del HTML guardado (soporta legacy <b> y nuevo <strong>)
       const comparecenciaPlano = protocolo.textoComparecenciaGenerado
         .replace(/<strong>/g, '')
-        .replace(/<\/strong>/g, '');
+        .replace(/<\/strong>/g, '')
+        .replace(/<b[^>]*>/g, '')
+        .replace(/<\/b>/g, '');
 
       return res.json({
         success: true,
