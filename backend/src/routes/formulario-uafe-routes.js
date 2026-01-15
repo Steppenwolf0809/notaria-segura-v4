@@ -19,7 +19,8 @@ import {
   listarTodosProtocolos,
   eliminarProtocolo,
   listarPersonasRegistradas,
-  eliminarPersonaRegistrada
+  eliminarPersonaRegistrada,
+  generarTextos
 } from '../controllers/formulario-uafe-controller.js';
 
 const router = express.Router();
@@ -177,6 +178,19 @@ router.get(
   authenticateToken,
   requireRoles(['MATRIZADOR', 'ADMIN']),
   generarPDFs
+);
+
+/**
+ * Generar textos notariales (encabezado y comparecencia)
+ * POST /api/formulario-uafe/protocolo/:protocoloId/generar-textos
+ * Requiere: JWT + role MATRIZADOR o ADMIN
+ * Body: { forzar: boolean } - Si true, regenera aunque ya exista en cache
+ */
+router.post(
+  '/protocolo/:protocoloId/generar-textos',
+  authenticateToken,
+  requireRoles(['MATRIZADOR', 'ADMIN']),
+  generarTextos
 );
 
 /**
