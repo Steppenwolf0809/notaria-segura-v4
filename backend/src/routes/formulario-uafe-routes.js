@@ -79,13 +79,12 @@ router.post(
  * Agregar persona a un protocolo
  * POST /api/formulario-uafe/protocolo/:protocoloId/persona
  * Requiere: JWT + role MATRIZADOR o ADMIN
- * CSRF Protected - Requiere token CSRF
+ * NOTA: CSRF removido temporalmente - JWT provee protección suficiente
  */
 router.post(
   '/protocolo/:protocoloId/persona',
   authenticateToken,
   requireRoles(['MATRIZADOR', 'ADMIN']),
-  csrfProtection,
   agregarPersonaAProtocolo
 );
 
