@@ -117,7 +117,8 @@ export async function crearProtocolo(req, res) {
     const protocolo = await prisma.protocoloUAFE.create({
       data: {
         numeroProtocolo: numeroProtocolo || null,
-        fecha: new Date(fecha),
+        // FIX TIMEZONE: Agregar T12:00:00 para evitar que la fecha caiga en día anterior por UTC
+        fecha: new Date(`${fecha}T12:00:00`),
         tipoActo: actoContrato,  // Campo requerido por el schema
         actoContrato,            // Mantenido para retrocompatibilidad
         tipoActoOtro: tipoActoOtro || null,
