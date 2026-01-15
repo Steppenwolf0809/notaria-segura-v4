@@ -437,7 +437,7 @@ const AnalisisUAFE = () => {
                                 <TableRow>
                                     <TableCell colSpan={10} sx={{ p: 0 }}>
                                         <Collapse in={expandedRow === persona.id} timeout="auto" unmountOnExit>
-                                            <Box sx={{ p: 2, backgroundColor: '#f5f5f5' }}>
+                                            <Box sx={{ p: 2, backgroundColor: 'action.hover' }}>
                                                 <Grid container spacing={2}>
                                                     <Grid item xs={12} md={4}>
                                                         <Typography variant="subtitle2" fontWeight="bold">Contacto</Typography>
