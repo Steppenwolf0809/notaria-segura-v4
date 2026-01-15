@@ -22,18 +22,12 @@ import {
     DialogContent,
     DialogContentText,
     DialogActions,
-    List,
-    ListItem,
-    ListItemIcon,
-    ListItemText,
     Tooltip
 } from '@mui/material';
 import {
     ContentCopy as CopyIcon,
     Refresh as RefreshIcon,
-    CheckCircle as CheckCircleIcon,
     Warning as WarningIcon,
-    Error as ErrorIcon,
     Schedule as ScheduleIcon,
     Description as DescriptionIcon
 } from '@mui/icons-material';
@@ -46,10 +40,11 @@ const encabezadoStyles = {
     fontFamily: '"Courier New", Courier, monospace',
     whiteSpace: 'pre-wrap',
     fontSize: '11px',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#1e1e1e',
+    color: '#e0e0e0',
     padding: '16px',
     borderRadius: '8px',
-    border: '1px solid #e0e0e0',
+    border: '1px solid #444',
     overflowX: 'auto',
     lineHeight: 1.3,
     maxHeight: '400px',
@@ -65,8 +60,9 @@ const comparecenciaStyles = {
     lineHeight: 1.8,
     textAlign: 'justify',
     padding: '16px',
-    backgroundColor: '#ffffff',
-    border: '1px solid #e0e0e0',
+    backgroundColor: '#1e1e1e',
+    color: '#e0e0e0',
+    border: '1px solid #444',
     borderRadius: '8px',
     maxHeight: '400px',
     overflowY: 'auto'
@@ -90,29 +86,20 @@ const TextosNotarialesPanel = ({
     const [loading, setLoading] = useState(false);
     const [fromCache, setFromCache] = useState(false);
     const [fechaGeneracion, setFechaGeneracion] = useState(null);
-    const [participantesIncompletos, setParticipantesIncompletos] = useState([]);
+    const [tieneIncompletos, setTieneIncompletos] = useState(false);
     const [error, setError] = useState(null);
     const [openConfirmRegenerar, setOpenConfirmRegenerar] = useState(false);
     const [textosDisponibles, setTextosDisponibles] = useState(false);
 
     // Verificar si es tipo de acto válido para generar textos
     const esActoSinTextos = ['VENTA_VEHICULO', 'RECONOCIMIENTO_VEHICULO'].includes(tipoActo);
-    const todosCompletos = participantesCount > 0 && participantesCompletados === participantesCount;
-
-    // Cargar textos al montar si hay participantes completos
-    useEffect(() => {
-        if (protocoloId && todosCompletos && !esActoSinTextos) {
-            cargarTextos();
-        }
-    }, [protocoloId, todosCompletos]);
 
     /**
-     * Cargar textos del servidor (desde cache si existe)
+     * Cargar textos del servidor
      */
     const cargarTextos = async (forzar = false) => {
         setLoading(true);
         setError(null);
-        setParticipantesIncompletos([]);
 
         try {
             const response = await apiClient.post(
@@ -128,22 +115,15 @@ const TextosNotarialesPanel = ({
                 });
                 setFromCache(response.data.fromCache || false);
                 setFechaGeneracion(response.data.fechaGeneracion);
+                setTieneIncompletos(response.data.tieneIncompletos || false);
                 setTextosDisponibles(true);
                 onSuccess(forzar ? 'Textos regenerados exitosamente' : 'Textos cargados');
             } else {
                 setError(response.data.message || 'Error al generar textos');
-                if (response.data.participantesIncompletos) {
-                    setParticipantesIncompletos(response.data.participantesIncompletos);
-                }
             }
         } catch (err) {
             const errorMsg = err.response?.data?.message || 'Error al conectar con el servidor';
             setError(errorMsg);
-
-            if (err.response?.data?.participantesIncompletos) {
-                setParticipantesIncompletos(err.response.data.participantesIncompletos);
-            }
-
             onError(errorMsg);
         } finally {
             setLoading(false);
@@ -159,7 +139,7 @@ const TextosNotarialesPanel = ({
     };
 
     /**
-     * Copiar texto al portapapeles
+     * Copiar texto al portapapeles (texto plano)
      */
     const copiarAlPortapapeles = async (texto, tipo) => {
         try {
@@ -167,6 +147,32 @@ const TextosNotarialesPanel = ({
             onSuccess(`${tipo} copiado al portapapeles`);
         } catch (err) {
             onError('Error al copiar al portapapeles');
+        }
+    };
+
+    /**
+     * Copiar HTML con formato rico (para Word)
+     * Esto preserva las negritas al pegar en Word/Google Docs
+     */
+    const copiarHtmlConFormato = async (html, tipo) => {
+        try {
+            // Crear un blob con el HTML
+            const blob = new Blob([html], { type: 'text/html' });
+            const clipboardItem = new ClipboardItem({
+                'text/html': blob,
+                'text/plain': new Blob([html.replace(/<[^>]*>/g, '')], { type: 'text/plain' })
+            });
+            await navigator.clipboard.write([clipboardItem]);
+            onSuccess(`${tipo} copiado al portapapeles (con formato)`);
+        } catch (err) {
+            // Fallback: copiar como texto plano si falla el HTML
+            console.warn('No se pudo copiar con formato, usando texto plano:', err);
+            try {
+                await navigator.clipboard.writeText(html.replace(/<[^>]*>/g, ''));
+                onSuccess(`${tipo} copiado al portapapeles (texto plano)`);
+            } catch (err2) {
+                onError('Error al copiar al portapapeles');
+            }
         }
     };
 
@@ -208,51 +214,8 @@ const TextosNotarialesPanel = ({
         );
     }
 
-    // Si hay participantes incompletos
-    if (!todosCompletos && !textosDisponibles) {
-        return (
-            <Box sx={{ mt: 2 }}>
-                <Alert severity="warning" icon={<WarningIcon />}>
-                    <Typography variant="body2" gutterBottom>
-                        <strong>No se pueden generar textos.</strong> Hay {participantesCount - participantesCompletados} participante(s)
-                        con datos incompletos.
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                        Todos los participantes deben completar su formulario (semáforo verde) antes de poder
-                        generar el encabezado y la comparecencia.
-                    </Typography>
-                </Alert>
-
-                {participantesIncompletos.length > 0 && (
-                    <Paper variant="outlined" sx={{ mt: 2, p: 2 }}>
-                        <Typography variant="subtitle2" gutterBottom>
-                            Participantes con datos faltantes:
-                        </Typography>
-                        <List dense>
-                            {participantesIncompletos.map((p, index) => (
-                                <ListItem key={index}>
-                                    <ListItemIcon>
-                                        <ErrorIcon color="error" fontSize="small" />
-                                    </ListItemIcon>
-                                    <ListItemText
-                                        primary={p.nombre || p.cedula}
-                                        secondary={
-                                            <>
-                                                {p.porcentaje}% completado
-                                                {p.faltantes && p.faltantes.length > 0 && (
-                                                    <span> • Falta: {p.faltantes.slice(0, 3).join(', ')}{p.faltantes.length > 3 ? '...' : ''}</span>
-                                                )}
-                                            </>
-                                        }
-                                    />
-                                </ListItem>
-                            ))}
-                        </List>
-                    </Paper>
-                )}
-            </Box>
-        );
-    }
+    // Calcular si hay incompletos
+    const hayIncompletos = participantesCompletados < participantesCount;
 
     return (
         <Box sx={{ mt: 2 }}>
@@ -278,6 +241,20 @@ const TextosNotarialesPanel = ({
                 </Stack>
             </Stack>
 
+            {/* Advertencia si hay incompletos (no bloqueante) */}
+            {hayIncompletos && !textosDisponibles && (
+                <Alert severity="warning" icon={<WarningIcon />} sx={{ mb: 2 }}>
+                    <Typography variant="body2" gutterBottom>
+                        <strong>Advertencia:</strong> Hay {participantesCount - participantesCompletados} participante(s)
+                        con datos incompletos.
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                        Los textos se generarán con marcadores [PENDIENTE] para los datos faltantes.
+                        Podrás regenerar cuando todos los participantes completen su información.
+                    </Typography>
+                </Alert>
+            )}
+
             {/* Mensaje de error */}
             {error && (
                 <Alert severity="error" sx={{ mb: 2 }}>
@@ -285,9 +262,19 @@ const TextosNotarialesPanel = ({
                 </Alert>
             )}
 
+            {/* Advertencia si se generó con incompletos */}
+            {tieneIncompletos && textosDisponibles && (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                    <Typography variant="body2">
+                        Estos textos fueron generados con datos incompletos.
+                        Busca los marcadores [PENDIENTE] y regenera cuando todos los participantes completen su información.
+                    </Typography>
+                </Alert>
+            )}
+
             {/* Loading */}
             {loading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', p: 4 }}>
                     <CircularProgress />
                     <Typography sx={{ ml: 2 }}>Generando textos...</Typography>
                 </Box>
@@ -336,7 +323,7 @@ const TextosNotarialesPanel = ({
                                 <Alert severity="info" sx={{ mb: 2 }}>
                                     <Typography variant="caption">
                                         Las palabras en <strong>negrita</strong> corresponden a la fecha, la notaria
-                                        y los nombres de los comparecientes.
+                                        y los nombres de los comparecientes. Al copiar, se preservará el formato.
                                     </Typography>
                                 </Alert>
 
@@ -345,24 +332,15 @@ const TextosNotarialesPanel = ({
                                     dangerouslySetInnerHTML={{ __html: textos.comparecenciaHtml }}
                                 />
 
-                                <Stack direction="row" spacing={2} sx={{ mt: 2 }}>
-                                    <Button
-                                        variant="outlined"
-                                        startIcon={<CopyIcon />}
-                                        onClick={() => copiarAlPortapapeles(textos.comparecencia, 'Comparecencia')}
-                                        disabled={!textos.comparecencia}
-                                    >
-                                        Copiar Texto Plano
-                                    </Button>
-                                    <Button
-                                        variant="outlined"
-                                        startIcon={<CopyIcon />}
-                                        onClick={() => copiarAlPortapapeles(textos.comparecenciaHtml, 'Comparecencia HTML')}
-                                        disabled={!textos.comparecenciaHtml}
-                                    >
-                                        Copiar con Formato HTML
-                                    </Button>
-                                </Stack>
+                                <Button
+                                    variant="outlined"
+                                    startIcon={<CopyIcon />}
+                                    onClick={() => copiarHtmlConFormato(textos.comparecenciaHtml, 'Comparecencia')}
+                                    disabled={!textos.comparecenciaHtml}
+                                    sx={{ mt: 2 }}
+                                >
+                                    Copiar al Portapapeles
+                                </Button>
                             </Box>
                         )}
                     </Paper>
@@ -389,7 +367,7 @@ const TextosNotarialesPanel = ({
                         color="primary"
                         startIcon={<DescriptionIcon />}
                         onClick={() => cargarTextos(false)}
-                        disabled={loading || !todosCompletos}
+                        disabled={loading}
                         sx={{ mt: 2 }}
                     >
                         Generar Textos Notariales

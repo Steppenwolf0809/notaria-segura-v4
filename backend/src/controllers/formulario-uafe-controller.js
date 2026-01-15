@@ -151,7 +151,7 @@ export async function crearProtocolo(req, res) {
 export async function agregarPersonaAProtocolo(req, res) {
   try {
     const { protocoloId } = req.params;
-    const { cedula, calidad, actuaPor, representadoId, datosRepresentado } = req.body;
+    const { cedula, calidad, actuaPor, representadoId, datosRepresentado, compareceConyugeJunto } = req.body;
 
     // Validaciones
     if (!cedula || !calidad || !actuaPor) {
@@ -186,14 +186,13 @@ export async function agregarPersonaAProtocolo(req, res) {
       });
     }
 
-    // Verificar si ya existe EXACTAMENTE la misma entrada (Cedula + Calidad + ActuaPor)
+    // Verificar si ya existe esta persona en el protocolo
+    // El índice único es: protocoloId + personaCedula (una persona solo puede estar una vez por protocolo)
     const existente = await prisma.personaProtocolo.findUnique({
       where: {
-        protocoloId_personaCedula_calidad_actuaPor: {
+        protocoloId_personaCedula: {
           protocoloId,
-          personaCedula: cedula,
-          calidad,
-          actuaPor
+          personaCedula: cedula
         }
       }
     });
@@ -201,7 +200,7 @@ export async function agregarPersonaAProtocolo(req, res) {
     if (existente) {
       return res.status(409).json({
         success: false,
-        message: 'Esta persona ya está agregada con esa misma calidad y rol.'
+        message: 'Esta persona ya está agregada a este protocolo.'
       });
     }
 
@@ -210,7 +209,8 @@ export async function agregarPersonaAProtocolo(req, res) {
       protocoloId,
       personaCedula: cedula,
       calidad,
-      actuaPor
+      actuaPor,
+      compareceConyugeJunto: compareceConyugeJunto || false
     };
 
     // Agregar datos de representación si aplican
@@ -720,12 +720,15 @@ export async function listarProtocolos(req, res) {
           representado: nombreRepresentado ? { nombre: nombreRepresentado } : null,
           completado: pp.completado,
           completadoAt: pp.completadoAt,
+          // Nuevos campos de completitud (semáforo)
+          estadoCompletitud: pp.estadoCompletitud || 'pendiente',
+          porcentajeCompletitud: pp.porcentajeCompletitud || 0,
           createdAt: pp.createdAt
         };
       });
 
-      // Calcular progreso
-      const personasCompletadas = personasFormateadas.filter(p => p.completado).length;
+      // Calcular progreso basado en estadoCompletitud (nuevo sistema de semáforos)
+      const personasCompletadas = personasFormateadas.filter(p => p.estadoCompletitud === 'completo').length;
       const totalPersonas = personasFormateadas.length;
       const progreso = totalPersonas > 0 ? Math.round((personasCompletadas / totalPersonas) * 100) : 0;
 
@@ -857,6 +860,12 @@ export async function obtenerProtocolo(req, res) {
         }
       }
 
+      // Extraer estadoCivil para el checkbox de cónyuge
+      let estadoCivil = null;
+      if (pp.persona.tipoPersona === 'NATURAL' && pp.persona.datosPersonaNatural?.datosPersonales) {
+        estadoCivil = pp.persona.datosPersonaNatural.datosPersonales.estadoCivil || null;
+      }
+
       return {
         id: pp.id,
         cedula: pp.persona.numeroIdentificacion,
@@ -865,8 +874,17 @@ export async function obtenerProtocolo(req, res) {
         calidad: pp.calidad,
         actuaPor: pp.actuaPor,
         representado: nombreRepresentado ? { nombre: nombreRepresentado } : null,
+        // Campos para edición
+        estadoCivil: estadoCivil,
+        compareceConyugeJunto: pp.compareceConyugeJunto || false,
+        mandanteCedula: pp.mandanteCedula || null,
+        mandanteNombre: pp.mandanteNombre || null,
+        // Otros campos
         completado: pp.completado,
         completadoAt: pp.completadoAt,
+        // Nuevos campos de completitud (semáforo)
+        estadoCompletitud: pp.estadoCompletitud || 'pendiente',
+        porcentajeCompletitud: pp.porcentajeCompletitud || 0,
         respuestaFormulario: pp.respuestaFormulario,
         createdAt: pp.createdAt,
         updatedAt: pp.updatedAt
@@ -1009,7 +1027,7 @@ export async function actualizarPersonaEnProtocolo(req, res) {
   try {
     const { protocoloId, personaProtocoloId, personaId } = req.params;
     const personaIdFinal = personaProtocoloId || personaId; // Soportar ambos nombres
-    const { calidad, actuaPor } = req.body;
+    const { calidad, actuaPor, compareceConyugeJunto, mandanteCedula } = req.body;
 
     // Verificar que el protocolo existe y pertenece al usuario
     const protocolo = await prisma.protocoloUAFE.findUnique({
@@ -1067,13 +1085,42 @@ export async function actualizarPersonaEnProtocolo(req, res) {
       });
     }
 
+    // Preparar datos a actualizar
+    const dataToUpdate = {
+      ...(calidad && { calidad }),
+      ...(actuaPor && { actuaPor })
+    };
+
+    // Manejar compareceConyugeJunto
+    if (typeof compareceConyugeJunto === 'boolean') {
+      dataToUpdate.compareceConyugeJunto = compareceConyugeJunto;
+    }
+
+    // Manejar mandanteCedula
+    if (actuaPor === 'REPRESENTANDO_A' && mandanteCedula) {
+      dataToUpdate.mandanteCedula = mandanteCedula;
+      // Buscar nombre del mandante
+      const mandante = await prisma.personaRegistrada.findUnique({
+        where: { numeroIdentificacion: mandanteCedula }
+      });
+      if (mandante) {
+        if (mandante.tipoPersona === 'NATURAL' && mandante.datosPersonaNatural?.datosPersonales) {
+          const dp = mandante.datosPersonaNatural.datosPersonales;
+          dataToUpdate.mandanteNombre = `${dp.nombres || ''} ${dp.apellidos || ''}`.trim();
+        } else if (mandante.tipoPersona === 'JURIDICA' && mandante.datosPersonaJuridica?.compania) {
+          dataToUpdate.mandanteNombre = mandante.datosPersonaJuridica.compania.razonSocial || '';
+        }
+      }
+    } else if (actuaPor === 'PROPIOS_DERECHOS') {
+      // Limpiar mandante si cambia a propios derechos
+      dataToUpdate.mandanteCedula = null;
+      dataToUpdate.mandanteNombre = null;
+    }
+
     // Actualizar persona en protocolo
     const personaActualizada = await prisma.personaProtocolo.update({
       where: { id: personaIdFinal },
-      data: {
-        ...(calidad && { calidad }),
-        ...(actuaPor && { actuaPor })
-      },
+      data: dataToUpdate,
       include: {
         persona: {
           select: {
@@ -2577,28 +2624,20 @@ export async function generarTextos(req, res) {
       });
     }
 
-    // 2. Verificar completitud de todos los participantes
+    // 2. Verificar completitud de todos los participantes (informativo, no bloqueante)
     const estadoGeneral = await obtenerEstadoGeneralProtocolo(protocoloId);
+    const tieneIncompletos = !estadoGeneral.puedeGenerar;
 
-    if (!estadoGeneral.puedeGenerar) {
-      return res.status(400).json({
-        success: false,
-        message: 'No se pueden generar textos. Hay participantes con datos incompletos.',
-        estadoGeneral,
-        participantesIncompletos: estadoGeneral.participantes
-          .filter(p => p.estado !== 'completo')
-          .map(p => ({
-            cedula: p.cedulaRuc,
-            nombre: p.nombreCompleto || p.nombreTemporal,
-            estado: p.estado,
-            porcentaje: p.porcentaje,
-            faltantes: p.camposFaltantes
-          }))
-      });
-    }
+    // Nota: Ya no bloqueamos la generación, solo advertimos
+    // Los datos faltantes se mostrarán como [PENDIENTE] en los textos generados
 
     // 3. Verificar si ya hay textos en cache y no se fuerza regeneración
     if (!forzar && protocolo.textoEncabezadoGenerado && protocolo.textoComparecenciaGenerado) {
+      // Generar versión texto plano del HTML guardado
+      const comparecenciaPlano = protocolo.textoComparecenciaGenerado
+        .replace(/<strong>/g, '')
+        .replace(/<\/strong>/g, '');
+
       return res.json({
         success: true,
         message: 'Textos recuperados de cache',
@@ -2606,7 +2645,8 @@ export async function generarTextos(req, res) {
         fechaGeneracion: protocolo.fechaUltimaGeneracion,
         data: {
           encabezado: protocolo.textoEncabezadoGenerado,
-          comparecencia: protocolo.textoComparecenciaGenerado
+          comparecencia: comparecenciaPlano,
+          comparecenciaHtml: protocolo.textoComparecenciaGenerado
         }
       });
     }
@@ -2645,12 +2685,25 @@ export async function generarTextos(req, res) {
 
     console.log(`[UAFE] Textos generados para protocolo ${protocolo.numeroProtocolo || protocolo.identificadorTemporal}`);
 
-    // 7. Retornar textos
+    // 7. Retornar textos con advertencia si hay incompletos
     res.json({
       success: true,
-      message: 'Textos generados exitosamente',
+      message: tieneIncompletos
+        ? 'Textos generados con advertencia: algunos participantes tienen datos incompletos'
+        : 'Textos generados exitosamente',
       fromCache: false,
       fechaGeneracion: new Date().toISOString(),
+      tieneIncompletos,
+      participantesIncompletos: tieneIncompletos
+        ? estadoGeneral.participantes
+          .filter(p => p.estado !== 'completo')
+          .map(p => ({
+            cedula: p.cedulaRuc,
+            nombre: p.nombreCompleto || p.nombreTemporal,
+            porcentaje: p.porcentaje,
+            faltantes: p.camposFaltantes?.slice(0, 5) // Limitar a 5 campos
+          }))
+        : [],
       data: {
         encabezado: resultadoEncabezado.encabezado,
         comparecencia: resultadoComparecencia.comparecencia,
