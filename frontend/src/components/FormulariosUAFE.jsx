@@ -60,7 +60,8 @@ import {
   HowToReg as HowToRegIcon,
   Info as InfoIcon,
   AssignmentInd as AssignmentIndIcon,
-  FiberManualRecord as CircleIcon
+  FiberManualRecord as CircleIcon,
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { API_BASE } from '../utils/apiConfig';
 import { formatDateES, formatDateTimeES } from '../utils/dateUtils';
@@ -524,6 +525,31 @@ const FormulariosUAFE = ({ adminMode = false }) => {
     } catch (error) {
       mostrarSnackbar('Error al cargar detalles', 'error');
       console.error('Error cargando detalles:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /**
+   * Actualizar datos del protocolo actual sin cambiar de vista
+   * Útil para refrescar datos después de que una persona complete su registro
+   */
+  const actualizarDatosProtocolo = async () => {
+    if (!protocoloSeleccionado?.id) return;
+
+    setLoading(true);
+    try {
+      const response = await apiClient.get(`/formulario-uafe/protocolo/${protocoloSeleccionado.id}`);
+
+      if (response.data.success) {
+        setProtocoloSeleccionado(response.data.data);
+        mostrarSnackbar('Datos actualizados correctamente', 'success');
+      } else {
+        mostrarSnackbar('Error al actualizar datos', 'error');
+      }
+    } catch (error) {
+      mostrarSnackbar('Error al actualizar datos', 'error');
+      console.error('Error actualizando datos:', error);
     } finally {
       setLoading(false);
     }
@@ -2222,9 +2248,20 @@ const FormulariosUAFE = ({ adminMode = false }) => {
 
               {/* Personas */}
               <Box>
-                <Typography variant="h6" gutterBottom>
-                  Personas ({protocoloSeleccionado.personas?.length || 0})
-                </Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6">
+                    Personas ({protocoloSeleccionado.personas?.length || 0})
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={actualizarDatosProtocolo}
+                    disabled={loading}
+                    startIcon={<RefreshIcon />}
+                  >
+                    {loading ? 'Actualizando...' : 'Actualizar Datos'}
+                  </Button>
+                </Box>
                 {protocoloSeleccionado.personas && protocoloSeleccionado.personas.length > 0 ? (
                   <List>
                     {protocoloSeleccionado.personas.map((persona) => (
