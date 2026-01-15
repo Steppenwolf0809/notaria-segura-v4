@@ -24,9 +24,13 @@ import {
   COLORS,
   FONTS
 } from '../utils/pdf-uafe-helpers.js';
+import { generarEncabezado } from '../services/encabezado-generator-service.js';
+import { generarComparecencia } from '../services/comparecencia-generator-service.js';
+import { obtenerEstadoGeneralProtocolo } from '../services/completitud-service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
 
 /**
  * Crear nuevo protocolo UAFE
@@ -2522,3 +2526,145 @@ export async function eliminarPersonaRegistrada(req, res) {
     });
   }
 }
+
+/**
+ * Generar textos notariales (encabezado y comparecencia)
+ * POST /api/formulario-uafe/protocolo/:protocoloId/generar-textos
+ * Requiere: authenticateToken + role MATRIZADOR o ADMIN
+ * 
+ * Genera el encabezado estructurado y la comparecencia con negritas HTML.
+ * Guarda los textos en cache de BD y retorna ambos.
+ */
+export async function generarTextos(req, res) {
+  try {
+    const { protocoloId } = req.params;
+    const { forzar = false } = req.body; // Si true, regenera aunque ya exista
+
+    // 1. Obtener el protocolo con todos los participantes
+    const protocolo = await prisma.protocoloUAFE.findUnique({
+      where: { id: protocoloId },
+      include: {
+        personas: {
+          include: {
+            persona: {
+              select: {
+                id: true,
+                numeroIdentificacion: true,
+                tipoPersona: true,
+                datosPersonaNatural: true,
+                datosPersonaJuridica: true,
+                completado: true
+              }
+            }
+          },
+          orderBy: { orden: 'asc' }
+        }
+      }
+    });
+
+    if (!protocolo) {
+      return res.status(404).json({
+        success: false,
+        message: 'Protocolo no encontrado'
+      });
+    }
+
+    // Verificar permisos: solo el creador o ADMIN
+    if (protocolo.createdBy !== req.user.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permiso para generar textos de este protocolo'
+      });
+    }
+
+    // 2. Verificar completitud de todos los participantes
+    const estadoGeneral = await obtenerEstadoGeneralProtocolo(protocoloId);
+
+    if (!estadoGeneral.puedeGenerar) {
+      return res.status(400).json({
+        success: false,
+        message: 'No se pueden generar textos. Hay participantes con datos incompletos.',
+        estadoGeneral,
+        participantesIncompletos: estadoGeneral.participantes
+          .filter(p => p.estado !== 'completo')
+          .map(p => ({
+            cedula: p.cedulaRuc,
+            nombre: p.nombreCompleto || p.nombreTemporal,
+            estado: p.estado,
+            porcentaje: p.porcentaje,
+            faltantes: p.camposFaltantes
+          }))
+      });
+    }
+
+    // 3. Verificar si ya hay textos en cache y no se fuerza regeneración
+    if (!forzar && protocolo.textoEncabezadoGenerado && protocolo.textoComparecenciaGenerado) {
+      return res.json({
+        success: true,
+        message: 'Textos recuperados de cache',
+        fromCache: true,
+        fechaGeneracion: protocolo.fechaUltimaGeneracion,
+        data: {
+          encabezado: protocolo.textoEncabezadoGenerado,
+          comparecencia: protocolo.textoComparecenciaGenerado
+        }
+      });
+    }
+
+    // 4. Generar encabezado
+    const resultadoEncabezado = generarEncabezado(protocolo, protocolo.personas);
+
+    if (!resultadoEncabezado.success) {
+      return res.status(400).json({
+        success: false,
+        message: 'Error generando encabezado',
+        error: resultadoEncabezado.error
+      });
+    }
+
+    // 5. Generar comparecencia
+    const resultadoComparecencia = generarComparecencia(protocolo, protocolo.personas, { formatoHtml: true });
+
+    if (!resultadoComparecencia.success) {
+      return res.status(400).json({
+        success: false,
+        message: 'Error generando comparecencia',
+        error: resultadoComparecencia.error
+      });
+    }
+
+    // 6. Guardar en cache
+    await prisma.protocoloUAFE.update({
+      where: { id: protocoloId },
+      data: {
+        textoEncabezadoGenerado: resultadoEncabezado.encabezado,
+        textoComparecenciaGenerado: resultadoComparecencia.comparecenciaHtml,
+        fechaUltimaGeneracion: new Date()
+      }
+    });
+
+    console.log(`[UAFE] Textos generados para protocolo ${protocolo.numeroProtocolo || protocolo.identificadorTemporal}`);
+
+    // 7. Retornar textos
+    res.json({
+      success: true,
+      message: 'Textos generados exitosamente',
+      fromCache: false,
+      fechaGeneracion: new Date().toISOString(),
+      data: {
+        encabezado: resultadoEncabezado.encabezado,
+        comparecencia: resultadoComparecencia.comparecencia,
+        comparecenciaHtml: resultadoComparecencia.comparecenciaHtml
+      }
+    });
+
+  } catch (error) {
+    console.error('Error generando textos:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al generar textos notariales',
+      error: error.message
+    });
+  }
+}
+

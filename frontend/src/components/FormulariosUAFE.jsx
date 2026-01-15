@@ -61,6 +61,7 @@ import { API_BASE } from '../utils/apiConfig';
 import { formatDateES, formatDateTimeES } from '../utils/dateUtils';
 import ResetearPinDialog from './ResetearPinDialog';
 import VistaPreviewFormulario from './VistaPreviewFormulario';
+import TextosNotarialesPanel from './TextosNotarialesPanel';
 import apiClient from '../services/api-client';
 
 /**
@@ -2224,6 +2225,20 @@ const FormulariosUAFE = ({ adminMode = false }) => {
                     <li>Su PIN personal (configurado al registrarse)</li>
                   </ol>
                 </Alert>
+              </Box>
+
+              <Divider />
+
+              {/* Textos Notariales Generados */}
+              <Box>
+                <TextosNotarialesPanel
+                  protocoloId={protocoloSeleccionado.id}
+                  tipoActo={protocoloSeleccionado.actoContrato}
+                  participantesCount={protocoloSeleccionado.personas?.length || 0}
+                  participantesCompletados={protocoloSeleccionado.personas?.filter(p => p.completado).length || 0}
+                  onError={(msg) => mostrarSnackbar(msg, 'error')}
+                  onSuccess={(msg) => mostrarSnackbar(msg, 'success')}
+                />
               </Box>
             </Stack>
           )}

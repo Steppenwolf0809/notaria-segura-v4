@@ -1,0 +1,23 @@
+{
+    "name": "auditoria-secuencias",
+    "version": "1.0.0",
+    "description": "Script de auditoría de secuencias documentales - Notaría Segura",
+    "type": "module",
+    "main": "index.js",
+    "scripts": {
+        "start": "node index.js",
+        "audit": "node index.js"
+    },
+    "dependencies": {
+        "pg": "^8.11.0",
+        "exceljs": "^4.4.0",
+        "dotenv": "^16.3.0"
+    },
+    "keywords": [
+        "audit",
+        "sequences",
+        "notaria"
+    ],
+    "author": "Notaría Segura",
+    "license": "PRIVATE"
+}
