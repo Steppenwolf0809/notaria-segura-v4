@@ -255,6 +255,107 @@ async function safeMigrate() {
   }
 }
 
+/**
+ * Seed de plantillas WhatsApp por defecto
+ * Inserta plantillas que no existan aún en la BD
+ */
+async function seedWhatsAppTemplates() {
+  logSection('SEED DE PLANTILLAS WHATSAPP');
+
+  const templates = [
+    {
+      tipo: 'DOCUMENTO_LISTO',
+      titulo: 'Documento Listo para Retiro (Mejorado)',
+      mensaje: `🏛️ *{nombreNotariaCompleto}*
+
+Estimado/a {nombreCompareciente},
+
+Su documento está listo para retiro:
+📄 *Documento:* {documento}
+📝 *Acto:* {actoPrincipal}
+🔢 *Código de retiro:* {codigo}
+{codigosEscritura}
+📊 *Documentos:* {cantidadDocumentos}
+
+⚠️ *IMPORTANTE:* Presente este código al momento del retiro.
+
+📍 *Dirección:* Azuay E2-231 y Av Amazonas, Quito
+⏰ *Horario:* Lunes a Viernes 8:00-17:00
+
+Para consultas: Tel: (02) 2247787
+¡Gracias por confiar en nosotros!`
+    },
+    {
+      tipo: 'RECORDATORIO_RETIRO',
+      titulo: 'Recordatorio de Retiro de Documento',
+      mensaje: `🏛️ *{nombreNotariaCompleto}*
+
+Estimado/a {nombreCompareciente},
+
+⏰ *RECORDATORIO:* Su(s) documento(s) está(n) listo(s) para retiro desde hace varios días.
+
+📄 *Documento:* {documento}
+📝 *Acto:* {actoPrincipal}
+🔢 *Código de retiro:* {codigo}
+{codigosEscritura}
+
+⚠️ Le recordamos que puede retirar su documentación en nuestras oficinas.
+
+📍 *Dirección:* Azuay E2-231 y Av Amazonas, Quito
+⏰ *Horario:* Lunes a Viernes 8:00-17:00
+
+Para consultas: Tel: (02) 2247787
+¡Esperamos su visita!`
+    },
+    {
+      tipo: 'DOCUMENTO_ENTREGADO',
+      titulo: 'Confirmación de Entrega',
+      mensaje: `🏛️ *{nombreNotariaCompleto}*
+
+Estimado/a {nombreCompareciente},
+
+✅ Confirmamos la entrega de {tipoEntrega}:
+{documentosDetalle}
+👤 *Retirado por:* {nombreRetirador}
+{seccionCedula}
+📅 *Fecha:* {fechaFormateada}
+
+Para consultas: Tel: (02) 2247787
+¡Gracias por confiar en nuestros servicios!`
+    }
+  ];
+
+  try {
+    for (const template of templates) {
+      // Verificar si existe
+      const existing = await queryDb(
+        `SELECT id FROM whatsapp_templates WHERE tipo = $1 LIMIT 1`,
+        [template.tipo]
+      );
+
+      if (existing.rows.length === 0) {
+        // Insertar nueva plantilla
+        await queryDb(
+          `INSERT INTO whatsapp_templates (id, tipo, titulo, mensaje, activo, "createdAt", "updatedAt")
+           VALUES (gen_random_uuid(), $1, $2, $3, true, NOW(), NOW())`,
+          [template.tipo, template.titulo, template.mensaje]
+        );
+        log(`✅ Plantilla ${template.tipo} creada`, 'success');
+      } else {
+        log(`ℹ️  Plantilla ${template.tipo} ya existe, saltando...`);
+      }
+    }
+
+    log('✅ Seed de plantillas WhatsApp completado', 'success');
+    return true;
+
+  } catch (error) {
+    log(`⚠️ Error en seed de plantillas (no crítico): ${error.message}`, 'warning');
+    // No lanzamos error porque el seed no es crítico para el deploy
+    return false;
+  }
+}
+
 async function postMigrationValidation() {
   logSection('VALIDACIÓN POST-MIGRACIÓN');
 
@@ -342,6 +443,9 @@ async function main() {
 
     // Fase 3: Safe Migration
     await safeMigrate();
+
+    // Fase 3.5: Seed de plantillas WhatsApp (no crítico)
+    await seedWhatsAppTemplates();
 
     // Fase 4: Post-migration Validation
     await postMigrationValidation();

@@ -1133,12 +1133,12 @@
         {
           "file": "backend/src/services/whatsapp-service.js",
           "line": 549,
-          "snippet": "contactoConsultas: process.env.NOTARIA_CONTACTO || 'Tel: (02) 2234-567',"
+          "snippet": "contactoConsultas: process.env.NOTARIA_CONTACTO || 'Tel: (02) 2247787',"
         },
         {
           "file": "backend/src/services/whatsapp-service.js",
           "line": 800,
-          "snippet": "Para consultas: ${process.env.NOTARIA_CONTACTO || 'Tel: (02) 2234-567'}"
+          "snippet": "Para consultas: ${process.env.NOTARIA_CONTACTO || 'Tel: (02) 2247787'}"
         }
       ],
       "usage_kind": "default",

@@ -853,9 +853,13 @@
                                         <option value="">Seleccionar...</option>
                                         <option value="SOLTERO">Soltero/a</option>
                                         <option value="CASADO">Casado/a</option>
+                                        <option value="CASADO_CON_DISOLUCION">Casado/a con disolución de sociedad
+                                            conyugal</option>
                                         <option value="DIVORCIADO">Divorciado/a</option>
                                         <option value="VIUDO">Viudo/a</option>
                                         <option value="UNION_LIBRE">Unión Libre</option>
+                                        <option value="UNION_LIBRE_CON_SEPARACION">Unión Libre con separación de bienes
+                                        </option>
                                     </select>
                                 </div>
                                 <div class="col-md-4 mb-3">
@@ -2810,6 +2814,22 @@
                 clearInterval(sessionTimer);
             }
             sessionToken = null;
+
+            // Limpiar formulario visualmente para evitar datos cruzados
+            document.querySelectorAll('input, select, textarea').forEach(input => {
+                if (input.type !== 'radio' && input.type !== 'checkbox') {
+                    input.value = '';
+                }
+                if (input.type === 'checkbox') {
+                    input.checked = false;
+                }
+            });
+
+            // Resetear selects específicamente a su valor por defecto
+            document.querySelectorAll('select').forEach(select => {
+                select.selectedIndex = 0;
+            });
+
             showStep('step1');
             document.getElementById('cedula').value = '';
             showAlert('Sesión cerrada correctamente', 'info');
@@ -2839,9 +2859,24 @@
                 }
             });
 
-            // Solo números en cédula
+            // Inicializar estado seleccionado
+            document.getElementById('radioNatural').classList.add('selected');
+
+            // Solo números en cédula + Detección automática de tipo
             document.getElementById('cedula').addEventListener('input', (e) => {
-                e.target.value = e.target.value.replace(/\D/g, '');
+                const val = e.target.value.replace(/\D/g, '');
+                e.target.value = val;
+
+                // UX: Detectar automáticamente el tipo según la longitud
+                if (val.length === 13) {
+                    document.getElementById('tipoJuridica').checked = true;
+                    document.getElementById('radioJuridica').classList.add('selected');
+                    document.getElementById('radioNatural').classList.remove('selected');
+                } else if (val.length === 10) {
+                    document.getElementById('tipoNatural').checked = true;
+                    document.getElementById('radioNatural').classList.add('selected');
+                    document.getElementById('radioJuridica').classList.remove('selected');
+                }
             });
         });
     </script>

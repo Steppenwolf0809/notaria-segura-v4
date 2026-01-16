@@ -42,7 +42,7 @@ import useAuth from '../hooks/use-auth';
 import AdminLayout from './AdminLayout';
 import UserManagement from './admin/UserManagement';
 import DocumentOversight from './admin/DocumentOversight';
-import NotificationHistory from './admin/NotificationHistory';
+import NotificationCenter from './notifications/NotificationCenter';
 import NotificationSettings from './admin/NotificationSettings';
 import NotificationTemplates from './admin/NotificationTemplates';
 import WhatsAppTemplates from './admin/WhatsAppTemplates';
@@ -51,6 +51,7 @@ import AdminSettings from './admin/AdminSettings';
 import FormulariosUAFE from './FormulariosUAFE';
 import AnalisisUAFE from './admin/AnalisisUAFE';
 import QROversight from './admin/QROversight';
+import EncuestasSatisfaccion from './admin/EncuestasSatisfaccion';
 import { getSupervisionStats, getMatrizadores } from '../services/admin-supervision-service';
 
 /**
@@ -76,13 +77,15 @@ const AdminCenter = () => {
       case 'analisis-uafe':
         return <AnalisisUAFE />;
       case 'notifications':
-        return <NotificationHistory />;
+        return <NotificationCenter />;
       case 'notification-templates':
         return <NotificationTemplates />;
       case 'whatsapp-templates':
         return <WhatsAppTemplates />;
       case 'qr-management':
         return <QROversight />;
+      case 'encuestas-satisfaccion':
+        return <EncuestasSatisfaccion />;
       case 'settings':
         return <AdminSettings />;
       default:
@@ -216,9 +219,6 @@ const AdminDashboard = () => {
 
   // Mapping para textos de intervalos
   const billingIntervals = {
-    'current_month': 'Mes Actual',
-    'last_month': 'Mes Anterior',
-    'year_to_date': 'Año Actual',
     'current_week': 'Esta Semana',
     'current_month': 'Mes Actual',
     'last_month': 'Mes Anterior',

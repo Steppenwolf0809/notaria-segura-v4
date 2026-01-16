@@ -53,7 +53,7 @@ const passwordChangeRateLimit = rateLimit({
  */
 const loginRateLimit = rateLimit({
   windowMs: parseInt(process.env.LOGIN_RATE_LIMIT_WINDOW || '900000'), // Default: 15 minutos (15 * 60 * 1000)
-  max: parseInt(process.env.LOGIN_RATE_LIMIT_MAX || '50'), // Default: 50 intentos (aumentado para pruebas)
+  max: parseInt(process.env.LOGIN_RATE_LIMIT_MAX || '100'), // Default: 100 intentos (DUPLICADO para pruebas)
   message: {
     success: false,
     message: 'Demasiados intentos de inicio de sesión para esta cuenta. Intente nuevamente en 15 minutos.',
@@ -62,19 +62,19 @@ const loginRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   trustProxy: process.env.NODE_ENV === 'production', // Solo confiar en proxy en producción
-  
+
   // Generar key única por combinación email+IP con soporte IPv6
   keyGenerator: (req) => {
     const clientIP = ipKeyGenerator(req); // Helper oficial para IPv4/IPv6
     const email = req.body?.email || 'no-email';
     return `${email}:${clientIP}`;
   },
-  
+
   handler: (req, res) => {
     const clientIP = ipKeyGenerator(req); // Usar helper oficial para consistencia
     const userAgent = req.headers['user-agent'] || 'unknown';
     const attemptedEmail = req.body?.email || 'unknown';
-    
+
     logSecurityViolation({
       userId: null,
       userEmail: attemptedEmail,
@@ -83,9 +83,9 @@ const loginRateLimit = rateLimit({
       violation: 'Excedido límite de intentos de login por email+IP',
       severity: 'high'
     });
-    
+
     console.warn(`Login rate limit exceeded - Email: ${attemptedEmail}, IP: ${clientIP}`);
-    
+
     res.status(429).json({
       success: false,
       message: 'Demasiados intentos de inicio de sesión para esta cuenta. Intente nuevamente en 15 minutos.',
@@ -101,7 +101,7 @@ const loginRateLimit = rateLimit({
  */
 const authGeneralRateLimit = rateLimit({
   windowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW || '900000'), // Default: 15 minutos
-  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '100'), // Default: 100 requests (aumentado para pruebas)
+  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '200'), // Default: 200 requests (DUPLICADO para pruebas)
   message: {
     success: false,
     message: 'Demasiadas peticiones a servicios de autenticación. Intente nuevamente más tarde.',
@@ -138,7 +138,7 @@ const addRateLimitHeaders = (req, res, next) => {
     'X-RateLimit-Policy': 'Notaria-Segura-Security-Policy',
     'X-Security-Info': 'Rate limiting active for security'
   });
-  
+
   next();
 };
 
@@ -148,7 +148,7 @@ const addRateLimitHeaders = (req, res, next) => {
  */
 const adminRateLimit = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hora
-  max: 100, // Máximo 100 requests por hora por IP
+  max: 200, // Máximo 200 requests por hora por IP (DUPLICADO para pruebas)
   message: {
     success: false,
     message: 'Demasiadas operaciones administrativas. Intente nuevamente en 1 hora.',
@@ -157,11 +157,11 @@ const adminRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   trustProxy: process.env.NODE_ENV === 'production', // Solo confiar en proxy en producción
-  
+
   handler: (req, res) => {
     const clientIP = req.ip || req.connection.remoteAddress || 'unknown';
     const userAgent = req.headers['user-agent'] || 'unknown';
-    
+
     logSecurityViolation({
       userId: req.user?.id || null,
       userEmail: req.user?.email || 'unknown',
@@ -170,9 +170,9 @@ const adminRateLimit = rateLimit({
       violation: 'Excedido límite de operaciones administrativas',
       severity: 'medium'
     });
-    
+
     console.warn(`Admin rate limit exceeded - IP: ${clientIP}, User: ${req.user?.email || 'unknown'}`);
-    
+
     res.status(429).json({
       success: false,
       message: 'Demasiadas operaciones administrativas. Intente nuevamente en 1 hora.',
@@ -187,7 +187,7 @@ const adminRateLimit = rateLimit({
  */
 const documentsRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 200, // 200 requests por 15 minutos
+  max: 400, // 400 requests por 15 minutos (DUPLICADO para pruebas)
   message: {
     success: false,
     message: 'Demasiadas operaciones de documentos. Intente nuevamente en unos minutos.'
@@ -222,7 +222,7 @@ const documentsRateLimit = rateLimit({
  */
 const receptionRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 500, // 500 requests por 15 minutos (aumentado para operaciones intensivas)
+  max: 1000, // 1000 requests por 15 minutos (DUPLICADO para pruebas)
   message: {
     success: false,
     message: 'Demasiadas operaciones de recepción. Intente nuevamente en unos minutos.'
@@ -256,7 +256,7 @@ const receptionRateLimit = rateLimit({
  */
 const archivoRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 150, // 150 requests por 15 minutos
+  max: 1000, // 1000 requests por 15 minutos (DUPLICADO para pruebas)
   message: {
     success: false,
     message: 'Demasiadas operaciones de archivo. Intente nuevamente en unos minutos.'

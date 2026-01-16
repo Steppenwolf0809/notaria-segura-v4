@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "documents" ADD COLUMN IF NOT EXISTS "fechaListo" TIMESTAMP(3);
+ALTER TABLE "documents" ADD COLUMN IF NOT EXISTS "ultimoRecordatorio" TIMESTAMP(3);
+ALTER TABLE "documents" ADD COLUMN IF NOT EXISTS "pagoConfirmado" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "documents" ADD COLUMN IF NOT EXISTS "alertaInterna" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "documents" ADD COLUMN IF NOT EXISTS "mensajeInterno" TEXT;

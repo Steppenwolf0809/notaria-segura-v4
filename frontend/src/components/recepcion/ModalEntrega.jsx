@@ -106,7 +106,8 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
 
     // 🆕 Solo validar código de verificación para RECEPCIÓN si se requiere explícitamente (ahora simplificado)
     // El usuario pidió quitar el código para recepción también.
-    // if (serviceType !== 'archivo') { ... } -> Lo comentamos    // 🆕 Validación de código relax para recepción también
+    // if (serviceType !== 'archivo') { ... } -> Lo comentamos    // 🆕 Validación de código: YA NO ES OBLIGATORIO.
+    // Se elimina la validación del lado del cliente.
     /*
     if (serviceType !== 'archivo') {
        if (!formData.verificacionManual && !formData.codigoVerificacion.trim()) {
@@ -125,10 +126,7 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
       const result = await service.procesarEntrega(documento.id, formData);
 
       if (result.success) {
-        // 🔗 NUEVA FUNCIONALIDAD: Mostrar información de entrega grupal si aplica
-        const groupInfo = result.data?.groupDelivery;
-        if (groupInfo?.wasGroupDelivery) {
-        }
+
         // Notificación global según WhatsApp
         const w = result.data?.whatsapp || {};
         if (w.sent) {
@@ -162,44 +160,60 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
       <DialogContent dividers>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
 
-        {/* 🔗 NUEVA FUNCIONALIDAD: Alerta de entrega grupal */}
-        {documento.isGrouped && (
-          <Alert
-            severity="info"
-            sx={{ mb: 2 }}
-            icon={<Box component="span">📦</Box>}
-          >
-            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-              ⚡ Entrega Grupal Automática
-            </Typography>
-            <Typography variant="body2">
-              Este documento es parte de un grupo. Al procesarlo, se entregarán automáticamente
-              TODOS los documentos del grupo que estén listos.
-            </Typography>
-          </Alert>
-        )}
 
+
+        {/* 🔐 ZONA DE CÓDIGO DE RETIRO - Prominente */}
+        <Box sx={{
+          p: 3,
+          bgcolor: (theme) => documento.codigoRetiro
+            ? (theme.palette.mode === 'dark' ? 'rgba(46, 125, 50, 0.15)' : '#E8F5E9')
+            : (theme.palette.mode === 'dark' ? 'rgba(237, 108, 2, 0.15)' : '#FFF3E0'),
+          border: (theme) => `2px solid ${documento.codigoRetiro ? theme.palette.success.main : theme.palette.warning.main}`,
+          borderRadius: 2,
+          textAlign: 'center',
+          mb: 3
+        }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            🔢 Código de Retiro
+          </Typography>
+          <Typography
+            variant="h2"
+            sx={{
+              fontFamily: 'monospace',
+              fontWeight: 'bold',
+              color: (theme) => documento.codigoRetiro ? theme.palette.success.main : theme.palette.warning.main,
+              letterSpacing: '0.15em'
+            }}
+          >
+            {documento.codigoRetiro || '----'}
+          </Typography>
+          {documento.codigoRetiro ? (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              👆 Solicite este código al cliente antes de entregar
+            </Typography>
+          ) : (
+            <Alert severity="warning" sx={{ mt: 2, textAlign: 'left' }}>
+              <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                ⚠️ No se generó código de retiro
+              </Typography>
+              <Typography variant="body2">
+                Este documento no fue notificado por WhatsApp. Use "Verificación Manual" abajo.
+              </Typography>
+            </Alert>
+          )}
+        </Box>
+
+        {/* Información del documento */}
         <Box sx={{ p: 2, bgcolor: (theme) => theme.palette.background.default, borderRadius: 2, mb: 3 }}>
           <Typography variant="h6" sx={{ mb: 1 }}>
             📄 {documento.clientName}
           </Typography>
           <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}>
+            <Grid item xs={12} sm={6}>
               <Typography variant="body2"><strong>Protocolo:</strong> {documento.protocolNumber}</Typography>
             </Grid>
-            <Grid item xs={12} sm={4}>
+            <Grid item xs={12} sm={6}>
               <Typography variant="body2"><strong>Tipo:</strong> {documento.documentType}</Typography>
-            </Grid>
-            <Grid item xs={12} sm={4}>
-              <Typography variant="body2">
-                <strong>Código:</strong>
-                <Chip
-                  label={documento.codigoRetiro || documento.verificationCode || 'N/A'}
-                  size="small"
-                  color="success"
-                  sx={{ ml: 1, fontFamily: 'monospace', fontWeight: 'bold' }}
-                />
-              </Typography>
             </Grid>
           </Grid>
         </Box>
@@ -269,6 +283,54 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
               />
             </Grid>
 
+            {/* 🔐 Checkbox de Verificación Manual (Fallback) */}
+            <Grid item xs={12}>
+              <Box sx={{
+                p: 2,
+                border: '1px dashed',
+                borderColor: formData.verificacionManual ? 'warning.main' : 'grey.400',
+                borderRadius: 1,
+                bgcolor: (theme) => formData.verificacionManual
+                  ? (theme.palette.mode === 'dark' ? 'rgba(237, 108, 2, 0.15)' : 'rgba(237, 108, 2, 0.05)')
+                  : 'transparent'
+              }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={formData.verificacionManual}
+                      onChange={handleChange}
+                      name="verificacionManual"
+                      color="warning"
+                    />
+                  }
+                  label={
+                    <Typography variant="body2" fontWeight="bold">
+                      Verificación Alternativa (Sin Código)
+                    </Typography>
+                  }
+                />
+
+                {formData.verificacionManual && (
+                  <Alert
+                    severity="warning"
+                    variant="outlined"
+                    sx={{
+                      mt: 1,
+                      py: 0.5,
+                      border: 'none',
+                      bgcolor: 'transparent',
+                      color: 'warning.main',
+                      '& .MuiAlert-icon': { color: 'warning.main' }
+                    }}
+                  >
+                    <Typography variant="caption" sx={{ fontWeight: 'medium' }}>
+                      ℹ️ Entrega sin código. Por seguridad, verifique la identidad física del receptor.
+                    </Typography>
+                  </Alert>
+                )}
+              </Box>
+            </Grid>
+
             <Grid item xs={12}>
               <TextField
                 fullWidth
@@ -278,6 +340,7 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
                 name="observaciones"
                 value={formData.observaciones}
                 onChange={handleChange}
+                placeholder={formData.verificacionManual ? "Ej: Perdió celular, verifiqué cédula..." : ""}
               />
             </Grid>
           </Grid>
@@ -290,11 +353,11 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
         <Button
           onClick={handleSubmit}
           variant="contained"
-          color="primary"
           disabled={loading}
+          color={formData.verificacionManual ? "warning" : "primary"}
           startIcon={loading ? <CircularProgress size={20} /> : null}
         >
-          {loading ? 'Procesando...' : 'Confirmar Entrega'}
+          {loading ? 'Procesando...' : (formData.verificacionManual ? '⚠️ Confirmar Entrega Manual' : 'Confirmar Entrega')}
         </Button>
       </DialogActions>
     </Dialog>

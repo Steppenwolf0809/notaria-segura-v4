@@ -44,6 +44,7 @@ import ConfirmDialog from './ConfirmDialog';
 
 const TEMPLATE_TYPES = [
   { value: 'DOCUMENTO_LISTO', label: 'Documento Listo para Retiro' },
+  { value: 'RECORDATORIO_RETIRO', label: 'Recordatorio de Retiro' },
   { value: 'DOCUMENTO_ENTREGADO', label: 'Confirmación de Entrega' }
 ];
 
@@ -55,7 +56,7 @@ const AVAILABLE_VARIABLES = {
   codigo: 'Código de verificación 4 dígitos',
   notaria: 'Nombre de la notaría',
   fecha: 'Fecha actual formateada',
-  
+
   // Mejoradas
   nombreCompareciente: 'Nombre completo del compareciente/cliente',
   nombreNotariaCompleto: 'Nombre oficial completo de la notaría',
@@ -92,7 +93,7 @@ const WhatsAppTemplates = () => {
   const [formErrors, setFormErrors] = useState({});
   // Variables disponibles desde backend (con fallback local)
   const [availableVariables, setAvailableVariables] = useState(AVAILABLE_VARIABLES);
-  
+
   const [preview, setPreview] = useState('');
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
@@ -180,10 +181,10 @@ const WhatsAppTemplates = () => {
     const errors = {};
     if (!formData.titulo?.trim()) errors.titulo = 'El título es obligatorio';
     if (!formData.mensaje?.trim()) errors.mensaje = 'El mensaje es obligatorio';
-    
+
     const malformed = formData.mensaje?.match(/\{[^{}]*$/) || formData.mensaje?.match(/\{[^{}]*[^\w}]/);
-    if(malformed){
-        errors.mensaje = "Variable mal formada. Use el formato {variable}.";
+    if (malformed) {
+      errors.mensaje = "Variable mal formada. Use el formato {variable}.";
     }
 
     setFormErrors(errors);
@@ -259,7 +260,7 @@ const WhatsAppTemplates = () => {
     } catch (err) {
       // Silently fail preview
     } finally {
-        setIsPreviewLoading(false);
+      setIsPreviewLoading(false);
     }
   }, [token]);
 
@@ -272,13 +273,13 @@ const WhatsAppTemplates = () => {
       generatePreview(newValue);
     }
   };
-  
+
   const insertVariable = (variable) => {
     const textarea = document.getElementById('mensaje');
     if (!textarea) {
       // Fallback si no se encuentra el textarea
       const newText = `${formData.mensaje || ''}{${variable}}`;
-      setFormData(prev => ({...prev, mensaje: newText}));
+      setFormData(prev => ({ ...prev, mensaje: newText }));
       generatePreview(newText);
       return;
     }
@@ -286,13 +287,13 @@ const WhatsAppTemplates = () => {
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     const currentMessage = formData.mensaje || '';
-    
+
     // Insertar la variable en la posición del cursor
-    const newMessage = currentMessage.substring(0, start) + 
-                      `{${variable}}` + 
-                      currentMessage.substring(end);
-    
-    setFormData(prev => ({...prev, mensaje: newMessage}));
+    const newMessage = currentMessage.substring(0, start) +
+      `{${variable}}` +
+      currentMessage.substring(end);
+
+    setFormData(prev => ({ ...prev, mensaje: newMessage }));
     generatePreview(newMessage);
 
     // Restaurar el foco y posicionar el cursor después de la variable insertada
@@ -350,11 +351,11 @@ const WhatsAppTemplates = () => {
                 </TableCell>
               </TableRow>
             ) : templates.length === 0 ? (
-                <TableRow>
-                    <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                        <Typography color="text.secondary">No hay templates configurados.</Typography>
-                    </TableCell>
-                </TableRow>
+              <TableRow>
+                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
+                  <Typography color="text.secondary">No hay templates configurados.</Typography>
+                </TableCell>
+              </TableRow>
             ) : (
               templates.map((template) => (
                 <TableRow key={template.id} hover>
@@ -410,7 +411,7 @@ const WhatsAppTemplates = () => {
             {/* Form Fields */}
             <Grid item xs={12} md={6}>
               <Box component="form" noValidate autoComplete="off">
-                 <FormControl fullWidth margin="normal">
+                <FormControl fullWidth margin="normal">
                   <InputLabel id="tipo-label">Tipo de Template</InputLabel>
                   <Select
                     labelId="tipo-label"
@@ -459,30 +460,30 @@ const WhatsAppTemplates = () => {
                 />
 
                 <FormControl fullWidth margin="normal">
-                    <Typography component="label" sx={{ display: 'flex', alignItems: 'center' }}>
-                      <Switch
-                        id="activo"
-                        name="activo"
-                        checked={formData.activo || false}
-                        onChange={handleFormChange}
-                      />
-                      Template activo
-                    </Typography>
+                  <Typography component="label" sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Switch
+                      id="activo"
+                      name="activo"
+                      checked={formData.activo || false}
+                      onChange={handleFormChange}
+                    />
+                    Template activo
+                  </Typography>
                 </FormControl>
 
                 <Box mt={2}>
-                    <Typography variant="subtitle2" gutterBottom>Variables Disponibles</Typography>
-                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                        {Object.entries(availableVariables).map(([key, desc]) => (
-                            <Tooltip key={key} title={desc}>
-                                <Chip
-                                    label={`{${key}}`}
-                                    onClick={() => insertVariable(key)}
-                                    size="small"
-                                />
-                            </Tooltip>
-                        ))}
-                     </Box>
+                  <Typography variant="subtitle2" gutterBottom>Variables Disponibles</Typography>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                    {Object.entries(availableVariables).map(([key, desc]) => (
+                      <Tooltip key={key} title={desc}>
+                        <Chip
+                          label={`{${key}}`}
+                          onClick={() => insertVariable(key)}
+                          size="small"
+                        />
+                      </Tooltip>
+                    ))}
+                  </Box>
                 </Box>
               </Box>
             </Grid>
@@ -493,7 +494,7 @@ const WhatsAppTemplates = () => {
                 <PreviewIcon sx={{ mr: 1 }} />
                 Vista Previa del Mensaje
               </Typography>
-               <Paper
+              <Paper
                 variant="outlined"
                 sx={{
                   p: 2,
@@ -505,7 +506,7 @@ const WhatsAppTemplates = () => {
                 }}
               >
                 {isPreviewLoading ? (
-                    <CircularProgress size={24}/>
+                  <CircularProgress size={24} />
                 ) : preview ? (
                   <Box
                     sx={{
@@ -522,10 +523,10 @@ const WhatsAppTemplates = () => {
                     </Typography>
                   </Box>
                 ) : (
-                   <Box textAlign="center" color="text.secondary">
-                        <InfoIcon sx={{fontSize: 40, mb:1}}/>
-                        <Typography>Escriba un mensaje para ver la vista previa.</Typography>
-                   </Box>
+                  <Box textAlign="center" color="text.secondary">
+                    <InfoIcon sx={{ fontSize: 40, mb: 1 }} />
+                    <Typography>Escriba un mensaje para ver la vista previa.</Typography>
+                  </Box>
                 )}
               </Paper>
             </Grid>
@@ -538,13 +539,13 @@ const WhatsAppTemplates = () => {
           </Button>
         </DialogActions>
       </Dialog>
-      
+
       <ConfirmDialog
         open={confirmDialog.open}
         onClose={() => setConfirmDialog({ ...confirmDialog, open: false })}
         onConfirm={() => {
-            if(confirmDialog.action) confirmDialog.action();
-            setConfirmDialog({ ...confirmDialog, open: false });
+          if (confirmDialog.action) confirmDialog.action();
+          setConfirmDialog({ ...confirmDialog, open: false });
         }}
         {...confirmDialog}
       />

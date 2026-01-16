@@ -43,7 +43,7 @@ import useDocumentStore from '../../store/document-store';
 import useStats from '../../hooks/useStats';
 import useDebounce from '../../hooks/useDebounce';
 import DocumentDetailModal from './DocumentDetailModal';
-import GroupingAlert from '../grouping/GroupingAlert';
+
 
 /**
  * Componente DocumentsList - Vista de tabla con búsqueda y filtros avanzados
@@ -460,7 +460,7 @@ const DocumentsList = () => {
                       <Chip
                         label={document.documentType}
                         size="small"
-                        sx={{ 
+                        sx={{
                           mb: 0.5,
                           bgcolor: (theme) => theme.palette.mode === 'dark'
                             ? 'rgba(255, 255, 255, 0.1)'
@@ -487,13 +487,7 @@ const DocumentsList = () => {
                         size="small"
                         variant={document.status === 'LISTO' ? 'filled' : 'outlined'}
                       />
-                      {/* 🔗 ALERTA DE AGRUPACIÓN COMPACTA */}
-                      {!document.isGrouped && (
-                        <GroupingAlert
-                          document={document}
-                          variant="chip"
-                        />
-                      )}
+
                     </Box>
                   </TableCell>
 
@@ -528,14 +522,14 @@ const DocumentsList = () => {
                   <TableCell>
                     <Stack direction="row" spacing={0.5}>
                       <Tooltip title="Ver detalle">
-                        <IconButton 
+                        <IconButton
                           size="small"
                           onClick={() => openDetailModal(document)}
                         >
                           <ViewIcon sx={{ fontSize: 18 }} />
                         </IconButton>
                       </Tooltip>
-                      
+
                       {document.status === 'PENDIENTE' && (
                         <Tooltip title="Iniciar proceso">
                           <IconButton
@@ -546,7 +540,7 @@ const DocumentsList = () => {
                           </IconButton>
                         </Tooltip>
                       )}
-                      
+
                       {document.status === 'EN_PROCESO' && (
                         <Tooltip title="Marcar como listo">
                           <IconButton
@@ -557,7 +551,7 @@ const DocumentsList = () => {
                           </IconButton>
                         </Tooltip>
                       )}
-                      
+
                       {document.status === 'LISTO' && (
                         <Tooltip title="Marcar como entregado">
                           <IconButton

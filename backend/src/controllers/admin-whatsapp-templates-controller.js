@@ -1,4 +1,5 @@
 import prisma from '../db.js';
+import { EMOJIS } from '../utils/emojis.js';
 
 /**
  * Controller para administración de templates WhatsApp
@@ -15,7 +16,7 @@ const AVAILABLE_VARIABLES = {
   codigo: 'Código de verificación 4 dígitos',
   notaria: 'Nombre de la notaría (alias: nombreNotariaCompleto)',
   fecha: 'Fecha actual formateada (alias: fechaFormateada)',
-  
+
   // Variables mejoradas y nuevas
   nombreCompareciente: 'Nombre completo del compareciente/cliente',
   nombreNotariaCompleto: 'Nombre oficial completo de la notaría',
@@ -24,25 +25,28 @@ const AVAILABLE_VARIABLES = {
   contactoConsultas: 'Teléfono/email para consultas',
   actoPrincipal: 'Descripción del acto principal del trámite',
   actoPrincipalValor: 'Valor del acto principal (monto)',
-  
+
   // Variables para códigos de escritura
   codigosEscritura: 'Lista de códigos de escritura de documentos',
   cantidadDocumentos: 'Número total de documentos',
   listaDocumentosCompleta: 'Lista detallada con códigos específicos',
-  
+
   // Variables condicionales
   nombreRetirador: 'Nombre de quien retira el documento',
   cedulaRetirador: 'Cédula de quien retira (solo si existe)',
   seccionCedula: 'Línea completa "🆔 Cédula: XXXX" o vacía si no hay cédula',
   tipoEntrega: 'Individual o múltiple (afecta formato)',
-  
+
   // Variables de formato para entrega
   documentosDetalle: 'Lista formateada de documentos entregados',
-  
+
   // Variables para templates de entrega
   receptor_nombre: 'Nombre de quien recibió el documento',
   receptor_cedula: 'Cédula del receptor (opcional)',
-  receptor_relacion: 'Relación con el titular'
+  receptor_relacion: 'Relación con el titular',
+
+  // Variable de encuesta de satisfacción
+  urlEncuesta: 'URL de la encuesta de satisfacción con ID de trámite'
 };
 
 /**
@@ -57,8 +61,10 @@ Estimado/a {nombreCompareciente},
 
 Su documento está listo para retiro:
 📄 *Documento:* {documento}
+📝 *Acto:* {actoPrincipal}
 🔢 *Código de retiro:* {codigo}
 {codigosEscritura}
+📊 *Documentos:* {cantidadDocumentos}
 
 ⚠️ *IMPORTANTE:* Presente este código al momento del retiro.
 
@@ -66,7 +72,31 @@ Su documento está listo para retiro:
 ⏰ *Horario:* Lunes a Viernes 8:00-17:00
 
 Para consultas: {contactoConsultas}
-¡Gracias por confiar en nosotros!`
+¡Gracias por confiar en nosotros!
+
+📣 ¿Cómo fue su experiencia? Cuéntenos aquí:
+{urlEncuesta}`
+  },
+  RECORDATORIO_RETIRO: {
+    titulo: 'Recordatorio de Retiro de Documento',
+    mensaje: `🏛️ *{nombreNotariaCompleto}*
+
+Estimado/a {nombreCompareciente},
+
+⏰ *RECORDATORIO:* Su(s) documento(s) está(n) listo(s) para retiro desde hace varios días.
+
+📄 *Documento:* {documento}
+📝 *Acto:* {actoPrincipal}
+🔢 *Código de retiro:* {codigo}
+{codigosEscritura}
+
+⚠️ Le recordamos que puede retirar su documentación en nuestras oficinas.
+
+📍 *Dirección:* Azuay E2-231 y Av Amazonas, Quito
+⏰ *Horario:* Lunes a Viernes 8:00-17:00
+
+Para consultas: {contactoConsultas}
+¡Esperamos su visita!`
   },
   DOCUMENTO_ENTREGADO: {
     titulo: 'Confirmación de Entrega (Mejorado)',
@@ -117,7 +147,7 @@ export const getTemplates = async (req, res) => {
 export const getTemplate = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const template = await prisma.whatsAppTemplate.findUnique({
       where: { id }
     });
@@ -157,7 +187,7 @@ export const createTemplate = async (req, res) => {
       });
     }
 
-    if (!['DOCUMENTO_LISTO', 'DOCUMENTO_ENTREGADO'].includes(tipo)) {
+    if (!['DOCUMENTO_LISTO', 'DOCUMENTO_ENTREGADO', 'RECORDATORIO_RETIRO'].includes(tipo)) {
       return res.status(400).json({
         success: false,
         error: 'Tipo de template inválido'
@@ -330,37 +360,50 @@ export const previewTemplate = async (req, res) => {
       notaria: 'NOTARÍA DÉCIMO OCTAVA DEL CANTÓN QUITO',
       fecha: new Date().toLocaleDateString('es-EC', {
         day: '2-digit',
-        month: '2-digit', 
+        month: '2-digit',
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
       }),
-      
+
       // Variables mejoradas
       nombreCompareciente: 'María García Pérez',
       nombreNotariaCompleto: 'NOTARÍA DÉCIMO OCTAVA DEL CANTÓN QUITO',
       fechaFormateada: '23 de agosto de 2025, 12:54 PM',
       horaEntrega: '12:54 PM',
-      contactoConsultas: 'Tel: (02) 2234-567 | email@notaria18.gob.ec',
+      contactoConsultas: 'Tel: (02) 2247787',
       actoPrincipal: 'Compraventa de inmueble',
       actoPrincipalValor: '150.00',
-      
+
       // Variables de códigos
       codigosEscritura: '📋 *Código de escritura:* 20251701018D00919',
       cantidadDocumentos: '1',
       listaDocumentosCompleta: '• Protocolo de Compraventa - Código: 20251701018D00919',
-      
+
       // Variables condicionales (ejemplo con cédula)
       nombreRetirador: 'María García Pérez',
       cedulaRetirador: '1234567890',
       seccionCedula: '🆔 *Cédula:* 1234567890',
       tipoEntrega: 'su documento',
       documentosDetalle: '📄 *Protocolo de Compraventa*\n📋 *Código:* 20251701018D00919',
-      
+
       // Variables de entrega
       receptor_nombre: 'María García Pérez',
       receptor_cedula: '1234567890',
-      receptor_relacion: 'Titular'
+      receptor_relacion: 'Titular',
+
+      // 🛡️ Variables de Emojis Seguros
+      emoji_notaria: EMOJIS.NOTARIA,
+      emoji_documento: EMOJIS.DOCUMENTO,
+      emoji_codigo: EMOJIS.CODIGO,
+      emoji_escritura: EMOJIS.ESCRITURA,
+      emoji_importante: EMOJIS.IMPORTANTE,
+      emoji_direccion: EMOJIS.DIRECCION,
+      emoji_horario: EMOJIS.HORARIO,
+      emoji_reloj: EMOJIS.RELOJ,
+
+      // Variable de encuesta
+      urlEncuesta: 'https://notaria18quito.com.ec/encuesta-satisfaccion.html?ref=20251701018D00919'
     };
 
     // Reemplazar variables
@@ -375,7 +418,7 @@ export const previewTemplate = async (req, res) => {
       data: {
         preview,
         datosEjemplo,
-        variablesEncontradas: Object.keys(datosEjemplo).filter(variable => 
+        variablesEncontradas: Object.keys(datosEjemplo).filter(variable =>
           mensaje.includes(`{${variable}}`)
         )
       }
@@ -395,9 +438,9 @@ export const previewTemplate = async (req, res) => {
 export const getActiveTemplateByType = async (tipo) => {
   try {
     const template = await prisma.whatsAppTemplate.findFirst({
-      where: { 
+      where: {
         tipo: tipo,
-        activo: true 
+        activo: true
       },
       orderBy: { updatedAt: 'desc' }
     });
@@ -427,7 +470,7 @@ export const getActiveTemplateByType = async (tipo) => {
 export const initializeDefaultTemplates = async (req, res) => {
   try {
     const existingTemplates = await prisma.whatsAppTemplate.count();
-    
+
     if (existingTemplates > 0) {
       return res.json({
         success: true,

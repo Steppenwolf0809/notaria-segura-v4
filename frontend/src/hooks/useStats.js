@@ -80,8 +80,20 @@ const useStats = () => {
       return docDate >= weekAgo;
     });
 
-    // Tiempo promedio de procesamiento (simulado por ahora)
-    const avgProcessingTime = inProgress.length > 0 ? 2.5 : 0;
+    // Tiempo promedio de procesamiento (calculado desde documentos entregados)
+    let avgProcessingTime = 0;
+    if (delivered.length > 0) {
+      const processingTimes = delivered
+        .filter(doc => doc.createdAt && doc.fechaEntrega)
+        .map(doc => {
+          const start = new Date(doc.createdAt);
+          const end = new Date(doc.fechaEntrega);
+          return Math.floor((end - start) / (1000 * 60 * 60 * 24));
+        });
+      if (processingTimes.length > 0) {
+        avgProcessingTime = Math.round((processingTimes.reduce((a, b) => a + b, 0) / processingTimes.length) * 10) / 10;
+      }
+    }
 
     // Productividad (porcentaje de documentos completados)
     const productivity = Math.round((delivered.length / Math.max(basicStats.total, 1)) * 100);

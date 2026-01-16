@@ -18,7 +18,7 @@ import useAuth from '../hooks/use-auth';
 const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
   // Estados para paginación y filtros en servidor
   const [page, setPage] = useState(0); // backend espera 1-indexed, frontend usa 0-indexed para UI
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [totalDocuments, setTotalDocuments] = useState(0);
 
   // Auth token
@@ -39,12 +39,11 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
         return {
           search: parsed.search ?? '',
           estado: parsed.estado ?? 'TODOS',
-          tipo: parsed.tipo ?? 'TODOS',
-          mostrarEntregados: parsed.mostrarEntregados ?? false
+          tipo: parsed.tipo ?? 'TODOS'
         };
       }
     } catch (_) { }
-    return { search: '', estado: 'TODOS', tipo: 'TODOS', mostrarEntregados: false };
+    return { search: '', estado: 'TODOS', tipo: 'TODOS' };
   });
 
   const [orderBy, setOrderBy] = useState('updatedAt');
@@ -76,7 +75,9 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
         orderBy: rOrderBy,
         orderDirection: rOrder,
         fechaDesde: rFiltros.fechaDesde || undefined,
-        fechaHasta: rFiltros.fechaHasta || undefined
+        fechaHasta: rFiltros.fechaHasta || undefined,
+        // 🆕 Siempre ocultar entregados por defecto (el backend los muestra si filtramos por ENTREGADO)
+        ocultarEntregados: true
       });
 
       if (response.success) {
@@ -174,7 +175,7 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
       );
     }
 
-    if (error && documents.length === 0) {
+    if (error && documentos.length === 0) {
       return (
         <Alert
           severity="error"

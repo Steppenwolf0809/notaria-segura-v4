@@ -39,7 +39,8 @@ import {
     AttachMoney as MoneyIcon,
     Refresh as RefreshIcon,
     Download as DownloadIcon,
-    Delete as DeleteIcon
+    Delete as DeleteIcon,
+    Edit as EditIcon
 } from '@mui/icons-material';
 import apiClient from '../../services/api-client';
 
@@ -59,6 +60,9 @@ const AnalisisUAFE = () => {
     const [hasMore, setHasMore] = useState(false);
     const [deleteDialog, setDeleteDialog] = useState({ open: false, persona: null });
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+    // Estados para edición de persona
+    const [editDialog, setEditDialog] = useState({ open: false, persona: null });
+    const [editForm, setEditForm] = useState({ nombres: '', apellidos: '', email: '', telefono: '', profesion: '' });
 
     useEffect(() => {
         cargarPersonas();
@@ -176,6 +180,54 @@ const AnalisisUAFE = () => {
             } else {
                 setSnackbar({ open: true, message: errorMsg, severity: 'error' });
             }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Abrir modal de edición
+    const handleOpenEdit = (persona) => {
+        setEditForm({
+            nombres: persona.nombre?.split(' ').slice(0, 2).join(' ') || '',
+            apellidos: persona.nombre?.split(' ').slice(2).join(' ') || '',
+            email: persona.email || '',
+            telefono: persona.telefono || '',
+            profesion: persona.profesion || ''
+        });
+        setEditDialog({ open: true, persona });
+    };
+
+    // Guardar cambios de persona
+    const handleSaveEdit = async () => {
+        if (!editDialog.persona) return;
+
+        try {
+            setLoading(true);
+            const response = await apiClient.put(
+                `/formulario-uafe/persona/${editDialog.persona.numeroIdentificacion}`,
+                {
+                    datosPersonales: {
+                        nombres: editForm.nombres.trim().toUpperCase(),
+                        apellidos: editForm.apellidos.trim().toUpperCase()
+                    },
+                    contacto: {
+                        email: editForm.email.trim(),
+                        celular: editForm.telefono.trim()
+                    },
+                    informacionLaboral: {
+                        profesionOficio: editForm.profesion.trim().toUpperCase()
+                    }
+                }
+            );
+
+            if (response.data.success) {
+                setSnackbar({ open: true, message: 'Datos actualizados correctamente', severity: 'success' });
+                setEditDialog({ open: false, persona: null });
+                cargarPersonas(1, false);
+            }
+        } catch (err) {
+            const errorMsg = err.response?.data?.message || 'Error al actualizar';
+            setSnackbar({ open: true, message: errorMsg, severity: 'error' });
         } finally {
             setLoading(false);
         }
@@ -358,15 +410,26 @@ const AnalisisUAFE = () => {
                                         )}
                                     </TableCell>
                                     <TableCell align="center">
-                                        <Tooltip title="Eliminar persona">
-                                            <IconButton
-                                                size="small"
-                                                color="error"
-                                                onClick={() => setDeleteDialog({ open: true, persona })}
-                                            >
-                                                <DeleteIcon fontSize="small" />
-                                            </IconButton>
-                                        </Tooltip>
+                                        <Stack direction="row" spacing={1} justifyContent="center">
+                                            <Tooltip title="Editar datos">
+                                                <IconButton
+                                                    size="small"
+                                                    color="primary"
+                                                    onClick={() => handleOpenEdit(persona)}
+                                                >
+                                                    <EditIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="Eliminar persona">
+                                                <IconButton
+                                                    size="small"
+                                                    color="error"
+                                                    onClick={() => setDeleteDialog({ open: true, persona })}
+                                                >
+                                                    <DeleteIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </Stack>
                                     </TableCell>
                                 </TableRow>
 
@@ -374,7 +437,7 @@ const AnalisisUAFE = () => {
                                 <TableRow>
                                     <TableCell colSpan={10} sx={{ p: 0 }}>
                                         <Collapse in={expandedRow === persona.id} timeout="auto" unmountOnExit>
-                                            <Box sx={{ p: 2, backgroundColor: '#f5f5f5' }}>
+                                            <Box sx={{ p: 2, backgroundColor: 'action.hover' }}>
                                                 <Grid container spacing={2}>
                                                     <Grid item xs={12} md={4}>
                                                         <Typography variant="subtitle2" fontWeight="bold">Contacto</Typography>
@@ -472,6 +535,71 @@ const AnalisisUAFE = () => {
                         disabled={loading}
                     >
                         {loading ? <CircularProgress size={20} /> : 'Eliminar'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Dialog de edición de persona */}
+            <Dialog open={editDialog.open} onClose={() => setEditDialog({ open: false, persona: null })} maxWidth="sm" fullWidth>
+                <DialogTitle sx={{ bgcolor: 'primary.main', color: 'white' }}>
+                    ✏️ Editar Datos de Persona
+                </DialogTitle>
+                <DialogContent sx={{ mt: 2 }}>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                        Cédula: <strong>{editDialog.persona?.numeroIdentificacion}</strong>
+                    </Typography>
+                    <Stack spacing={2} sx={{ mt: 2 }}>
+                        <TextField
+                            label="Nombres"
+                            value={editForm.nombres}
+                            onChange={(e) => setEditForm({ ...editForm, nombres: e.target.value })}
+                            fullWidth
+                            size="small"
+                            placeholder="Ej: RUBEN DARIO"
+                        />
+                        <TextField
+                            label="Apellidos"
+                            value={editForm.apellidos}
+                            onChange={(e) => setEditForm({ ...editForm, apellidos: e.target.value })}
+                            fullWidth
+                            size="small"
+                            placeholder="Ej: VILLEGAS VALDIVIESO"
+                        />
+                        <TextField
+                            label="Email"
+                            value={editForm.email}
+                            onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                            fullWidth
+                            size="small"
+                            type="email"
+                        />
+                        <TextField
+                            label="Teléfono"
+                            value={editForm.telefono}
+                            onChange={(e) => setEditForm({ ...editForm, telefono: e.target.value })}
+                            fullWidth
+                            size="small"
+                        />
+                        <TextField
+                            label="Profesión/Oficio"
+                            value={editForm.profesion}
+                            onChange={(e) => setEditForm({ ...editForm, profesion: e.target.value })}
+                            fullWidth
+                            size="small"
+                        />
+                    </Stack>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setEditDialog({ open: false, persona: null })}>
+                        Cancelar
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={handleSaveEdit}
+                        disabled={loading || !editForm.nombres || !editForm.apellidos}
+                    >
+                        {loading ? <CircularProgress size={20} /> : 'Guardar Cambios'}
                     </Button>
                 </DialogActions>
             </Dialog>
