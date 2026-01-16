@@ -1,14 +1,12 @@
 import { getPrismaClient } from '../db.js';
 
-import CodigoRetiroService from '../utils/codigo-retiro.js';
-
 const prisma = getPrismaClient();
 
 /**
  * Servicio para cambios masivos de estado de documentos.
  * - Permite a RECEPCION, ARCHIVO, MATRIZADOR y ADMIN marcar documentos como LISTO.
- * - Cuando hay múltiples documentos del mismo cliente, usa código grupal y envía un solo WhatsApp por cliente.
- * - Cuando hay documentos de distintos clientes, envía un WhatsApp por cliente (no por documento).
+ * - NO genera código de retiro (los documentos aparecen en la cola "Por Notificar").
+ * - El código de retiro se genera posteriormente al enviar la notificación real (bulkNotify).
  */
 export async function bulkMarkReady({ documentIds, actor, sendNotifications = true }) {
   if (!Array.isArray(documentIds) || documentIds.length === 0) {
@@ -86,32 +84,20 @@ export async function bulkMarkReady({ documentIds, actor, sendNotifications = tr
     byClient.get(key).push(d);
   }
 
-  // Pre-calcular códigos: un código por cliente si hay >1 documento, si no, uno por documento
-  const perDocCode = new Map();
-  const perClientGroupCode = new Map();
-
-  for (const [key, docs] of byClient.entries()) {
-    if (docs.length > 1) {
-      // Código grupal compartido
-      const code = await CodigoRetiroService.generarUnicoGrupo();
-      perClientGroupCode.set(key, code);
-    } else {
-      const code = await CodigoRetiroService.generarUnico();
-      perDocCode.set(docs[0].id, code);
-    }
-  }
+  // ⚠️ FIX: NO generar códigos de retiro aquí
+  // Los documentos deben tener codigoRetiro=null para aparecer en la cola de "Por Notificar"
+  // El código de retiro se generará cuando se envíe la notificación real desde bulkNotify
 
   // Ejecutar actualización en transacción
   const updated = await prisma.$transaction(async (tx) => {
     const updatedDocs = [];
     for (const d of documents) {
       const key = groupKey(d);
-      const isGroup = byClient.get(key).length > 1;
-      const code = isGroup ? perClientGroupCode.get(key) : perDocCode.get(d.id);
 
       const data = {
         status: 'LISTO',
-        codigoRetiro: code,
+        // codigoRetiro: null => aparecerá en cola "Por Notificar"
+        fechaListo: new Date(),
         updatedAt: new Date(),
       };
 
@@ -130,7 +116,7 @@ export async function bulkMarkReady({ documentIds, actor, sendNotifications = tr
             toStatus: 'LISTO',
             bulk: true,
             groupByClient: byClient.get(key).length,
-            codigoRetiro: code
+            pendingNotification: true
           }),
           createdAt: new Date()
         }
