@@ -646,6 +646,7 @@ async function getMyDocuments(req, res) {
         if (status && status !== 'TODOS') {
           statusFilter = Prisma.sql`AND d."status" = ${status}`;
         }
+        // Nota: Cuando hay búsqueda activa, mostrar todos los estados incluyendo ENTREGADO
 
         // Filtro por rango de fechas (fechaFactura)
         let dateFilter = Prisma.sql``;
@@ -750,6 +751,10 @@ async function getMyDocuments(req, res) {
     // CASO 2: LISTADO ESTÁNDAR (Sin búsqueda por texto o fallback)
     if (status && status !== 'TODOS') {
       where.status = status;
+    } else {
+      // 🆕 OCULTAR ENTREGADOS por defecto cuando NO hay búsqueda activa
+      // Solo se muestran si el usuario filtra específicamente por ENTREGADO
+      where.status = { not: 'ENTREGADO' };
     }
 
     if (tipo && tipo !== 'TODOS') {
