@@ -10,16 +10,16 @@ function resolveConfigPaths() {
   try {
     const execDir = path.dirname(process.execPath);
     candidates.push(path.join(execDir, 'config.json'));
-  } catch {}
+  } catch { }
   // 2) Directorio de trabajo actual
   try {
     candidates.push(path.resolve(process.cwd(), 'config.json'));
-  } catch {}
+  } catch { }
   // 3) Directorio del proyecto (modo dev)
   try {
     const moduleDir = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
     candidates.push(path.join(moduleDir, 'config.json'));
-  } catch {}
+  } catch { }
   return candidates;
 }
 
@@ -51,10 +51,12 @@ export function loadConfig(overrides = {}) {
       password: env.password || raw.credentials?.password || ''
     },
     folders: {
+      source: raw.folders?.source || 'C:/SRI/Comprobantes_generados',
       watch: raw.folders?.watch || 'C:/xmlcopiados',
       processed: raw.folders?.processed || 'C:/xmlcopiados/processed',
       errors: raw.folders?.errors || 'C:/xmlcopiados/errors',
-      archived: raw.folders?.archived || 'C:/xmlcopiados/archived'
+      archived: raw.folders?.archived || 'C:/xmlcopiados/archived',
+      ignored: raw.folders?.ignored || 'C:/xmlcopiados/ignored'
     },
     settings: {
       watchDelay: raw.settings?.watchDelay ?? 5000,
@@ -71,6 +73,18 @@ export function loadConfig(overrides = {}) {
         compressOldFiles: raw.settings?.cleanup?.compressOldFiles ?? true,
         cleanupHour: raw.settings?.cleanup?.cleanupHour ?? 2
       }
+    },
+    sourceWatcher: {
+      enabled: raw.sourceWatcher?.enabled ?? true,
+      copyDelay: raw.sourceWatcher?.copyDelay ?? 2000,
+      deleteAfterCopy: raw.sourceWatcher?.deleteAfterCopy ?? false
+    },
+    sequenceTracking: {
+      enabled: raw.sequenceTracking?.enabled ?? true,
+      prefixPattern: raw.sequenceTracking?.prefixPattern || '^([a-zA-Z]+)(\\d+)',
+      alertPopup: raw.sequenceTracking?.alertPopup ?? true,
+      stateFile: raw.sequenceTracking?.stateFile || 'sequence-state.json',
+      gapLogFile: raw.sequenceTracking?.gapLogFile || 'sequence-gaps.log'
     }
   };
 
