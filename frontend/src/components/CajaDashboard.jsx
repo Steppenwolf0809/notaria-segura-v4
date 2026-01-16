@@ -70,7 +70,7 @@ const CajaDashboard = () => {
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [selectedMatrizador, setSelectedMatrizador] = useState('');
   const [refreshing, setRefreshing] = useState(false);
-  
+
   // Estados para Nota de Crédito
   const [notaCreditoDialogOpen, setNotaCreditoDialogOpen] = useState(false);
   const [notaCreditoMotivo, setNotaCreditoMotivo] = useState('');
@@ -211,7 +211,7 @@ const CajaDashboard = () => {
 
     try {
       const result = await documentService.markAsNotaCredito(notaCreditoDocument.id, notaCreditoMotivo);
-      
+
       if (result.success) {
         toast.success('Documento marcado como Nota de Crédito exitosamente');
         handleCloseNotaCreditoDialog();
@@ -238,8 +238,8 @@ const CajaDashboard = () => {
   /**
    * Filtrar documentos según búsqueda - MEJORADO con debouncing
    */
-  const filteredDocuments = debouncedSearchTerm && debouncedSearchTerm.length >= 2 
-    ? searchDocuments(debouncedSearchTerm) 
+  const filteredDocuments = debouncedSearchTerm && debouncedSearchTerm.length >= 2
+    ? searchDocuments(debouncedSearchTerm)
     : documents;
 
   /**
@@ -280,7 +280,7 @@ const CajaDashboard = () => {
       )}
 
       {/* Barra de búsqueda */}
-      <Box sx={{ mb: 3 }}>
+      <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>
         <TextField
           fullWidth
           placeholder="Buscar por cliente, protocolo, tipo o acto principal..."
@@ -301,6 +301,17 @@ const CajaDashboard = () => {
             )
           }}
         />
+        {inputValue && (
+          <Button
+            variant="outlined"
+            color="secondary"
+            onClick={() => setInputValue('')}
+            size="small"
+            sx={{ whiteSpace: 'nowrap' }}
+          >
+            Borrar Filtros
+          </Button>
+        )}
       </Box>
 
       {/* Tabla de documentos */}
@@ -309,7 +320,7 @@ const CajaDashboard = () => {
           <Typography variant="h6" gutterBottom sx={{ color: 'primary.main' }}>
             Documentos Creados
           </Typography>
-          
+
           <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
             <Table stickyHeader>
               <TableHead>
@@ -326,8 +337,8 @@ const CajaDashboard = () => {
               </TableHead>
               <TableBody>
                 {filteredDocuments.map((document) => (
-                  <TableRow 
-                    key={document.id} 
+                  <TableRow
+                    key={document.id}
                     hover
                     sx={{
                       // Fila atenuada para documentos anulados
@@ -338,7 +349,7 @@ const CajaDashboard = () => {
                     <TableCell>
                       <Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography variant="body2" sx={{ 
+                          <Typography variant="body2" sx={{
                             fontWeight: 'bold',
                             textDecoration: document.status === 'ANULADO_NOTA_CREDITO' ? 'line-through' : 'none'
                           }}>
@@ -361,7 +372,7 @@ const CajaDashboard = () => {
                       </Box>
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2" sx={{ 
+                      <Typography variant="body2" sx={{
                         fontFamily: 'monospace',
                         textDecoration: document.status === 'ANULADO_NOTA_CREDITO' ? 'line-through' : 'none'
                       }}>
@@ -414,9 +425,9 @@ const CajaDashboard = () => {
                             variant="outlined"
                             onClick={() => handleOpenAssignDialog(document)}
                             startIcon={<AssignmentIcon />}
-                            sx={{ 
-                              color: 'primary.main', 
-                              borderColor: 'primary.main' 
+                            sx={{
+                              color: 'primary.main',
+                              borderColor: 'primary.main'
                             }}
                           >
                             Asignar
@@ -481,7 +492,7 @@ const CajaDashboard = () => {
                   El documento NO aparecerá en estadísticas de entrega ni en pendientes
                 </Typography>
               </Alert>
-              
+
               <Typography variant="body2" color="text.secondary" gutterBottom>
                 Documento a anular:
               </Typography>
@@ -496,7 +507,7 @@ const CajaDashboard = () => {
               </Typography>
             </Box>
           )}
-          
+
           <TextField
             fullWidth
             multiline
@@ -544,7 +555,7 @@ const CajaDashboard = () => {
               </Typography>
             </Box>
           )}
-          
+
           <FormControl fullWidth>
             <InputLabel>Seleccionar Matrizador</InputLabel>
             <Select

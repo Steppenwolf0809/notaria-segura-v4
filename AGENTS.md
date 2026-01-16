@@ -164,7 +164,7 @@ WhatsAppTemplate: id, templateType, title, message, variables, active
 ### Casos de Prueba Críticos
 1. **Flujo completo**: XML → Procesamiento → Notificación → Entrega
 2. **Permisos por rol**: Verificar accesos apropiados
-3. **Agrupación**: Documentos se mueven juntos correctamente
+3. **Agrupación**: Documentos se mueven juntos correctamente. funcion eliminada.
 4. **Notificaciones**: WhatsApp se envía con información correcta
 5. **Historial**: Eventos se registran apropiadamente
 
@@ -186,10 +186,7 @@ WhatsAppTemplate: id, templateType, title, message, variables, active
 NODE_ENV=production|staging|development
 DATABASE_URL=postgresql://...
 JWT_SECRET=...
-TWILIO_ACCOUNT_SID=...
-TWILIO_AUTH_TOKEN=...
-TWILIO_PHONE_NUMBER=...
-WHATSAPP_ENABLED=true|false
+
 ```
 
 ## PRÓXIMOS DESARROLLOS

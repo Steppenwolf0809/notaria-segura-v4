@@ -40,16 +40,12 @@ const ConfirmationModal = ({
   newStatus,
   confirmationInfo,
   isLoading = false,
-  // 🔗 NUEVOS PROPS para soporte de grupos
-  isGroupMove = false,
-  groupSize = 1,
-  // 🔗 NUEVO PROP: Acción alternativa (ej: Entregar Directamente)
-  alternativeAction = null
+
 }) => {
   const [confirmed, setConfirmed] = useState(false);
   const [reversionReason, setReversionReason] = useState('');
   const [showReversionField, setShowReversionField] = useState(false);
-  const [deliveredTo, setDeliveredTo] = useState('');
+
 
   // Reset del estado cuando se abre/cierra el modal
   useEffect(() => {
@@ -57,7 +53,7 @@ const ConfirmationModal = ({
       setConfirmed(false);
       setReversionReason('');
       setShowReversionField(false);
-      setDeliveredTo('');
+
     }
   }, [open]);
 
@@ -119,13 +115,13 @@ const ConfirmationModal = ({
       newStatus,
       reversionReason: showReversionField ? reversionReason : null,
       changeType: changeInfo.type,
-      deliveredTo: changeInfo.isDirectDelivery ? deliveredTo : null
+      deliveredTo: null
     });
   };
 
   // Deshabilitar si no ha confirmado (excepto entrega directa que no requiere check)
   // O si es reversión y no puso motivo
-  const isConfirmDisabled = (!changeInfo.isDirectDelivery && !confirmed) ||
+  const isConfirmDisabled = !confirmed ||
     (showReversionField && !reversionReason.trim()) ||
     isLoading;
 
@@ -160,7 +156,7 @@ const ConfirmationModal = ({
           <WarningIcon />
         )}
         <Typography variant="h6" component="div">
-          {changeInfo.isDirectDelivery ? 'Confirmar Entrega Directa' : 'Confirmar Cambio de Estado'}
+          {changeInfo.type === 'critical' ? 'Confirmar Cambio de Estado' : 'Confirmar Cambio'}
         </Typography>
       </DialogTitle>
 
@@ -168,23 +164,13 @@ const ConfirmationModal = ({
         {/* Información del documento */}
         <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
           <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-            {isGroupMove ? 'INFORMACIÓN DEL GRUPO' : 'INFORMACIÓN DEL DOCUMENTO'}
+            INFORMACIÓN DEL DOCUMENTO
           </Typography>
-
-          {/* 🔗 NUEVA FUNCIONALIDAD: Información de grupo */}
-          {isGroupMove && (
-            <Alert severity="info" sx={{ mb: 2 }}>
-              <Typography variant="body2">
-                <strong>Movimiento de Grupo:</strong> Se actualizarán {groupSize} documentos del mismo cliente simultáneamente.
-              </Typography>
-            </Alert>
-          )}
-
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <AssignmentIcon sx={{ fontSize: 16, color: 'primary.main' }} />
               <Typography variant="body2">
-                <strong>{isGroupMove ? 'Documento principal:' : 'Documento:'}</strong> {document.protocolNumber}
+                <strong>Documento:</strong> {document.protocolNumber}
               </Typography>
             </Box>
 
@@ -205,12 +191,7 @@ const ConfirmationModal = ({
               </Box>
             )}
 
-            {/* 🔗 NUEVA FUNCIONALIDAD: Mostrar cantidad de documentos en grupo */}
-            {isGroupMove && (
-              <Typography variant="body2" sx={{ color: 'primary.main', fontWeight: 'medium' }}>
-                <strong>Documentos en grupo:</strong> {groupSize}
-              </Typography>
-            )}
+
           </Box>
         </Box>
 
@@ -234,17 +215,17 @@ const ConfirmationModal = ({
           <Alert severity="info" sx={{ mb: 2 }}>
             <Typography variant="subtitle2" gutterBottom>
               <WhatsAppIcon sx={{ fontSize: 16, mr: 0.5 }} />
-              Se enviará notificación automática:
+              Se gestionará notificación:
             </Typography>
             <Box component="ul" sx={{ m: 0, pl: 2 }}>
-              <li>📱 WhatsApp al cliente: "Su documento está listo"</li>
+              <li>📱 Programar WhatsApp al cliente: "Su documento está listo"</li>
               <li>🔢 Se generará código de retiro automáticamente</li>
               <li>📋 Documento aparecerá en recepción para entrega</li>
             </Box>
           </Alert>
         )}
 
-        {changeInfo.isCriticalForward && newStatus === 'ENTREGADO' && !changeInfo.isDirectDelivery && (
+        {changeInfo.isCriticalForward && newStatus === 'ENTREGADO' && (
           <Alert severity="success" sx={{ mb: 2 }}>
             <Typography variant="subtitle2" gutterBottom>
               <CheckCircleIcon sx={{ fontSize: 16, mr: 0.5 }} />
@@ -258,36 +239,7 @@ const ConfirmationModal = ({
           </Alert>
         )}
 
-        {changeInfo.isDirectDelivery && (
-          <>
-            <Alert severity="info" sx={{ mb: 2 }}>
-              <Typography variant="subtitle2" gutterBottom>
-                <CheckCircleIcon sx={{ fontSize: 16, mr: 0.5 }} />
-                Entrega Directa por {changeInfo.userRole === 'MATRIZADOR' ? 'Matrizador' : 'Archivo'}:
-              </Typography>
-              <Box component="ul" sx={{ m: 0, pl: 2 }}>
-                <li>✅ Se registrará como entrega directa</li>
-                <li>👤 Usted aparecerá como quien entregó</li>
-                <li>📝 Se mantendrá trazabilidad completa</li>
-                <li>⚡ Proceso simplificado sin códigos</li>
-              </Box>
-            </Alert>
 
-            {/* Campo para nombre de quien retira */}
-            <Box sx={{ mb: 2 }}>
-              <TextField
-                fullWidth
-                label="Nombre de quien retira el documento"
-                placeholder="Ej: Juan Pérez, Cliente directo, etc."
-                value={deliveredTo}
-                onChange={(e) => setDeliveredTo(e.target.value)}
-                variant="outlined"
-                size="small"
-                helperText="Campo opcional para control posterior"
-              />
-            </Box>
-          </>
-        )}
 
         {changeInfo.isReversion && (
           <Alert severity="warning" sx={{ mb: 2 }}>
@@ -325,7 +277,7 @@ const ConfirmationModal = ({
         <Divider sx={{ my: 2 }} />
 
         {/* Checkbox de confirmación - Solo mostrar si NO es entrega directa */}
-        {!changeInfo.isDirectDelivery && (
+        {true && (
           <FormControlLabel
             control={
               <Checkbox
@@ -351,18 +303,7 @@ const ConfirmationModal = ({
         >
           Cancelar
         </Button>
-        {/* 🔗 BOTÓN DE ACCIÓN ALTERNATIVA */}
-        {alternativeAction && (
-          <Button
-            onClick={alternativeAction.onClick}
-            variant="outlined"
-            color="primary"
-            startIcon={alternativeAction.icon || <ArrowIcon />}
-            sx={{ mr: 1 }}
-          >
-            {alternativeAction.label}
-          </Button>
-        )}
+
         <Button
           onClick={handleConfirm}
           variant="contained"
@@ -373,7 +314,7 @@ const ConfirmationModal = ({
           {isLoading ? 'Procesando...' : 'Confirmar Cambio'}
         </Button>
       </DialogActions>
-    </Dialog>
+    </Dialog >
   );
 };
 

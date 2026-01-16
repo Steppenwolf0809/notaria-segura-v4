@@ -29,7 +29,7 @@ import {
  */
 function AlertaItem({ alerta, onDocumentClick, showDetails = true }) {
   const theme = useTheme();
-  
+
   // Configuración de colores y iconos según nivel de alerta
   const getAlertConfig = (nivel) => {
     const configs = {
@@ -115,14 +115,7 @@ function AlertaItem({ alerta, onDocumentClick, showDetails = true }) {
               size="small"
               variant="outlined"
             />
-            {alerta.isGrouped && (
-              <Chip
-                label="GRUPO"
-                color="secondary"
-                size="small"
-                variant="outlined"
-              />
-            )}
+
           </Box>
         }
         secondary={
@@ -130,25 +123,25 @@ function AlertaItem({ alerta, onDocumentClick, showDetails = true }) {
             <Typography variant="body2" color="text.primary" sx={{ fontWeight: 600 }}>
               {alerta.clientName}
             </Typography>
-            
+
             {showDetails && (
               <>
-                <Typography 
-                  variant="body2" 
-                  sx={{ 
+                <Typography
+                  variant="body2"
+                  sx={{
                     fontWeight: 500,
                     color: (theme) => theme.palette.mode === 'dark' ? '#e2e8f0' : '#374151'
                   }}
                 >
                   {formatearTipoDocumento(alerta.documentType)}
                 </Typography>
-                
+
                 <Box display="flex" alignItems="center" gap={2} mt={0.5}>
                   <Box display="flex" alignItems="center" gap={0.5}>
                     <ScheduleIcon fontSize="small" color="action" />
-                    <Typography 
-                      variant="caption" 
-                      sx={{ 
+                    <Typography
+                      variant="caption"
+                      sx={{
                         fontWeight: 500,
                         color: (theme) => theme.palette.mode === 'dark' ? '#cbd5e1' : '#4b5563'
                       }}
@@ -156,13 +149,13 @@ function AlertaItem({ alerta, onDocumentClick, showDetails = true }) {
                       {alerta.diasPendientes} día{alerta.diasPendientes !== 1 ? 's' : ''} pendiente{alerta.diasPendientes !== 1 ? 's' : ''}
                     </Typography>
                   </Box>
-                  
+
                   {alerta.clientPhone && (
                     <Box display="flex" alignItems="center" gap={0.5}>
                       <PhoneIcon fontSize="small" color="action" />
-                      <Typography 
-                        variant="caption" 
-                        sx={{ 
+                      <Typography
+                        variant="caption"
+                        sx={{
                           fontWeight: 500,
                           color: (theme) => theme.palette.mode === 'dark' ? '#cbd5e1' : '#4b5563'
                         }}
@@ -173,12 +166,12 @@ function AlertaItem({ alerta, onDocumentClick, showDetails = true }) {
                   )}
                 </Box>
 
-                <Typography 
-                  variant="caption" 
-                  sx={{ 
-                    fontStyle: 'italic', 
-                    display: 'block', 
-                    mt: 0.5, 
+                <Typography
+                  variant="caption"
+                  sx={{
+                    fontStyle: 'italic',
+                    display: 'block',
+                    mt: 0.5,
                     fontWeight: 500,
                     color: (theme) => theme.palette.mode === 'dark' ? '#94a3b8' : '#6b7280'
                   }}
@@ -193,8 +186,8 @@ function AlertaItem({ alerta, onDocumentClick, showDetails = true }) {
 
       <ListItemSecondaryAction>
         <Tooltip title="Ver documento">
-          <IconButton 
-            edge="end" 
+          <IconButton
+            edge="end"
             onClick={handleDocumentClick}
             size="small"
           >

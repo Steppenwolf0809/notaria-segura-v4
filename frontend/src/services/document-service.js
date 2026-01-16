@@ -813,79 +813,9 @@ const documentService = {
     }
   },
 
-  /**
-   * Actualizar política de notificación de un documento individual
-   * @param {string} documentId - ID del documento
-   * @param {string} policy - Política de notificación ('automatica', 'no_notificar', 'entrega_inmediata')
-   * @returns {Promise<Object>} Resultado de la actualización
-   */
-  async updateNotificationPolicy(documentId, policy) {
-    try {
-
-      const response = await api.put(`/documents/${documentId}/notification-policy`, {
-        notificationPolicy: policy
-      });
 
 
-      // Manejar respuesta de migración pendiente
-      if (response.status === 202 && response.data.data?.migrationPending) {
-      }
 
-      return {
-        success: true,
-        data: response.data.data || response.data,
-        message: response.data.message || 'Política de notificación actualizada exitosamente'
-      };
-    } catch (error) {
-
-      const errorMessage = error.response?.data?.message ||
-        error.message ||
-        'Error al actualizar la política de notificación';
-
-      return {
-        success: false,
-        error: errorMessage,
-        message: errorMessage
-      };
-    }
-  },
-
-  /**
-   * Actualizar política de notificación de un grupo de documentos
-   * @param {string} groupId - ID del grupo
-   * @param {string} policy - Política de notificación ('automatica', 'no_notificar', 'entrega_inmediata')
-   * @returns {Promise<Object>} Resultado de la actualización
-   */
-  async updateGroupNotificationPolicy(groupId, policy) {
-    try {
-
-      const response = await api.put(`/documents/group/${groupId}/notification-policy`, {
-        notificationPolicy: policy
-      });
-
-
-      // Manejar respuesta de migración pendiente
-      if (response.status === 202 && response.data.data?.migrationPending) {
-      }
-
-      return {
-        success: true,
-        data: response.data.data || response.data,
-        message: response.data.message || 'Política de notificación del grupo actualizada exitosamente'
-      };
-    } catch (error) {
-
-      const errorMessage = error.response?.data?.message ||
-        error.message ||
-        'Error al actualizar la política de notificación del grupo';
-
-      return {
-        success: false,
-        error: errorMessage,
-        message: errorMessage
-      };
-    }
-  },
 
   /**
    * 💳 NUEVA FUNCIONALIDAD: Marcar documento como Nota de Crédito
@@ -919,46 +849,7 @@ const documentService = {
     }
   },
 
-  /**
-   * Marcar documento como entregado inmediatamente (para política de entrega inmediata)
-   * @param {string} documentId - ID del documento
-   * @param {Object} deliveryData - Datos mínimos de entrega
-   * @returns {Promise<Object>} Resultado de la entrega inmediata
-   */
-  async markAsDeliveredImmediate(documentId, deliveryData = {}) {
-    try {
 
-      const immediateDeliveryData = {
-        entregadoA: deliveryData.entregadoA || 'Cliente',
-        relacionTitular: 'titular',
-        verificacionManual: true,
-        codigoVerificacion: '',
-        facturaPresenta: false,
-        observacionesEntrega: deliveryData.observacionesEntrega || 'Entrega inmediata automática',
-        immediateDelivery: true
-      };
-
-      const response = await api.post(`/documents/${documentId}/deliver`, immediateDeliveryData);
-
-
-      return {
-        success: true,
-        data: response.data.data || response.data,
-        message: response.data.message || 'Documento entregado inmediatamente'
-      };
-    } catch (error) {
-
-      const errorMessage = error.response?.data?.message ||
-        error.message ||
-        'Error al marcar documento como entregado';
-
-      return {
-        success: false,
-        error: errorMessage,
-        message: errorMessage
-      };
-    }
-  },
 
   /**
    * 📊 Obtener estadísticas completas para dashboard de CAJA

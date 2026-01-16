@@ -22,7 +22,6 @@ import {
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatCurrency } from '../../utils/currencyUtils';
-import GroupingDetector from '../grouping/GroupingDetector';
 
 /**
  * Componente de tarjeta unificado para ambos roles (Matrizador y Archivo)
@@ -38,13 +37,11 @@ const UnifiedDocumentCard = ({
   onOpenDetail,
   onOpenEdit,
   onAdvanceStatus,
-  onGroupDocuments, // Nueva prop para agrupación
-  onShowGroupInfo, // Nueva prop para mostrar info del grupo
   isDragging = false,
   dragHandlers = {},
   style = {}
 }) => {
-  
+
   /**
    * Formatear teléfono con guiones
    */
@@ -100,7 +97,7 @@ const UnifiedDocumentCard = ({
    */
   const getAdvanceButtonConfig = () => {
     const { status } = document;
-    
+
     if (role === 'matrizador') {
       if (status === 'EN_PROCESO') {
         return {
@@ -119,7 +116,7 @@ const UnifiedDocumentCard = ({
         };
       }
     }
-    
+
     if (role === 'archivo') {
       if (status === 'EN_PROCESO') {
         return {
@@ -138,7 +135,7 @@ const UnifiedDocumentCard = ({
         };
       }
     }
-    
+
     return null;
   };
 
@@ -147,15 +144,15 @@ const UnifiedDocumentCard = ({
    */
   const getRelevantDate = () => {
     const { status, createdAt, updatedAt } = document;
-    
+
     if (role === 'archivo' && status === 'ENTREGADO') {
       return { label: 'Entregado', date: updatedAt };
     }
-    
+
     if (status === 'LISTO') {
       return { label: 'Listo', date: updatedAt };
     }
-    
+
     return { label: 'Recibido', date: createdAt };
   };
 
@@ -180,8 +177,8 @@ const UnifiedDocumentCard = ({
         mb: 2,
         cursor: isDragging ? 'grabbing' : 'grab',
         transition: 'all 0.2s ease',
-        border: document.isGrouped ? '2px solid' : '1px solid',
-        borderColor: document.isGrouped ? 'primary.main' : 'divider',
+        border: '1px solid',
+        borderColor: 'divider',
         '&:hover': {
           boxShadow: 3,
           transform: 'translateY(-2px)'
@@ -216,7 +213,7 @@ const UnifiedDocumentCard = ({
           <Chip
             label={document.documentType}
             size="small"
-            sx={{ 
+            sx={{
               fontSize: '0.75rem',
               height: 24,
               bgcolor: 'action.hover',
@@ -227,8 +224,8 @@ const UnifiedDocumentCard = ({
 
         {/* Descripción del trámite (acto principal) */}
         {document.actoPrincipalDescripcion && (
-          <Typography 
-            variant="body2" 
+          <Typography
+            variant="body2"
             sx={{ fontSize: '0.85rem', color: 'text.secondary', mb: 1 }}
           >
             {document.actoPrincipalDescripcion}
@@ -265,14 +262,7 @@ const UnifiedDocumentCard = ({
 
         {/* 🚫 Indicador de grupo ELIMINADO */}
 
-        {/* Detector de agrupación inteligente - Para archivo y matrizador */}
-        {onGroupDocuments && (
-          <GroupingDetector
-            document={document}
-            onGroupDocuments={(groupableDocuments) => onGroupDocuments(groupableDocuments, document)}
-            isVisible={true}
-          />
-        )}
+
 
         {/* Acciones: Botón de editar y botón de avance */}
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1.5 }}>

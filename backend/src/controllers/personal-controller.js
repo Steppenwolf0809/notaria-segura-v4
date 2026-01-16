@@ -500,6 +500,62 @@ export async function obtenerMiInformacion(req, res) {
       });
     }
 
+    // AUTO-POPULATION LOGIC:
+    // Si la persona NO tiene datos completados (datosPersonaNatural es null o vacío)
+    // Buscamos si existe como cónyuge en otro registro para precargar sus datos.
+    if (!persona.datosPersonaNatural && persona.tipoPersona === 'NATURAL') {
+      try {
+        // Buscar registros donde esta persona aparezca como cónyuge
+        // Nota: Prisma Json filters pueden ser limitados en versiones antiguas, 
+        // pero intentaremos busqueda directa o raw query si es necesario.
+        // Por ahora, asumimos que podemos buscar en el path del JSON.
+        const esposo = await prisma.personaRegistrada.findFirst({
+          where: {
+            datosPersonaNatural: {
+              path: ['conyuge', 'numeroIdentificacion'],
+              equals: persona.numeroIdentificacion
+            }
+          }
+        });
+
+        if (esposo && esposo.datosPersonaNatural && esposo.datosPersonaNatural.conyuge) {
+          const datosConyuge = esposo.datosPersonaNatural.conyuge;
+          logger.info(`✨ Auto-populando datos para ${persona.numeroIdentificacion} desde el registro de ${esposo.numeroIdentificacion}`);
+
+          // Construimos el objeto datosPersonaNatural con la información disponible
+          persona.datosPersonaNatural = {
+            identificacion: {
+              tipo: 'CEDULA',
+              numero: persona.numeroIdentificacion,
+              nacionalidad: datosConyuge.nacionalidad || 'ECUATORIANA'
+            },
+            datosPersonales: {
+              nombres: datosConyuge.nombres || '',
+              apellidos: datosConyuge.apellidos || '',
+              // Intentar inferir o mapear otros campos si es posible, pero nombre es lo crítico
+              // El formulario pedirá el resto.
+              genero: datosConyuge.genero || '',
+              estadoCivil: datosConyuge.estadoCivil || 'CASADO', // Asumimos casado si aparece como cónyuge
+            },
+            contacto: {
+              email: datosConyuge.email || '',
+              celular: datosConyuge.celular || ''
+            },
+            informacionLaboral: {
+              profesionOcupacion: datosConyuge.profesionOcupacion || '',
+              situacion: datosConyuge.situacionLaboral || ''
+            },
+            // Heredar dirección del esposo (asunción razonable para autocompletado)
+            direccion: esposo.datosPersonaNatural.direccion || {},
+            // Importante: No marcamos como 'completado' para obligar a verificar/guardar
+          };
+        }
+      } catch (err) {
+        logger.warn('Error intentando auto-popular datos de cónyuge:', err);
+        // No fallamos el request, simplemente no autocompletamos
+      }
+    }
+
     res.json({
       success: true,
       data: persona

@@ -7,19 +7,38 @@ import { AuthClient } from './auth.js';
 import { XmlUploader } from './uploader.js';
 import { XmlWatcher } from './watcher.js';
 import { Organizer } from './organizer.js';
+import { SourceWatcher } from './source-watcher.js';
+import { SequenceTracker } from './sequence-tracker.js';
 
 async function main() {
   const config = loadConfig();
+
+  // Asegurar que todas las carpetas existan
+  await fs.ensureDir(config.folders.source);
   await fs.ensureDir(config.folders.watch);
   await fs.ensureDir(config.folders.processed);
   await fs.ensureDir(config.folders.errors);
   await fs.ensureDir(config.folders.archived);
+  if (config.folders.ignored) {
+    await fs.ensureDir(config.folders.ignored);
+  }
 
   const logDir = config.folders.watch; // log en la carpeta raíz vigilada
   const logger = createLogger(logDir, config.settings.logLevel || 'INFO');
 
-  logger.info('XML Watcher Service - Notaría iniciado');
+  logger.info('═══════════════════════════════════════════════════════════');
+  logger.info('   XML Watcher Service UNIFICADO - Notaría');
+  logger.info('═══════════════════════════════════════════════════════════');
   logger.info(`API: ${config.apiUrl}`);
+  logger.info(`Carpeta fuente (SRI): ${config.folders.source}`);
+  logger.info(`Carpeta procesamiento: ${config.folders.watch}`);
+
+  // Inicializar tracker de secuencias
+  const sequenceTracker = new SequenceTracker({
+    config,
+    logger,
+    watchDir: config.folders.watch
+  });
 
   const auth = new AuthClient({
     apiUrl: config.apiUrl,
@@ -38,12 +57,34 @@ async function main() {
   const uploader = new XmlUploader({ apiUrl: config.apiUrl, auth, config, logger });
   const organizer = new Organizer({ folders: config.folders, settings: config.settings, logger });
 
+  // === SOURCE WATCHER ===
+  // Vigila C:\SRI\Comprobantes_generados y copia a xmlcopiados
+  let sourceWatcher = null;
+  if (config.sourceWatcher?.enabled) {
+    sourceWatcher = new SourceWatcher({
+      sourceDir: config.folders.source,
+      targetDir: config.folders.watch,
+      copyDelay: config.sourceWatcher.copyDelay,
+      deleteAfterCopy: config.sourceWatcher.deleteAfterCopy,
+      logger,
+      onFileCopied: async (filename, targetPath) => {
+        // Verificar secuencia cuando se copia un archivo
+        sequenceTracker.track(filename);
+      }
+    });
+    await sourceWatcher.start();
+    logger.info('✅ SourceWatcher iniciado - vigilando carpeta SRI');
+  } else {
+    logger.info('⚠️ SourceWatcher deshabilitado');
+  }
+
+  // === MAIN WATCHER ===
+  // Vigila xmlcopiados y sube a la API
   const watcher = new XmlWatcher({
     watchDir: config.folders.watch,
     delayMs: config.settings.watchDelay,
     logger,
     onFilesReady: async (files) => {
-      // Si llegan varias detecciones casi simultáneas, agrupar por ventana de tiempo
       try {
         logger.info(`Procesando ${files.length} archivo(s)...`);
         await uploader.processAndMove(files);
@@ -54,6 +95,8 @@ async function main() {
   });
 
   await watcher.start();
+  logger.info('✅ MainWatcher iniciado - procesando y subiendo XMLs');
+
 
   // Programar limpieza diaria a la hora indicada
   if (config.settings.cleanup.enabled) {

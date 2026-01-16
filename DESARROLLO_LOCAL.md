@@ -118,8 +118,6 @@ npm run verify:users
 ### Variables Críticas
 - **JWT_SECRET**: Genera uno único para desarrollo
 - **DATABASE_URL**: Usa SQLite local
-- **TWILIO_***: Opcional, puedes deshabilitarlo
-
 ### Archivo .env
 - ✅ Está en `.gitignore` - no se sube a Git
 - ✅ No afecta el deploy de Railway

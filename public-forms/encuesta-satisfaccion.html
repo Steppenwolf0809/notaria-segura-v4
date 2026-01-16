@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Encuesta de Satisfacción - Notaría 18 Quito</title>
+    <meta name="description" content="Cuéntenos su experiencia. Su opinión nos ayuda a mejorar.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #1e40af;
+            --primary-light: #3b82f6;
+            --primary-dark: #1e3a8a;
+            --success: #10b981;
+            --success-light: #d1fae5;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --bg: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            min-height: 100vh;
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 520px;
+            margin: 0 auto;
+            padding: 24px 16px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .logo {
+            width: 100px;
+            height: 100px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+            overflow: hidden;
+        }
+
+        .logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+        }
+
+        /* Card */
+        .card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: var(--shadow-lg);
+            flex: 1;
+        }
+
+        /* Rating Section */
+        .section {
+            margin-bottom: 28px;
+        }
+
+        .section-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--text);
+        }
+
+        /* Emoji Rating */
+        .rating-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .rating-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 8px;
+            border: 2px solid transparent;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: #f8fafc;
+        }
+
+        .rating-item:hover {
+            background: #e0e7ff;
+            transform: translateY(-2px);
+        }
+
+        .rating-item.selected {
+            border-color: var(--primary);
+            background: #dbeafe;
+        }
+
+        .rating-emoji {
+            font-size: 2.2rem;
+            line-height: 1;
+            transition: transform 0.2s ease;
+        }
+
+        .rating-item:hover .rating-emoji,
+        .rating-item.selected .rating-emoji {
+            transform: scale(1.15);
+        }
+
+        .rating-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-align: center;
+            font-weight: 500;
+        }
+
+        /* Yes/No Toggle */
+        .toggle-group {
+            display: flex;
+            gap: 12px;
+        }
+
+        .toggle-btn {
+            flex: 1;
+            padding: 14px 20px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            background: var(--card-bg);
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .toggle-btn:hover {
+            border-color: var(--primary-light);
+            background: #f0f9ff;
+        }
+
+        .toggle-btn.selected.yes {
+            border-color: var(--success);
+            background: var(--success-light);
+            color: #065f46;
+        }
+
+        .toggle-btn.selected.no {
+            border-color: var(--error);
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .toggle-icon {
+            font-size: 1.2rem;
+        }
+
+        /* Textarea */
+        .textarea {
+            width: 100%;
+            min-height: 100px;
+            padding: 14px;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            font-family: inherit;
+            font-size: 1rem;
+            resize: vertical;
+            transition: border-color 0.2s ease;
+        }
+
+        .textarea:focus {
+            outline: none;
+            border-color: var(--primary-light);
+        }
+
+        .textarea::placeholder {
+            color: var(--text-muted);
+        }
+
+        /* Submit Button */
+        .submit-btn {
+            width: 100%;
+            padding: 16px 24px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow);
+            margin-top: 8px;
+        }
+
+        .submit-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .submit-btn.loading {
+            position: relative;
+            color: transparent;
+        }
+
+        .submit-btn.loading::after {
+            content: '';
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border: 3px solid white;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            left: 50%;
+            top: 50%;
+            margin-left: -12px;
+            margin-top: -12px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Success State */
+        .success-state {
+            display: none;
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .success-state.show {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: var(--success-light);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            font-size: 3rem;
+        }
+
+        .success-state h2 {
+            font-size: 1.5rem;
+            color: var(--text);
+            margin-bottom: 12px;
+        }
+
+        .success-state p {
+            color: var(--text-muted);
+            font-size: 1rem;
+        }
+
+        /* Form State */
+        .form-state {
+            display: block;
+        }
+
+        .form-state.hide {
+            display: none;
+        }
+
+        /* Error Alert */
+        .error-alert {
+            background: #fee2e2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+            display: none;
+        }
+
+        .error-alert.show {
+            display: block;
+            animation: shake 0.4s ease;
+        }
+
+        @keyframes shake {
+
+            0%,
+            100% {
+                transform: translateX(0);
+            }
+
+            20%,
+            60% {
+                transform: translateX(-5px);
+            }
+
+            40%,
+            80% {
+                transform: translateX(5px);
+            }
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 24px 16px 16px;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 360px) {
+            .rating-emoji {
+                font-size: 1.8rem;
+            }
+
+            .rating-label {
+                font-size: 0.65rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">
+                <!-- Logo ubicado en /images/ del servidor -->
+                <img src="/images/logo-notaria18.jpg" alt="Logo Notaría 18" onerror="this.style.display='none'">
+            </div>
+            <h1>Notaría Décima Octava de Quito</h1>
+            <p>Su opinión es muy importante para nosotros</p>
+        </div>
+
+        <div class="card">
+            <!-- Error Alert -->
+            <div id="errorAlert" class="error-alert"></div>
+
+            <!-- Form State -->
+            <div id="formState" class="form-state">
+                <!-- Rating Section -->
+                <div class="section">
+                    <div class="section-title">¿Cómo calificaría su experiencia?</div>
+                    <div class="rating-container" id="ratingContainer">
+                        <div class="rating-item" data-value="1" onclick="selectRating(1)">
+                            <span class="rating-emoji">😞</span>
+                            <span class="rating-label">Muy mala</span>
+                        </div>
+                        <div class="rating-item" data-value="2" onclick="selectRating(2)">
+                            <span class="rating-emoji">😕</span>
+                            <span class="rating-label">Mala</span>
+                        </div>
+                        <div class="rating-item" data-value="3" onclick="selectRating(3)">
+                            <span class="rating-emoji">😐</span>
+                            <span class="rating-label">Regular</span>
+                        </div>
+                        <div class="rating-item" data-value="4" onclick="selectRating(4)">
+                            <span class="rating-emoji">🙂</span>
+                            <span class="rating-label">Buena</span>
+                        </div>
+                        <div class="rating-item" data-value="5" onclick="selectRating(5)">
+                            <span class="rating-emoji">😍</span>
+                            <span class="rating-label">Excelente</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Info Clara -->
+                <div class="section">
+                    <div class="section-title">¿La información brindada fue clara?</div>
+                    <div class="toggle-group">
+                        <button type="button" class="toggle-btn" id="infoSi" onclick="selectInfoClara(true)">
+                            <span class="toggle-icon">✓</span> Sí
+                        </button>
+                        <button type="button" class="toggle-btn" id="infoNo" onclick="selectInfoClara(false)">
+                            <span class="toggle-icon">✗</span> No
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Trato Cordial -->
+                <div class="section">
+                    <div class="section-title">¿El trato fue cordial y respetuoso?</div>
+                    <div class="toggle-group">
+                        <button type="button" class="toggle-btn" id="tratoSi" onclick="selectTratoCordial(true)">
+                            <span class="toggle-icon">✓</span> Sí
+                        </button>
+                        <button type="button" class="toggle-btn" id="tratoNo" onclick="selectTratoCordial(false)">
+                            <span class="toggle-icon">✗</span> No
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Sugerencia -->
+                <div class="section">
+                    <div class="section-title">¿Tiene alguna sugerencia? (Opcional)</div>
+                    <textarea class="textarea" id="sugerencia" placeholder="Cuéntenos cómo podemos mejorar..."
+                        maxlength="1000"></textarea>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="button" class="submit-btn" id="submitBtn" onclick="submitEncuesta()">
+                    Enviar Encuesta
+                </button>
+            </div>
+
+            <!-- Success State -->
+            <div id="successState" class="success-state">
+                <div class="success-icon">✓</div>
+                <h2>¡Gracias por su opinión!</h2>
+                <p>Su encuesta ha sido registrada exitosamente. Sus comentarios nos ayudan a brindarle un mejor
+                    servicio.</p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Notaría Décima Octava del Cantón Quito</p>
+        </div>
+    </div>
+
+    <script>
+        // =====================================================================
+        // CONFIGURACIÓN
+        // =====================================================================
+
+        // URL del API Backend (Railway)
+        // CAMBIAR ESTA URL PARA PRODUCCIÓN
+        const API_URL = 'https://notaria-segura-v4-production.up.railway.app';
+
+        // =====================================================================
+        // ESTADO DEL FORMULARIO
+        // =====================================================================
+
+        let formData = {
+            calificacion: null,
+            infoClara: null,
+            tratoCordial: null,
+            sugerencia: '',
+            tramiteId: null
+        };
+
+        // =====================================================================
+        // INICIALIZACIÓN
+        // =====================================================================
+
+        document.addEventListener('DOMContentLoaded', function () {
+            // Capturar el parámetro ref de la URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const ref = urlParams.get('ref');
+            if (ref) {
+                formData.tramiteId = ref;
+                console.log('Trámite ID capturado:', ref);
+
+                // MEJORA: Limpiar la URL visualmente para que la encuesta parezca anónima
+                // Mantenemos el ID internamente pero lo borramos de la barra de direcciones
+                if (window.history && window.history.replaceState) {
+                    const cleanUrl = window.location.pathname;
+                    window.history.replaceState(null, '', cleanUrl);
+                }
+            }
+        });
+
+        // =====================================================================
+        // FUNCIONES DE SELECCIÓN
+        // =====================================================================
+
+        function selectRating(value) {
+            formData.calificacion = value;
+
+            // Actualizar UI
+            document.querySelectorAll('.rating-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            document.querySelector(`.rating-item[data-value="${value}"]`).classList.add('selected');
+
+            hideError();
+        }
+
+        function selectInfoClara(value) {
+            formData.infoClara = value;
+
+            // Actualizar UI
+            document.getElementById('infoSi').classList.remove('selected', 'yes');
+            document.getElementById('infoNo').classList.remove('selected', 'no');
+
+            if (value) {
+                document.getElementById('infoSi').classList.add('selected', 'yes');
+            } else {
+                document.getElementById('infoNo').classList.add('selected', 'no');
+            }
+
+            hideError();
+        }
+
+        function selectTratoCordial(value) {
+            formData.tratoCordial = value;
+
+            // Actualizar UI
+            document.getElementById('tratoSi').classList.remove('selected', 'yes');
+            document.getElementById('tratoNo').classList.remove('selected', 'no');
+
+            if (value) {
+                document.getElementById('tratoSi').classList.add('selected', 'yes');
+            } else {
+                document.getElementById('tratoNo').classList.add('selected', 'no');
+            }
+
+            hideError();
+        }
+
+        // =====================================================================
+        // FUNCIONES DE UI
+        // =====================================================================
+
+        function showError(message) {
+            const alert = document.getElementById('errorAlert');
+            alert.textContent = message;
+            alert.classList.add('show');
+        }
+
+        function hideError() {
+            document.getElementById('errorAlert').classList.remove('show');
+        }
+
+        function setLoading(loading) {
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = loading;
+            if (loading) {
+                btn.classList.add('loading');
+            } else {
+                btn.classList.remove('loading');
+            }
+        }
+
+        function showSuccess() {
+            document.getElementById('formState').classList.add('hide');
+            document.getElementById('successState').classList.add('show');
+        }
+
+        // =====================================================================
+        // ENVÍO DEL FORMULARIO
+        // =====================================================================
+
+        async function submitEncuesta() {
+            hideError();
+
+            // Validaciones
+            if (formData.calificacion === null) {
+                showError('Por favor, seleccione una calificación.');
+                return;
+            }
+
+            if (formData.infoClara === null) {
+                showError('Por favor, indique si la información fue clara.');
+                return;
+            }
+
+            if (formData.tratoCordial === null) {
+                showError('Por favor, indique si el trato fue cordial.');
+                return;
+            }
+
+            // Capturar sugerencia
+            formData.sugerencia = document.getElementById('sugerencia').value.trim() || null;
+
+            // Enviar
+            setLoading(true);
+
+            try {
+                const response = await fetch(`${API_URL}/api/encuesta`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        calificacion: formData.calificacion,
+                        infoClara: formData.infoClara,
+                        tratoCordial: formData.tratoCordial,
+                        sugerencia: formData.sugerencia,
+                        tramiteId: formData.tramiteId
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Error al enviar la encuesta');
+                }
+
+                console.log('Encuesta enviada exitosamente:', data);
+                showSuccess();
+
+            } catch (error) {
+                console.error('Error al enviar encuesta:', error);
+                showError('Hubo un error al enviar la encuesta. Por favor, intente nuevamente.');
+            } finally {
+                setLoading(false);
+            }
+        }
+    </script>
+</body>
+
+</html>

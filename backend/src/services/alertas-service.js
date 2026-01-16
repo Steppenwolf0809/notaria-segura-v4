@@ -12,7 +12,7 @@ class AlertasService {
    */
   static async getAlertasRecepcion() {
     const now = new Date();
-    
+
     // Calcular fechas límite
     const fechaAmarilla = new Date(now.getTime() - (3 * 24 * 60 * 60 * 1000)); // 3 días
     const fechaNaranja = new Date(now.getTime() - (8 * 24 * 60 * 60 * 1000));  // 8 días  
@@ -36,14 +36,7 @@ class AlertasService {
             clientPhone: true,
             documentType: true,
             updatedAt: true,
-            verificationCode: true,
-            isGrouped: true,
-            documentGroup: {
-              select: {
-                groupCode: true,
-                documentsCount: true
-              }
-            }
+            verificationCode: true
           },
           orderBy: {
             updatedAt: 'asc' // Más antiguos primero
@@ -66,14 +59,7 @@ class AlertasService {
             clientPhone: true,
             documentType: true,
             updatedAt: true,
-            verificationCode: true,
-            isGrouped: true,
-            documentGroup: {
-              select: {
-                groupCode: true,
-                documentsCount: true
-              }
-            }
+            verificationCode: true
           },
           orderBy: {
             updatedAt: 'asc'
@@ -96,14 +82,7 @@ class AlertasService {
             clientPhone: true,
             documentType: true,
             updatedAt: true,
-            verificationCode: true,
-            isGrouped: true,
-            documentGroup: {
-              select: {
-                groupCode: true,
-                documentsCount: true
-              }
-            }
+            verificationCode: true
           },
           orderBy: {
             updatedAt: 'asc'
@@ -121,8 +100,6 @@ class AlertasService {
           documentType: doc.documentType,
           updatedAt: doc.updatedAt,
           verificationCode: doc.verificationCode,
-          isGrouped: doc.isGrouped,
-          groupInfo: doc.documentGroup,
           nivel,
           diasPendientes: Math.floor((now - doc.updatedAt) / (24 * 60 * 60 * 1000)),
           mensaje: this.generarMensajeAlerta('RECEPCION', nivel, Math.floor((now - doc.updatedAt) / (24 * 60 * 60 * 1000)))
@@ -131,7 +108,7 @@ class AlertasService {
 
       const alertas = [
         ...procesarAlertas(alertasRojas, 'CRITICA'),
-        ...procesarAlertas(alertasNaranjas, 'URGENTE'), 
+        ...procesarAlertas(alertasNaranjas, 'URGENTE'),
         ...procesarAlertas(alertasAmarillas, 'ATENCION')
       ];
 
@@ -172,7 +149,7 @@ class AlertasService {
    */
   static async getAlertasMatrizador(matrizadorId) {
     const now = new Date();
-    
+
     const fechaAmarilla = new Date(now.getTime() - (5 * 24 * 60 * 60 * 1000)); // 5 días
     const fechaNaranja = new Date(now.getTime() - (8 * 24 * 60 * 60 * 1000));  // 8 días
     const fechaRoja = new Date(now.getTime() - (10 * 24 * 60 * 60 * 1000));   // 10 días
@@ -286,11 +263,11 @@ class AlertasService {
         criticas: alertasRojas.length,
         urgentes: alertasNaranjas.length,
         atencion: alertasAmarillas.length,
-        documentosEnProceso: await prisma.document.count({ 
-          where: { 
-            assignedToId: matrizadorId, 
-            status: 'EN_PROCESO' 
-          } 
+        documentosEnProceso: await prisma.document.count({
+          where: {
+            assignedToId: matrizadorId,
+            status: 'EN_PROCESO'
+          }
         })
       };
 
@@ -322,7 +299,7 @@ class AlertasService {
    */
   static async getAlertasArchivo(archivoId) {
     const now = new Date();
-    
+
     const fechaAmarilla = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));  // 7 días
     const fechaNaranja = new Date(now.getTime() - (15 * 24 * 60 * 60 * 1000)); // 15 días
     const fechaRoja = new Date(now.getTime() - (21 * 24 * 60 * 60 * 1000));    // 21 días
@@ -456,7 +433,7 @@ class AlertasService {
    */
   static async getAlertasAdmin() {
     const now = new Date();
-    
+
     const fechaAmarilla = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));  // 7 días
     const fechaNaranja = new Date(now.getTime() - (15 * 24 * 60 * 60 * 1000)); // 15 días
     const fechaRoja = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000));    // 30 días
@@ -601,10 +578,10 @@ class AlertasService {
         error: 'Error interno del servidor',
         data: {
           alertas: [],
-          stats: { 
-            total: 0, 
-            criticas: 0, 
-            urgentes: 0, 
+          stats: {
+            total: 0,
+            criticas: 0,
+            urgentes: 0,
             atencion: 0,
             estadisticasGlobales: { total: 0, pendientes: 0, enProceso: 0, listos: 0, entregados: 0 }
           }

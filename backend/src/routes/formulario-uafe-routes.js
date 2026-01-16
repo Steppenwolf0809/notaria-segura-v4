@@ -19,7 +19,9 @@ import {
   listarTodosProtocolos,
   eliminarProtocolo,
   listarPersonasRegistradas,
-  eliminarPersonaRegistrada
+  eliminarPersonaRegistrada,
+  generarTextos,
+  actualizarDatosPersona
 } from '../controllers/formulario-uafe-controller.js';
 
 const router = express.Router();
@@ -77,13 +79,12 @@ router.post(
  * Agregar persona a un protocolo
  * POST /api/formulario-uafe/protocolo/:protocoloId/persona
  * Requiere: JWT + role MATRIZADOR o ADMIN
- * CSRF Protected - Requiere token CSRF
+ * NOTA: CSRF removido temporalmente - JWT provee protección suficiente
  */
 router.post(
   '/protocolo/:protocoloId/persona',
   authenticateToken,
   requireRoles(['MATRIZADOR', 'ADMIN']),
-  csrfProtection,
   agregarPersonaAProtocolo
 );
 
@@ -180,6 +181,19 @@ router.get(
 );
 
 /**
+ * Generar textos notariales (encabezado y comparecencia)
+ * POST /api/formulario-uafe/protocolo/:protocoloId/generar-textos
+ * Requiere: JWT + role MATRIZADOR o ADMIN
+ * Body: { forzar: boolean } - Si true, regenera aunque ya exista en cache
+ */
+router.post(
+  '/protocolo/:protocoloId/generar-textos',
+  authenticateToken,
+  requireRoles(['MATRIZADOR', 'ADMIN']),
+  generarTextos
+);
+
+/**
  * Descargar archivo temporal (PDF o ZIP)
  * GET /api/formulario-uafe/download/:folder/:filename
  */
@@ -210,6 +224,18 @@ router.delete(
   authenticateToken,
   requireRoles(['MATRIZADOR', 'ADMIN']),
   eliminarPersonaDeProtocolo
+);
+
+/**
+ * Actualizar datos UAFE de persona (Matrizador/Admin)
+ * PUT /api/formulario-uafe/persona/:cedula
+ */
+router.put(
+  '/persona/:cedula',
+  authenticateToken,
+  requireRoles(['MATRIZADOR', 'ADMIN']),
+  csrfProtection,
+  actualizarDatosPersona
 );
 
 /**

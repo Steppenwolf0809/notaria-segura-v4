@@ -1,6 +1,6 @@
 import prisma from '../db.js';
 import { Prisma } from '@prisma/client';
-import whatsappService from '../services/whatsapp-service.js';
+
 import CodigoRetiroService from '../utils/codigo-retiro.js';
 import { getReversionCleanupData, STATUS_ORDER_LIST } from '../utils/status-transitions.js';
 import cache from '../services/cache-service.js';
@@ -92,13 +92,22 @@ async function listarMisDocumentos(req, res) {
       page = 1,
       limit = 10,
       fechaDesde,
-      fechaHasta
+      fechaHasta,
+      // 🆕 Parámetro para ocultar entregados
+      ocultarEntregados
     } = req.query;
 
     // Filtros base
     const where = {
       assignedToId: userId
     };
+
+    // 🆕 Si ocultarEntregados es true, excluir documentos ENTREGADO
+    // A menos que el filtro de estado sea específicamente ENTREGADO
+    // ESTO ESTABA CAUSANDO CONFLICTO CON FILTROS ESPECÍFICOS: SE MUEVE ABAJO
+    /* if (ocultarEntregados === 'true' && estado !== 'ENTREGADO') {
+      where.status = { notIn: ['ENTREGADO'] };
+    } */
 
     // Filtro por rango de fechas (fechaFactura)
     if (fechaDesde || fechaHasta) {
@@ -125,7 +134,8 @@ async function listarMisDocumentos(req, res) {
       orderBy,
       orderDirection,
       fechaDesde,
-      fechaHasta
+      fechaHasta,
+      ocultarEntregados
     });
 
     const cached = await cache.get(cacheKey);
@@ -159,9 +169,13 @@ async function listarMisDocumentos(req, res) {
           typeFilter = Prisma.sql`AND d."documentType" = ${tipo}`;
         }
 
+        // 🆕 Filtro de estado mejorado: incluye ocultarEntregados
         let statusFilter = Prisma.sql``;
         if (estado && estado !== 'TODOS') {
           statusFilter = Prisma.sql`AND d."status" = ${estado}`;
+        } else if (ocultarEntregados === 'true') {
+          // Si no hay filtro de estado específico, ocultar ENTREGADO
+          statusFilter = Prisma.sql`AND d."status" != 'ENTREGADO'`;
         }
 
         // Filtro por rango de fechas (fechaFactura) para raw SQL
@@ -178,18 +192,27 @@ async function listarMisDocumentos(req, res) {
           dateFilter = Prisma.sql`AND d."fechaFactura" < ${endDate}`;
         }
 
-        // Construcción dinámica de ORDER BY SQL
-        let orderSql = Prisma.sql`d."updatedAt" DESC`;
-        if (orderBy !== 'prioridad') { // Si es prioridad, mantenemos updatedAt por ahora en búsqueda
-          // Mapeo seguro de columnas para evitar inyección
-          const allowedCols = ['createdAt', 'updatedAt', 'clientName', 'protocolNumber', 'totalFactura', 'status', 'fechaFactura'];
-          const safeCol = allowedCols.includes(orderBy) ? orderBy : 'updatedAt';
-          const safeDir = orderDirection.toLowerCase() === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
+        // 🆕 Ordenamiento por PRIORIDAD DE ESTADO por defecto
+        // Prioridad: EN_PROCESO > LISTO > otros > ENTREGADO
+        // Luego ordenamiento secundario por updatedAt
+        const statusPriorityOrder = Prisma.sql`
+          CASE d."status"
+            WHEN 'EN_PROCESO' THEN 1
+            WHEN 'LISTO' THEN 2
+            WHEN 'PENDIENTE' THEN 3
+            WHEN 'CANCELADO' THEN 4
+            WHEN 'ENTREGADO' THEN 5
+            ELSE 6
+          END`;
 
-          // Construcción manual segura ya que Prisma.sql no acepta identificadores dinámicos fácilmente en ORDER BY
-          // Usamos raw string concatenado SOLO para el nombre de columna que ya validamos con allowedCols
-          orderSql = Prisma.sql([`d."${safeCol}" ${safeDir === Prisma.sql`ASC` ? 'ASC' : 'DESC'}`]);
-        }
+        // Construcción dinámica de ORDER BY SQL
+        // Siempre ordenamos primero por prioridad de estado, luego por el campo seleccionado
+        let orderSql;
+        const allowedCols = ['createdAt', 'updatedAt', 'clientName', 'protocolNumber', 'totalFactura', 'status', 'fechaFactura'];
+        const safeCol = allowedCols.includes(orderBy) ? orderBy : 'updatedAt';
+        const safeDirStr = orderDirection.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+
+        orderSql = Prisma.sql([`${statusPriorityOrder.strings[0]} ASC, d."${safeCol}" ${safeDirStr}`]);
 
         const pattern = `%${searchTerm}%`;
 
@@ -249,8 +272,13 @@ async function listarMisDocumentos(req, res) {
     }
 
     // CASO 2: LISTADO ESTÁNDAR (Sin búsqueda o fallback)
+    // CASO 2: LISTADO ESTÁNDAR (Sin búsqueda o fallback)
+    // Aplicar filtro de estado tiene prioridad sobre ocultarEntregados
     if (estado && estado !== 'TODOS') {
       where.status = estado;
+    } else if (ocultarEntregados === 'true') {
+      // Si no hay filtro específico, ocultar ENTREGADOS por defecto
+      where.status = { notIn: ['ENTREGADO'] };
     }
 
     if (tipo && tipo !== 'TODOS') {
@@ -260,7 +288,9 @@ async function listarMisDocumentos(req, res) {
     // Paginación
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    const [documentos, total] = await Promise.all([
+    // 🆕 Para ordenamiento por prioridad de estado, necesitamos obtener más documentos
+    // y ordenar en memoria, luego paginar
+    const [allDocumentos, total] = await Promise.all([
       prisma.document.findMany({
         where,
         include: {
@@ -268,12 +298,51 @@ async function listarMisDocumentos(req, res) {
             select: { firstName: true, lastName: true }
           }
         },
-        orderBy: prismaOrderBy,
-        skip,
-        take: parseInt(limit)
+        orderBy: prismaOrderBy
       }),
       prisma.document.count({ where })
     ]);
+
+    // 🆕 Ordenamiento en memoria por PRIORIDAD DE ESTADO
+    const prioridad = {
+      'EN_PROCESO': 1,
+      'LISTO': 2,
+      'PENDIENTE': 3,
+      'CANCELADO': 4,
+      'ENTREGADO': 5
+    };
+
+    const documentosOrdenados = allDocumentos.sort((a, b) => {
+      const prioA = prioridad[a.status] || 99;
+      const prioB = prioridad[b.status] || 99;
+
+      // Si tienen diferente prioridad, ordenar por prioridad
+      if (prioA !== prioB) {
+        return prioA - prioB;
+      }
+
+      // Misma prioridad: aplicar ordenamiento secundario
+      let aValue = a[orderBy];
+      let bValue = b[orderBy];
+
+      if (orderBy === 'createdAt' || orderBy === 'updatedAt' || orderBy === 'fechaFactura') {
+        aValue = new Date(aValue).getTime();
+        bValue = new Date(bValue).getTime();
+      }
+
+      if (typeof aValue === 'string') {
+        aValue = aValue?.toLowerCase() || '';
+        bValue = bValue?.toLowerCase() || '';
+      }
+
+      if (orderDirection.toLowerCase() === 'desc') {
+        return bValue > aValue ? 1 : (bValue < aValue ? -1 : 0);
+      }
+      return aValue > bValue ? 1 : (aValue < bValue ? -1 : 0);
+    });
+
+    // Aplicar paginación sobre los documentos ordenados
+    const documentos = documentosOrdenados.slice(skip, skip + parseInt(limit));
 
     const payload = {
       documentos,
@@ -312,9 +381,6 @@ async function cambiarEstadoDocumento(req, res) {
         id,
         assignedToId: userId
       },
-      include: {
-        documentGroup: true
-      }
     });
 
     if (!documento) {
@@ -344,10 +410,7 @@ async function cambiarEstadoDocumento(req, res) {
     // Si se marca como LISTO, generar código de retiro
     let codigoGenerado = null;
     if (nuevoEstado === 'LISTO' && !documento.codigoRetiro) {
-      // Para documentos agrupados, usar el código del grupo si existe
-      if (documento.isGrouped && documento.documentGroup?.verificationCode) {
-        updateData.codigoRetiro = documento.documentGroup.verificationCode;
-      } else {
+      if (true) {
         codigoGenerado = await CodigoRetiroService.generarUnico();
         updateData.codigoRetiro = codigoGenerado;
 
@@ -385,177 +448,18 @@ async function cambiarEstadoDocumento(req, res) {
       updateData.relacionTitular = 'directo';
     }
 
-    // 🔗 NUEVA FUNCIONALIDAD: Sincronización grupal
+    // Actualizar solo el documento individual
     let documentosActualizados = [];
-
-    if (documento.isGrouped && documento.documentGroupId) {
-      logger.debug('Documento es parte de un grupo, sincronizando cambio de estado');
-
-      if (nuevoEstado === 'LISTO') {
-        // Marcar como LISTO todos los documentos del grupo asignados al mismo usuario
-        // y garantizar código de retiro individual por documento
-        const groupDocs = await prisma.document.findMany({
-          where: {
-            documentGroupId: documento.documentGroupId,
-            isGrouped: true,
-            assignedToId: userId,
-            status: { not: 'ENTREGADO' }
-          }
-        });
-
-        const updatesPlan = [];
-        for (const doc of groupDocs) {
-          let codigoParaDoc = doc.codigoRetiro;
-          if (!codigoParaDoc) {
-            // Generar código único por documento
-            // Nota: usamos el mismo generador que para individuales
-            // para asegurar unicidad a nivel sistema
-            // (4 dígitos según lineamientos)
-            codigoParaDoc = await CodigoRetiroService.generarUnico();
-          }
-          updatesPlan.push({ id: doc.id, codigo: codigoParaDoc });
-        }
-
-        documentosActualizados = await prisma.$transaction(async (tx) => {
-          const result = [];
-          for (const up of updatesPlan) {
-            const updated = await tx.document.update({
-              where: { id: up.id },
-              data: {
-                status: 'LISTO',
-                codigoRetiro: up.codigo,
-                updatedAt: new Date()
-              }
-            });
-            result.push(updated);
-          }
-          return result;
-        });
-
-        logger.debug(`${documentosActualizados.length} documentos del grupo marcados como LISTO`);
-      } else {
-        // Para otros estados (EN_PROCESO, ENTREGADO), propagar sin tocar códigos
-        const dataGroupSync = { ...updateData };
-        if (codigoGenerado) delete dataGroupSync.codigoRetiro;
-
-        await prisma.document.updateMany({
-          where: {
-            documentGroupId: documento.documentGroupId,
-            isGrouped: true,
-            assignedToId: userId
-          },
-          data: dataGroupSync
-        });
-
-        documentosActualizados = await prisma.document.findMany({
-          where: {
-            documentGroupId: documento.documentGroupId,
-            isGrouped: true,
-            assignedToId: userId
-          }
-        });
-        logger.debug(`Sincronizados ${documentosActualizados.length} documentos del grupo`);
-      }
-    } else {
-      // Actualizar solo el documento individual
-      const documentoActualizado = await prisma.document.update({
-        where: { id },
-        data: updateData
-      });
-      documentosActualizados = [documentoActualizado];
-    }
+    const documentoActualizado = await prisma.document.update({
+      where: { id },
+      data: updateData
+    });
+    documentosActualizados = [documentoActualizado];
 
     // Usar el primer documento para las notificaciones (en grupos, todos son iguales)
-    const documentoActualizado = documentosActualizados[0];
+    const docPrincipal = documentosActualizados[0];
 
-    // 📱 ENVIAR NOTIFICACIÓN WHATSAPP si se marca como LISTO
-    let whatsappSent = false;
-    let whatsappError = null;
 
-    if (nuevoEstado === 'LISTO') {
-      // Respetar política de no notificar
-      if (documento.notificationPolicy === 'no_notificar') {
-        logger.debug('Política no_notificar activa, omitiendo WhatsApp');
-      } else {
-        try {
-          const clienteData = {
-            clientName: documento.clientName,
-            clientPhone: documento.clientPhone
-          };
-
-          if (documento.isGrouped && documento.documentGroupId) {
-            // Notificación grupal con TODOS los documentos del grupo y sus códigos individuales
-            await whatsappService.enviarGrupoDocumentosListo(
-              clienteData,
-              documentosActualizados,
-              documentosActualizados[0]?.codigoRetiro || null
-            );
-            logger.debug('Notificación WhatsApp GRUPAL enviada');
-            whatsappSent = true;
-          } else if (codigoGenerado || updateData.codigoRetiro) {
-            // Notificación individual
-            const documentoData = {
-              tipoDocumento: documento.documentType,
-              protocolNumber: documento.protocolNumber
-            };
-            await whatsappService.enviarDocumentoListo(
-              clienteData,
-              documentoData,
-              codigoGenerado || updateData.codigoRetiro
-            );
-            logger.debug('Notificación WhatsApp enviada');
-            whatsappSent = true;
-          } else {
-            logger.debug('LISTO sin código de retiro disponible para WhatsApp');
-          }
-        } catch (error) {
-          // No fallar la operación principal si WhatsApp falla
-          logger.warn('Error enviando WhatsApp desde archivo (operación continúa):', error.message);
-          whatsappError = error.message;
-        }
-      }
-    }
-    // 📱 ENVIAR NOTIFICACIÓN WHATSAPP si se marca como ENTREGADO
-    if (nuevoEstado === 'ENTREGADO' && documento.clientPhone && documento.notificationPolicy !== 'no_notificar') {
-      try {
-        // Preparar datos de entrega
-        const datosEntrega = {
-          entregado_a: updateData.entregadoA,
-          deliveredTo: updateData.entregadoA,
-          fecha: updateData.fechaEntrega,
-          usuario_entrega: `${req.user.firstName} ${req.user.lastName} (ARCHIVO)`
-        };
-
-        // Enviar notificación de documento entregado
-        const whatsappResult = await whatsappService.enviarDocumentoEntregado(
-          {
-            nombre: documento.clientName,
-            clientName: documento.clientName,
-            telefono: documento.clientPhone,
-            clientPhone: documento.clientPhone
-          },
-          {
-            tipo_documento: documento.documentType,
-            tipoDocumento: documento.documentType,
-            numero_documento: documento.protocolNumber,
-            protocolNumber: documento.protocolNumber
-          },
-          datosEntrega
-        );
-
-        whatsappSent = whatsappResult.success;
-
-        if (!whatsappResult.success) {
-          whatsappError = whatsappResult.error;
-          logger.error('Error enviando WhatsApp de entrega directa:', whatsappResult.error);
-        } else {
-          logger.debug('Notificación WhatsApp de entrega directa enviada');
-        }
-      } catch (error) {
-        logger.error('Error en servicio WhatsApp para entrega directa:', error);
-        whatsappError = error.message;
-      }
-    }
 
     // Preparar respuesta con información de sincronización
     const totalSincronizados = documentosActualizados.length;
@@ -566,25 +470,20 @@ async function cambiarEstadoDocumento(req, res) {
     res.json({
       success: true,
       data: {
-        documento: documentoActualizado,
+        documento: docPrincipal,
         documentos: documentosActualizados,
         documentosSincronizados: totalSincronizados,
         esGrupo: totalSincronizados > 1,
-        codigoGenerado,
-        whatsapp: {
-          sent: whatsappSent,
-          error: whatsappError,
-          phone: documento.clientPhone
-        }
+        codigoGenerado
       },
       message: `${mensajeBase}${codigoGenerado ? ` - Código: ${codigoGenerado}` : ''}`
     });
 
   } catch (error) {
-    logger.error('Error cambiando estado:', error);
+    logger.error('Error changing document status in archivo:', error);
     res.status(500).json({
       success: false,
-      message: 'Error interno del servidor'
+      message: 'Error interno al cambiar estado'
     });
   }
 }
@@ -640,12 +539,6 @@ async function procesarEntregaDocumento(req, res) {
       include: {
         assignedTo: {
           select: { firstName: true, lastName: true }
-        },
-        // 🔗 NUEVA FUNCIONALIDAD: Incluir información de grupo
-        documentGroup: {
-          include: {
-            documents: true
-          }
         }
       }
     });
@@ -668,7 +561,7 @@ async function procesarEntregaDocumento(req, res) {
     // 🆕 MEJORA: Código de verificación es OPCIONAL para archivo
     // Si se proporciona un código, se valida; si no, se acepta como verificación manual
     if (codigoVerificacion && !isManualVerification) {
-      const expectedCode = documento.codigoRetiro || documento.verificationCode || documento.groupVerificationCode;
+      const expectedCode = documento.codigoRetiro || documento.verificationCode;
       if (!expectedCode || expectedCode !== codigoVerificacion) {
         return res.status(400).json({
           success: false,
@@ -677,71 +570,6 @@ async function procesarEntregaDocumento(req, res) {
       }
     }
 
-    // 🔗 NUEVA FUNCIONALIDAD: Si el documento está agrupado, entregar todos los documentos del grupo
-    let groupDocuments = [];
-    if (documento.isGrouped && documento.documentGroupId) {
-      logger.debug('Documento agrupado, entregando grupo completo');
-
-      // Buscar todos los documentos del grupo que estén LISTO o EN_PROCESO
-      const groupDocsToDeliver = await prisma.document.findMany({
-        where: {
-          documentGroupId: documento.documentGroupId,
-          status: { in: ['LISTO', 'EN_PROCESO'] },
-          id: { not: id }, // Excluir el documento actual
-          isGrouped: true
-        }
-      });
-
-      if (groupDocsToDeliver.length > 0) {
-        logger.debug(`Entregando ${groupDocsToDeliver.length + 1} documentos del grupo`);
-
-        // Actualizar todos los documentos del grupo
-        await prisma.document.updateMany({
-          where: {
-            id: { in: groupDocsToDeliver.map(doc => doc.id) }
-          },
-          data: {
-            status: 'ENTREGADO',
-            entregadoA,
-            cedulaReceptor,
-            relacionTitular,
-            verificacionManual: isManualVerification,
-            facturaPresenta: facturaPresenta || false,
-            fechaEntrega: new Date(),
-            usuarioEntregaId: userId,
-            observacionesEntrega: observaciones || `Entregado grupalmente junto con ${documento.protocolNumber} por ARCHIVO`
-          }
-        });
-
-        // Registrar eventos para todos los documentos del grupo
-        for (const doc of groupDocsToDeliver) {
-          await prisma.documentEvent.create({
-            data: {
-              documentId: doc.id,
-              userId: userId,
-              eventType: 'STATUS_CHANGED',
-              description: `Documento entregado grupalmente por ARCHIVO a ${entregadoA}`,
-              details: JSON.stringify({
-                entregadoA,
-                cedulaReceptor,
-                relacionTitular,
-                verificacionManual: isManualVerification,
-                facturaPresenta: facturaPresenta || false,
-                deliveredWith: documento.protocolNumber,
-                groupDelivery: true,
-                deliveredBy: 'ARCHIVO'
-              }),
-              personaRetiro: entregadoA,
-              cedulaRetiro: cedulaReceptor || undefined,
-              metodoVerificacion: computedVerificationMethod,
-              observacionesRetiro: (observaciones || `Entregado grupalmente junto con ${documento.protocolNumber} por ARCHIVO`)
-            }
-          });
-        }
-
-        groupDocuments = groupDocsToDeliver;
-      }
-    }
 
     // Actualizar documento principal con información de entrega
     const documentoActualizado = await prisma.document.update({
@@ -767,73 +595,13 @@ async function procesarEntregaDocumento(req, res) {
       }
     });
 
-    // 📱 ENVIAR NOTIFICACIÓN WHATSAPP
-    let whatsappSent = false;
-    let whatsappError = null;
-
-    if (documentoActualizado.clientPhone) {
-      try {
-        // Preparar lista de documentos para el template (individual o grupal)
-        const documentosParaMensaje = groupDocuments.length > 0
-          ? [documentoActualizado, ...groupDocuments]
-          : [documentoActualizado];
-
-        const datosEntrega = {
-          entregado_a: entregadoA,
-          deliveredTo: entregadoA,
-          fecha: new Date(),
-          usuario_entrega: `${req.user.firstName} ${req.user.lastName} (ARCHIVO)`,
-          // Campos opcionales y condicionales
-          cedulaReceptor,
-          cedula_receptor: cedulaReceptor,
-          relacionTitular,
-          relacion_titular: relacionTitular,
-          documentos: documentosParaMensaje,
-          cantidadDocumentos: documentosParaMensaje.length
-        };
-
-        const whatsappResult = await whatsappService.enviarDocumentoEntregado(
-          {
-            nombre: documentoActualizado.clientName,
-            clientName: documentoActualizado.clientName,
-            telefono: documentoActualizado.clientPhone,
-            clientPhone: documentoActualizado.clientPhone
-          },
-          {
-            tipo_documento: documentoActualizado.documentType,
-            tipoDocumento: documentoActualizado.documentType,
-            numero_documento: documentoActualizado.protocolNumber,
-            protocolNumber: documentoActualizado.protocolNumber,
-            actoPrincipalDescripcion: documentoActualizado.actoPrincipalDescripcion,
-            actoPrincipalValor: documentoActualizado.actoPrincipalValor
-          },
-          datosEntrega
-        );
-
-        whatsappSent = whatsappResult.success;
-
-        if (!whatsappResult.success) {
-          whatsappError = whatsappResult.error;
-          logger.error('Error enviando WhatsApp de entrega:', whatsappResult.error);
-        } else {
-          logger.debug('Notificación WhatsApp de entrega enviada');
-        }
-      } catch (error) {
-        logger.error('Error en servicio WhatsApp para entrega:', error);
-        whatsappError = error.message;
-      }
-    }
+    // Como la funcionalidad de agrupación fue removida, definimos array vacío
+    const groupDocuments = [];
 
     // Preparar mensaje de respuesta (incluir información de grupo)
-    let message = groupDocuments.length > 0
+    const message = groupDocuments.length > 0
       ? `Grupo de ${groupDocuments.length + 1} documentos entregado exitosamente`
       : 'Documento entregado exitosamente';
-
-    if (whatsappSent) {
-      message += ' y notificación WhatsApp enviada';
-    } else if (documentoActualizado.clientPhone && whatsappError) {
-      message += ', pero falló la notificación WhatsApp';
-    }
 
     res.json({
       success: true,
@@ -860,11 +628,7 @@ async function procesarEntregaDocumento(req, res) {
           usuarioEntrega: `${req.user.firstName} ${req.user.lastName}`,
           observacionesEntrega: observaciones
         },
-        whatsapp: {
-          sent: whatsappSent,
-          error: whatsappError,
-          phone: documentoActualizado.clientPhone
-        }
+
       }
     });
 
@@ -970,61 +734,13 @@ async function procesarEntregaGrupal(req, res) {
       });
     });
 
-    // Agrupar por cliente para notificaciones
-    const docsByClient = updatedDocuments.reduce((acc, doc) => {
-      const key = doc.clientPhone || 'no-phone';
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(doc);
-      return acc;
-    }, {});
 
-    // Enviar notificaciones (una por cliente)
-    let whatsappSentCount = 0;
-
-    for (const [phone, clientDocs] of Object.entries(docsByClient)) {
-      if (phone === 'no-phone' || clientDocs[0].notificationPolicy === 'no_notificar') continue;
-
-      try {
-        const doc = clientDocs[0];
-        const datosEntrega = {
-          entregado_a: entregadoA,
-          deliveredTo: entregadoA,
-          fecha: new Date(),
-          usuario_entrega: `${req.user.firstName} ${req.user.lastName} (ARCHIVO)`,
-          cedulaReceptor,
-          relacionTitular,
-          documentos: clientDocs,
-          cantidadDocumentos: clientDocs.length
-        };
-
-        const result = await whatsappService.enviarDocumentoEntregado(
-          {
-            nombre: doc.clientName,
-            clientName: doc.clientName,
-            telefono: doc.clientPhone,
-            clientPhone: doc.clientPhone
-          },
-          {
-            tipo_documento: doc.documentType, // Referencia del primero
-            tipoDocumento: doc.documentType,
-            numero_documento: doc.protocolNumber,
-            protocolNumber: doc.protocolNumber
-          },
-          datosEntrega
-        );
-
-        if (result.success) whatsappSentCount++;
-      } catch (error) {
-        logger.warn(`Error enviando notificación grupal a ${phone}:`, error.message);
-      }
-    }
 
     res.json({
       success: true,
       message: `${updatedDocuments.length} documentos entregados exitosamente`,
       data: {
-        documentsCount: updatedDocuments.length,
-        whatsappSentCount
+        documentsCount: updatedDocuments.length
       }
     });
 

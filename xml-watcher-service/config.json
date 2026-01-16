@@ -5,6 +5,7 @@
     "password": "SistemaCaja2024!"
   },
   "folders": {
+    "source": "C:\\SRI\\Comprobantes_generados",
     "watch": "C:\\Users\\admlocal\\Desktop\\xmlcopiados",
     "processed": "C:\\Users\\admlocal\\Desktop\\xmlcopiados\\processed",
     "errors": "C:\\Users\\admlocal\\Desktop\\xmlcopiados\\errors",
@@ -26,5 +27,17 @@
       "compressOldFiles": true,
       "cleanupHour": 2
     }
+  },
+  "sourceWatcher": {
+    "enabled": true,
+    "copyDelay": 2000,
+    "deleteAfterCopy": false
+  },
+  "sequenceTracking": {
+    "enabled": true,
+    "prefixPattern": "^([a-zA-Z]+)(\\d+)",
+    "alertPopup": true,
+    "stateFile": "sequence-state.json",
+    "gapLogFile": "sequence-gaps.log"
   }
 }
