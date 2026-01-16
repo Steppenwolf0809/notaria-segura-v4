@@ -1,52 +1,72 @@
-# XML Watcher Service - Notaría
+# XML Watcher Service UNIFICADO - Notaría
 
-Servicio standalone para Windows que monitorea una carpeta, sube XMLs a la API y organiza archivos con limpieza automática.
+Servicio standalone para Windows que:
+1. **Vigila `C:\SRI\Comprobantes_generados`** - Copia XMLs a `xmlcopiados` antes de que el software de facturación los borre
+2. **Procesa y sube XMLs** - Sube vía API al sistema de la notaría
+3. **Detecta gaps en secuencias** - Muestra popup de alerta cuando falta un número (ej: p00098 → p00100)
+4. **Corre en segundo plano** - Servicio de Windows con PM2
 
 ## Uso rápido
-1. Configura `config.json` (usa la URL de producción `https://notaria-segura-v4-production.up.railway.app/api`).
-2. Construye el ejecutable:
 ```bash
 cd xml-watcher-service
 npm install
-node build-exe.js
+node src/index.js
 ```
-3. Ejecuta `dist/xml-service.exe` junto a `config.json`.
 
-## Despliegue con PM2 (Recomendado)
+## Instalar como servicio con PM2 (Recomendado)
 ```bash
-# Instalar PM2 globalmente
+# Instalar PM2 y startup
 npm install -g pm2
+npm install -g pm2-windows-startup
+
+# Habilitar inicio automático con Windows
+pm2-startup install
 
 # Iniciar servicio
 cd C:\notaria-segura\xml-watcher-service
-npm install
-pm2 start ecosystem.config.js
+pm2 start ecosystem.config.js --name xml-watcher
 
-# Guardar configuración y habilitar inicio automático
+# Guardar configuración
 pm2 save
-pm2-startup install
 ```
 
-## Instalar como servicio (NSSM - Alternativo)
-1) `nssm install XmlWatcherService`
-2) Path: `C:\ruta\dist\xml-service.exe`
-3) Startup directory: carpeta con `config.json`
-4) `nssm start XmlWatcherService`
-
-## Características
-- **Filtrado de Facturas**: Solo procesa archivos con etiqueta `<factura>`. Notas de Crédito/Débito se mueven a `ignored/`.
-- Autenticación JWT con reintentos y re-login 401
-- Monitoreo `.xml` con `chokidar` y espera de escritura
-- Upload individual/lote (hasta 20)
-- Mover a `processed/YYYY-MM-DD`, `errors/YYYY-MM-DD` o `ignored/YYYY-MM-DD`
-- Limpieza diaria 02:00 y compresión mensual
-- Logs rotados por tamaño/fecha en la carpeta vigilada
+## Configuración (config.json)
+```json
+{
+  "folders": {
+    "source": "C:\\SRI\\Comprobantes_generados",
+    "watch": "C:\\Users\\admlocal\\Desktop\\xmlcopiados"
+  },
+  "sourceWatcher": {
+    "enabled": true,
+    "copyDelay": 2000
+  },
+  "sequenceTracking": {
+    "enabled": true,
+    "alertPopup": true
+  }
+}
+```
 
 ## Carpetas
 | Carpeta | Descripción |
 |---------|-------------|
-| `watch` | Carpeta vigilada para nuevos XMLs |
+| `source` | Carpeta SRI donde llegan los XMLs (vigilada) |
+| `watch` | Carpeta intermedia donde se procesan |
 | `processed` | Facturas subidas exitosamente |
 | `errors` | Archivos con errores de subida |
 | `ignored` | Notas de Crédito y otros documentos no-factura |
-| `archived` | Archivos comprimidos mensualmente |
+
+## Detección de Gaps
+Cuando se detecta un salto en la secuencia:
+- Se muestra un **popup de Windows** con los números faltantes
+- Se registra en `sequence-gaps.log`
+- El estado de secuencias se persiste en `sequence-state.json`
+
+## Características
+- Autenticación JWT con reintentos y re-login 401
+- Monitoreo `.xml` con `chokidar` y espera de escritura
+- Upload individual/lote (hasta 20)
+- Filtrado de Notas de Crédito/Débito (van a `ignored/`)
+- Limpieza diaria 02:00 y compresión mensual
+- Logs rotados por tamaño/fecha
