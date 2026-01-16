@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Paper,
@@ -120,6 +120,48 @@ const ListaArchivo = ({
   const filtros = filtrosProp || internalFiltros;
   const orderBy = orderByProp || internalOrderBy;
   const order = orderProp || internalOrder;
+
+  // Estado local para el input de búsqueda con debounce
+  const [localSearchValue, setLocalSearchValue] = useState(filtros.search || '');
+  const searchDebounceRef = useRef(null);
+
+  // Sincronizar localSearchValue cuando filtros.search cambia externamente
+  useEffect(() => {
+    setLocalSearchValue(filtros.search || '');
+  }, [filtros.search]);
+
+  // Debounce del campo de búsqueda (500ms)
+  useEffect(() => {
+    // No hacer debounce si el valor ya está sincronizado
+    if (localSearchValue === filtros.search) return;
+
+    // Limpiar timeout anterior
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+
+    // Crear nuevo timeout para llamar al callback después de 500ms
+    searchDebounceRef.current = setTimeout(() => {
+      const newFiltros = {
+        ...filtros,
+        search: localSearchValue
+      };
+
+      if (serverSide && onFilterChange) {
+        onFilterChange(newFiltros);
+      } else {
+        setInternalFiltros(newFiltros);
+        setInternalPage(0);
+      }
+    }, 500);
+
+    // Cleanup al desmontar o cambiar dependencias
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+    };
+  }, [localSearchValue, filtros, serverSide, onFilterChange]);
 
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [selectedDocument, setSelectedDocument] = useState(null);
@@ -722,11 +764,11 @@ const ListaArchivo = ({
       {/* Controles y Filtros */}
       <Paper sx={{ p: 3, mb: 3 }}>
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-          {/* Búsqueda */}
+          {/* Búsqueda con debounce */}
           <TextField
             placeholder="Buscar por cliente, protocolo, acto o teléfono..."
-            value={filtros.search}
-            onChange={(e) => handleFilterChange('search', e.target.value)}
+            value={localSearchValue}
+            onChange={(e) => setLocalSearchValue(e.target.value)}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
