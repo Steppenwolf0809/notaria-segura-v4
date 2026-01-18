@@ -534,12 +534,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
                 <Typography variant="overline" color="text.secondary" fontWeight="bold">
                   Estado Financiero
                 </Typography>
-                <EstadoPago
-                  documentId={localDocument?.id}
-                  onViewInvoice={(invoiceNumber) => {
-                    window.location.hash = `#/factura-detalle/${invoiceNumber}`;
-                  }}
-                />
+                <EstadoPago documentId={localDocument?.id} />
               </Box>
 
             </Box>

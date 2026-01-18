@@ -26,6 +26,7 @@ export const navItemsByRole = {
     { id: 'dashboard', label: 'Dashboard', view: 'dashboard', icon: 'Dashboard' },
     { id: 'documents', label: 'Documentos', view: 'documents', icon: 'Assignment' },
     { id: 'notifications', label: 'Notificaciones', view: 'notifications', icon: 'WhatsApp' },
+    { id: 'cartera-cobros', label: 'Cartera de Cobros', view: 'cartera-cobros', icon: 'AccountBalance' },
     { id: 'formularios-uafe', label: 'Formularios UAFE', view: 'formularios-uafe', icon: 'Description' },
     { id: 'generador-qr', label: 'Generador QR', view: 'generador-qr', icon: 'QrCode' }
   ],

@@ -5,6 +5,102 @@
 import { db as prisma } from '../db.js';
 
 /**
+ * Helper function to get payment status for a document (internal use)
+ * Can be called from other controllers without req/res
+ * @param {number} documentId - Document ID
+ * @returns {Object} Payment status info
+ */
+export async function getPaymentStatusForDocument(documentId) {
+    try {
+        const invoices = await prisma.invoice.findMany({
+            where: { documentId },
+            include: {
+                payments: true
+            }
+        });
+
+        if (invoices.length === 0) {
+            return {
+                hasInvoice: false,
+                status: 'NO_INVOICE',
+                message: '',
+                totalDebt: 0,
+                infoPago: '' // No mostrar nada si no hay factura
+            };
+        }
+
+        let totalAmount = 0;
+        let totalPaid = 0;
+        const invoiceDetails = [];
+
+        for (const invoice of invoices) {
+            const paid = invoice.payments.reduce(
+                (sum, p) => sum + Number(p.amount),
+                0
+            );
+            const balance = Number(invoice.totalAmount) - paid;
+
+            totalAmount += Number(invoice.totalAmount);
+            totalPaid += paid;
+
+            invoiceDetails.push({
+                id: invoice.id,
+                invoiceNumber: invoice.invoiceNumber,
+                total: Number(invoice.totalAmount),
+                paid: paid,
+                balance: balance,
+                status: balance <= 0 ? 'PAID' : (paid > 0 ? 'PARTIAL' : 'PENDING')
+            });
+        }
+
+        const totalDebt = totalAmount - totalPaid;
+        const firstInvoice = invoiceDetails[0];
+
+        // Generar texto de infoPago solo si hay saldo pendiente
+        let infoPago = '';
+        if (totalDebt > 0) {
+            infoPago = `
+💰 *INFORMACIÓN DE PAGO:*
+📄 *Factura:* ${firstInvoice.invoiceNumber}
+💵 *Total:* $${totalAmount.toFixed(2)}
+✅ *Pagado:* $${totalPaid.toFixed(2)}
+⚠️ *Saldo pendiente:* $${totalDebt.toFixed(2)}
+
+🔔 Por favor regularice su pago antes de retirar.
+`;
+        }
+
+        return {
+            hasInvoice: true,
+            status: totalDebt <= 0 ? 'PAID' : (totalPaid > 0 ? 'PARTIAL' : 'PENDING'),
+            message: totalDebt <= 0
+                ? 'Pagado completamente'
+                : `Saldo pendiente: $${totalDebt.toFixed(2)}`,
+            totalAmount,
+            totalPaid,
+            totalDebt,
+            invoices: invoiceDetails,
+            // Variables para templates
+            saldoPendiente: totalDebt > 0 ? `$${totalDebt.toFixed(2)}` : '',
+            numeroFactura: firstInvoice?.invoiceNumber || '',
+            totalFactura: `$${totalAmount.toFixed(2)}`,
+            estadoPago: totalDebt <= 0 ? 'PAID' : (totalPaid > 0 ? 'PARTIAL' : 'PENDING'),
+            infoPago
+        };
+    } catch (error) {
+        console.error('[billing-controller] getPaymentStatusForDocument error:', error);
+        return {
+            hasInvoice: false,
+            status: 'ERROR',
+            message: '',
+            totalDebt: 0,
+            infoPago: ''
+        };
+    }
+}
+
+
+/**
  * Health check for billing module
  */
 export async function healthCheck(req, res) {
@@ -668,6 +764,255 @@ export async function getSummary(req, res) {
         });
     } catch (error) {
         console.error('[billing-controller] Get summary error:', error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
+/**
+ * ============================================================================
+ * SPRINT 6: CARTERA DE MATRIZADORES
+ * ============================================================================
+ */
+
+/**
+ * Get my portfolio - invoices for documents assigned to the current user
+ * For MATRIZADOR role to see pending invoices from their documents
+ */
+export async function getMyPortfolio(req, res) {
+    try {
+        const userId = req.user.id;
+        const { page = 1, limit = 50, status, groupByClient = 'true' } = req.query;
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const take = parseInt(limit);
+
+        console.log(`[billing-controller] getMyPortfolio for user ${userId}`);
+
+        // Get documents assigned to this user that have invoices
+        const documents = await prisma.document.findMany({
+            where: {
+                assignedToId: userId,
+                invoices: {
+                    some: {} // Has at least one invoice
+                }
+            },
+            include: {
+                invoices: {
+                    include: {
+                        payments: true
+                    }
+                }
+            }
+        });
+
+        // Process invoices and calculate balances
+        const clientMap = new Map();
+        let totalDebt = 0;
+        let totalOverdue = 0;
+
+        for (const doc of documents) {
+            for (const invoice of doc.invoices) {
+                const paid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+                const balance = Number(invoice.totalAmount) - paid;
+
+                if (balance <= 0) continue; // Skip fully paid
+
+                // Check if overdue
+                const isOverdue = invoice.dueDate && new Date(invoice.dueDate) < new Date();
+                if (isOverdue) totalOverdue += balance;
+                totalDebt += balance;
+
+                // Group by client
+                const clientKey = invoice.clientTaxId;
+                if (!clientMap.has(clientKey)) {
+                    clientMap.set(clientKey, {
+                        clientTaxId: invoice.clientTaxId,
+                        clientName: invoice.clientName,
+                        clientPhone: doc.clientPhone,
+                        totalDebt: 0,
+                        overdueDebt: 0,
+                        invoices: []
+                    });
+                }
+
+                const client = clientMap.get(clientKey);
+                client.totalDebt += balance;
+                if (isOverdue) client.overdueDebt += balance;
+                client.invoices.push({
+                    id: invoice.id,
+                    invoiceNumber: invoice.invoiceNumber,
+                    documentId: doc.id,
+                    protocolNumber: doc.protocolNumber,
+                    documentType: doc.documentType,
+                    issueDate: invoice.issueDate,
+                    dueDate: invoice.dueDate,
+                    totalAmount: Number(invoice.totalAmount),
+                    totalPaid: paid,
+                    balance,
+                    isOverdue,
+                    daysOverdue: isOverdue
+                        ? Math.floor((new Date() - new Date(invoice.dueDate)) / (1000 * 60 * 60 * 24))
+                        : 0
+                });
+            }
+        }
+
+        // Convert to array and sort by debt amount
+        const clients = Array.from(clientMap.values())
+            .sort((a, b) => b.totalDebt - a.totalDebt);
+
+        // Apply pagination
+        const paginatedClients = clients.slice(skip, skip + take);
+
+        res.json({
+            summary: {
+                totalClients: clients.length,
+                totalDebt,
+                totalOverdue,
+                totalCurrent: totalDebt - totalOverdue
+            },
+            data: groupByClient === 'true' ? paginatedClients : clients.flatMap(c => c.invoices),
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total: clients.length,
+                pages: Math.ceil(clients.length / parseInt(limit))
+            }
+        });
+    } catch (error) {
+        console.error('[billing-controller] getMyPortfolio error:', error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
+/**
+ * Generate WhatsApp reminder message for collection
+ * Creates a formatted message with all pending invoices for a client
+ */
+export async function generateCollectionReminder(req, res) {
+    try {
+        const { clientTaxId } = req.params;
+        const userId = req.user.id;
+
+        // Get invoices for this client from documents assigned to the user
+        const documents = await prisma.document.findMany({
+            where: {
+                assignedToId: userId,
+                invoices: {
+                    some: {
+                        clientTaxId
+                    }
+                }
+            },
+            include: {
+                invoices: {
+                    where: { clientTaxId },
+                    include: { payments: true }
+                }
+            }
+        });
+
+        if (documents.length === 0) {
+            return res.status(404).json({ error: 'No se encontraron facturas para este cliente' });
+        }
+
+        // Calculate totals
+        let totalDebt = 0;
+        const invoiceDetails = [];
+        let clientName = '';
+        let clientPhone = '';
+
+        for (const doc of documents) {
+            if (!clientPhone && doc.clientPhone) clientPhone = doc.clientPhone;
+
+            for (const invoice of doc.invoices) {
+                clientName = invoice.clientName;
+                const paid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+                const balance = Number(invoice.totalAmount) - paid;
+
+                if (balance > 0) {
+                    totalDebt += balance;
+                    invoiceDetails.push({
+                        invoiceNumber: invoice.invoiceNumber,
+                        total: Number(invoice.totalAmount),
+                        paid,
+                        balance,
+                        dueDate: invoice.dueDate
+                    });
+                }
+            }
+        }
+
+        if (invoiceDetails.length === 0) {
+            return res.json({
+                success: false,
+                message: 'El cliente no tiene saldo pendiente'
+            });
+        }
+
+        // Build message
+        let message = `📋 *NOTARÍA 18 - RECORDATORIO DE PAGO*\n\nEstimado cliente,\n\nLe recordamos que tiene los siguientes valores pendientes:\n\n`;
+
+        for (const inv of invoiceDetails) {
+            message += `📄 *Factura:* ${inv.invoiceNumber}\n`;
+            message += `   • Total: $${inv.total.toFixed(2)}\n`;
+            message += `   • Pagado: $${inv.paid.toFixed(2)}\n`;
+            message += `   • Saldo: $${inv.balance.toFixed(2)}\n`;
+            if (inv.dueDate) {
+                message += `   • Vencimiento: ${new Date(inv.dueDate).toLocaleDateString('es-EC')}\n`;
+            }
+            message += `\n`;
+        }
+
+        message += `💰 *TOTAL PENDIENTE: $${totalDebt.toFixed(2)}*\n\n`;
+        message += `Para su comodidad puede realizar el pago mediante:\n`;
+        message += `• Transferencia bancaria\n`;
+        message += `• Pago en efectivo en nuestras oficinas\n\n`;
+        message += `Atentamente,\n`;
+        message += `*Notaría Décima Octava del Cantón Quito*\n`;
+        message += `📍 Azuay E2-231 y Av Amazonas, Quito\n`;
+        message += `📞 Tel: (02) 2247787`;
+
+        // Format phone for wa.me - use query param phone if provided, otherwise use from document
+        const phoneToUse = req.query.phone || clientPhone;
+        let formattedPhone = phoneToUse ? phoneToUse.replace(/[\s\-\(\)]/g, '') : '';
+        if (formattedPhone.startsWith('0')) {
+            formattedPhone = '593' + formattedPhone.substring(1);
+        } else if (formattedPhone && !formattedPhone.startsWith('593')) {
+            formattedPhone = '593' + formattedPhone;
+        }
+
+        const waUrl = formattedPhone
+            ? `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`
+            : null;
+
+        // Log the reminder
+        await prisma.documentEvent.create({
+            data: {
+                documentId: documents[0].id,
+                userId,
+                eventType: 'COLLECTION_REMINDER',
+                description: `Recordatorio de cobro generado para ${clientName}`,
+                details: JSON.stringify({
+                    clientTaxId,
+                    clientName,
+                    totalDebt,
+                    invoiceCount: invoiceDetails.length,
+                    timestamp: new Date().toISOString()
+                })
+            }
+        });
+
+        res.json({
+            success: true,
+            clientName,
+            clientPhone,
+            totalDebt,
+            invoiceCount: invoiceDetails.length,
+            message,
+            waUrl
+        });
+    } catch (error) {
+        console.error('[billing-controller] generateCollectionReminder error:', error);
         res.status(500).json({ error: error.message });
     }
 }

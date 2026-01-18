@@ -6,6 +6,7 @@ import GeneradorQR from './matrizador/GeneradorQR';
 import GestionDocumentos from './GestionDocumentos';
 import NotificationCenter from './notifications/NotificationCenter';
 import FormulariosUAFE from './FormulariosUAFE';
+import CarteraCobros from './billing/CarteraCobros';
 import useDocumentStore from '../store/document-store';
 
 /**
@@ -91,6 +92,9 @@ const MatrizadorCenter = () => {
 
       case 'generador-qr':
         return <GeneradorQR />;
+
+      case 'cartera-cobros':
+        return <CarteraCobros />;
 
       default:
         return <MatrizadorDashboard />;

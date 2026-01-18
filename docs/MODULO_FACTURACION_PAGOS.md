@@ -5,8 +5,8 @@
 
 ## 📋 REGISTRO DE PROGRESO
 
-### Estado Actual: Sprint 3 Completado ✅
-**Última actualización:** 2026-01-17
+### Estado Actual: Sprint 5 En Progreso 🔄
+**Última actualización:** 2026-01-18
 **Rama Git:** `feature/billing-module-sprint1`
 
 #### Resumen Sprint 1:
@@ -21,7 +21,19 @@
 #### Resumen Sprint 3:
 - ✅ Endpoints: clients, client balance, summary, invoice payments
 - ✅ Integración payment status en document detail
-- ⏭️ **Próximo:** Sprint 4 - Interfaz de Usuario
+
+#### Resumen Sprint 4:
+- ✅ Sección "Facturación" agregada al menú (CAJA/ADMIN)
+- ✅ ImportarDatos.jsx con drag & drop
+- ✅ ListaFacturas.jsx con filtros y paginación
+- ✅ DetalleFactura.jsx con historial de pagos
+- ✅ ListaPagos.jsx con filtros
+- ✅ billing-service.js (frontend) completo
+
+#### Resumen Sprint 5 (En Progreso):
+- ✅ EstadoPago.jsx integrado en DocumentDetailModal
+- ⬜ Modificar mensaje WhatsApp con saldo
+- ⏭️ **Próximo:** Sprint 6 - Cartera de Matrizadores
 
 ### Leyenda de Estados
 - ⬜ **Pendiente** - No iniciado
@@ -1039,22 +1051,22 @@ ORDER BY "Días Vencido" DESC;
 
 | # | Tarea | Estado | Notas |
 |---|-------|--------|-------|
-| 3.1 | Crear controlador `billing-controller.js` | ⬜ | |
-| 3.2 | Endpoint: `GET /api/billing/invoices` (lista con filtros) | ⬜ | |
-| 3.3 | Endpoint: `GET /api/billing/invoices/:id` (detalle) | ⬜ | |
-| 3.4 | Endpoint: `GET /api/billing/invoices/:id/payments` | ⬜ | |
-| 3.5 | Endpoint: `GET /api/billing/payments` (lista con filtros) | ⬜ | |
-| 3.6 | Endpoint: `GET /api/billing/clients` | ⬜ | |
-| 3.7 | Endpoint: `GET /api/billing/clients/:taxId/balance` | ⬜ | |
-| 3.8 | Endpoint: `GET /api/billing/import-logs` | ⬜ | |
-| 3.9 | Función: `getDocumentPaymentStatus(documentId)` | ⬜ | |
-| 3.10 | Integrar estado de pago en `GET /api/documents/:id` | ⬜ | |
+| 3.1 | Crear controlador `billing-controller.js` | ✅ | 674 líneas, 13 funciones |
+| 3.2 | Endpoint: `GET /api/billing/invoices` (lista con filtros) | ✅ | |
+| 3.3 | Endpoint: `GET /api/billing/invoices/:id` (detalle) | ✅ | |
+| 3.4 | Endpoint: `GET /api/billing/invoices/:id/payments` | ✅ | |
+| 3.5 | Endpoint: `GET /api/billing/payments` (lista con filtros) | ✅ | |
+| 3.6 | Endpoint: `GET /api/billing/clients` | ✅ | |
+| 3.7 | Endpoint: `GET /api/billing/clients/:taxId/balance` | ✅ | |
+| 3.8 | Endpoint: `GET /api/billing/import-logs` | ✅ | |
+| 3.9 | Función: `getDocumentPaymentStatus(documentId)` | ✅ | |
+| 3.10 | Integrar estado de pago en `GET /api/documents/:id` | ✅ | |
 
 #### Criterios de Aceptación
-- [ ] Todos los endpoints responden correctamente
-- [ ] Filtros funcionan (por estado, fecha, cliente)
-- [ ] Paginación implementada
-- [ ] Estado de pago visible en detalle de documento
+- [x] Todos los endpoints responden correctamente
+- [x] Filtros funcionan (por estado, fecha, cliente)
+- [x] Paginación implementada
+- [x] Estado de pago visible en detalle de documento
 
 ---
 
@@ -1065,23 +1077,23 @@ ORDER BY "Días Vencido" DESC;
 
 | # | Tarea | Estado | Notas |
 |---|-------|--------|-------|
-| 4.1 | Agregar sección "Facturación" al menú lateral | ⬜ | Roles: CAJA, ADMIN |
-| 4.2 | Crear página `ImportarDatos.jsx` | ⬜ | |
-| 4.3 | Implementar componente de upload con drag & drop | ⬜ | |
-| 4.4 | Implementar filtro de fechas para importación | ⬜ | |
-| 4.5 | Mostrar historial de importaciones | ⬜ | |
-| 4.6 | Crear página `ListaFacturas.jsx` | ⬜ | |
-| 4.7 | Implementar filtros y búsqueda de facturas | ⬜ | |
-| 4.8 | Crear página `DetalleFactura.jsx` | ⬜ | |
-| 4.9 | Mostrar historial de pagos en detalle | ⬜ | |
-| 4.10 | Crear página `ListaPagos.jsx` | ⬜ | |
-| 4.11 | Crear servicio `billing-service.js` (frontend) | ⬜ | |
+| 4.1 | Agregar sección "Facturación" al menú lateral | ✅ | Roles: CAJA, ADMIN en nav-items.js |
+| 4.2 | Crear página `ImportarDatos.jsx` | ✅ | 367 líneas |
+| 4.3 | Implementar componente de upload con drag & drop | ✅ | |
+| 4.4 | Implementar filtro de fechas para importación | ✅ | |
+| 4.5 | Mostrar historial de importaciones | ✅ | |
+| 4.6 | Crear página `ListaFacturas.jsx` | ✅ | 373 líneas |
+| 4.7 | Implementar filtros y búsqueda de facturas | ✅ | |
+| 4.8 | Crear página `DetalleFactura.jsx` | ✅ | 346 líneas |
+| 4.9 | Mostrar historial de pagos en detalle | ✅ | |
+| 4.10 | Crear página `ListaPagos.jsx` | ✅ | 318 líneas |
+| 4.11 | Crear servicio `billing-service.js` (frontend) | ✅ | 283 líneas |
 
 #### Criterios de Aceptación
-- [ ] Navegación funcional desde menú
-- [ ] Importación de archivo funciona desde UI
-- [ ] Lista de facturas muestra estados correctos
-- [ ] Detalle de factura muestra pagos asociados
+- [x] Navegación funcional desde menú
+- [x] Importación de archivo funciona desde UI
+- [x] Lista de facturas muestra estados correctos
+- [x] Detalle de factura muestra pagos asociados
 
 ---
 
@@ -1092,9 +1104,9 @@ ORDER BY "Días Vencido" DESC;
 
 | # | Tarea | Estado | Notas |
 |---|-------|--------|-------|
-| 5.1 | Crear componente `EstadoPago.jsx` | ⬜ | Widget informativo (alerta visual) |
-| 5.2 | Integrar `EstadoPago` en vista de documento (recepción) | ⬜ | Solo informativo, sin bloquear |
-| 5.3 | Implementar función `getDocumentPaymentStatus()` | ⬜ | Retorna info de saldo |
+| 5.1 | Crear componente `EstadoPago.jsx` | ✅ | 264 líneas, widget informativo |
+| 5.2 | Integrar `EstadoPago` en vista de documento | ✅ | En DocumentDetailModal.jsx |
+| 5.3 | Implementar función `getDocumentPaymentStatus()` | ✅ | Hook usePaymentStatus incluido |
 | 5.4 | Modificar mensaje WhatsApp "documento listo" | ⬜ | Incluir info de saldo pendiente |
 | 5.5 | Registrar en auditoría entregas con saldo pendiente | ⬜ | Para reportes posteriores |
 | 5.6 | Agregar indicador visual en lista de documentos | ⬜ | 🟢🟡🔴 según estado de pago |
