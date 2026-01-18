@@ -27,6 +27,7 @@ model User {
   escriturasQR               EscrituraQR[]
   formularioUAFEAsignaciones FormularioUAFEAsignacion[]
   protocolosUAFE             ProtocoloUAFE[]
+  importLogs                 ImportLog[]
 
   @@map("users")
 }
@@ -82,6 +83,7 @@ model Document {
   createdBy                User                   @relation("CreatedDocuments", fields: [createdById], references: [id])
   usuarioEntrega           User?                  @relation("DeliveredDocuments", fields: [usuarioEntregaId], references: [id])
   notifications            WhatsAppNotification[]
+  invoices                  Invoice[]
 
   @@index([status])
   @@index([createdAt])
@@ -530,4 +532,146 @@ enum UserRole {
   MATRIZADOR
   RECEPCION
   ARCHIVO
+}
+
+// ========================================
+// MÓDULO DE FACTURACIÓN
+// ========================================
+
+model Invoice {
+  id                String        @id @default(uuid())
+  
+  // Identificación (ÚNICO)
+  invoiceNumber     String        @unique  // numtra normalizado: 001-002-000123341
+  invoiceNumberRaw  String                 // numtra original: 001002-00123341
+  
+  // Datos del cliente (desnormalizados del CSV, para facturas sin documento)
+  clientTaxId       String                 // codcli (cédula/RUC)
+  clientName        String                 // nomcli
+  
+  // Montos
+  totalAmount       Decimal       @db.Decimal(12, 2)  // valcob de FC
+  
+  // Fechas
+  issueDate         DateTime               // fecemi (en FC) o fectra (en AB para legacy)
+  dueDate           DateTime?              // fecven
+  
+  // Referencia
+  concept           String?                // concep
+  
+  // Estado y control
+  status            InvoiceStatus @default(PENDING)
+  isLegacy          Boolean       @default(false)  // Creada por pago huérfano
+  
+  // Vinculación con documento notarial (automática por numeroFactura)
+  documentId        String?
+  document          Document?     @relation(fields: [documentId], references: [id])
+  
+  // Metadata de importación
+  importedAt        DateTime      @default(now())
+  lastSyncAt        DateTime      @updatedAt
+  sourceFile        String?                // Nombre del archivo de origen
+  
+  // Relaciones
+  payments          Payment[]
+  
+  @@map("invoices")
+  @@index([invoiceNumber])
+  @@index([clientTaxId])
+  @@index([status])
+  @@index([issueDate])
+  @@index([documentId])
+}
+
+model Payment {
+  id              String      @id @default(uuid())
+  
+  // Identificación (ÚNICO)
+  receiptNumber   String      @unique  // numdoc: 001-2601000089
+  
+  // Monto
+  amount          Decimal     @db.Decimal(12, 2)  // valcob de AB
+  
+  // Fechas
+  paymentDate     DateTime               // fecemi
+  
+  // Referencias
+  concept         String?                // concep (ej: "PAGO FACT 119478 05/09")
+  accountingRef   String?                // numcco (comprobante contable)
+  
+  // Tipo de pago
+  paymentType     PaymentType @default(CASH)
+  
+  // Factura asociada
+  invoiceId       String
+  invoice         Invoice     @relation(fields: [invoiceId], references: [id])
+  
+  // Metadata
+  importedAt      DateTime    @default(now())
+  sourceFile      String?
+  
+  @@map("payments")
+  @@index([receiptNumber])
+  @@index([invoiceId])
+  @@index([paymentDate])
+}
+
+model ImportLog {
+  id              String       @id @default(uuid())
+  
+  // Información del archivo
+  fileName        String
+  fileType        String               // 'POR_COBRAR' o 'CXC'
+  
+  // Estadísticas
+  totalRows       Int
+  invoicesCreated Int          @default(0)
+  invoicesUpdated Int          @default(0)
+  paymentsCreated Int          @default(0)
+  paymentsSkipped Int          @default(0)
+  errors          Int          @default(0)
+  
+  // Rango de fechas procesado
+  dateFrom        DateTime?
+  dateTo          DateTime?
+  
+  // Estado
+  status          ImportStatus @default(PROCESSING)
+  errorDetails    Json?
+  
+  // Usuario que ejecutó
+  executedBy      Int?
+  executedByUser  User?        @relation(fields: [executedBy], references: [id])
+  
+  // Timestamps
+  startedAt       DateTime     @default(now())
+  completedAt     DateTime?
+  
+  @@map("import_logs")
+  @@index([status])
+  @@index([startedAt])
+}
+
+enum InvoiceStatus {
+  PENDING       // Pendiente de pago
+  PARTIAL       // Pago parcial
+  PAID          // Pagada completamente
+  OVERDUE       // Vencida
+  CANCELLED     // Anulada
+}
+
+enum PaymentType {
+  CASH          // Efectivo
+  TRANSFER      // Transferencia
+  CHECK         // Cheque
+  RETENTION     // Retención
+  CREDIT_NOTE   // Nota de crédito
+  OTHER         // Otro
+}
+
+enum ImportStatus {
+  PROCESSING
+  COMPLETED
+  COMPLETED_WITH_ERRORS
+  FAILED
 }
