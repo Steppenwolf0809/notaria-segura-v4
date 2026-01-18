@@ -5,7 +5,17 @@ export const navItemsByRole = {
   CAJA: [
     { id: 'dashboard', label: 'Dashboard', view: 'dashboard', icon: 'Dashboard' },
     { id: 'documentos', label: 'Documentos', view: 'documentos', icon: 'Assignment' },
-    { id: 'subir-xml', label: 'Subir XML', view: 'uploads', icon: 'CloudUpload' }
+    { id: 'subir-xml', label: 'Subir XML', view: 'uploads', icon: 'CloudUpload' },
+    {
+      id: 'facturacion',
+      label: 'Facturación',
+      icon: 'AccountBalance',
+      submenu: [
+        { id: 'importar-datos', label: 'Importar Datos', view: 'importar-datos', icon: 'CloudUpload' },
+        { id: 'facturas', label: 'Facturas', view: 'facturas', icon: 'Receipt' },
+        { id: 'pagos', label: 'Pagos', view: 'pagos', icon: 'Payments' }
+      ]
+    }
   ],
   RECEPCION: [
     { id: 'dashboard', label: 'Dashboard', view: 'dashboard', icon: 'Dashboard' },
@@ -26,6 +36,16 @@ export const navItemsByRole = {
     { id: 'qr-management', label: 'Gestor QR', view: 'qr-management', icon: 'QrCode' },
     { id: 'formularios-uafe', label: 'Gestión Formularios UAFE', view: 'formularios-uafe', icon: 'Description' },
     { id: 'analisis-uafe', label: 'Análisis UAFE', view: 'analisis-uafe', icon: 'Analytics' },
+    {
+      id: 'facturacion',
+      label: 'Facturación',
+      icon: 'AccountBalance',
+      submenu: [
+        { id: 'importar-datos', label: 'Importar Datos', view: 'importar-datos', icon: 'CloudUpload' },
+        { id: 'facturas', label: 'Facturas', view: 'facturas', icon: 'Receipt' },
+        { id: 'pagos', label: 'Pagos', view: 'pagos', icon: 'Payments' }
+      ]
+    },
     { id: 'notifications', label: 'Notificaciones', view: 'notifications', icon: 'WhatsApp' },
     { id: 'encuestas-satisfaccion', label: 'Encuestas Satisfacción', view: 'encuestas-satisfaccion', icon: 'Poll' },
     { id: 'settings', label: 'Configuración', view: 'settings', icon: 'Settings' },

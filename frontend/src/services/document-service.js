@@ -231,6 +231,7 @@ const documentService = {
       if (params.orderDirection) queryParams.append('orderDirection', params.orderDirection);
       if (params.fechaDesde) queryParams.append('fechaDesde', params.fechaDesde);
       if (params.fechaHasta) queryParams.append('fechaHasta', params.fechaHasta);
+      if (params.paymentStatus) queryParams.append('paymentStatus', params.paymentStatus);
 
       const response = await api.get(`/documents/my-documents?${queryParams.toString()}`);
 

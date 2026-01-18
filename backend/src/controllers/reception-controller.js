@@ -261,6 +261,8 @@ async function listarTodosDocumentos(req, res) {
       where.status = estado;
     }
 
+
+
     if (fechaDesde || fechaHasta) {
       where.createdAt = {};
       if (fechaDesde) {
@@ -283,8 +285,10 @@ async function listarTodosDocumentos(req, res) {
       fechaDesde: fechaDesde || null,
       fechaHasta: fechaHasta || null,
       sortBy: mappedSortField,
+      sortBy: mappedSortField,
       sortOrder: mappedSortOrder
     });
+
 
     const cached = await cache.get(cacheKey);
     if (cached) {
@@ -299,6 +303,7 @@ async function listarTodosDocumentos(req, res) {
         // Construir cláusulas adicionales según filtros
         const filterClauses = [];
         if (estado) filterClauses.push(Prisma.sql`d."status"::text = ${estado}`);
+
         if (matrizador) filterClauses.push(Prisma.sql`d."assignedToId" = ${parseInt(matrizador)}`);
         if (fechaDesde) filterClauses.push(Prisma.sql`d."createdAt" >= ${new Date(fechaDesde)}`);
         if (fechaHasta) {
@@ -366,6 +371,7 @@ async function listarTodosDocumentos(req, res) {
           actoPrincipalValor: doc.totalFactura,
           totalFactura: doc.totalFactura,
           matrizadorName: doc.matrizadorName,
+
           detalle_documento: doc.detalle_documento,
           comentarios_recepcion: doc.comentarios_recepcion
         }));
@@ -481,6 +487,7 @@ async function listarTodosDocumentos(req, res) {
       actoPrincipalValor: doc.totalFactura, // ⭐ CAMBIO: Usar valor total de factura
       totalFactura: doc.totalFactura,
       matrizadorName: doc.matrizadorName,
+
       // Campos editables
       detalle_documento: doc.detalle_documento,
       comentarios_recepcion: doc.comentarios_recepcion

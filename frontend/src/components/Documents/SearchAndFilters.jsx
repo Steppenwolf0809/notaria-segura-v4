@@ -10,8 +10,6 @@ import {
   Select,
   MenuItem,
   Chip,
-  ToggleButtonGroup,
-  ToggleButton,
   Typography,
   Switch,
   FormControlLabel
@@ -35,6 +33,8 @@ const SearchAndFilters = memo(({
   onStatusFilterChange,
   typeFilter,
   onTypeFilterChange,
+  paymentFilter,
+  onPaymentFilterChange,
   debouncedSearchTerm,
   mostrarEntregados,
   onMostrarEntregadosChange,
@@ -47,9 +47,61 @@ const SearchAndFilters = memo(({
 }) => {
   const statusLabelMap = {
     'EN_PROCESO': 'En Proceso',
-    'LISTO': 'Listo para Entrega',
+    'LISTO': 'Listo',
     'ENTREGADO': 'Entregado'
   };
+
+  const paymentLabelMap = {
+    'PAGADO': 'Pagado',
+    'PENDIENTE': 'Pendiente'
+  };
+
+  // Componente reutilizable para Segmented Control
+  const SegmentedControl = ({ options, value, onChange, label }) => (
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+      {label && (
+        <Typography variant="caption" color="text.secondary" sx={{ pl: 0.5, fontWeight: 500 }}>
+          {label}
+        </Typography>
+      )}
+      <Box sx={{
+        display: 'flex',
+        bgcolor: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'grey.100',
+        p: 0.5,
+        borderRadius: 2,
+        gap: 0.5
+      }}>
+        {options.map((option) => {
+          const isActive = value === option.value;
+          return (
+            <Box
+              key={option.value}
+              onClick={() => onChange({ target: { value: option.value } })}
+              sx={{
+                px: 1.5,
+                py: 0.5,
+                borderRadius: 1.5,
+                fontSize: '0.875rem',
+                fontWeight: isActive ? 600 : 400,
+                cursor: 'pointer',
+                color: isActive ? 'text.primary' : 'text.secondary',
+                bgcolor: isActive ? 'background.paper' : 'transparent',
+                boxShadow: isActive ? '0px 1px 2px rgba(0,0,0,0.1)' : 'none',
+                transition: 'all 0.2s',
+                whiteSpace: 'nowrap', // Evitar saltos de línea
+                '&:hover': {
+                  color: 'text.primary',
+                  bgcolor: isActive ? 'background.paper' : 'rgba(0,0,0,0.04)'
+                }
+              }}
+            >
+              {option.label}
+            </Box>
+          );
+        })}
+      </Box>
+    </Box>
+  );
 
   return (
     <Card sx={{ mb: 1.5 }}>
@@ -58,14 +110,15 @@ const SearchAndFilters = memo(({
           display: 'flex',
           flexDirection: { xs: 'column', md: 'row' },
           gap: 2,
-          alignItems: { md: 'center' }
+          alignItems: { xs: 'stretch', md: 'center' }, // Stretch en móvil, center en desktop
+          flexWrap: 'wrap' // Permitir wrapping si hay poco espacio
         }}>
-          {/* Campo de búsqueda */}
+          {/* Campo de búsqueda (Flex grow para ocupar espacio disponible) */}
           <TextField
             placeholder="Buscar por cliente, código o tipo..."
             value={inputValue}
             onChange={onInputChange}
-            sx={{ flex: 1 }}
+            sx={{ flex: 1, minWidth: { xs: '100%', md: '250px' } }}
             size="small"
             InputProps={{
               startAdornment: (
@@ -76,105 +129,51 @@ const SearchAndFilters = memo(({
             }}
           />
 
-          {/* Filtro por estado (botones) */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-            <Typography variant="caption" color="text.secondary" sx={{ pl: 0.5 }}>
-              Estado
-            </Typography>
-            <ToggleButtonGroup
-              size="small"
-              exclusive
+          {/* Filtros Segmentados (Flexibles y adaptables) */}
+          <Box sx={{ display: 'flex', gap: 2, overflowX: 'auto', pb: { xs: 1, md: 0 } }}>
+            {/* Filtro Estado */}
+            <SegmentedControl
+              label="Estado del Trámite"
               value={statusFilter || ''}
-              onChange={(e, value) => onStatusFilterChange({ target: { value: value || '' } })}
-              sx={{
-                bgcolor: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-                borderRadius: 1,
-                p: 0.25,
-                '& .MuiToggleButton-root': {
-                  border: 0,
-                  textTransform: 'none',
-                  px: 1.5,
-                  height: 32,
-                }
-              }}
-            >
-              <ToggleButton value="">Todos</ToggleButton>
-              <ToggleButton
-                value="EN_PROCESO"
-                sx={{
-                  '&.Mui-selected': {
-                    bgcolor: 'info.main',
-                    color: 'common.white'
-                  },
-                  '&.Mui-selected:hover': { bgcolor: 'info.dark' }
-                }}
-              >
-                En Proceso
-              </ToggleButton>
-              <ToggleButton
-                value="LISTO"
-                sx={{
-                  '&.Mui-selected': {
-                    bgcolor: 'success.main',
-                    color: 'common.white'
-                  },
-                  '&.Mui-selected:hover': { bgcolor: 'success.dark' }
-                }}
-              >
-                Listo
-              </ToggleButton>
-              <ToggleButton
-                value="ENTREGADO"
-                sx={{
-                  '&.Mui-selected': {
-                    bgcolor: (t) => t.palette.mode === 'dark' ? t.palette.grey[700] : t.palette.grey[300],
-                    color: 'text.primary'
-                  },
-                  '&.Mui-selected:hover': {
-                    bgcolor: (t) => t.palette.mode === 'dark' ? t.palette.grey[600] : t.palette.grey[400]
-                  }
-                }}
-              >
-                Entregado
-              </ToggleButton>
-            </ToggleButtonGroup>
+              onChange={onStatusFilterChange}
+              options={[
+                { value: '', label: 'Todos' },
+                { value: 'EN_PROCESO', label: 'En Proceso' },
+                { value: 'LISTO', label: 'Listo' },
+                { value: 'ENTREGADO', label: 'Entregado' }
+              ]}
+            />
+
+            {/* Filtro Pago (NUEVO) */}
+            <SegmentedControl
+              label="Estado de Pago"
+              value={paymentFilter || ''}
+              onChange={onPaymentFilterChange}
+              options={[
+                { value: '', label: 'Todos' },
+                { value: 'PAGADO', label: 'Pagado' },
+                { value: 'PENDIENTE', label: 'Pendiente' }
+              ]}
+            />
           </Box>
 
-          {/* Filtro por tipo */}
-          <FormControl size="small" sx={{ minWidth: 150 }}>
-            <InputLabel>Tipo</InputLabel>
-            <Select
-              value={typeFilter}
-              label="Tipo"
-              onChange={onTypeFilterChange}
-            >
-              <MenuItem value="">Todos</MenuItem>
-              <MenuItem value="CERTIFICACIONES">Certificaciones</MenuItem>
-              <MenuItem value="PROTOCOLO">Protocolo</MenuItem>
-              <MenuItem value="COMPRAVENTA">Compraventa</MenuItem>
-            </Select>
-          </FormControl>
-
-          {/* 🆕 Toggle para mostrar/ocultar ENTREGADOS */}
-          <FormControlLabel
-            control={
-              <Switch
-                checked={mostrarEntregados}
-                onChange={onMostrarEntregadosChange}
-                color="primary"
-                size="small"
-              />
-            }
-            label={
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                {mostrarEntregados ? <VisibilityIcon fontSize="small" /> : <VisibilityOffIcon fontSize="small" />}
-                <Typography variant="body2">
-                  Mostrar entregados
-                </Typography>
-              </Box>
-            }
-            sx={{ ml: { md: 'auto' } }}
-          />
+          {/* Opciones Adicionales */}
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', ml: 'auto' }}>
+            {/* Filtro por tipo */}
+            <FormControl size="small" sx={{ minWidth: 150 }}>
+              <InputLabel>Tipo de Trámite</InputLabel>
+              <Select
+                value={typeFilter}
+                label="Tipo de Trámite"
+                onChange={onTypeFilterChange}
+              >
+                <MenuItem value="">Todos</MenuItem>
+                <MenuItem value="CERTIFICACIONES">Certificaciones</MenuItem>
+                <MenuItem value="PROTOCOLO">Protocolo</MenuItem>
+                <MenuItem value="COMPRAVENTA">Compraventa</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
         </Box>
 
         {/* Filtro por rango de fechas */}
@@ -191,8 +190,8 @@ const SearchAndFilters = memo(({
           </Box>
         )}
 
-        {/* Filtros activos */}
-        {(statusFilter || typeFilter || (debouncedSearchTerm && debouncedSearchTerm.length >= 2)) && (
+        {/* Chips de Filtros Activos (Feedback visual) */}
+        {(statusFilter || typeFilter || paymentFilter || (debouncedSearchTerm && debouncedSearchTerm.length >= 2)) && (
           <Box sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
             {debouncedSearchTerm && debouncedSearchTerm.length >= 2 && (
               <Chip
@@ -212,12 +211,21 @@ const SearchAndFilters = memo(({
                 variant="outlined"
               />
             )}
+            {paymentFilter && (
+              <Chip
+                label={`Pago: ${paymentLabelMap[paymentFilter] || paymentFilter}`}
+                onDelete={() => onPaymentFilterChange({ target: { value: '' } })}
+                size="small"
+                color="secondary"
+                variant="outlined"
+              />
+            )}
             {typeFilter && (
               <Chip
                 label={`Tipo: ${typeFilter}`}
                 onDelete={() => onTypeFilterChange({ target: { value: '' } })}
                 size="small"
-                color="primary"
+                color="default"
                 variant="outlined"
               />
             )}

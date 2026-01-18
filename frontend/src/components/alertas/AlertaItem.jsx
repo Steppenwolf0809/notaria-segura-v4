@@ -182,6 +182,9 @@ function AlertaItem({ alerta, onDocumentClick, showDetails = true }) {
             )}
           </Box>
         }
+        disableTypography
+        primaryTypographyProps={{ component: 'div' }}
+        secondaryTypographyProps={{ component: 'div' }}
       />
 
       <ListItemSecondaryAction>

@@ -53,6 +53,11 @@ import AnalisisUAFE from './admin/AnalisisUAFE';
 import QROversight from './admin/QROversight';
 import EncuestasSatisfaccion from './admin/EncuestasSatisfaccion';
 import { getSupervisionStats, getMatrizadores } from '../services/admin-supervision-service';
+// Billing module components
+import ImportarDatos from './billing/ImportarDatos';
+import ListaFacturas from './billing/ListaFacturas';
+import DetalleFactura from './billing/DetalleFactura';
+import ListaPagos from './billing/ListaPagos';
 
 /**
  * Centro de administración - Panel principal para ADMIN
@@ -88,6 +93,15 @@ const AdminCenter = () => {
         return <EncuestasSatisfaccion />;
       case 'settings':
         return <AdminSettings />;
+      // === BILLING MODULE ROUTES ===
+      case 'importar-datos':
+        return <ImportarDatos />;
+      case 'facturas':
+        return <ListaFacturas />;
+      case 'factura-detalle':
+        return <DetalleFactura />;
+      case 'pagos':
+        return <ListaPagos />;
       default:
         return <AdminDashboard />;
     }

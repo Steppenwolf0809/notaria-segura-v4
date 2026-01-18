@@ -16,6 +16,7 @@ const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
   const [inputValue, setInputValue] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [paymentFilter, setPaymentFilter] = useState(''); // Estado para filtro de pago
   const [mostrarEntregados, setMostrarEntregados] = useState(false);
 
   // Estado para filtros de fecha
@@ -42,13 +43,15 @@ const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
       limit: rowsPerPage,
       search: debouncedSearchTerm,
       status: statusFilter,
+      status: statusFilter,
       tipo: typeFilter,
+      paymentStatus: paymentFilter, // Pasar filtro de pago
       orderBy: orderBy,
       orderDirection: orderDirection,
       fechaDesde: fechaDesde || undefined,
       fechaHasta: fechaHasta || undefined
     });
-  }, [page, rowsPerPage, debouncedSearchTerm, statusFilter, typeFilter, orderBy, orderDirection, fechaDesde, fechaHasta]);
+  }, [page, rowsPerPage, debouncedSearchTerm, statusFilter, typeFilter, paymentFilter, orderBy, orderDirection, fechaDesde, fechaHasta]);
 
   /**
    * Handlers memoizados para evitar re-renders
@@ -71,6 +74,11 @@ const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
   const handleTypeFilterChange = useCallback((e) => {
     setTypeFilter(e.target.value);
     setPage(0); // Reset página al filtrar
+  }, []);
+
+  const handlePaymentFilterChange = useCallback((e) => {
+    setPaymentFilter(e.target.value);
+    setPage(0);
   }, []);
 
   const handleMostrarEntregadosChange = useCallback((e) => {
@@ -138,13 +146,15 @@ const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
       limit: rowsPerPage,
       search: debouncedSearchTerm,
       status: statusFilter,
+      status: statusFilter,
       tipo: typeFilter,
+      paymentStatus: paymentFilter,
       orderBy: orderBy,
       orderDirection: orderDirection,
       fechaDesde: fechaDesde || undefined,
       fechaHasta: fechaHasta || undefined
     });
-  }, [page, rowsPerPage, debouncedSearchTerm, statusFilter, typeFilter, orderBy, orderDirection, fechaDesde, fechaHasta, fetchMyDocuments]);
+  }, [page, rowsPerPage, debouncedSearchTerm, statusFilter, typeFilter, paymentFilter, orderBy, orderDirection, fechaDesde, fechaHasta, fetchMyDocuments]);
 
   return (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -168,6 +178,8 @@ const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
           onStatusFilterChange={handleStatusFilterChange}
           typeFilter={typeFilter}
           onTypeFilterChange={handleTypeFilterChange}
+          paymentFilter={paymentFilter}
+          onPaymentFilterChange={handlePaymentFilterChange}
           debouncedSearchTerm={debouncedSearchTerm}
           mostrarEntregados={mostrarEntregados}
           onMostrarEntregadosChange={handleMostrarEntregadosChange}

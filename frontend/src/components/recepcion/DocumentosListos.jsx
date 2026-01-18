@@ -20,7 +20,7 @@ import {
   MenuItem,
   ToggleButtonGroup,
   ToggleButton,
-  Typography,
+
   Paper,
   TablePagination,
   CircularProgress,
@@ -42,7 +42,11 @@ import {
   CheckCircle as CheckCircleIcon,
   Assignment as AssignmentIcon,
   List as ListIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
+  AttachMoney as AttachMoneyIcon,
+  MoneyOff as MoneyOffIcon,
+  Description as DescriptionIcon,
+  Receipt as ReceiptIcon
 } from '@mui/icons-material';
 import ModalEntrega from './ModalEntrega';
 
@@ -61,7 +65,8 @@ function DocumentosListos({ onEstadisticasChange }) {
   const [filters, setFilters] = useState({
     search: '',
     matrizador: '',
-    estado: '' // Para filtrar por estado en la pestaña "Todos"
+    estado: '', // Para filtrar por estado en la pestaña "Todos"
+    paymentStatus: '' // Nuevo filtro de pago
   });
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
@@ -126,6 +131,7 @@ function DocumentosListos({ onEstadisticasChange }) {
         ...(filters.search && { search: filters.search }),
         ...(filters.matrizador && { matrizador: filters.matrizador }),
         ...(filters.estado && { estado: filters.estado }),
+        ...(filters.paymentStatus && { paymentStatus: filters.paymentStatus }),
         // Si el backend soporta orden, lo enviamos; si no, ordenaremos en memoria
         sortBy: sortBy,
         sortOrder: sortOrder
@@ -338,15 +344,17 @@ function DocumentosListos({ onEstadisticasChange }) {
         </Box>
 
         {/* Filtros y búsqueda */}
-        <Card sx={{ mb: 3 }}>
-          <CardContent>
-            <Grid container spacing={3} alignItems="center">
-              {/* Búsqueda */}
-              <Grid item xs={12} md={4}>
+        {/* Filtros y búsqueda */}
+        <Paper elevation={0} variant="outlined" sx={{ mb: 3, p: 2, bgcolor: 'background.default' }}>
+          <Stack spacing={2}>
+            {/* Fila 1: Búsqueda y Matrizador */}
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
+                  size="small"
                   variant="outlined"
-                  placeholder="Buscar por cliente, teléfono o protocolo..."
+                  placeholder="Buscar documento..."
                   value={filters.search}
                   onChange={(e) => handleBusqueda(e.target.value)}
                   InputProps={{
@@ -354,17 +362,15 @@ function DocumentosListos({ onEstadisticasChange }) {
                   }}
                 />
               </Grid>
-
-              {/* Filtro por matrizador */}
-              <Grid item xs={12} md={currentTab === 1 ? 2.5 : 3}>
-                <FormControl fullWidth>
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth size="small">
                   <InputLabel>Matrizador</InputLabel>
                   <Select
                     value={filters.matrizador}
                     onChange={(e) => setFilters(prev => ({ ...prev, matrizador: e.target.value }))}
                     label="Matrizador"
                   >
-                    <MenuItem value="">Todos los matrizadores</MenuItem>
+                    <MenuItem value="">Todos</MenuItem>
                     {matrizadores.map(mat => (
                       <MenuItem key={mat.id} value={mat.id}>
                         {mat.nombre || `${mat.firstName} ${mat.lastName}`}
@@ -373,158 +379,226 @@ function DocumentosListos({ onEstadisticasChange }) {
                   </Select>
                 </FormControl>
               </Grid>
+            </Grid>
 
-              {/* Filtro por estado - Solo en pestaña "Todos" */}
+            {/* Fila 2: Filtros de Estado y Pago (Pills) */}
+            <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+
+              {/* Filtro Estado (Solo pestaña Todos) */}
               {currentTab === 1 && (
-                <Grid item xs={12} md={2.5}>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                    <Typography variant="caption" color="text.secondary" sx={{ pl: 0.5 }}>
-                      Estado
-                    </Typography>
-                    <ToggleButtonGroup
-                      size="small"
-                      exclusive
-                      value={filters.estado || ''}
-                      onChange={(e, value) => setFilters(prev => ({ ...prev, estado: value || '' }))}
-                      fullWidth
-                      sx={{
-                        bgcolor: (t) => t.palette.mode === 'dark' ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-                        borderRadius: 1,
-                        p: 0.25,
-                        '& .MuiToggleButton-root': {
-                          border: 0,
-                          textTransform: 'none',
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="body2" fontWeight="bold" color="text.secondary" sx={{ mr: 0.5 }}>Estado:</Typography>
+                  <Box sx={{ bgcolor: 'rgba(0,0,0,0.04)', p: 0.5, borderRadius: 2, display: 'inline-flex', gap: 0.5 }}>
+                    {[
+                      { label: 'Todos', value: '' },
+                      { label: 'En Proceso', value: 'EN_PROCESO' },
+                      { label: 'Listo', value: 'LISTO' },
+                      { label: 'Entregado', value: 'ENTREGADO' }
+                    ].map((opt) => (
+                      <Button
+                        key={opt.value}
+                        size="small"
+                        onClick={() => setFilters(prev => ({ ...prev, estado: opt.value }))}
+                        sx={{
                           px: 1.5,
-                          height: 32,
+                          py: 0.5,
+                          borderRadius: 1.5,
+                          textTransform: 'none',
+                          minWidth: 'auto',
+                          fontWeight: filters.estado === opt.value ? 600 : 400,
+                          color: filters.estado === opt.value ? 'text.primary' : 'text.secondary',
+                          bgcolor: filters.estado === opt.value ? 'background.paper' : 'transparent',
+                          boxShadow: filters.estado === opt.value ? 1 : 0,
+                          '&:hover': {
+                            bgcolor: filters.estado === opt.value ? 'background.paper' : 'rgba(0,0,0,0.05)'
+                          }
+                        }}
+                      >
+                        {opt.label}
+                      </Button>
+                    ))}
+                  </Box>
+                </Box>
+              )}
+
+              {/* Filtro Pago */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="body2" fontWeight="bold" color="text.secondary" sx={{ mr: 0.5 }}>Pago:</Typography>
+                <Box sx={{ bgcolor: 'rgba(0,0,0,0.04)', p: 0.5, borderRadius: 2, display: 'inline-flex', gap: 0.5 }}>
+                  {[
+                    { label: 'Todos', value: '' },
+                    { label: 'Pagado', value: 'PAID' },
+                    { label: 'Pendiente', value: 'PENDING' }
+                  ].map((opt) => (
+                    <Button
+                      key={opt.value}
+                      size="small"
+                      onClick={() => setFilters(prev => ({ ...prev, paymentStatus: opt.value }))}
+                      sx={{
+                        px: 1.5,
+                        py: 0.5,
+                        borderRadius: 1.5,
+                        textTransform: 'none',
+                        minWidth: 'auto',
+                        fontWeight: filters.paymentStatus === opt.value ? 600 : 400,
+                        color: filters.paymentStatus === opt.value ? 'text.primary' : 'text.secondary',
+                        bgcolor: filters.paymentStatus === opt.value ? 'background.paper' : 'transparent',
+                        boxShadow: filters.paymentStatus === opt.value ? 1 : 0,
+                        '&:hover': {
+                          bgcolor: filters.paymentStatus === opt.value ? 'background.paper' : 'rgba(0,0,0,0.05)'
                         }
                       }}
                     >
-                      <ToggleButton value="">Todos</ToggleButton>
-                      <ToggleButton value="EN_PROCESO" sx={{ '&.Mui-selected': { bgcolor: 'info.main', color: 'common.white' }, '&.Mui-selected:hover': { bgcolor: 'info.dark' } }}>En Proceso</ToggleButton>
-                      <ToggleButton value="LISTO" sx={{ '&.Mui-selected': { bgcolor: 'success.main', color: 'common.white' }, '&.Mui-selected:hover': { bgcolor: 'success.dark' } }}>Listo</ToggleButton>
-                      <ToggleButton value="ENTREGADO" sx={{ '&.Mui-selected': { bgcolor: (t) => t.palette.mode === 'dark' ? t.palette.grey[700] : t.palette.grey[300], color: 'text.primary' }, '&.Mui-selected:hover': { bgcolor: (t) => t.palette.mode === 'dark' ? t.palette.grey[600] : t.palette.grey[400] } }}>Entregado</ToggleButton>
-                    </ToggleButtonGroup>
-                  </Box>
-                </Grid>
-              )}
-
-              {/* Botones de acción */}
-              <Grid item xs={12} md={currentTab === 1 ? 2 : 5}>
-                <Stack direction="row" spacing={2} justifyContent="flex-end">
-                  {/* Botón de Notificación WhatsApp - Solo en Tab 0 */}
-                  {currentTab === 0 && (
-                    <Button
-                      variant="contained"
-                      color="success"
-                      onClick={handleBulkNotify}
-                      startIcon={<Box component="span">📱</Box>}
-                      disabled={selectedDocuments.length === 0}
-                      title="Generar códigos y notificar por WhatsApp"
-                    >
-                      Notificar ({selectedDocuments.length})
+                      {opt.label}
                     </Button>
-                  )}
+                  ))}
+                </Box>
+              </Box>
 
-                  <Button
-                    variant="outlined"
-                    onClick={toggleSortOrder}
-                    title="Ordenar por fecha"
-                    sx={{ textTransform: 'none' }}
-                  >
-                    {sortOrder === 'asc' ? 'Fecha ↑' : 'Fecha ↓'}
-                  </Button>
+              <Box sx={{ flexGrow: 1 }} />
 
+              {/* Botón Limpiar */}
+              {(filters.search || filters.matrizador || filters.estado || filters.paymentStatus) && (
+                <Button
+                  size="small"
+                  onClick={() => setFilters({ search: '', matrizador: '', estado: '', paymentStatus: '' })}
+                  startIcon={<RefreshIcon />}
+                  color="inherit"
+                  sx={{ opacity: 0.7 }}
+                >
+                  Limpiar Filtros
+                </Button>
+              )}
+            </Box>
+          </Stack>
+        </Paper>
 
-                  {/* ... (rest of buttons) */}
-                </Stack>
-              </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
+        {/* Botones de acción y Ordenamiento */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Box>
+            {/* Espacio para contadores o selección si se desea */}
+            {selectedDocuments.length > 0 && (
+              <Typography variant="body2" color="primary">
+                {selectedDocuments.length} documentos seleccionados
+              </Typography>
+            )}
+          </Box>
+          <Stack direction="row" spacing={2}>
+            {/* Botón de Notificación WhatsApp - Solo en Tab 0 (Listos) */}
+            {currentTab === 0 && (
+              <Button
+                variant="contained"
+                color="success"
+                onClick={handleBulkNotify}
+                startIcon={<span>📱</span>}
+                disabled={selectedDocuments.length === 0}
+                title="Generar códigos y notificar por WhatsApp"
+                size="small"
+              >
+                Notificar ({selectedDocuments.length})
+              </Button>
+            )}
+
+            <Button
+              variant="outlined"
+              onClick={toggleSortOrder}
+              startIcon={sortOrder === 'asc' ? <RefreshIcon sx={{ transform: 'rotate(180deg)' }} /> : <RefreshIcon />}
+              title={`Ordenar por fecha ${sortOrder === 'asc' ? 'ascendente' : 'descendente'}`}
+              size="small"
+              sx={{ textTransform: 'none' }}
+            >
+              Fecha
+            </Button>
+          </Stack>
+        </Box>
       </Box>
 
       {/* ... (Table) */}
 
       {/* Modales */}
-      {showModalEntrega && documentoSeleccionado && (
-        <ModalEntrega
-          documento={documentoSeleccionado}
-          onClose={cerrarModales}
-          onEntregaExitosa={onEntregaCompletada}
-        />
-      )}
+      {
+        showModalEntrega && documentoSeleccionado && (
+          <ModalEntrega
+            documento={documentoSeleccionado}
+            onClose={cerrarModales}
+            onEntregaExitosa={onEntregaCompletada}
+          />
+        )
+      }
 
 
 
       {/* Modal de Resultados de Notificación */}
-      {showNotificationResult && notificationResult && (
-        <Dialog
-          open={showNotificationResult}
-          onClose={() => setShowNotificationResult(false)}
-          maxWidth="sm"
-          fullWidth
-        >
-          <Box sx={{ p: 3 }}>
-            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              📱 Resultado de Notificación
-            </Typography>
+      {
+        showNotificationResult && notificationResult && (
+          <Dialog
+            open={showNotificationResult}
+            onClose={() => setShowNotificationResult(false)}
+            maxWidth="sm"
+            fullWidth
+          >
+            <Box sx={{ p: 3 }}>
+              <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                📱 Resultado de Notificación
+              </Typography>
 
-            {notificationResult.notificados.length > 0 && (
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="subtitle2" color="success.main" gutterBottom>
-                  ✅ Notificados con Código ({notificationResult.notificados.length})
-                </Typography>
-                {notificationResult.notificados.map((item, index) => (
-                  <Card key={index} variant="outlined" sx={{ mb: 1, p: 1 }}>
-                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+              {notificationResult.notificados.length > 0 && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle2" color="success.main" gutterBottom>
+                    ✅ Notificados con Código ({notificationResult.notificados.length})
+                  </Typography>
+                  {notificationResult.notificados.map((item, index) => (
+                    <Card key={index} variant="outlined" sx={{ mb: 1, p: 1 }}>
+                      <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Box>
+                          <Typography variant="body2" fontWeight="bold">{item.clientName}</Typography>
+                          <Typography variant="caption">Código: <strong>{item.codigoRetiro}</strong></Typography>
+                          <Typography variant="caption" display="block">{item.documentCount} documento(s)</Typography>
+                        </Box>
+                        {item.waUrl && (
+                          <Button
+                            size="small"
+                            variant="contained"
+                            color="success"
+                            href={item.waUrl}
+                            target="_blank"
+                            startIcon={<SendIcon />}
+                          >
+                            Abrir WhatsApp
+                          </Button>
+                        )}
+                      </Stack>
+                    </Card>
+                  ))}
+                </Box>
+              )}
+
+              {notificationResult.sinTelefono.length > 0 && (
+                <Box sx={{ mb: 3 }}>
+                  <Typography variant="subtitle2" color="warning.main" gutterBottom>
+                    ⚠️ Sin Teléfono - Código Interno ({notificationResult.sinTelefono.length})
+                  </Typography>
+                  {notificationResult.sinTelefono.map((item, index) => (
+                    <Card key={index} variant="outlined" sx={{ mb: 1, p: 1, bgcolor: 'warning.light' }}>
                       <Box>
                         <Typography variant="body2" fontWeight="bold">{item.clientName}</Typography>
-                        <Typography variant="caption">Código: <strong>{item.codigoRetiro}</strong></Typography>
-                        <Typography variant="caption" display="block">{item.documentCount} documento(s)</Typography>
+                        <Typography variant="caption">Código Interno: <strong>{item.codigoRetiro}</strong></Typography>
+                        <Typography variant="caption" display="block">Debe entregar código manualmente</Typography>
                       </Box>
-                      {item.waUrl && (
-                        <Button
-                          size="small"
-                          variant="contained"
-                          color="success"
-                          href={item.waUrl}
-                          target="_blank"
-                          startIcon={<SendIcon />}
-                        >
-                          Abrir WhatsApp
-                        </Button>
-                      )}
-                    </Stack>
-                  </Card>
-                ))}
-              </Box>
-            )}
+                    </Card>
+                  ))}
+                </Box>
+              )}
 
-            {notificationResult.sinTelefono.length > 0 && (
-              <Box sx={{ mb: 3 }}>
-                <Typography variant="subtitle2" color="warning.main" gutterBottom>
-                  ⚠️ Sin Teléfono - Código Interno ({notificationResult.sinTelefono.length})
-                </Typography>
-                {notificationResult.sinTelefono.map((item, index) => (
-                  <Card key={index} variant="outlined" sx={{ mb: 1, p: 1, bgcolor: 'warning.light' }}>
-                    <Box>
-                      <Typography variant="body2" fontWeight="bold">{item.clientName}</Typography>
-                      <Typography variant="caption">Código Interno: <strong>{item.codigoRetiro}</strong></Typography>
-                      <Typography variant="caption" display="block">Debe entregar código manualmente</Typography>
-                    </Box>
-                  </Card>
-                ))}
-              </Box>
-            )}
+              <Button fullWidth onClick={() => setShowNotificationResult(false)} variant="outlined">
+                Cerrar
+              </Button>
+            </Box>
+          </Dialog>
+        )
+      }
 
-            <Button fullWidth onClick={() => setShowNotificationResult(false)} variant="outlined">
-              Cerrar
-            </Button>
-          </Box>
-        </Dialog>
-      )}
-
-    </Box>
+    </Box >
   );
 }
 

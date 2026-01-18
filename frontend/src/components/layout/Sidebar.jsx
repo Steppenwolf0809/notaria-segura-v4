@@ -9,7 +9,8 @@ import {
   ListItemText,
   Tooltip,
   Divider,
-  IconButton
+  IconButton,
+  Collapse
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -25,7 +26,12 @@ import {
   FolderSpecial as FolderSpecialIcon,
   Visibility as VisibilityIcon,
   KeyboardDoubleArrowLeft as CollapseIcon,
-  KeyboardDoubleArrowRight as ExpandIcon
+  KeyboardDoubleArrowRight as ExpandIcon,
+  AccountBalance as AccountBalanceIcon,
+  Receipt as ReceiptIcon,
+  Payments as PaymentsIcon,
+  ExpandMore as ExpandMoreIcon,
+  ExpandLess as ExpandLessIcon
 } from '@mui/icons-material';
 import useAuth from '../../hooks/use-auth';
 import { navItemsByRole } from '../../config/nav-items';
@@ -43,7 +49,10 @@ const iconMap = {
   Notifications: <NotificationsIcon />,
   Settings: <SettingsIcon />,
   FolderSpecial: <FolderSpecialIcon />,
-  Visibility: <VisibilityIcon />
+  Visibility: <VisibilityIcon />,
+  AccountBalance: <AccountBalanceIcon />,
+  Receipt: <ReceiptIcon />,
+  Payments: <PaymentsIcon />
 };
 
 const DRAWER_WIDTH = 240;
@@ -87,6 +96,23 @@ const Sidebar = ({
 
   const currentActive = activeId || hashId;
 
+  // Estado para submenús expandidos
+  const [expandedMenus, setExpandedMenus] = useState({});
+
+  // Función para toggle de submenu
+  const handleSubmenuToggle = (menuId) => {
+    setExpandedMenus(prev => ({
+      ...prev,
+      [menuId]: !prev[menuId]
+    }));
+  };
+
+  // Verificar si algún subitem está activo
+  const isSubmenuItemActive = (submenu) => {
+    if (!submenu || !currentActive) return false;
+    return submenu.some(item => item.id === currentActive || item.view === currentActive);
+  };
+
   const DrawerContent = (
     <Box
       sx={{
@@ -122,59 +148,130 @@ const Sidebar = ({
       <Box sx={{ flex: 1, overflow: 'auto' }}>
         <List sx={{ px: 1, py: 1 }}>
           {items.map((item) => {
-            const isActive = !!currentActive
-              ? currentActive === item.id || currentActive === item.view
-              : false;
+            const hasSubmenu = item.submenu && item.submenu.length > 0;
+            const isExpanded = expandedMenus[item.id];
+            const submenuActive = hasSubmenu && isSubmenuItemActive(item.submenu);
+            const isActive = !hasSubmenu && (
+              !!currentActive
+                ? currentActive === item.id || currentActive === item.view
+                : false
+            );
 
             return (
-              <ListItem key={item.id} disablePadding sx={{ mb: 0.5 }}>
-                <Tooltip
-                  title={collapsed ? item.label : ''}
-                  placement="right"
-                  disableHoverListener={!collapsed}
-                >
-                  <ListItemButton
-                    onClick={() => {
-                      // Marcar hash para tener una “ruta” mínima sin router
-                      try {
-                        window.location.hash = `#/${item.id}`;
-                      } catch {}
-                      onNavigate?.(item);
-                    }}
-                    sx={{
-                      borderRadius: 1,
-                      py: 1.2,
-                      px: collapsed ? 1.5 : 2,
-                      bgcolor: isActive ? 'primary.main' : 'transparent',
-                      color: isActive ? 'primary.contrastText' : 'text.primary',
-                      '&:hover': {
-                        bgcolor: isActive ? 'primary.dark' : 'action.hover'
-                      },
-                      justifyContent: collapsed ? 'center' : 'flex-start',
-                      transition: 'all 0.2s ease'
-                    }}
+              <React.Fragment key={item.id}>
+                <ListItem disablePadding sx={{ mb: 0.5 }}>
+                  <Tooltip
+                    title={collapsed ? item.label : ''}
+                    placement="right"
+                    disableHoverListener={!collapsed}
                   >
-                    <ListItemIcon
+                    <ListItemButton
+                      onClick={() => {
+                        if (hasSubmenu) {
+                          handleSubmenuToggle(item.id);
+                        } else {
+                          // Marcar hash para tener una "ruta" mínima sin router
+                          try {
+                            window.location.hash = `#/${item.view || item.id}`;
+                          } catch { }
+                          onNavigate?.(item);
+                        }
+                      }}
                       sx={{
-                        color: isActive ? 'primary.contrastText' : 'primary.main',
-                        minWidth: collapsed ? 'unset' : 40,
-                        justifyContent: 'center'
+                        borderRadius: 1,
+                        py: 1.2,
+                        px: collapsed ? 1.5 : 2,
+                        bgcolor: (isActive || submenuActive) ? 'primary.main' : 'transparent',
+                        color: (isActive || submenuActive) ? 'primary.contrastText' : 'text.primary',
+                        '&:hover': {
+                          bgcolor: (isActive || submenuActive) ? 'primary.dark' : 'action.hover'
+                        },
+                        justifyContent: collapsed ? 'center' : 'flex-start',
+                        transition: 'all 0.2s ease'
                       }}
                     >
-                      {iconMap[item.icon] || <DashboardIcon />}
-                    </ListItemIcon>
-                    {!collapsed && (
-                      <ListItemText
-                        primary={item.label}
-                        primaryTypographyProps={{
-                          variant: 'body2',
-                          fontWeight: isActive ? 600 : 500
+                      <ListItemIcon
+                        sx={{
+                          color: (isActive || submenuActive) ? 'primary.contrastText' : 'primary.main',
+                          minWidth: collapsed ? 'unset' : 40,
+                          justifyContent: 'center'
                         }}
-                      />
-                    )}
-                  </ListItemButton>
-                </Tooltip>
-              </ListItem>
+                      >
+                        {iconMap[item.icon] || <DashboardIcon />}
+                      </ListItemIcon>
+                      {!collapsed && (
+                        <>
+                          <ListItemText
+                            primary={item.label}
+                            primaryTypographyProps={{
+                              variant: 'body2',
+                              fontWeight: (isActive || submenuActive) ? 600 : 500
+                            }}
+                          />
+                          {hasSubmenu && (
+                            isExpanded ? <ExpandLessIcon /> : <ExpandMoreIcon />
+                          )}
+                        </>
+                      )}
+                    </ListItemButton>
+                  </Tooltip>
+                </ListItem>
+
+                {/* Submenu */}
+                {hasSubmenu && !collapsed && (
+                  <Collapse in={isExpanded} timeout="auto" unmountOnExit>
+                    <List component="div" disablePadding sx={{ pl: 2 }}>
+                      {item.submenu.map((subItem) => {
+                        const isSubActive = !!currentActive && (
+                          currentActive === subItem.id || currentActive === subItem.view
+                        );
+
+                        return (
+                          <ListItem key={subItem.id} disablePadding sx={{ mb: 0.5 }}>
+                            <ListItemButton
+                              onClick={() => {
+                                try {
+                                  window.location.hash = `#/${subItem.view || subItem.id}`;
+                                } catch { }
+                                onNavigate?.(subItem);
+                              }}
+                              sx={{
+                                borderRadius: 1,
+                                py: 0.8,
+                                px: 2,
+                                bgcolor: isSubActive ? 'primary.light' : 'transparent',
+                                color: isSubActive ? 'primary.contrastText' : 'text.secondary',
+                                '&:hover': {
+                                  bgcolor: isSubActive ? 'primary.main' : 'action.hover'
+                                },
+                                transition: 'all 0.2s ease'
+                              }}
+                            >
+                              <ListItemIcon
+                                sx={{
+                                  color: isSubActive ? 'primary.contrastText' : 'text.secondary',
+                                  minWidth: 32,
+                                  justifyContent: 'center'
+                                }}
+                              >
+                                {iconMap[subItem.icon] || <DashboardIcon />}
+                              </ListItemIcon>
+                              <ListItemText
+                                primary={subItem.label}
+                                primaryTypographyProps={{
+                                  variant: 'body2',
+                                  fontSize: '0.85rem',
+                                  fontWeight: isSubActive ? 600 : 400
+                                }}
+                              />
+                            </ListItemButton>
+                          </ListItem>
+                        );
+                      })}
+                    </List>
+                  </Collapse>
+                )}
+              </React.Fragment>
             );
           })}
         </List>

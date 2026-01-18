@@ -58,7 +58,11 @@ import BulkDeliveryDialog from './BulkDeliveryDialog';
 import receptionService from '../../services/reception-service';
 import documentService from '../../services/document-service';
 import useDocumentStore from '../../store/document-store';
-import DateRangeFilter from '../shared/DateRangeFilter';
+// import DateRangeFilter from '../shared/DateRangeFilter'; // 🗑️ Eliminado para usar implementación custom
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { es } from 'date-fns/locale';
 import { toast } from 'react-toastify';
 
 const StatusIndicator = ({ status }) => {
@@ -107,29 +111,84 @@ const getInitials = (name) => {
   return '?';
 };
 
+const SegmentedControl = ({ value, onChange, options, label }) => (
+  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+    {label && <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>{label}</Typography>}
+    <Box sx={{
+      display: 'flex',
+      bgcolor: 'action.hover', // gray-100 equivalent adapting to dark mode
+      p: 0.5,
+      borderRadius: 2,
+      gap: 0.5
+    }}>
+      {options.map((option) => {
+        const isSelected = value === option.value;
+        return (
+          <Button
+            key={option.value}
+            onClick={() => onChange({ target: { value: option.value } })}
+            disableRipple
+            sx={{
+              flex: 1,
+              py: 0.5,
+              textTransform: 'none',
+              borderRadius: 1.5,
+              bgcolor: isSelected ? 'background.paper' : 'transparent',
+              color: isSelected ? 'text.primary' : 'text.secondary',
+              boxShadow: isSelected ? '0px 1px 2px rgba(0,0,0,0.1)' : 'none',
+              fontWeight: isSelected ? 600 : 400,
+              minWidth: 'auto',
+              border: '1px solid',
+              borderColor: isSelected ? 'divider' : 'transparent',
+              '&:hover': {
+                bgcolor: isSelected ? 'background.paper' : 'action.hover'
+              }
+            }}
+          >
+            {option.label}
+          </Button>
+        );
+      })}
+    </Box>
+  </Box>
+);
+
 function formatLocalDate(dateString) {
   if (!dateString) return '-';
   const date = new Date(dateString);
   return date.toLocaleDateString('es-EC', { year: 'numeric', month: '2-digit', day: '2-digit' });
 }
 
+// Helpers par DatePicker (Manejo local sin UTC)
+const parseLocalISO = (dateStr) => {
+  if (!dateStr) return null;
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day);
+};
+
+const formatLocalISO = (date) => {
+  if (!date || isNaN(date.getTime())) return '';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDocumentoFound }) {
   const { documents } = useDocumentStore();
   const [documentos, setDocumentos] = useState([]);
-  const [selectedDocuments, setSelectedDocuments] = useState([]); // Solo para visualización
-  const [visualSelection, setVisualSelection] = useState(new Set()); // 🎯 NUEVA: Selección visual sin funcionalidad
+  const [selectedDocuments, setSelectedDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [matrizadores, setMatrizadores] = useState([]);
 
-  // 🎯 NUEVOS: Estados para entrega en bloque
-  const [bulkDeliveryMode, setBulkDeliveryMode] = useState(false);
-  const [bulkDeliverySelection, setBulkDeliverySelection] = useState(new Set());
+  // Estado para diálogo de entrega en bloque
   const [showBulkDeliveryDialog, setShowBulkDeliveryDialog] = useState(false);
 
   const [filters, setFilters] = useState({
     search: '',
     matrizador: '',
+    estado: '', // 🎯 ACTUALIZADO: Mostrar todos los estados por defecto (Recepción ahora se enfoca en marcar como listo)
     estado: '', // 🎯 ACTUALIZADO: Mostrar todos los estados por defecto (Recepción ahora se enfoca en marcar como listo)
     fechaDesde: '',
     fechaHasta: '',
@@ -570,7 +629,8 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
       return { action: 'marcar-listo', text: `Marcar ${enProceso.length} como Listo`, color: 'success', disabled };
     }
     if (listos.length > 0 && enProceso.length === 0) {
-      return { action: 'entregar', text: `Entregar ${listos.length} docs`, color: 'primary', disabled };
+      // ✅ Enable delivery for multiple documents if they belong to the same client
+      return { action: 'entregar', text: `Entregar ${listos.length} docs`, color: 'primary', disabled: !documentosSeleccionadosMismoCliente() };
     }
     return { action: 'mixto', text: 'Estados mixtos', color: 'warning', disabled: true };
   };
@@ -579,81 +639,46 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
 
 
 
-  // 🎯 NUEVAS FUNCIONES PARA SELECCIÓN VISUAL (SOLO INFORMATIVA)
-
   /**
-   * Alternar selección visual de documento (sin funcionalidad)
+   * Alternar selección de documento
    */
-  const handleToggleVisualSelection = (documentId) => {
-    setVisualSelection(prev => {
-      const newSelection = new Set(prev);
-      if (newSelection.has(documentId)) {
-        newSelection.delete(documentId);
+  const handleToggleSelection = (documentId) => {
+    setSelectedDocuments(prev => {
+      const isSelected = prev.includes(documentId);
+      if (isSelected) {
+        return prev.filter(id => id !== documentId);
       } else {
-        newSelection.add(documentId);
+        return [...prev, documentId];
       }
-      return newSelection;
     });
   };
 
   /**
    * Seleccionar/deseleccionar todos los documentos visibles
    */
-  const handleToggleAllVisual = (selectAll) => {
+  const handleToggleAll = (selectAll) => {
     if (selectAll) {
       const visibleIds = documentos.slice(page * rowsPerPage, (page + 1) * rowsPerPage).map(doc => doc.id);
-      setVisualSelection(new Set(visibleIds));
+      // Añadir solo los que no están ya seleccionados
+      setSelectedDocuments(prev => {
+        const newSelection = [...prev];
+        visibleIds.forEach(id => {
+          if (!newSelection.includes(id)) newSelection.push(id);
+        });
+        return newSelection;
+      });
     } else {
-      setVisualSelection(new Set());
+      // Remover los visibles de la selección actual
+      const visibleIds = documentos.slice(page * rowsPerPage, (page + 1) * rowsPerPage).map(doc => doc.id);
+      setSelectedDocuments(prev => prev.filter(id => !visibleIds.includes(id)));
     }
-  };
-
-  // 🎯 NUEVAS FUNCIONES PARA ENTREGA EN BLOQUE
-
-  /**
-   * Activar/desactivar modo de entrega en bloque
-   */
-  const handleToggleBulkDeliveryMode = () => {
-    setBulkDeliveryMode(!bulkDeliveryMode);
-    if (bulkDeliveryMode) {
-      // Si se desactiva, limpiar selección
-      setBulkDeliverySelection(new Set());
-    }
-  };
-
-  /**
-   * Seleccionar documento para entrega en bloque
-   */
-  const handleSelectForBulkDelivery = (documentId) => {
-    setBulkDeliverySelection(prev => {
-      const newSelection = new Set(prev);
-      if (newSelection.has(documentId)) {
-        newSelection.delete(documentId);
-      } else {
-        newSelection.add(documentId);
-      }
-      return newSelection;
-    });
-  };
-
-  /**
-   * Seleccionar todos los documentos LISTO del mismo cliente
-   */
-  const handleSelectAllByClient = (clientId, clientName) => {
-    const clientDocs = documentos
-      .filter(d =>
-        (d.clientId === clientId || d.clientName === clientName) &&
-        d.status === 'LISTO'
-      )
-      .map(d => d.id);
-    setBulkDeliverySelection(new Set(clientDocs));
   };
 
   /**
    * Abrir modal de entrega en bloque
    */
   const handleOpenBulkDelivery = () => {
-    if (bulkDeliverySelection.size === 0) {
+    if (selectedDocuments.length === 0) {
       setSnackbar({
         open: true,
         message: 'Seleccione al menos un documento',
@@ -668,8 +693,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
    * Completar entrega en bloque
    */
   const handleBulkDeliveryComplete = async () => {
-    setBulkDeliverySelection(new Set());
-    setBulkDeliveryMode(false);
+    setSelectedDocuments([]);
     setShowBulkDeliveryDialog(false);
     await cargarDocumentos();
     onEstadisticasChange?.();
@@ -689,8 +713,8 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
 
 
   // Verificar estado de selección para checkbox master
-  const allVisualSelected = documentosPaginados.length > 0 && documentosPaginados.every(doc => visualSelection.has(doc.id));
-  const someVisualSelected = documentosPaginados.some(doc => visualSelection.has(doc.id));
+  const allSelected = documentosPaginados.length > 0 && documentosPaginados.every(doc => selectedDocuments.includes(doc.id));
+  const someSelected = documentosPaginados.some(doc => selectedDocuments.includes(doc.id));
 
   if (loading && !documentos.length) {
     return (
@@ -715,158 +739,167 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
             <Typography variant="body1" color="text.secondary">Vista unificada para marcar, entregar y consultar documentos.</Typography>
           </Box>
 
-          {/* 🎯 NUEVO: Botón de Entrega en Bloque */}
-          <Button
-            variant={bulkDeliveryMode ? "contained" : "outlined"}
-            color="primary"
-            onClick={handleToggleBulkDeliveryMode}
-            startIcon={<SendIcon />}
-          >
-            {bulkDeliveryMode ? 'Cancelar Entrega en Bloque' : 'Entrega en Bloque'}
-          </Button>
+
+
         </Box>
 
-        {/* 🎯 NUEVO: Toolbar de entrega en bloque */}
-        {bulkDeliveryMode && (
-          <Alert severity="info" sx={{ mb: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Typography variant="body2">
-                Modo Entrega en Bloque: {bulkDeliverySelection.size} documentos seleccionados
-              </Typography>
-              {bulkDeliverySelection.size > 0 && (
-                <Button
-                  variant="contained"
-                  color="success"
-                  size="small"
-                  onClick={handleOpenBulkDelivery}
-                  startIcon={<CheckCircleIcon />}
-                >
-                  Entregar {bulkDeliverySelection.size} Documentos
-                </Button>
-              )}
-            </Box>
-          </Alert>
-        )}
-
-        <Card sx={{ mb: 3 }}>
+        <Card sx={{ mb: 3, overflow: 'visible' }}>
           <CardContent>
-            <Grid container spacing={2}>
-              {/* Fila 1 */}
-              <Grid item xs={12} sm={6} md={8}>
-                <TextField
-                  fullWidth
-                  size="small"
-                  placeholder="Buscar por cliente, teléfono, protocolo o acto principal..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <SearchIcon sx={{ color: 'action.active' }} />
-                      </InputAdornment>
-                    ),
-                    endAdornment: searchQuery && (
-                      <InputAdornment position="end">
-                        <Tooltip title="Limpiar búsqueda">
-                          <IconButton
-                            aria-label="limpiar búsqueda"
-                            onClick={handleClearSearch}
-                            edge="end"
-                            size="small"
-                          >
-                            <ClearIcon />
-                          </IconButton>
-                        </Tooltip>
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <FormControl fullWidth size="small">
-                  <Select
-                    value={filters.matrizador}
-                    onChange={(e) => handleFilterChange('matrizador', e.target.value)}
-                    displayEmpty
-                    renderValue={(selected) => {
-                      if (!selected) {
-                        return <em style={{ color: '#999' }}>Todos los matrizadores</em>;
+            <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={es}>
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+
+                {/* Fila 1: Búsqueda y Estados */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap-reverse', gap: 2 }}>
+                  {/* Búsqueda a la izquierda */}
+                  <TextField
+                    size="small"
+                    placeholder="Buscar por cliente, teléfono, protocolo o acto..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    sx={{ flex: 1, minWidth: 280, maxWidth: 500 }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <SearchIcon color="action" />
+                        </InputAdornment>
+                      ),
+                      endAdornment: searchQuery && (
+                        <InputAdornment position="end">
+                          <Tooltip title="Limpiar búsqueda">
+                            <IconButton size="small" onClick={handleClearSearch}>
+                              <ClearIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </InputAdornment>
+                      )
+                    }}
+                  />
+
+                  {/* Tabs/Pills de Estado a la derecha */}
+                  <Box sx={{ minWidth: 280, ml: 'auto' }}>
+                    <SegmentedControl
+                      value={filters.estado || ''}
+                      onChange={(e) => handleFilterChange('estado', e.target.value)}
+                      options={[
+                        { value: '', label: 'Todos' },
+                        { value: 'EN_PROCESO', label: 'En Proceso' },
+                        { value: 'LISTO', label: 'Listo' },
+                        { value: 'ENTREGADO', label: 'Entregado' }
+                      ]}
+                    />
+                  </Box>
+                </Box>
+
+                {/* Fila 2: Filtros secundarios (Fechas, Matrizador, Orden) */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+
+                  {/* Grupo Fechas Fusionado */}
+                  <Box sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    border: '1px solid',
+                    borderColor: 'action.disabledBackground',
+                    borderRadius: 1,
+                    overflow: 'hidden',
+                    bgcolor: 'background.paper'
+                  }}>
+                    <DatePicker
+                      value={parseLocalISO(filters.fechaDesde)}
+                      onChange={(d) => handleFilterChange('fechaDesde', formatLocalISO(d))}
+                      format="dd/MM/yyyy"
+                      slotProps={{
+                        textField: {
+                          size: 'small',
+                          placeholder: 'Desde',
+                          variant: 'standard',
+                          InputProps: { disableUnderline: true, sx: { px: 1.5, py: 0.5, fontSize: '0.875rem', width: 120 } }
+                        }
+                      }}
+                    />
+                    <Box sx={{ px: 0.5, color: 'text.disabled', userSelect: 'none' }}>→</Box>
+                    <DatePicker
+                      value={parseLocalISO(filters.fechaHasta)}
+                      onChange={(d) => handleFilterChange('fechaHasta', formatLocalISO(d))}
+                      format="dd/MM/yyyy"
+                      minDate={parseLocalISO(filters.fechaDesde)}
+                      slotProps={{
+                        textField: {
+                          size: 'small',
+                          placeholder: 'Hasta',
+                          variant: 'standard',
+                          InputProps: { disableUnderline: true, sx: { px: 1.5, py: 0.5, fontSize: '0.875rem', width: 120 } }
+                        }
+                      }}
+                    />
+                  </Box>
+
+                  {/* Selector Matrizador */}
+                  <FormControl size="small" sx={{ minWidth: 200, maxWidth: 250 }}>
+                    <Select
+                      value={filters.matrizador}
+                      onChange={(e) => handleFilterChange('matrizador', e.target.value)}
+                      displayEmpty
+                      renderValue={(selected) => {
+                        if (!selected) return <Typography variant="body2" color="text.secondary">Matrizador: Todos</Typography>;
+                        const mat = matrizadores.find(m => m.id === selected);
+                        return mat ? (mat.nombre || `${mat.firstName} ${mat.lastName}`) : selected;
+                      }}
+                      sx={{ '& .MuiSelect-select': { py: 0.85 } }}
+                    >
+                      <MenuItem value="">Todos los matrizadores</MenuItem>
+                      {matrizadores.map(mat => (
+                        <MenuItem key={mat.id} value={mat.id}>{mat.nombre || `${mat.firstName} ${mat.lastName}`}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+
+                  {/* Botón Orden */}
+                  <Tooltip title={`Ordenar por fecha (${sortOrder === 'asc' ? 'Ascendente' : 'Descendente'})`}>
+                    <IconButton
+                      onClick={toggleSortOrder}
+                      size="small"
+                      sx={{ border: '1px solid', borderColor: 'action.disabledBackground', borderRadius: 1 }}
+                    >
+                      <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                        {sortOrder === 'asc' ? '↑' : '↓'}
+                      </Typography>
+                    </IconButton>
+                  </Tooltip>
+
+                  <Tooltip title="Refrescar datos">
+                    <IconButton onClick={() => cargarDocumentos()} color="primary" size="small">
+                      <RefreshIcon />
+                    </IconButton>
+                  </Tooltip>
+
+                  {/* Reset */}
+                  <Typography
+                    variant="caption"
+                    onClick={() => {
+                      setFilters(prev => ({ ...prev, matrizador: '', fechaDesde: '', fechaHasta: '', estado: '' }));
+                      setSearchQuery('');
+                      setPage(0);
+                    }}
+                    sx={{
+                      color: 'text.secondary',
+                      cursor: 'pointer',
+                      ml: 'auto',
+                      textDecoration: 'underline',
+                      textUnderlineOffset: 4,
+                      transition: 'color 0.2s',
+                      '&:hover': {
+                        color: 'error.main'
                       }
-                      const matrizador = matrizadores.find(mat => mat.id === selected);
-                      return matrizador ? (matrizador.nombre || `${matrizador.firstName} ${matrizador.lastName}`) : selected;
                     }}
                   >
-                    <MenuItem value="">Todos los matrizadores</MenuItem>
-                    {matrizadores.map(mat => <MenuItem key={mat.id} value={mat.id}>{mat.nombre || `${mat.firstName} ${mat.lastName}`}</MenuItem>)}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6} md={2} sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
-                <Button
-                  variant="outlined"
-                  onClick={toggleSortOrder}
-                  sx={{ textTransform: 'none' }}
-                >
-                  {sortOrder === 'asc' ? 'Fecha ↑' : 'Fecha ↓'}
-                </Button>
-              </Grid>
+                    Limpiar filtros
+                  </Typography>
 
-              {/* Fila 2 */}
-              <Grid item xs={12} sm={6} md={3}>
-                <FormControl fullWidth size="small">
-                  <Select
-                    value={filters.estado}
-                    onChange={(e) => handleFilterChange('estado', e.target.value)}
-                    displayEmpty
-                    renderValue={(selected) => {
-                      if (!selected) {
-                        return <em style={{ color: '#999' }}>Todos los estados</em>;
-                      }
-                      const estadoLabels = {
-                        'EN_PROCESO': 'En Proceso',
-                        'LISTO': 'Listo',
-                        'ENTREGADO': 'Entregado'
-                      };
-                      return estadoLabels[selected] || selected;
-                    }}
-                  >
-                    <MenuItem value="">Todos los estados</MenuItem>
-                    <MenuItem value="EN_PROCESO">En Proceso</MenuItem>
-                    <MenuItem value="LISTO">Listo</MenuItem>
-                    <MenuItem value="ENTREGADO">Entregado</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={12} md={6} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <DateRangeFilter
-                  fechaDesde={filters.fechaDesde}
-                  fechaHasta={filters.fechaHasta}
-                  onApply={(desde, hasta) => {
-                    setFilters(prev => ({
-                      ...prev,
-                      fechaDesde: desde,
-                      fechaHasta: hasta
-                    }));
-                    setPage(0);
-                  }}
-                  onClear={() => {
-                    setFilters(prev => ({
-                      ...prev,
-                      fechaDesde: '',
-                      fechaHasta: ''
-                    }));
-                    setPage(0);
-                  }}
-                  label=""
-                />
-                <Tooltip title="Refrescar">
-                  <IconButton onClick={() => cargarDocumentos()} color="primary">
-                    <RefreshIcon />
-                  </IconButton>
-                </Tooltip>
-              </Grid>
-            </Grid>
+                </Box>
+              </Box>
+            </LocalizationProvider>
 
+            {/* Acciones en bloque (si hay selección) */}
             {selectedDocuments.length > 0 && (
               <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
                 <Button
@@ -874,7 +907,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                   startIcon={selectedAction.action === 'marcar-listo' ? <CheckCircleIcon /> : <SendIcon />}
                   onClick={() => {
                     if (selectedAction.action === 'marcar-listo') abrirConfirmacionGrupal();
-                    // else if (selectedAction.action === 'entregar') ... // Manejado por BulkDelivery Mode
+                    if (selectedAction.action === 'entregar') handleOpenBulkDelivery();
                   }}
                 >{selectedAction.text} ({selectedDocuments.length})</Button>
               </Box>
@@ -890,9 +923,9 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
               <TableRow sx={{ bgcolor: 'grey.50' }}>
                 <TableCell padding="checkbox">
                   <Checkbox
-                    indeterminate={someVisualSelected && !allVisualSelected}
-                    checked={allVisualSelected}
-                    onChange={(e) => handleToggleAllVisual(e.target.checked)}
+                    indeterminate={someSelected && !allSelected}
+                    checked={allSelected}
+                    onChange={(e) => handleToggleAll(e.target.checked)}
                     disabled={documentosPaginados.length === 0}
                     color="primary"
                   />
@@ -941,13 +974,13 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                 documentosOrdenados.map((documento) => (
                   <TableRow
                     key={documento.id}
-                    selected={visualSelection.has(documento.id)}
+                    selected={selectedDocuments.includes(documento.id)}
                     hover
                     onClick={() => abrirDetalles(documento)}
                     data-document-id={documento.id} // Para scroll automático
                     sx={{
                       cursor: 'pointer',
-                      ...(visualSelection.has(documento.id) && {
+                      ...(selectedDocuments.includes(documento.id) && {
                         bgcolor: 'action.selected'
                       }),
                       // Highlight para navegación específica desde alertas
@@ -978,22 +1011,11 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                       padding="checkbox"
                       onClick={(e) => e.stopPropagation()} // Evitar que abra el modal
                     >
-                      {bulkDeliveryMode && documento.status === 'LISTO' ? (
-                        // 🎯 Checkbox funcional para entrega en bloque (solo documentos LISTO)
-                        <Checkbox
-                          checked={bulkDeliverySelection.has(documento.id)}
-                          onChange={() => handleSelectForBulkDelivery(documento.id)}
-                          color="primary"
-                        />
-                      ) : (
-                        // Checkbox visual sin funcionalidad
-                        <Checkbox
-                          checked={visualSelection.has(documento.id)}
-                          onChange={() => handleToggleVisualSelection(documento.id)}
-                          color="primary"
-                          disabled={bulkDeliveryMode}
-                        />
-                      )}
+                      <Checkbox
+                        checked={selectedDocuments.includes(documento.id)}
+                        onChange={() => handleToggleSelection(documento.id)}
+                        color="primary"
+                      />
                     </TableCell>
                     <TableCell sx={{ py: 1.5 }}>
                       <Box>
@@ -1057,20 +1079,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                           </Box>
                         )}
 
-                        {/* 🎯 NUEVO: Botón para seleccionar todos del cliente en modo entrega en bloque */}
-                        {bulkDeliveryMode && documento.status === 'LISTO' && (
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSelectAllByClient(documento.clientId, documento.clientName);
-                            }}
-                            sx={{ mt: 0.5 }}
-                          >
-                            Seleccionar todos de este cliente
-                          </Button>
-                        )}
+
                       </Box>
                     </TableCell>
                     <TableCell>
@@ -1196,7 +1205,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
           {actionType === 'individual' && currentDocumento && (
             <Box>
               <Typography variant="body1" sx={{ mb: 2 }}>¿Está seguro que desea marcar este documento como LISTO?</Typography>
-              <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+              <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
                 <Typography variant="body2"><strong>Cliente:</strong> {currentDocumento.clientName}</Typography>
                 <Typography variant="body2"><strong>Documento:</strong> {currentDocumento.protocolNumber}</Typography>
                 <Typography variant="body2"><strong>Tipo:</strong> {currentDocumento.documentType}</Typography>
@@ -1207,7 +1216,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
           {actionType === 'grupal' && selectedDocuments.length > 0 && (
             <Box>
               <Typography variant="body1" sx={{ mb: 2 }}>¿Está seguro de marcar estos {selectedDocuments.length} documentos como LISTOS?</Typography>
-              <Box sx={{ p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+              <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
                 <Typography variant="body2"><strong>Documentos:</strong> {selectedDocuments.length}</Typography>
                 <Typography variant="body2"><strong>Cliente:</strong> {documentos.find(d => selectedDocuments.includes(d.id))?.clientName}</Typography>
               </Box>
@@ -1262,37 +1271,10 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
       <BulkDeliveryDialog
         open={showBulkDeliveryDialog}
         onClose={() => setShowBulkDeliveryDialog(false)}
-        documentIds={Array.from(bulkDeliverySelection)}
-        documents={documentos.filter(d => bulkDeliverySelection.has(d.id))}
+        documentIds={selectedDocuments}
+        documents={documentos.filter(d => selectedDocuments.includes(d.id))}
         onDeliveryComplete={handleBulkDeliveryComplete}
       />
-
-      {/* 🎯 NOTA INFORMATIVA: Checkboxes solo visuales para Recepción */}
-      {visualSelection.size > 0 && !bulkDeliveryMode && (
-        <Alert
-          severity="info"
-          sx={{
-            position: 'fixed',
-            bottom: 24,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 1200,
-            maxWidth: '90vw'
-          }}
-        >
-          <Typography variant="body2">
-            📋 Documentos seleccionados: {visualSelection.size} (solo visualización)
-          </Typography>
-          <Typography
-            variant="caption"
-            sx={{
-              color: (theme) => theme.palette.mode === 'dark' ? '#cbd5e1' : '#4b5563'
-            }}
-          >
-            Los checkboxes permiten selección visual. Para cambios masivos, use las vistas de Matrizador o Archivo.
-          </Typography>
-        </Alert>
-      )}
     </Box>
   );
 }
