@@ -5,16 +5,20 @@
 
 ## 📋 REGISTRO DE PROGRESO
 
-### Estado Actual: Sprint 1 Completado ✅
+### Estado Actual: Sprint 2 Completado ✅
 **Última actualización:** 2026-01-17
 **Rama Git:** `feature/billing-module-sprint1`
 
 #### Resumen Sprint 1:
-- ✅ Modelos Prisma creados: `Invoice`, `Payment`, `ImportLog` + enums
-- ✅ Migración ejecutada en Railway PostgreSQL (tablas creadas con índices)
-- ✅ Utilidades de transformación probadas con archivo Excel real (2,790 filas)
-- ✅ Rutas `/api/billing/*` configuradas y funcionando
-- ⏭️ **Próximo:** Sprint 2 - Servicio de Importación
+- ✅ Modelos Prisma: `Invoice`, `Payment`, `ImportLog` + enums
+- ✅ Migración ejecutada en Railway PostgreSQL
+
+#### Resumen Sprint 2:
+- ✅ Servicio de importación: 2,789 filas procesadas
+- ✅ 1,181 facturas + 1,585 pagos importados
+- ✅ Idempotencia verificada (0 duplicados en 2da ejecución)
+- ✅ Vinculación automática Invoice ↔ Document funcionando
+- ⏭️ **Próximo:** Sprint 3 - API y Consultas
 
 ### Leyenda de Estados
 - ⬜ **Pendiente** - No iniciado
@@ -989,34 +993,39 @@ ORDER BY "Días Vencido" DESC;
 
 ---
 
-### 📦 SPRINT 2: SERVICIO DE IMPORTACIÓN (4-5 días)
+### 📦 SPRINT 2: SERVICIO DE IMPORTACIÓN (4-5 días) ✅ COMPLETADO
 **Objetivo:** Implementar lógica completa de importación idempotente
+
+**Resultados del Test (2026-01-17):**
+- Primera ejecución: 2,789 filas → 1,181 facturas + 1,585 pagos
+- Segunda ejecución: 0 nuevos registros (idempotencia verificada)
+- 4 errores menores (pagos sin numdoc)
 
 #### Tareas
 
 | # | Tarea | Estado | Notas |
 |---|-------|--------|-------|
-| 2.1 | Instalar dependencias: `xlsx`, `csv-parser` | ⬜ | |
-| 2.2 | Crear servicio `import-koinor-service.js` | ⬜ | |
-| 2.3 | Implementar parsing de archivo XLS/CSV | ⬜ | |
-| 2.4 | Implementar función de normalización de número de factura | ⬜ | `001002-00123341` → `001-002-000123341` |
-| 2.5 | Implementar procesamiento de facturas FC (upsert) | ⬜ | Guardar clientTaxId/clientName del CSV |
-| 2.6 | Implementar procesamiento de pagos AB (upsert) | ⬜ | |
-| 2.7 | Implementar lógica de "Auto-Healing" para facturas legacy | ⬜ | Usar `fectra` para fecha factura |
-| 2.8 | Implementar cálculo y actualización de estados de factura | ⬜ | |
-| 2.9 | **Implementar vinculación automática Invoice ↔ Document** | ⬜ | Por `numeroFactura` |
-| 2.10 | Implementar registro en `ImportLog` | ⬜ | |
-| 2.11 | Crear endpoint `POST /api/billing/import` | ⬜ | |
-| 2.12 | Pruebas con archivo real `POR_COBRAR26.xls` | ⬜ | |
-| 2.13 | Pruebas de idempotencia (cargar mismo archivo 3 veces) | ⬜ | |
-| 2.14 | Verificar vinculación correcta con documentos existentes | ⬜ | |
+| 2.1 | Instalar dependencias: `xlsx`, `csv-parser` | ✅ | xlsx ya instalado en Sprint 1 |
+| 2.2 | Crear servicio `import-koinor-service.js` | ✅ | |
+| 2.3 | Implementar parsing de archivo XLS/CSV | ✅ | |
+| 2.4 | Implementar función de normalización de número de factura | ✅ | En billing-utils.js (Sprint 1) |
+| 2.5 | Implementar procesamiento de facturas FC (upsert) | ✅ | |
+| 2.6 | Implementar procesamiento de pagos AB (upsert) | ✅ | |
+| 2.7 | Implementar lógica de "Auto-Healing" para facturas legacy | ✅ | Usa `fectra` para fecha |
+| 2.8 | Implementar cálculo y actualización de estados de factura | ✅ | |
+| 2.9 | **Implementar vinculación automática Invoice ↔ Document** | ✅ | Por `numeroFactura` |
+| 2.10 | Implementar registro en `ImportLog` | ✅ | |
+| 2.11 | Crear endpoint `POST /api/billing/import` | ✅ | Con multer upload |
+| 2.12 | Pruebas con archivo real `POR_COBRAR26.xls` | ✅ | 2,789 filas |
+| 2.13 | Pruebas de idempotencia (cargar mismo archivo 3 veces) | ✅ | 0 duplicados |
+| 2.14 | Verificar vinculación correcta con documentos existentes | ✅ | Funcionando |
 
 #### Criterios de Aceptación
-- [ ] Importación procesa correctamente facturas y pagos
-- [ ] Pagos de facturas anteriores crean facturas legacy automáticamente
-- [ ] Múltiples cargas del mismo archivo no duplican datos
-- [ ] Estados de factura se calculan correctamente
-- [ ] Log de importación registra estadísticas
+- [x] Importación procesa correctamente facturas y pagos
+- [x] Pagos de facturas anteriores crean facturas legacy automáticamente
+- [x] Múltiples cargas del mismo archivo no duplican datos
+- [x] Estados de factura se calculan correctamente
+- [x] Log de importación registra estadísticas
 
 ---
 

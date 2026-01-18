@@ -3,16 +3,46 @@
  * API routes for billing module - invoices, payments, and imports
  */
 import express from 'express';
+import multer from 'multer';
 import * as billingController from '../controllers/billing-controller.js';
 import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
+
+// Configure multer for file uploads (memory storage)
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 10 * 1024 * 1024 // 10MB limit
+    },
+    fileFilter: (req, file, cb) => {
+        const allowedMimes = [
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'text/csv',
+            'application/octet-stream' // Some browsers send .xls as this
+        ];
+
+        // Also check file extension
+        const ext = file.originalname.toLowerCase().substring(file.originalname.lastIndexOf('.'));
+        const allowedExts = ['.xls', '.xlsx', '.csv'];
+
+        if (allowedMimes.includes(file.mimetype) || allowedExts.includes(ext)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Tipo de archivo no permitido. Solo .xls, .xlsx, .csv'), false);
+        }
+    }
+});
 
 // Health check (public)
 router.get('/health', billingController.healthCheck);
 
 // All other routes require authentication
 router.use(authenticateToken);
+
+// Statistics
+router.get('/stats', billingController.getStats);
 
 // Invoice routes
 router.get('/invoices', billingController.getInvoices);
@@ -27,12 +57,7 @@ router.get('/import-logs', billingController.getImportLogs);
 // Document payment status (for integration with document views)
 router.get('/documents/:documentId/payment-status', billingController.getDocumentPaymentStatus);
 
-// Import endpoint placeholder (to be implemented in Sprint 2)
-router.post('/import', (req, res) => {
-    res.status(501).json({
-        error: 'Not Implemented',
-        message: 'Import functionality will be available in Sprint 2'
-    });
-});
+// Import endpoint - requires file upload
+router.post('/import', upload.single('file'), billingController.importFile);
 
 export default router;
