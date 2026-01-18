@@ -1185,6 +1185,12 @@ async function getDocumentById(req, res) {
             lastName: true,
             email: true
           }
+        },
+        // Include invoices for payment status
+        invoices: {
+          include: {
+            payments: true
+          }
         }
       }
     });
@@ -1211,10 +1217,50 @@ async function getDocumentById(req, res) {
       });
     }
 
+    // Calculate payment status from invoices
+    let paymentStatus = null;
+    if (document.invoices && document.invoices.length > 0) {
+      let totalAmount = 0;
+      let totalPaid = 0;
+
+      for (const invoice of document.invoices) {
+        totalAmount += Number(invoice.totalAmount);
+        const paid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+        totalPaid += paid;
+      }
+
+      const balance = totalAmount - totalPaid;
+      paymentStatus = {
+        hasInvoice: true,
+        status: balance <= 0 ? 'PAID' : (totalPaid > 0 ? 'PARTIAL' : 'PENDING'),
+        message: balance <= 0
+          ? 'Pagado completamente'
+          : `Saldo pendiente: $${balance.toFixed(2)}`,
+        totalAmount,
+        totalPaid,
+        balance,
+        invoiceCount: document.invoices.length
+      };
+    } else {
+      paymentStatus = {
+        hasInvoice: false,
+        status: 'NO_INVOICE',
+        message: 'Sin factura asociada',
+        totalAmount: 0,
+        totalPaid: 0,
+        balance: 0,
+        invoiceCount: 0
+      };
+    }
+
+    // Remove invoices from document response (they're in paymentStatus)
+    const { invoices, ...documentWithoutInvoices } = document;
+
     res.json({
       success: true,
       data: {
-        document
+        document: documentWithoutInvoices,
+        paymentStatus
       }
     });
 

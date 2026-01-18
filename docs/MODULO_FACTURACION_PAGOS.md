@@ -5,7 +5,7 @@
 
 ## 📋 REGISTRO DE PROGRESO
 
-### Estado Actual: Sprint 2 Completado ✅
+### Estado Actual: Sprint 3 Completado ✅
 **Última actualización:** 2026-01-17
 **Rama Git:** `feature/billing-module-sprint1`
 
@@ -16,9 +16,12 @@
 #### Resumen Sprint 2:
 - ✅ Servicio de importación: 2,789 filas procesadas
 - ✅ 1,181 facturas + 1,585 pagos importados
-- ✅ Idempotencia verificada (0 duplicados en 2da ejecución)
-- ✅ Vinculación automática Invoice ↔ Document funcionando
-- ⏭️ **Próximo:** Sprint 3 - API y Consultas
+- ✅ Idempotencia verificada
+
+#### Resumen Sprint 3:
+- ✅ Endpoints: clients, client balance, summary, invoice payments
+- ✅ Integración payment status en document detail
+- ⏭️ **Próximo:** Sprint 4 - Interfaz de Usuario
 
 ### Leyenda de Estados
 - ⬜ **Pendiente** - No iniciado

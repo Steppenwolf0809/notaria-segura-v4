@@ -430,3 +430,244 @@ export async function getStats(req, res) {
     }
 }
 
+/**
+ * Get list of clients with balances
+ */
+export async function getClients(req, res) {
+    try {
+        const { page = 1, limit = 20, search, hasDebt } = req.query;
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+        const take = parseInt(limit);
+
+        // Get unique clients from invoices with aggregated data
+        const clients = await prisma.$queryRaw`
+            SELECT 
+                i."clientTaxId",
+                i."clientName",
+                COUNT(DISTINCT i.id) as "invoiceCount",
+                SUM(i."totalAmount") as "totalInvoiced",
+                COALESCE(SUM(p.paid), 0) as "totalPaid",
+                SUM(i."totalAmount") - COALESCE(SUM(p.paid), 0) as "balance",
+                MAX(i."issueDate") as "lastInvoiceDate"
+            FROM invoices i
+            LEFT JOIN (
+                SELECT "invoiceId", SUM(amount) as paid
+                FROM payments
+                GROUP BY "invoiceId"
+            ) p ON i.id = p."invoiceId"
+            ${search ? prisma.$queryRaw`WHERE i."clientName" ILIKE ${'%' + search + '%'} OR i."clientTaxId" LIKE ${'%' + search + '%'}` : prisma.$queryRaw``}
+            GROUP BY i."clientTaxId", i."clientName"
+            ${hasDebt === 'true' ? prisma.$queryRaw`HAVING SUM(i."totalAmount") - COALESCE(SUM(p.paid), 0) > 0` : prisma.$queryRaw``}
+            ORDER BY "balance" DESC
+            LIMIT ${take} OFFSET ${skip}
+        `;
+
+        // Get total count
+        const countResult = await prisma.$queryRaw`
+            SELECT COUNT(DISTINCT "clientTaxId") as count FROM invoices
+        `;
+
+        res.json({
+            data: clients.map(c => ({
+                ...c,
+                invoiceCount: Number(c.invoiceCount),
+                totalInvoiced: Number(c.totalInvoiced),
+                totalPaid: Number(c.totalPaid),
+                balance: Number(c.balance)
+            })),
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total: Number(countResult[0]?.count || 0),
+                pages: Math.ceil(Number(countResult[0]?.count || 0) / parseInt(limit))
+            }
+        });
+    } catch (error) {
+        console.error('[billing-controller] Get clients error:', error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
+/**
+ * Get balance for a specific client by tax ID
+ */
+export async function getClientBalance(req, res) {
+    try {
+        const { taxId } = req.params;
+
+        // Get client invoices with payments
+        const invoices = await prisma.invoice.findMany({
+            where: { clientTaxId: taxId },
+            include: {
+                payments: true,
+                document: {
+                    select: {
+                        id: true,
+                        protocolNumber: true,
+                        status: true
+                    }
+                }
+            },
+            orderBy: { issueDate: 'desc' }
+        });
+
+        if (invoices.length === 0) {
+            return res.status(404).json({
+                error: 'Cliente no encontrado',
+                message: `No se encontraron facturas para el cliente ${taxId}`
+            });
+        }
+
+        let totalInvoiced = 0;
+        let totalPaid = 0;
+        const invoiceDetails = [];
+
+        for (const invoice of invoices) {
+            const paid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+            const balance = Number(invoice.totalAmount) - paid;
+
+            totalInvoiced += Number(invoice.totalAmount);
+            totalPaid += paid;
+
+            invoiceDetails.push({
+                id: invoice.id,
+                invoiceNumber: invoice.invoiceNumber,
+                issueDate: invoice.issueDate,
+                total: Number(invoice.totalAmount),
+                paid,
+                balance,
+                status: invoice.status,
+                document: invoice.document
+            });
+        }
+
+        res.json({
+            clientTaxId: taxId,
+            clientName: invoices[0].clientName,
+            totalInvoiced,
+            totalPaid,
+            balance: totalInvoiced - totalPaid,
+            invoiceCount: invoices.length,
+            status: totalInvoiced - totalPaid <= 0 ? 'PAID' : (totalPaid > 0 ? 'PARTIAL' : 'PENDING'),
+            invoices: invoiceDetails
+        });
+    } catch (error) {
+        console.error('[billing-controller] Get client balance error:', error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
+/**
+ * Get payments for a specific invoice
+ */
+export async function getInvoicePayments(req, res) {
+    try {
+        const { id } = req.params;
+
+        const invoice = await prisma.invoice.findUnique({
+            where: { id },
+            include: {
+                payments: {
+                    orderBy: { paymentDate: 'desc' }
+                }
+            }
+        });
+
+        if (!invoice) {
+            return res.status(404).json({ error: 'Factura no encontrada' });
+        }
+
+        const totalPaid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+
+        res.json({
+            invoiceNumber: invoice.invoiceNumber,
+            totalAmount: Number(invoice.totalAmount),
+            totalPaid,
+            balance: Number(invoice.totalAmount) - totalPaid,
+            payments: invoice.payments.map(p => ({
+                ...p,
+                amount: Number(p.amount)
+            }))
+        });
+    } catch (error) {
+        console.error('[billing-controller] Get invoice payments error:', error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
+/**
+ * Get billing summary for a date range (for dashboard)
+ */
+export async function getSummary(req, res) {
+    try {
+        const { dateFrom, dateTo } = req.query;
+
+        const where = {};
+        if (dateFrom || dateTo) {
+            where.issueDate = {};
+            if (dateFrom) where.issueDate.gte = new Date(dateFrom);
+            if (dateTo) where.issueDate.lte = new Date(dateTo);
+        }
+
+        // Get invoices in range
+        const invoices = await prisma.invoice.findMany({
+            where,
+            include: { payments: true }
+        });
+
+        let totalInvoiced = 0;
+        let totalPaid = 0;
+        let pendingCount = 0;
+        let paidCount = 0;
+        let partialCount = 0;
+
+        for (const invoice of invoices) {
+            const paid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+            const balance = Number(invoice.totalAmount) - paid;
+
+            totalInvoiced += Number(invoice.totalAmount);
+            totalPaid += paid;
+
+            if (balance <= 0) paidCount++;
+            else if (paid > 0) partialCount++;
+            else pendingCount++;
+        }
+
+        // Get recent imports
+        const recentImports = await prisma.importLog.findMany({
+            take: 5,
+            orderBy: { startedAt: 'desc' },
+            select: {
+                id: true,
+                fileName: true,
+                status: true,
+                totalRows: true,
+                invoicesCreated: true,
+                paymentsCreated: true,
+                startedAt: true
+            }
+        });
+
+        res.json({
+            period: {
+                from: dateFrom || 'all',
+                to: dateTo || 'all'
+            },
+            totals: {
+                invoiced: totalInvoiced,
+                paid: totalPaid,
+                pending: totalInvoiced - totalPaid
+            },
+            counts: {
+                total: invoices.length,
+                paid: paidCount,
+                partial: partialCount,
+                pending: pendingCount
+            },
+            recentImports
+        });
+    } catch (error) {
+        console.error('[billing-controller] Get summary error:', error);
+        res.status(500).json({ error: error.message });
+    }
+}
