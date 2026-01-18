@@ -40,7 +40,8 @@ import {
   Schedule as ScheduleIcon,
   Edit as EditIcon,
   History as HistoryIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -55,6 +56,7 @@ import notificationsService from '../../services/notifications-service';
 
 import { toast } from 'react-toastify';
 import archivoService from '../../services/archivo-service';
+import EstadoPago from '../billing/EstadoPago';
 
 
 /**
@@ -65,7 +67,6 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
   const { updateDocumentStatus } = useDocumentStore();
   const { user } = useAuthStore();
   const { history, loading, error } = useDocumentHistory(document?.id);
-  const [currentTab, setCurrentTab] = useState(0);
   const [actionLoading, setActionLoading] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
@@ -354,118 +355,100 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
     <Dialog
       open={open}
       onClose={onClose}
-      maxWidth="lg"
+      maxWidth="xl" // Widescreen
       fullWidth
       sx={{
         '& .MuiDialog-paper': {
           borderRadius: 2,
-          maxHeight: '90vh'
+          height: '90vh', // Fixed height for better scrolling
+          maxHeight: '90vh',
+          overflowY: 'hidden' // Ensure no scroll on the modal container itself
         }
       }}
     >
-      {/* Header del Modal */}
-      <DialogTitle sx={{ m: 0, p: 2, bgcolor: 'primary.main', color: 'white' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Avatar sx={{
-              bgcolor: (theme) => theme.palette.mode === 'dark'
-                ? 'rgba(255, 255, 255, 0.15)'
-                : 'white',
-              color: 'primary.main',
-              mr: 2,
-              border: (theme) => theme.palette.mode === 'dark'
-                ? '1px solid rgba(255, 255, 255, 0.2)'
-                : 'none'
-            }}>
-              <AssignmentIcon />
-            </Avatar>
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
-                Detalle del Documento
-              </Typography>
-              <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                {localDocument?.protocolNumber || 'Sin número'}
-              </Typography>
-            </Box>
+      {/* Dense Header */}
+      <DialogTitle sx={{
+        m: 0,
+        p: 2,
+        py: 1.5,
+        bgcolor: 'primary.main',
+        color: 'white',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        minHeight: '64px'
+      }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Avatar sx={{
+            bgcolor: 'rgba(255, 255, 255, 0.2)',
+            color: 'inherit',
+            width: 40,
+            height: 40
+          }}>
+            <AssignmentIcon />
+          </Avatar>
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 'bold', lineHeight: 1.2 }}>
+              {localDocument?.documentType || 'Detalle del Documento'}
+            </Typography>
+            <Typography variant="caption" sx={{ opacity: 0.9, display: 'block' }}>
+              {localDocument?.protocolNumber || 'Sin número de protocolo'}
+            </Typography>
           </Box>
-          <IconButton
-            onClick={onClose}
-            sx={{ color: 'white' }}
-          >
-            <CloseIcon />
-          </IconButton>
+
+          <Chip
+            label={getStatusText(localDocument?.status)}
+            color={getStatusColor(localDocument?.status)}
+            size="small"
+            sx={{
+              ml: 2,
+              bgcolor: 'rgba(255,255,255,0.2)',
+              color: 'white',
+              fontWeight: 600,
+              border: '1px solid rgba(255,255,255,0.3)'
+            }}
+          />
         </Box>
+        <IconButton
+          onClick={onClose}
+          sx={{ color: 'white' }}
+          size="small"
+        >
+          <CloseIcon />
+        </IconButton>
       </DialogTitle>
 
-      {/* Navegación por pestañas */}
-      <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
-        <Tabs
-          value={currentTab}
-          onChange={(e, newValue) => setCurrentTab(newValue)}
-          variant="fullWidth"
-        >
-          <Tab
-            icon={<InfoIcon />}
-            label="Información General"
-            sx={{ fontWeight: 'bold' }}
-          />
-          <Tab
-            icon={<HistoryIcon />}
-            label="Historial"
-            sx={{ fontWeight: 'bold' }}
-          />
-        </Tabs>
-      </Box>
+      <DialogContent sx={{ p: 0, display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
+        {isReadOnly && (
+          <Alert severity="info" sx={{ borderRadius: 0 }}>
+            Vista en modo solo lectura. No puedes modificar este documento.
+          </Alert>
+        )}
 
-      <DialogContent sx={{ p: 0 }}>
-        {/* Pestaña: Información General */}
-        {currentTab === 0 && (
-          <Box sx={{ p: 3 }}>
-            {isReadOnly && (
-              <Alert severity="info" sx={{ mb: 2 }}>
-                Vista en modo solo lectura. No puedes modificar este documento.
-              </Alert>
-            )}
-            {/* Estado y tipo */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-              <Chip
-                label={localDocument?.documentType || 'Sin tipo'}
-                sx={{
-                  fontSize: '1rem',
-                  p: 1,
-                  bgcolor: (theme) => theme.palette.mode === 'dark'
-                    ? 'rgba(255, 255, 255, 0.1)'
-                    : 'rgb(226, 232, 240)',
-                  color: (theme) => theme.palette.mode === 'dark'
-                    ? 'rgba(255, 255, 255, 0.7)'
-                    : 'rgb(71, 85, 105)',
-                  border: 'none',
-                  borderRadius: '12px' // rounded-full
-                }}
-              />
-              <Chip
-                label={getStatusText(localDocument?.status)}
-                color={getStatusColor(localDocument?.status)}
-                variant="filled"
-                sx={{ fontSize: '1rem', p: 1 }}
-              />
-            </Box>
+        <Grid container sx={{ flexGrow: 1, height: '100%', overflow: 'hidden' }}>
+          {/* Left Column: Context (Client & Act info) - Scrollable */}
+          <Grid item xs={12} md={5} lg={4} sx={{
+            height: '100%',
+            overflowY: 'auto',
+            borderRight: '1px solid',
+            borderColor: 'divider',
+            bgcolor: 'background.paper'
+          }}>
+            <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 3 }}>
 
-            <Grid container spacing={3}>
               {/* Información del Cliente */}
-              <Grid item xs={12} md={6}>
-                <Card sx={{ height: '100%' }}>
-                  <CardContent>
-                    <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, color: 'primary.main' }}>
-                      👤 Información del Cliente
-                    </Typography>
-
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                      <Avatar sx={{ bgcolor: 'primary.main', mr: 2 }}>
+              <Box>
+                <Typography variant="overline" color="text.secondary" fontWeight="bold">
+                  Información del Cliente
+                </Typography>
+                <Card variant="outlined" sx={{ mt: 1 }}>
+                  <CardContent sx={{ '&:last-child': { pb: 2 } }}>
+                    <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                      <Avatar sx={{ bgcolor: 'primary.soft', color: 'primary.main' }}>
                         <PersonIcon />
                       </Avatar>
                       <Box>
-                        <Typography variant="h6" sx={{ fontWeight: 'bold' }}>
+                        <Typography variant="subtitle1" fontWeight="bold">
                           {localDocument?.clientName || 'Sin nombre'}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
@@ -474,145 +457,149 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
                       </Box>
                     </Box>
 
-                    <Divider sx={{ my: 2 }} />
+                    <Stack spacing={1.5}>
+                      {localDocument?.clientPhone && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <PhoneIcon fontSize="small" color="action" />
+                          <Typography variant="body2">{localDocument.clientPhone}</Typography>
+                        </Box>
+                      )}
 
-                    {localDocument?.clientPhone && (
-                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                        <PhoneIcon sx={{ mr: 2, color: 'info.main' }} />
-                        <Typography variant="body1">
-                          {localDocument.clientPhone}
-                        </Typography>
-                      </Box>
-                    )}
+                      {localDocument?.clientId && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <AssignmentIcon fontSize="small" color="action" />
+                          <Typography variant="body2">{localDocument.clientId}</Typography>
+                        </Box>
+                      )}
 
-                    {localDocument?.clientId && (
-                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                        <AssignmentIcon sx={{ mr: 2, color: 'warning.main' }} />
-                        <Typography variant="body1">
-                          <strong>Identificación:</strong> {localDocument.clientId}
-                        </Typography>
-                      </Box>
-                    )}
-
-                    {localDocument?.clientEmail && (
-                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                        <EmailIcon sx={{ mr: 2, color: 'info.main' }} />
-                        <Typography variant="body1">
-                          {localDocument.clientEmail}
-                        </Typography>
-                      </Box>
-                    )}
-
-                    <Box sx={{
-                      mt: 2,
-                      p: 2,
-                      bgcolor: (theme) => theme.palette.mode === 'dark'
-                        ? 'rgba(255, 255, 255, 0.05)'
-                        : 'grey.50',
-                      borderRadius: 1,
-                      border: (theme) => theme.palette.mode === 'dark'
-                        ? '1px solid rgba(255, 255, 255, 0.1)'
-                        : 'none'
-                    }}>
-                      <Typography variant="body2" color="text.secondary">
-                        <strong>Fecha Factura:</strong> {formatDate(document.fechaFactura || document.createdAt)}
-                      </Typography>
-                    </Box>
+                      {localDocument?.clientEmail && (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <EmailIcon fontSize="small" color="action" />
+                          <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
+                            {localDocument.clientEmail}
+                          </Typography>
+                        </Box>
+                      )}
+                    </Stack>
                   </CardContent>
                 </Card>
-              </Grid>
+              </Box>
 
               {/* Acto Principal */}
-              <Grid item xs={12} md={6}>
-                <Card sx={{ height: '100%' }}>
-                  <CardContent>
-                    <Typography variant="h6" sx={{ fontWeight: 'bold', mb: 2, color: 'success.main' }}>
-                      📋 Acto Principal
-                    </Typography>
-
-                    <Typography variant="h5" sx={{ mb: 2, fontWeight: 'bold' }}>
+              <Box>
+                <Typography variant="overline" color="text.secondary" fontWeight="bold">
+                  Detalles del Acto
+                </Typography>
+                <Card variant="outlined" sx={{ mt: 1 }}>
+                  <CardContent sx={{ '&:last-child': { pb: 2 } }}>
+                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
                       {document.actoPrincipalDescripcion || 'No especificado'}
                     </Typography>
 
                     <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                      <MoneyIcon sx={{ mr: 1, color: 'success.main' }} />
-                      <Typography variant="h4" sx={{ color: 'success.main', fontWeight: 'bold' }}>
-                        {formatCurrency(document.totalFactura)} {/* ⭐ CAMBIO: Usar valor total de factura */}
+                      <Typography variant="h5" color="success.main" fontWeight="bold">
+                        {formatCurrency(document.totalFactura)}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ ml: 1, alignSelf: 'flex-end', mb: 0.5 }}>
+                        Total Facturado
                       </Typography>
                     </Box>
 
-                    <Divider sx={{ my: 2 }} />
+                    <Divider sx={{ my: 1.5 }} />
 
-                    <Box sx={{
-                      p: 2,
-                      bgcolor: (theme) => theme.palette.mode === 'dark'
-                        ? 'rgba(34, 197, 94, 0.1)'
-                        : 'success.50',
-                      borderRadius: 1,
-                      border: (theme) => theme.palette.mode === 'dark'
-                        ? '1px solid rgba(34, 197, 94, 0.2)'
-                        : 'none'
-                    }}>
-                      <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
-                        Información del Documento:
-                      </Typography>
-                      <Typography variant="body2">
-                        <strong>Protocolo:</strong> {document.protocolNumber}
-                      </Typography>
-                      <Typography variant="body2">
-                        <strong>Total Factura:</strong> {formatCurrency(document.totalFactura)}
-                      </Typography>
-                      <Typography variant="body2">
-                        <strong>Matrizador XML:</strong> {document.matrizadorName || 'No especificado'}
-                      </Typography>
-                    </Box>
+                    <Stack spacing={1}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="body2" color="text.secondary">Protocolo:</Typography>
+                        <Typography variant="body2" fontWeight="medium">{document.protocolNumber}</Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="body2" color="text.secondary">Matrizador:</Typography>
+                        <Typography variant="body2" fontWeight="medium">{document.matrizadorName || 'N/A'}</Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="body2" color="text.secondary">Fecha Factura:</Typography>
+                        <Typography variant="body2" fontWeight="medium">
+                          {localDocument?.fechaFactura
+                            ? formatDate(localDocument.fechaFactura)
+                            : (localDocument?.createdAt || localDocument?.fechaCreacion ? formatDate(localDocument?.createdAt || localDocument?.fechaCreacion) : 'Pendiente')}
+                        </Typography>
+                      </Box>
+                    </Stack>
                   </CardContent>
                 </Card>
-              </Grid>
+              </Box>
 
+              {/* Estado de Pago */}
+              <Box>
+                <Typography variant="overline" color="text.secondary" fontWeight="bold">
+                  Estado Financiero
+                </Typography>
+                <EstadoPago
+                  documentId={localDocument?.id}
+                  onViewInvoice={(invoiceNumber) => {
+                    window.location.hash = `#/factura-detalle/${invoiceNumber}`;
+                  }}
+                />
+              </Box>
 
-            </Grid>
-          </Box>
-        )}
+            </Box>
+          </Grid>
 
-        {/* Pestaña: Historial */}
-        {currentTab === 1 && (
-          <Box sx={{ p: 3 }}>
-            <DocumentTimeline
-              documentId={document?.id}
-              showRefresh={true}
-              showLoadMore={true}
-              autoRefresh={false}
-              options={{
-                limit: 20,
-                fallbackToSimulated: true
-              }}
-            />
-          </Box>
-        )}
+          {/* Right Column: Timeline - Scrollable */}
+          <Grid item xs={12} md={7} lg={8} sx={{
+            height: '100%',
+            overflowY: 'auto',
+            bgcolor: 'action.hover' // Adapts to dark mode (light: grey, dark: dark grey)
+          }}>
+            <Box sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, justifyContent: 'space-between' }}>
+                <Typography variant="overline" color="text.secondary" fontWeight="bold">
+                  Línea de Tiempo
+                </Typography>
+                <Button
+                  size="small"
+                  startIcon={<RefreshIcon />}
+                  onClick={() => { }} // Refresh handled internally by auto-updates usually
+                  sx={{ textTransform: 'none' }}
+                >
+                  Actualizar
+                </Button>
+              </Box>
 
-
+              <DocumentTimeline
+                documentId={document?.id}
+                showRefresh={false}
+                showLoadMore={true}
+                autoRefresh={false}
+                options={{
+                  limit: 20,
+                  fallbackToSimulated: true
+                }}
+              />
+            </Box>
+          </Grid>
+        </Grid>
       </DialogContent>
 
       {/* Acciones */}
       <DialogActions sx={{
-        p: 3,
-        bgcolor: (theme) => theme.palette.mode === 'dark'
-          ? 'rgba(255, 255, 255, 0.03)'
-          : 'grey.50',
-        borderTop: (theme) => theme.palette.mode === 'dark'
-          ? '1px solid rgba(255, 255, 255, 0.1)'
-          : 'none'
+        p: 2,
+        bgcolor: 'background.paper',
+        borderTop: '1px solid',
+        borderColor: 'divider',
+        height: 'auto'
       }}>
         <Button
           onClick={onClose}
           variant="outlined"
-          sx={{ mr: 1 }}
+          color="inherit"
         >
           Cerrar
         </Button>
 
-        {/* Botón de Edición - oculto en solo lectura */}
+        <Box sx={{ flexGrow: 1 }} />
+
+        {/* Botón de Edición */}
         {!isReadOnly && (
           <Button
             onClick={() => setShowEditModal(true)}
@@ -620,11 +607,11 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
             startIcon={<EditIcon />}
             sx={{ mr: 1 }}
           >
-            Editar Información
+            Editar Info
           </Button>
         )}
 
-        {/* Botón para regresar al estado anterior (solo ARCHIVO) */}
+        {/* Botón Revertir (Archivo) */}
         {user?.role === 'ARCHIVO' && previousStatus && !isReadOnly && (
           <Button
             onClick={() => handleRevert(previousStatus)}
@@ -634,10 +621,11 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
             disabled={actionLoading}
             sx={{ mr: 1 }}
           >
-            Regresar al estado anterior
+            Revertir
           </Button>
         )}
 
+        {/* Botón Acción Principal */}
         {!isReadOnly && actionConfig && (
           <Button
             onClick={handleAction}
@@ -645,7 +633,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
             color={actionConfig.color}
             disabled={actionLoading}
             startIcon={actionConfig.icon}
-            sx={{ fontWeight: 'bold' }}
+            disableElevation
           >
             {actionLoading ? 'Procesando...' : actionConfig.text}
           </Button>
@@ -824,7 +812,7 @@ const DeliveryModal = ({ open, onClose, document, onDocumentDelivered, serviceTy
       <DialogContent>
         <Box sx={{ mt: 2 }}>
           {/* Información del documento */}
-          <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+          <Box sx={{ mb: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
               📄 Documento a Entregar
             </Typography>
@@ -839,6 +827,9 @@ const DeliveryModal = ({ open, onClose, document, onDocumentDelivered, serviceTy
               </Typography>
             )}
           </Box>
+
+          {/* Estado de Pago - Alerta informativa antes de entregar */}
+          <EstadoPago documentId={document?.id} />
 
           {/* Errores */}
           {errors.length > 0 && (
@@ -1068,7 +1059,7 @@ const MatrizadorDeliveryModal = ({ open, onClose, document, onDocumentDelivered 
       <DialogContent>
         <Box sx={{ mt: 2 }}>
           {/* Información del documento */}
-          <Box sx={{ mb: 3, p: 2, bgcolor: 'grey.50', borderRadius: 1 }}>
+          <Box sx={{ mb: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
               📄 Documento a Entregar
             </Typography>
@@ -1078,6 +1069,9 @@ const MatrizadorDeliveryModal = ({ open, onClose, document, onDocumentDelivered 
               <strong> Cliente:</strong> {document.clientName}
             </Typography>
           </Box>
+
+          {/* Estado de Pago - Alerta informativa antes de entregar */}
+          <EstadoPago documentId={document?.id} />
 
           {/* Errores */}
           {errors.length > 0 && (

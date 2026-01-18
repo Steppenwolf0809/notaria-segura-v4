@@ -611,7 +611,8 @@ async function getMyDocuments(req, res) {
       page = 1,
       limit = 10,
       fechaDesde, // Filtro por fecha desde (fechaFactura)
-      fechaHasta  // Filtro por fecha hasta (fechaFactura)
+      fechaHasta,  // Filtro por fecha hasta (fechaFactura)
+      paymentStatus // Nuevo filtro de estado de pago: 'PAGADO', 'PENDIENTE'
     } = req.query;
 
     const userId = req.user.id;
@@ -772,6 +773,15 @@ async function getMyDocuments(req, res) {
         const endDate = new Date(fechaHasta);
         endDate.setDate(endDate.getDate() + 1);
         where.fechaFactura.lt = endDate;
+      }
+    }
+
+    // Filtro por estado de pago (Nuevo)
+    if (paymentStatus) {
+      if (paymentStatus === 'PAGADO') {
+        where.pagoConfirmado = true;
+      } else if (paymentStatus === 'PENDIENTE') {
+        where.pagoConfirmado = false; // O null si se considera pendiente
       }
     }
 

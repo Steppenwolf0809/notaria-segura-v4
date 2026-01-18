@@ -247,26 +247,42 @@ export function generateWhatsAppUrl(phone, message) {
 
 /**
  * Generar mensaje estándar de documento listo
- * @param {Object} options - { clientName, documents, codigoRetiro }
+ * @param {Object} options - { clientName, documents, codigoRetiro, paymentStatus? }
  * @returns {string} Mensaje formateado para WhatsApp
  */
-export function generateReadyMessage({ clientName, documents, codigoRetiro }) {
+export function generateReadyMessage({ clientName, documents, codigoRetiro, paymentStatus }) {
     const docList = generateDocumentListText(documents);
     const cantidad = documents.length;
     const plural = cantidad > 1 ? 's' : '';
 
-    return `🏛️ *NOTARÍA DÉCIMO OCTAVA*
+    let message = `🏛️ *NOTARÍA DÉCIMO OCTAVA*
 
 Estimado/a ${clientName},
 
 Su${plural} documento${plural} está${cantidad > 1 ? 'n' : ''} listo${plural} para retiro:
 ${docList}
 
-🔢 *Código de retiro:* ${codigoRetiro}
+🔢 *Código de retiro:* ${codigoRetiro}`;
+
+    // Agregar información de saldo pendiente si existe
+    if (paymentStatus?.hasInvoice && paymentStatus.totalDebt > 0) {
+        message += `
+
+💰 *INFORMACIÓN DE PAGO:*
+• Total facturado: $${paymentStatus.totalAmount.toFixed(2)}
+• Pagado: $${paymentStatus.totalPaid.toFixed(2)}
+• *Saldo pendiente: $${paymentStatus.totalDebt.toFixed(2)}*
+
+⚠️ Por favor regularice su pago al momento del retiro.`;
+    }
+
+    message += `
 
 ⚠️ Presente este código en ventanilla.
 📍 Azuay E2-231 y Av Amazonas, Quito
 ⏰ Lunes a Viernes 8:00-17:00`;
+
+    return message;
 }
 
 /**
