@@ -41,15 +41,21 @@ router.get('/health', billingController.healthCheck);
 // All other routes require authentication
 router.use(authenticateToken);
 
-// Statistics
+// Dashboard & Summary
 router.get('/stats', billingController.getStats);
+router.get('/summary', billingController.getSummary);
 
 // Invoice routes
 router.get('/invoices', billingController.getInvoices);
 router.get('/invoices/:id', billingController.getInvoiceById);
+router.get('/invoices/:id/payments', billingController.getInvoicePayments);
 
 // Payment routes
 router.get('/payments', billingController.getPayments);
+
+// Client routes
+router.get('/clients', billingController.getClients);
+router.get('/clients/:taxId/balance', billingController.getClientBalance);
 
 // Import log routes
 router.get('/import-logs', billingController.getImportLogs);
