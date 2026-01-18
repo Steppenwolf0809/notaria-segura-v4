@@ -353,3 +353,80 @@ export async function getDocumentPaymentStatus(req, res) {
         res.status(500).json({ error: error.message });
     }
 }
+
+/**
+ * Import Koinor Excel file
+ * Requires multipart/form-data with 'file' field
+ */
+export async function importFile(req, res) {
+    try {
+        // Check if file was uploaded
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                error: 'No se proporcionó archivo',
+                message: 'Debe subir un archivo Excel (.xls, .xlsx) o CSV (.csv)'
+            });
+        }
+
+        const { file } = req;
+        const userId = req.user?.id;
+
+        // Validate file type
+        const allowedExtensions = ['.xls', '.xlsx', '.csv'];
+        const ext = file.originalname.toLowerCase().substring(file.originalname.lastIndexOf('.'));
+
+        if (!allowedExtensions.includes(ext)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Tipo de archivo no válido',
+                message: `Solo se permiten archivos: ${allowedExtensions.join(', ')}`
+            });
+        }
+
+        console.log(`[billing-controller] Starting import of ${file.originalname} (${file.size} bytes)`);
+
+        // Import the service dynamically to avoid circular dependencies
+        const { importKoinorFile } = await import('../services/import-koinor-service.js');
+
+        // Process the file
+        const result = await importKoinorFile(
+            file.buffer,
+            file.originalname,
+            userId
+        );
+
+        res.json({
+            success: true,
+            message: 'Importación completada',
+            ...result
+        });
+
+    } catch (error) {
+        console.error('[billing-controller] Import error:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error durante la importación',
+            message: error.message
+        });
+    }
+}
+
+/**
+ * Get billing statistics
+ */
+export async function getStats(req, res) {
+    try {
+        const { getImportStats } = await import('../services/import-koinor-service.js');
+        const stats = await getImportStats();
+
+        res.json({
+            success: true,
+            stats
+        });
+    } catch (error) {
+        console.error('[billing-controller] Get stats error:', error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
