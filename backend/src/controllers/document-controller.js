@@ -3268,6 +3268,20 @@ async function bulkNotify(req, res) {
           // Obtener primer documento para datos adicionales
           const firstDoc = clientGroup.documents[0];
 
+          // 💰 Obtener estado de pago del primer documento para incluir en el mensaje
+          let infoPago = '';
+          try {
+            const { getPaymentStatusForDocument } = await import('./billing-controller.js');
+            const paymentStatus = await getPaymentStatusForDocument(firstDoc.id);
+            infoPago = paymentStatus.infoPago || '';
+            if (infoPago) {
+              console.log(`💰 Documento ${firstDoc.protocolNumber} tiene saldo pendiente: ${paymentStatus.saldoPendiente}`);
+            }
+          } catch (paymentError) {
+            console.warn(`⚠️ No se pudo obtener estado de pago para documento ${firstDoc.id}:`, paymentError.message);
+            // Continuar sin información de pago
+          }
+
           // Reemplazar variables en la plantilla
           let message = template.mensaje
             // Variables de cliente
@@ -3293,6 +3307,8 @@ async function bulkNotify(req, res) {
             .replace(/\{nombreNotariaCompleto\}/g, 'NOTARÍA DÉCIMO OCTAVA DEL CANTÓN QUITO')
             // Variables de contacto
             .replace(/\{contactoConsultas\}/g, 'Tel: (02) 2247787')
+            // 💰 Variables de facturación/saldo
+            .replace(/\{infoPago\}/g, infoPago)
             // 🛡️ Variables de Emojis Seguros (Usando constantes Unicode Escapes)
             .replace(/\{emoji_notaria\}/g, EMOJIS.NOTARIA)
             .replace(/\{emoji_documento\}/g, EMOJIS.DOCUMENTO)

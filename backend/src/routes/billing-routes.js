@@ -66,4 +66,14 @@ router.get('/documents/:documentId/payment-status', billingController.getDocumen
 // Import endpoint - requires file upload
 router.post('/import', upload.single('file'), billingController.importFile);
 
+// ============================================================================
+// SPRINT 6: Cartera de Matrizadores
+// ============================================================================
+
+// My portfolio - for users to see invoices from their assigned documents
+router.get('/my-portfolio', billingController.getMyPortfolio);
+
+// Generate collection reminder message for a client
+router.get('/collection-reminder/:clientTaxId', billingController.generateCollectionReminder);
+
 export default router;

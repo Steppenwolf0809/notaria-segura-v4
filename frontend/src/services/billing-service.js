@@ -244,6 +244,34 @@ function formatDate(date) {
 
 /**
  * ============================================================================
+ * SECCIÓN 7: CARTERA DE MATRIZADORES
+ * ============================================================================
+ */
+
+/**
+ * Obtener cartera del usuario actual (facturas de sus documentos asignados)
+ * @param {Object} params - Parámetros de búsqueda
+ * @returns {Promise<Object>} Lista de clientes con facturas pendientes
+ */
+async function getMyPortfolio(params = {}) {
+    const response = await apiClient.get('/billing/my-portfolio', { params });
+    return response.data;
+}
+
+/**
+ * Generar mensaje de recordatorio de cobro para WhatsApp
+ * @param {string} clientTaxId - Cédula o RUC del cliente
+ * @param {string} phone - Número de teléfono (opcional, override del registrado)
+ * @returns {Promise<Object>} Mensaje y URL de WhatsApp
+ */
+async function generateCollectionReminder(clientTaxId, phone) {
+    const params = phone ? { phone } : {};
+    const response = await apiClient.get(`/billing/collection-reminder/${encodeURIComponent(clientTaxId)}`, { params });
+    return response.data;
+}
+
+/**
+ * ============================================================================
  * EXPORTAR SERVICIO
  * ============================================================================
  */
@@ -272,6 +300,10 @@ const billingService = {
 
     // Documentos
     getDocumentPaymentStatus,
+
+    // Cartera de Matrizadores (Sprint 6)
+    getMyPortfolio,
+    generateCollectionReminder,
 
     // Utilidades
     formatInvoiceStatus,

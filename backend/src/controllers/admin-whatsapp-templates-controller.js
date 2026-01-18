@@ -46,7 +46,17 @@ const AVAILABLE_VARIABLES = {
   receptor_relacion: 'Relación con el titular',
 
   // Variable de encuesta de satisfacción
-  urlEncuesta: 'URL de la encuesta de satisfacción con ID de trámite'
+  urlEncuesta: 'URL de la encuesta de satisfacción con ID de trámite',
+
+  // ======================================
+  // VARIABLES DE FACTURACIÓN Y SALDOS
+  // ======================================
+  saldoPendiente: 'Monto del saldo pendiente de pago (ej: "$60.28")',
+  numeroFactura: 'Número de factura asociada (ej: "001-002-000123341")',
+  infoPago: 'Sección completa de información de pago (condicional)',
+  totalFactura: 'Monto total de la factura',
+  totalPagado: 'Monto que ya fue pagado',
+  estadoPago: 'Estado del pago: PAID, PARTIAL, PENDING'
 };
 
 /**
@@ -65,7 +75,7 @@ Su documento está listo para retiro:
 🔢 *Código de retiro:* {codigo}
 {codigosEscritura}
 📊 *Documentos:* {cantidadDocumentos}
-
+{infoPago}
 ⚠️ *IMPORTANTE:* Presente este código al momento del retiro.
 
 📍 *Dirección:* Azuay E2-231 y Av Amazonas, Quito
@@ -403,7 +413,23 @@ export const previewTemplate = async (req, res) => {
       emoji_reloj: EMOJIS.RELOJ,
 
       // Variable de encuesta
-      urlEncuesta: 'https://notaria18quito.com.ec/encuesta-satisfaccion.html?ref=20251701018D00919'
+      urlEncuesta: 'https://notaria18quito.com.ec/encuesta-satisfaccion.html?ref=20251701018D00919',
+
+      // 💰 Variables de facturación/saldo (para preview)
+      saldoPendiente: '$60.28',
+      numeroFactura: '001-002-000123341',
+      totalFactura: '$76.98',
+      totalPagado: '$16.70',
+      estadoPago: 'PARTIAL',
+      infoPago: `
+💰 *INFORMACIÓN DE PAGO:*
+📄 *Factura:* 001-002-000123341
+💵 *Total:* $76.98
+✅ *Pagado:* $16.70
+⚠️ *Saldo pendiente:* $60.28
+
+🔔 Por favor regularice su pago antes de retirar.
+`
     };
 
     // Reemplazar variables
