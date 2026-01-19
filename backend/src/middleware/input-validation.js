@@ -69,6 +69,98 @@ export const dateFilterSchema = z.object({
 );
 
 /**
+ * ============================================================================
+ * BILLING MODULE SCHEMAS - OWASP Security Enhancement
+ * ============================================================================
+ */
+
+/**
+ * Esquema para invoice ID (UUID)
+ */
+export const invoiceIdSchema = z.object({
+  id: uuidSchema
+});
+
+/**
+ * Esquema para búsqueda de facturas con paginación
+ */
+export const invoiceQuerySchema = paginationSchema.merge(z.object({
+  status: z.enum(['PENDING', 'PARTIAL', 'PAID', 'OVERDUE', 'CANCELLED']).optional(),
+  clientTaxId: z.string().max(13).regex(/^[0-9]+$/, 'Cédula/RUC debe contener solo números').optional(),
+  search: z.string().max(200).trim().optional(),
+  dateFrom: z.coerce.date().optional(),
+  dateTo: z.coerce.date().optional()
+}));
+
+/**
+ * Esquema para búsqueda de pagos
+ */
+export const paymentQuerySchema = paginationSchema.merge(z.object({
+  invoiceId: uuidSchema.optional(),
+  dateFrom: z.coerce.date().optional(),
+  dateTo: z.coerce.date().optional()
+}));
+
+/**
+ * Esquema para búsqueda de clientes
+ */
+export const clientQuerySchema = paginationSchema.merge(z.object({
+  search: z.string().max(200).trim().optional(),
+  hasDebt: z.enum(['true', 'false']).optional()
+}));
+
+/**
+ * Esquema para taxId de cliente (cédula/RUC ecuatoriano)
+ */
+export const taxIdSchema = z.object({
+  taxId: z.string()
+    .min(10, 'Cédula/RUC debe tener mínimo 10 dígitos')
+    .max(13, 'Cédula/RUC debe tener máximo 13 dígitos')
+    .regex(/^[0-9]+$/, 'Cédula/RUC debe contener solo números')
+});
+
+/**
+ * Esquema para documentId (UUID)
+ */
+export const documentIdParamSchema = z.object({
+  documentId: uuidSchema
+});
+
+/**
+ * Esquema para portfolio query
+ */
+export const portfolioQuerySchema = paginationSchema.merge(z.object({
+  status: z.enum(['PENDING', 'PARTIAL', 'PAID', 'OVERDUE']).optional(),
+  groupByClient: z.enum(['true', 'false']).default('true')
+}));
+
+/**
+ * Esquema para clientTaxId en collection reminder
+ */
+export const clientTaxIdParamSchema = z.object({
+  clientTaxId: z.string()
+    .min(10, 'Cédula/RUC debe tener mínimo 10 dígitos')
+    .max(13, 'Cédula/RUC debe tener máximo 13 dígitos')
+    .regex(/^[0-9]+$/, 'Cédula/RUC debe contener solo números')
+});
+
+/**
+ * Esquema para reportes de billing con filtros de fecha
+ */
+export const billingReportQuerySchema = z.object({
+  dateFrom: z.coerce.date().optional(),
+  dateTo: z.coerce.date().optional()
+}).refine(
+  (data) => {
+    if (data.dateFrom && data.dateTo) {
+      return data.dateFrom <= data.dateTo;
+    }
+    return true;
+  },
+  { message: 'Fecha desde debe ser anterior a fecha hasta' }
+);
+
+/**
  * Middleware factory para validar parámetros de ruta
  */
 export function validateParams(schema) {

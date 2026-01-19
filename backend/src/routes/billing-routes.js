@@ -1,11 +1,26 @@
 /**
  * Billing Routes
  * API routes for billing module - invoices, payments, and imports
+ * 🔒 OWASP Security Enhancement: Input validation added
  */
 import express from 'express';
 import multer from 'multer';
 import * as billingController from '../controllers/billing-controller.js';
 import { authenticateToken } from '../middleware/auth-middleware.js';
+import { csrfProtection } from '../middleware/csrf-protection.js';
+import {
+    validateQuery,
+    validateParams,
+    invoiceQuerySchema,
+    invoiceIdSchema,
+    paymentQuerySchema,
+    clientQuerySchema,
+    taxIdSchema,
+    documentIdParamSchema,
+    portfolioQuerySchema,
+    clientTaxIdParamSchema,
+    billingReportQuerySchema
+} from '../middleware/input-validation.js';
 
 const router = express.Router();
 
@@ -45,36 +60,36 @@ router.use(authenticateToken);
 router.get('/stats', billingController.getStats);
 router.get('/summary', billingController.getSummary);
 
-// Invoice routes
-router.get('/invoices', billingController.getInvoices);
-router.get('/invoices/:id', billingController.getInvoiceById);
-router.get('/invoices/:id/payments', billingController.getInvoicePayments);
+// Invoice routes - 🔒 SECURITY: Input validation added
+router.get('/invoices', validateQuery(invoiceQuerySchema), billingController.getInvoices);
+router.get('/invoices/:id', validateParams(invoiceIdSchema), billingController.getInvoiceById);
+router.get('/invoices/:id/payments', validateParams(invoiceIdSchema), billingController.getInvoicePayments);
 
-// Payment routes
-router.get('/payments', billingController.getPayments);
+// Payment routes - 🔒 SECURITY: Input validation added
+router.get('/payments', validateQuery(paymentQuerySchema), billingController.getPayments);
 
-// Client routes
-router.get('/clients', billingController.getClients);
-router.get('/clients/:taxId/balance', billingController.getClientBalance);
+// Client routes - 🔒 SECURITY: Input validation added
+router.get('/clients', validateQuery(clientQuerySchema), billingController.getClients);
+router.get('/clients/:taxId/balance', validateParams(taxIdSchema), billingController.getClientBalance);
 
 // Import log routes
 router.get('/import-logs', billingController.getImportLogs);
 
-// Document payment status (for integration with document views)
-router.get('/documents/:documentId/payment-status', billingController.getDocumentPaymentStatus);
+// Document payment status (for integration with document views) - 🔒 SECURITY: UUID validation
+router.get('/documents/:documentId/payment-status', validateParams(documentIdParamSchema), billingController.getDocumentPaymentStatus);
 
-// Import endpoint - requires file upload
-router.post('/import', upload.single('file'), billingController.importFile);
+// Import endpoint - requires file upload - 🔒 SECURITY: CSRF protection added
+router.post('/import', csrfProtection, upload.single('file'), billingController.importFile);
 
 // ============================================================================
 // SPRINT 6: Cartera de Matrizadores
 // ============================================================================
 
-// My portfolio - for users to see invoices from their assigned documents
-router.get('/my-portfolio', billingController.getMyPortfolio);
+// My portfolio - for users to see invoices from their assigned documents - 🔒 SECURITY: Input validation
+router.get('/my-portfolio', validateQuery(portfolioQuerySchema), billingController.getMyPortfolio);
 
-// Generate collection reminder message for a client
-router.get('/collection-reminder/:clientTaxId', billingController.generateCollectionReminder);
+// Generate collection reminder message for a client - 🔒 SECURITY: Input validation
+router.get('/collection-reminder/:clientTaxId', validateParams(clientTaxIdParamSchema), billingController.generateCollectionReminder);
 
 // ============================================================================
 // SPRINT 7: REPORTES
@@ -83,8 +98,8 @@ router.get('/collection-reminder/:clientTaxId', billingController.generateCollec
 // Report: Cartera por Cobrar (Accounts Receivable)
 router.get('/reports/cartera-por-cobrar', billingController.getCarteraPorCobrar);
 
-// Report: Pagos del Período
-router.get('/reports/pagos-periodo', billingController.getPagosDelPeriodo);
+// Report: Pagos del Período - 🔒 SECURITY: Input validation for date filters
+router.get('/reports/pagos-periodo', validateQuery(billingReportQuerySchema), billingController.getPagosDelPeriodo);
 
 // Report: Facturas Vencidas
 router.get('/reports/facturas-vencidas', billingController.getFacturasVencidas);

@@ -13,7 +13,6 @@ import {
 } from '../utils/event-formatter.js';
 import AdvancedExtractionService from '../services/advanced-extraction-service.js';
 import ActosExtractorService from '../services/actos-extractor-service.js';
-// const WhatsAppService = require('../services/whatsapp-service.js'); // Descomentar cuando exista
 
 /**
  * Procesar XML y crear documento automáticamente
@@ -1057,15 +1056,14 @@ async function updateDocumentStatus(req, res) {
 
 
     // NUEVA FUNCIONALIDAD: Enviar notificación WhatsApp si se marca como LISTO
-    // ⚠️ LÓGICA LEGADA DE TWILIO REMOVIDA - Se usa el nuevo Centro de Notificaciones
+    // ℹ️ NOTA: El sistema usa wa.me para notificaciones manuales, no envío automático
     let whatsappSent = false;
     let whatsappError = null;
     let whatsappResults = [];
 
     if (status === 'LISTO') {
-      // La lógica automática anterior ha sido deshabilitada para evitar errores con Twilio.
-      // Las notificaciones deben gestionarse a través del sistema unificado de notificaciones.
-      console.log('ℹ️ Cambio a LISTO: Notificación automática legacy deshabilitada');
+      // Las notificaciones se gestionan manualmente a través del Centro de Notificaciones
+      console.log('ℹ️ Cambio a LISTO: Use el Centro de Notificaciones para enviar mensajes vía wa.me');
     }
 
 

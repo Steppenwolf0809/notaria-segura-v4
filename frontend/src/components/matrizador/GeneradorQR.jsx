@@ -90,7 +90,7 @@ const GeneradorQR = () => {
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showHardDeleteDialog, setShowHardDeleteDialog] = useState(false); // Dialog para confirmación de eliminación permanente
   const [uploadLoading, setUploadLoading] = useState(false);
-  
+
   // Estados para PDFs completos
   const [showPDFUploadModal, setShowPDFUploadModal] = useState(false);
   const [showPDFViewerModal, setShowPDFViewerModal] = useState(false);
@@ -103,6 +103,11 @@ const GeneradorQR = () => {
   const [totalCount, setTotalCount] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [estadoFilter, setEstadoFilter] = useState('');
+
+  // ✅ Estados para manejar duplicados
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [duplicateInfo, setDuplicateInfo] = useState(null);
+  const [pendingUploadFiles, setPendingUploadFiles] = useState(null);
 
   /**
    * Carga la lista de escrituras
@@ -150,7 +155,7 @@ const GeneradorQR = () => {
 
     try {
       const response = await uploadEscritura(pdfFile, photoFile);
-      
+
       if (response.success) {
         // Mensaje personalizado si hay foto
         if (response.data.fotoURL) {
@@ -160,7 +165,7 @@ const GeneradorQR = () => {
         } else {
           toast.success('PDF procesado exitosamente');
         }
-        
+
         setShowUploadDialog(false);
         loadEscrituras(false); // Recargar lista
 
@@ -169,9 +174,85 @@ const GeneradorQR = () => {
         setShowDetailsDialog(true);
       }
     } catch (err) {
-      toast.error(err.message);
+      // ✅ Detectar error de duplicado (409 Conflict)
+      if (err.response?.status === 409 && err.response?.data?.code === 'DUPLICATE_QR') {
+        // Guardar información del duplicado
+        setDuplicateInfo(err.response.data);
+        // Guardar archivos para posible reintento
+        setPendingUploadFiles({ pdfFile, photoFile });
+        // Mostrar diálogo de confirmación
+        setShowDuplicateDialog(true);
+      } else {
+        toast.error(err.message || 'Error al subir la escritura');
+      }
     } finally {
       setUploadLoading(false);
+    }
+  };
+
+  /**
+   * Maneja la vista del QR existente cuando hay duplicado
+   */
+  const handleViewExistingQR = () => {
+    if (duplicateInfo?.data?.existingQR) {
+      // Buscar la escritura existente en la lista
+      const existing = escrituras.find(e => e.id === duplicateInfo.data.existingQR.id);
+
+      if (existing) {
+        setSelectedEscritura(existing);
+      } else {
+        // Si no está en la lista, crear objeto mínimo
+        setSelectedEscritura(duplicateInfo.data.existingQR);
+      }
+
+      // Cerrar diálogos
+      setShowDuplicateDialog(false);
+      setShowUploadDialog(false);
+      // Mostrar detalles
+      setShowDetailsDialog(true);
+
+      toast.info('Mostrando QR existente');
+    }
+  };
+
+  /**
+   * Maneja el reemplazo del QR existente (eliminarlo y crear uno nuevo)
+   */
+  const handleReplaceQR = async () => {
+    if (!duplicateInfo?.data?.existingQR || !pendingUploadFiles) return;
+
+    try {
+      setUploadLoading(true);
+
+      // Primero, eliminar el QR existente (hard delete)
+      await hardDeleteEscritura(duplicateInfo.data.existingQR.id);
+
+      toast.info('QR anterior eliminado, creando nuevo...');
+
+      // Cerrar diálogo de duplicados
+      setShowDuplicateDialog(false);
+
+      // Reintentar el upload con los archivos guardados
+      const { pdfFile, photoFile } = pendingUploadFiles;
+      const response = await uploadEscritura(pdfFile, photoFile);
+
+      if (response.success) {
+        toast.success('✅ QR reemplazado exitosamente');
+
+        setShowUploadDialog(false);
+        loadEscrituras(false);
+
+        // Mostrar detalles del nuevo QR
+        setSelectedEscritura(response.data);
+        setShowDetailsDialog(true);
+      }
+    } catch (err) {
+      toast.error(err.message || 'Error al reemplazar el QR');
+    } finally {
+      setUploadLoading(false);
+      // Limpiar archivos pendientes
+      setPendingUploadFiles(null);
+      setDuplicateInfo(null);
     }
   };
 
@@ -183,7 +264,7 @@ const GeneradorQR = () => {
 
     try {
       const response = await createEscrituraManual(datosEscritura, photoFile);
-      
+
       if (response.success) {
         // Mensaje personalizado si hay foto
         if (response.data.fotoURL) {
@@ -193,7 +274,7 @@ const GeneradorQR = () => {
         } else {
           toast.success('Escritura creada exitosamente');
         }
-        
+
         setShowManualDialog(false);
         loadEscrituras(false); // Recargar lista
 
@@ -219,7 +300,7 @@ const GeneradorQR = () => {
 
     try {
       const response = await deleteEscritura(escrituraId);
-      
+
       if (response.success) {
         toast.success('Escritura desactivada');
         loadEscrituras(false);
@@ -238,7 +319,7 @@ const GeneradorQR = () => {
     try {
       setUploadLoading(true);
       const response = await hardDeleteEscritura(selectedEscritura.id);
-      
+
       if (response.success) {
         toast.success('✅ Escritura eliminada permanentemente');
         setShowHardDeleteDialog(false);
@@ -296,12 +377,12 @@ const GeneradorQR = () => {
    * Actualiza una escritura en la lista
    */
   const handleEscrituraUpdate = (updatedEscritura) => {
-    setEscrituras(prev => 
+    setEscrituras(prev =>
       prev.map(e => e.id === updatedEscritura.id ? updatedEscritura : e)
     );
     setSelectedEscritura(updatedEscritura);
   };
-  
+
   /**
    * Abre el modal para subir PDF
    */
@@ -309,7 +390,7 @@ const GeneradorQR = () => {
     setSelectedEscrituraForPDF(escritura);
     setShowPDFUploadModal(true);
   };
-  
+
   /**
    * Abre el modal para ver PDF
    */
@@ -317,7 +398,7 @@ const GeneradorQR = () => {
     setSelectedEscrituraForPDF(escritura);
     setShowPDFViewerModal(true);
   };
-  
+
   /**
    * Abre el modal para gestionar páginas ocultas del PDF
    */
@@ -325,7 +406,7 @@ const GeneradorQR = () => {
     setSelectedEscrituraForPDF(escritura);
     setShowPDFPageManagerModal(true);
   };
-  
+
   /**
    * Callback cuando se sube exitosamente un PDF
    */
@@ -352,7 +433,7 @@ const GeneradorQR = () => {
             Genera códigos QR para verificación pública de escrituras notariales
           </Typography>
         </Box>
-        
+
         <Button
           variant="contained"
           startIcon={<AddIcon />}
@@ -382,7 +463,7 @@ const GeneradorQR = () => {
               }}
             />
           </Grid>
-          
+
           <Grid item xs={12} md={3}>
             <FormControl fullWidth size="small">
               <InputLabel>Estado</InputLabel>
@@ -398,7 +479,7 @@ const GeneradorQR = () => {
               </Select>
             </FormControl>
           </Grid>
-          
+
           <Grid item xs={12} md={3}>
             <Button
               fullWidth
@@ -453,7 +534,7 @@ const GeneradorQR = () => {
               ) : (
                 escrituras.map((escritura) => {
                   const estadoInfo = getEstadoInfo(escritura.estado);
-                  
+
                   return (
                     <TableRow key={escritura.id} hover>
                       <TableCell>
@@ -461,13 +542,13 @@ const GeneradorQR = () => {
                           {escritura.numeroEscritura || 'N/A'}
                         </Typography>
                       </TableCell>
-                      
+
                       <TableCell>
                         <Typography variant="body2" noWrap>
                           {escritura.archivoOriginal}
                         </Typography>
                       </TableCell>
-                      
+
                       <TableCell>
                         <Chip
                           label={estadoInfo.label}
@@ -475,13 +556,13 @@ const GeneradorQR = () => {
                           size="small"
                         />
                       </TableCell>
-                      
+
                       <TableCell>
                         <Typography variant="body2" fontFamily="monospace">
                           {escritura.token}
                         </Typography>
                       </TableCell>
-                      
+
                       {/* Columna de PDF */}
                       <TableCell align="center">
                         {hasPDFUploaded(escritura) ? (
@@ -525,7 +606,7 @@ const GeneradorQR = () => {
                           </Tooltip>
                         )}
                       </TableCell>
-                      
+
                       <TableCell>
                         <Typography variant="body2">
                           {new Date(escritura.createdAt).toLocaleDateString()}
@@ -534,7 +615,7 @@ const GeneradorQR = () => {
                           {new Date(escritura.createdAt).toLocaleTimeString('es-EC', { hour: '2-digit', minute: '2-digit' })}
                         </Typography>
                       </TableCell>
-                      
+
                       <TableCell align="center">
                         <Box sx={{ display: 'flex', gap: 0.5 }}>
                           <Tooltip title="Ver detalles">
@@ -545,7 +626,7 @@ const GeneradorQR = () => {
                               <ViewIcon />
                             </IconButton>
                           </Tooltip>
-                          
+
                           {escritura.estado === 'activo' && (
                             <Tooltip title="Ver QR">
                               <IconButton
@@ -557,7 +638,7 @@ const GeneradorQR = () => {
                               </IconButton>
                             </Tooltip>
                           )}
-                          
+
                           <Tooltip title="Desactivar">
                             <IconButton
                               size="small"
@@ -587,7 +668,7 @@ const GeneradorQR = () => {
           onRowsPerPageChange={handleChangeRowsPerPage}
           rowsPerPageOptions={[5, 10, 25, 50]}
           labelRowsPerPage="Filas por página:"
-          labelDisplayedRows={({ from, to, count }) => 
+          labelDisplayedRows={({ from, to, count }) =>
             `${from}-${to} de ${count !== -1 ? count : `más de ${to}`}`
           }
         />
@@ -684,7 +765,7 @@ const GeneradorQR = () => {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button 
+          <Button
             onClick={() => setShowUploadDialog(false)}
             disabled={uploadLoading}
           >
@@ -732,7 +813,7 @@ const GeneradorQR = () => {
             </Typography>
           </Box>
         </DialogTitle>
-        
+
         <DialogContent>
           {selectedEscritura && (
             <Grid container spacing={3}>
@@ -767,7 +848,7 @@ const GeneradorQR = () => {
                     </Typography>
                   </Paper>
                 )}
-                
+
                 {/* Acciones del PDF */}
                 {hasPDFUploaded(selectedEscritura) && (
                   <Paper sx={{ p: 2, mt: 2 }}>
@@ -819,7 +900,7 @@ const GeneradorQR = () => {
             </Grid>
           )}
         </DialogContent>
-        
+
         <DialogActions sx={{ justifyContent: 'space-between', px: 3, py: 2 }}>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Button
@@ -865,7 +946,7 @@ const GeneradorQR = () => {
             </Typography>
           </Box>
         </DialogTitle>
-        
+
         <DialogContent sx={{ mt: 2 }}>
           <Alert severity="error" sx={{ mb: 2 }}>
             <Typography variant="body1" gutterBottom sx={{ fontWeight: 'bold' }}>
@@ -901,16 +982,16 @@ const GeneradorQR = () => {
             </Typography>
           </Alert>
         </DialogContent>
-        
+
         <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button 
+          <Button
             onClick={() => setShowHardDeleteDialog(false)}
             disabled={uploadLoading}
             variant="outlined"
           >
             Cancelar
           </Button>
-          <Button 
+          <Button
             onClick={handleHardDelete}
             disabled={uploadLoading}
             variant="contained"
@@ -918,6 +999,94 @@ const GeneradorQR = () => {
             startIcon={uploadLoading ? <CircularProgress size={20} /> : <DeleteIcon />}
           >
             {uploadLoading ? 'Eliminando...' : 'Confirmar Eliminación'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* ✅ Diálogo de confirmación para QR duplicado */}
+      <Dialog
+        open={showDuplicateDialog}
+        onClose={() => {
+          setShowDuplicateDialog(false);
+          setPendingUploadFiles(null);
+          setDuplicateInfo(null);
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ bgcolor: 'warning.main', color: 'white' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <QrCodeIcon />
+            <Typography variant="h6">
+              ⚠️ QR Duplicado Detectado
+            </Typography>
+          </Box>
+        </DialogTitle>
+
+        <DialogContent sx={{ mt: 2 }}>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <Typography variant="body1" gutterBottom sx={{ fontWeight: 'bold' }}>
+              Ya existe un código QR para esta escritura
+            </Typography>
+            <Typography variant="body2">
+              {duplicateInfo?.message}
+            </Typography>
+          </Alert>
+
+          {duplicateInfo?.data?.existingQR && (
+            <Box sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
+              <Typography variant="body2" gutterBottom>
+                <strong>Número de Escritura:</strong> {duplicateInfo.data.existingQR.numeroEscritura}
+              </Typography>
+              <Typography variant="body2" gutterBottom>
+                <strong>Estado:</strong> <Chip label={getEstadoInfo(duplicateInfo.data.existingQR.estado).label} color={getEstadoInfo(duplicateInfo.data.existingQR.estado).color} size="small" />
+              </Typography>
+              <Typography variant="body2" gutterBottom>
+                <strong>Archivo Original:</strong> {duplicateInfo.data.existingQR.archivoOriginal}
+              </Typography>
+              <Typography variant="body2">
+                <strong>Creado:</strong> {new Date(duplicateInfo.data.existingQR.createdAt).toLocaleString()}
+              </Typography>
+            </Box>
+          )}
+
+          <Alert severity="info" sx={{ mt: 2 }}>
+            <Typography variant="body2">
+              <strong>¿Qué deseas hacer?</strong><br />
+              • <strong>Ver Existente:</strong> Ver el QR que ya fue creado<br />
+              • <strong>Reemplazar:</strong> Eliminar el QR anterior y crear uno nuevo<br />
+              • <strong>Cancelar:</strong> No hacer nada
+            </Typography>
+          </Alert>
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
+          <Button
+            onClick={() => {
+              setShowDuplicateDialog(false);
+              setPendingUploadFiles(null);
+              setDuplicateInfo(null);
+            }}
+            variant="outlined"
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={handleViewExistingQR}
+            variant="outlined"
+            color="info"
+            startIcon={<QrCodeIcon />}
+          >
+            Ver Existente
+          </Button>
+          <Button
+            onClick={handleReplaceQR}
+            variant="contained"
+            color="warning"
+            startIcon={<DeleteIcon />}
+            disabled={uploadLoading}
+          >
+            {uploadLoading ? 'Reemplazando...' : 'Reemplazar'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -946,14 +1115,14 @@ const GeneradorQR = () => {
               <strong>¡Bienvenido al Generador QR de Escrituras!</strong>
             </Typography>
             <Typography variant="body2">
-              Para comenzar, sube un extracto de escritura en formato PDF. 
-              El sistema extraerá automáticamente los datos y generará un código QR 
+              Para comenzar, sube un extracto de escritura en formato PDF.
+              El sistema extraerá automáticamente los datos y generará un código QR
               para verificación pública.
             </Typography>
           </Alert>
         </Box>
       )}
-      
+
       {/* Modal de subida de PDF completo */}
       {selectedEscrituraForPDF && (
         <PDFUploaderModal
@@ -966,7 +1135,7 @@ const GeneradorQR = () => {
           onSuccess={handlePDFUploadSuccess}
         />
       )}
-      
+
       {/* Modal de visualización de PDF */}
       {selectedEscrituraForPDF && hasPDFUploaded(selectedEscrituraForPDF) && (
         <Dialog
@@ -1007,7 +1176,7 @@ const GeneradorQR = () => {
           </DialogContent>
         </Dialog>
       )}
-      
+
       {/* Modal de gestión de páginas ocultas */}
       {selectedEscrituraForPDF && hasPDFUploaded(selectedEscrituraForPDF) && (
         <PDFPageManagerModal

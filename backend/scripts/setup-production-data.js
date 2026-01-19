@@ -37,47 +37,46 @@ async function setupProduction() {
   try {
     console.log('🚀 CONFIGURACIÓN RAILWAY - Notaría Segura');
     console.log('=========================================');
-    
+
     // Verificar conexión a base de datos
     console.log('📡 Verificando conexión a base de datos...');
     await prisma.$connect();
     console.log('✅ Conexión a base de datos exitosa');
-    
+
     // Verificar si es primera instalación
     const isFirst = await isFirstInstallation();
-    
+
     if (isFirst) {
       console.log('🌱 Primera instalación detectada - Poblando datos iniciales...');
-      
+
       // Importar y ejecutar el seed
       const { default: seed } = await import('../prisma/seed.js');
       await seed();
-      
+
       console.log('✅ Datos iniciales creados exitosamente');
     } else {
       console.log('ℹ️  Base de datos ya contiene datos - Saltando población inicial');
     }
-    
+
     // Verificar configuración
     console.log('🔧 Verificando configuración del sistema...');
-    
+
     const config = {
       nodeEnv: process.env.NODE_ENV,
       port: process.env.PORT,
       databaseUrl: process.env.DATABASE_URL ? 'CONFIGURADO' : 'NO CONFIGURADO',
       jwtSecret: process.env.JWT_SECRET ? 'CONFIGURADO' : 'NO CONFIGURADO',
-      whatsappEnabled: process.env.WHATSAPP_ENABLED,
-      twilioConfigured: process.env.TWILIO_ACCOUNT_SID ? 'SÍ' : 'NO'
+      whatsappEnabled: process.env.WHATSAPP_ENABLED
     };
-    
+
     console.log('📋 Configuración actual:');
     Object.entries(config).forEach(([key, value]) => {
       console.log(`   ${key}: ${value}`);
     });
-    
+
     console.log('\n🎉 CONFIGURACIÓN COMPLETADA EXITOSAMENTE');
     console.log('Sistema listo para recibir requests');
-    
+
   } catch (error) {
     console.error('💥 ERROR EN CONFIGURACIÓN:', error);
     throw error;
