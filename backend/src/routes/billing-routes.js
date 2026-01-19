@@ -76,4 +76,18 @@ router.get('/my-portfolio', billingController.getMyPortfolio);
 // Generate collection reminder message for a client
 router.get('/collection-reminder/:clientTaxId', billingController.generateCollectionReminder);
 
+// ============================================================================
+// SPRINT 7: REPORTES
+// ============================================================================
+
+// Report: Cartera por Cobrar (Accounts Receivable)
+router.get('/reports/cartera-por-cobrar', billingController.getCarteraPorCobrar);
+
+// Report: Pagos del Período
+router.get('/reports/pagos-periodo', billingController.getPagosDelPeriodo);
+
+// Report: Facturas Vencidas
+router.get('/reports/facturas-vencidas', billingController.getFacturasVencidas);
+
 export default router;
+
