@@ -22,14 +22,24 @@ import {
     Grid,
     Card,
     CardContent,
-    Skeleton
+    Skeleton,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Button,
+    Divider
 } from '@mui/material';
 import {
     Receipt as ReceiptIcon,
     Search as SearchIcon,
     Refresh as RefreshIcon,
     Visibility as VisibilityIcon,
-    FilterList as FilterIcon
+    FilterList as FilterIcon,
+    Close as CloseIcon,
+    Person as PersonIcon,
+    CalendarToday as CalendarIcon,
+    AttachMoney as MoneyIcon
 } from '@mui/icons-material';
 import billingService from '../../services/billing-service';
 
@@ -56,6 +66,11 @@ const ListaFacturas = () => {
 
     // Estadísticas
     const [stats, setStats] = useState(null);
+
+    // Modal de detalle
+    const [selectedInvoice, setSelectedInvoice] = useState(null);
+    const [invoiceDetail, setInvoiceDetail] = useState(null);
+    const [detailLoading, setDetailLoading] = useState(false);
 
     // Cargar estadísticas
     const loadStats = useCallback(async () => {
@@ -120,9 +135,23 @@ const ListaFacturas = () => {
         setPage(0);
     };
 
-    // Navegar a detalle de factura
-    const handleViewInvoice = (invoiceId) => {
-        window.location.hash = `#/factura-detalle/${invoiceId}`;
+    // Abrir modal de detalle de factura
+    const handleViewInvoice = async (invoice) => {
+        setSelectedInvoice(invoice);
+        setDetailLoading(true);
+        try {
+            const response = await billingService.getInvoiceById(invoice.id);
+            setInvoiceDetail(response.data);
+        } catch (err) {
+            console.error('Error cargando detalle:', err);
+        } finally {
+            setDetailLoading(false);
+        }
+    };
+
+    const handleCloseDetail = () => {
+        setSelectedInvoice(null);
+        setInvoiceDetail(null);
     };
 
     // Formatear estado de factura
@@ -273,7 +302,6 @@ const ListaFacturas = () => {
                     </TableHead>
                     <TableBody>
                         {loading ? (
-                            // Skeleton de carga
                             [...Array(5)].map((_, index) => (
                                 <TableRow key={index}>
                                     {[...Array(7)].map((_, cellIndex) => (
@@ -303,7 +331,7 @@ const ListaFacturas = () => {
                                     key={invoice.id}
                                     hover
                                     sx={{ cursor: 'pointer' }}
-                                    onClick={() => handleViewInvoice(invoice.id)}
+                                    onClick={() => handleViewInvoice(invoice)}
                                 >
                                     <TableCell>
                                         <Typography variant="body2" fontWeight={500}>
@@ -340,7 +368,7 @@ const ListaFacturas = () => {
                                                 size="small"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    handleViewInvoice(invoice.id);
+                                                    handleViewInvoice(invoice);
                                                 }}
                                             >
                                                 <VisibilityIcon fontSize="small" />
@@ -365,8 +393,148 @@ const ListaFacturas = () => {
                     labelDisplayedRows={({ from, to, count }) => `${from}-${to} de ${count}`}
                 />
             </TableContainer>
+
+            {/* Modal de Detalle de Factura */}
+            <Dialog
+                open={Boolean(selectedInvoice)}
+                onClose={handleCloseDetail}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box display="flex" alignItems="center" gap={1}>
+                        <ReceiptIcon color="primary" />
+                        <Typography variant="h6">
+                            Detalle de Factura {selectedInvoice?.invoiceNumber}
+                        </Typography>
+                    </Box>
+                    <IconButton onClick={handleCloseDetail}>
+                        <CloseIcon />
+                    </IconButton>
+                </DialogTitle>
+                <DialogContent dividers>
+                    {detailLoading ? (
+                        <Box sx={{ py: 4, textAlign: 'center' }}>
+                            <Typography color="text.secondary">Cargando detalle...</Typography>
+                        </Box>
+                    ) : invoiceDetail ? (
+                        <Box>
+                            {/* Info del cliente */}
+                            <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+                                <Typography variant="subtitle2" color="primary" gutterBottom>
+                                    <PersonIcon fontSize="small" sx={{ mr: 0.5, verticalAlign: 'middle' }} />
+                                    Cliente
+                                </Typography>
+                                <Grid container spacing={2}>
+                                    <Grid size={{ xs: 12, sm: 6 }}>
+                                        <Typography variant="body2" color="text.secondary">Nombre</Typography>
+                                        <Typography variant="body1" fontWeight={500}>{invoiceDetail.clientName || '-'}</Typography>
+                                    </Grid>
+                                    <Grid size={{ xs: 12, sm: 6 }}>
+                                        <Typography variant="body2" color="text.secondary">Cédula/RUC</Typography>
+                                        <Typography variant="body1" fontWeight={500}>{invoiceDetail.clientTaxId || '-'}</Typography>
+                                    </Grid>
+                                </Grid>
+                            </Paper>
+
+                            {/* Info de la factura */}
+                            <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+                                <Typography variant="subtitle2" color="primary" gutterBottom>
+                                    <CalendarIcon fontSize="small" sx={{ mr: 0.5, verticalAlign: 'middle' }} />
+                                    Información de Factura
+                                </Typography>
+                                <Grid container spacing={2}>
+                                    <Grid size={{ xs: 6, sm: 3 }}>
+                                        <Typography variant="body2" color="text.secondary">Emisión</Typography>
+                                        <Typography variant="body1">{billingService.formatDate(invoiceDetail.issueDate)}</Typography>
+                                    </Grid>
+                                    <Grid size={{ xs: 6, sm: 3 }}>
+                                        <Typography variant="body2" color="text.secondary">Vencimiento</Typography>
+                                        <Typography variant="body1">{billingService.formatDate(invoiceDetail.dueDate)}</Typography>
+                                    </Grid>
+                                    <Grid size={{ xs: 6, sm: 3 }}>
+                                        <Typography variant="body2" color="text.secondary">Estado</Typography>
+                                        {renderStatus(invoiceDetail.status)}
+                                    </Grid>
+                                    <Grid size={{ xs: 6, sm: 3 }}>
+                                        <Typography variant="body2" color="text.secondary">Concepto</Typography>
+                                        <Typography variant="body1">{invoiceDetail.concept || '-'}</Typography>
+                                    </Grid>
+                                </Grid>
+                            </Paper>
+
+                            {/* Montos */}
+                            <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
+                                <Typography variant="subtitle2" color="primary" gutterBottom>
+                                    <MoneyIcon fontSize="small" sx={{ mr: 0.5, verticalAlign: 'middle' }} />
+                                    Montos
+                                </Typography>
+                                <Grid container spacing={2}>
+                                    <Grid size={{ xs: 4 }}>
+                                        <Typography variant="body2" color="text.secondary">Total Factura</Typography>
+                                        <Typography variant="h6">{billingService.formatCurrency(invoiceDetail.totalAmount)}</Typography>
+                                    </Grid>
+                                    <Grid size={{ xs: 4 }}>
+                                        <Typography variant="body2" color="text.secondary">Total Pagado</Typography>
+                                        <Typography variant="h6" color="success.main">
+                                            {billingService.formatCurrency(invoiceDetail.paidAmount || 0)}
+                                        </Typography>
+                                    </Grid>
+                                    <Grid size={{ xs: 4 }}>
+                                        <Typography variant="body2" color="text.secondary">Saldo Pendiente</Typography>
+                                        <Typography
+                                            variant="h6"
+                                            color={invoiceDetail.balance > 0 ? 'error.main' : 'success.main'}
+                                            fontWeight="bold"
+                                        >
+                                            {billingService.formatCurrency(invoiceDetail.balance)}
+                                        </Typography>
+                                    </Grid>
+                                </Grid>
+                            </Paper>
+
+                            {/* Historial de pagos */}
+                            {invoiceDetail.payments && invoiceDetail.payments.length > 0 && (
+                                <Paper variant="outlined" sx={{ p: 2 }}>
+                                    <Typography variant="subtitle2" color="primary" gutterBottom>
+                                        Historial de Pagos ({invoiceDetail.payments.length})
+                                    </Typography>
+                                    <Table size="small">
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell>Fecha</TableCell>
+                                                <TableCell>Recibo</TableCell>
+                                                <TableCell align="right">Monto</TableCell>
+                                                <TableCell>Concepto</TableCell>
+                                            </TableRow>
+                                        </TableHead>
+                                        <TableBody>
+                                            {invoiceDetail.payments.map((payment) => (
+                                                <TableRow key={payment.id}>
+                                                    <TableCell>{billingService.formatDate(payment.paymentDate)}</TableCell>
+                                                    <TableCell>{payment.receiptNumber || '-'}</TableCell>
+                                                    <TableCell align="right" sx={{ color: 'success.main', fontWeight: 500 }}>
+                                                        {billingService.formatCurrency(payment.amount)}
+                                                    </TableCell>
+                                                    <TableCell>{payment.concept || '-'}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </Paper>
+                            )}
+                        </Box>
+                    ) : (
+                        <Typography color="text.secondary">No se pudo cargar el detalle</Typography>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseDetail}>Cerrar</Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };
 
 export default ListaFacturas;
+

@@ -592,7 +592,7 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
         </Box>
 
         {/* Botones de acción */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
           <Tooltip title={sidebarCollapsed ? 'Cambiar Contraseña' : ''} placement="right">
             <Button
               variant="outlined"
@@ -608,23 +608,30 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
               {sidebarCollapsed ? <SettingsIcon /> : 'Cambiar Contraseña'}
             </Button>
           </Tooltip>
-          <Tooltip title={sidebarCollapsed ? 'Cerrar Sesión' : ''} placement="right">
-            <Button
-              variant="contained"
-              startIcon={!sidebarCollapsed ? <LogoutIcon /> : null}
-              onClick={logout}
-              size="small"
-              fullWidth={!sidebarCollapsed}
-              color="error"
-              sx={{
-                minWidth: sidebarCollapsed ? 36 : 'auto',
-                px: sidebarCollapsed ? 0 : undefined
-              }}
-            >
-              {sidebarCollapsed ? <LogoutIcon /> : 'Cerrar Sesión'}
-            </Button>
-          </Tooltip>
         </Box>
+      </Box>
+
+      {/* Footer con Botón de Cerrar Sesión Prominente */}
+      <Box sx={{ p: sidebarCollapsed ? 1 : 2, mt: 'auto', borderTop: '1px solid', borderColor: 'divider', bgcolor: isDarkMode ? 'rgba(255,0,0,0.05)' : 'rgba(255,0,0,0.02)' }}>
+        <Tooltip title={sidebarCollapsed ? 'Cerrar Sesión' : ''} placement="right">
+          <Button
+            variant="contained"
+            startIcon={!sidebarCollapsed ? <LogoutIcon /> : <LogoutIcon />}
+            onClick={logout}
+            size="medium"
+            fullWidth
+            color="error"
+            sx={{
+              minWidth: sidebarCollapsed ? 36 : 'auto',
+              px: sidebarCollapsed ? 0 : 2,
+              py: 1,
+              fontWeight: 'bold',
+              boxShadow: 2
+            }}
+          >
+            {!sidebarCollapsed && 'Cerrar Sesión'}
+          </Button>
+        </Tooltip>
       </Box>
     </Box>
   );
