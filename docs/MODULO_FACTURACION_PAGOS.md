@@ -1138,7 +1138,7 @@ ORDER BY "Días Vencido" DESC;
 | 6.5 | Implementar "Enviar Recordatorio WhatsApp" | ⬜ | Usa wa.me con mensaje pre-generado |
 | 6.6 | Crear función `buildCollectionReminderMessage()` | ⬜ | Genera mensaje de cobro |
 | 6.7 | Registrar historial de recordatorios enviados | ⬜ | Para seguimiento |
-| 6.8 | Filtros: Vencidas, Por vencer, Mi cartera | ⬜ | |
+| 6.8 | Filtros: Vencidas, Por vencer, Mi cartera | ✅ | Chips de filtro locales |
 
 #### Criterios de Aceptación
 - [ ] Matrizador ve facturas pendientes de sus documentos

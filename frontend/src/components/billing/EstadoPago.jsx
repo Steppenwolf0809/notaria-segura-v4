@@ -289,7 +289,7 @@ const EstadoPago = ({ documentId, paymentStatus: externalStatus, compact = false
             >
                 <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <ReceiptIcon color="primary" />
-                    <Typography variant="h6" sx={{ flex: 1 }}>
+                    <Typography component="span" variant="h6" sx={{ flex: 1 }}>
                         {loadingInvoice ? 'Cargando...' : `Factura ${invoiceDetail?.invoiceNumber || ''}`}
                     </Typography>
                     <IconButton onClick={handleCloseModal} size="small">

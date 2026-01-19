@@ -53,10 +53,46 @@ const CarteraCobros = () => {
     const [sendingReminder, setSendingReminder] = useState(null);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
 
+    // Estado para filtros: 'TODOS', 'VENCIDAS', 'POR_VENCER'
+    const [activeFilter, setActiveFilter] = useState('TODOS');
+
     // Estado para modal de edición de teléfono
     const [phoneModalOpen, setPhoneModalOpen] = useState(false);
     const [selectedClient, setSelectedClient] = useState(null);
     const [editPhone, setEditPhone] = useState('');
+
+    // Filtrar clientes según el filtro activo
+    const getFilteredClients = () => {
+        if (!portfolio?.data) return [];
+
+        const clients = portfolio.data;
+
+        switch (activeFilter) {
+            case 'VENCIDAS':
+                // Filtrar clientes que tienen al menos una factura vencida
+                return clients
+                    .map(client => ({
+                        ...client,
+                        invoices: client.invoices.filter(inv => inv.isOverdue)
+                    }))
+                    .filter(client => client.invoices.length > 0);
+
+            case 'POR_VENCER':
+                // Filtrar clientes con facturas NO vencidas (pendientes pero no vencidas)
+                return clients
+                    .map(client => ({
+                        ...client,
+                        invoices: client.invoices.filter(inv => !inv.isOverdue)
+                    }))
+                    .filter(client => client.invoices.length > 0);
+
+            case 'TODOS':
+            default:
+                return clients;
+        }
+    };
+
+    const filteredClients = getFilteredClients();
 
     const loadPortfolio = useCallback(async () => {
         setLoading(true);
@@ -234,6 +270,40 @@ const CarteraCobros = () => {
                 </Grid>
             )}
 
+            {/* Filter Chips */}
+            {portfolio?.data?.length > 0 && (
+                <Box sx={{ mb: 3, display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <Typography variant="subtitle2" color="text.secondary" sx={{ mr: 1 }}>
+                        Filtrar:
+                    </Typography>
+                    <Chip
+                        label="Todos"
+                        onClick={() => setActiveFilter('TODOS')}
+                        color={activeFilter === 'TODOS' ? 'primary' : 'default'}
+                        variant={activeFilter === 'TODOS' ? 'filled' : 'outlined'}
+                    />
+                    <Chip
+                        icon={<WarningIcon />}
+                        label="Vencidas"
+                        onClick={() => setActiveFilter('VENCIDAS')}
+                        color={activeFilter === 'VENCIDAS' ? 'error' : 'default'}
+                        variant={activeFilter === 'VENCIDAS' ? 'filled' : 'outlined'}
+                    />
+                    <Chip
+                        icon={<ScheduleIcon />}
+                        label="Por Vencer"
+                        onClick={() => setActiveFilter('POR_VENCER')}
+                        color={activeFilter === 'POR_VENCER' ? 'warning' : 'default'}
+                        variant={activeFilter === 'POR_VENCER' ? 'filled' : 'outlined'}
+                    />
+                    {activeFilter !== 'TODOS' && (
+                        <Typography variant="caption" color="text.secondary" sx={{ ml: 2 }}>
+                            Mostrando {filteredClients.length} de {portfolio.data.length} clientes
+                        </Typography>
+                    )}
+                </Box>
+            )}
+
             {/* Client List */}
             {portfolio?.data?.length === 0 ? (
                 <Paper sx={{ p: 4, textAlign: 'center' }}>
@@ -245,9 +315,19 @@ const CarteraCobros = () => {
                         Todos los documentos asignados a ti tienen sus pagos al día
                     </Typography>
                 </Paper>
+            ) : filteredClients.length === 0 ? (
+                <Paper sx={{ p: 4, textAlign: 'center' }}>
+                    <MoneyIcon sx={{ fontSize: 60, color: 'info.main', mb: 2 }} />
+                    <Typography variant="h6" color="info.main">
+                        No hay facturas {activeFilter === 'VENCIDAS' ? 'vencidas' : 'por vencer'}
+                    </Typography>
+                    <Typography color="text.secondary">
+                        Cambia el filtro para ver otras facturas
+                    </Typography>
+                </Paper>
             ) : (
                 <Paper>
-                    {portfolio?.data?.map((client) => (
+                    {filteredClients.map((client) => (
                         <Accordion
                             key={client.clientTaxId}
                             expanded={expandedClient === client.clientTaxId}
