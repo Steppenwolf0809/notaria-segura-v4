@@ -56,6 +56,15 @@ import {
   addRateLimitHeaders
 } from '../middleware/rate-limiter.js';
 import { csrfProtection } from '../middleware/csrf-protection.js';
+import {
+  validateQuery,
+  validateParams,
+  paginationSchema,
+  searchSchema,
+  userIdSchema,
+  positiveIntSchema
+} from '../middleware/input-validation.js';
+import { z } from 'zod';
 import cache from '../services/cache-service.js';
 
 const router = express.Router();
@@ -70,6 +79,12 @@ router.use(requireAdmin);
 // Aplicar rate limiting a todas las rutas administrativas
 router.use(adminRateLimit);
 
+// 🔒 OWASP Security: Define validation schemas for admin routes
+const adminUsersQuerySchema = paginationSchema.merge(searchSchema).merge(z.object({
+  role: z.enum(['ADMIN', 'CAJA', 'MATRIZADOR', 'RECEPCION', 'ARCHIVO']).optional(),
+  status: z.enum(['true', 'false']).optional()
+}));
+
 /**
  * @route GET /api/admin/users
  * @desc Obtener todos los usuarios con paginación y filtros
@@ -79,8 +94,9 @@ router.use(adminRateLimit);
  * @query search - Búsqueda por nombre, apellido o email
  * @query role - Filtrar por rol
  * @query status - Filtrar por estado (true/false)
+ * 🔒 SECURITY: Input validation with Zod
  */
-router.get('/users', getAllUsers);
+router.get('/users', validateQuery(adminUsersQuerySchema), getAllUsers);
 
 /**
  * @route GET /api/admin/users/stats
@@ -107,8 +123,9 @@ router.get('/personas-registradas', getPersonasRegistradas);
  * @route GET /api/admin/users/:id
  * @desc Obtener un usuario específico por ID
  * @access Private (ADMIN only)
+ * 🔒 SECURITY: Validate user ID parameter
  */
-router.get('/users/:id', getUserById);
+router.get('/users/:id', validateParams(userIdSchema), getUserById);
 
 /**
  * @route POST /api/admin/users
@@ -125,8 +142,9 @@ router.post('/users', csrfProtection, createUser);
  * @access Private (ADMIN only)
  * @csrf Protected - Requiere token CSRF
  * @body email?, firstName?, lastName?, role?, password?
+ * 🔒 SECURITY: Validate user ID parameter
  */
-router.put('/users/:id', csrfProtection, updateUser);
+router.put('/users/:id', validateParams(userIdSchema), csrfProtection, updateUser);
 
 /**
  * @route PATCH /api/admin/users/:id/status
@@ -134,8 +152,9 @@ router.put('/users/:id', csrfProtection, updateUser);
  * @access Private (ADMIN only)
  * @csrf Protected - Requiere token CSRF
  * @body isActive (boolean)
+ * 🔒 SECURITY: Validate user ID parameter
  */
-router.patch('/users/:id/status', csrfProtection, toggleUserStatus);
+router.patch('/users/:id/status', validateParams(userIdSchema), csrfProtection, toggleUserStatus);
 
 /**
  * @route DELETE /api/admin/users/:id
@@ -143,8 +162,9 @@ router.patch('/users/:id/status', csrfProtection, toggleUserStatus);
  * @access Private (ADMIN only)
  * @csrf Protected - Requiere token CSRF
  * @warning Esta acción es irreversible
+ * 🔒 SECURITY: Validate user ID parameter
  */
-router.delete('/users/:id', csrfProtection, deleteUser);
+router.delete('/users/:id', validateParams(userIdSchema), csrfProtection, deleteUser);
 
 // ============================================================================
 // RUTAS DE SUPERVISIÓN DE DOCUMENTOS - ADMIN OVERSIGHT
@@ -315,18 +335,20 @@ router.post('/notifications/retry-all', retryAllFailedNotifications);
  * @route GET /api/admin/notificaciones
  * @desc Obtener notificaciones WhatsApp reales del sistema
  * @access Private (ADMIN only)
+ * 🔒 SECURITY: Validate query parameters
  */
-router.get('/notificaciones', async (req, res) => {
+router.get('/notificaciones', validateQuery(paginationSchema), async (req, res) => {
   try {
-    const { page = 1, limit = 50 } = req.query;
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    // ✅ SECURITY: Parameters validated by Zod middleware
+    const { page, limit } = req.query;
+    const skip = (page - 1) * limit;
 
     // Query directo a la base de datos para obtener notificaciones reales
     const [notifications, total] = await Promise.all([
       prisma.whatsAppNotification.findMany({
         orderBy: { createdAt: 'desc' },
         skip,
-        take: parseInt(limit),
+        take: limit,
         include: {
           document: {
             select: {
@@ -366,10 +388,10 @@ router.get('/notificaciones', async (req, res) => {
           esGrupo: !!n.groupId
         })),
         pagination: {
-          page: parseInt(page),
-          limit: parseInt(limit),
+          page,
+          limit,
           total,
-          pages: Math.ceil(total / parseInt(limit))
+          pages: Math.ceil(total / limit)
         }
       }
     });

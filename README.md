@@ -143,6 +143,5 @@ Para empezar a probar la aplicación, puedes usar los siguientes usuarios:
 ## Documentación Adicional
 
 - **[Guía de Onboarding para IA](AGENTS.md)**: Contexto del proyecto y guías para asistentes IA.
-- **[Guía de Configuración de Twilio](docs/TWILIO_SETUP_GUIDE.md)**: Cómo configurar las notificaciones de WhatsApp.
 - **[Documentación de Funcionalidades](docs/features/)**: Explicaciones detalladas de las características clave del sistema.
 - **[Guía de Desarrollo Local](DESARROLLO_LOCAL.md)**: Pasos para configurar el entorno de desarrollo local.

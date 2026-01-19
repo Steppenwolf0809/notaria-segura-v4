@@ -8,10 +8,10 @@ import { parseEscrituraPDF, validatePDFFile, sanitizeFilename } from '../service
 import { generateUniqueToken } from '../utils/token-generator.js';
 import { generateQRInfo, generateMultiFormatQR } from '../services/qr-generator-service.js';
 import { uploadPhotoToFTP } from '../services/cpanel-ftp-service.js';
-import { 
-  uploadPDFToFTP, 
-  downloadPDFFromFTP, 
-  validatePDFFile as validatePDFBuffer 
+import {
+  uploadPDFToFTP,
+  downloadPDFFromFTP,
+  validatePDFFile as validatePDFBuffer
 } from '../services/cpanel-ftp-service.js';
 
 /**
@@ -23,7 +23,7 @@ export async function uploadEscritura(req, res) {
   try {
     const userId = req.user.id;
     const userRole = req.user.role;
-    
+
     // Verificar que sea matrizador
     if (userRole !== 'MATRIZADOR') {
       return res.status(403).json({
@@ -31,12 +31,12 @@ export async function uploadEscritura(req, res) {
         message: 'Solo los matrizadores pueden subir escrituras'
       });
     }
-    
+
     // Con multer.fields(), los archivos están en req.files
     const files = req.files || {};
     const pdfFile = files.pdfFile ? files.pdfFile[0] : null;
     const fotoFile = files.foto ? files.foto[0] : null;
-    
+
     // Verificar que se subió el PDF (obligatorio)
     if (!pdfFile) {
       return res.status(400).json({
@@ -44,7 +44,7 @@ export async function uploadEscritura(req, res) {
         message: 'No se proporcionó ningún archivo PDF'
       });
     }
-    
+
     // Validar que sea un PDF
     if (!validatePDFFile(pdfFile.buffer, pdfFile.mimetype)) {
       return res.status(400).json({
@@ -52,7 +52,7 @@ export async function uploadEscritura(req, res) {
         message: 'El archivo debe ser un PDF válido'
       });
     }
-    
+
     // Validar foto si se proporcionó
     if (fotoFile) {
       const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
@@ -62,7 +62,7 @@ export async function uploadEscritura(req, res) {
           message: 'Formato de foto inválido. Solo JPG, PNG o WEBP'
         });
       }
-      
+
       // Verificar tamaño de foto (máximo 5MB)
       const maxFotoSize = 5 * 1024 * 1024; // 5MB
       if (fotoFile.size > maxFotoSize) {
@@ -71,16 +71,16 @@ export async function uploadEscritura(req, res) {
           message: 'La foto es demasiado grande (máximo 5MB)'
         });
       }
-      
+
       console.log(`[uploadEscritura] Foto recibida: ${fotoFile.originalname} (${(fotoFile.size / 1024).toFixed(2)} KB)`);
     }
-    
+
     // Sanitizar nombre del archivo PDF
     const sanitizedFilename = sanitizeFilename(pdfFile.originalname);
-    
+
     // Parsear el PDF
     const parseResult = await parseEscrituraPDF(pdfFile.buffer, sanitizedFilename);
-    
+
     if (!parseResult.success) {
       return res.status(400).json({
         success: false,
@@ -88,26 +88,65 @@ export async function uploadEscritura(req, res) {
         error: parseResult.error
       });
     }
-    
+
+    // ✅ VALIDACIÓN DE DUPLICADOS: Verificar si ya existe un QR con este número de escritura
+    if (parseResult.numeroEscritura) {
+      const existingQR = await prisma.escrituraQR.findFirst({
+        where: {
+          numeroEscritura: parseResult.numeroEscritura,
+          createdBy: userId, // Solo buscar en las escrituras del mismo usuario
+          activo: true // Solo considerar escrituras activas (no eliminadas)
+        },
+        select: {
+          id: true,
+          token: true,
+          numeroEscritura: true,
+          estado: true,
+          createdAt: true,
+          archivoOriginal: true
+        }
+      });
+
+      if (existingQR) {
+        console.warn(`[uploadEscritura] ⚠️ Duplicado detectado: ${parseResult.numeroEscritura} (QR ID: ${existingQR.id})`);
+
+        return res.status(409).json({
+          success: false,
+          code: 'DUPLICATE_QR',
+          message: `Ya existe un código QR para la escritura ${parseResult.numeroEscritura}`,
+          data: {
+            existingQR: {
+              id: existingQR.id,
+              token: existingQR.token,
+              numeroEscritura: existingQR.numeroEscritura,
+              estado: existingQR.estado,
+              createdAt: existingQR.createdAt,
+              archivoOriginal: existingQR.archivoOriginal
+            }
+          }
+        });
+      }
+    }
+
     // Generar token único
     const token = await generateUniqueToken(prisma);
-    
+
     // Variable para la URL de la foto
     let fotoURL = null;
     let fotoUploadWarning = null;
-    
+
     // Procesar foto si existe
     if (fotoFile) {
       try {
         console.log(`[uploadEscritura] Subiendo foto al FTP para token ${token}...`);
-        
+
         // Nombre del archivo: token + extensión original
         const fotoExtension = fotoFile.originalname.split('.').pop().toLowerCase();
         const fotoFilename = `${token}.${fotoExtension}`;
-        
+
         // Subir foto al FTP
         fotoURL = await uploadPhotoToFTP(fotoFile.buffer, fotoFilename);
-        
+
         console.log(`[uploadEscritura] ✅ Foto subida exitosamente: ${fotoURL}`);
       } catch (fotoError) {
         // Si falla la foto, NO bloquear la creación de la escritura
@@ -116,7 +155,7 @@ export async function uploadEscritura(req, res) {
         fotoURL = null; // Asegurar que quede null
       }
     }
-    
+
     // Guardar en base de datos
     const escritura = await prisma.escrituraQR.create({
       data: {
@@ -138,10 +177,10 @@ export async function uploadEscritura(req, res) {
         }
       }
     });
-    
+
     // Generar información del QR
     const qrInfo = await generateQRInfo(token);
-    
+
     // Parsear datosCompletos si viene como string (para consistencia con el frontend)
     let datosCompletosParsed = escritura.datosCompletos;
     if (typeof datosCompletosParsed === 'string') {
@@ -151,13 +190,13 @@ export async function uploadEscritura(req, res) {
         console.warn('[uploadEscritura] No se pudo parsear datosCompletos:', e.message);
       }
     }
-    
+
     // Construir warnings
     const allWarnings = [...(parseResult.warnings || [])];
     if (fotoUploadWarning) {
       allWarnings.push(fotoUploadWarning);
     }
-    
+
     // Construir mensaje de respuesta
     let successMessage = 'Escritura procesada exitosamente';
     if (fotoURL) {
@@ -165,7 +204,7 @@ export async function uploadEscritura(req, res) {
     } else if (fotoFile) {
       successMessage += ' (sin fotografía debido a error en upload)';
     }
-    
+
     res.status(201).json({
       success: true,
       message: successMessage,
@@ -183,7 +222,7 @@ export async function uploadEscritura(req, res) {
         warnings: allWarnings
       }
     });
-    
+
   } catch (error) {
     console.error('Error en uploadEscritura:', error);
     res.status(500).json({
@@ -202,7 +241,7 @@ export async function getEscrituras(req, res) {
   try {
     const userId = req.user.id;
     const userRole = req.user.role;
-    
+
     // Verificar permisos
     if (userRole !== 'MATRIZADOR' && userRole !== 'ADMIN') {
       return res.status(403).json({
@@ -210,34 +249,34 @@ export async function getEscrituras(req, res) {
         message: 'No tienes permisos para ver las escrituras'
       });
     }
-    
+
     // Parámetros de consulta
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const estado = req.query.estado;
     const search = req.query.search;
-    
+
     const skip = (page - 1) * limit;
-    
+
     // Construir filtros
     const where = {};
-    
+
     // Solo matrizadores ven sus propias escrituras, admins ven todas
     if (userRole === 'MATRIZADOR') {
       where.createdBy = userId;
     }
-    
+
     if (estado) {
       where.estado = estado;
     }
-    
+
     if (search) {
       where.OR = [
         { numeroEscritura: { contains: search } },
         { archivoOriginal: { contains: search } }
       ];
     }
-    
+
     // Obtener escrituras con paginación
     const [escrituras, total] = await Promise.all([
       prisma.escrituraQR.findMany({
@@ -257,7 +296,7 @@ export async function getEscrituras(req, res) {
       }),
       prisma.escrituraQR.count({ where })
     ]);
-    
+
     // Parsear datosCompletos de cada escritura para consistencia
     const escriturasConDatosParsed = escrituras.map(esc => {
       let datosCompletosParsed = esc.datosCompletos;
@@ -273,7 +312,7 @@ export async function getEscrituras(req, res) {
         datosCompletos: datosCompletosParsed
       };
     });
-    
+
     res.json({
       success: true,
       data: {
@@ -286,7 +325,7 @@ export async function getEscrituras(req, res) {
         }
       }
     });
-    
+
   } catch (error) {
     console.error('Error en getEscrituras:', error);
     res.status(500).json({
@@ -305,7 +344,7 @@ export async function getEscritura(req, res) {
     const { id } = req.params;
     const userId = req.user.id;
     const userRole = req.user.role;
-    
+
     const escritura = await prisma.escrituraQR.findUnique({
       where: { id: parseInt(id) },
       include: {
@@ -318,14 +357,14 @@ export async function getEscritura(req, res) {
         }
       }
     });
-    
+
     if (!escritura) {
       return res.status(404).json({
         success: false,
         message: 'Escritura no encontrada'
       });
     }
-    
+
     // Verificar permisos
     if (userRole === 'MATRIZADOR' && escritura.createdBy !== userId) {
       return res.status(403).json({
@@ -333,10 +372,10 @@ export async function getEscritura(req, res) {
         message: 'No tienes permisos para ver esta escritura'
       });
     }
-    
+
     // Generar QR actualizado
     const qrInfo = await generateQRInfo(escritura.token);
-    
+
     // Parsear datosCompletos para consistencia
     let datosCompletosParsed = escritura.datosCompletos;
     if (typeof datosCompletosParsed === 'string') {
@@ -346,7 +385,7 @@ export async function getEscritura(req, res) {
         console.warn('[getEscritura] No se pudo parsear datosCompletos:', e.message);
       }
     }
-    
+
     res.json({
       success: true,
       data: {
@@ -355,7 +394,7 @@ export async function getEscritura(req, res) {
         qr: qrInfo
       }
     });
-    
+
   } catch (error) {
     console.error('Error en getEscritura:', error);
     res.status(500).json({
@@ -374,7 +413,7 @@ export async function updateEscritura(req, res) {
     const { id } = req.params;
     const userId = req.user.id;
     const userRole = req.user.role;
-    
+
     // Extraer datos del body
     // Si viene con foto, los datos pueden estar en req.body.data como JSON string
     let bodyData;
@@ -387,21 +426,21 @@ export async function updateEscritura(req, res) {
     } else {
       bodyData = req.body;
     }
-    
+
     const { datosCompletos, estado, numeroEscritura } = bodyData;
-    
+
     // Buscar escritura actual
     const escritura = await prisma.escrituraQR.findUnique({
       where: { id: parseInt(id) }
     });
-    
+
     if (!escritura) {
       return res.status(404).json({
         success: false,
         message: 'Escritura no encontrada'
       });
     }
-    
+
     // Verificar permisos
     if (userRole === 'MATRIZADOR' && escritura.createdBy !== userId) {
       return res.status(403).json({
@@ -409,7 +448,7 @@ export async function updateEscritura(req, res) {
         message: 'No tienes permisos para editar esta escritura'
       });
     }
-    
+
     // Validar estado si se proporciona
     const estadosValidos = ['activo', 'revision_requerida', 'inactivo'];
     if (estado && !estadosValidos.includes(estado)) {
@@ -418,16 +457,16 @@ export async function updateEscritura(req, res) {
         message: 'Estado inválido'
       });
     }
-    
+
     // Procesar foto si se está actualizando
     let nuevaFotoURL = null;
     let fotoWarning = null;
     const files = req.files || {};
     const fotoFile = files.foto ? files.foto[0] : null;
-    
+
     if (fotoFile) {
       console.log(`[updateEscritura] Procesando nueva foto para escritura ${id}...`);
-      
+
       try {
         // Si existe una foto anterior, eliminarla del FTP
         if (escritura.fotoURL) {
@@ -435,20 +474,20 @@ export async function updateEscritura(req, res) {
             // Extraer nombre del archivo de la URL antigua
             const urlParts = escritura.fotoURL.split('/');
             const oldFilename = urlParts[urlParts.length - 1];
-            
+
             console.log(`[updateEscritura] Eliminando foto antigua del FTP: ${oldFilename}`);
-            
+
             // Importar función de eliminación dinámicamente
             const { deletePhotoFromFTP } = await import('../services/cpanel-ftp-service.js');
             await deletePhotoFromFTP(oldFilename);
-            
+
             console.log(`[updateEscritura] ✅ Foto antigua eliminada del FTP`);
           } catch (deleteError) {
             // Si falla la eliminación, solo registrar warning pero continuar
             console.warn(`[updateEscritura] ⚠️ No se pudo eliminar foto antigua: ${deleteError.message}`);
           }
         }
-        
+
         // Generar nombre único para la nueva foto
         const timestamp = Date.now();
         const originalExtension = fotoFile.originalname.split('.').pop().toLowerCase();
@@ -456,28 +495,28 @@ export async function updateEscritura(req, res) {
           fotoFile.originalname.replace(/\.[^/.]+$/, '') // Remover extensión
         );
         const newFilename = `${timestamp}-${sanitizedBasename}.${originalExtension}`;
-        
+
         console.log(`[updateEscritura] Subiendo nueva foto al FTP: ${newFilename}`);
-        
+
         // Subir nueva foto al FTP
         nuevaFotoURL = await uploadPhotoToFTP(fotoFile.buffer, newFilename);
-        
+
         console.log(`[updateEscritura] ✅ Nueva foto subida exitosamente: ${nuevaFotoURL}`);
-        
+
       } catch (fotoError) {
         // Si falla la actualización de foto, registrar warning pero no bloquear la actualización
         console.error('[updateEscritura] ❌ Error procesando foto:', fotoError.message);
         fotoWarning = `Datos actualizados, pero no se pudo actualizar la foto: ${fotoError.message}`;
       }
     }
-    
+
     // Preparar datos para actualización
     const dataToUpdate = {};
     if (datosCompletos) dataToUpdate.datosCompletos = datosCompletos;
     if (estado) dataToUpdate.estado = estado;
     if (numeroEscritura) dataToUpdate.numeroEscritura = numeroEscritura;
     if (nuevaFotoURL) dataToUpdate.fotoURL = nuevaFotoURL;
-    
+
     // Actualizar escritura en base de datos
     const updatedEscritura = await prisma.escrituraQR.update({
       where: { id: parseInt(id) },
@@ -492,7 +531,7 @@ export async function updateEscritura(req, res) {
         }
       }
     });
-    
+
     // Parsear datosCompletos para consistencia
     let datosCompletosParsed = updatedEscritura.datosCompletos;
     if (typeof datosCompletosParsed === 'string') {
@@ -502,7 +541,7 @@ export async function updateEscritura(req, res) {
         console.warn('[updateEscritura] No se pudo parsear datosCompletos:', e.message);
       }
     }
-    
+
     // Construir respuesta
     const response = {
       success: true,
@@ -512,13 +551,13 @@ export async function updateEscritura(req, res) {
         datosCompletos: datosCompletosParsed
       }
     };
-    
+
     if (fotoWarning) {
       response.warning = fotoWarning;
     }
-    
+
     res.json(response);
-    
+
   } catch (error) {
     console.error('Error en updateEscritura:', error);
     res.status(500).json({
@@ -536,25 +575,25 @@ export async function getEscrituraQR(req, res) {
   try {
     const { id } = req.params;
     const format = req.query.format || 'display';
-    
+
     const escritura = await prisma.escrituraQR.findUnique({
       where: { id: parseInt(id) }
     });
-    
+
     if (!escritura) {
       return res.status(404).json({
         success: false,
         message: 'Escritura no encontrada'
       });
     }
-    
+
     if (escritura.estado !== 'activo') {
       return res.status(400).json({
         success: false,
         message: 'La escritura no está activa para generar QR'
       });
     }
-    
+
     // Generar QR según formato solicitado
     let qrData;
     if (format === 'multi') {
@@ -562,12 +601,12 @@ export async function getEscrituraQR(req, res) {
     } else {
       qrData = await generateQRInfo(escritura.token);
     }
-    
+
     res.json({
       success: true,
       data: qrData
     });
-    
+
   } catch (error) {
     console.error('Error en getEscrituraQR:', error);
     res.status(500).json({
@@ -656,35 +695,35 @@ function normalizeDatosEscritura(datosCompletos) {
 
   // Normalizar notario y notaría desde diferentes posibles campos
   const notario = (
-    datos.notarioNombre ?? 
-    datos.notario ?? 
-    datos.titularNotaria ?? 
-    datos.encabezadoNotario ?? 
+    datos.notarioNombre ??
+    datos.notario ??
+    datos.titularNotaria ??
+    datos.encabezadoNotario ??
     ''
   ).toString().trim();
 
   const notaria = (
-    datos.notariaNombre ?? 
-    datos.notaria ?? 
-    datos.oficina ?? 
-    datos.encabezadoNotaria ?? 
+    datos.notariaNombre ??
+    datos.notaria ??
+    datos.oficina ??
+    datos.encabezadoNotaria ??
     ''
   ).toString().trim();
 
   // Normalizar acto/contrato
   const acto = (
-    datos.acto ?? 
-    datos.actoContrato ?? 
-    datos.tipoActo ?? 
-    datos.contrato ?? 
+    datos.acto ??
+    datos.actoContrato ??
+    datos.tipoActo ??
+    datos.contrato ??
     ''
   ).toString().trim();
 
   // Normalizar fecha
   const fechaOtorgamiento = (
-    datos.fecha_otorgamiento ?? 
-    datos.fechaOtorgamiento ?? 
-    datos.fecha ?? 
+    datos.fecha_otorgamiento ??
+    datos.fechaOtorgamiento ??
+    datos.fecha ??
     ''
   ).toString().trim();
 
@@ -708,7 +747,7 @@ function sanitizePersonas(personas) {
 
   // Palabras que indican que es un campo de cabecera o basura
   const palabrasBasura = [
-    'DOCUMENTO', 'IDENTIDAD', 'COMPARECIENTE', 'INTERVINIENTE', 
+    'DOCUMENTO', 'IDENTIDAD', 'COMPARECIENTE', 'INTERVINIENTE',
     'NOMBRES', 'RAZON SOCIAL', 'DESCONOCIDO', 'CÉDULA', 'CEDULA',
     'TIPO INTERVINIENTE', 'PERSONA QUE', 'NACIONALIDAD', 'CALIDAD',
     'PASAPORTE', 'UBICACIÓN', 'UBICACION', 'PROVINCIA', 'CANTON',
@@ -720,15 +759,15 @@ function sanitizePersonas(personas) {
     if (!persona || !persona.nombre) return false;
 
     const nombreUpper = String(persona.nombre).toUpperCase().trim();
-    
+
     // Filtrar si el nombre es muy corto (menos de 5 caracteres)
     if (nombreUpper.length < 5) return false;
 
     // Filtrar si contiene palabras basura
-    const contieneBasura = palabrasBasura.some(basura => 
+    const contieneBasura = palabrasBasura.some(basura =>
       nombreUpper.includes(basura)
     );
-    
+
     if (contieneBasura) return false;
 
     // Filtrar si el nombre es solo números o caracteres especiales
@@ -742,18 +781,18 @@ function sanitizePersonas(personas) {
   }).map(persona => {
     // Limpiar los campos de la persona - estructura simplificada
     const numero = String(persona.numero || '').replace(/\D+/g, '');
-    
+
     const personaLimpia = {
       nombre: String(persona.nombre || '').trim(),
       documento: String(persona.documento || '').trim() || 'CÉDULA',
       numero: numero || null
     };
-    
+
     // Solo incluir representadoPor si tiene valor
     if (persona.representadoPor && String(persona.representadoPor).trim()) {
       personaLimpia.representadoPor = String(persona.representadoPor).trim();
     }
-    
+
     return personaLimpia;
   });
 }
@@ -770,7 +809,7 @@ function extractDatosPublicos(datosNormalizados, escritura) {
   if (datosNormalizados.otorgantes) {
     const otorgadoPor = sanitizePersonas(datosNormalizados.otorgantes.otorgado_por || []);
     const aFavorDe = sanitizePersonas(datosNormalizados.otorgantes.a_favor_de || []);
-    
+
     // Solo incluir si hay al menos una persona válida
     if (otorgadoPor.length > 0 || aFavorDe.length > 0) {
       otorgantesLimpios = {
@@ -815,8 +854,8 @@ function extractDatosPublicos(datosNormalizados, escritura) {
 
     // Metadata de verificación
     verificadoEn: new Date().toISOString(),
-    procesadoPor: escritura.creador ? 
-      `${escritura.creador.firstName} ${escritura.creador.lastName}` : 
+    procesadoPor: escritura.creador ?
+      `${escritura.creador.firstName} ${escritura.creador.lastName}` :
       'Sistema'
   };
 
@@ -830,9 +869,9 @@ function extractDatosPublicos(datosNormalizados, escritura) {
 export async function verifyEscritura(req, res) {
   try {
     console.log('[API-QR] Verificando token:', req.params.token?.substring(0, 4) + '****');
-    
+
     const { token } = req.params;
-    
+
     // Validar formato del token
     if (!token || !/^[A-Za-z0-9]{8}$/.test(token)) {
       return res.status(400).json({
@@ -840,7 +879,7 @@ export async function verifyEscritura(req, res) {
         message: 'Token inválido'
       });
     }
-    
+
     // Buscar escritura por token
     const escritura = await prisma.escrituraQR.findUnique({
       where: { token },
@@ -853,7 +892,7 @@ export async function verifyEscritura(req, res) {
         }
       }
     });
-    
+
     if (!escritura) {
       console.log('[API-QR] Escritura no encontrada para token:', token);
       return res.status(404).json({
@@ -861,7 +900,7 @@ export async function verifyEscritura(req, res) {
         message: 'Escritura no encontrada'
       });
     }
-    
+
     if (escritura.estado !== 'activo') {
       console.log('[API-QR] Escritura inactiva:', token, 'estado:', escritura.estado);
       return res.status(400).json({
@@ -869,29 +908,29 @@ export async function verifyEscritura(req, res) {
         message: 'Esta escritura no está disponible para verificación'
       });
     }
-    
+
     // Parsear datos completos (puede venir stringificado)
     let datosCompletos = {};
     try {
-      datosCompletos = typeof escritura.datosCompletos === 'string' 
+      datosCompletos = typeof escritura.datosCompletos === 'string'
         ? JSON.parse(escritura.datosCompletos)
         : escritura.datosCompletos || {};
     } catch (e) {
       console.error('[API-QR] Error parsing datosCompletos:', e.message);
       datosCompletos = {};
     }
-    
+
     // Normalizar datos (cuantía, notario, etc.)
     const datosNormalizados = normalizeDatosEscritura(datosCompletos);
-    
+
     // Extraer solo campos públicos importantes
     const datosPublicos = extractDatosPublicos(datosNormalizados, escritura);
-    
+
     // Agregar información del PDF si existe
     if (escritura.pdfFileName) {
       datosPublicos.pdfFileName = escritura.pdfFileName;
       datosPublicos.pdfFileSize = escritura.pdfFileSize;
-      
+
       // Parsear páginas ocultas
       let hiddenPages = [];
       if (escritura.pdfHiddenPages) {
@@ -902,12 +941,12 @@ export async function verifyEscritura(req, res) {
         }
       }
       datosPublicos.pdfHiddenPages = hiddenPages;
-      
+
       // URL pública del PDF
       const publicBaseURL = process.env.PUBLIC_FOTOS_URL || 'https://notaria18quito.com.ec/fotos-escrituras';
       datosPublicos.pdfPublicUrl = `${publicBaseURL}/${escritura.pdfFileName}`;
     }
-    
+
     console.log('[API-QR] Verificación exitosa:', {
       token: token.substring(0, 4) + '****',
       numeroEscritura: datosPublicos.numeroEscritura,
@@ -915,16 +954,16 @@ export async function verifyEscritura(req, res) {
       cuantia: typeof datosPublicos.cuantia === 'number' ? `$${datosPublicos.cuantia}` : datosPublicos.cuantia,
       tienePDF: !!escritura.pdfFileName
     });
-    
+
     // TODO: Registrar verificación para analytics
     // await registrarVerificacion(token, req.ip, req.get('User-Agent'));
-    
+
     res.json({
       success: true,
       message: 'Escritura verificada exitosamente',
       data: datosPublicos
     });
-    
+
   } catch (error) {
     console.error('[API-QR] Error en verifyEscritura:', error);
     res.status(500).json({
@@ -943,7 +982,7 @@ export async function createEscrituraManual(req, res) {
   try {
     const userId = req.user.id;
     const userRole = req.user.role;
-    
+
     // Verificar que sea matrizador
     if (userRole !== 'MATRIZADOR' && userRole !== 'ADMIN') {
       return res.status(403).json({
@@ -951,11 +990,11 @@ export async function createEscrituraManual(req, res) {
         message: 'Solo los matrizadores pueden crear escrituras'
       });
     }
-    
+
     // Con multer.fields(), los archivos están en req.files
     const files = req.files || {};
     const fotoFile = files.foto ? files.foto[0] : null;
-    
+
     // Si viene con foto, los datos están en req.body.data como string JSON
     // Si viene sin foto, los datos están directamente en req.body
     let datosBody;
@@ -971,7 +1010,7 @@ export async function createEscrituraManual(req, res) {
     } else {
       datosBody = req.body;
     }
-    
+
     const {
       numeroEscritura,
       acto,
@@ -984,7 +1023,7 @@ export async function createEscrituraManual(req, res) {
       objeto_observaciones,
       extractoTextoCompleto
     } = datosBody;
-    
+
     // Validar campos requeridos
     if (!numeroEscritura) {
       return res.status(400).json({
@@ -992,46 +1031,46 @@ export async function createEscrituraManual(req, res) {
         message: 'El número de escritura es requerido'
       });
     }
-    
+
     if (!acto) {
       return res.status(400).json({
         success: false,
         message: 'El acto/contrato es requerido'
       });
     }
-    
+
     if (!fecha_otorgamiento) {
       return res.status(400).json({
         success: false,
         message: 'La fecha de otorgamiento es requerida'
       });
     }
-    
+
     console.log('[createEscrituraManual] Creando escritura manual:', {
       numeroEscritura,
       acto: acto.substring(0, 30) + '...',
       tieneFoto: !!fotoFile,
       usuario: req.user.email
     });
-    
+
     // Generar token único
     const token = await generateUniqueToken(prisma);
-    
+
     // Procesar foto si existe
     let fotoURL = null;
     let fotoUploadWarning = null;
-    
+
     if (fotoFile) {
       try {
         console.log(`[createEscrituraManual] Subiendo foto al FTP para token ${token}...`);
-        
+
         // Nombre del archivo: token + extensión original
         const fotoExtension = fotoFile.originalname.split('.').pop().toLowerCase();
         const fotoFilename = `${token}.${fotoExtension}`;
-        
+
         // Subir foto al FTP
         fotoURL = await uploadPhotoToFTP(fotoFile.buffer, fotoFilename);
-        
+
         console.log(`[createEscrituraManual] ✅ Foto subida exitosamente: ${fotoURL}`);
       } catch (fotoError) {
         // Si falla la foto, NO bloquear la creación de la escritura
@@ -1040,7 +1079,7 @@ export async function createEscrituraManual(req, res) {
         fotoURL = null; // Asegurar que quede null
       }
     }
-    
+
     // Construir objeto datosCompletos (estructura simplificada)
     const datosCompletos = {
       escritura: numeroEscritura,
@@ -1053,7 +1092,7 @@ export async function createEscrituraManual(req, res) {
       otorgantes: otorgantes || { otorgado_por: [], a_favor_de: [] },
       objeto_observaciones: objeto_observaciones || ''
     };
-    
+
     // Crear escritura en base de datos
     const escritura = await prisma.escrituraQR.create({
       data: {
@@ -1077,12 +1116,12 @@ export async function createEscrituraManual(req, res) {
         }
       }
     });
-    
+
     // Generar información del QR
     const qrInfo = await generateQRInfo(token);
-    
+
     console.log('[createEscrituraManual] Escritura manual creada exitosamente:', escritura.id);
-    
+
     // Respuesta con o sin warning de foto
     const response = {
       success: true,
@@ -1100,13 +1139,13 @@ export async function createEscrituraManual(req, res) {
         qr: qrInfo
       }
     };
-    
+
     if (fotoUploadWarning) {
       response.warning = fotoUploadWarning;
     }
-    
+
     res.status(201).json(response);
-    
+
   } catch (error) {
     console.error('[createEscrituraManual] Error:', error);
     res.status(500).json({
@@ -1126,18 +1165,18 @@ export async function deleteEscritura(req, res) {
     const { id } = req.params;
     const userId = req.user.id;
     const userRole = req.user.role;
-    
+
     const escritura = await prisma.escrituraQR.findUnique({
       where: { id: parseInt(id) }
     });
-    
+
     if (!escritura) {
       return res.status(404).json({
         success: false,
         message: 'Escritura no encontrada'
       });
     }
-    
+
     // Verificar permisos
     if (userRole === 'MATRIZADOR' && escritura.createdBy !== userId) {
       return res.status(403).json({
@@ -1145,7 +1184,7 @@ export async function deleteEscritura(req, res) {
         message: 'No tienes permisos para eliminar esta escritura'
       });
     }
-    
+
     // Desactivar escritura
     await prisma.escrituraQR.update({
       where: { id: parseInt(id) },
@@ -1154,12 +1193,12 @@ export async function deleteEscritura(req, res) {
         activo: false
       }
     });
-    
+
     res.json({
       success: true,
       message: 'Escritura desactivada exitosamente'
     });
-    
+
   } catch (error) {
     console.error('Error en deleteEscritura:', error);
     res.status(500).json({
@@ -1179,9 +1218,9 @@ export async function hardDeleteEscritura(req, res) {
     const { id } = req.params;
     const userId = req.user.id;
     const userRole = req.user.role;
-    
+
     console.log(`[hardDelete] Usuario ${userId} (${userRole}) intentando eliminar escritura ${id}`);
-    
+
     // Verificar que sea matrizador (el middleware ya validó, pero doble verificación)
     if (userRole !== 'MATRIZADOR' && userRole !== 'ADMIN') {
       return res.status(403).json({
@@ -1189,19 +1228,19 @@ export async function hardDeleteEscritura(req, res) {
         message: 'Solo los matrizadores pueden eliminar escrituras permanentemente'
       });
     }
-    
+
     // Buscar escritura
     const escritura = await prisma.escrituraQR.findUnique({
       where: { id: parseInt(id) }
     });
-    
+
     if (!escritura) {
       return res.status(404).json({
         success: false,
         message: 'Escritura no encontrada'
       });
     }
-    
+
     // Verificar permisos: solo el creador puede eliminar (o admin)
     if (userRole === 'MATRIZADOR' && escritura.createdBy !== userId) {
       console.log(`[hardDelete] Permiso denegado: escritura creada por ${escritura.createdBy}, solicitante ${userId}`);
@@ -1210,19 +1249,19 @@ export async function hardDeleteEscritura(req, res) {
         message: 'Solo puedes eliminar escrituras que tú creaste'
       });
     }
-    
+
     // Guardar info para logs antes de eliminar
     const numeroEscritura = escritura.numeroEscritura;
     const token = escritura.token;
     const fotoURL = escritura.fotoURL;
-    
+
     // ELIMINACIÓN PERMANENTE de la base de datos
     await prisma.escrituraQR.delete({
       where: { id: parseInt(id) }
     });
-    
+
     console.log(`[hardDelete] ✅ Escritura ${id} (${numeroEscritura}, token: ${token}) eliminada permanentemente por usuario ${userId}`);
-    
+
     // TODO FUTURO: Eliminar foto del FTP si existe
     // if (fotoURL) {
     //   try {
@@ -1232,7 +1271,7 @@ export async function hardDeleteEscritura(req, res) {
     //     console.warn(`[hardDelete] No se pudo eliminar foto del FTP: ${ftpError.message}`);
     //   }
     // }
-    
+
     res.json({
       success: true,
       message: 'Escritura eliminada permanentemente',
@@ -1242,7 +1281,7 @@ export async function hardDeleteEscritura(req, res) {
         token
       }
     });
-    
+
   } catch (error) {
     console.error('[hardDelete] Error eliminando escritura:', error);
     res.status(500).json({
@@ -1263,9 +1302,9 @@ export async function uploadPDFToEscritura(req, res) {
     const { id } = req.params;
     const userId = req.user.id;
     const userRole = req.user.role;
-    
+
     console.log(`[uploadPDF] Usuario ${userId} (${userRole}) subiendo PDF para escritura ${id}`);
-    
+
     // Verificar permisos (ADMIN o MATRIZADOR)
     if (userRole !== 'ADMIN' && userRole !== 'MATRIZADOR') {
       return res.status(403).json({
@@ -1273,7 +1312,7 @@ export async function uploadPDFToEscritura(req, res) {
         message: 'Solo administradores y matrizadores pueden subir PDFs'
       });
     }
-    
+
     // Verificar que se recibió el archivo
     if (!req.file) {
       return res.status(400).json({
@@ -1281,13 +1320,13 @@ export async function uploadPDFToEscritura(req, res) {
         message: 'No se proporcionó ningún archivo PDF'
       });
     }
-    
+
     const pdfFile = req.file;
-    
+
     // Obtener páginas ocultas si se proporcionaron
     const hiddenPages = req.body.hiddenPages || null;
     let hiddenPagesArray = null;
-    
+
     if (hiddenPages) {
       try {
         hiddenPagesArray = JSON.parse(hiddenPages);
@@ -1306,7 +1345,7 @@ export async function uploadPDFToEscritura(req, res) {
         });
       }
     }
-    
+
     // Validar que sea un PDF (verificar magic bytes)
     if (!validatePDFBuffer(pdfFile.buffer)) {
       return res.status(400).json({
@@ -1314,7 +1353,7 @@ export async function uploadPDFToEscritura(req, res) {
         message: 'El archivo no es un PDF válido'
       });
     }
-    
+
     // Validar tamaño máximo (10MB)
     const maxSize = 10 * 1024 * 1024;
     if (pdfFile.size > maxSize) {
@@ -1324,27 +1363,27 @@ export async function uploadPDFToEscritura(req, res) {
         message: `El archivo es demasiado grande (${sizeMB}MB). Máximo permitido: 10MB`
       });
     }
-    
+
     // Buscar escritura
     const escritura = await prisma.escrituraQR.findUnique({
       where: { id: parseInt(id) }
     });
-    
+
     if (!escritura) {
       return res.status(404).json({
         success: false,
         message: 'Escritura no encontrada'
       });
     }
-    
+
     // Nombre del archivo: {TOKEN}.pdf
     const filename = `${escritura.token}.pdf`;
-    
+
     console.log(`[uploadPDF] Subiendo PDF al FTP: ${filename} (${(pdfFile.size / 1024).toFixed(2)} KB)`);
-    
+
     // Subir PDF al FTP (si ya existe, se reemplaza automáticamente)
     const pdfURL = await uploadPDFToFTP(pdfFile.buffer, filename);
-    
+
     // Actualizar base de datos
     const updateData = {
       pdfFileName: filename,
@@ -1352,7 +1391,7 @@ export async function uploadPDFToEscritura(req, res) {
       pdfUploadedBy: userId,
       pdfFileSize: pdfFile.size
     };
-    
+
     // Agregar páginas ocultas si se proporcionaron
     if (hiddenPagesArray && hiddenPagesArray.length > 0) {
       updateData.pdfHiddenPages = JSON.stringify(hiddenPagesArray);
@@ -1361,14 +1400,14 @@ export async function uploadPDFToEscritura(req, res) {
       // Si no hay páginas ocultas, establecer como null (todas visibles)
       updateData.pdfHiddenPages = null;
     }
-    
+
     await prisma.escrituraQR.update({
       where: { id: parseInt(id) },
       data: updateData
     });
-    
+
     console.log(`[uploadPDF] ✅ PDF subido exitosamente para escritura ${id}`);
-    
+
     // Respuesta
     res.json({
       success: true,
@@ -1381,7 +1420,7 @@ export async function uploadPDFToEscritura(req, res) {
         hiddenPages: hiddenPagesArray || []
       }
     });
-    
+
   } catch (error) {
     console.error('[uploadPDF] Error:', error);
     res.status(500).json({
@@ -1402,9 +1441,9 @@ export async function uploadPDFToEscritura(req, res) {
 export async function getPDFPublic(req, res) {
   try {
     const { token } = req.params;
-    
+
     console.log(`[getPDFPublic] Solicitud de PDF con token: ${token.substring(0, 4)}****`);
-    
+
     // Validar formato del token
     if (!token || !/^[A-Za-z0-9]{8}$/.test(token)) {
       return res.status(400).json({
@@ -1412,12 +1451,12 @@ export async function getPDFPublic(req, res) {
         message: 'Token inválido'
       });
     }
-    
+
     // Buscar escritura por token
     const escritura = await prisma.escrituraQR.findUnique({
       where: { token }
     });
-    
+
     if (!escritura) {
       console.log(`[getPDFPublic] Escritura no encontrada para token: ${token}`);
       return res.status(404).json({
@@ -1425,7 +1464,7 @@ export async function getPDFPublic(req, res) {
         message: 'Escritura no encontrada'
       });
     }
-    
+
     // Verificar que esté activa
     if (escritura.estado !== 'activo') {
       console.log(`[getPDFPublic] Escritura inactiva: ${token}`);
@@ -1434,7 +1473,7 @@ export async function getPDFPublic(req, res) {
         message: 'Esta escritura no está disponible para verificación'
       });
     }
-    
+
     // Verificar que tenga PDF subido
     if (!escritura.pdfFileName) {
       console.log(`[getPDFPublic] Escritura sin PDF subido: ${token}`);
@@ -1443,7 +1482,7 @@ export async function getPDFPublic(req, res) {
         message: 'El PDF de esta escritura no está disponible'
       });
     }
-    
+
     // Incrementar contador de visualizaciones (no esperar)
     prisma.escrituraQR.update({
       where: { id: escritura.id },
@@ -1455,24 +1494,24 @@ export async function getPDFPublic(req, res) {
     }).catch(err => {
       console.warn('[getPDFPublic] Error actualizando contador de vistas:', err.message);
     });
-    
+
     // Registrar visualización (IP, fecha)
     const clientIP = req.ip || req.headers['x-forwarded-for'] || 'unknown';
     console.log(`[getPDFPublic] ✅ Redirigiendo a PDF. IP: ${clientIP}, Token: ${token.substring(0, 4)}****`);
-    
+
     // Construir URL pública del PDF (sirve directamente desde el dominio)
     const publicBaseURL = process.env.PUBLIC_FOTOS_URL || 'https://notaria18quito.com.ec/fotos-escrituras';
     const pdfURL = `${publicBaseURL}/${escritura.pdfFileName}`;
-    
+
     console.log(`[getPDFPublic] Redirigiendo a: ${pdfURL}`);
-    
+
     // Redirigir al PDF hospedado en el dominio
     // Usamos 302 (temporal) en caso de que necesitemos cambiar la ubicación en el futuro
     res.redirect(302, pdfURL);
-    
+
   } catch (error) {
     console.error('[getPDFPublic] Error:', error);
-    
+
     res.status(500).json({
       success: false,
       message: 'Error al obtener el PDF',
@@ -1489,7 +1528,7 @@ export async function getPDFPublic(req, res) {
 export async function getPDFMetadata(req, res) {
   try {
     const { token } = req.params;
-    
+
     // Validar formato del token
     if (!token || !/^[A-Za-z0-9]{8}$/.test(token)) {
       return res.status(400).json({
@@ -1497,7 +1536,7 @@ export async function getPDFMetadata(req, res) {
         message: 'Token inválido'
       });
     }
-    
+
     // Buscar escritura por token
     const escritura = await prisma.escrituraQR.findUnique({
       where: { token },
@@ -1511,14 +1550,14 @@ export async function getPDFMetadata(req, res) {
         estado: true
       }
     });
-    
+
     if (!escritura) {
       return res.status(404).json({
         success: false,
         message: 'Escritura no encontrada'
       });
     }
-    
+
     // Verificar que esté activa
     if (escritura.estado !== 'activo') {
       return res.status(400).json({
@@ -1526,7 +1565,7 @@ export async function getPDFMetadata(req, res) {
         message: 'Esta escritura no está disponible para verificación'
       });
     }
-    
+
     // Verificar que tenga PDF
     if (!escritura.pdfFileName) {
       return res.status(404).json({
@@ -1534,7 +1573,7 @@ export async function getPDFMetadata(req, res) {
         message: 'Esta escritura no tiene PDF disponible'
       });
     }
-    
+
     // Parsear páginas ocultas
     let hiddenPages = [];
     if (escritura.pdfHiddenPages) {
@@ -1545,7 +1584,7 @@ export async function getPDFMetadata(req, res) {
         hiddenPages = [];
       }
     }
-    
+
     res.json({
       success: true,
       data: {
@@ -1556,7 +1595,7 @@ export async function getPDFMetadata(req, res) {
         hasHiddenPages: hiddenPages.length > 0
       }
     });
-    
+
   } catch (error) {
     console.error('[getPDFMetadata] Error:', error);
     res.status(500).json({
@@ -1577,9 +1616,9 @@ export async function updatePDFHiddenPages(req, res) {
     const { hiddenPages } = req.body;
     const userId = req.user.id;
     const userRole = req.user.role;
-    
+
     console.log(`[updatePDFHiddenPages] Usuario ${userId} (${userRole}) actualizando páginas ocultas de escritura ${id}`);
-    
+
     // Verificar permisos
     if (userRole !== 'ADMIN' && userRole !== 'MATRIZADOR') {
       return res.status(403).json({
@@ -1587,7 +1626,7 @@ export async function updatePDFHiddenPages(req, res) {
         message: 'No tienes permisos para editar las páginas ocultas'
       });
     }
-    
+
     // Validar hiddenPages
     if (hiddenPages !== null && hiddenPages !== undefined) {
       if (!Array.isArray(hiddenPages)) {
@@ -1596,7 +1635,7 @@ export async function updatePDFHiddenPages(req, res) {
           message: 'hiddenPages debe ser un array de números'
         });
       }
-      
+
       // Validar que todos sean números positivos
       if (!hiddenPages.every(p => typeof p === 'number' && p > 0 && Number.isInteger(p))) {
         return res.status(400).json({
@@ -1605,19 +1644,19 @@ export async function updatePDFHiddenPages(req, res) {
         });
       }
     }
-    
+
     // Buscar escritura
     const escritura = await prisma.escrituraQR.findUnique({
       where: { id: parseInt(id) }
     });
-    
+
     if (!escritura) {
       return res.status(404).json({
         success: false,
         message: 'Escritura no encontrada'
       });
     }
-    
+
     // Verificar que tenga PDF subido
     if (!escritura.pdfFileName) {
       return res.status(400).json({
@@ -1625,19 +1664,19 @@ export async function updatePDFHiddenPages(req, res) {
         message: 'Esta escritura no tiene un PDF subido. Sube el PDF primero.'
       });
     }
-    
+
     // Actualizar páginas ocultas
     const updateData = {
       pdfHiddenPages: hiddenPages && hiddenPages.length > 0 ? JSON.stringify(hiddenPages) : null
     };
-    
+
     await prisma.escrituraQR.update({
       where: { id: parseInt(id) },
       data: updateData
     });
-    
+
     console.log(`[updatePDFHiddenPages] ✅ Páginas ocultas actualizadas para escritura ${id}: ${hiddenPages || 'ninguna'}`);
-    
+
     res.json({
       success: true,
       message: 'Páginas ocultas actualizadas exitosamente',
@@ -1645,7 +1684,7 @@ export async function updatePDFHiddenPages(req, res) {
         hiddenPages: hiddenPages || []
       }
     });
-    
+
   } catch (error) {
     console.error('[updatePDFHiddenPages] Error:', error);
     res.status(500).json({
@@ -1666,9 +1705,9 @@ export async function getPDFPrivate(req, res) {
     const { id } = req.params;
     const userId = req.user.id;
     const userRole = req.user.role;
-    
+
     console.log(`[getPDFPrivate] Usuario ${userId} (${userRole}) solicitando PDF de escritura ${id}`);
-    
+
     // Verificar permisos
     if (userRole !== 'ADMIN' && userRole !== 'MATRIZADOR') {
       return res.status(403).json({
@@ -1676,19 +1715,19 @@ export async function getPDFPrivate(req, res) {
         message: 'No tienes permisos para acceder a este PDF'
       });
     }
-    
+
     // Buscar escritura
     const escritura = await prisma.escrituraQR.findUnique({
       where: { id: parseInt(id) }
     });
-    
+
     if (!escritura) {
       return res.status(404).json({
         success: false,
         message: 'Escritura no encontrada'
       });
     }
-    
+
     // Verificar que tenga PDF subido
     if (!escritura.pdfFileName) {
       return res.status(404).json({
@@ -1696,26 +1735,26 @@ export async function getPDFPrivate(req, res) {
         message: 'Esta escritura no tiene un PDF subido'
       });
     }
-    
+
     // Descargar PDF del FTP
     console.log(`[getPDFPrivate] Descargando PDF del FTP: ${escritura.pdfFileName}`);
     const pdfBuffer = await downloadPDFFromFTP(escritura.pdfFileName);
-    
+
     console.log(`[getPDFPrivate] ✅ PDF servido exitosamente a usuario ${userId}`);
-    
+
     // Configurar headers para visualización inline
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'inline');
     res.setHeader('Cache-Control', 'private, max-age=3600');
     res.setHeader('Content-Length', pdfBuffer.length);
-    
+
     // Enviar el PDF
     res.send(pdfBuffer);
-    
+
   } catch (error) {
     console.error('[getPDFPrivate] Error completo:', error);
     console.error('[getPDFPrivate] Stack trace:', error.stack);
-    
+
     // Errores específicos del FTP
     if (error.message.includes('PDF no encontrado') || error.message.includes('not found')) {
       return res.status(404).json({
@@ -1723,14 +1762,14 @@ export async function getPDFPrivate(req, res) {
         message: 'El archivo PDF no se encuentra en el servidor FTP'
       });
     }
-    
+
     if (error.message.includes('FTP') || error.message.includes('timeout')) {
       return res.status(503).json({
         success: false,
         message: 'Error al conectar con el servidor de archivos. Intenta nuevamente en unos momentos.'
       });
     }
-    
+
     res.status(500).json({
       success: false,
       message: 'Error al obtener el PDF',

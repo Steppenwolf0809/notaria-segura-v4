@@ -125,35 +125,115 @@ apiClient.interceptors.response.use(
   },
   async (error) => {
     const status = error?.response?.status;
+    const originalRequest = error.config;
+
+    // ✅ MANEJO DE 401 (Token Expirado o Inválido)
     if (status === 401) {
-      // Flujo opcional de refresh (comentado por defecto):
-      // const refreshToken = localStorage.getItem('refreshToken');
-      // if (refreshToken && !isRefreshing) {
-      //   isRefreshing = true;
-      //   try {
-      //     const res = await axios.post(`${API_BASE}/auth/refresh`, {}, { headers: { Authorization: `Bearer ${refreshToken}` }});
-      //     const newToken = res?.data?.data?.token;
-      //     if (newToken) {
-      //       localStorage.setItem('token', newToken);
-      //       isRefreshing = false;
-      //       // Repetir req original con nuevo token
-      //       const cfg = error.config;
-      //       cfg.headers = cfg.headers || {};
-      //       cfg.headers.Authorization = `Bearer ${newToken}`;
-      //       return apiClient(cfg);
-      //     }
-      //   } catch (e) {
-      //     // Falló refresh → logout
-      //   } finally {
-      //     isRefreshing = false;
-      //   }
-      // }
+      // eslint-disable-next-line no-console
+      console.warn('[AUTH] 401 Unauthorized detectado', {
+        url: originalRequest?.url,
+        method: originalRequest?.method
+      });
+
+      // ✅ Intentar refresh automático (si no estamos ya refrescando)
+      if (!isRefreshing && !originalRequest._retry) {
+        isRefreshing = true;
+        originalRequest._retry = true; // Marcar para evitar loops
+
+        try {
+          // Obtener el token actual de Zustand o localStorage
+          let currentToken = null;
+          const raw = localStorage.getItem('notaria-auth-storage');
+          if (raw) {
+            try {
+              const parsed = JSON.parse(raw);
+              currentToken = parsed?.state?.token;
+            } catch { }
+          }
+
+          if (!currentToken) {
+            currentToken = localStorage.getItem('token');
+          }
+
+          if (!currentToken) {
+            // eslint-disable-next-line no-console
+            console.error('[AUTH] No hay token para refrescar, forzando logout');
+            handleUnauthorized();
+            return Promise.reject(error);
+          }
+
+          // eslint-disable-next-line no-console
+          console.log('[AUTH] Intentando refrescar token...');
+
+          // Intentar refresh (usando axios directo para evitar el interceptor)
+          const response = await axios.post(`${API_BASE}/auth/refresh`, {}, {
+            headers: {
+              Authorization: `Bearer ${currentToken}`,
+              'Content-Type': 'application/json'
+            },
+            timeout: 10000
+          });
+
+          const newToken = response?.data?.data?.token || response?.data?.token;
+
+          if (newToken) {
+            // esl�-disable-next-line no-console
+            console.log('[AUTH] ✅ Token refrescado exitosamente');
+
+            // ✅ Actualizar token en TODOS los storages
+            localStorage.setItem('token', newToken);
+
+            // Actualizar en Zustand si existe
+            try {
+              const zustandRaw = localStorage.getItem('notaria-auth-storage');
+              if (zustandRaw) {
+                const zustandData = JSON.parse(zustandRaw);
+                if (zustandData && zustandData.state) {
+                  zustandData.state.token = newToken;
+                  localStorage.setItem('notaria-auth-storage', JSON.stringify(zustandData));
+                }
+              }
+            } catch (e) {
+              // eslint-disable-next-line no-console
+              console.warn('[AUTH] No se pudo actualizar Zustand store', e);
+            }
+
+            // ✅ Reintentar request original con el nuevo token
+            originalRequest.headers = originalRequest.headers || {};
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+
+            isRefreshing = false;
+            return apiClient(originalRequest);
+          } else {
+            throw new Error('No se recibió nuevo token en la respuesta');
+          }
+        } catch (refreshError) {
+          // ❌ Falló el refresh → Logout forzado
+          isRefreshing = false;
+          // eslint-disable-next-line no-console
+          console.error('[AUTH] ❌ Refresh falló, forzando logout:', refreshError.message);
+          handleUnauthorized();
+          return Promise.reject(refreshError);
+        }
+      } else if (isRefreshing) {
+        // Si ya estamos refrescando, esperar un momento y rechazar
+        // eslint-disable-next-line no-console
+        console.warn('[AUTH] Ya hay un refresh en progreso, rechazando request');
+      }
+
+      // Si llegamos aquí y no pudimos refrescar, logout
       handleUnauthorized();
     }
-    // Para 403 (forbidden), no forzar logout. Dejar que la UI maneje permisos.
+
+    // ✅ MANEJO DE 403 (Forbidden - Permisos insuficientes)
+    // No forzar logout, dejar que la UI maneje permisos
     if (status === 403) {
       // eslint-disable-next-line no-console
+      console.warn('[AUTH] 403 Forbidden - Usuario sin permisos suficientes', {
+        url: originalRequest?.url
+      });
     }
+
     return Promise.reject(error);
   }
 );

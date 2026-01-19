@@ -120,10 +120,11 @@ export async function healthCheck(req, res) {
         });
     } catch (error) {
         console.error('[billing-controller] Health check error:', error);
+        // 🔒 SECURITY: Never expose internal error details
         res.status(500).json({
             status: 'error',
             module: 'billing',
-            error: error.message
+            message: 'Error en health check del módulo de facturación'
         });
     }
 }
@@ -224,16 +225,24 @@ export async function getInvoices(req, res) {
         });
     } catch (error) {
         console.error('[billing-controller] Get invoices error:', error);
-        res.status(500).json({ error: error.message });
+        // 🔒 SECURITY: Never expose internal error details
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener facturas'
+        });
     }
 }
 
 /**
  * Get single invoice by ID
+ * 🔒 OWASP Security: Added ownership validation to prevent IDOR attacks
  */
 export async function getInvoiceById(req, res) {
     try {
+        // ✅ SECURITY: ID is validated by Zod middleware before reaching here
         const { id } = req.params;
+        const userId = req.user.id;
+        const userRole = req.user.role;
 
         const invoice = await prisma.invoice.findUnique({
             where: { id },
@@ -248,14 +257,30 @@ export async function getInvoiceById(req, res) {
                         clientName: true,
                         clientPhone: true,
                         status: true,
-                        codigoRetiro: true
+                        codigoRetiro: true,
+                        assignedToId: true // 🔒 SECURITY: Need this for ownership check
                     }
                 }
             }
         });
 
         if (!invoice) {
-            return res.status(404).json({ error: 'Factura no encontrada' });
+            return res.status(404).json({
+                success: false,
+                message: 'Factura no encontrada'
+            });
+        }
+
+        // 🔒 SECURITY FIX: Check ownership - only ADMIN, CAJA, or assigned user can view
+        if (userRole !== 'ADMIN' && userRole !== 'CAJA' && userRole !== 'RECEPCION') {
+            // For MATRIZADOR and ARCHIVO: verify they own the document
+            if (invoice.document?.assignedToId !== userId) {
+                console.warn(`[SECURITY] IDOR attempt: User ${userId} (${userRole}) tried to access invoice ${id} owned by ${invoice.document?.assignedToId}`);
+                return res.status(403).json({
+                    success: false,
+                    message: 'No tienes permisos para acceder a esta factura'
+                });
+            }
         }
 
         const totalPaid = invoice.payments.reduce(
@@ -263,15 +288,23 @@ export async function getInvoiceById(req, res) {
             0
         );
 
+        // Remove assignedToId from response (internal use only)
+        const { assignedToId, ...documentData } = invoice.document || {};
+
         res.json({
             ...invoice,
+            document: documentData,
             totalAmount: Number(invoice.totalAmount),
             totalPaid,
             balance: Number(invoice.totalAmount) - totalPaid
         });
     } catch (error) {
         console.error('[billing-controller] Get invoice by ID error:', error);
-        res.status(500).json({ error: error.message });
+        // 🔒 SECURITY: Never expose internal error details to client
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener factura'
+        });
     }
 }
 
@@ -337,7 +370,11 @@ export async function getPayments(req, res) {
         });
     } catch (error) {
         console.error('[billing-controller] Get payments error:', error);
-        res.status(500).json({ error: error.message });
+        // 🔒 SECURITY: Never expose internal error details
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener pagos'
+        });
     }
 }
 
@@ -380,7 +417,11 @@ export async function getImportLogs(req, res) {
         });
     } catch (error) {
         console.error('[billing-controller] Get import logs error:', error);
-        res.status(500).json({ error: error.message });
+        // 🔒 SECURITY: Never expose internal error details
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener logs de importación'
+        });
     }
 }
 
@@ -447,7 +488,11 @@ export async function getDocumentPaymentStatus(req, res) {
         });
     } catch (error) {
         console.error('[billing-controller] Get document payment status error:', error);
-        res.status(500).json({ error: error.message });
+        // 🔒 SECURITY: Never expose internal error details
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener estado de pago del documento'
+        });
     }
 }
 
@@ -501,10 +546,10 @@ export async function importFile(req, res) {
 
     } catch (error) {
         console.error('[billing-controller] Import error:', error);
+        // 🔒 SECURITY: Never expose internal error details
         res.status(500).json({
             success: false,
-            error: 'Error durante la importación',
-            message: error.message
+            message: 'Error durante la importación del archivo'
         });
     }
 }
@@ -523,22 +568,42 @@ export async function getStats(req, res) {
         });
     } catch (error) {
         console.error('[billing-controller] Get stats error:', error);
-        res.status(500).json({ error: error.message });
+        // 🔒 SECURITY: Never expose internal error details
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener estadísticas'
+        });
     }
 }
 
 /**
  * Get list of clients with balances
+ * 🔒 OWASP Security: Migrated from $queryRaw to Prisma.sql with safe parametrization
  */
 export async function getClients(req, res) {
     try {
-        const { page = 1, limit = 20, search, hasDebt } = req.query;
-        const skip = (parseInt(page) - 1) * parseInt(limit);
-        const take = parseInt(limit);
+        // ✅ SECURITY: Parameters are validated by Zod middleware before reaching here
+        const { page, limit, search, hasDebt } = req.query;
+        const skip = (page - 1) * limit;
+        const take = limit;
+
+        // 🔒 SECURITY FIX: Use Prisma.sql with proper placeholders instead of string concatenation
+        // This prevents SQL injection attacks
+        const searchPattern = search ? `%${search}%` : null;
+
+        // Build WHERE clause safely
+        const whereClause = search
+            ? Prisma.sql`WHERE i."clientName" ILIKE ${searchPattern} OR i."clientTaxId" LIKE ${searchPattern}`
+            : Prisma.empty;
+
+        // Build HAVING clause safely
+        const havingClause = hasDebt === 'true'
+            ? Prisma.sql`HAVING SUM(i."totalAmount") - COALESCE(SUM(p.paid), 0) > 0`
+            : Prisma.empty;
 
         // Get unique clients from invoices with aggregated data
         const clients = await prisma.$queryRaw`
-            SELECT 
+            SELECT
                 i."clientTaxId",
                 i."clientName",
                 COUNT(DISTINCT i.id) as "invoiceCount",
@@ -552,16 +617,22 @@ export async function getClients(req, res) {
                 FROM payments
                 GROUP BY "invoiceId"
             ) p ON i.id = p."invoiceId"
-            ${search ? prisma.$queryRaw`WHERE i."clientName" ILIKE ${'%' + search + '%'} OR i."clientTaxId" LIKE ${'%' + search + '%'}` : prisma.$queryRaw``}
+            ${whereClause}
             GROUP BY i."clientTaxId", i."clientName"
-            ${hasDebt === 'true' ? prisma.$queryRaw`HAVING SUM(i."totalAmount") - COALESCE(SUM(p.paid), 0) > 0` : prisma.$queryRaw``}
+            ${havingClause}
             ORDER BY "balance" DESC
             LIMIT ${take} OFFSET ${skip}
         `;
 
-        // Get total count
+        // Get total count with same WHERE condition
+        const countWhereClause = search
+            ? Prisma.sql`WHERE "clientName" ILIKE ${searchPattern} OR "clientTaxId" LIKE ${searchPattern}`
+            : Prisma.empty;
+
         const countResult = await prisma.$queryRaw`
-            SELECT COUNT(DISTINCT "clientTaxId") as count FROM invoices
+            SELECT COUNT(DISTINCT "clientTaxId") as count
+            FROM invoices
+            ${countWhereClause}
         `;
 
         res.json({
@@ -573,24 +644,32 @@ export async function getClients(req, res) {
                 balance: Number(c.balance)
             })),
             pagination: {
-                page: parseInt(page),
-                limit: parseInt(limit),
+                page,
+                limit,
                 total: Number(countResult[0]?.count || 0),
-                pages: Math.ceil(Number(countResult[0]?.count || 0) / parseInt(limit))
+                pages: Math.ceil(Number(countResult[0]?.count || 0) / limit)
             }
         });
     } catch (error) {
         console.error('[billing-controller] Get clients error:', error);
-        res.status(500).json({ error: error.message });
+        // 🔒 SECURITY: Never expose internal error details to client
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener lista de clientes'
+        });
     }
 }
 
 /**
  * Get balance for a specific client by tax ID
+ * 🔒 OWASP Security: Added ownership validation to prevent IDOR attacks
  */
 export async function getClientBalance(req, res) {
     try {
+        // ✅ SECURITY: taxId is validated by Zod middleware before reaching here
         const { taxId } = req.params;
+        const userId = req.user.id;
+        const userRole = req.user.role;
 
         // Get client invoices with payments
         const invoices = await prisma.invoice.findMany({
@@ -601,7 +680,8 @@ export async function getClientBalance(req, res) {
                     select: {
                         id: true,
                         protocolNumber: true,
-                        status: true
+                        status: true,
+                        assignedToId: true // 🔒 SECURITY: Need this for ownership check
                     }
                 }
             },
@@ -610,9 +690,22 @@ export async function getClientBalance(req, res) {
 
         if (invoices.length === 0) {
             return res.status(404).json({
-                error: 'Cliente no encontrado',
+                success: false,
                 message: `No se encontraron facturas para el cliente ${taxId}`
             });
+        }
+
+        // 🔒 SECURITY FIX: Check ownership - only ADMIN, CAJA, RECEPCION, or assigned user can view
+        if (userRole !== 'ADMIN' && userRole !== 'CAJA' && userRole !== 'RECEPCION') {
+            // For MATRIZADOR and ARCHIVO: verify they own at least one document for this client
+            const hasAccess = invoices.some(inv => inv.document?.assignedToId === userId);
+            if (!hasAccess) {
+                console.warn(`[SECURITY] IDOR attempt: User ${userId} (${userRole}) tried to access client balance for ${taxId}`);
+                return res.status(403).json({
+                    success: false,
+                    message: 'No tienes permisos para acceder a este cliente'
+                });
+            }
         }
 
         let totalInvoiced = 0;
@@ -626,6 +719,9 @@ export async function getClientBalance(req, res) {
             totalInvoiced += Number(invoice.totalAmount);
             totalPaid += paid;
 
+            // Remove assignedToId from document (internal use only)
+            const { assignedToId, ...documentData } = invoice.document || {};
+
             invoiceDetails.push({
                 id: invoice.id,
                 invoiceNumber: invoice.invoiceNumber,
@@ -634,7 +730,7 @@ export async function getClientBalance(req, res) {
                 paid,
                 balance,
                 status: invoice.status,
-                document: invoice.document
+                document: documentData
             });
         }
 
@@ -650,7 +746,11 @@ export async function getClientBalance(req, res) {
         });
     } catch (error) {
         console.error('[billing-controller] Get client balance error:', error);
-        res.status(500).json({ error: error.message });
+        // 🔒 SECURITY: Never expose internal error details to client
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener balance del cliente'
+        });
     }
 }
 
@@ -688,7 +788,11 @@ export async function getInvoicePayments(req, res) {
         });
     } catch (error) {
         console.error('[billing-controller] Get invoice payments error:', error);
-        res.status(500).json({ error: error.message });
+        // 🔒 SECURITY: Never expose internal error details
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener pagos de la factura'
+        });
     }
 }
 
@@ -765,7 +869,11 @@ export async function getSummary(req, res) {
         });
     } catch (error) {
         console.error('[billing-controller] Get summary error:', error);
-        res.status(500).json({ error: error.message });
+        // 🔒 SECURITY: Never expose internal error details
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener resumen de facturación'
+        });
     }
 }
 
@@ -881,7 +989,11 @@ export async function getMyPortfolio(req, res) {
         });
     } catch (error) {
         console.error('[billing-controller] getMyPortfolio error:', error);
-        res.status(500).json({ error: error.message });
+        // 🔒 SECURITY: Never expose internal error details
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener cartera de documentos'
+        });
     }
 }
 
@@ -1014,7 +1126,11 @@ export async function generateCollectionReminder(req, res) {
         });
     } catch (error) {
         console.error('[billing-controller] generateCollectionReminder error:', error);
-        res.status(500).json({ error: error.message });
+        // 🔒 SECURITY: Never expose internal error details
+        res.status(500).json({
+            success: false,
+            message: 'Error al generar recordatorio de cobro'
+        });
     }
 }
 
@@ -1108,7 +1224,11 @@ export async function getCarteraPorCobrar(req, res) {
         });
     } catch (error) {
         console.error('[billing-controller] getCarteraPorCobrar error:', error);
-        res.status(500).json({ error: error.message });
+        // 🔒 SECURITY: Never expose internal error details
+        res.status(500).json({
+            success: false,
+            message: 'Error al generar reporte de cartera por cobrar'
+        });
     }
 }
 
@@ -1180,7 +1300,11 @@ export async function getPagosDelPeriodo(req, res) {
         });
     } catch (error) {
         console.error('[billing-controller] getPagosDelPeriodo error:', error);
-        res.status(500).json({ error: error.message });
+        // 🔒 SECURITY: Never expose internal error details
+        res.status(500).json({
+            success: false,
+            message: 'Error al generar reporte de pagos del período'
+        });
     }
 }
 
@@ -1268,7 +1392,11 @@ export async function getFacturasVencidas(req, res) {
         });
     } catch (error) {
         console.error('[billing-controller] getFacturasVencidas error:', error);
-        res.status(500).json({ error: error.message });
+        // 🔒 SECURITY: Never expose internal error details
+        res.status(500).json({
+            success: false,
+            message: 'Error al generar reporte de facturas vencidas'
+        });
     }
 }
 
@@ -1366,6 +1494,10 @@ export async function getEntregasConSaldo(req, res) {
         });
     } catch (error) {
         console.error('[billing-controller] getEntregasConSaldo error:', error);
-        res.status(500).json({ error: error.message });
+        // 🔒 SECURITY: Never expose internal error details
+        res.status(500).json({
+            success: false,
+            message: 'Error al generar reporte de entregas con saldo pendiente'
+        });
     }
 }

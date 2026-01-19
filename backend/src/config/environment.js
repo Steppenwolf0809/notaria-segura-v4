@@ -47,19 +47,6 @@ const environmentSchema = z.object({
     })
     .min(32, 'JWT_SECRET debe tener al menos 32 caracteres para seguridad'),
 
-  // Twilio - Opcionales, requeridos solo si WhatsApp habilitado
-  TWILIO_ACCOUNT_SID: z
-    .string()
-    .optional(),
-
-  TWILIO_AUTH_TOKEN: z
-    .string()
-    .optional(),
-
-  TWILIO_WHATSAPP_FROM: z
-    .string()
-    .optional(),
-
   // Entorno - Con valores válidos específicos
   NODE_ENV: z
     .enum(['development', 'production', 'test', 'staging'], {
@@ -273,12 +260,6 @@ function getConfig() {
     }
   };
 
-  // Verificar Twilio si WhatsApp habilitado
-  if (cfg.WHATSAPP_ENABLED && (!cfg.TWILIO_ACCOUNT_SID || !cfg.TWILIO_AUTH_TOKEN || !cfg.TWILIO_WHATSAPP_FROM)) {
-    console.warn('⚠️  WhatsApp habilitado pero credenciales Twilio faltantes. Desactivando WhatsApp.');
-    cfg.WHATSAPP_ENABLED = false;
-  }
-
   // Impresión única de advertencias y tabla de configuración efectiva
   if (!printedOnce) {
     printedOnce = true;
@@ -390,11 +371,7 @@ function validateConfigurationComplete(config) {
       message: 'Sin GOOGLE_API_KEY, Gemini AI no funcionará'
     },
 
-    {
-      name: 'WhatsApp',
-      check: () => config.WHATSAPP_ENABLED && config.TWILIO_ACCOUNT_SID && config.TWILIO_AUTH_TOKEN,
-      message: 'WhatsApp habilitado pero credenciales Twilio faltantes'
-    }
+
   ];
 
   optionalServices.forEach(service => {
@@ -409,9 +386,7 @@ function validateConfigurationComplete(config) {
   if (!process.env.GOOGLE_API_KEY) {
     result.recommendations.push('Configure GOOGLE_API_KEY para usar IA en procesamiento de documentos');
   }
-  if (config.WHATSAPP_ENABLED && (!config.TWILIO_ACCOUNT_SID || !config.TWILIO_AUTH_TOKEN)) {
-    result.recommendations.push('Complete credenciales Twilio para funcionalidad WhatsApp completa');
-  }
+
 
   return result;
 }

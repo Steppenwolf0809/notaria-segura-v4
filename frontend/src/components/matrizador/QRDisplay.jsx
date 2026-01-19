@@ -3,7 +3,7 @@
  * Muestra códigos QR generados con opciones de descarga y compartir
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Box,
   Paper,
@@ -59,32 +59,87 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
   ];
 
   /**
-   * Carga los datos del QR
+   * Función de reset del estado del QR (Limpieza Preventiva)
+   */
+  const resetQRState = () => {
+    setQrData(null);
+    setError(null);
+    setLoading(false);
+  };
+
+  /**
+   * Carga los datos del QR con manejo robusto de errores
    */
   const loadQRData = async (format = selectedFormat) => {
     if (!escrituraId) return;
 
+    // ✅ LIMPIEZA PREVENTIVA: Reset explícito antes del await
+    setQrData(null);
     setLoading(true);
     setError(null);
 
     try {
       const response = await getEscrituraQR(escrituraId, format);
       setQrData(response.data);
+
+      // Log para debugging
+      console.log('[QRDisplay] QR Data loaded:', {
+        escrituraId: response.data?.escrituraId,
+        currentDocId: escrituraId,
+        token: response.data?.token
+      });
     } catch (err) {
-      setError(err.message);
+      // ✅ LIMPIEZA DEFENSIVA: Asegurar que no quede basura en el estado
+      setQrData(null);
+
+      // Detectar errores de autenticación (sesión expirada)
+      if (err.status === 401 || err.status === 403) {
+        setError('⚠️ Tu sesión ha expirado. Por favor, inicia sesión nuevamente.');
+      }
+      // Detectar errores de red
+      else if (!navigator.onLine || err.code === 'ERR_NETWORK') {
+        setError('❌ Error de conexión. Verifica tu conexión a internet.');
+      }
+      // Otros errores
+      else {
+        setError(err.message || 'Error al generar el código QR');
+      }
+
+      console.error('[QRDisplay] Error loading QR:', err);
     } finally {
       setLoading(false);
     }
   };
 
   /**
-   * Efecto para cargar datos iniciales
+   * Efecto para cargar datos iniciales y cleanup
+   * ✅ LIMPIEZA en cambio de escrituraId y unmount
    */
   useEffect(() => {
+    // Reset state cuando cambia el ID del documento
+    resetQRState();
+
+    // Cargar nuevo QR si hay un ID válido
     if (escrituraId) {
       loadQRData();
     }
+
+    // ✅ Cleanup en unmount para evitar state stale
+    return () => {
+      resetQRState();
+    };
   }, [escrituraId]);
+
+  /**
+   * Validación de integridad: verificar que el QR corresponde al documento actual
+   */
+  const isQRValid = useMemo(() => {
+    if (!qrData || !escrituraId) return false;
+
+    // Verificar que el QR corresponde al documento actual
+    // El backend incluye escrituraId en la respuesta para validación
+    return qrData.escrituraId === escrituraId;
+  }, [qrData, escrituraId]);
 
   /**
    * Maneja el cambio de formato
@@ -419,6 +474,18 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
         {formats.find(f => f.key === selectedFormat)?.description}
       </Alert>
 
+      {/* ✅ Validación Visual: Advertencia si el QR no corresponde al documento actual */}
+      {qrData && !isQRValid && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          <Typography variant="body2" fontWeight="bold">
+            ⚠️ ADVERTENCIA: El código QR no corresponde al documento actual.
+          </Typography>
+          <Typography variant="body2">
+            Por favor, regenera el QR para garantizar la integridad.
+          </Typography>
+        </Alert>
+      )}
+
       <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
         {/* Código QR */}
         <Card sx={{ flex: '1 1 300px', minWidth: 300 }}>
@@ -485,20 +552,24 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
           </CardContent>
 
           <CardActions sx={{ justifyContent: 'center', flexWrap: 'wrap', gap: 1 }}>
-            <Tooltip title="Copiar QR al portapapeles">
+            <Tooltip title={!isQRValid ? "⚠️ QR no válido para este documento" : "Copiar QR al portapapeles"}>
               <span>
                 <IconButton
                   onClick={handleCopyQR}
                   color="primary"
-                  disabled={copyingQR}
+                  disabled={copyingQR || !isQRValid}
                 >
                   <CopyIcon />
                 </IconButton>
               </span>
             </Tooltip>
 
-            <Tooltip title="Descargar imagen">
-              <IconButton onClick={handleDownload} color="primary">
+            <Tooltip title={!isQRValid ? "⚠️ QR no válido para este documento" : "Descargar imagen"}>
+              <IconButton
+                onClick={handleDownload}
+                color="primary"
+                disabled={!isQRValid}
+              >
                 <DownloadIcon />
               </IconButton>
             </Tooltip>
@@ -509,8 +580,12 @@ const QRDisplay = ({ escrituraId, escritura, onRefresh }) => {
               </IconButton>
             </Tooltip>
 
-            <Tooltip title="Imprimir">
-              <IconButton onClick={handlePrint} color="primary">
+            <Tooltip title={!isQRValid ? "⚠️ QR no válido para este documento" : "Imprimir"}>
+              <IconButton
+                onClick={handlePrint}
+                color="primary"
+                disabled={!isQRValid}
+              >
                 <PrintIcon />
               </IconButton>
             </Tooltip>

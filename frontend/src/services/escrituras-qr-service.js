@@ -15,22 +15,22 @@ export async function uploadEscritura(pdfFile, photoFile = null) {
   try {
     const formData = new FormData();
     formData.append('pdfFile', pdfFile);
-    
+
     // Agregar foto si se proporcionó
     if (photoFile) {
       formData.append('foto', photoFile);
     }
-    
+
     const response = await apiClient.post('/escrituras/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     });
-    
+
     return response.data;
   } catch (error) {
     throw new Error(
-      error.response?.data?.message || 
+      error.response?.data?.message ||
       'Error al subir el archivo PDF'
     );
   }
@@ -51,7 +51,7 @@ export async function createEscrituraManual(datosEscritura, photoFile = null) {
       formData.append('data', JSON.stringify(datosEscritura));
       // Agregar foto
       formData.append('foto', photoFile);
-      
+
       const response = await apiClient.post('/escrituras/manual', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -65,7 +65,7 @@ export async function createEscrituraManual(datosEscritura, photoFile = null) {
     }
   } catch (error) {
     throw new Error(
-      error.response?.data?.message || 
+      error.response?.data?.message ||
       'Error al crear la escritura manualmente'
     );
   }
@@ -83,17 +83,17 @@ export async function createEscrituraManual(datosEscritura, photoFile = null) {
 export async function getEscrituras(params = {}) {
   try {
     const queryParams = new URLSearchParams();
-    
+
     if (params.page) queryParams.append('page', params.page);
     if (params.limit) queryParams.append('limit', params.limit);
     if (params.estado) queryParams.append('estado', params.estado);
     if (params.search) queryParams.append('search', params.search);
-    
+
     const response = await apiClient.get(`/escrituras?${queryParams.toString()}`);
     return response.data;
   } catch (error) {
     throw new Error(
-      error.response?.data?.message || 
+      error.response?.data?.message ||
       'Error al obtener las escrituras'
     );
   }
@@ -110,7 +110,7 @@ export async function getEscritura(id) {
     return response.data;
   } catch (error) {
     throw new Error(
-      error.response?.data?.message || 
+      error.response?.data?.message ||
       'Error al obtener la escritura'
     );
   }
@@ -134,7 +134,7 @@ export async function updateEscritura(id, data, photoFile = null) {
       formData.append('data', JSON.stringify(data));
       // Agregar foto
       formData.append('foto', photoFile);
-      
+
       const response = await apiClient.put(`/escrituras/${id}`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -148,7 +148,7 @@ export async function updateEscritura(id, data, photoFile = null) {
     }
   } catch (error) {
     throw new Error(
-      error.response?.data?.message || 
+      error.response?.data?.message ||
       'Error al actualizar la escritura'
     );
   }
@@ -163,12 +163,22 @@ export async function updateEscritura(id, data, photoFile = null) {
 export async function getEscrituraQR(id, format = 'display') {
   try {
     const response = await apiClient.get(`/escrituras/${id}/qr?format=${format}`);
+
+    // ✅ Asegurar que la respuesta incluye escrituraId para validación de integridad
+    if (response.data && response.data.data) {
+      response.data.data.escrituraId = id;
+    }
+
     return response.data;
   } catch (error) {
-    throw new Error(
-      error.response?.data?.message || 
-      'Error al generar el código QR'
-    );
+    // ✅ Propagar información completa del error para mejor manejo
+    const errorInfo = {
+      message: error.response?.data?.message || 'Error al generar el código QR',
+      status: error.response?.status,
+      code: error.code,
+      response: error.response
+    };
+    throw errorInfo;
   }
 }
 
@@ -183,7 +193,7 @@ export async function deleteEscritura(id) {
     return response.data;
   } catch (error) {
     throw new Error(
-      error.response?.data?.message || 
+      error.response?.data?.message ||
       'Error al desactivar la escritura'
     );
   }
@@ -201,7 +211,7 @@ export async function hardDeleteEscritura(id) {
     return response.data;
   } catch (error) {
     throw new Error(
-      error.response?.data?.message || 
+      error.response?.data?.message ||
       'Error al eliminar la escritura permanentemente'
     );
   }
@@ -221,12 +231,12 @@ export async function verifyEscritura(token) {
         'Content-Type': 'application/json',
       },
     });
-    
+
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.message || 'Error en la verificación');
     }
-    
+
     return await response.json();
   } catch (error) {
     throw new Error(
@@ -243,34 +253,34 @@ export async function verifyEscritura(token) {
 export function validatePDFFile(file) {
   const errors = [];
   const warnings = [];
-  
+
   // Verificar que sea un archivo
   if (!file) {
     errors.push('No se ha seleccionado ningún archivo');
     return { isValid: false, errors, warnings };
   }
-  
+
   // Verificar tipo de archivo
   if (file.type !== 'application/pdf') {
     errors.push('El archivo debe ser un PDF');
   }
-  
+
   // Verificar tamaño (máximo 10MB)
   const maxSize = 10 * 1024 * 1024; // 10MB
   if (file.size > maxSize) {
     errors.push('El archivo es demasiado grande (máximo 10MB)');
   }
-  
+
   // Verificar tamaño mínimo (al menos 1KB)
   if (file.size < 1024) {
     errors.push('El archivo es demasiado pequeño');
   }
-  
+
   // Advertencias
   if (file.size > 5 * 1024 * 1024) { // Mayor a 5MB
     warnings.push('El archivo es grande, el procesamiento puede tomar más tiempo');
   }
-  
+
   return {
     isValid: errors.length === 0,
     errors,
@@ -285,11 +295,11 @@ export function validatePDFFile(file) {
  */
 export function formatFileSize(bytes) {
   if (bytes === 0) return '0 Bytes';
-  
+
   const k = 1024;
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  
+
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
@@ -325,7 +335,7 @@ export function getEstadoInfo(estado) {
       description: 'Escritura desactivada'
     }
   };
-  
+
   return estadosInfo[estado] || {
     color: 'default',
     label: 'Desconocido',
@@ -406,18 +416,18 @@ export async function uploadPDFToEscritura(escrituraId, pdfFile, hiddenPages = [
   try {
     const formData = new FormData();
     formData.append('pdfFile', pdfFile); // Cambiado de 'pdf' a 'pdfFile'
-    
+
     // Agregar páginas ocultas si hay alguna
     if (hiddenPages && hiddenPages.length > 0) {
       formData.append('hiddenPages', JSON.stringify(hiddenPages));
     }
-    
+
     const config = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     };
-    
+
     // Agregar callback de progreso si se proporcionó
     if (onUploadProgress) {
       config.onUploadProgress = (progressEvent) => {
@@ -425,12 +435,12 @@ export async function uploadPDFToEscritura(escrituraId, pdfFile, hiddenPages = [
         onUploadProgress(percentCompleted);
       };
     }
-    
+
     const response = await apiClient.post(`/escrituras/${escrituraId}/pdf`, formData, config);
     return response.data;
   } catch (error) {
     throw new Error(
-      error.response?.data?.message || 
+      error.response?.data?.message ||
       'Error al subir el PDF'
     );
   }
@@ -449,12 +459,12 @@ export async function getPDFMetadata(token) {
         'Content-Type': 'application/json',
       },
     });
-    
+
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(errorData.message || 'Error al obtener metadata');
     }
-    
+
     return await response.json();
   } catch (error) {
     throw new Error(
@@ -495,7 +505,7 @@ export async function updatePDFHiddenPages(escrituraId, hiddenPages = []) {
     return response.data;
   } catch (error) {
     throw new Error(
-      error.response?.data?.message || 
+      error.response?.data?.message ||
       'Error al actualizar las páginas ocultas'
     );
   }
@@ -510,22 +520,22 @@ export async function getPDFHiddenPages(escrituraId) {
   try {
     const response = await apiClient.get(`/escrituras/${escrituraId}`);
     const escritura = response.data.data;
-    
+
     // Parsear pdfHiddenPages si existe
     if (escritura.pdfHiddenPages) {
       try {
-        return typeof escritura.pdfHiddenPages === 'string' 
+        return typeof escritura.pdfHiddenPages === 'string'
           ? JSON.parse(escritura.pdfHiddenPages)
           : escritura.pdfHiddenPages;
       } catch (e) {
         return [];
       }
     }
-    
+
     return [];
   } catch (error) {
     throw new Error(
-      error.response?.data?.message || 
+      error.response?.data?.message ||
       'Error al obtener las páginas ocultas'
     );
   }
@@ -549,7 +559,7 @@ export function getPDFInfo(escritura) {
   if (!hasPDFUploaded(escritura)) {
     return null;
   }
-  
+
   return {
     fileName: escritura.pdfFileName,
     uploadedAt: escritura.pdfUploadedAt ? new Date(escritura.pdfUploadedAt) : null,
@@ -566,41 +576,41 @@ export function getPDFInfo(escritura) {
 export function validatePDFFileUpload(file) {
   const errors = [];
   const warnings = [];
-  
+
   // Verificar que sea un archivo
   if (!file) {
     errors.push('No se ha seleccionado ningún archivo');
     return { isValid: false, errors, warnings };
   }
-  
+
   // Verificar extensión
   const extension = file.name.split('.').pop().toLowerCase();
   if (extension !== 'pdf') {
     errors.push('El archivo debe tener extensión .pdf');
   }
-  
+
   // Verificar tipo MIME
   if (file.type !== 'application/pdf' && file.type !== '') {
     errors.push('El archivo debe ser un PDF válido');
   }
-  
+
   // Verificar tamaño máximo (10MB)
   const maxSize = 10 * 1024 * 1024; // 10MB
   if (file.size > maxSize) {
     const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
     errors.push(`El archivo es demasiado grande (${sizeMB}MB). Máximo permitido: 10MB`);
   }
-  
+
   // Verificar tamaño mínimo (10KB)
   if (file.size < 10 * 1024) {
     errors.push('El archivo parece ser demasiado pequeño para ser un PDF válido');
   }
-  
+
   // Advertencias
   if (file.size > 7 * 1024 * 1024) { // Mayor a 7MB
     warnings.push('El archivo es grande, la subida puede tomar varios segundos');
   }
-  
+
   return {
     isValid: errors.length === 0,
     errors,
