@@ -423,6 +423,7 @@ export async function getDocumentPaymentStatus(req, res) {
             totalPaid += paid;
 
             invoiceDetails.push({
+                id: invoice.id,
                 invoiceNumber: invoice.invoiceNumber,
                 total: Number(invoice.totalAmount),
                 paid: paid,
