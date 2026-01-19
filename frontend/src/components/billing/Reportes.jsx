@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     Box,
     Paper,
@@ -20,7 +20,13 @@ import {
     TextField,
     IconButton,
     Tooltip,
-    Chip
+    Chip,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    InputAdornment,
+    Collapse
 } from '@mui/material';
 import {
     Assessment as ReportIcon,
@@ -28,14 +34,19 @@ import {
     Refresh as RefreshIcon,
     AccountBalance as CarteraIcon,
     Payment as PaymentIcon,
-    Warning as WarningIcon
+    Warning as WarningIcon,
+    Search as SearchIcon,
+    FilterList as FilterIcon,
+    Sort as SortIcon,
+    ArrowUpward as AscIcon,
+    ArrowDownward as DescIcon,
+    Clear as ClearIcon
 } from '@mui/icons-material';
 import billingService from '../../services/billing-service';
 import * as XLSX from 'xlsx';
 
 /**
- * Reportes Component
- * Permite generar y descargar reportes de facturación
+ * Reportes Component - Enhanced with Admin Filters
  * 
  * Reportes disponibles:
  * 1. Cartera por Cobrar - Clientes con saldo pendiente
@@ -47,6 +58,7 @@ const Reportes = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
     const [reportData, setReportData] = useState(null);
+    const [showFilters, setShowFilters] = useState(true);
 
     // Date filters for "Pagos del Período"
     const today = new Date();
@@ -54,11 +66,31 @@ const Reportes = () => {
     const [dateFrom, setDateFrom] = useState(firstDayOfMonth.toISOString().split('T')[0]);
     const [dateTo, setDateTo] = useState(today.toISOString().split('T')[0]);
 
+    // Enhanced filters
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedMatrizador, setSelectedMatrizador] = useState('');
+    const [minBalance, setMinBalance] = useState('');
+    const [sortField, setSortField] = useState('balance');
+    const [sortDirection, setSortDirection] = useState('desc');
+
     const reportTypes = [
         { id: 'cartera', label: 'Cartera por Cobrar', icon: <CarteraIcon /> },
         { id: 'pagos', label: 'Pagos del Período', icon: <PaymentIcon /> },
         { id: 'vencidas', label: 'Facturas Vencidas', icon: <WarningIcon /> }
     ];
+
+    // Extract unique matrizadores from data
+    const uniqueMatrizadores = useMemo(() => {
+        if (!reportData?.data) return [];
+        const matrizadores = new Set();
+        reportData.data.forEach(row => {
+            const mat = row.matrizador || row.matrizador_name;
+            if (mat && mat !== 'Sin asignar') {
+                matrizadores.add(mat);
+            }
+        });
+        return Array.from(matrizadores).sort();
+    }, [reportData]);
 
     const loadReport = useCallback(async () => {
         setLoading(true);
@@ -91,7 +123,115 @@ const Reportes = () => {
 
     useEffect(() => {
         loadReport();
+        // Reset filters when changing tabs
+        setSearchTerm('');
+        setSelectedMatrizador('');
+        setMinBalance('');
     }, [loadReport]);
+
+    // Apply filters and sorting
+    const filteredData = useMemo(() => {
+        if (!reportData?.data) return [];
+
+        let filtered = [...reportData.data];
+
+        // Search filter
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            filtered = filtered.filter(row => {
+                const searchFields = [
+                    row.clientName, row.clientTaxId, row.cliente, row.cedula, row.factura
+                ].filter(Boolean);
+                return searchFields.some(field => field.toLowerCase().includes(term));
+            });
+        }
+
+        // Matrizador filter
+        if (selectedMatrizador) {
+            filtered = filtered.filter(row => {
+                const mat = row.matrizador || row.matrizador_name;
+                return mat === selectedMatrizador;
+            });
+        }
+
+        // Minimum balance filter
+        if (minBalance && !isNaN(parseFloat(minBalance))) {
+            const min = parseFloat(minBalance);
+            filtered = filtered.filter(row => {
+                const balance = row.balance || row.saldo || row.monto || 0;
+                return balance >= min;
+            });
+        }
+
+        // Sorting
+        filtered.sort((a, b) => {
+            let aVal, bVal;
+
+            switch (sortField) {
+                case 'balance':
+                    aVal = a.balance || a.saldo || 0;
+                    bVal = b.balance || b.saldo || 0;
+                    break;
+                case 'monto':
+                    aVal = a.monto || a.totalInvoiced || 0;
+                    bVal = b.monto || b.totalInvoiced || 0;
+                    break;
+                case 'diasVencido':
+                    aVal = a.diasVencido || 0;
+                    bVal = b.diasVencido || 0;
+                    break;
+                case 'cliente':
+                    aVal = (a.clientName || a.cliente || '').toLowerCase();
+                    bVal = (b.clientName || b.cliente || '').toLowerCase();
+                    break;
+                case 'fecha':
+                    aVal = new Date(a.fecha || a.issueDate || 0).getTime();
+                    bVal = new Date(b.fecha || b.issueDate || 0).getTime();
+                    break;
+                default:
+                    aVal = a.balance || a.saldo || 0;
+                    bVal = b.balance || b.saldo || 0;
+            }
+
+            if (typeof aVal === 'string') {
+                return sortDirection === 'asc'
+                    ? aVal.localeCompare(bVal)
+                    : bVal.localeCompare(aVal);
+            }
+            return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+        });
+
+        return filtered;
+    }, [reportData, searchTerm, selectedMatrizador, minBalance, sortField, sortDirection]);
+
+    // Recalculate totals based on filtered data
+    const filteredTotals = useMemo(() => {
+        if (filteredData.length === 0) return null;
+
+        switch (activeTab) {
+            case 0: // Cartera
+                return filteredData.reduce((acc, row) => ({
+                    clientCount: acc.clientCount + 1,
+                    totalInvoiced: acc.totalInvoiced + (row.totalInvoiced || 0),
+                    totalPaid: acc.totalPaid + (row.totalPaid || 0),
+                    totalBalance: acc.totalBalance + (row.balance || 0)
+                }), { clientCount: 0, totalInvoiced: 0, totalPaid: 0, totalBalance: 0 });
+            case 1: // Pagos
+                return {
+                    count: filteredData.length,
+                    totalMonto: filteredData.reduce((sum, row) => sum + (row.monto || 0), 0)
+                };
+            case 2: // Vencidas
+                return filteredData.reduce((acc, row) => ({
+                    count: acc.count + 1,
+                    totalFacturado: acc.totalFacturado + (row.totalFactura || 0),
+                    totalPagado: acc.totalPagado + (row.pagado || 0),
+                    totalSaldo: acc.totalSaldo + (row.saldo || 0)
+                }), { count: 0, totalFacturado: 0, totalPagado: 0, totalSaldo: 0 });
+            default:
+                return null;
+        }
+    }, [filteredData, activeTab]);
 
     const formatCurrency = (amount) => {
         return new Intl.NumberFormat('es-EC', {
@@ -105,15 +245,25 @@ const Reportes = () => {
         return new Date(date).toLocaleDateString('es-EC');
     };
 
+    const clearFilters = () => {
+        setSearchTerm('');
+        setSelectedMatrizador('');
+        setMinBalance('');
+        setSortField('balance');
+        setSortDirection('desc');
+    };
+
+    const hasActiveFilters = searchTerm || selectedMatrizador || minBalance;
+
     const exportToExcel = () => {
-        if (!reportData?.data || reportData.data.length === 0) return;
+        if (filteredData.length === 0) return;
 
         let sheetData;
         let fileName;
 
         switch (activeTab) {
-            case 0: // Cartera por Cobrar
-                sheetData = reportData.data.map(row => ({
+            case 0:
+                sheetData = filteredData.map(row => ({
                     'Cédula/RUC': row.clientTaxId,
                     'Cliente': row.clientName,
                     'Facturas': row.invoiceCount,
@@ -124,8 +274,8 @@ const Reportes = () => {
                 }));
                 fileName = `Cartera_Por_Cobrar_${new Date().toISOString().split('T')[0]}.xlsx`;
                 break;
-            case 1: // Pagos del Período
-                sheetData = reportData.data.map(row => ({
+            case 1:
+                sheetData = filteredData.map(row => ({
                     'Fecha': formatDate(row.fecha),
                     'Recibo': row.recibo,
                     'Cliente': row.cliente,
@@ -136,8 +286,8 @@ const Reportes = () => {
                 }));
                 fileName = `Pagos_${dateFrom}_a_${dateTo}.xlsx`;
                 break;
-            case 2: // Facturas Vencidas
-                sheetData = reportData.data.map(row => ({
+            case 2:
+                sheetData = filteredData.map(row => ({
                     'Factura': row.factura,
                     'Cliente': row.cliente,
                     'Cédula/RUC': row.cedula,
@@ -156,156 +306,268 @@ const Reportes = () => {
                 return;
         }
 
-        // Create workbook and worksheet
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.json_to_sheet(sheetData);
-
-        // Auto-width columns
-        const colWidths = Object.keys(sheetData[0] || {}).map(key => ({
-            wch: Math.max(key.length, 15)
-        }));
+        const colWidths = Object.keys(sheetData[0] || {}).map(key => ({ wch: Math.max(key.length, 15) }));
         ws['!cols'] = colWidths;
-
         XLSX.utils.book_append_sheet(wb, ws, 'Reporte');
         XLSX.writeFile(wb, fileName);
     };
 
+    const handleSort = (field) => {
+        if (sortField === field) {
+            setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortField(field);
+            setSortDirection('desc');
+        }
+    };
+
+    const SortableHeader = ({ field, children, ...props }) => (
+        <TableCell
+            {...props}
+            onClick={() => handleSort(field)}
+            sx={{
+                ...props.sx,
+                cursor: 'pointer',
+                '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
+            }}
+        >
+            <Box display="flex" alignItems="center" gap={0.5}>
+                {children}
+                {sortField === field && (
+                    sortDirection === 'asc' ? <AscIcon fontSize="small" /> : <DescIcon fontSize="small" />
+                )}
+            </Box>
+        </TableCell>
+    );
+
+    const renderFiltersBar = () => (
+        <Collapse in={showFilters}>
+            <Paper sx={{ p: 2, mb: 3 }}>
+                <Grid container spacing={2} alignItems="center">
+                    {/* Search */}
+                    <Grid item xs={12} md={3}>
+                        <TextField
+                            fullWidth
+                            size="small"
+                            label="Buscar cliente"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            InputProps={{
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <SearchIcon color="action" />
+                                    </InputAdornment>
+                                )
+                            }}
+                        />
+                    </Grid>
+
+                    {/* Matrizador filter */}
+                    {(activeTab === 0 || activeTab === 2) && uniqueMatrizadores.length > 0 && (
+                        <Grid item xs={12} md={2}>
+                            <FormControl fullWidth size="small">
+                                <InputLabel>Matrizador</InputLabel>
+                                <Select
+                                    value={selectedMatrizador}
+                                    label="Matrizador"
+                                    onChange={(e) => setSelectedMatrizador(e.target.value)}
+                                >
+                                    <MenuItem value="">Todos</MenuItem>
+                                    {uniqueMatrizadores.map(mat => (
+                                        <MenuItem key={mat} value={mat}>{mat}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                    )}
+
+                    {/* Minimum balance filter */}
+                    {(activeTab === 0 || activeTab === 2) && (
+                        <Grid item xs={12} md={2}>
+                            <TextField
+                                fullWidth
+                                size="small"
+                                type="number"
+                                label="Saldo mínimo"
+                                value={minBalance}
+                                onChange={(e) => setMinBalance(e.target.value)}
+                                InputProps={{
+                                    startAdornment: <InputAdornment position="start">$</InputAdornment>
+                                }}
+                            />
+                        </Grid>
+                    )}
+
+                    {/* Sort options */}
+                    <Grid item xs={12} md={2}>
+                        <FormControl fullWidth size="small">
+                            <InputLabel>Ordenar por</InputLabel>
+                            <Select
+                                value={sortField}
+                                label="Ordenar por"
+                                onChange={(e) => setSortField(e.target.value)}
+                            >
+                                {activeTab === 0 && <MenuItem value="balance">Saldo</MenuItem>}
+                                {activeTab === 0 && <MenuItem value="monto">Total Facturado</MenuItem>}
+                                {activeTab === 1 && <MenuItem value="monto">Monto</MenuItem>}
+                                {activeTab === 1 && <MenuItem value="fecha">Fecha</MenuItem>}
+                                {activeTab === 2 && <MenuItem value="saldo">Saldo</MenuItem>}
+                                {activeTab === 2 && <MenuItem value="diasVencido">Días Vencido</MenuItem>}
+                                <MenuItem value="cliente">Cliente</MenuItem>
+                            </Select>
+                        </FormControl>
+                    </Grid>
+
+                    {/* Sort direction */}
+                    <Grid item xs={6} md={1}>
+                        <Tooltip title={sortDirection === 'desc' ? 'Mayor a menor' : 'Menor a mayor'}>
+                            <IconButton onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}>
+                                {sortDirection === 'desc' ? <DescIcon /> : <AscIcon />}
+                            </IconButton>
+                        </Tooltip>
+                    </Grid>
+
+                    {/* Clear filters */}
+                    {hasActiveFilters && (
+                        <Grid item xs={6} md={2}>
+                            <Button
+                                startIcon={<ClearIcon />}
+                                onClick={clearFilters}
+                                color="secondary"
+                                size="small"
+                            >
+                                Limpiar filtros
+                            </Button>
+                        </Grid>
+                    )}
+
+                    {/* Date filters for Pagos */}
+                    {activeTab === 1 && (
+                        <>
+                            <Grid item xs={12}>
+                                <Box display="flex" gap={2} alignItems="center" mt={1}>
+                                    <Typography variant="subtitle2" color="text.secondary">
+                                        Período:
+                                    </Typography>
+                                    <TextField
+                                        type="date"
+                                        label="Desde"
+                                        value={dateFrom}
+                                        onChange={(e) => setDateFrom(e.target.value)}
+                                        size="small"
+                                        InputLabelProps={{ shrink: true }}
+                                    />
+                                    <TextField
+                                        type="date"
+                                        label="Hasta"
+                                        value={dateTo}
+                                        onChange={(e) => setDateTo(e.target.value)}
+                                        size="small"
+                                        InputLabelProps={{ shrink: true }}
+                                    />
+                                    <Button variant="outlined" onClick={loadReport} disabled={loading}>
+                                        Aplicar
+                                    </Button>
+                                </Box>
+                            </Grid>
+                        </>
+                    )}
+                </Grid>
+
+                {/* Filter status */}
+                {hasActiveFilters && (
+                    <Box mt={2} display="flex" gap={1} flexWrap="wrap">
+                        <Typography variant="caption" color="text.secondary">
+                            Mostrando {filteredData.length} de {reportData?.data?.length || 0} registros
+                        </Typography>
+                        {searchTerm && <Chip size="small" label={`Búsqueda: ${searchTerm}`} onDelete={() => setSearchTerm('')} />}
+                        {selectedMatrizador && <Chip size="small" label={`Matrizador: ${selectedMatrizador}`} onDelete={() => setSelectedMatrizador('')} />}
+                        {minBalance && <Chip size="small" label={`Saldo ≥ $${minBalance}`} onDelete={() => setMinBalance('')} />}
+                    </Box>
+                )}
+            </Paper>
+        </Collapse>
+    );
+
     const renderTotalsCard = () => {
-        if (!reportData?.totals) return null;
+        const totals = filteredTotals || reportData?.totals;
+        if (!totals) return null;
 
         switch (activeTab) {
-            case 0: // Cartera por Cobrar
+            case 0:
                 return (
                     <Grid container spacing={2} sx={{ mb: 3 }}>
                         <Grid item xs={6} md={3}>
-                            <Card>
-                                <CardContent>
-                                    <Typography variant="overline" color="text.secondary">
-                                        Clientes
-                                    </Typography>
-                                    <Typography variant="h5" fontWeight="bold">
-                                        {reportData.totals.clientCount}
-                                    </Typography>
-                                </CardContent>
-                            </Card>
+                            <Card><CardContent>
+                                <Typography variant="overline" color="text.secondary">Clientes</Typography>
+                                <Typography variant="h5" fontWeight="bold">{totals.clientCount}</Typography>
+                            </CardContent></Card>
                         </Grid>
                         <Grid item xs={6} md={3}>
-                            <Card>
-                                <CardContent>
-                                    <Typography variant="overline" color="text.secondary">
-                                        Total Facturado
-                                    </Typography>
-                                    <Typography variant="h5" fontWeight="bold">
-                                        {formatCurrency(reportData.totals.totalInvoiced)}
-                                    </Typography>
-                                </CardContent>
-                            </Card>
+                            <Card><CardContent>
+                                <Typography variant="overline" color="text.secondary">Total Facturado</Typography>
+                                <Typography variant="h5" fontWeight="bold">{formatCurrency(totals.totalInvoiced)}</Typography>
+                            </CardContent></Card>
                         </Grid>
                         <Grid item xs={6} md={3}>
-                            <Card>
-                                <CardContent>
-                                    <Typography variant="overline" color="text.secondary">
-                                        Total Pagado
-                                    </Typography>
-                                    <Typography variant="h5" fontWeight="bold" color="success.main">
-                                        {formatCurrency(reportData.totals.totalPaid)}
-                                    </Typography>
-                                </CardContent>
-                            </Card>
+                            <Card><CardContent>
+                                <Typography variant="overline" color="text.secondary">Total Pagado</Typography>
+                                <Typography variant="h5" fontWeight="bold" color="success.main">{formatCurrency(totals.totalPaid)}</Typography>
+                            </CardContent></Card>
                         </Grid>
                         <Grid item xs={6} md={3}>
-                            <Card sx={{ bgcolor: 'error.light' }}>
-                                <CardContent>
-                                    <Typography variant="overline" color="error.contrastText">
-                                        Saldo Pendiente
-                                    </Typography>
-                                    <Typography variant="h5" fontWeight="bold" color="error.contrastText">
-                                        {formatCurrency(reportData.totals.totalBalance)}
-                                    </Typography>
-                                </CardContent>
-                            </Card>
+                            <Card sx={{ bgcolor: 'error.light' }}><CardContent>
+                                <Typography variant="overline" color="error.contrastText">Saldo Pendiente</Typography>
+                                <Typography variant="h5" fontWeight="bold" color="error.contrastText">{formatCurrency(totals.totalBalance)}</Typography>
+                            </CardContent></Card>
                         </Grid>
                     </Grid>
                 );
-            case 1: // Pagos del Período
+            case 1:
                 return (
                     <Grid container spacing={2} sx={{ mb: 3 }}>
                         <Grid item xs={6} md={4}>
-                            <Card>
-                                <CardContent>
-                                    <Typography variant="overline" color="text.secondary">
-                                        Cantidad de Pagos
-                                    </Typography>
-                                    <Typography variant="h5" fontWeight="bold">
-                                        {reportData.totals.count}
-                                    </Typography>
-                                </CardContent>
-                            </Card>
+                            <Card><CardContent>
+                                <Typography variant="overline" color="text.secondary">Cantidad de Pagos</Typography>
+                                <Typography variant="h5" fontWeight="bold">{totals.count}</Typography>
+                            </CardContent></Card>
                         </Grid>
                         <Grid item xs={6} md={4}>
-                            <Card sx={{ bgcolor: 'success.light' }}>
-                                <CardContent>
-                                    <Typography variant="overline" color="success.contrastText">
-                                        Total Recaudado
-                                    </Typography>
-                                    <Typography variant="h5" fontWeight="bold" color="success.contrastText">
-                                        {formatCurrency(reportData.totals.totalMonto)}
-                                    </Typography>
-                                </CardContent>
-                            </Card>
+                            <Card sx={{ bgcolor: 'success.light' }}><CardContent>
+                                <Typography variant="overline" color="success.contrastText">Total Recaudado</Typography>
+                                <Typography variant="h5" fontWeight="bold" color="success.contrastText">{formatCurrency(totals.totalMonto)}</Typography>
+                            </CardContent></Card>
                         </Grid>
                     </Grid>
                 );
-            case 2: // Facturas Vencidas
+            case 2:
                 return (
                     <Grid container spacing={2} sx={{ mb: 3 }}>
                         <Grid item xs={6} md={3}>
-                            <Card sx={{ bgcolor: 'error.light' }}>
-                                <CardContent>
-                                    <Typography variant="overline" color="error.contrastText">
-                                        Facturas Vencidas
-                                    </Typography>
-                                    <Typography variant="h5" fontWeight="bold" color="error.contrastText">
-                                        {reportData.totals.count}
-                                    </Typography>
-                                </CardContent>
-                            </Card>
+                            <Card sx={{ bgcolor: 'error.light' }}><CardContent>
+                                <Typography variant="overline" color="error.contrastText">Facturas Vencidas</Typography>
+                                <Typography variant="h5" fontWeight="bold" color="error.contrastText">{totals.count}</Typography>
+                            </CardContent></Card>
                         </Grid>
                         <Grid item xs={6} md={3}>
-                            <Card>
-                                <CardContent>
-                                    <Typography variant="overline" color="text.secondary">
-                                        Total Facturado
-                                    </Typography>
-                                    <Typography variant="h5" fontWeight="bold">
-                                        {formatCurrency(reportData.totals.totalFacturado)}
-                                    </Typography>
-                                </CardContent>
-                            </Card>
+                            <Card><CardContent>
+                                <Typography variant="overline" color="text.secondary">Total Facturado</Typography>
+                                <Typography variant="h5" fontWeight="bold">{formatCurrency(totals.totalFacturado)}</Typography>
+                            </CardContent></Card>
                         </Grid>
                         <Grid item xs={6} md={3}>
-                            <Card>
-                                <CardContent>
-                                    <Typography variant="overline" color="text.secondary">
-                                        Total Pagado
-                                    </Typography>
-                                    <Typography variant="h5" fontWeight="bold" color="success.main">
-                                        {formatCurrency(reportData.totals.totalPagado)}
-                                    </Typography>
-                                </CardContent>
-                            </Card>
+                            <Card><CardContent>
+                                <Typography variant="overline" color="text.secondary">Total Pagado</Typography>
+                                <Typography variant="h5" fontWeight="bold" color="success.main">{formatCurrency(totals.totalPagado)}</Typography>
+                            </CardContent></Card>
                         </Grid>
                         <Grid item xs={6} md={3}>
-                            <Card>
-                                <CardContent>
-                                    <Typography variant="overline" color="text.secondary">
-                                        Saldo Pendiente
-                                    </Typography>
-                                    <Typography variant="h5" fontWeight="bold" color="error.main">
-                                        {formatCurrency(reportData.totals.totalSaldo)}
-                                    </Typography>
-                                </CardContent>
-                            </Card>
+                            <Card><CardContent>
+                                <Typography variant="overline" color="text.secondary">Saldo Pendiente</Typography>
+                                <Typography variant="h5" fontWeight="bold" color="error.main">{formatCurrency(totals.totalSaldo)}</Typography>
+                            </CardContent></Card>
                         </Grid>
                     </Grid>
                 );
@@ -315,34 +577,34 @@ const Reportes = () => {
     };
 
     const renderTable = () => {
-        if (!reportData?.data || reportData.data.length === 0) {
+        if (filteredData.length === 0) {
             return (
                 <Paper sx={{ p: 4, textAlign: 'center' }}>
                     <Typography color="text.secondary">
-                        No hay datos para mostrar
+                        {hasActiveFilters ? 'No hay datos que coincidan con los filtros' : 'No hay datos para mostrar'}
                     </Typography>
                 </Paper>
             );
         }
 
         switch (activeTab) {
-            case 0: // Cartera por Cobrar
+            case 0:
                 return (
                     <TableContainer component={Paper}>
                         <Table size="small">
                             <TableHead>
                                 <TableRow sx={{ bgcolor: 'primary.main' }}>
                                     <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Cédula/RUC</TableCell>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Cliente</TableCell>
+                                    <SortableHeader field="cliente" sx={{ color: 'white', fontWeight: 'bold' }}>Cliente</SortableHeader>
                                     <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="center">Facturas</TableCell>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="right">Facturado</TableCell>
+                                    <SortableHeader field="monto" sx={{ color: 'white', fontWeight: 'bold' }} align="right">Facturado</SortableHeader>
                                     <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="right">Pagado</TableCell>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="right">Saldo</TableCell>
+                                    <SortableHeader field="balance" sx={{ color: 'white', fontWeight: 'bold' }} align="right">Saldo</SortableHeader>
                                     <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Matrizador</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {reportData.data.map((row, idx) => (
+                                {filteredData.map((row, idx) => (
                                     <TableRow key={idx} hover>
                                         <TableCell>{row.clientTaxId}</TableCell>
                                         <TableCell>{row.clientName}</TableCell>
@@ -352,30 +614,32 @@ const Reportes = () => {
                                         <TableCell align="right" sx={{ color: 'error.main', fontWeight: 'bold' }}>
                                             {formatCurrency(row.balance)}
                                         </TableCell>
-                                        <TableCell>{row.matrizador}</TableCell>
+                                        <TableCell>
+                                            <Chip size="small" label={row.matrizador} variant="outlined" />
+                                        </TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
                         </Table>
                     </TableContainer>
                 );
-            case 1: // Pagos del Período
+            case 1:
                 return (
                     <TableContainer component={Paper}>
                         <Table size="small">
                             <TableHead>
                                 <TableRow sx={{ bgcolor: 'success.main' }}>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Fecha</TableCell>
+                                    <SortableHeader field="fecha" sx={{ color: 'white', fontWeight: 'bold' }}>Fecha</SortableHeader>
                                     <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Recibo</TableCell>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Cliente</TableCell>
+                                    <SortableHeader field="cliente" sx={{ color: 'white', fontWeight: 'bold' }}>Cliente</SortableHeader>
                                     <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Cédula/RUC</TableCell>
                                     <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Factura</TableCell>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="right">Monto</TableCell>
+                                    <SortableHeader field="monto" sx={{ color: 'white', fontWeight: 'bold' }} align="right">Monto</SortableHeader>
                                     <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Concepto</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {reportData.data.map((row, idx) => (
+                                {filteredData.map((row, idx) => (
                                     <TableRow key={idx} hover>
                                         <TableCell>{formatDate(row.fecha)}</TableCell>
                                         <TableCell>{row.recibo}</TableCell>
@@ -392,23 +656,23 @@ const Reportes = () => {
                         </Table>
                     </TableContainer>
                 );
-            case 2: // Facturas Vencidas
+            case 2:
                 return (
                     <TableContainer component={Paper}>
                         <Table size="small">
                             <TableHead>
                                 <TableRow sx={{ bgcolor: 'error.main' }}>
                                     <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Factura</TableCell>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Cliente</TableCell>
+                                    <SortableHeader field="cliente" sx={{ color: 'white', fontWeight: 'bold' }}>Cliente</SortableHeader>
                                     <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Vencimiento</TableCell>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="center">Días</TableCell>
+                                    <SortableHeader field="diasVencido" sx={{ color: 'white', fontWeight: 'bold' }} align="center">Días</SortableHeader>
                                     <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="right">Total</TableCell>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="right">Saldo</TableCell>
+                                    <SortableHeader field="saldo" sx={{ color: 'white', fontWeight: 'bold' }} align="right">Saldo</SortableHeader>
                                     <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Matrizador</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {reportData.data.map((row, idx) => (
+                                {filteredData.map((row, idx) => (
                                     <TableRow key={idx} hover>
                                         <TableCell>{row.factura}</TableCell>
                                         <TableCell>
@@ -420,14 +684,16 @@ const Reportes = () => {
                                             <Chip
                                                 label={`${row.diasVencido}d`}
                                                 size="small"
-                                                color={row.diasVencido > 30 ? 'error' : 'warning'}
+                                                color={row.diasVencido > 60 ? 'error' : row.diasVencido > 30 ? 'warning' : 'default'}
                                             />
                                         </TableCell>
                                         <TableCell align="right">{formatCurrency(row.totalFactura)}</TableCell>
                                         <TableCell align="right" sx={{ color: 'error.main', fontWeight: 'bold' }}>
                                             {formatCurrency(row.saldo)}
                                         </TableCell>
-                                        <TableCell>{row.matrizador}</TableCell>
+                                        <TableCell>
+                                            <Chip size="small" label={row.matrizador} variant="outlined" />
+                                        </TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
@@ -450,6 +716,11 @@ const Reportes = () => {
                     </Typography>
                 </Box>
                 <Box display="flex" gap={1}>
+                    <Tooltip title={showFilters ? 'Ocultar filtros' : 'Mostrar filtros'}>
+                        <IconButton onClick={() => setShowFilters(!showFilters)} color={showFilters ? 'primary' : 'default'}>
+                            <FilterIcon />
+                        </IconButton>
+                    </Tooltip>
                     <Tooltip title="Actualizar">
                         <IconButton onClick={loadReport} color="primary" disabled={loading}>
                             <RefreshIcon />
@@ -460,7 +731,7 @@ const Reportes = () => {
                         color="success"
                         startIcon={<DownloadIcon />}
                         onClick={exportToExcel}
-                        disabled={loading || !reportData?.data?.length}
+                        disabled={loading || filteredData.length === 0}
                     >
                         Exportar Excel
                     </Button>
@@ -474,7 +745,7 @@ const Reportes = () => {
                     onChange={(_, newValue) => setActiveTab(newValue)}
                     variant="fullWidth"
                 >
-                    {reportTypes.map((report, index) => (
+                    {reportTypes.map((report) => (
                         <Tab
                             key={report.id}
                             icon={report.icon}
@@ -485,35 +756,8 @@ const Reportes = () => {
                 </Tabs>
             </Paper>
 
-            {/* Date Filters for Pagos del Período */}
-            {activeTab === 1 && (
-                <Paper sx={{ p: 2, mb: 3 }}>
-                    <Box display="flex" gap={2} alignItems="center">
-                        <Typography variant="subtitle2" color="text.secondary">
-                            Período:
-                        </Typography>
-                        <TextField
-                            type="date"
-                            label="Desde"
-                            value={dateFrom}
-                            onChange={(e) => setDateFrom(e.target.value)}
-                            size="small"
-                            InputLabelProps={{ shrink: true }}
-                        />
-                        <TextField
-                            type="date"
-                            label="Hasta"
-                            value={dateTo}
-                            onChange={(e) => setDateTo(e.target.value)}
-                            size="small"
-                            InputLabelProps={{ shrink: true }}
-                        />
-                        <Button variant="outlined" onClick={loadReport} disabled={loading}>
-                            Aplicar
-                        </Button>
-                    </Box>
-                </Paper>
-            )}
+            {/* Filters Bar */}
+            {renderFiltersBar()}
 
             {/* Error */}
             {error && (
@@ -533,17 +777,15 @@ const Reportes = () => {
             {/* Content */}
             {!loading && !error && (
                 <>
-                    {/* Totals Cards */}
                     {renderTotalsCard()}
 
-                    {/* Generated timestamp */}
                     {reportData?.generatedAt && (
                         <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
                             Generado: {new Date(reportData.generatedAt).toLocaleString('es-EC')}
+                            {hasActiveFilters && ` • Filtrado: ${filteredData.length} registros`}
                         </Typography>
                     )}
 
-                    {/* Data Table */}
                     {renderTable()}
                 </>
             )}
@@ -552,3 +794,4 @@ const Reportes = () => {
 };
 
 export default Reportes;
+
