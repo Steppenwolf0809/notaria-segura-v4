@@ -1281,7 +1281,7 @@ export async function getEntregasConSaldo(req, res) {
         console.log('[billing-controller] getEntregasConSaldo');
 
         // Get delivered documents that have invoices with pending balance
-        const documents = await prisma.documento.findMany({
+        const documents = await prisma.document.findMany({
             where: {
                 status: 'ENTREGADO',
                 invoices: {
@@ -1330,9 +1330,9 @@ export async function getEntregasConSaldo(req, res) {
                 );
 
                 return {
-                    protocolo: doc.protocolNumber || doc.codigoBarras,
+                    protocolo: doc.protocolNumber,
                     cliente: doc.clientName || 'Sin nombre',
-                    cedula: doc.clientTaxId || '',
+                    cedula: doc.clientId || '',
                     telefono: doc.clientPhone || '',
                     fechaEntrega: deliveryDate,
                     diasDesdeEntrega: daysSinceDelivery,

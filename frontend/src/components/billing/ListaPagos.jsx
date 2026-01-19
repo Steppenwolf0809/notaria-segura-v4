@@ -98,11 +98,6 @@ const ListaPagos = () => {
         setPage(0);
     };
 
-    // Navegar a detalle de factura
-    const handleViewInvoice = (invoiceId) => {
-        window.location.hash = `#/factura-detalle/${invoiceId}`;
-    };
-
     return (
         <Box sx={{ p: 3 }}>
             {/* Header */}
@@ -253,23 +248,18 @@ const ListaPagos = () => {
                                     </TableCell>
                                     <TableCell>
                                         {payment.invoiceId ? (
-                                            <Tooltip title="Ver factura">
-                                                <Box
-                                                    sx={{
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: 0.5,
-                                                        cursor: 'pointer',
-                                                        '&:hover': { color: 'primary.main' }
-                                                    }}
-                                                    onClick={() => handleViewInvoice(payment.invoiceId)}
-                                                >
-                                                    <ReceiptIcon fontSize="small" />
-                                                    <Typography variant="body2">
-                                                        {payment.invoice?.invoiceNumber || `#${payment.invoiceId}`}
-                                                    </Typography>
-                                                </Box>
-                                            </Tooltip>
+                                            <Box
+                                                sx={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 0.5
+                                                }}
+                                            >
+                                                <ReceiptIcon fontSize="small" color="action" />
+                                                <Typography variant="body2">
+                                                    {payment.invoice?.invoiceNumber || `#${payment.invoiceId}`}
+                                                </Typography>
+                                            </Box>
                                         ) : (
                                             <Typography variant="body2" color="text.secondary">-</Typography>
                                         )}
