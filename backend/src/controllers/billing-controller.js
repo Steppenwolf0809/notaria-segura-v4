@@ -1271,3 +1271,101 @@ export async function getFacturasVencidas(req, res) {
         res.status(500).json({ error: error.message });
     }
 }
+
+/**
+ * Report: Entregas con Saldo Pendiente (Delivered Documents with Pending Balance)
+ * For auditing purposes - documents marked as ENTREGADO but still have pending payments
+ */
+export async function getEntregasConSaldo(req, res) {
+    try {
+        console.log('[billing-controller] getEntregasConSaldo');
+
+        // Get delivered documents that have invoices with pending balance
+        const documents = await prisma.documento.findMany({
+            where: {
+                status: 'ENTREGADO',
+                invoices: {
+                    some: {
+                        status: {
+                            not: 'PAID'
+                        }
+                    }
+                }
+            },
+            include: {
+                invoices: {
+                    include: {
+                        payments: true
+                    }
+                },
+                assignedTo: {
+                    select: {
+                        firstName: true,
+                        lastName: true
+                    }
+                }
+            },
+            orderBy: { updatedAt: 'desc' }
+        });
+
+        const data = documents
+            .map(doc => {
+                // Calculate total invoiced, paid, and balance for this document
+                const invoiceData = doc.invoices.reduce((acc, inv) => {
+                    const paid = inv.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+                    const balance = Number(inv.totalAmount) - paid;
+                    return {
+                        totalInvoiced: acc.totalInvoiced + Number(inv.totalAmount),
+                        totalPaid: acc.totalPaid + paid,
+                        balance: acc.balance + balance,
+                        invoiceCount: acc.invoiceCount + 1
+                    };
+                }, { totalInvoiced: 0, totalPaid: 0, balance: 0, invoiceCount: 0 });
+
+                if (invoiceData.balance <= 0) return null; // Skip if fully paid
+
+                const deliveryDate = doc.deliveryDate || doc.updatedAt;
+                const daysSinceDelivery = Math.floor(
+                    (new Date().getTime() - new Date(deliveryDate).getTime()) / (1000 * 60 * 60 * 24)
+                );
+
+                return {
+                    protocolo: doc.protocolNumber || doc.codigoBarras,
+                    cliente: doc.clientName || 'Sin nombre',
+                    cedula: doc.clientTaxId || '',
+                    telefono: doc.clientPhone || '',
+                    fechaEntrega: deliveryDate,
+                    diasDesdeEntrega: daysSinceDelivery,
+                    facturas: invoiceData.invoiceCount,
+                    totalFacturado: invoiceData.totalInvoiced,
+                    totalPagado: invoiceData.totalPaid,
+                    saldoPendiente: invoiceData.balance,
+                    matrizador: doc.assignedTo
+                        ? `${doc.assignedTo.firstName} ${doc.assignedTo.lastName}`
+                        : 'Sin asignar'
+                };
+            })
+            .filter(Boolean)
+            .sort((a, b) => b.saldoPendiente - a.saldoPendiente);
+
+        // Calculate totals
+        const totals = data.reduce((acc, row) => ({
+            count: acc.count + 1,
+            totalFacturado: acc.totalFacturado + row.totalFacturado,
+            totalPagado: acc.totalPagado + row.totalPagado,
+            totalSaldo: acc.totalSaldo + row.saldoPendiente
+        }), { count: 0, totalFacturado: 0, totalPagado: 0, totalSaldo: 0 });
+
+        res.json({
+            success: true,
+            reportType: 'entregas-con-saldo',
+            reportName: 'Entregas con Saldo Pendiente',
+            generatedAt: new Date().toISOString(),
+            data,
+            totals
+        });
+    } catch (error) {
+        console.error('[billing-controller] getEntregasConSaldo error:', error);
+        res.status(500).json({ error: error.message });
+    }
+}

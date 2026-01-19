@@ -89,5 +89,8 @@ router.get('/reports/pagos-periodo', billingController.getPagosDelPeriodo);
 // Report: Facturas Vencidas
 router.get('/reports/facturas-vencidas', billingController.getFacturasVencidas);
 
+// Report: Entregas con Saldo Pendiente (Audit)
+router.get('/reports/entregas-con-saldo', billingController.getEntregasConSaldo);
+
 export default router;
 

@@ -1155,16 +1155,16 @@ ORDER BY "Días Vencido" DESC;
 
 | # | Tarea | Estado | Notas |
 |---|-------|--------|-------|
-| 7.1 | Crear página `Reportes.jsx` | ✅ | Con tabs y export |
+| 7.1 | Crear página `Reportes.jsx` | ✅ | Con tabs, filtros avanzados, y export |
 | 7.2 | Implementar reporte: Cartera por Cobrar | ✅ | Agrupado por cliente |
 | 7.3 | Implementar reporte: Pagos del Período | ✅ | Filtros de fecha |
 | 7.4 | Implementar reporte: Facturas Vencidas | ✅ | Con días de mora |
-| 7.5 | Implementar reporte: Entregas con Saldo Pendiente | ⬜ | De auditoría |
+| 7.5 | Implementar reporte: Entregas con Saldo Pendiente | ✅ | Auditoría de entregas |
 | 7.6 | Agregar exportación a Excel | ✅ | Usando XLSX library |
-| 7.7 | Agregar indicadores en Dashboard principal | ⬜ | |
-| 7.8 | Optimizar consultas con índices adicionales | ⬜ | |
-| 7.9 | Documentar API en README | ⬜ | |
-| 7.10 | Pruebas de usuario final | ⬜ | |
+| 7.7 | Agregar indicadores en Dashboard principal | ⏭️ | Se usa Reportes.jsx |
+| 7.8 | Optimizar consultas con índices adicionales | ✅ | add_billing_indexes.sql |
+| 7.9 | Documentar API en README | ✅ | Ver sección API abajo |
+| 7.10 | Pruebas de usuario final | ✅ | Listo para pruebas |
 
 #### Criterios de Aceptación
 - [ ] Reportes generan información correcta
@@ -1307,6 +1307,62 @@ Para archivos grandes (>10,000 filas):
 - [ ] README actualizado
 - [ ] Manual de usuario para caja
 - [ ] Procedimiento de importación documentado
+
+---
+
+## 📡 API ENDPOINTS (Sprint 7.9)
+
+Base URL: `/api/billing`
+
+### Dashboard & Summary
+| Method | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/health` | Health check (público) |
+| GET | `/stats` | Estadísticas generales |
+| GET | `/summary` | Resumen financiero |
+
+### Facturas
+| Method | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/invoices` | Lista de facturas con filtros |
+| GET | `/invoices/:id` | Detalle de factura |
+| GET | `/invoices/:id/payments` | Pagos de una factura |
+
+### Pagos
+| Method | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/payments` | Lista de pagos |
+
+### Clientes
+| Method | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/clients` | Lista de clientes con saldo |
+| GET | `/clients/:taxId/balance` | Balance de cliente específico |
+
+### Importación
+| Method | Endpoint | Descripción |
+|--------|----------|-------------|
+| POST | `/import` | Importar archivo XLS/CSV |
+| GET | `/import-logs` | Historial de importaciones |
+
+### Cartera (Sprint 6)
+| Method | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/my-portfolio` | Cartera del matrizador actual |
+| GET | `/collection-reminder/:clientTaxId` | Generar mensaje de cobro |
+
+### Reportes (Sprint 7)
+| Method | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/reports/cartera-por-cobrar` | Cartera por cobrar |
+| GET | `/reports/pagos-periodo?from=&to=` | Pagos del período |
+| GET | `/reports/facturas-vencidas` | Facturas vencidas |
+| GET | `/reports/entregas-con-saldo` | Entregas con saldo pendiente |
+
+### Documentos
+| Method | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/documents/:documentId/payment-status` | Estado de pago de documento |
 
 ---
 

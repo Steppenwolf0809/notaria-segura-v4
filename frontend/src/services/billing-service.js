@@ -309,6 +309,15 @@ async function getReporteFacturasVencidas() {
 }
 
 /**
+ * Obtener reporte de entregas con saldo pendiente
+ * @returns {Promise<Object>} Lista de documentos entregados con saldo pendiente
+ */
+async function getReporteEntregasConSaldo() {
+    const response = await apiClient.get('/billing/reports/entregas-con-saldo');
+    return response.data;
+}
+
+/**
  * ============================================================================
  * EXPORTAR SERVICIO
  * ============================================================================
@@ -347,6 +356,7 @@ const billingService = {
     getReporteCarteraPorCobrar,
     getReportePagosDelPeriodo,
     getReporteFacturasVencidas,
+    getReporteEntregasConSaldo,
 
     // Utilidades
     formatInvoiceStatus,
