@@ -37,7 +37,12 @@ import {
   Description as DescriptionIcon,
   Analytics as AnalyticsIcon,
   Poll as PollIcon,
-  QrCode as QrCodeIcon
+  QrCode as QrCodeIcon,
+  AccountBalance as AccountBalanceIcon,
+  CloudUpload as CloudUploadIcon,
+  Receipt as ReceiptIcon,
+  Payments as PaymentsIcon,
+  Assessment as AssessmentIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import { useThemeCtx } from '../contexts/theme-ctx';
@@ -59,6 +64,7 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [configMenuOpen, setConfigMenuOpen] = useState(false);
+  const [billingMenuOpen, setBillingMenuOpen] = useState(false);
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
   const { resolvedIsDark: isDarkMode, setMode } = useThemeCtx();
 
@@ -82,12 +88,25 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
     if (savedConfigOpen !== null) {
       setConfigMenuOpen(JSON.parse(savedConfigOpen));
     }
+
+    const savedBillingOpen = localStorage.getItem('admin-billing-menu-open');
+    if (savedBillingOpen !== null) {
+      setBillingMenuOpen(JSON.parse(savedBillingOpen));
+    }
   }, []);
 
   // Mantener submenu de configuración abierto si estamos en una vista de configuración
   useEffect(() => {
     if (currentView === 'settings' || currentView === 'whatsapp-templates') {
       setConfigMenuOpen(true);
+    }
+  }, [currentView]);
+
+  // Mantener submenu de facturación abierto si estamos en una vista de facturación
+  useEffect(() => {
+    const billingViews = ['importar-datos', 'facturas', 'pagos', 'reportes'];
+    if (billingViews.includes(currentView)) {
+      setBillingMenuOpen(true);
     }
   }, [currentView]);
 
@@ -100,6 +119,11 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
   useEffect(() => {
     localStorage.setItem('admin-config-menu-open', JSON.stringify(configMenuOpen));
   }, [configMenuOpen]);
+
+  // Guardar estado del submenu de facturación
+  useEffect(() => {
+    localStorage.setItem('admin-billing-menu-open', JSON.stringify(billingMenuOpen));
+  }, [billingMenuOpen]);
 
   /**
    * Toggle del drawer móvil
@@ -322,6 +346,102 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
               ))}
             </React.Fragment>
           ))}
+
+          {/* Facturación con submenu */}
+          <ListItem disablePadding sx={{ mb: 0.5, flexDirection: 'column' }}>
+            <Tooltip title={sidebarCollapsed ? 'Facturación' : ''} placement="right">
+              <ListItemButton
+                onClick={() => setBillingMenuOpen(!billingMenuOpen)}
+                sx={{
+                  borderRadius: 1,
+                  minHeight: 48,
+                  justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                  px: sidebarCollapsed ? 1 : 2,
+                  backgroundColor: ['importar-datos', 'facturas', 'pagos', 'reportes'].includes(currentView)
+                    ? (isDarkMode ? 'primary.dark' : 'rgba(255, 255, 255, 0.25)')
+                    : 'transparent',
+                  color: 'inherit',
+                  '&:hover': {
+                    backgroundColor: ['importar-datos', 'facturas', 'pagos', 'reportes'].includes(currentView)
+                      ? (isDarkMode ? 'primary.main' : 'rgba(255, 255, 255, 0.35)')
+                      : (isDarkMode ? 'action.hover' : 'rgba(255, 255, 255, 0.15)'),
+                  },
+                  transition: 'all 0.2s ease',
+                  width: '100%'
+                }}
+              >
+                <ListItemIcon
+                  sx={{
+                    color: 'inherit',
+                    minWidth: sidebarCollapsed ? 'auto' : 40,
+                    justifyContent: 'center',
+                  }}
+                >
+                  <AccountBalanceIcon />
+                </ListItemIcon>
+                {!sidebarCollapsed && (
+                  <>
+                    <ListItemText
+                      primary="Facturación"
+                      primaryTypographyProps={{
+                        fontSize: '0.875rem',
+                        fontWeight: ['importar-datos', 'facturas', 'pagos', 'reportes'].includes(currentView) ? 600 : 400,
+                        color: 'inherit'
+                      }}
+                    />
+                    <IconButton size="small" sx={{ color: 'inherit' }}>
+                      {billingMenuOpen ? <ExpandMoreIcon /> : <ChevronRightIcon />}
+                    </IconButton>
+                  </>
+                )}
+              </ListItemButton>
+            </Tooltip>
+
+            {/* Submenu de Facturación */}
+            {!sidebarCollapsed && billingMenuOpen && (
+              <List sx={{ pl: 2, width: '100%' }}>
+                {[
+                  { view: 'importar-datos', text: 'Importar Datos', icon: <CloudUploadIcon fontSize="small" /> },
+                  { view: 'facturas', text: 'Facturas', icon: <ReceiptIcon fontSize="small" /> },
+                  { view: 'pagos', text: 'Pagos', icon: <PaymentsIcon fontSize="small" /> },
+                  { view: 'reportes', text: 'Reportes', icon: <AssessmentIcon fontSize="small" /> }
+                ].map((subItem) => (
+                  <ListItem key={subItem.view} disablePadding>
+                    <ListItemButton
+                      onClick={() => handleNavigation(subItem.view)}
+                      sx={{
+                        borderRadius: 1,
+                        minHeight: 40,
+                        px: 2,
+                        backgroundColor: currentView === subItem.view
+                          ? (isDarkMode ? 'primary.main' : 'rgba(255, 255, 255, 0.35)')
+                          : 'transparent',
+                        color: 'inherit',
+                        '&:hover': {
+                          backgroundColor: currentView === subItem.view
+                            ? (isDarkMode ? 'primary.light' : 'rgba(255, 255, 255, 0.45)')
+                            : (isDarkMode ? 'action.hover' : 'rgba(255, 255, 255, 0.25)'),
+                        },
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      <ListItemIcon sx={{ color: 'inherit', minWidth: 30 }}>
+                        {subItem.icon}
+                      </ListItemIcon>
+                      <ListItemText
+                        primary={subItem.text}
+                        primaryTypographyProps={{
+                          fontSize: '0.8rem',
+                          fontWeight: currentView === subItem.view ? 600 : 400,
+                          color: 'inherit'
+                        }}
+                      />
+                    </ListItemButton>
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </ListItem>
 
           {/* Configuración con submenu */}
           <ListItem disablePadding sx={{ mb: 0.5, flexDirection: 'column' }}>
