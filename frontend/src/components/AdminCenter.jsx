@@ -58,6 +58,7 @@ import ImportarDatos from './billing/ImportarDatos';
 import ListaFacturas from './billing/ListaFacturas';
 import DetalleFactura from './billing/DetalleFactura';
 import ListaPagos from './billing/ListaPagos';
+import Reportes from './billing/Reportes';
 
 /**
  * Centro de administración - Panel principal para ADMIN
@@ -102,6 +103,8 @@ const AdminCenter = () => {
         return <DetalleFactura />;
       case 'pagos':
         return <ListaPagos />;
+      case 'reportes':
+        return <Reportes />;
       default:
         return <AdminDashboard />;
     }

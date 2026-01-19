@@ -8,6 +8,7 @@ import ImportarDatos from './billing/ImportarDatos';
 import ListaFacturas from './billing/ListaFacturas';
 import DetalleFactura from './billing/DetalleFactura';
 import ListaPagos from './billing/ListaPagos';
+import Reportes from './billing/Reportes';
 
 /**
  * Centro de Control de CAJA
@@ -79,6 +80,9 @@ const CajaCenter = () => {
 
       case 'pagos':
         return <ListaPagos />;
+
+      case 'reportes':
+        return <Reportes />;
 
       default:
         // Si el hash no coincide con ninguna vista, mostrar dashboard

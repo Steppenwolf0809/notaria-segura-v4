@@ -1155,12 +1155,12 @@ ORDER BY "Días Vencido" DESC;
 
 | # | Tarea | Estado | Notas |
 |---|-------|--------|-------|
-| 7.1 | Crear página `Reportes.jsx` | ⬜ | |
-| 7.2 | Implementar reporte: Cartera por Cobrar | ⬜ | |
-| 7.3 | Implementar reporte: Pagos del Período | ⬜ | |
-| 7.4 | Implementar reporte: Facturas Vencidas | ⬜ | |
+| 7.1 | Crear página `Reportes.jsx` | ✅ | Con tabs y export |
+| 7.2 | Implementar reporte: Cartera por Cobrar | ✅ | Agrupado por cliente |
+| 7.3 | Implementar reporte: Pagos del Período | ✅ | Filtros de fecha |
+| 7.4 | Implementar reporte: Facturas Vencidas | ✅ | Con días de mora |
 | 7.5 | Implementar reporte: Entregas con Saldo Pendiente | ⬜ | De auditoría |
-| 7.6 | Agregar exportación a Excel | ⬜ | |
+| 7.6 | Agregar exportación a Excel | ✅ | Usando XLSX library |
 | 7.7 | Agregar indicadores en Dashboard principal | ⬜ | |
 | 7.8 | Optimizar consultas con índices adicionales | ⬜ | |
 | 7.9 | Documentar API en README | ⬜ | |

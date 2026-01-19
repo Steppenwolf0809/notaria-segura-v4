@@ -272,6 +272,44 @@ async function generateCollectionReminder(clientTaxId, phone) {
 
 /**
  * ============================================================================
+ * SECCIÓN 8: REPORTES (Sprint 7)
+ * ============================================================================
+ */
+
+/**
+ * Obtener reporte de cartera por cobrar
+ * @returns {Promise<Object>} Reporte agrupado por cliente
+ */
+async function getReporteCarteraPorCobrar() {
+    const response = await apiClient.get('/billing/reports/cartera-por-cobrar');
+    return response.data;
+}
+
+/**
+ * Obtener reporte de pagos del período
+ * @param {string} dateFrom - Fecha desde (YYYY-MM-DD)
+ * @param {string} dateTo - Fecha hasta (YYYY-MM-DD)
+ * @returns {Promise<Object>} Lista de pagos en el período
+ */
+async function getReportePagosDelPeriodo(dateFrom, dateTo) {
+    const params = {};
+    if (dateFrom) params.dateFrom = dateFrom;
+    if (dateTo) params.dateTo = dateTo;
+    const response = await apiClient.get('/billing/reports/pagos-periodo', { params });
+    return response.data;
+}
+
+/**
+ * Obtener reporte de facturas vencidas
+ * @returns {Promise<Object>} Lista de facturas vencidas con días de mora
+ */
+async function getReporteFacturasVencidas() {
+    const response = await apiClient.get('/billing/reports/facturas-vencidas');
+    return response.data;
+}
+
+/**
+ * ============================================================================
  * EXPORTAR SERVICIO
  * ============================================================================
  */
@@ -305,6 +343,11 @@ const billingService = {
     getMyPortfolio,
     generateCollectionReminder,
 
+    // Reportes (Sprint 7)
+    getReporteCarteraPorCobrar,
+    getReportePagosDelPeriodo,
+    getReporteFacturasVencidas,
+
     // Utilidades
     formatInvoiceStatus,
     formatCurrency,
@@ -312,3 +355,4 @@ const billingService = {
 };
 
 export default billingService;
+
