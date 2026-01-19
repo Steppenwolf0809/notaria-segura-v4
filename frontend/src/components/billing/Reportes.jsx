@@ -35,6 +35,7 @@ import {
     AccountBalance as CarteraIcon,
     Payment as PaymentIcon,
     Warning as WarningIcon,
+    LocalShipping as DeliveryIcon,
     Search as SearchIcon,
     FilterList as FilterIcon,
     Sort as SortIcon,
@@ -76,7 +77,8 @@ const Reportes = () => {
     const reportTypes = [
         { id: 'cartera', label: 'Cartera por Cobrar', icon: <CarteraIcon /> },
         { id: 'pagos', label: 'Pagos del Período', icon: <PaymentIcon /> },
-        { id: 'vencidas', label: 'Facturas Vencidas', icon: <WarningIcon /> }
+        { id: 'vencidas', label: 'Facturas Vencidas', icon: <WarningIcon /> },
+        { id: 'entregas', label: 'Entregas con Saldo', icon: <DeliveryIcon /> }
     ];
 
     // Extract unique matrizadores from data
@@ -108,6 +110,9 @@ const Reportes = () => {
                     break;
                 case 2:
                     data = await billingService.getReporteFacturasVencidas();
+                    break;
+                case 3:
+                    data = await billingService.getReporteEntregasConSaldo();
                     break;
                 default:
                     data = null;
@@ -228,6 +233,13 @@ const Reportes = () => {
                     totalPagado: acc.totalPagado + (row.pagado || 0),
                     totalSaldo: acc.totalSaldo + (row.saldo || 0)
                 }), { count: 0, totalFacturado: 0, totalPagado: 0, totalSaldo: 0 });
+            case 3: // Entregas con Saldo
+                return filteredData.reduce((acc, row) => ({
+                    count: acc.count + 1,
+                    totalFacturado: acc.totalFacturado + (row.totalFacturado || 0),
+                    totalPagado: acc.totalPagado + (row.totalPagado || 0),
+                    totalSaldo: acc.totalSaldo + (row.saldoPendiente || 0)
+                }), { count: 0, totalFacturado: 0, totalPagado: 0, totalSaldo: 0 });
             default:
                 return null;
         }
@@ -301,6 +313,22 @@ const Reportes = () => {
                     'Matrizador': row.matrizador
                 }));
                 fileName = `Facturas_Vencidas_${new Date().toISOString().split('T')[0]}.xlsx`;
+                break;
+            case 3:
+                sheetData = filteredData.map(row => ({
+                    'Protocolo': row.protocolo,
+                    'Cliente': row.cliente,
+                    'Cédula/RUC': row.cedula,
+                    'Teléfono': row.telefono,
+                    'Fecha Entrega': formatDate(row.fechaEntrega),
+                    'Días desde Entrega': row.diasDesdeEntrega,
+                    'Facturas': row.facturas,
+                    'Total Facturado': row.totalFacturado,
+                    'Total Pagado': row.totalPagado,
+                    'Saldo Pendiente': row.saldoPendiente,
+                    'Matrizador': row.matrizador
+                }));
+                fileName = `Entregas_Con_Saldo_${new Date().toISOString().split('T')[0]}.xlsx`;
                 break;
             default:
                 return;
@@ -571,6 +599,35 @@ const Reportes = () => {
                         </Grid>
                     </Grid>
                 );
+            case 3: // Entregas con Saldo
+                return (
+                    <Grid container spacing={2} sx={{ mb: 3 }}>
+                        <Grid item xs={6} md={3}>
+                            <Card sx={{ bgcolor: 'warning.light' }}><CardContent>
+                                <Typography variant="overline" color="warning.contrastText">Entregas con Saldo</Typography>
+                                <Typography variant="h5" fontWeight="bold" color="warning.contrastText">{totals.count}</Typography>
+                            </CardContent></Card>
+                        </Grid>
+                        <Grid item xs={6} md={3}>
+                            <Card><CardContent>
+                                <Typography variant="overline" color="text.secondary">Total Facturado</Typography>
+                                <Typography variant="h5" fontWeight="bold">{formatCurrency(totals.totalFacturado)}</Typography>
+                            </CardContent></Card>
+                        </Grid>
+                        <Grid item xs={6} md={3}>
+                            <Card><CardContent>
+                                <Typography variant="overline" color="text.secondary">Total Pagado</Typography>
+                                <Typography variant="h5" fontWeight="bold" color="success.main">{formatCurrency(totals.totalPagado)}</Typography>
+                            </CardContent></Card>
+                        </Grid>
+                        <Grid item xs={6} md={3}>
+                            <Card sx={{ bgcolor: 'error.light' }}><CardContent>
+                                <Typography variant="overline" color="error.contrastText">Saldo Pendiente</Typography>
+                                <Typography variant="h5" fontWeight="bold" color="error.contrastText">{formatCurrency(totals.totalSaldo)}</Typography>
+                            </CardContent></Card>
+                        </Grid>
+                    </Grid>
+                );
             default:
                 return null;
         }
@@ -690,6 +747,52 @@ const Reportes = () => {
                                         <TableCell align="right">{formatCurrency(row.totalFactura)}</TableCell>
                                         <TableCell align="right" sx={{ color: 'error.main', fontWeight: 'bold' }}>
                                             {formatCurrency(row.saldo)}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Chip size="small" label={row.matrizador} variant="outlined" />
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                );
+            case 3: // Entregas con Saldo
+                return (
+                    <TableContainer component={Paper}>
+                        <Table size="small">
+                            <TableHead>
+                                <TableRow sx={{ bgcolor: 'warning.main' }}>
+                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Protocolo</TableCell>
+                                    <SortableHeader field="cliente" sx={{ color: 'white', fontWeight: 'bold' }}>Cliente</SortableHeader>
+                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Entrega</TableCell>
+                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="center">Días</TableCell>
+                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="center">Facturas</TableCell>
+                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="right">Facturado</TableCell>
+                                    <SortableHeader field="saldo" sx={{ color: 'white', fontWeight: 'bold' }} align="right">Saldo</SortableHeader>
+                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Matrizador</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {filteredData.map((row, idx) => (
+                                    <TableRow key={idx} hover>
+                                        <TableCell sx={{ fontWeight: 'bold' }}>{row.protocolo}</TableCell>
+                                        <TableCell>
+                                            <Typography variant="body2">{row.cliente}</Typography>
+                                            <Typography variant="caption" color="text.secondary">{row.cedula}</Typography>
+                                        </TableCell>
+                                        <TableCell>{formatDate(row.fechaEntrega)}</TableCell>
+                                        <TableCell align="center">
+                                            <Chip
+                                                label={`${row.diasDesdeEntrega}d`}
+                                                size="small"
+                                                color={row.diasDesdeEntrega > 30 ? 'error' : row.diasDesdeEntrega > 15 ? 'warning' : 'default'}
+                                            />
+                                        </TableCell>
+                                        <TableCell align="center">{row.facturas}</TableCell>
+                                        <TableCell align="right">{formatCurrency(row.totalFacturado)}</TableCell>
+                                        <TableCell align="right" sx={{ color: 'error.main', fontWeight: 'bold' }}>
+                                            {formatCurrency(row.saldoPendiente)}
                                         </TableCell>
                                         <TableCell>
                                             <Chip size="small" label={row.matrizador} variant="outlined" />
