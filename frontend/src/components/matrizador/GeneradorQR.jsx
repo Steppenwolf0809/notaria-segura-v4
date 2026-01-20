@@ -409,14 +409,47 @@ const GeneradorQR = () => {
 
   /**
    * Callback cuando se sube exitosamente un PDF
+   * Implementa "Smart Merge" para no perder cambios no guardados
    */
   const handlePDFUploadSuccess = (pdfData) => {
     toast.success('PDF subido exitosamente');
 
-    // Recargar la lista de escrituras para actualizar los datos
-    loadEscrituras(false);
+    // 1. Actualizar la lista de escrituras sin recargar del backend
+    setEscrituras(prevEscrituras =>
+      prevEscrituras.map(e => {
+        if (e.id === pdfData.id) {
+          // Fusionar SOLO datos relacionados al PDF/Archivo para no sobrescribir textos locales
+          return {
+            ...e,
+            pdfFileName: pdfData.pdfFileName,
+            pdfFileSize: pdfData.pdfFileSize,
+            pdfUploadedAt: pdfData.pdfUploadedAt,
+            pdfHiddenPages: pdfData.pdfHiddenPages,
+            estado: pdfData.estado,
+            token: pdfData.token, // El token podría generarse al subir
+            fotoURL: pdfData.fotoURL || e.fotoURL // Si venía foto
+          };
+        }
+        return e;
+      })
+    );
 
-    // Cerrar modal
+    // 2. Actualizar la escritura seleccionada si coincide
+    if (selectedEscritura && selectedEscritura.id === pdfData.id) {
+      setSelectedEscritura(prev => ({
+        ...prev,
+        // Solo actualizar campos de archivo
+        pdfFileName: pdfData.pdfFileName,
+        pdfFileSize: pdfData.pdfFileSize,
+        pdfUploadedAt: pdfData.pdfUploadedAt,
+        pdfHiddenPages: pdfData.pdfHiddenPages,
+        estado: pdfData.estado,
+        token: pdfData.token,
+        fotoURL: pdfData.fotoURL || prev.fotoURL
+      }));
+    }
+
+    // Cerrar modal de upload
     setShowPDFUploadModal(false);
     setSelectedEscrituraForPDF(null);
   };
@@ -862,7 +895,8 @@ const GeneradorQR = () => {
                         startIcon={<EyeIcon />}
                         onClick={() => {
                           handleViewPDF(selectedEscritura);
-                          setShowDetailsDialog(false);
+                          // Mantenemos el diálogo abierto para preservar el estado del formulario
+                          // setShowDetailsDialog(false); 
                         }}
                         size="small"
                       >
@@ -875,7 +909,8 @@ const GeneradorQR = () => {
                         startIcon={<ManageHiddenIcon />}
                         onClick={() => {
                           handleManagePDFPages(selectedEscritura);
-                          setShowDetailsDialog(false);
+                          // Mantenemos el diálogo abierto para preservar el estado del formulario
+                          // setShowDetailsDialog(false);
                         }}
                         size="small"
                       >
@@ -887,7 +922,8 @@ const GeneradorQR = () => {
                         startIcon={<UploadIcon />}
                         onClick={() => {
                           handleUploadPDF(selectedEscritura);
-                          setShowDetailsDialog(false);
+                          // Mantenemos el diálogo abierto para preservar el estado del formulario
+                          // setShowDetailsDialog(false);
                         }}
                         size="small"
                       >

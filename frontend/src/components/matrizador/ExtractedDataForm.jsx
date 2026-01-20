@@ -102,15 +102,15 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
    * Maneja datosCompletos tanto como string JSON o como objeto ya parseado
    */
   useEffect(() => {
-    
+
     if (escritura?.datosCompletos) {
       try {
         let parsed;
-        
+
         // Si datosCompletos ya es un objeto, usarlo directamente
         if (typeof escritura.datosCompletos === 'object') {
           parsed = escritura.datosCompletos;
-        } 
+        }
         // Si es un string, parsearlo como JSON
         else if (typeof escritura.datosCompletos === 'string') {
           parsed = JSON.parse(escritura.datosCompletos);
@@ -118,7 +118,7 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
         else {
           throw new Error('datosCompletos tiene un formato inesperado');
         }
-        
+
         // Limpiar otorgantes si existen (aplicar misma lógica que backend)
         if (parsed.otorgantes) {
           const otorgantesLimpios = {
@@ -135,7 +135,7 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
       }
     } else {
     }
-  }, [escritura]);
+  }, [escritura?.id, escritura?.datosCompletos]);
 
   /**
    * Maneja cambios en los campos del formulario
@@ -210,16 +210,16 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
         setError('Por favor selecciona un archivo de imagen válido');
         return;
       }
-      
+
       // Validar tamaño (máximo 5MB)
       const maxSize = 5 * 1024 * 1024;
       if (file.size > maxSize) {
         setError('La foto es demasiado grande (máximo 5MB)');
         return;
       }
-      
+
       setSelectedPhoto(file);
-      
+
       // Generar preview
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -253,7 +253,7 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
 
       // Pasar la foto si se seleccionó una
       const response = await updateEscritura(escritura.id, updatedData, selectedPhoto);
-      
+
       if (response.success) {
         setOriginalData(formData);
         setEditMode(false);
@@ -290,7 +290,7 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
 
     try {
       const response = await updateEscritura(escritura.id, { estado: newState });
-      
+
       if (response.success && onStateChange) {
         onStateChange(response.data);
       }
@@ -329,8 +329,8 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
               size="small"
               icon={
                 escritura?.estado === 'activo' ? <CheckIcon /> :
-                escritura?.estado === 'revision_requerida' ? <WarningIcon /> :
-                <ErrorIcon />
+                  escritura?.estado === 'revision_requerida' ? <WarningIcon /> :
+                    <ErrorIcon />
               }
             />
           </Box>
@@ -496,8 +496,8 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
         {/* Fotografía del Menor */}
         <Grid item xs={12}>
           <Card>
-            <CardHeader 
-              title="Fotografía del Menor (Opcional)" 
+            <CardHeader
+              title="Fotografía del Menor (Opcional)"
               subheader="Fotografía para verificación de identidad"
             />
             <CardContent>
@@ -541,8 +541,8 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
                 {/* Input para nueva foto */}
                 {editMode && (
                   <Grid item xs={12} md={escritura?.fotoURL || photoPreview ? 6 : 12}>
-                    <Box sx={{ 
-                      border: '2px dashed', 
+                    <Box sx={{
+                      border: '2px dashed',
                       borderColor: 'primary.main',
                       borderRadius: 2,
                       p: 3,
@@ -580,7 +580,7 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
                 {!editMode && !escritura?.fotoURL && (
                   <Grid item xs={12}>
                     <Alert severity="info">
-                      No se ha agregado una fotografía para esta escritura. 
+                      No se ha agregado una fotografía para esta escritura.
                       Puedes agregar una usando el botón "Editar datos" arriba.
                     </Alert>
                   </Grid>
@@ -835,7 +835,7 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
         {showRawData && (
           <Grid item xs={12}>
             <Card>
-              <CardHeader 
+              <CardHeader
                 title="Datos JSON Completos"
                 action={
                   <Tooltip title="Copiar JSON">
@@ -939,7 +939,7 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
       <Box sx={{ mt: 2 }}>
         <Alert severity="info">
           <Typography variant="body2">
-            <strong>Instrucciones:</strong> Revisa y corrige los datos extraídos automáticamente. 
+            <strong>Instrucciones:</strong> Revisa y corrige los datos extraídos automáticamente.
             Los campos críticos son: número de escritura, acto y fecha de otorgamiento.
           </Typography>
         </Alert>
