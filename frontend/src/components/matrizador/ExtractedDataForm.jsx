@@ -42,8 +42,17 @@ import {
   Warning as WarningIcon,
   Error as ErrorIcon,
   PhotoCamera as PhotoCameraIcon,
-  Delete as DeleteIcon
+  Delete as DeleteIcon,
+  ContentPaste as PasteIcon
 } from '@mui/icons-material';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  RadioGroup,
+  Radio
+} from '@mui/material';
 import { updateEscritura, getEstadoInfo } from '../../services/escrituras-qr-service';
 
 const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
@@ -55,6 +64,11 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
   const [originalData, setOriginalData] = useState({});
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
+
+  // Estado para importación de texto
+  const [openTextImport, setOpenTextImport] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importType, setImportType] = useState('otorgante'); // 'otorgante' | 'beneficiario'
 
   /**
    * Limpia una lista de personas removiendo entradas con basura
@@ -235,6 +249,119 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
   const handlePhotoRemove = () => {
     setSelectedPhoto(null);
     setPhotoPreview(null);
+  };
+
+  /**
+   * Parsea texto pegado (separado por tabs o espacios dobles)
+   */
+  /**
+   * Parsea texto pegado e inteligentemente detecta Otorgantes vs Beneficiarios
+   */
+  const handleParseImportedText = () => {
+    if (!importText.trim()) return;
+
+    const lines = importText.split(/\r?\n/).filter(line => line.trim().length > 0);
+
+    // Arrays temporales para acumular
+    const newOtorgantes = [];
+    const newBeneficiarios = [];
+
+    lines.forEach(line => {
+      // 1. Detectar Rol (Otorgante vs Beneficiario)
+      let targetList = null;
+      const upperLine = line.toUpperCase();
+
+      // Palabras clave para asignar
+      if (upperLine.includes('BENEFICIARI') || upperLine.includes('A FAVOR')) {
+        targetList = newBeneficiarios;
+      } else if (upperLine.includes('COMPARECIENTE') || upperLine.includes('OTORGANTE') || upperLine.includes('OTORGADO POR')) {
+        targetList = newOtorgantes;
+      } else {
+        // Fallback: usar el tipo seleccionado al abrir el dialog
+        targetList = (importType === 'beneficiario') ? newBeneficiarios : newOtorgantes;
+      }
+
+      // 2. Parsear la línea (Nombre, ID, Calidad)
+      // Regex flexible: Busca ID (10-13 digitos) opcionalmente precedido por tipo doc
+      // Todo lo anterior es Nombre, todo los posterior es Calidad
+      const idMatch = line.match(/(?:CC|CEDULA|RUC|PASAPORTE)?\s*(\d{10,13}|\d{9}-\d)/i);
+
+      const person = {
+        nombre: '',
+        documento: 'CÉDULA',
+        numero: '',
+        nacionalidad: 'ECUATORIANA',
+        calidad: 'COMPARECIENTE',
+        representadoPor: null
+      };
+
+      if (idMatch) {
+        // Si encontramos ID, usamos esa posición para dividir
+        const idFull = idMatch[0];
+        const numberOnly = idMatch[1];
+        const index = idMatch.index;
+
+        person.numero = numberOnly;
+        person.nombre = line.substring(0, index).trim();
+
+        // Detectar tipo documento mejorado
+        if (/RUC/i.test(idFull) || numberOnly.length === 13) {
+          person.documento = 'RUC';
+        } else if (/PASAPORTE/i.test(idFull) || numberOnly.length < 10 || /[A-Z]/i.test(numberOnly)) {
+          // Si es explícitamente pasaporte, o tiene menos de 10 dígitos, o tiene letras
+          person.documento = 'Pasaporte';
+        } else if (numberOnly.length === 10) {
+          person.documento = 'Cédula';
+        }
+
+        // El resto es calidad
+        const resto = line.substring(index + idFull.length).trim();
+        if (resto.length > 2) person.calidad = resto;
+
+      } else {
+        // Si no hay ID claro, intentamos separar por tabs/espacios dobles
+        const parts = line.split(/\t+|\s{2,}/).map(p => p.trim()).filter(Boolean);
+        if (parts.length > 0) {
+          person.nombre = parts[0];
+          if (parts.length > 1) person.calidad = parts[parts.length - 1];
+        }
+      }
+
+      // Limpieza final de nombre
+      if (person.nombre) {
+        // Eliminar posibles basuras al final del nombre si se pegó mal
+        person.nombre = person.nombre.replace(/\s+(CC|CEDULA|RUC)$/i, '');
+      }
+
+      // Asignar Calidad por defecto según la lista destino si no se detectó
+      if (targetList === newBeneficiarios && !person.calidad) person.calidad = 'BENEFICIARIO';
+
+      if (person.nombre && person.nombre.length > 2) {
+        targetList.push(person);
+      }
+    });
+
+    // Actualizar el estado (Fix crash: asegurar que los arrays destino existan)
+    setFormData(prev => {
+      // Asegurar estructura
+      const otorgantesCurrent = prev.otorgantes || { otorgado_por: [], a_favor_de: [] };
+
+      // Safety checks para arrays internos
+      const currentOtorgados = Array.isArray(otorgantesCurrent.otorgado_por) ? otorgantesCurrent.otorgado_por : [];
+      const currentFavor = Array.isArray(otorgantesCurrent.a_favor_de) ? otorgantesCurrent.a_favor_de : [];
+
+      return {
+        ...prev,
+        otorgantes: {
+          ...otorgantesCurrent,
+          otorgado_por: [...currentOtorgados, ...newOtorgantes],
+          a_favor_de: [...currentFavor, ...newBeneficiarios]
+        }
+      };
+    });
+
+    setOpenTextImport(false);
+    setImportText('');
   };
 
   /**
@@ -633,11 +760,9 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
 
         {/* Otorgantes */}
         <Grid item xs={12}>
-          <Accordion>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="h6">Otorgantes y Beneficiarios</Typography>
-            </AccordionSummary>
-            <AccordionDetails>
+          <Card>
+            <CardHeader title="Otorgantes y Beneficiarios" />
+            <CardContent>
               <Grid container spacing={2}>
                 {/* Otorgado por */}
                 <Grid item xs={12} md={6}>
@@ -645,9 +770,20 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
                     Otorgado Por:
                   </Typography>
                   {editMode && (
-                    <Box sx={{ mb: 1 }}>
+                    <Box sx={{ mb: 1, display: 'flex', gap: 1 }}>
                       <Button size="small" variant="outlined" onClick={() => addPersona('otorgado_por')}>
                         Añadir Otorgante
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="text"
+                        startIcon={<PasteIcon />}
+                        onClick={() => {
+                          setImportType('otorgante');
+                          setOpenTextImport(true);
+                        }}
+                      >
+                        Pegar Texto
                       </Button>
                     </Box>
                   )}
@@ -676,6 +812,7 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
                               >
                                 <MenuItem value="Cédula">Cédula</MenuItem>
                                 <MenuItem value="Pasaporte">Pasaporte</MenuItem>
+                                <MenuItem value="RUC">RUC</MenuItem>
                               </Select>
                             </FormControl>
                           </Grid>
@@ -739,9 +876,20 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
                     A Favor De:
                   </Typography>
                   {editMode && (
-                    <Box sx={{ mb: 1 }}>
+                    <Box sx={{ mb: 1, display: 'flex', gap: 1 }}>
                       <Button size="small" variant="outlined" onClick={() => addPersona('a_favor_de')}>
                         Añadir Beneficiario
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="text"
+                        startIcon={<PasteIcon />}
+                        onClick={() => {
+                          setImportType('beneficiario');
+                          setOpenTextImport(true);
+                        }}
+                      >
+                        Pegar Texto
                       </Button>
                     </Box>
                   )}
@@ -770,6 +918,7 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
                               >
                                 <MenuItem value="Cédula">Cédula</MenuItem>
                                 <MenuItem value="Pasaporte">Pasaporte</MenuItem>
+                                <MenuItem value="RUC">RUC</MenuItem>
                               </Select>
                             </FormControl>
                           </Grid>
@@ -827,8 +976,8 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
                   ))}
                 </Grid>
               </Grid>
-            </AccordionDetails>
-          </Accordion>
+            </CardContent>
+          </Card>
         </Grid>
 
         {/* Vista JSON cruda */}
@@ -944,6 +1093,49 @@ const ExtractedDataForm = ({ escritura, onUpdate, onStateChange }) => {
           </Typography>
         </Alert>
       </Box>
+      {/* Modal para importar texto */}
+      <Dialog open={openTextImport} onClose={() => setOpenTextImport(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Importar Personas desde Texto</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mb: 2, mt: 1 }}>
+            <Typography variant="body2" color="text.secondary" gutterBottom>
+              Pegue el texto copiado (ej. desde Word/Excel). El sistema intentará separar columnas por espacios dobles o tabulaciones.
+            </Typography>
+            <Alert severity="info" sx={{ mb: 2 }}>
+              Formato ideal: <b>NOMBRE</b> [espacio] <b>CC/RUC</b> [espacio] <b>NÚMERO</b> [espacio] <b>CALIDAD</b>
+            </Alert>
+            {/* RadioButtons ocultos - El sistema detecta automáticamente o usa el contexto del botón presionado */}
+            {/* 
+            <FormControl component="fieldset">
+              <RadioGroup
+                row
+                value={importType}
+                onChange={(e) => setImportType(e.target.value)}
+              >
+                <FormControlLabel value="otorgante" control={<Radio />} label="Otorgantes" />
+                <FormControlLabel value="beneficiario" control={<Radio />} label="Beneficiarios" />
+              </RadioGroup>
+            </FormControl> 
+            */}
+          </Box>
+          <TextField
+            autoFocus
+            multiline
+            rows={10}
+            fullWidth
+            variant="outlined"
+            placeholder={`Ejemplo:\nJUAN PEREZ    CC 1712345678    COMPARECIENTE\nMARIA LOPEZ   CC 1787654321    COMPARECIENTE`}
+            value={importText}
+            onChange={(e) => setImportText(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenTextImport(false)}>Cancelar</Button>
+          <Button onClick={handleParseImportedText} variant="contained" disabled={!importText.trim()}>
+            Procesar e Importar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

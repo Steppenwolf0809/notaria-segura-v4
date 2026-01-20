@@ -221,8 +221,12 @@ function extractWithPatterns(text, patterns) {
  */
 function extractSectionText(text, labelRegex) {
   if (!text) return null;
-  const startIdx = text.search(labelRegex);
-  if (startIdx === -1) return null;
+  const match = text.match(labelRegex);
+  if (!match) return null;
+
+  // Start AFTER the full match of the label
+  const startIdx = match.index + match[0].length;
+
   const after = text.slice(startIdx);
   // Próximo encabezado común (inicio de línea + etiqueta en mayúscula con dos puntos opcionales)
   const nextHeader = after.search(/^[ \t]*?(OTORGADO\s+POR|OTORGADO\s+A\s+FAVOR|A\s+FAVOR\s+DE|BENEFICIARIO|UBICACI[ÓO]N|CUANT[IÍ]A|OBJETO|OBSERVACIONES|ACTO|CONTRATO|FECHA|NOTAR[IÍ]A|NOTARIO)\s*:?.*$/im);
@@ -271,15 +275,35 @@ function parsePersonsTableFromSection(sectionText) {
   // Encontrar línea de cabecera (contenga varias columnas relevantes)
   let headerIndex = -1;
   let headerCells = [];
-  const splitRow = (line) => line.split(/\s{2,}|\t+|\|/).map(c => c.trim()).filter(Boolean);
+
+  // Función mejorada para separar columnas:
+  // Si detectamos el header específico "Persona | Nombres/Razón social", somos más permisivos con los espacios
+  const splitRow = (line, isHeaderSearch = false) => {
+    // Si contiene pipes, usar pipes
+    if (line.includes('|')) {
+      return line.split('|').map(c => c.trim()).filter(Boolean);
+    }
+
+    // Si estamos buscando headers y parece ser la tabla específica de Notaría 18
+    if (isHeaderSearch && /Persona.*Nombres.*Razón/i.test(line)) {
+      // Separar por 2+ espacios O por cambios bruscos de capitalización/categoría conocidos
+      return line.split(/\s{2,}|\t+/).map(c => c.trim()).filter(Boolean);
+    }
+
+    // Default: 2 o más espacios o tabs
+    return line.split(/\s{2,}|\t+/).map(c => c.trim()).filter(Boolean);
+  };
 
   for (let i = 0; i < Math.min(lines.length, 25); i++) {
-    const cells = splitRow(lines[i]);
+    const cells = splitRow(lines[i], true);
     if (cells.length >= 2) {
       const normCells = cells.map(normalizeLabel);
+      // Check específico para "Persona" como primer columna común en N18
+      const hasPersonaCol = normCells.some(c => c === 'PERSONA');
       const hasNameCol = normCells.some(c => c.includes('NOMBRES') || c.includes('RAZON SOCIAL'));
       const hasIdCol = normCells.some(c => c.includes('CEDULA') || c.includes('RUC') || c.includes('PASAPORTE') || c.includes('NUMERO') || c.includes('IDENTIFICACION'));
-      if (hasNameCol && hasIdCol) {
+
+      if ((hasNameCol && hasIdCol) || (hasPersonaCol && hasNameCol)) {
         headerIndex = i;
         headerCells = cells;
         break;
@@ -504,7 +528,7 @@ function cleanPersonsList(persons) {
     'CUANTÍA DEL ACTO O', 'ACTO O CONTRATO', 'OBJETO', 'OBSERVACIONES',
     'UBICACIÓN', 'PROVINCIA', 'CANTÓN', 'PARROQUIA',
     'REPRESENTADO POR', 'REPRESENTADO PORRUC', 'REPRESENTANTE LEGAL',
-    'NA', 'TE'
+    'NA', 'TE', 'DE A FAVOR', 'PROPIOS POR SUS', 'DE A'
   ]);
 
   // Patrones regex que indican basura
@@ -512,7 +536,8 @@ function cleanPersonsList(persons) {
     /^Documento/i, /^Persona/i, /^Tipo/i, /^No\s+/i, /^Nombres/i,
     /^Razón/i, /^Social/i, /^Interviniente/i, /^Nacionalidad/i,
     /^Calidad/i, /^Representa/i, /^Cuantía/i, /^Ubicación/i,
-    /CalidadPersona/i, /NacionalidadCalidad/i, /socialTipo/i
+    /CalidadPersona/i, /NacionalidadCalidad/i, /socialTipo/i,
+    /^Natural/i, /^Jur[ií]dica/i // Start of line garbage
   ];
 
   return persons.filter(p => {
@@ -528,15 +553,32 @@ function cleanPersonsList(persons) {
     // Filtrar si comienza con patrón basura
     if (garbagePatterns.some(pat => pat.test(name))) return false;
 
+    // Limpiar basura concatenada al final (ej. "NaturalLIU" -> "LIU")
+    // Esto pasa cuando la columna "Tipo" se pega al nombre
+    let cleanName = name.replace(/Natural[A-Z]*$/i, '')
+      .replace(/Jur[ií]dica[A-Z]*$/i, '')
+      .trim();
+
+    // Si quedó vacío o muy corto tras limpiar
+    if (cleanName.length < 3) return false;
+
     return true;
-  }).map(p => ({
-    nombre: String(p.nombre).trim(),
-    documento: p.documento || 'CÉDULA',
-    numero: p.numero ? String(p.numero).replace(/[^0-9A-Z]/g, '') : null,
-    nacionalidad: p.nacionalidad || 'ECUATORIANA',
-    calidad: p.calidad || 'COMPARECIENTE',
-    representadoPor: p.representadoPor || null
-  }));
+  }).map(p => {
+    let cleanName = String(p.nombre).trim();
+    // Re-aplicar limpieza de sufijos basura para el valor final
+    cleanName = cleanName.replace(/Natural[A-Z]*$/i, '')
+      .replace(/Jur[ií]dica[A-Z]*$/i, '')
+      .trim();
+
+    return {
+      nombre: cleanName,
+      documento: p.documento || 'CÉDULA',
+      numero: p.numero ? String(p.numero).replace(/[^0-9A-Z]/g, '') : null,
+      nacionalidad: p.nacionalidad || 'ECUATORIANA',
+      calidad: p.calidad || 'COMPARECIENTE',
+      representadoPor: p.representadoPor || null
+    };
+  });
 }
 
 /**
@@ -873,25 +915,11 @@ export async function parseEscrituraPDF(pdfBuffer, filename) {
     const objetoObs = cleanObservaciones(objetoObsRaw);
     const ubicacion = extractUbicacion(text);
 
-    // OTORGANTES: Extracción mejorada
-    // Se define explícitamente el rango para evitar overlap
-    const extractInRange = (startRegex, endRegex) => {
-      const startMatch = text.search(startRegex);
-      if (startMatch === -1) return null;
-      const rest = text.slice(startMatch);
-      const endMatch = rest.search(endRegex);
-      return endMatch !== -1 ? rest.slice(0, endMatch) : rest;
-    };
-
-    const otorgadoPorText = extractInRange(/OTORGADO\s+POR/i, /A\s+FAVOR\s+DE/i);
-    const aFavorDeText = extractInRange(/(A\s+FAVOR\s+DE|BENEFICIARIO)/i, /(UBICACI[ÓO]N|CUANT[IÍ]A|OBSERVACIONES|DESCRIPCI[ÓO]N)/i);
-
-    const otorgadoPorPersons = extractPersonas(otorgadoPorText);
-    const aFavorDePersons = extractPersonas(aFavorDeText);
-
+    // OTORGANTES: Extracción deshabilitada a petición del usuario (20-01-2026)
+    // Se usará ingreso manual o importación de texto.
     const otorgantes = {
-      otorgado_por: cleanPersonsList(otorgadoPorPersons),
-      a_favor_de: cleanPersonsList(aFavorDePersons)
+      otorgado_por: [],
+      a_favor_de: []
     };
 
     // Extraer pares etiqueta:valor genéricos
