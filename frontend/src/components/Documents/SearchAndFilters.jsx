@@ -168,9 +168,11 @@ const SearchAndFilters = memo(({
                 onChange={onTypeFilterChange}
               >
                 <MenuItem value="">Todos</MenuItem>
-                <MenuItem value="CERTIFICACIONES">Certificaciones</MenuItem>
-                <MenuItem value="PROTOCOLO">Protocolo</MenuItem>
-                <MenuItem value="COMPRAVENTA">Compraventa</MenuItem>
+                <MenuItem value="CERTIFICACION">Certificaciones</MenuItem>
+                <MenuItem value="PROTOCOLO">Protocolo / Escrituras</MenuItem>
+                <MenuItem value="DILIGENCIA">Diligencias</MenuItem>
+                <MenuItem value="ARRENDAMIENTO">Arrendamientos</MenuItem>
+                <MenuItem value="OTROS">Otros</MenuItem>
               </Select>
             </FormControl>
           </Box>

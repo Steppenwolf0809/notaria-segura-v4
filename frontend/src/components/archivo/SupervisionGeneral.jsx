@@ -73,6 +73,7 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
           search: parsed.search ?? '',
           matrizador: parsed.matrizador ?? 'TODOS',
           estado: parsed.estado ?? 'TODOS',
+          tipo: parsed.tipo ?? 'TODOS',
           alerta: parsed.alerta ?? 'TODAS',
           sortDias: parsed.sortDias ?? undefined,
           fechaDesde: parsed.fechaDesde ?? '',
@@ -86,6 +87,7 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
       search: '',
       matrizador: 'TODOS',
       estado: 'TODOS',
+      tipo: 'TODOS',
       alerta: 'TODAS',
       sortDias: undefined,
       fechaDesde: '',
@@ -119,7 +121,7 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
    */
   useEffect(() => {
     cargarDocumentos();
-  }, [filtros.matrizador, filtros.estado, filtros.alerta, filtros.sortDias, debouncedSearch, page, rowsPerPage, token]);
+  }, [filtros.matrizador, filtros.estado, filtros.tipo, filtros.alerta, filtros.sortDias, debouncedSearch, page, rowsPerPage, token]);
 
   /**
    * Cargar datos iniciales
@@ -233,10 +235,12 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
       search: '',
       matrizador: 'TODOS',
       estado: 'TODOS',
+      tipo: 'TODOS',
       alerta: 'TODAS'
     });
     setPage(0);
   };
+
 
   // Toggle orden por días (backend aplica el orden para toda la paginación)
   const toggleSortDias = () => {
@@ -443,6 +447,23 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
             </Select>
           </FormControl>
 
+          {/* Filtro Tipo (NUEVO) */}
+          <FormControl size="small" sx={{ minWidth: 150 }}>
+            <InputLabel>Tipo</InputLabel>
+            <Select
+              value={filtros.tipo}
+              label="Tipo"
+              onChange={(e) => handleFilterChange('tipo', e.target.value)}
+            >
+              <MenuItem value="TODOS">Todos</MenuItem>
+              <MenuItem value="PROTOCOLO">Protocolo</MenuItem>
+              <MenuItem value="DILIGENCIA">Diligencia</MenuItem>
+              <MenuItem value="CERTIFICACION">Certificación</MenuItem>
+              <MenuItem value="ARRENDAMIENTO">Arrendamiento</MenuItem>
+              <MenuItem value="OTROS">Otros</MenuItem>
+            </Select>
+          </FormControl>
+
           {/* Filtro Estado */}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
             <Typography variant="caption" color="text.secondary" sx={{ pl: 0.5 }}>
@@ -543,6 +564,14 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
               label={`Matrizador: ${matrizadores.find(m => m.id === parseInt(filtros.matrizador))?.fullName || filtros.matrizador}`}
               size="small"
               onDelete={() => handleFilterChange('matrizador', 'TODOS')}
+            />
+          )}
+
+          {filtros.tipo !== 'TODOS' && (
+            <Chip
+              label={`Tipo: ${filtros.tipo}`}
+              size="small"
+              onDelete={() => handleFilterChange('tipo', 'TODOS')}
             />
           )}
 
