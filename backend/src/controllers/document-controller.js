@@ -2277,6 +2277,8 @@ async function getDocumentHistory(req, res) {
     const { id } = req.params;
     const { limit = 50, offset = 0, eventType } = req.query;
 
+    console.log(`📜 getDocumentHistory params: id=${id}, limit=${limit}, offset=${offset}, eventType=${eventType || 'ALL'}`);
+
     // Buscar documento y verificar permisos
     const document = await prisma.document.findUnique({
       where: { id }
@@ -2338,6 +2340,7 @@ async function getDocumentHistory(req, res) {
     }
 
     // Obtener eventos del historial
+    console.log(`🔍 Querying events for document ${id}...`);
     const events = await prisma.documentEvent.findMany({
       where: whereClause,
       include: {
@@ -2356,6 +2359,9 @@ async function getDocumentHistory(req, res) {
       skip: parseInt(offset),
       take: parseInt(limit)
     });
+
+    console.log(`✅ Events found: ${events.length}`);
+
 
     // Obtener total de eventos para paginación
     const totalEvents = await prisma.documentEvent.count({
@@ -2449,7 +2455,7 @@ async function getDocumentHistory(req, res) {
     });
 
   } catch (error) {
-    console.error('Error obteniendo historial del documento:', error);
+    console.error('❌ Error obteniendo historial del documento:', error);
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor'
