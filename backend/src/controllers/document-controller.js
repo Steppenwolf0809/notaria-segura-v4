@@ -1889,39 +1889,38 @@ async function deliverDocument(req, res) {
     // Si el documento está agrupado, entregar todos los documentos del grupo
     // let groupDocuments = []; // REMOVED: Group delivery logic
 
-    // Actualizar documento principal con información de entrega
-    const updatedDocument = await prisma.document.update({
-      where: { id },
-      data: {
-        status: 'ENTREGADO',
-        entregadoA,
-        cedulaReceptor,
-        relacionTitular,
-        verificacionManual: verificacionManual || false,
-        facturaPresenta: facturaPresenta || false,
-        fechaEntrega: new Date(),
-        usuarioEntregaId: req.user.id,
-        observacionesEntrega
-      },
-      include: {
-        assignedTo: {
-          select: { firstName: true, lastName: true }
+    // CONSERVADORA: Usar transacción para garantizar atomicidad entre update y log
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Actualizar documento principal con información de entrega
+      const updatedDocument = await tx.document.update({
+        where: { id },
+        data: {
+          status: 'ENTREGADO',
+          entregadoA,
+          cedulaReceptor,
+          relacionTitular,
+          verificacionManual: verificacionManual || false,
+          facturaPresenta: facturaPresenta || false,
+          fechaEntrega: new Date(),
+          usuarioEntregaId: req.user.id,
+          observacionesEntrega
         },
-        usuarioEntrega: {
-          select: { firstName: true, lastName: true }
+        include: {
+          assignedTo: {
+            select: { firstName: true, lastName: true }
+          },
+          usuarioEntrega: {
+            select: { firstName: true, lastName: true }
+          }
         }
-      }
-    });
+      });
 
-
-
-    // Registrar evento de auditoría
-    try {
+      // 2. Registrar evento de auditoría
       const eventDescription = immediateDelivery
         ? `Documento entregado INMEDIATAMENTE a ${entregadoA} por ${req.user.firstName} ${req.user.lastName} (${req.user.role}) - Estado anterior: ${document.status}`
         : `Documento entregado a ${entregadoA} por ${req.user.firstName} ${req.user.lastName} (${req.user.role})`;
 
-      await prisma.documentEvent.create({
+      await tx.documentEvent.create({
         data: {
           documentId: id,
           userId: req.user.id,
@@ -1949,9 +1948,18 @@ async function deliverDocument(req, res) {
           userAgent: req.get('User-Agent') || 'unknown'
         }
       });
-    } catch (auditError) {
-      console.error('Error registrando evento de auditoría:', auditError);
-    }
+
+      return updatedDocument;
+    });
+
+    const updatedDocument = result;
+
+    /* REMOVED: Old non-transactional code
+    // Actualizar documento principal con información de entrega
+    const updatedDocument = await prisma.document.update({ ... });
+    // Registrar evento de auditoría
+    try { ... } catch (auditError) { ... }
+    */
 
     // Preparar mensaje de respuesta
     res.json({
@@ -2281,7 +2289,17 @@ async function getDocumentHistory(req, res) {
 
     // Buscar documento y verificar permisos
     const document = await prisma.document.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        usuarioEntrega: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true
+          }
+        }
+      }
     });
 
     if (!document) {
@@ -2359,6 +2377,60 @@ async function getDocumentHistory(req, res) {
       skip: parseInt(offset),
       take: parseInt(limit)
     });
+
+    // 🩹 FIX: Detectar y reparar eventos de entrega perdidos (Self-Healing)
+    // Si el documento está entregado pero no hay evento en esta página, verificamos e inyectamos
+    if (document.status === 'ENTREGADO' && document.fechaEntrega) {
+      // Verificar si el evento ya existe en la lista recuperada
+      const hasDeliveryEvent = events.some(e => {
+        // Verificar por tipo
+        if (e.eventType !== 'STATUS_CHANGED') return false;
+
+        // Verificar contenido de details
+        let det = e.details;
+        if (typeof det === 'string') {
+          try { det = JSON.parse(det); } catch { return false; }
+        }
+        return det?.newStatus === 'ENTREGADO';
+      });
+
+      // Si no existe el evento y estamos en la primera página (offset 0), inyectarlo
+      if (!hasDeliveryEvent && parseInt(offset) === 0) {
+        console.warn(`🩹 Inyectando evento de entrega sintético para documento ${id}`);
+
+        const syntheticEvent = {
+          id: `synthetic-delivery-${id}`,
+          documentId: id,
+          userId: document.usuarioEntregaId || 0,
+          eventType: 'STATUS_CHANGED',
+          description: `Documento entregado a ${document.entregadoA || 'Cliente'} (Recuperado)`,
+          details: JSON.stringify({
+            previousStatus: 'LISTO', // Asunción lógica
+            newStatus: 'ENTREGADO',
+            entregadoA: document.entregadoA,
+            cedulaReceptor: document.cedulaReceptor,
+            observacionesEntrega: document.observacionesEntrega,
+            metodoVerificacion: document.verificacionManual ? 'manual' : 'unknown',
+            isSynthetic: true
+          }),
+          personaRetiro: document.entregadoA,
+          cedulaRetiro: document.cedulaReceptor,
+          observacionesRetiro: document.observacionesEntrega,
+          metodoVerificacion: document.verificacionManual ? 'manual' : 'unknown',
+          createdAt: document.fechaEntrega,
+          user: document.usuarioEntrega || {
+            id: 0,
+            firstName: 'Sistema',
+            lastName: '(Recuperado)',
+            role: 'SYSTEM'
+          }
+        };
+
+        // Agregar y reordenar
+        events.push(syntheticEvent);
+        events.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      }
+    }
 
     console.log(`✅ Events found: ${events.length}`);
 

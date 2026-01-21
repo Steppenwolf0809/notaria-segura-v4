@@ -61,7 +61,7 @@ const DocumentTimeline = ({
   });
 
   // Debug por consola
-  console.log('DocumentTimeline render:', { documentId, hookData, history, loading, error });
+  console.log('DocumentTimeline render:', { documentId, historyLength: hookData?.history?.length, firstEvent: hookData?.history?.[0] });
 
   // Determinar qué datos usar
   const timelineData = documentId ? hookData : {
@@ -372,105 +372,112 @@ const DocumentTimeline = ({
 
       {/* Timeline */}
       <MuiTimeline sx={{ p: 0 }}>
-        {timelineHistory.map((event, index) => (
-          <MuiTimelineItem key={event.id}>
-            <MuiTimelineSeparator>
-              <MuiTimelineDot
-                color={getEventColor(event.color)}
-                sx={{
-                  boxShadow: 2,
-                  border: (theme) => theme.palette.mode === 'dark'
-                    ? '2px solid rgba(255, 255, 255, 0.1)'
-                    : '2px solid white',
-                  p: 1
-                }}
-              >
-                {getEventIcon(event.icon)}
-              </MuiTimelineDot>
-              {index < timelineHistory.length - 1 && (
-                <MuiTimelineConnector sx={{ height: 60 }} />
-              )}
-            </MuiTimelineSeparator>
+        {timelineHistory.map((event, index) => {
+          try {
+            return (
+              <MuiTimelineItem key={event.id || index}>
+                <MuiTimelineSeparator>
+                  <MuiTimelineDot
+                    color={getEventColor(event.color)}
+                    sx={{
+                      boxShadow: 2,
+                      border: (theme) => theme.palette.mode === 'dark'
+                        ? '2px solid rgba(255, 255, 255, 0.1)'
+                        : '2px solid white',
+                      p: 1
+                    }}
+                  >
+                    {getEventIcon(event.icon)}
+                  </MuiTimelineDot>
+                  {index < timelineHistory.length - 1 && (
+                    <MuiTimelineConnector sx={{ height: 60 }} />
+                  )}
+                </MuiTimelineSeparator>
 
-            <MuiTimelineContent sx={{ pb: 3, width: '100%', flex: 1 }}>
-              <Card sx={{
-                boxShadow: 1,
-                border: '1px solid',
-                borderColor: 'divider',
-                width: '100%', // Asegurar ancho completo
-                '&:hover': {
-                  boxShadow: 2
-                }
-              }}>
-                <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
-                    {/* IZQUIERDA: Información del Evento */}
-                    <Box sx={{ flex: 1 }}>
-                      <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 0.5, lineHeight: 1.2 }}>
-                        {event.title}
-                      </Typography>
+                <MuiTimelineContent sx={{ pb: 3, width: '100%', flex: 1 }}>
+                  <Card sx={{
+                    boxShadow: 1,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    width: '100%', // Asegurar ancho completo
+                    '&:hover': {
+                      boxShadow: 2
+                    }
+                  }}>
+                    <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+                        {/* IZQUIERDA: Información del Evento */}
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 0.5, lineHeight: 1.2 }}>
+                            {event.title}
+                          </Typography>
 
-                      <Typography variant="body2" color="text.secondary" sx={{ mb: 1, lineHeight: 1.4 }}>
-                        {event.description}
-                      </Typography>
+                          <Typography variant="body2" color="text.secondary" sx={{ mb: 1, lineHeight: 1.4 }}>
+                            {event.description}
+                          </Typography>
 
-                      {/* Información contextual */}
-                      {renderEventContextInfo(event.contextInfo, event)}
-                    </Box>
-
-                    {/* DERECHA: Metadata (Usuario, Fecha) */}
-                    <Box sx={{ textAlign: 'right', minWidth: '140px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                      <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'text.primary', display: 'block' }}>
-                        {formatTimestamp(event.timestamp)}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                        {formatRelativeTime(event.timestamp)}
-                      </Typography>
-
-                      {/* Usuario Compacto */}
-                      {event.user && (
-                        <Box sx={{ mt: 'auto' }}>
-                          {(() => {
-                            const roleColors = {
-                              'ADMIN': '#d32f2f',
-                              'RECEPCION': '#1976d2',
-                              'CAJA': '#388e3c',
-                              'ARCHIVO': '#f57c00',
-                              'MATRIZADOR': '#7b1fa2'
-                            };
-                            const role = event.user.match(/\(([^)]+)\)/)?.[1];
-                            const name = event.user.replace(/\s*\(.*?\)\s*/, '');
-
-                            return (
-                              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                                <Typography variant="caption" sx={{ fontWeight: 'medium', maxWidth: '120px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                  {name}
-                                </Typography>
-                                {role && (
-                                  <Chip
-                                    label={role}
-                                    size="small"
-                                    sx={{
-                                      height: 16,
-                                      fontSize: '0.65rem',
-                                      mt: 0.5,
-                                      backgroundColor: roleColors[role] || '#757575',
-                                      color: 'white'
-                                    }}
-                                  />
-                                )}
-                              </Box>
-                            );
-                          })()}
+                          {/* Información contextual */}
+                          {renderEventContextInfo(event.contextInfo, event)}
                         </Box>
-                      )}
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
-            </MuiTimelineContent>
-          </MuiTimelineItem>
-        ))}
+
+                        {/* DERECHA: Metadata (Usuario, Fecha) */}
+                        <Box sx={{ textAlign: 'right', minWidth: '140px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                          <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'text.primary', display: 'block' }}>
+                            {formatTimestamp(event.timestamp)}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                            {formatRelativeTime(event.timestamp)}
+                          </Typography>
+
+                          {/* Usuario Compacto */}
+                          {event.user && (
+                            <Box sx={{ mt: 'auto' }}>
+                              {(() => {
+                                const roleColors = {
+                                  'ADMIN': '#d32f2f',
+                                  'RECEPCION': '#1976d2',
+                                  'CAJA': '#388e3c',
+                                  'ARCHIVO': '#f57c00',
+                                  'MATRIZADOR': '#7b1fa2'
+                                };
+                                const role = event.user.match(/\(([^)]+)\)/)?.[1];
+                                const name = event.user.replace(/\s*\(.*?\)\s*/, '');
+
+                                return (
+                                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                                    <Typography variant="caption" sx={{ fontWeight: 'medium', maxWidth: '120px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {name}
+                                    </Typography>
+                                    {role && (
+                                      <Chip
+                                        label={role}
+                                        size="small"
+                                        sx={{
+                                          height: 16,
+                                          fontSize: '0.65rem',
+                                          mt: 0.5,
+                                          backgroundColor: roleColors[role] || '#757575',
+                                          color: 'white'
+                                        }}
+                                      />
+                                    )}
+                                  </Box>
+                                );
+                              })()}
+                            </Box>
+                          )}
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </MuiTimelineContent>
+              </MuiTimelineItem>
+            );
+          } catch (err) {
+            console.error('Error rendering timeline item:', err, event);
+            return null;
+          }
+        })}
       </MuiTimeline>
 
       {/* Botón de cargar más */}
