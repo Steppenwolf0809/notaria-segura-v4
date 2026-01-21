@@ -380,11 +380,17 @@ const DocumentTimeline = ({
       </Box>
 
       {/* Timeline */}
-      <MuiTimeline position="right" sx={{
+      <MuiTimeline sx={{
         p: 0,
-        '& .MuiTimelineItem-root:before': {
-          flex: 0,
-          padding: 0
+        m: 0,
+        '& .MuiTimelineItem-root': {
+          minHeight: 'auto',
+          '&:before': {
+            display: 'none' // Eliminar el espacio vacío a la izquierda
+          }
+        },
+        '& .MuiTimelineContent-root': {
+          pr: 0, // Sin padding derecho extra
         }
       }}>
         {timelineHistory.map((event, index) => {
