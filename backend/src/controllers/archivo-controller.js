@@ -767,6 +767,7 @@ async function supervisionGeneral(req, res) {
       search,
       matrizador,
       estado,
+      tipo, // Nuevo parámetro
       alerta,
       fechaDesde,
       fechaHasta,
@@ -793,6 +794,7 @@ async function supervisionGeneral(req, res) {
         const filterClauses = [];
         if (matrizador && matrizador !== 'TODOS') filterClauses.push(Prisma.sql`d."assignedToId" = ${parseInt(matrizador)}`);
         if (estado && estado !== 'TODOS') filterClauses.push(Prisma.sql`d."status"::text = ${estado}`);
+        if (tipo && tipo !== 'TODOS') filterClauses.push(Prisma.sql`d."documentType" = ${tipo}`); // Filtro de tipo
         if (fechaDesde) filterClauses.push(Prisma.sql`d."createdAt" >= ${new Date(fechaDesde)}`);
         if (fechaHasta) filterClauses.push(Prisma.sql`d."createdAt" <= ${new Date(fechaHasta)}`);
         // Aplicar filtro de alerta por updatedAt en SQL si corresponde
@@ -825,6 +827,9 @@ async function supervisionGeneral(req, res) {
         }
         if (estado && estado !== 'TODOS') {
           conditions.push(Prisma.sql`d."status"::text = ${estado}`);
+        }
+        if (tipo && tipo !== 'TODOS') {
+          conditions.push(Prisma.sql`d."documentType" = ${tipo}`);
         }
         if (fechaDesde) {
           conditions.push(Prisma.sql`d."createdAt" >= ${new Date(fechaDesde)}`);
@@ -932,6 +937,10 @@ async function supervisionGeneral(req, res) {
 
     if (estado && estado !== 'TODOS') {
       where.status = estado;
+    }
+
+    if (tipo && tipo !== 'TODOS') {
+      where.documentType = tipo;
     }
 
     if (fechaDesde || fechaHasta) {

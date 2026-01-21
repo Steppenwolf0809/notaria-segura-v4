@@ -71,6 +71,10 @@ function formatEventDescription(event) {
           } else {
             return `Documento entregado a ${deliveredTo} por ${deliveredBy} (método: ${metodo})`;
           }
+        case 'ANULADO_NOTA_CREDITO':
+          const motivo = details.motivo || 'Sin motivo especificado';
+          const estadoAnterior = details.estadoAnterior || previousStatus || 'desconocido';
+          return `Documento anulado por NOTA DE CRÉDITO por ${userName}. Motivo: ${motivo}. Estado anterior: ${translateStatus(estadoAnterior)}`;
         default:
           if (previousStatus && newStatus) {
             return `Estado cambiado de ${translateStatus(previousStatus)} a ${translateStatus(newStatus)}`;
@@ -137,7 +141,8 @@ function translateStatus(status) {
     'PENDIENTE': 'Pendiente',
     'EN_PROCESO': 'En Proceso',
     'LISTO': 'Listo',
-    'ENTREGADO': 'Entregado'
+    'ENTREGADO': 'Entregado',
+    'ANULADO_NOTA_CREDITO': 'Anulado (Nota de Crédito)'
   };
   return statusMap[status] || status;
 }
@@ -197,7 +202,21 @@ function getEventContextInfo(event) {
       break;
 
     case 'STATUS_CHANGED':
-      if (details.newStatus === 'ENTREGADO') {
+      if (details.newStatus === 'LISTO') {
+        // Mostrar información del documento marcado como listo
+        if (details.verificationCodeGenerated) {
+          contextInfo.push('✅ Código de verificación generado');
+        }
+        if (details.whatsappSent) {
+          contextInfo.push('📱 WhatsApp enviado');
+        } else if (details.whatsappError) {
+          contextInfo.push(`⚠️ WhatsApp falló: ${truncate(details.whatsappError, 40)}`);
+        }
+        // Rol del usuario que marcó como listo
+        if (details.userRole) {
+          contextInfo.push(`Por: ${details.userRole}`);
+        }
+      } else if (details.newStatus === 'ENTREGADO') {
         // Mostrar nombre e identificación del retirador
         const quien = personaRetiro || details.entregadoA || details.deliveredTo;
         if (quien) contextInfo.push(`Retiró: ${quien}`);
@@ -215,6 +234,12 @@ function getEventContextInfo(event) {
         // Observaciones
         const obs = observacionesRetiro || details.observacionesEntrega;
         if (obs) contextInfo.push(`Obs: ${truncate(obs, 80)}`);
+      } else if (details.newStatus === 'ANULADO_NOTA_CREDITO') {
+        // Mostrar información de la nota de crédito
+        const motivo = details.motivo;
+        if (motivo) contextInfo.push(`📋 Motivo: ${motivo}`);
+        const estadoPrevio = details.estadoAnterior || details.previousStatus;
+        if (estadoPrevio) contextInfo.push(`Estado anterior: ${translateStatus(estadoPrevio)}`);
       }
       break;
 
@@ -329,6 +354,7 @@ function getEventTitle(eventType, details = {}) {
   if (eventType === 'STATUS_CHANGED') {
     if (details?.newStatus === 'ENTREGADO') return 'Entrega Registrada';
     if (details?.newStatus === 'LISTO') return 'Listo para Entrega';
+    if (details?.newStatus === 'ANULADO_NOTA_CREDITO') return '⚠️ Nota de Crédito Aplicada';
     return 'Estado Actualizado';
   }
   const titleMap = {
@@ -351,6 +377,7 @@ function getEventIcon(eventType, details = {}) {
   if (eventType === 'STATUS_CHANGED') {
     if (details?.newStatus === 'ENTREGADO') return 'delivery';
     if (details?.newStatus === 'LISTO') return 'check_circle';
+    if (details?.newStatus === 'ANULADO_NOTA_CREDITO') return 'error';
     return 'play';
   }
   const iconMap = {
@@ -378,6 +405,7 @@ function getEventColor(eventType, details = {}) {
     case 'STATUS_CHANGED':
       if (details.newStatus === 'ENTREGADO') return 'success';
       if (details.newStatus === 'LISTO') return 'success';
+      if (details.newStatus === 'ANULADO_NOTA_CREDITO') return 'error';
       return 'warning';
     case 'STATUS_UNDO':
       return 'warning';
