@@ -169,7 +169,7 @@ export function validateParams(schema) {
       req.params = await schema.parseAsync(req.params);
       next();
     } catch (error) {
-      if (error instanceof z.ZodError) {
+      if (error instanceof z.ZodError && Array.isArray(error.errors)) {
         return res.status(400).json({
           success: false,
           message: 'Parámetros inválidos',
@@ -179,6 +179,8 @@ export function validateParams(schema) {
           }))
         });
       }
+      // Handle non-Zod errors or malformed Zod errors
+      console.error('Error en validateParams:', error);
       next(error);
     }
   };
@@ -193,7 +195,7 @@ export function validateQuery(schema) {
       req.query = await schema.parseAsync(req.query);
       next();
     } catch (error) {
-      if (error instanceof z.ZodError) {
+      if (error instanceof z.ZodError && Array.isArray(error.errors)) {
         return res.status(400).json({
           success: false,
           message: 'Query parameters inválidos',
@@ -203,6 +205,8 @@ export function validateQuery(schema) {
           }))
         });
       }
+      // Handle non-Zod errors or malformed Zod errors
+      console.error('Error en validateQuery:', error);
       next(error);
     }
   };
@@ -217,7 +221,7 @@ export function validateBody(schema) {
       req.body = await schema.parseAsync(req.body);
       next();
     } catch (error) {
-      if (error instanceof z.ZodError) {
+      if (error instanceof z.ZodError && Array.isArray(error.errors)) {
         return res.status(400).json({
           success: false,
           message: 'Datos del body inválidos',
@@ -227,6 +231,8 @@ export function validateBody(schema) {
           }))
         });
       }
+      // Handle non-Zod errors or malformed Zod errors
+      console.error('Error en validateBody:', error);
       next(error);
     }
   };
