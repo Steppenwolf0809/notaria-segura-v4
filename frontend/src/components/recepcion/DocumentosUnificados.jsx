@@ -1108,6 +1108,17 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                     </TableCell>
                     <TableCell sx={{ textAlign: 'center' }}>
                       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', justifyContent: 'center' }}>
+                        {/* Botón Detalles - SIEMPRE VISIBLE */}
+                        <Tooltip title="Ver detalles e historial">
+                          <IconButton
+                            size="small"
+                            color="info"
+                            onClick={(e) => { e.stopPropagation(); abrirDetalles(documento); }}
+                          >
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+
                         {/* Botón principal según estado */}
                         {documento.status === 'EN_PROCESO' && (
                           <Button
@@ -1141,7 +1152,8 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                               fontStyle: 'italic'
                             }}
                           >
-                            Completado
+                            Entregado
+
                           </Typography>
                         )}
 
@@ -1185,10 +1197,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
       </Card>
 
       <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={handleMenuClose}>
-        <MenuItem onClick={() => { if (currentDocumento) abrirDetalles(currentDocumento); handleMenuClose(); }}>
-          <ListItemIcon><VisibilityIcon fontSize="small" /></ListItemIcon>
-          <ListItemText>Ver Detalles</ListItemText>
-        </MenuItem>
+
 
 
 
