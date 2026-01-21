@@ -60,6 +60,9 @@ const DocumentTimeline = ({
     ...options
   });
 
+  // Debug por consola
+  console.log('DocumentTimeline render:', { documentId, hookData, history, loading, error });
+
   // Determinar qué datos usar
   const timelineData = documentId ? hookData : {
     history: history || [],
