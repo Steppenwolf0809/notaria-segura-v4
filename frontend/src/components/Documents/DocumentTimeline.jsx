@@ -348,7 +348,7 @@ const DocumentTimeline = ({
 
   console.log('DocumentTimeline RENDERING timeline with', timelineHistory.length, 'events');
   return (
-    <Box>
+    <Box sx={{ border: '3px solid red', minHeight: '200px' }}> {/* DEBUG BORDER */}
       {/* Header del timeline */}
       <Box sx={{ mb: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
