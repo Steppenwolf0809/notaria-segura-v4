@@ -57,29 +57,15 @@ function ModalEntrega({ documento, onClose, onEntregaExitosa, serviceType = 'rec
   }, [documento]);
 
   const cargarRelacionesOptions = async () => {
-    try {
-      // Opciones por defecto ya que no existe la función en el servicio
-      const relacionesDefault = [
-        { value: 'titular', label: 'Titular del documento' },
-        { value: 'conyuge', label: 'Cónyuge' },
-        { value: 'hijo', label: 'Hijo/Hija' },
-        { value: 'padre', label: 'Padre/Madre' },
-        { value: 'hermano', label: 'Hermano/Hermana' },
-        { value: 'apoderado', label: 'Apoderado legal' },
-        { value: 'representante', label: 'Representante autorizado' },
-        { value: 'otro', label: 'Otro' }
-      ];
-      setRelacionesOptions(relacionesDefault);
-    } catch (error) {
-      // Fallback con opciones básicas
-      setRelacionesOptions([
-        { value: 'titular', label: 'Titular del documento' },
-        { value: 'apoderado', label: 'Apoderado legal' },
-        { value: 'mensajero', label: 'Mensajero' },
-        { value: 'empleado', label: 'Empleado' },
-        { value: 'otro', label: 'Otro' }
-      ]);
-    }
+    // ✅ Opciones simplificadas para reducir fricción
+    const relacionesSimplificadas = [
+      { value: 'titular', label: '👤 Titular del documento' },
+      { value: 'familiar', label: '👨‍👩‍👧 Familiar' },
+      { value: 'mensajero', label: '🏍️ Mensajero' },
+      { value: 'apoderado', label: '📋 Apoderado legal' },
+      { value: 'otro', label: '❓ Otro' }
+    ];
+    setRelacionesOptions(relacionesSimplificadas);
   };
 
   const handleChange = (e) => {
