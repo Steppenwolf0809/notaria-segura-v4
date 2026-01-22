@@ -76,16 +76,62 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
   const [showMatrizadorDeliveryModal, setShowMatrizadorDeliveryModal] = useState(false);
 
   const [localDocument, setLocalDocument] = useState(document);
+  const [documentLoading, setDocumentLoading] = useState(false);
+  const [documentError, setDocumentError] = useState(null);
 
+  // Obtener el ID del documento de manera robusta
+  const documentId = document?.id || localDocument?.id;
 
-  // Actualizar documento local cuando cambie el prop
+  // Cargar documento completo cuando se abre el modal
   useEffect(() => {
-    if (document) {
+    const loadFullDocument = async () => {
+      // Si no hay ID o el modal está cerrado, no hacer nada
+      if (!open || !documentId) return;
+
+      // Si ya tenemos datos completos, no recargar
+      if (localDocument?.id === documentId && localDocument?.protocolNumber) {
+        return;
+      }
+
+      setDocumentLoading(true);
+      setDocumentError(null);
+
+      try {
+        const response = await documentService.getDocumentById(documentId);
+        if (response.success && response.data) {
+          setLocalDocument(response.data);
+        } else {
+          // Si falla la carga completa, usar los datos que tenemos
+          console.warn('No se pudo cargar documento completo, usando datos parciales');
+          if (document) {
+            setLocalDocument(document);
+          }
+        }
+      } catch (err) {
+        console.error('Error cargando documento:', err);
+        // Usar datos parciales si existen
+        if (document) {
+          setLocalDocument(document);
+        } else {
+          setDocumentError('Error al cargar el documento');
+        }
+      } finally {
+        setDocumentLoading(false);
+      }
+    };
+
+    loadFullDocument();
+  }, [open, documentId]);
+
+  // Actualizar documento local cuando cambie el prop (para actualizaciones externas)
+  useEffect(() => {
+    if (document && document.id && (!localDocument || localDocument.id !== document.id)) {
       setLocalDocument(document);
     }
-  }, [document]);
+  }, [document?.id]);
 
-  if (!document || !localDocument) return null;
+  // Si no hay documento ni ID, no renderizar
+  if (!documentId) return null;
 
   /**
    * Obtener color del estado
@@ -428,6 +474,23 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
           </Alert>
         )}
 
+        {/* Estado de carga del documento */}
+        {documentLoading && (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', flexDirection: 'column', gap: 2 }}>
+            <CircularProgress />
+            <Typography color="text.secondary">Cargando información del documento...</Typography>
+          </Box>
+        )}
+
+        {/* Estado de error */}
+        {documentError && !documentLoading && (
+          <Box sx={{ p: 3 }}>
+            <Alert severity="error">{documentError}</Alert>
+          </Box>
+        )}
+
+        {/* Contenido principal - solo mostrar si no está cargando y hay documento */}
+        {!documentLoading && localDocument && (
         <Grid container sx={{ flexGrow: 1, height: '100%', overflow: 'hidden' }}>
           {/* Left Column: Context (Client & Act info) - Scrollable */}
           <Grid item xs={12} md={5} lg={4} sx={{
@@ -574,6 +637,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
             </Box>
           </Grid>
         </Grid>
+        )}
       </DialogContent>
 
       {/* Acciones */}
