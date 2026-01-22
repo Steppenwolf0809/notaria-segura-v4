@@ -565,8 +565,8 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
               </Box>
 
               <DocumentTimeline
-                documentId={document?.id}
-                showRefresh={false}
+                documentId={localDocument?.id}
+                showRefresh={true}
                 showLoadMore={true}
                 autoRefresh={false}
                 options={TIMELINE_OPTIONS}

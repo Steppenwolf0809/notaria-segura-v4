@@ -190,8 +190,17 @@ async function getImportLogs(params = {}) {
  * @returns {Promise<Object>} Estado de pago del documento
  */
 async function getDocumentPaymentStatus(documentId) {
-    const response = await apiClient.get(`/billing/documents/${documentId}/payment-status`);
-    return response.data;
+    try {
+        const response = await apiClient.get(`/billing/documents/${documentId}/payment-status`);
+        // Asegurar que devolvemos un objeto consistente
+        return {
+            success: true,
+            data: response.data?.data || response.data
+        };
+    } catch (error) {
+        console.error('billingService.getDocumentPaymentStatus error:', error);
+        throw error;
+    }
 }
 
 /**

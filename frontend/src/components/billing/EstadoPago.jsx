@@ -75,7 +75,15 @@ const EstadoPago = ({ documentId, paymentStatus: externalStatus, compact = false
             try {
                 setLoading(true);
                 const response = await billingService.getDocumentPaymentStatus(documentId);
-                setStatus(response);
+                // Extraer data de forma robusta
+                const paymentData = response?.data || response;
+
+                if (paymentData && typeof paymentData === 'object') {
+                    setStatus(paymentData);
+                } else {
+                    console.warn('EstadoPago: Data recibida no es válida', paymentData);
+                    setError('Respuesta del servidor no válida');
+                }
             } catch (err) {
                 console.error('Error cargando estado de pago:', err);
                 // Si es 404, significa que no hay factura asociada
