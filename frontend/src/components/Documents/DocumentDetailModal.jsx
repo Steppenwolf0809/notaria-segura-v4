@@ -104,8 +104,21 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
 
       try {
         const response = await documentService.getDocumentById(documentId);
+        console.log('[DocumentDetailModal] getDocumentById response:', response);
+
         if (response.success && response.data) {
-          setLocalDocument(response.data);
+          // FIX: Handle both response structures { document: {...} } or direct document
+          const documentData = response.data.document || response.data;
+          console.log('[DocumentDetailModal] Extracted document data:', documentData?.id, documentData?.protocolNumber);
+
+          if (documentData && documentData.id) {
+            setLocalDocument(documentData);
+          } else {
+            console.warn('[DocumentDetailModal] Invalid document data received, using prop');
+            if (document) {
+              setLocalDocument(document);
+            }
+          }
         } else {
           // Si falla la carga completa, usar los datos que tenemos
           console.warn('No se pudo cargar documento completo, usando datos parciales');
@@ -124,6 +137,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
       } finally {
         setDocumentLoading(false);
       }
+
     };
 
     loadFullDocument();
@@ -262,7 +276,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
    * Obtener botón de acción contextual
    */
   const getActionButton = () => {
-    switch (document.status) {
+    switch (localDocument?.status) {
       case 'PENDIENTE':
 
         return {
@@ -341,7 +355,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
 
     setActionLoading(true);
     try {
-      const result = await updateDocumentStatus(document.id, actionConfig.action);
+      const result = await updateDocumentStatus(localDocument?.id, actionConfig.action);
 
       if (result.success) {
         // Actualizar documento local
@@ -497,153 +511,153 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
 
         {/* Contenido principal - solo mostrar si no está cargando y hay documento */}
         {!documentLoading && localDocument && (
-        <Grid container sx={{ flexGrow: 1, height: '100%', overflow: 'hidden' }}>
-          {/* Left Column: Context (Client & Act info) - Scrollable */}
-          <Grid item xs={12} md={5} lg={4} sx={{
-            height: '100%',
-            overflowY: 'auto',
-            borderRight: '1px solid',
-            borderColor: 'divider',
-            bgcolor: 'background.paper'
-          }}>
-            <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <Grid container sx={{ flexGrow: 1, height: '100%', overflow: 'hidden' }}>
+            {/* Left Column: Context (Client & Act info) - Scrollable */}
+            <Grid size={{ xs: 12, md: 5, lg: 4 }} sx={{
+              height: '100%',
+              overflowY: 'auto',
+              borderRight: '1px solid',
+              borderColor: 'divider',
+              bgcolor: 'background.paper'
+            }}>
+              <Box sx={{ p: 3, display: 'flex', flexDirection: 'column', gap: 3 }}>
 
-              {/* Información del Cliente */}
-              <Box>
-                <Typography variant="overline" color="text.secondary" fontWeight="bold">
-                  Información del Cliente
-                </Typography>
-                <Card variant="outlined" sx={{ mt: 1 }}>
-                  <CardContent sx={{ '&:last-child': { pb: 2 } }}>
-                    <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                      <Avatar sx={{ bgcolor: 'primary.soft', color: 'primary.main' }}>
-                        <PersonIcon />
-                      </Avatar>
-                      <Box>
-                        <Typography variant="subtitle1" fontWeight="bold">
-                          {localDocument?.clientName || 'Sin nombre'}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          Cliente principal
-                        </Typography>
-                      </Box>
-                    </Box>
-
-                    <Stack spacing={1.5}>
-                      {localDocument?.clientPhone && (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                          <PhoneIcon fontSize="small" color="action" />
-                          <Typography variant="body2">{localDocument.clientPhone}</Typography>
-                        </Box>
-                      )}
-
-                      {localDocument?.clientId && (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                          <AssignmentIcon fontSize="small" color="action" />
-                          <Typography variant="body2">{localDocument.clientId}</Typography>
-                        </Box>
-                      )}
-
-                      {localDocument?.clientEmail && (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                          <EmailIcon fontSize="small" color="action" />
-                          <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
-                            {localDocument.clientEmail}
+                {/* Información del Cliente */}
+                <Box>
+                  <Typography variant="overline" color="text.secondary" fontWeight="bold">
+                    Información del Cliente
+                  </Typography>
+                  <Card variant="outlined" sx={{ mt: 1 }}>
+                    <CardContent sx={{ '&:last-child': { pb: 2 } }}>
+                      <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                        <Avatar sx={{ bgcolor: 'primary.soft', color: 'primary.main' }}>
+                          <PersonIcon />
+                        </Avatar>
+                        <Box>
+                          <Typography variant="subtitle1" fontWeight="bold">
+                            {localDocument?.clientName || 'Sin nombre'}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Cliente principal
                           </Typography>
                         </Box>
-                      )}
-                    </Stack>
-                  </CardContent>
-                </Card>
-              </Box>
-
-              {/* Acto Principal */}
-              <Box>
-                <Typography variant="overline" color="text.secondary" fontWeight="bold">
-                  Detalles del Acto
-                </Typography>
-                <Card variant="outlined" sx={{ mt: 1 }}>
-                  <CardContent sx={{ '&:last-child': { pb: 2 } }}>
-                    <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                      {document.actoPrincipalDescripcion || 'No especificado'}
-                    </Typography>
-
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                      <Typography variant="h5" color="success.main" fontWeight="bold">
-                        {formatCurrency(document.totalFactura)}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ ml: 1, alignSelf: 'flex-end', mb: 0.5 }}>
-                        Total Facturado
-                      </Typography>
-                    </Box>
-
-                    <Divider sx={{ my: 1.5 }} />
-
-                    <Stack spacing={1}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2" color="text.secondary">Protocolo:</Typography>
-                        <Typography variant="body2" fontWeight="medium">{document.protocolNumber}</Typography>
                       </Box>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2" color="text.secondary">Matrizador:</Typography>
-                        <Typography variant="body2" fontWeight="medium">{document.matrizadorName || 'N/A'}</Typography>
-                      </Box>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <Typography variant="body2" color="text.secondary">Fecha Factura:</Typography>
-                        <Typography variant="body2" fontWeight="medium">
-                          {localDocument?.fechaFactura
-                            ? formatDate(localDocument.fechaFactura)
-                            : (localDocument?.createdAt || localDocument?.fechaCreacion ? formatDate(localDocument?.createdAt || localDocument?.fechaCreacion) : 'Pendiente')}
+
+                      <Stack spacing={1.5}>
+                        {localDocument?.clientPhone && (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <PhoneIcon fontSize="small" color="action" />
+                            <Typography variant="body2">{localDocument.clientPhone}</Typography>
+                          </Box>
+                        )}
+
+                        {localDocument?.clientId && (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <AssignmentIcon fontSize="small" color="action" />
+                            <Typography variant="body2">{localDocument.clientId}</Typography>
+                          </Box>
+                        )}
+
+                        {localDocument?.clientEmail && (
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <EmailIcon fontSize="small" color="action" />
+                            <Typography variant="body2" sx={{ wordBreak: 'break-all' }}>
+                              {localDocument.clientEmail}
+                            </Typography>
+                          </Box>
+                        )}
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Box>
+
+                {/* Acto Principal */}
+                <Box>
+                  <Typography variant="overline" color="text.secondary" fontWeight="bold">
+                    Detalles del Acto
+                  </Typography>
+                  <Card variant="outlined" sx={{ mt: 1 }}>
+                    <CardContent sx={{ '&:last-child': { pb: 2 } }}>
+                      <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                        {localDocument?.actoPrincipalDescripcion || 'No especificado'}
+                      </Typography>
+
+                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                        <Typography variant="h5" color="success.main" fontWeight="bold">
+                          {formatCurrency(localDocument?.totalFactura)}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ ml: 1, alignSelf: 'flex-end', mb: 0.5 }}>
+                          Total Facturado
                         </Typography>
                       </Box>
-                    </Stack>
-                  </CardContent>
-                </Card>
-              </Box>
 
-              {/* Estado de Pago */}
-              <Box>
-                <Typography variant="overline" color="text.secondary" fontWeight="bold">
-                  Estado Financiero
-                </Typography>
-                <EstadoPago documentId={localDocument?.id} />
-              </Box>
+                      <Divider sx={{ my: 1.5 }} />
 
-            </Box>
+                      <Stack spacing={1}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">Protocolo:</Typography>
+                          <Typography variant="body2" fontWeight="medium">{localDocument?.protocolNumber}</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">Matrizador:</Typography>
+                          <Typography variant="body2" fontWeight="medium">{localDocument?.matrizadorName || 'N/A'}</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">Fecha Factura:</Typography>
+                          <Typography variant="body2" fontWeight="medium">
+                            {localDocument?.fechaFactura
+                              ? formatDate(localDocument.fechaFactura)
+                              : (localDocument?.createdAt || localDocument?.fechaCreacion ? formatDate(localDocument?.createdAt || localDocument?.fechaCreacion) : 'Pendiente')}
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    </CardContent>
+                  </Card>
+                </Box>
+
+                {/* Estado de Pago */}
+                <Box>
+                  <Typography variant="overline" color="text.secondary" fontWeight="bold">
+                    Estado Financiero
+                  </Typography>
+                  <EstadoPago documentId={localDocument?.id} />
+                </Box>
+
+              </Box>
+            </Grid>
+
+            {/* Right Column: Timeline - Scrollable */}
+            <Grid size={{ xs: 12, md: 7, lg: 8 }} sx={{
+              height: '100%',
+              overflowY: 'auto',
+              bgcolor: 'action.hover' // Adapts to dark mode (light: grey, dark: dark grey)
+            }}>
+              <Box sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, justifyContent: 'space-between' }}>
+                  <Typography variant="overline" color="text.secondary" fontWeight="bold">
+                    Línea de Tiempo
+                  </Typography>
+                  <Button
+                    size="small"
+                    startIcon={<RefreshIcon />}
+                    onClick={handleRefreshTimeline}
+                    sx={{ textTransform: 'none' }}
+                  >
+                    Actualizar
+                  </Button>
+                </Box>
+
+                <DocumentTimeline
+                  key={`timeline-${localDocument?.id}-${timelineKey}`}
+                  documentId={localDocument?.id}
+                  showRefresh={true}
+                  showLoadMore={true}
+                  autoRefresh={false}
+                  options={TIMELINE_OPTIONS}
+                />
+              </Box>
+            </Grid>
           </Grid>
-
-          {/* Right Column: Timeline - Scrollable */}
-          <Grid item xs={12} md={7} lg={8} sx={{
-            height: '100%',
-            overflowY: 'auto',
-            bgcolor: 'action.hover' // Adapts to dark mode (light: grey, dark: dark grey)
-          }}>
-            <Box sx={{ p: 3 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, justifyContent: 'space-between' }}>
-                <Typography variant="overline" color="text.secondary" fontWeight="bold">
-                  Línea de Tiempo
-                </Typography>
-                <Button
-                  size="small"
-                  startIcon={<RefreshIcon />}
-                  onClick={handleRefreshTimeline}
-                  sx={{ textTransform: 'none' }}
-                >
-                  Actualizar
-                </Button>
-              </Box>
-
-              <DocumentTimeline
-                key={`timeline-${localDocument?.id}-${timelineKey}`}
-                documentId={localDocument?.id}
-                showRefresh={true}
-                showLoadMore={true}
-                autoRefresh={false}
-                options={TIMELINE_OPTIONS}
-              />
-            </Box>
-          </Grid>
-        </Grid>
         )}
       </DialogContent>
 

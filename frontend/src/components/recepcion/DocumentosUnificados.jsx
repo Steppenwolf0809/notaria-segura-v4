@@ -189,10 +189,10 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
     search: '',
     matrizador: '',
     estado: '', // 🎯 ACTUALIZADO: Mostrar todos los estados por defecto (Recepción ahora se enfoca en marcar como listo)
-    estado: '', // 🎯 ACTUALIZADO: Mostrar todos los estados por defecto (Recepción ahora se enfoca en marcar como listo)
     fechaDesde: '',
     fechaHasta: '',
   });
+
 
   const [searchQuery, setSearchQuery] = useState('');
 

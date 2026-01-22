@@ -2332,11 +2332,20 @@ async function getDocumentHistory(req, res) {
     const userId = req.user.id;
 
     // MATRIZADOR: Solo SUS documentos asignados
-    if (userRole === 'MATRIZADOR' && document.assignedToId !== userId) {
-      return res.status(403).json({
-        success: false,
-        message: 'Solo puedes ver el historial de documentos asignados a ti'
-      });
+    // FIX: Convertir a números para comparación correcta y agregar logging
+    if (userRole === 'MATRIZADOR') {
+      const assignedId = document.assignedToId ? Number(document.assignedToId) : null;
+      const currentUserId = userId ? Number(userId) : null;
+
+      console.log(`🔍 [getDocumentHistory] MATRIZADOR check: assignedToId=${assignedId}, userId=${currentUserId}, match=${assignedId === currentUserId}`);
+
+      if (assignedId !== currentUserId) {
+        console.warn(`⚠️ [getDocumentHistory] MATRIZADOR ${currentUserId} denied access to document ${id} (assigned to ${assignedId})`);
+        return res.status(403).json({
+          success: false,
+          message: 'Solo puedes ver el historial de documentos asignados a ti'
+        });
+      }
     }
 
     // ADMIN/RECEPCIÓN/CAJA/ARCHIVO: Ven TODOS los documentos
