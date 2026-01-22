@@ -28,7 +28,7 @@ const useDocumentHistory = (documentId, options = {}) => {
     history: [],
     document: null,
     permissions: null,
-    loading: false,
+    loading: true, // Iniciar en true para mostrar skeleton mientras carga
     error: null,
     pagination: {
       total: 0,
@@ -36,16 +36,27 @@ const useDocumentHistory = (documentId, options = {}) => {
       offset: 0,
       hasMore: false
     },
-    usingRealData: false
+    usingRealData: false,
+    initialized: false // Track si ya se intentó cargar al menos una vez
   });
 
   /**
    * Cargar historial del documento usando la API real
    */
   const fetchHistory = useCallback(async (offset = 0) => {
-    if (!documentId || !enabled) return;
+    // Si no hay documentId o no está habilitado, marcar como inicializado sin datos
+    if (!documentId || !enabled) {
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        initialized: true,
+        history: [],
+        error: null
+      }));
+      return;
+    }
 
-    // Prevenir fetches duplicados
+    // Prevenir fetches duplicados solo para offset 0 (carga inicial)
     if (fetchInProgressRef.current && offset === 0) {
       console.log('useDocumentHistory: Fetch already in progress, skipping duplicate');
       return;
@@ -63,6 +74,7 @@ const useDocumentHistory = (documentId, options = {}) => {
       const currentOptions = optionsRef.current;
       const currentLimit = currentOptions.limit || 50;
       const currentEventType = currentOptions.eventType || null;
+      const currentFallback = currentOptions.fallbackToSimulated !== false;
 
       // Intentar obtener historial real de la API
       const params = {
@@ -102,7 +114,8 @@ const useDocumentHistory = (documentId, options = {}) => {
           pagination: history.pagination || prev.pagination,
           loading: false,
           error: null,
-          usingRealData: true
+          usingRealData: true,
+          initialized: true
         }));
 
         fetchInProgressRef.current = false;
@@ -110,29 +123,36 @@ const useDocumentHistory = (documentId, options = {}) => {
       } else {
         console.warn('⚠️ API returned success=false for history:', response);
         fetchInProgressRef.current = false;
-        if (fallbackToSimulated) {
+
+        if (currentFallback) {
           console.log('🔄 Falling back to simulated history due to API failure response');
           await loadSimulatedHistory();
-          return;
         } else {
           setState(prev => ({
             ...prev,
             loading: false,
-            error: response.message || 'Error al cargar el historial (API returned false)'
+            initialized: true,
+            error: response.message || 'Error al cargar el historial'
           }));
-          return;
         }
+        return;
       }
     } catch (err) {
+      console.error('useDocumentHistory: Error fetching history:', err);
       fetchInProgressRef.current = false;
+
+      // Obtener fallback del ref actual
+      const currentFallback = optionsRef.current.fallbackToSimulated !== false;
+
       // Si falla la API y está habilitado el fallback, usar datos simulados
-      if (fallbackToSimulated) {
+      if (currentFallback) {
+        console.log('🔄 Falling back to simulated history due to exception');
         await loadSimulatedHistory();
-        return;
       } else {
         setState(prev => ({
           ...prev,
           loading: false,
+          initialized: true,
           error: err.message || 'Error al cargar el historial del documento'
         }));
       }
@@ -143,8 +163,9 @@ const useDocumentHistory = (documentId, options = {}) => {
    * Cargar historial simulado (fallback)
    */
   const loadSimulatedHistory = useCallback(async () => {
-    try {
+    console.log('[useDocumentHistory] Loading simulated history for', documentId);
 
+    try {
       // Generar historial simulado base
       const simulatedHistory = generateSimulatedHistory(documentId);
 
@@ -154,7 +175,7 @@ const useDocumentHistory = (documentId, options = {}) => {
       try {
         const notificationsResponse = await notificationsService.getDocumentNotifications(documentId);
 
-        if (notificationsResponse.success && notificationsResponse.data.length > 0) {
+        if (notificationsResponse.success && notificationsResponse.data && notificationsResponse.data.length > 0) {
           // Convertir notificaciones reales a eventos de historial
           const realNotificationEvents = notificationsResponse.data.map((notification, index) => ({
             id: `notification_real_${notification.id || index}`,
@@ -179,10 +200,12 @@ const useDocumentHistory = (documentId, options = {}) => {
           // Combinar historial simulado con notificaciones reales
           combinedHistory = [...simulatedHistory, ...realNotificationEvents]
             .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
         }
       } catch (notificationError) {
+        console.warn('[useDocumentHistory] Error loading notifications, using only simulated data');
       }
+
+      console.log('[useDocumentHistory] Simulated history loaded:', combinedHistory.length, 'events');
 
       setState(prev => ({
         ...prev,
@@ -192,17 +215,20 @@ const useDocumentHistory = (documentId, options = {}) => {
         pagination: { total: combinedHistory.length, limit: optionsRef.current.limit || 50, offset: 0, hasMore: false },
         loading: false,
         error: null,
-        usingRealData: false
+        usingRealData: false,
+        initialized: true
       }));
 
     } catch (err) {
+      console.error('[useDocumentHistory] Error in loadSimulatedHistory:', err);
       setState(prev => ({
         ...prev,
         loading: false,
+        initialized: true,
         error: 'Error al cargar el historial del documento'
       }));
     }
-  }, [documentId, limit]);
+  }, [documentId]);
 
   /**
    * Obtener título del evento según su tipo
@@ -434,6 +460,7 @@ const useDocumentHistory = (documentId, options = {}) => {
     error: state.error,
     pagination: state.pagination,
     usingRealData: state.usingRealData,
+    initialized: state.initialized,
     fetchInProgress: fetchInProgressRef.current,
 
     // Funciones de gestión

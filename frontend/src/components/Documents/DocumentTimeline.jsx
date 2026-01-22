@@ -60,15 +60,6 @@ const DocumentTimeline = ({
     ...options
   });
 
-  console.log('DocumentTimeline: hookData for', documentId, {
-    historyLength: hookData.history?.length,
-    loading: hookData.loading,
-    error: hookData.error,
-    usingRealData: hookData.usingRealData
-  });
-
-
-
   // Determinar qué datos usar
   const timelineData = documentId ? hookData : {
     history: history || [],
@@ -76,7 +67,8 @@ const DocumentTimeline = ({
     error: error || null,
     refresh: () => { },
     loadMore: () => { },
-    stats: { hasMoreToLoad: false }
+    stats: { hasMoreToLoad: false },
+    initialized: true
   };
 
   const {
@@ -87,16 +79,19 @@ const DocumentTimeline = ({
     loadMore,
     stats,
     usingRealData,
-    fetchInProgress
+    initialized
   } = timelineData;
 
-  console.log('[DocumentTimeline] Rendering:', {
-    documentId,
-    historyCount: timelineHistory?.length,
-    loading: timelineLoading,
-    fetchInProgress,
-    error: timelineError
-  });
+  // Solo loguear en desarrollo para debugging
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[DocumentTimeline] State:', {
+      documentId,
+      historyCount: timelineHistory?.length,
+      loading: timelineLoading,
+      initialized,
+      error: timelineError
+    });
+  }
 
   /**
    * Obtener icono según el tipo de evento
@@ -306,9 +301,9 @@ const DocumentTimeline = ({
   };
 
   /**
-   * Loading skeleton
+   * Loading skeleton - Mostrar mientras carga y no está inicializado
    */
-  if (timelineLoading) {
+  if (timelineLoading && !initialized) {
     return (
       <Box>
         {[1, 2, 3].map((item) => (
@@ -326,20 +321,30 @@ const DocumentTimeline = ({
   }
 
   /**
-   * Error state
+   * Error state - Mostrar error con opción de reintentar
    */
   if (timelineError) {
     return (
-      <Alert severity="error" sx={{ mt: 2 }}>
+      <Alert
+        severity="error"
+        sx={{ mt: 2 }}
+        action={
+          showRefresh && (
+            <Button color="inherit" size="small" onClick={refresh}>
+              Reintentar
+            </Button>
+          )
+        }
+      >
         {timelineError}
       </Alert>
     );
   }
 
   /**
-   * Empty state
+   * Empty state - Solo mostrar si ya se inicializó y no hay datos
    */
-  if (!timelineHistory || timelineHistory.length === 0) {
+  if (initialized && (!timelineHistory || timelineHistory.length === 0)) {
     return (
       <Box sx={{ textAlign: 'center', py: 4 }}>
         <DefaultIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
@@ -348,6 +353,31 @@ const DocumentTimeline = ({
         </Typography>
         <Typography variant="body2" color="text.secondary">
           Los eventos del documento aparecerán aquí conforme se generen
+        </Typography>
+        {showRefresh && (
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<RefreshIcon />}
+            onClick={refresh}
+            sx={{ mt: 2 }}
+          >
+            Actualizar
+          </Button>
+        )}
+      </Box>
+    );
+  }
+
+  /**
+   * Waiting state - Si no está inicializado y no está cargando (caso edge)
+   */
+  if (!initialized && !timelineLoading) {
+    return (
+      <Box sx={{ textAlign: 'center', py: 4 }}>
+        <Skeleton variant="circular" width={64} height={64} sx={{ mx: 'auto', mb: 2 }} />
+        <Typography variant="body2" color="text.secondary">
+          Preparando historial...
         </Typography>
       </Box>
     );
