@@ -1211,14 +1211,16 @@ async function getDocumentById(req, res) {
     }
 
     // Verificar permisos según rol
-    if (['MATRIZADOR', 'ARCHIVO'].includes(req.user.role)) {
+    // MATRIZADOR: Solo puede ver documentos asignados a él
+    // ARCHIVO/ADMIN/RECEPCION/CAJA: Pueden ver todos los documentos
+    if (req.user.role === 'MATRIZADOR') {
       if (document.assignedToId !== req.user.id) {
         return res.status(403).json({
           success: false,
           message: 'Solo puedes ver documentos asignados a ti'
         });
       }
-    } else if (!['CAJA', 'ADMIN', 'RECEPCION'].includes(req.user.role)) {
+    } else if (!['CAJA', 'ADMIN', 'RECEPCION', 'ARCHIVO'].includes(req.user.role)) {
       return res.status(403).json({
         success: false,
         message: 'No tienes permisos para ver este documento'
