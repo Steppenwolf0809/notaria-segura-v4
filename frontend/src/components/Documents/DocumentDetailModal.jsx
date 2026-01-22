@@ -46,7 +46,6 @@ import {
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import DocumentTimeline from './DocumentTimeline';
-import useDocumentHistory from '../../hooks/useDocumentHistory';
 import useDocumentStore from '../../store/document-store';
 import useAuthStore from '../../store/auth-store';
 import EditDocumentModal from './EditDocumentModal';
@@ -63,10 +62,14 @@ import EstadoPago from '../billing/EstadoPago';
  * Componente DocumentDetailModal - Modal de detalle avanzado del documento
  * Incluye información completa, historial visual y acciones contextuales
  */
+// Opciones estables para el timeline - fuera del componente para evitar re-renders
+const TIMELINE_OPTIONS = { limit: 50, fallbackToSimulated: true };
+
 const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readOnly = false }) => {
   const { updateDocumentStatus } = useDocumentStore();
   const { user } = useAuthStore();
-  const { history, loading, error } = useDocumentHistory(document?.id);
+  // NOTA: useDocumentHistory se usa directamente en DocumentTimeline, no aquí
+  // para evitar fetches duplicados que causaban race conditions
   const [actionLoading, setActionLoading] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
@@ -566,10 +569,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
                 showRefresh={false}
                 showLoadMore={true}
                 autoRefresh={false}
-                options={{
-                  limit: 20,
-                  fallbackToSimulated: true
-                }}
+                options={TIMELINE_OPTIONS}
               />
             </Box>
           </Grid>
