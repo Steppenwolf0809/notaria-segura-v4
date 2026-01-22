@@ -46,7 +46,11 @@
       "Bash(sed:*)",
       "Bash(pg_config:*)",
       "Bash(npm test:*)",
-      "Bash(gh pr create:*)"
+      "Bash(gh pr create:*)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" pr create --title \"fix: corregir modal de historial para roles RECEPCION, ARCHIVO y MATRIZADOR\" --body \"$\\(cat <<''EOF''\n## Summary\n- Corrige problema donde el modal de historial de documentos no se renderizaba para los roles RECEPCION, ARCHIVO y MATRIZADOR\n- El problema era una inconsistencia en los permisos de `getDocumentById` que restringía a ARCHIVO a solo documentos asignados\n- Mejora la estabilidad del componente DocumentTimeline con mejor manejo de estados\n\n## Cambios\n- **Backend**: Permitir que ARCHIVO vea todos los documentos en `getDocumentById` \\(alineando con `getDocumentHistory`\\)\n- **Frontend**: Agregar campo `initialized` en `useDocumentHistory` para evitar estados indefinidos\n- **Frontend**: Mejorar manejo de errores en `DocumentTimeline` con opción de reintentar\n\n## Test plan\n- [ ] Verificar que RECEPCION puede ver el historial de cualquier documento\n- [ ] Verificar que ARCHIVO puede ver el historial en Supervisión y en Mis Documentos\n- [ ] Verificar que MATRIZADOR puede ver el historial de documentos asignados a él\n- [ ] Verificar que ADMIN sigue viendo todo correctamente\n- [ ] Verificar que el skeleton de carga aparece correctamente\n- [ ] Verificar que el botón \"Reintentar\" funciona en caso de error\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\nEOF\n\\)\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: cargar documento completo al abrir modal para resolver historial vacío\n\nEl modal ahora carga el documento completo desde la API al abrirse,\nen lugar de depender únicamente de los datos parciales de la tabla.\n\nCambios:\n- Agregar carga asíncrona del documento por ID al abrir el modal\n- Mostrar estado de carga mientras se obtiene el documento\n- Usar datos parciales como fallback si la carga falla\n- Mejorar validación del documentId para el timeline\n\nEsto resuelve el problema donde el historial no se mostraba porque\nel documento pasado desde la tabla podía estar incompleto.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(git commit:*)"
     ],
     "deny": []
   }
