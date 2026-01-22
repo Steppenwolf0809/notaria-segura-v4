@@ -544,9 +544,11 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
           <Grid item xs={12} md={7} lg={8} sx={{
             height: '100%',
             overflowY: 'auto',
-            bgcolor: 'action.hover' // Adapts to dark mode (light: grey, dark: dark grey)
+            bgcolor: 'action.hover', // Adapts to dark mode (light: grey, dark: dark grey)
+            border: '5px solid lime' // DEBUG
           }}>
-            <Box sx={{ p: 3 }}>
+            <Box sx={{ p: 3, border: '3px solid orange' }}> {/* DEBUG */}
+              <Typography variant="h4" color="error">DEBUG: Columna Derecha Renderizada</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, justifyContent: 'space-between' }}>
                 <Typography variant="overline" color="text.secondary" fontWeight="bold">
                   Línea de Tiempo
