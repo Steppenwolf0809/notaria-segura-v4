@@ -45,7 +45,9 @@ import {
   MoreVert as MoreVertIcon,
   Phone as PhoneIcon,
   Clear as ClearIcon,
-  Undo as UndoIcon
+  Undo as UndoIcon,
+  Close as CloseIcon,
+  LocalShipping as LocalShippingIcon
 } from '@mui/icons-material';
 import ModalEntrega from './ModalEntrega';
 
@@ -623,14 +625,15 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
     const docs = documentos.filter(doc => selectedDocuments.includes(doc.id));
     const enProceso = docs.filter(doc => doc.status === 'EN_PROCESO');
     const listos = docs.filter(doc => doc.status === 'LISTO');
-    const disabled = !documentosSeleccionadosMismoCliente();
+    // ✅ Marcar LISTO requiere mismo cliente; Entregar permite múltiples clientes (ej: mensajero)
+    const disabledForListo = !documentosSeleccionadosMismoCliente();
 
     if (enProceso.length > 0 && listos.length === 0) {
-      return { action: 'marcar-listo', text: `Marcar ${enProceso.length} como Listo`, color: 'success', disabled };
+      return { action: 'marcar-listo', text: `Marcar ${enProceso.length} como Listo`, color: 'success', disabled: disabledForListo };
     }
     if (listos.length > 0 && enProceso.length === 0) {
-      // ✅ Enable delivery for multiple documents if they belong to the same client
-      return { action: 'entregar', text: `Entregar ${listos.length} docs`, color: 'primary', disabled: !documentosSeleccionadosMismoCliente() };
+      // ✅ Entrega masiva habilitada para múltiples clientes (ej: mensajero retira varios)
+      return { action: 'entregar', text: `Entregar ${listos.length} docs`, color: 'primary', disabled: false };
     }
     return { action: 'mixto', text: 'Estados mixtos', color: 'warning', disabled: true };
   };
@@ -898,20 +901,6 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                 </Box>
               </Box>
             </LocalizationProvider>
-
-            {/* Acciones en bloque (si hay selección) */}
-            {selectedDocuments.length > 0 && (
-              <Box sx={{ mt: 2, display: 'flex', justifyContent: 'flex-end' }}>
-                <Button
-                  variant="contained" color={selectedAction.color} disabled={selectedAction.disabled}
-                  startIcon={selectedAction.action === 'marcar-listo' ? <CheckCircleIcon /> : <SendIcon />}
-                  onClick={() => {
-                    if (selectedAction.action === 'marcar-listo') abrirConfirmacionGrupal();
-                    if (selectedAction.action === 'entregar') handleOpenBulkDelivery();
-                  }}
-                >{selectedAction.text} ({selectedDocuments.length})</Button>
-              </Box>
-            )}
           </CardContent>
         </Card>
       </Box>
@@ -1284,6 +1273,79 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
         documents={documentos.filter(d => selectedDocuments.includes(d.id))}
         onDeliveryComplete={handleBulkDeliveryComplete}
       />
+
+      {/* 🎯 NUEVO: Barra flotante fija en parte inferior */}
+      {selectedDocuments.length > 0 && (
+        <Box
+          sx={{
+            position: 'fixed',
+            bottom: 24,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 1300,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            px: 3,
+            py: 1.5,
+            borderRadius: '24px',
+            bgcolor: (theme) => theme.palette.mode === 'dark' ? '#1e293b' : '#ffffff',
+            border: (theme) => `2px solid ${theme.palette.primary.main}`,
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
+          }}
+        >
+          <Chip
+            label={`${selectedDocuments.length} seleccionado${selectedDocuments.length > 1 ? 's' : ''}`}
+            color="primary"
+            sx={{ fontWeight: 600 }}
+          />
+
+          {selectedAction.action === 'marcar-listo' && (
+            <Button
+              variant="contained"
+              color="success"
+              size="small"
+              startIcon={<CheckCircleIcon />}
+              disabled={selectedAction.disabled}
+              onClick={abrirConfirmacionGrupal}
+              sx={{ textTransform: 'none', fontWeight: 600 }}
+            >
+              LISTO
+            </Button>
+          )}
+
+          {selectedAction.action === 'entregar' && (
+            <Button
+              variant="contained"
+              color="primary"
+              size="small"
+              startIcon={<LocalShippingIcon />}
+              disabled={selectedAction.disabled}
+              onClick={handleOpenBulkDelivery}
+              sx={{ textTransform: 'none', fontWeight: 600 }}
+            >
+              Entregar
+            </Button>
+          )}
+
+          {selectedAction.action === 'mixto' && (
+            <Typography variant="body2" color="text.secondary">
+              Estados mixtos
+            </Typography>
+          )}
+
+          <IconButton
+            size="small"
+            onClick={() => setSelectedDocuments([])}
+            sx={{
+              color: 'text.secondary',
+              '&:hover': { bgcolor: 'error.main', color: 'white' }
+            }}
+          >
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        </Box>
+      )}
     </Box>
   );
 }

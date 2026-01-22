@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -7,15 +7,25 @@ import {
   Button,
   TextField,
   FormControl,
-  FormLabel,
-  RadioGroup,
-  FormControlLabel,
-  Radio,
+  InputLabel,
+  Select,
+  MenuItem,
   Typography,
   Alert,
   Box,
-  CircularProgress
+  CircularProgress,
+  Chip
 } from '@mui/material';
+import receptionService from '../../services/reception-service';
+
+// ✅ Opciones de relación simplificadas
+const RELACION_OPTIONS = [
+  { value: 'titular', label: '👤 Titular' },
+  { value: 'familiar', label: '👨‍👩‍👧 Familiar' },
+  { value: 'mensajero', label: '🏍️ Mensajero' },
+  { value: 'apoderado', label: '📋 Apoderado' },
+  { value: 'otro', label: '❓ Otro' }
+];
 
 function BulkDeliveryDialog({ open, onClose, documentIds, documents, onDeliveryComplete }) {
   const [loading, setLoading] = useState(false);
@@ -24,9 +34,27 @@ function BulkDeliveryDialog({ open, onClose, documentIds, documents, onDeliveryC
   const [formData, setFormData] = useState({
     personaRetira: '',
     cedulaRetira: '',
-    verificationType: 'CEDULA',
-    verificationCode: ''
+    relacionTitular: 'titular',
+    observaciones: ''
   });
+
+  // Debug: Log document IDs on mount/change
+  useEffect(() => {
+    if (open) {
+      console.log('[BulkDeliveryDialog] documentIds recibidos:', documentIds?.length, documentIds);
+      // ✅ Pre-llenar con nombre del primer cliente si todos son del mismo
+      if (documents && documents.length > 0) {
+        const firstClient = documents[0]?.clientName || '';
+        const allSameClient = documents.every(d => d.clientName === firstClient);
+        if (allSameClient && firstClient) {
+          setFormData(prev => ({
+            ...prev,
+            personaRetira: firstClient
+          }));
+        }
+      }
+    }
+  }, [open, documentIds, documents]);
 
   const handleChange = (e) => {
     setFormData({
@@ -37,8 +65,14 @@ function BulkDeliveryDialog({ open, onClose, documentIds, documents, onDeliveryC
 
   const handleSubmit = async () => {
     // Validaciones
-    if (!formData.personaRetira || !formData.cedulaRetira) {
-      setError('Complete todos los campos obligatorios');
+    if (!formData.personaRetira) {
+      setError('El nombre de quien retira es obligatorio');
+      return;
+    }
+
+    // Verificar que tenemos documentIds válidos
+    if (!documentIds || documentIds.length === 0) {
+      setError('No hay documentos seleccionados');
       return;
     }
 
@@ -46,32 +80,27 @@ function BulkDeliveryDialog({ open, onClose, documentIds, documents, onDeliveryC
     setError(null);
 
     try {
-      const response = await fetch('/api/reception/bulk-delivery', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          documentIds,
-          deliveryData: formData
-        })
+      // Usar el servicio en lugar de fetch directo para incluir CSRF token
+      const result = await receptionService.procesarEntregaGrupal({
+        documentIds: documentIds,
+        deliveredTo: formData.personaRetira,
+        receptorId: formData.cedulaRetira || null,
+        relationType: formData.relacionTitular,
+        observations: formData.observaciones || null
       });
 
-      const data = await response.json();
-
-      if (data.success) {
+      if (result.success) {
         onDeliveryComplete();
         onClose();
         // Resetear form
         setFormData({
           personaRetira: '',
           cedulaRetira: '',
-          verificationType: 'CEDULA',
-          verificationCode: ''
+          relacionTitular: 'titular',
+          observaciones: ''
         });
       } else {
-        setError(data.message || 'Error al realizar entrega');
+        setError(result.error || 'Error al realizar entrega');
       }
     } catch (err) {
       setError('Error de conexión: ' + err.message);
@@ -80,10 +109,20 @@ function BulkDeliveryDialog({ open, onClose, documentIds, documents, onDeliveryC
     }
   };
 
+  // Calcular si hay múltiples clientes
+  const uniqueClients = documents ? [...new Set(documents.map(d => d.clientName))] : [];
+  const isMultiClient = uniqueClients.length > 1;
+
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>
-        Entrega en Bloque ({documentIds.length} documentos)
+      <DialogTitle sx={{ pb: 1 }}>
+        🚚 Entrega en Bloque
+        <Chip
+          label={`${documentIds?.length || 0} doc${documentIds?.length !== 1 ? 's' : ''}`}
+          color="primary"
+          size="small"
+          sx={{ ml: 1 }}
+        />
       </DialogTitle>
 
       <DialogContent>
@@ -93,56 +132,67 @@ function BulkDeliveryDialog({ open, onClose, documentIds, documents, onDeliveryC
           </Alert>
         )}
 
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Se entregarán {documentIds.length} documentos del mismo cliente
-        </Typography>
+        {isMultiClient ? (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            📦 Entrega de {documentIds?.length} documentos de {uniqueClients.length} clientes diferentes
+          </Alert>
+        ) : (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Se entregarán {documentIds?.length} documento(s) de <strong>{uniqueClients[0]}</strong>
+          </Typography>
+        )}
 
-        <TextField
-          fullWidth
-          label="Nombre de quien retira"
-          name="personaRetira"
-          value={formData.personaRetira}
-          onChange={handleChange}
-          required
-          sx={{ mb: 2 }}
-        />
-
-        <TextField
-          fullWidth
-          label="Cédula de quien retira"
-          name="cedulaRetira"
-          value={formData.cedulaRetira}
-          onChange={handleChange}
-          required
-          sx={{ mb: 2 }}
-        />
-
-        <FormControl component="fieldset" sx={{ mb: 2 }}>
-          <FormLabel>Tipo de Verificación</FormLabel>
-          <RadioGroup
-            name="verificationType"
-            value={formData.verificationType}
-            onChange={handleChange}
-          >
-            <FormControlLabel value="CEDULA" control={<Radio />} label="Cédula" />
-            <FormControlLabel value="CODIGO" control={<Radio />} label="Código de verificación" />
-            <FormControlLabel value="TELEFONO" control={<Radio />} label="Verificación telefónica" />
-          </RadioGroup>
-        </FormControl>
-
-        {formData.verificationType === 'CODIGO' && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <TextField
             fullWidth
-            label="Código de verificación (4 dígitos)"
-            name="verificationCode"
-            value={formData.verificationCode}
+            label="Nombre de quien retira"
+            name="personaRetira"
+            value={formData.personaRetira}
             onChange={handleChange}
-            inputProps={{ maxLength: 4 }}
+            required
+            helperText={!isMultiClient ? "Por defecto: titular del documento" : ""}
           />
-        )}
+
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <TextField
+              sx={{ flex: 1 }}
+              label="Cédula (opcional)"
+              name="cedulaRetira"
+              value={formData.cedulaRetira}
+              onChange={handleChange}
+            />
+
+            <FormControl sx={{ flex: 1 }}>
+              <InputLabel>Relación</InputLabel>
+              <Select
+                name="relacionTitular"
+                value={formData.relacionTitular}
+                onChange={handleChange}
+                label="Relación"
+              >
+                {RELACION_OPTIONS.map(opt => (
+                  <MenuItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+
+          <TextField
+            fullWidth
+            multiline
+            rows={2}
+            label="Observaciones (opcional)"
+            name="observaciones"
+            value={formData.observaciones}
+            onChange={handleChange}
+            placeholder="Ej: Mensajero de empresa X, verificado por teléfono..."
+          />
+        </Box>
       </DialogContent>
 
-      <DialogActions>
+      <DialogActions sx={{ px: 3, pb: 2 }}>
         <Button onClick={onClose} disabled={loading}>
           Cancelar
         </Button>
@@ -151,7 +201,7 @@ function BulkDeliveryDialog({ open, onClose, documentIds, documents, onDeliveryC
           onClick={handleSubmit}
           disabled={loading}
         >
-          {loading ? <CircularProgress size={24} /> : `Entregar ${documentIds.length} Documentos`}
+          {loading ? <CircularProgress size={24} /> : `Entregar ${documentIds?.length || 0} Docs`}
         </Button>
       </DialogActions>
     </Dialog>
@@ -159,3 +209,4 @@ function BulkDeliveryDialog({ open, onClose, documentIds, documents, onDeliveryC
 }
 
 export default BulkDeliveryDialog;
+

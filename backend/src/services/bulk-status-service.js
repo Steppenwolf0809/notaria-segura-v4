@@ -1,12 +1,12 @@
 import { getPrismaClient } from '../db.js';
+import CodigoRetiroService from '../utils/codigo-retiro.js';
 
 const prisma = getPrismaClient();
 
 /**
  * Servicio para cambios masivos de estado de documentos.
  * - Permite a RECEPCION, ARCHIVO, MATRIZADOR y ADMIN marcar documentos como LISTO.
- * - NO genera código de retiro (los documentos aparecen en la cola "Por Notificar").
- * - El código de retiro se genera posteriormente al enviar la notificación real (bulkNotify).
+ * - Genera código de retiro para cada documento (igual que marcarComoListo individual).
  */
 export async function bulkMarkReady({ documentIds, actor, sendNotifications = true }) {
   if (!Array.isArray(documentIds) || documentIds.length === 0) {
@@ -84,19 +84,18 @@ export async function bulkMarkReady({ documentIds, actor, sendNotifications = tr
     byClient.get(key).push(d);
   }
 
-  // ⚠️ FIX: NO generar códigos de retiro aquí
-  // Los documentos deben tener codigoRetiro=null para aparecer en la cola de "Por Notificar"
-  // El código de retiro se generará cuando se envíe la notificación real desde bulkNotify
-
   // Ejecutar actualización en transacción
   const updated = await prisma.$transaction(async (tx) => {
     const updatedDocs = [];
     for (const d of documents) {
       const key = groupKey(d);
 
+      // ✅ Generar código de retiro para cada documento (igual que marcarComoListo individual)
+      const nuevoCodigo = await CodigoRetiroService.generarUnico();
+
       const data = {
         status: 'LISTO',
-        // codigoRetiro: null => aparecerá en cola "Por Notificar"
+        codigoRetiro: nuevoCodigo,
         fechaListo: new Date(),
         updatedAt: new Date(),
       };

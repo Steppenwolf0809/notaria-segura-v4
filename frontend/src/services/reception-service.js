@@ -199,7 +199,7 @@ const receptionService = {
    */
   async marcarGrupoListo(documentIds) {
     try {
-      const response = await api.post('/reception/documentos/marcar-grupo-listo', { documentIds });
+      const response = await api.post('/reception/documentos/marcar-listos', { documentIds });
       return {
         success: true,
         data: response.data.data,
