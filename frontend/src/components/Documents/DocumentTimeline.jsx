@@ -404,12 +404,20 @@ const DocumentTimeline = ({
               ` de ${stats.totalEvents} totales`
             }
           </Typography>
-          {usingRealData && (
+          {usingRealData ? (
             <Chip
               label="Datos en vivo"
               size="small"
               color="success"
               variant="outlined"
+            />
+          ) : (
+            <Chip
+              label="Historial recuperado"
+              size="small"
+              color="warning"
+              variant="outlined"
+              title="Este historial fue generado automáticamente porque no se encontraron eventos registrados"
             />
           )}
         </Box>

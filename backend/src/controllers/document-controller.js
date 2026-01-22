@@ -2300,6 +2300,22 @@ async function getDocumentHistory(req, res) {
             lastName: true,
             role: true
           }
+        },
+        createdBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true
+          }
+        },
+        assignedTo: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true
+          }
         }
       }
     });
@@ -2432,6 +2448,78 @@ async function getDocumentHistory(req, res) {
         events.push(syntheticEvent);
         events.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       }
+    }
+
+    // 🩹 FIX: Si no hay eventos en absoluto, crear evento DOCUMENT_CREATED sintético
+    // Esto cubre documentos antiguos que no tuvieron evento inicial
+    if (events.length === 0 && parseInt(offset) === 0) {
+      console.warn(`🩹 Documento ${id} sin eventos - inyectando evento DOCUMENT_CREATED sintético`);
+
+      const syntheticCreatedEvent = {
+        id: `synthetic-created-${id}`,
+        documentId: id,
+        userId: document.createdById || 0,
+        eventType: 'DOCUMENT_CREATED',
+        description: `Documento creado: ${document.documentType || 'Documento'} - ${document.protocolNumber || 'Sin protocolo'}`,
+        details: JSON.stringify({
+          documentType: document.documentType,
+          protocolNumber: document.protocolNumber,
+          clientName: document.clientName,
+          isSynthetic: true,
+          reason: 'Evento recuperado automáticamente - documento sin historial inicial'
+        }),
+        createdAt: document.createdAt,
+        user: document.createdBy || {
+          id: 0,
+          firstName: 'Sistema',
+          lastName: '(Recuperado)',
+          role: 'SYSTEM'
+        }
+      };
+
+      events.push(syntheticCreatedEvent);
+
+      // Si el documento tiene estado diferente a PENDIENTE, agregar eventos de transición
+      if (document.status && document.status !== 'PENDIENTE') {
+        const statusOrder = ['PENDIENTE', 'EN_PROCESO', 'LISTO', 'ENTREGADO'];
+        const currentStatusIndex = statusOrder.indexOf(document.status);
+
+        // Crear eventos sintéticos para cada transición de estado
+        for (let i = 1; i <= currentStatusIndex && i < statusOrder.length; i++) {
+          const prevStatus = statusOrder[i - 1];
+          const newStatus = statusOrder[i];
+
+          // No duplicar evento de entrega si ya lo agregamos arriba
+          if (newStatus === 'ENTREGADO' && document.fechaEntrega) continue;
+
+          const transitionDate = new Date(document.createdAt);
+          transitionDate.setHours(transitionDate.getHours() + (i * 24)); // Espaciar eventos
+
+          events.push({
+            id: `synthetic-status-${id}-${i}`,
+            documentId: id,
+            userId: document.assignedToId || 0,
+            eventType: 'STATUS_CHANGED',
+            description: `Estado cambiado de ${prevStatus} a ${newStatus} (Recuperado)`,
+            details: JSON.stringify({
+              previousStatus: prevStatus,
+              newStatus: newStatus,
+              isSynthetic: true,
+              reason: 'Evento recuperado automáticamente'
+            }),
+            createdAt: transitionDate,
+            user: document.assignedTo || {
+              id: 0,
+              firstName: 'Sistema',
+              lastName: '(Recuperado)',
+              role: 'SYSTEM'
+            }
+          });
+        }
+      }
+
+      // Reordenar por fecha descendente
+      events.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     }
 
     console.log(`✅ Events found: ${events.length}`);

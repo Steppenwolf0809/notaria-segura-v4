@@ -78,9 +78,15 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
   const [localDocument, setLocalDocument] = useState(document);
   const [documentLoading, setDocumentLoading] = useState(false);
   const [documentError, setDocumentError] = useState(null);
+  const [timelineKey, setTimelineKey] = useState(0); // Key para forzar re-render del timeline
 
   // Obtener el ID del documento de manera robusta
   const documentId = document?.id || localDocument?.id;
+
+  // Función para refrescar el timeline
+  const handleRefreshTimeline = () => {
+    setTimelineKey(prev => prev + 1);
+  };
 
   // Cargar documento completo cuando se abre el modal
   useEffect(() => {
@@ -620,7 +626,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
                 <Button
                   size="small"
                   startIcon={<RefreshIcon />}
-                  onClick={() => { }} // Refresh handled internally by auto-updates usually
+                  onClick={handleRefreshTimeline}
                   sx={{ textTransform: 'none' }}
                 >
                   Actualizar
@@ -628,6 +634,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
               </Box>
 
               <DocumentTimeline
+                key={`timeline-${localDocument?.id}-${timelineKey}`}
                 documentId={localDocument?.id}
                 showRefresh={true}
                 showLoadMore={true}
