@@ -60,15 +60,7 @@ const DocumentTimeline = ({
     ...options
   });
 
-  // Debug por consola
-  console.log('DocumentTimeline render:', {
-    documentId,
-    historyLength: hookData?.history?.length,
-    firstEvent: hookData?.history?.[0],
-    loading: hookData?.loading,
-    error: hookData?.error,
-    usingRealData: hookData?.usingRealData
-  });
+
 
   // Determinar qué datos usar
   const timelineData = documentId ? hookData : {
@@ -300,7 +292,6 @@ const DocumentTimeline = ({
   /**
    * Loading skeleton
    */
-  console.log('DocumentTimeline check conditions:', { timelineLoading, timelineError, historyCount: timelineHistory?.length });
   if (timelineLoading) {
     return (
       <Box>
@@ -346,9 +337,8 @@ const DocumentTimeline = ({
     );
   }
 
-  console.log('DocumentTimeline RENDERING timeline with', timelineHistory.length, 'events');
   return (
-    <Box sx={{ border: '3px solid red', minHeight: '200px' }}> {/* DEBUG BORDER */}
+    <Box>
       {/* Header del timeline */}
       <Box sx={{ mb: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import documentService from '../services/document-service';
 import notificationsService from '../services/notifications-service';
 
@@ -7,6 +7,10 @@ import notificationsService from '../services/notifications-service';
  * Gestiona la obtención y visualización del timeline de eventos con API real
  */
 const useDocumentHistory = (documentId, options = {}) => {
+  // Usar ref para estabilizar opciones y evitar re-fetches innecesarios
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
+
   const {
     limit = 50,
     eventType = null,
@@ -14,7 +18,11 @@ const useDocumentHistory = (documentId, options = {}) => {
     refreshInterval = 30000, // 30 segundos
     enabled = true,
     fallbackToSimulated = true // Fallback a datos simulados si falla la API
-  } = options;
+  } = optionsRef.current;
+
+  // Ref para prevenir fetches duplicados
+  const fetchInProgressRef = useRef(false);
+  const lastFetchedDocIdRef = useRef(null);
 
   const [state, setState] = useState({
     history: [],
@@ -37,14 +45,28 @@ const useDocumentHistory = (documentId, options = {}) => {
   const fetchHistory = useCallback(async (offset = 0) => {
     if (!documentId || !enabled) return;
 
+    // Prevenir fetches duplicados
+    if (fetchInProgressRef.current && offset === 0) {
+      console.log('useDocumentHistory: Fetch already in progress, skipping duplicate');
+      return;
+    }
+
+    fetchInProgressRef.current = true;
+    lastFetchedDocIdRef.current = documentId;
+
     setState(prev => ({ ...prev, loading: true, error: null }));
 
     try {
+      // Obtener opciones actuales del ref
+      const currentOptions = optionsRef.current;
+      const currentLimit = currentOptions.limit || 50;
+      const currentEventType = currentOptions.eventType || null;
+
       // Intentar obtener historial real de la API
       const params = {
-        limit,
+        limit: currentLimit,
         offset,
-        ...(eventType && { eventType })
+        ...(currentEventType && { eventType: currentEventType })
       };
 
       const response = await documentService.getDocumentHistory(documentId, params);
@@ -79,9 +101,11 @@ const useDocumentHistory = (documentId, options = {}) => {
           usingRealData: true
         }));
 
+        fetchInProgressRef.current = false;
         return;
       } else {
         console.warn('⚠️ API returned success=false for history:', response);
+        fetchInProgressRef.current = false;
         if (fallbackToSimulated) {
           console.log('🔄 Falling back to simulated history due to API failure response');
           await loadSimulatedHistory();
@@ -96,7 +120,7 @@ const useDocumentHistory = (documentId, options = {}) => {
         }
       }
     } catch (err) {
-
+      fetchInProgressRef.current = false;
       // Si falla la API y está habilitado el fallback, usar datos simulados
       if (fallbackToSimulated) {
         await loadSimulatedHistory();
@@ -109,7 +133,7 @@ const useDocumentHistory = (documentId, options = {}) => {
         }));
       }
     }
-  }, [documentId, limit, eventType, enabled, fallbackToSimulated]);
+  }, [documentId, enabled]); // Reducir dependencias para evitar re-creación innecesaria
 
   /**
    * Cargar historial simulado (fallback)
@@ -161,7 +185,7 @@ const useDocumentHistory = (documentId, options = {}) => {
         history: combinedHistory,
         document: { id: documentId }, // Documento simulado básico
         permissions: { canViewAll: true }, // Permisos simulados
-        pagination: { total: combinedHistory.length, limit, offset: 0, hasMore: false },
+        pagination: { total: combinedHistory.length, limit: optionsRef.current.limit || 50, offset: 0, hasMore: false },
         loading: false,
         error: null,
         usingRealData: false
