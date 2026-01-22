@@ -56,6 +56,8 @@ const useDocumentHistory = (documentId, options = {}) => {
 
     setState(prev => ({ ...prev, loading: true, error: null }));
 
+    console.log('[useDocumentHistory] fetchHistory starting for', documentId, { offset, enabled });
+
     try {
       // Obtener opciones actuales del ref
       const currentOptions = optionsRef.current;
@@ -69,7 +71,9 @@ const useDocumentHistory = (documentId, options = {}) => {
         ...(currentEventType && { eventType: currentEventType })
       };
 
+      console.log('useDocumentHistory: fetching', documentId, 'with params', params);
       const response = await documentService.getDocumentHistory(documentId, params);
+      console.log('useDocumentHistory: response for', documentId, response);
 
       if (response.success && response.data) {
         const { document, history, permissions } = response.data;
@@ -430,6 +434,7 @@ const useDocumentHistory = (documentId, options = {}) => {
     error: state.error,
     pagination: state.pagination,
     usingRealData: state.usingRealData,
+    fetchInProgress: fetchInProgressRef.current,
 
     // Funciones de gestión
     fetchHistory,

@@ -60,6 +60,13 @@ const DocumentTimeline = ({
     ...options
   });
 
+  console.log('DocumentTimeline: hookData for', documentId, {
+    historyLength: hookData.history?.length,
+    loading: hookData.loading,
+    error: hookData.error,
+    usingRealData: hookData.usingRealData
+  });
+
 
 
   // Determinar qué datos usar
@@ -79,8 +86,17 @@ const DocumentTimeline = ({
     refresh,
     loadMore,
     stats,
-    usingRealData
+    usingRealData,
+    fetchInProgress
   } = timelineData;
+
+  console.log('[DocumentTimeline] Rendering:', {
+    documentId,
+    historyCount: timelineHistory?.length,
+    loading: timelineLoading,
+    fetchInProgress,
+    error: timelineError
+  });
 
   /**
    * Obtener icono según el tipo de evento
@@ -353,8 +369,8 @@ const DocumentTimeline = ({
         </Box>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
           <Typography variant="body2" color="text.secondary">
-            {timelineHistory.length} eventos mostrados
-            {stats?.totalEvents && stats.totalEvents !== timelineHistory.length &&
+            {timelineHistory?.length || 0} eventos mostrados
+            {stats?.totalEvents && stats.totalEvents !== timelineHistory?.length &&
               ` de ${stats.totalEvents} totales`
             }
           </Typography>
@@ -369,21 +385,21 @@ const DocumentTimeline = ({
         </Box>
       </Box>
 
-      {/* Timeline */}
+      {/* Timeline con scroll habilitado y checks de seguridad */}
       <MuiTimeline sx={{
         p: 0,
         m: 0,
         '& .MuiTimelineItem-root': {
           minHeight: 'auto',
           '&:before': {
-            display: 'none' // Eliminar el espacio vacío a la izquierda
+            display: 'none'
           }
         },
         '& .MuiTimelineContent-root': {
-          pr: 0, // Sin padding derecho extra
+          pr: 0,
         }
       }}>
-        {timelineHistory.map((event, index) => {
+        {Array.isArray(timelineHistory) && timelineHistory.map((event, index) => {
           try {
             return (
               <MuiTimelineItem key={event.id || index}>
