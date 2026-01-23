@@ -955,8 +955,17 @@ export async function verifyEscritura(req, res) {
       tienePDF: !!escritura.pdfFileName
     });
 
-    // TODO: Registrar verificación para analytics
-    // await registrarVerificacion(token, req.ip, req.get('User-Agent'));
+    // Incrementar contador de verificaciones (no esperar)
+    prisma.escrituraQR.update({
+      where: { id: escritura.id },
+      data: {
+        verifyViewCount: {
+          increment: 1
+        }
+      }
+    }).catch(err => {
+      console.warn('[API-QR] Error actualizando contador de verificaciones:', err.message);
+    });
 
     res.json({
       success: true,

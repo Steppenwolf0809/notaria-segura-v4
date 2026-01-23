@@ -189,6 +189,7 @@ model EscrituraQR {
   pdfFileSize           Int?
   pdfViewCount          Int       @default(0)
   pdfHiddenPages        String?
+  verifyViewCount       Int       @default(0)  // Contador de visitas a página de verificación
   creador               User?     @relation(fields: [createdBy], references: [id])
 
   @@index([token])

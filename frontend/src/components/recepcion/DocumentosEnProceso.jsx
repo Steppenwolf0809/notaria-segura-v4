@@ -202,9 +202,24 @@ function DocumentosEnProceso({ onEstadisticasChange }) {
 
 
       if (result?.success) {
+        // Construir mensaje detallado con información de la notificación
+        let mensajeDetallado = result.message;
+        const data = result.data;
+
+        // Mostrar código de retiro y estado de notificación
+        if (data?.codigoRetiro) {
+          mensajeDetallado = `✅ ${mensajeDetallado}`;
+          if (data.notificacionCreada) {
+            mensajeDetallado += ` | 📱 Notificación lista - Código: ${data.codigoRetiro}`;
+          }
+          if (data.agrupadoConExistente && data.cantidadEnLote > 1) {
+            mensajeDetallado += ` (${data.cantidadEnLote} docs agrupados)`;
+          }
+        }
+
         setSnackbar({
           open: true,
-          message: result.message,
+          message: mensajeDetallado,
           severity: 'success'
         });
 
