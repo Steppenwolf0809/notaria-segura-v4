@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     Box,
     Typography,
@@ -12,54 +12,166 @@ import {
     TableContainer,
     TableHead,
     TableRow,
-    Paper,
+    TablePagination,
     CircularProgress,
     Alert,
-    Divider,
-    Chip
+    Chip,
+    TextField,
+    InputAdornment,
+    FormControl,
+    Select,
+    MenuItem,
+    IconButton,
+    Tooltip,
+    Button,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    Divider
 } from '@mui/material';
 import {
     QrCode as QrCodeIcon,
     EmojiEvents as TrophyIcon,
     Timeline as TimelineIcon,
-    History as HistoryIcon
+    History as HistoryIcon,
+    Search as SearchIcon,
+    Visibility as VisibilityIcon,
+    Refresh as RefreshIcon,
+    Close as CloseIcon,
+    FilterList as FilterIcon
 } from '@mui/icons-material';
 import { getSupervisionStats } from '../../services/admin-supervision-service';
 import { getEscrituras } from '../../services/escrituras-qr-service';
 
 const QROversight = () => {
+    // Estados de datos
     const [stats, setStats] = useState(null);
-    const [recentQRs, setRecentQRs] = useState([]);
+    const [escrituras, setEscrituras] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [totalCount, setTotalCount] = useState(0);
 
-    useEffect(() => {
-        loadData();
-    }, []);
+    // Estados de filtros
+    const [search, setSearch] = useState('');
+    const [estadoFilter, setEstadoFilter] = useState('');
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(10);
 
-    const loadData = async () => {
+    // Estado de modal de detalles
+    const [detailsOpen, setDetailsOpen] = useState(false);
+    const [selectedQR, setSelectedQR] = useState(null);
+
+    // Cargar estadísticas
+    const loadStats = useCallback(async () => {
         try {
-            setLoading(true);
-            // Obtener stats del dashboard (que ahora incluye qrStats)
             const dashData = await getSupervisionStats({ limit: 1 });
             setStats(dashData.kpis?.qrStats || { totalMonthly: 0, limit: 50, byMatrixer: [] });
+        } catch (err) {
+            console.error('Error cargando estadísticas de QR:', err);
+        }
+    }, []);
 
-            // Obtener escrituras recientes
-            const qrData = await getEscrituras({ limit: 10 });
-            // La respuesta viene como { success: true, data: { data: [...], meta: ... } }
-            // O a veces directamente data si el servicio lo maneja distinto, pero sendPaginated usa data.data
-            setRecentQRs(qrData.data?.data || qrData.data || []);
+    // Cargar escrituras con filtros
+    const loadEscrituras = useCallback(async () => {
+        try {
+            setLoading(true);
+            const params = {
+                page: page + 1,
+                limit: rowsPerPage,
+            };
 
+            if (search) params.search = search;
+            if (estadoFilter) params.estado = estadoFilter;
+
+            const response = await getEscrituras(params);
+
+            // La respuesta del backend es: { success: true, data: { escrituras: [...], pagination: {...} } }
+            const escriturasData = response.data?.escrituras || response.escrituras || [];
+            const pagination = response.data?.pagination || response.pagination || {};
+
+            setEscrituras(escriturasData);
+            setTotalCount(pagination.total || escriturasData.length);
             setError(null);
         } catch (err) {
-            console.error('Error cargando datos de QR:', err);
-            setError('No se pudieron cargar las estadísticas de QR.');
+            console.error('Error cargando escrituras:', err);
+            setError('No se pudieron cargar las escrituras QR.');
         } finally {
             setLoading(false);
         }
+    }, [page, rowsPerPage, search, estadoFilter]);
+
+    useEffect(() => {
+        loadStats();
+    }, [loadStats]);
+
+    useEffect(() => {
+        loadEscrituras();
+    }, [loadEscrituras]);
+
+    // Handlers
+    const handleChangePage = (event, newPage) => {
+        setPage(newPage);
     };
 
-    if (loading) {
+    const handleChangeRowsPerPage = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
+    };
+
+    const handleSearch = (event) => {
+        setSearch(event.target.value);
+        setPage(0);
+    };
+
+    const handleEstadoFilter = (event) => {
+        setEstadoFilter(event.target.value);
+        setPage(0);
+    };
+
+    const handleViewDetails = (qr) => {
+        setSelectedQR(qr);
+        setDetailsOpen(true);
+    };
+
+    const handleCloseDetails = () => {
+        setDetailsOpen(false);
+        setSelectedQR(null);
+    };
+
+    // Parsear datos completos del QR
+    const parseQRData = (qr) => {
+        try {
+            if (qr.datosCompletos) {
+                return typeof qr.datosCompletos === 'string'
+                    ? JSON.parse(qr.datosCompletos)
+                    : qr.datosCompletos;
+            }
+            return null;
+        } catch {
+            return null;
+        }
+    };
+
+    // Obtener tipo de acto del QR
+    const getTipoActo = (qr) => {
+        const datos = parseQRData(qr);
+        return datos?.acto || datos?.tipoActo || 'N/A';
+    };
+
+    // Obtener otorgantes del QR
+    const getOtorgantes = (qr) => {
+        const datos = parseQRData(qr);
+        if (datos?.otorgantes?.otorgado_por) {
+            const otorgantes = datos.otorgantes.otorgado_por;
+            if (Array.isArray(otorgantes) && otorgantes.length > 0) {
+                return otorgantes.slice(0, 2).map(o => o.nombre || o).join(', ');
+            }
+        }
+        return 'N/A';
+    };
+
+    if (loading && escrituras.length === 0) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
                 <CircularProgress />
@@ -67,7 +179,7 @@ const QROversight = () => {
         );
     }
 
-    if (error) {
+    if (error && escrituras.length === 0) {
         return <Alert severity="error" sx={{ m: 2 }}>{error}</Alert>;
     }
 
@@ -76,9 +188,17 @@ const QROversight = () => {
 
     return (
         <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-                <QrCodeIcon sx={{ mr: 1, fontSize: 32, color: 'primary.main' }} />
-                <Typography variant="h5" fontWeight="bold">Gestión de Códigos QR</Typography>
+            {/* Header */}
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <QrCodeIcon sx={{ mr: 1, fontSize: 32, color: 'primary.main' }} />
+                    <Typography variant="h5" fontWeight="bold">Gestión de Códigos QR</Typography>
+                </Box>
+                <Tooltip title="Actualizar">
+                    <IconButton onClick={() => { loadStats(); loadEscrituras(); }} color="primary">
+                        <RefreshIcon />
+                    </IconButton>
+                </Tooltip>
             </Box>
 
             <Grid container spacing={3}>
@@ -147,31 +267,82 @@ const QROversight = () => {
                     </Card>
                 </Grid>
 
-                {/* Historial Reciente */}
+                {/* Tabla de Escrituras con Filtros */}
                 <Grid item xs={12}>
                     <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 3 }}>
                         <CardContent>
                             <Typography variant="subtitle1" fontWeight="600" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-                                <HistoryIcon sx={{ mr: 1, color: 'info.main' }} /> Escrituras QR Recientes
+                                <HistoryIcon sx={{ mr: 1, color: 'info.main' }} /> Escrituras QR
                             </Typography>
-                            <TableContainer component={Box} sx={{ mt: 2 }}>
+
+                            {/* Filtros */}
+                            <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+                                <TextField
+                                    placeholder="Buscar por token o escritura..."
+                                    value={search}
+                                    onChange={handleSearch}
+                                    size="small"
+                                    sx={{ minWidth: 250 }}
+                                    InputProps={{
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <SearchIcon color="action" />
+                                            </InputAdornment>
+                                        )
+                                    }}
+                                    data-testid="qr-search"
+                                />
+                                <FormControl size="small" sx={{ minWidth: 150 }}>
+                                    <Select
+                                        value={estadoFilter}
+                                        onChange={handleEstadoFilter}
+                                        displayEmpty
+                                        data-testid="filtro-estado-qr"
+                                    >
+                                        <MenuItem value="">Todos los estados</MenuItem>
+                                        <MenuItem value="activo">Activo</MenuItem>
+                                        <MenuItem value="revision_requerida">Revisión Requerida</MenuItem>
+                                        <MenuItem value="inactivo">Inactivo</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            </Box>
+
+                            <TableContainer component={Box}>
                                 <Table size="small">
                                     <TableHead>
                                         <TableRow>
                                             <TableCell>Token</TableCell>
                                             <TableCell>N° Escritura</TableCell>
+                                            <TableCell>Tipo de Acto</TableCell>
                                             <TableCell>Fecha</TableCell>
                                             <TableCell>Matrizador</TableCell>
                                             <TableCell>Estado</TableCell>
-                                            <TableCell align="right">Vistas</TableCell>
+                                            <TableCell align="right">Verificaciones</TableCell>
+                                            <TableCell align="right">Vistas PDF</TableCell>
+                                            <TableCell align="center">Acciones</TableCell>
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
-                                        {recentQRs.length > 0 ? (
-                                            recentQRs.map((qr) => (
+                                        {loading ? (
+                                            <TableRow>
+                                                <TableCell colSpan={9} align="center">
+                                                    <CircularProgress size={24} />
+                                                </TableCell>
+                                            </TableRow>
+                                        ) : escrituras.length > 0 ? (
+                                            escrituras.map((qr) => (
                                                 <TableRow key={qr.id} hover>
-                                                    <TableCell sx={{ fontFamily: 'monospace', fontWeight: 'bold' }}>{qr.token}</TableCell>
+                                                    <TableCell sx={{ fontFamily: 'monospace', fontWeight: 'bold' }}>
+                                                        {qr.token}
+                                                    </TableCell>
                                                     <TableCell>{qr.numeroEscritura || 'N/A'}</TableCell>
+                                                    <TableCell>
+                                                        <Chip
+                                                            label={getTipoActo(qr)}
+                                                            size="small"
+                                                            variant="outlined"
+                                                        />
+                                                    </TableCell>
                                                     <TableCell>{new Date(qr.createdAt).toLocaleDateString()}</TableCell>
                                                     <TableCell>
                                                         {qr.creador ? `${qr.creador.firstName} ${qr.creador.lastName}` : 'N/A'}
@@ -180,25 +351,180 @@ const QROversight = () => {
                                                         <Chip
                                                             label={qr.estado?.toUpperCase()}
                                                             size="small"
-                                                            color={qr.estado === 'activo' ? 'success' : 'default'}
+                                                            color={qr.estado === 'activo' ? 'success' : qr.estado === 'revision_requerida' ? 'warning' : 'default'}
                                                             variant="outlined"
+                                                            data-testid="qr-estado"
                                                         />
                                                     </TableCell>
+                                                    <TableCell align="right">{qr.verifyViewCount || 0}</TableCell>
                                                     <TableCell align="right">{qr.pdfViewCount || 0}</TableCell>
+                                                    <TableCell align="center">
+                                                        <Tooltip title="Ver Detalles">
+                                                            <IconButton
+                                                                size="small"
+                                                                onClick={() => handleViewDetails(qr)}
+                                                                data-testid="btn-ver-qr"
+                                                            >
+                                                                <VisibilityIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    </TableCell>
                                                 </TableRow>
                                             ))
                                         ) : (
                                             <TableRow>
-                                                <TableCell colSpan={6} align="center">No hay registros recientes.</TableCell>
+                                                <TableCell colSpan={9} align="center">No hay registros.</TableCell>
                                             </TableRow>
                                         )}
                                     </TableBody>
                                 </Table>
                             </TableContainer>
+
+                            {/* Paginación */}
+                            <TablePagination
+                                component="div"
+                                count={totalCount}
+                                page={page}
+                                onPageChange={handleChangePage}
+                                rowsPerPage={rowsPerPage}
+                                onRowsPerPageChange={handleChangeRowsPerPage}
+                                labelRowsPerPage="Filas por página:"
+                                labelDisplayedRows={({ from, to, count }) =>
+                                    `${from}-${to} de ${count !== -1 ? count : `más de ${to}`}`
+                                }
+                            />
                         </CardContent>
                     </Card>
                 </Grid>
             </Grid>
+
+            {/* Modal de Detalles del QR */}
+            <Dialog
+                open={detailsOpen}
+                onClose={handleCloseDetails}
+                maxWidth="md"
+                fullWidth
+                data-testid="modal-detalles-qr"
+            >
+                <DialogTitle>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                            <QrCodeIcon sx={{ mr: 1, color: 'primary.main' }} />
+                            <Typography variant="h6">
+                                Detalles de Escritura QR
+                            </Typography>
+                        </Box>
+                        <IconButton onClick={handleCloseDetails} size="small">
+                            <CloseIcon />
+                        </IconButton>
+                    </Box>
+                </DialogTitle>
+                <DialogContent dividers>
+                    {selectedQR && (() => {
+                        const datosCompletos = parseQRData(selectedQR);
+                        return (
+                            <Grid container spacing={2}>
+                                {/* Información Básica */}
+                                <Grid item xs={12} sm={6}>
+                                    <Typography variant="overline" color="textSecondary">Token</Typography>
+                                    <Typography variant="body1" fontWeight="bold" sx={{ fontFamily: 'monospace' }} data-testid="qr-token">
+                                        {selectedQR.token}
+                                    </Typography>
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <Typography variant="overline" color="textSecondary">N° Escritura</Typography>
+                                    <Typography variant="body1" fontWeight="bold" data-testid="qr-escritura">
+                                        {selectedQR.numeroEscritura || 'N/A'}
+                                    </Typography>
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <Typography variant="overline" color="textSecondary">Estado</Typography>
+                                    <Box>
+                                        <Chip
+                                            label={selectedQR.estado?.toUpperCase()}
+                                            size="small"
+                                            color={selectedQR.estado === 'activo' ? 'success' : 'default'}
+                                        />
+                                    </Box>
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <Typography variant="overline" color="textSecondary">Vistas del PDF</Typography>
+                                    <Typography variant="body1">{selectedQR.pdfViewCount || 0}</Typography>
+                                </Grid>
+
+                                <Grid item xs={12}><Divider sx={{ my: 1 }} /></Grid>
+
+                                {/* Datos del documento */}
+                                {datosCompletos && (
+                                    <>
+                                        <Grid item xs={12} sm={6}>
+                                            <Typography variant="overline" color="textSecondary">Tipo de Acto</Typography>
+                                            <Typography variant="body1">{datosCompletos.acto || 'N/A'}</Typography>
+                                        </Grid>
+                                        <Grid item xs={12} sm={6}>
+                                            <Typography variant="overline" color="textSecondary">Fecha Otorgamiento</Typography>
+                                            <Typography variant="body1">{datosCompletos.fecha_otorgamiento || 'N/A'}</Typography>
+                                        </Grid>
+                                        {datosCompletos.notario && (
+                                            <Grid item xs={12}>
+                                                <Typography variant="overline" color="textSecondary">Notario</Typography>
+                                                <Typography variant="body1">{datosCompletos.notario}</Typography>
+                                            </Grid>
+                                        )}
+                                        {datosCompletos.otorgantes?.otorgado_por && (
+                                            <Grid item xs={12}>
+                                                <Typography variant="overline" color="textSecondary">Otorgantes</Typography>
+                                                <Box sx={{ mt: 0.5 }}>
+                                                    {datosCompletos.otorgantes.otorgado_por.map((o, i) => (
+                                                        <Chip key={i} label={o.nombre || o} size="small" sx={{ mr: 0.5, mb: 0.5 }} />
+                                                    ))}
+                                                </Box>
+                                            </Grid>
+                                        )}
+                                        {datosCompletos.otorgantes?.a_favor_de && (
+                                            <Grid item xs={12}>
+                                                <Typography variant="overline" color="textSecondary">A Favor De</Typography>
+                                                <Box sx={{ mt: 0.5 }}>
+                                                    {datosCompletos.otorgantes.a_favor_de.map((o, i) => (
+                                                        <Chip key={i} label={o.nombre || o} size="small" variant="outlined" sx={{ mr: 0.5, mb: 0.5 }} />
+                                                    ))}
+                                                </Box>
+                                            </Grid>
+                                        )}
+                                        {datosCompletos.cuantia && (
+                                            <Grid item xs={12} sm={6}>
+                                                <Typography variant="overline" color="textSecondary">Cuantía</Typography>
+                                                <Typography variant="body1">{datosCompletos.cuantia}</Typography>
+                                            </Grid>
+                                        )}
+                                    </>
+                                )}
+
+                                <Grid item xs={12}><Divider sx={{ my: 1 }} /></Grid>
+
+                                {/* Metadatos */}
+                                <Grid item xs={12} sm={6}>
+                                    <Typography variant="overline" color="textSecondary">Creado Por</Typography>
+                                    <Typography variant="body1">
+                                        {selectedQR.creador ? `${selectedQR.creador.firstName} ${selectedQR.creador.lastName}` : 'N/A'}
+                                    </Typography>
+                                </Grid>
+                                <Grid item xs={12} sm={6}>
+                                    <Typography variant="overline" color="textSecondary">Fecha Creación</Typography>
+                                    <Typography variant="body1">
+                                        {new Date(selectedQR.createdAt).toLocaleString()}
+                                    </Typography>
+                                </Grid>
+                            </Grid>
+                        );
+                    })()}
+                </DialogContent>
+                <DialogActions sx={{ px: 3, py: 2 }}>
+                    <Button onClick={handleCloseDetails} variant="outlined" startIcon={<CloseIcon />}>
+                        Cerrar
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };

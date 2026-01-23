@@ -11,7 +11,11 @@ import {
     TextField,
     IconButton,
     Tooltip,
-    CircularProgress
+    CircularProgress,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions
 } from '@mui/material';
 import {
     WhatsApp as WhatsAppIcon,
@@ -23,7 +27,8 @@ import {
     Edit as EditIcon,
     Save as SaveIcon,
     Close as CloseIcon,
-    Error as ErrorIcon
+    Error as ErrorIcon,
+    NotificationsOff as NotificationsOffIcon
 } from '@mui/icons-material';
 import { validatePhoneForWhatsApp } from '../../utils/whatsappUtils';
 import { toast } from 'react-toastify';
@@ -44,11 +49,13 @@ const daysSince = (date) => {
  * Card que muestra un cliente con sus documentos agrupados
  * para notificación WhatsApp
  */
-const ClientNotificationCard = ({ group, onNotify, isReminder = false, onPhoneUpdated }) => {
+const ClientNotificationCard = ({ group, onNotify, isReminder = false, onPhoneUpdated, onDismiss }) => {
     const { cliente, documentos, stats } = group;
     const [editingPhone, setEditingPhone] = useState(false);
     const [phoneValue, setPhoneValue] = useState(cliente?.telefono || '');
     const [saving, setSaving] = useState(false);
+    const [dismissing, setDismissing] = useState(false);
+    const [showDismissDialog, setShowDismissDialog] = useState(false);
 
     // Validar teléfono actual
     const phoneValidation = validatePhoneForWhatsApp(cliente?.telefono);
@@ -99,6 +106,40 @@ const ClientNotificationCard = ({ group, onNotify, isReminder = false, onPhoneUp
     const handleCancelEdit = () => {
         setPhoneValue(cliente?.telefono || '');
         setEditingPhone(false);
+    };
+
+    // Manejar ignorar notificación
+    const handleDismissClick = () => {
+        setShowDismissDialog(true);
+    };
+
+    const handleDismissConfirm = async () => {
+        setShowDismissDialog(false);
+        setDismissing(true);
+        try {
+            const docIds = documentos.map(d => d.id);
+            const result = await notificationService.dismissNotifications({
+                documentIds: docIds,
+                reason: 'Ignorado manualmente desde Centro de Notificaciones'
+            });
+
+            if (result.success) {
+                toast.success(`Notificación ignorada para ${cliente?.nombre}`);
+                // Notificar al padre para refrescar
+                if (onDismiss) {
+                    onDismiss(cliente.identificacion);
+                } else if (onPhoneUpdated) {
+                    onPhoneUpdated(); // Fallback para refrescar
+                }
+            } else {
+                toast.error(result.message || 'Error al ignorar notificación');
+            }
+        } catch (error) {
+            console.error('Error ignorando notificación:', error);
+            toast.error('Error al ignorar la notificación');
+        } finally {
+            setDismissing(false);
+        }
     };
 
     return (
@@ -265,7 +306,32 @@ const ClientNotificationCard = ({ group, onNotify, isReminder = false, onPhoneUp
                 )}
 
                 {/* Actions */}
-                <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 1 }}>
+                    {/* Botón Ignorar - solo en tab pending (no es reminder) */}
+                    {!isReminder && (
+                        <Tooltip title="Ignorar esta notificación (el documento permanece LISTO)">
+                            <Button
+                                variant="outlined"
+                                color="inherit"
+                                onClick={handleDismissClick}
+                                disabled={dismissing}
+                                startIcon={dismissing ? <CircularProgress size={16} /> : <NotificationsOffIcon />}
+                                size="small"
+                                sx={{
+                                    minWidth: 100,
+                                    color: 'text.secondary',
+                                    borderColor: 'divider',
+                                    '&:hover': {
+                                        borderColor: 'error.main',
+                                        color: 'error.main'
+                                    }
+                                }}
+                            >
+                                Ignorar
+                            </Button>
+                        </Tooltip>
+                    )}
+
                     <Button
                         variant="contained"
                         color={canNotify ? (isReminder ? 'warning' : 'success') : 'inherit'}
@@ -280,6 +346,40 @@ const ClientNotificationCard = ({ group, onNotify, isReminder = false, onPhoneUp
                     </Button>
                 </Box>
             </CardContent>
+
+            {/* Diálogo de confirmación compacto para Ignorar */}
+            <Dialog
+                open={showDismissDialog}
+                onClose={() => setShowDismissDialog(false)}
+                maxWidth="xs"
+                PaperProps={{ sx: { borderRadius: 2 } }}
+            >
+                <DialogTitle sx={{ pb: 1, fontSize: '1rem' }}>
+                    ¿Ignorar notificación?
+                </DialogTitle>
+                <DialogContent sx={{ py: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                        El documento permanecerá en estado LISTO pero no aparecerá en la cola de notificaciones.
+                    </Typography>
+                </DialogContent>
+                <DialogActions sx={{ px: 2, pb: 2 }}>
+                    <Button
+                        size="small"
+                        onClick={() => setShowDismissDialog(false)}
+                    >
+                        Cancelar
+                    </Button>
+                    <Button
+                        size="small"
+                        variant="contained"
+                        color="error"
+                        onClick={handleDismissConfirm}
+                        startIcon={<NotificationsOffIcon />}
+                    >
+                        Ignorar
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Card>
     );
 };

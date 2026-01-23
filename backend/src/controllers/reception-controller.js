@@ -720,22 +720,69 @@ async function marcarComoListo(req, res) {
       return res.status(400).json({ success: false, message: `El documento no está en proceso. Estado actual: ${document.status}` });
     }
 
-    // Generar código de retiro para documento individual
-    logger.debug('Generando código de retiro para documento individual');
-    const nuevoCodigo = await CodigoRetiroService.generarUnico();
+    // 🔄 NUEVA LÓGICA: Verificar si el cliente tiene notificación pendiente para agrupar
+    let codigoRetiro = null;
+    let notificacionExistente = null;
+    let documentosAgrupados = [];
+
+    if (document.clientPhone && document.clientPhone.trim()) {
+      const phoneNormalized = document.clientPhone.trim();
+
+      // Buscar notificación pendiente del mismo cliente (no enviada aún)
+      // Una notificación está "pendiente de envío" si tiene status PENDING o PREPARED pero no ha sido enviada por WhatsApp
+      notificacionExistente = await prisma.whatsAppNotification.findFirst({
+        where: {
+          clientPhone: phoneNormalized,
+          messageType: 'DOCUMENTO_LISTO',
+          status: { in: ['PENDING', 'PREPARED'] },
+          // Solo considerar notificaciones recientes (últimas 24 horas) para evitar agrupar con muy antiguas
+          createdAt: {
+            gte: new Date(Date.now() - 24 * 60 * 60 * 1000)
+          }
+        },
+        include: {
+          document: true
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      if (notificacionExistente && notificacionExistente.document?.codigoRetiro) {
+        // Usar el mismo código de retiro de la notificación existente
+        codigoRetiro = notificacionExistente.document.codigoRetiro;
+        logger.info(`📦 Agrupando documento ${document.protocolNumber} con notificación existente. Código: ${codigoRetiro}`);
+
+        // Buscar todos los documentos del mismo cliente con el mismo código
+        documentosAgrupados = await prisma.document.findMany({
+          where: {
+            codigoRetiro: codigoRetiro,
+            status: 'LISTO'
+          },
+          select: { id: true, protocolNumber: true, documentType: true }
+        });
+      }
+    }
+
+    // Si no hay notificación existente, generar nuevo código
+    if (!codigoRetiro) {
+      logger.debug('Generando código de retiro para documento individual');
+      codigoRetiro = await CodigoRetiroService.generarUnico();
+    }
 
     let updatedDocuments = [];
     let updatedDocument;
+    let notificacionCreada = null;
 
     // Usar transacción para evitar condiciones de carrera
-    updatedDocument = await prisma.$transaction(async (tx) => {
+    const transactionResult = await prisma.$transaction(async (tx) => {
       const currentDoc = await tx.document.findUnique({ where: { id } });
 
       if (!currentDoc || currentDoc.status !== 'EN_PROCESO') {
         throw new Error(`El documento ya no está en proceso. Estado actual: ${currentDoc?.status || 'NO_ENCONTRADO'}`);
       }
 
-      // Registro de evento
+      const now = new Date();
+
+      // Registro de evento de cambio de estado
       await tx.documentEvent.create({
         data: {
           documentId: id,
@@ -745,31 +792,106 @@ async function marcarComoListo(req, res) {
           details: JSON.stringify({
             previousStatus: 'EN_PROCESO',
             newStatus: 'LISTO',
-            codigoRetiro: nuevoCodigo,
-            timestamp: new Date().toISOString()
+            codigoRetiro: codigoRetiro,
+            agrupadoConExistente: !!notificacionExistente,
+            timestamp: now.toISOString()
           })
         }
       });
 
-      return await tx.document.update({
+      // Actualizar documento con código de retiro y estado LISTO
+      const docActualizado = await tx.document.update({
         where: { id },
-        data: { status: 'LISTO', codigoRetiro: nuevoCodigo, updatedAt: new Date() },
+        data: {
+          status: 'LISTO',
+          codigoRetiro: codigoRetiro,
+          fechaListo: now,
+          updatedAt: now
+        },
         include: {
           assignedTo: {
             select: { id: true, firstName: true, lastName: true, email: true }
           }
         }
       });
+
+      // 📱 CREAR NOTIFICACIÓN AUTOMÁTICAMENTE
+      // Solo si el cliente tiene teléfono
+      let notificacion = null;
+      if (document.clientPhone && document.clientPhone.trim()) {
+        const cantidadDocumentos = documentosAgrupados.length + 1;
+
+        notificacion = await tx.whatsAppNotification.create({
+          data: {
+            documentId: id,
+            clientName: document.clientName,
+            clientPhone: document.clientPhone.trim(),
+            messageType: 'DOCUMENTO_LISTO',
+            messageBody: `Código de retiro: ${codigoRetiro}. Documentos en lote: ${cantidadDocumentos}`,
+            status: 'PENDING', // Pendiente hasta que se envíe por WhatsApp
+            sentAt: null
+          }
+        });
+
+        // Registrar evento de notificación preparada
+        await tx.documentEvent.create({
+          data: {
+            documentId: id,
+            userId: req.user.id,
+            eventType: 'WHATSAPP_NOTIFICATION',
+            description: notificacionExistente
+              ? `Documento agregado a notificación existente. Código: ${codigoRetiro}`
+              : `Notificación WhatsApp preparada automáticamente. Código: ${codigoRetiro}`,
+            details: JSON.stringify({
+              codigoRetiro,
+              clientPhone: document.clientPhone.trim(),
+              documentosEnLote: cantidadDocumentos,
+              agrupadoConExistente: !!notificacionExistente,
+              notificacionId: notificacion.id,
+              timestamp: now.toISOString()
+            })
+          }
+        });
+
+        logger.info(`📱 Notificación creada para documento ${docActualizado.protocolNumber}. Código: ${codigoRetiro}${notificacionExistente ? ' (agrupado)' : ''}`);
+      } else {
+        // Sin teléfono: registrar evento de código interno
+        await tx.documentEvent.create({
+          data: {
+            documentId: id,
+            userId: req.user.id,
+            eventType: 'CODIGO_GENERADO',
+            description: `Código interno generado (cliente sin teléfono): ${codigoRetiro}`,
+            details: JSON.stringify({
+              codigoRetiro,
+              sinTelefono: true,
+              timestamp: now.toISOString()
+            })
+          }
+        });
+        logger.info(`📋 Código interno generado para documento ${docActualizado.protocolNumber} (sin teléfono). Código: ${codigoRetiro}`);
+      }
+
+      return { docActualizado, notificacion };
     });
 
+    updatedDocument = transactionResult.docActualizado;
+    notificacionCreada = transactionResult.notificacion;
     updatedDocuments = [updatedDocument];
     logger.debug('Documento actualizado exitosamente');
 
     // Variables para la respuesta
     const mainDocument = updatedDocument;
-    const groupAffected = false;
-    const responseMessage = `Documento ${mainDocument.protocolNumber} marcado como listo exitosamente`;
+    const groupAffected = !!notificacionExistente;
+    const cantidadEnLote = documentosAgrupados.length + 1;
 
+    let responseMessage = `Documento ${mainDocument.protocolNumber} marcado como listo exitosamente`;
+    if (notificacionExistente) {
+      responseMessage += `. Agrupado con ${documentosAgrupados.length} documento(s) del mismo cliente`;
+    }
+    if (notificacionCreada) {
+      responseMessage += `. Notificación preparada - Código: ${codigoRetiro}`;
+    }
 
     logger.debug('Proceso completado exitosamente');
 
@@ -788,7 +910,16 @@ async function marcarComoListo(req, res) {
         documents: updatedDocuments,
         codigoRetiro: mainDocument.codigoRetiro,
         groupAffected: groupAffected,
-        documentsUpdated: updatedDocuments.length
+        documentsUpdated: updatedDocuments.length,
+        // Nuevos campos para el frontend
+        notificacionCreada: !!notificacionCreada,
+        agrupadoConExistente: !!notificacionExistente,
+        cantidadEnLote: cantidadEnLote,
+        documentosAgrupados: documentosAgrupados.map(d => ({
+          id: d.id,
+          protocolNumber: d.protocolNumber,
+          documentType: d.documentType
+        }))
       }
     });
   } catch (error) {

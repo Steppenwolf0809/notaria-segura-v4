@@ -83,8 +83,7 @@ apiClient.interceptors.request.use(
           const csrfToken = await csrfService.getToken();
           config.headers = config.headers || {};
           config.headers['x-csrf-token'] = csrfToken;
-          // eslint-disable-next-line no-console
-          console.debug('[CSRF] Token agregado a request', { url: config.url, method });
+          // Token CSRF agregado silenciosamente
         }
       } catch (error) {
         // eslint-disable-next-line no-console
@@ -92,9 +91,7 @@ apiClient.interceptors.request.use(
       }
     }
 
-    // Log no intrusivo
-    // eslint-disable-next-line no-console
-    console.debug('[HTTP][REQ]', { url: config.url, hasAuth: !!tokenToUse, method });
+    // Log removido por limpieza de consola
     return config;
   },
   (error) => Promise.reject(error)
@@ -114,8 +111,7 @@ apiClient.interceptors.response.use(
       try {
         // Sanitizar todo el objeto de respuesta
         response.data = sanitizeObject(response.data);
-        // eslint-disable-next-line no-console
-        console.debug('[XSS] Respuesta sanitizada', { url: response.config.url });
+        // Sanitización completada silenciosamente
       } catch (error) {
         // eslint-disable-next-line no-console
         // Continuar sin sanitización si falla (mejor que bloquear la app)

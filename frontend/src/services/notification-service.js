@@ -57,6 +57,40 @@ const notificationService = {
                 message: error.response?.data?.message || 'Error al actualizar teléfono'
             };
         }
+    },
+
+    /**
+     * Ignorar/Descartar notificaciones pendientes
+     * @param {Object} data - { documentIds: string[], reason?: string }
+     */
+    async dismissNotifications(data) {
+        try {
+            const response = await apiClient.put('/notifications/dismiss', data);
+            return response.data;
+        } catch (error) {
+            console.error('Error dismissing notifications:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Error al ignorar notificaciones'
+            };
+        }
+    },
+
+    /**
+     * Marcar notificaciones como enviadas (después de abrir WhatsApp)
+     * @param {Object} data - { documentIds: string[] }
+     */
+    async markAsSent(data) {
+        try {
+            const response = await apiClient.put('/notifications/mark-sent', data);
+            return response.data;
+        } catch (error) {
+            console.error('Error marking notifications as sent:', error);
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Error al marcar como enviadas'
+            };
+        }
     }
 };
 

@@ -23,7 +23,12 @@ import {
   TableRow,
   Avatar,
   Button,
-  Menu
+  Menu,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Divider
 } from '@mui/material';
 import {
   Person as PersonIcon,
@@ -36,7 +41,8 @@ import {
   Error as ErrorIcon,
   Refresh as RefreshIcon,
   Visibility as VisibilityIcon,
-  CheckCircle as CheckCircleIcon
+  CheckCircle as CheckCircleIcon,
+  Close as CloseIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import AdminLayout from './AdminLayout';
@@ -53,6 +59,7 @@ import AnalisisUAFE from './admin/AnalisisUAFE';
 import QROversight from './admin/QROversight';
 import EncuestasSatisfaccion from './admin/EncuestasSatisfaccion';
 import { getSupervisionStats, getMatrizadores } from '../services/admin-supervision-service';
+import DocumentTimeline from './Documents/DocumentTimeline';
 // Billing module components
 import ImportarDatos from './billing/ImportarDatos';
 import ListaFacturas from './billing/ListaFacturas';
@@ -145,6 +152,21 @@ const AdminDashboard = () => {
   // Menu para filtro de facturación
   const [billingAnchorEl, setBillingAnchorEl] = useState(null);
   const [performanceAnchorEl, setPerformanceAnchorEl] = useState(null);
+
+  // Modal de detalles de documento
+  const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [selectedDocument, setSelectedDocument] = useState(null);
+
+  // Handler para ver detalles
+  const handleViewDetails = (document) => {
+    setSelectedDocument(document);
+    setDetailsModalOpen(true);
+  };
+
+  const handleCloseDetails = () => {
+    setDetailsModalOpen(false);
+    setSelectedDocument(null);
+  };
 
   useEffect(() => {
     loadMatrizadores();
@@ -466,7 +488,13 @@ const AdminDashboard = () => {
                       </TableCell>
                       <TableCell>
                         <Tooltip title="Ver Detalles">
-                          <IconButton size="small"><VisibilityIcon fontSize="small" /></IconButton>
+                          <IconButton
+                            size="small"
+                            onClick={() => handleViewDetails(row)}
+                            data-testid="btn-ver-detalles"
+                          >
+                            <VisibilityIcon fontSize="small" />
+                          </IconButton>
                         </Tooltip>
                       </TableCell>
                     </TableRow>
@@ -560,6 +588,110 @@ const AdminDashboard = () => {
           </TableContainer>
         </CardContent>
       </Card>
+
+      {/* Modal de Detalles de Documento */}
+      <Dialog
+        open={detailsModalOpen}
+        onClose={handleCloseDetails}
+        maxWidth="md"
+        fullWidth
+        data-testid="modal-detalles"
+      >
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <DescriptionIcon sx={{ mr: 1, color: 'primary.main' }} />
+              <Typography variant="h6">
+                Detalles del Documento
+              </Typography>
+            </Box>
+            <IconButton onClick={handleCloseDetails} size="small">
+              <CloseIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
+          {selectedDocument && (
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="overline" color="textSecondary">Número de Protocolo</Typography>
+                <Typography variant="body1" fontWeight="bold" data-testid="detalle-numero">
+                  {selectedDocument.protocol || 'S/N'}
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="overline" color="textSecondary">Estado Actual</Typography>
+                <Box>
+                  <Chip
+                    label={selectedDocument.status}
+                    size="small"
+                    color={selectedDocument.status === 'LISTO' ? 'success' : selectedDocument.status === 'EN_PROCESO' ? 'info' : 'default'}
+                  />
+                </Box>
+              </Grid>
+              <Grid item xs={12}>
+                <Divider sx={{ my: 1 }} />
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="overline" color="textSecondary">Cliente</Typography>
+                <Typography variant="body1">{selectedDocument.client || 'N/A'}</Typography>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="overline" color="textSecondary">Tipo de Acto</Typography>
+                <Typography variant="body1">{selectedDocument.type || 'N/A'}</Typography>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="overline" color="textSecondary">Matrizador Asignado</Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', mt: 0.5 }}>
+                  <Avatar sx={{ width: 24, height: 24, mr: 1, fontSize: 12 }}>
+                    {selectedDocument.matrixer?.charAt(0) || '?'}
+                  </Avatar>
+                  <Typography variant="body1">{selectedDocument.matrixer || 'Sin asignar'}</Typography>
+                </Box>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="overline" color="textSecondary">Antigüedad</Typography>
+                <Typography variant="body1" color={selectedDocument.daysDelayed > 15 ? 'error.main' : 'textPrimary'}>
+                  {selectedDocument.daysDelayed} días
+                </Typography>
+              </Grid>
+              {selectedDocument.id && (
+                <Grid item xs={12}>
+                  <Divider sx={{ my: 1 }} />
+                  <Typography variant="overline" color="textSecondary">ID del Documento</Typography>
+                  <Typography variant="body2" sx={{ fontFamily: 'monospace', color: 'text.secondary' }}>
+                    {selectedDocument.id}
+                  </Typography>
+                </Grid>
+              )}
+
+              {/* Timeline del documento */}
+              {selectedDocument.id && (
+                <Grid item xs={12}>
+                  <Divider sx={{ my: 2 }} />
+                  <Box sx={{ maxHeight: 400, overflow: 'auto' }}>
+                    <DocumentTimeline
+                      documentId={selectedDocument.id}
+                      showRefresh={true}
+                      showLoadMore={true}
+                      autoRefresh={false}
+                      options={{
+                        limit: 20,
+                        fallbackToSimulated: false
+                      }}
+                    />
+                  </Box>
+                </Grid>
+              )}
+            </Grid>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={handleCloseDetails} variant="outlined" startIcon={<CloseIcon />}>
+            Cerrar
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

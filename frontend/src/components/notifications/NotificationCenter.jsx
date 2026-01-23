@@ -246,11 +246,12 @@ const NotificationCenter = () => {
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     {groupedClients.map((group, index) => (
                         <ClientNotificationCard
-                            key={group.cliente.identificacion || index}
+                            key={group.cliente.identificacion || `group-${index}`}
                             group={group}
                             onNotify={handleNotify}
                             isReminder={activeTab === 1 || activeTab === 2}
                             onPhoneUpdated={() => loadQueue()}
+                            onDismiss={() => loadQueue()}
                         />
                     ))}
                 </Box>
