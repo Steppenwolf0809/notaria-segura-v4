@@ -4,7 +4,8 @@ import MatrizadorLayout from './MatrizadorLayout';
 import MatrizadorDashboard from './MatrizadorDashboard';
 import GeneradorQR from './matrizador/GeneradorQR';
 import GestionDocumentos from './GestionDocumentos';
-import NotificationCenter from './notifications/NotificationCenter';
+
+import MisMensajes from './MisMensajes';
 import FormulariosUAFE from './FormulariosUAFE';
 import CarteraCobros from './billing/CarteraCobros';
 import useDocumentStore from '../store/document-store';
@@ -19,10 +20,7 @@ const MatrizadorCenter = () => {
   const [currentView, setCurrentView] = useState('documents'); // Iniciar en documentos por defecto
   const [documentoEspecifico, setDocumentoEspecifico] = useState(null);
   const {
-    documents,
-    loading,
     error,
-    fetchMyDocuments,
     clearError
   } = useDocumentStore();
 
@@ -39,8 +37,21 @@ const MatrizadorCenter = () => {
 
   /**
    * Manejar cambios de vista
+   * @param {string} view - Nombre de la vista
+   * @param {Object} params - Parámetros opcionales (ej: documento específico)
    */
-  const handleViewChange = (view) => {
+  const handleViewChange = (view, params = null) => {
+    console.log('Changing view to:', view, params);
+
+    // Si hay params con información de documento, prepararlo para navegación
+    if (params && params.id) {
+      setDocumentoEspecifico({
+        id: params.id,
+        protocolNumber: params.protocolNumber,
+        autoSearch: params.autoSearch || false
+      });
+    }
+
     setCurrentView(view);
     clearError(); // Limpiar errores al cambiar vista
   };
@@ -68,6 +79,20 @@ const MatrizadorCenter = () => {
   };
 
   /**
+   * Función para navegar a un documento desde mensajes internos
+   */
+  const handleNavigateToDocumentFromMessage = (documento) => {
+    if (documento && documento.id) {
+      setDocumentoEspecifico({
+        id: documento.id,
+        protocolNumber: documento.protocolNumber,
+        autoSearch: true
+      });
+      setCurrentView('documents');
+    }
+  };
+
+  /**
    * Renderizar contenido según la vista actual
    */
   const renderContent = () => {
@@ -84,8 +109,12 @@ const MatrizadorCenter = () => {
         );
 
       case 'history':
-      case 'notifications':
-        return <NotificationCenter />;
+        // History podría ser otra vista, lo mantenemos por ahora
+        return <MisMensajes onNavigateToDocument={handleNavigateToDocumentFromMessage} />;
+
+      case 'notificaciones':
+      case 'mensajes':
+        return <MisMensajes onNavigateToDocument={handleNavigateToDocumentFromMessage} />;
 
       case 'formularios-uafe':
         return <FormulariosUAFE />;
@@ -113,7 +142,7 @@ const MatrizadorCenter = () => {
           onClose={clearError}
           sx={{ mb: 3 }}
         >
-          {error}
+          {error.toString()}
         </Alert>
       )}
 

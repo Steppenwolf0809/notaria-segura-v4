@@ -32,6 +32,9 @@ import ThemeToggle from './ThemeToggle';
 import useThemeStore from '../store/theme-store';
 import ChangePassword from './ChangePassword';
 import { navItemsByRole } from '../config/nav-items';
+import NotificacionesDropdown from './notifications/NotificacionesDropdown';
+import mensajesInternosService from '../services/mensajes-internos-service';
+import { Badge } from '@mui/material';
 
 // Ancho del sidebar
 const DRAWER_WIDTH = 240;
@@ -61,6 +64,23 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
   const { isDarkMode } = useThemeStore();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Polling de mensajes no leídos
+  useEffect(() => {
+    const fetchUnread = async () => {
+      try {
+        const res = await mensajesInternosService.contarNoLeidos();
+        if (res.success) setUnreadCount(res.data.count);
+      } catch (e) {
+        // Silencioso
+      }
+    };
+
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Trazas de verificación del layout
   useEffect(() => {
@@ -96,7 +116,11 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
   const iconMap = {
     Dashboard: <DashboardIcon />,
     FolderSpecial: <ArchiveIcon />,
-    WhatsApp: <WhatsAppIcon />,
+    WhatsApp: (
+      <Badge badgeContent={unreadCount} color="error" invisible={unreadCount === 0}>
+        <WhatsAppIcon />
+      </Badge>
+    ),
     Visibility: <SupervisionIcon />
   };
   const navigationItems = useMemo(() => {
@@ -122,17 +146,17 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
    * MODO OSCURO: Adaptación automática como MatrizadorLayout
    */
   const drawer = (
-    <Box sx={{ 
-      height: '100%', 
-      display: 'flex', 
+    <Box sx={{
+      height: '100%',
+      display: 'flex',
       flexDirection: 'column',
       backgroundColor: !isDarkMode ? '#1A5799' : undefined,
       color: !isDarkMode ? '#ffffff' : undefined,
       transition: 'all 0.3s ease',
     }}>
       {/* Header del Sidebar */}
-      <Box sx={{ 
-        p: 2, 
+      <Box sx={{
+        p: 2,
         bgcolor: !isDarkMode ? '#1A5799' : 'primary.main',
         color: 'white',
         minHeight: '64px',
@@ -144,10 +168,11 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
       }}>
         {!sidebarCollapsed ? (
           <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
-            <Avatar sx={{ 
-              bgcolor: 'white', 
-              color: 'primary.main', 
-              mr: 1, 
+            <NotificacionesDropdown onNavigate={(view, params) => onViewChange(view, params)} />
+            <Avatar sx={{
+              bgcolor: 'white',
+              color: 'primary.main',
+              mr: 1,
               fontSize: '1rem',
               width: 36,
               height: 36
@@ -183,9 +208,9 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
           </IconButton>
         </Tooltip>
       </Box>
-      
+
       <Divider sx={{ borderColor: !isDarkMode ? 'rgba(255, 255, 255, 0.2)' : undefined }} />
-      
+
       {/* Navegación Principal */}
       <Box sx={{ flex: 1, overflow: 'auto' }}>
         <List sx={{ px: 1, py: 2 }}>
@@ -197,14 +222,14 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
                   borderRadius: 1,
                   py: 1.5, // Botones más altos
                   px: sidebarCollapsed ? 1.5 : 2,
-                  bgcolor: item.active 
+                  bgcolor: item.active
                     ? (!isDarkMode ? '#468BE6' : 'primary.main')
                     : 'transparent',
-                  color: item.active 
-                    ? 'white' 
+                  color: item.active
+                    ? 'white'
                     : (!isDarkMode ? '#ffffff' : 'text.primary'),
                   '&:hover': {
-                    bgcolor: item.active 
+                    bgcolor: item.active
                       ? (!isDarkMode ? '#1A5799' : 'primary.dark')
                       : (!isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'action.hover')
                   },
@@ -212,9 +237,9 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
                   transition: 'all 0.2s ease',
                 }}
               >
-                <ListItemIcon sx={{ 
-                  color: item.active 
-                    ? 'white' 
+                <ListItemIcon sx={{
+                  color: item.active
+                    ? 'white'
                     : (!isDarkMode ? '#93BFEF' : 'primary.main'),
                   minWidth: sidebarCollapsed ? 'unset' : 40,
                   justifyContent: 'center'
@@ -222,13 +247,13 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
                   {item.icon}
                 </ListItemIcon>
                 {!sidebarCollapsed && (
-                  <ListItemText 
+                  <ListItemText
                     primary={item.text}
                     primaryTypographyProps={{
                       variant: 'body2',
                       fontWeight: item.active ? 'bold' : 'medium',
-                      color: item.active 
-                        ? 'white' 
+                      color: item.active
+                        ? 'white'
                         : (!isDarkMode ? '#ffffff' : 'inherit')
                     }}
                   />
@@ -240,7 +265,7 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
       </Box>
 
       <Divider sx={{ borderColor: !isDarkMode ? 'rgba(255, 255, 255, 0.2)' : undefined }} />
-      
+
       {/* Usuario y Logout */}
       <Box sx={{ p: 2 }}>
         {/* Usuario Info en el sidebar */}
@@ -258,9 +283,9 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
             {getUserInitials()}
           </Avatar>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography 
-              variant="body2" 
-              sx={{ 
+            <Typography
+              variant="body2"
+              sx={{
                 fontWeight: 600,
                 color: !isDarkMode ? '#ffffff' : 'text.primary',
                 lineHeight: 1.2
@@ -268,9 +293,9 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
             >
               {getFullName()}
             </Typography>
-            <Typography 
-              variant="caption" 
-              sx={{ 
+            <Typography
+              variant="caption"
+              sx={{
                 color: !isDarkMode ? '#B8D4F0' : 'text.secondary',
                 lineHeight: 1
               }}
@@ -298,13 +323,13 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
               }
             }}
           >
-            <ListItemIcon sx={{ 
+            <ListItemIcon sx={{
               color: !isDarkMode ? '#93BFEF' : 'text.secondary',
-              minWidth: 36 
+              minWidth: 36
             }}>
               <SettingsIcon fontSize="small" />
             </ListItemIcon>
-            <ListItemText 
+            <ListItemText
               primary="Configuración"
               primaryTypographyProps={{
                 variant: 'body2',
@@ -324,13 +349,13 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
               }
             }}
           >
-            <ListItemIcon sx={{ 
+            <ListItemIcon sx={{
               color: !isDarkMode ? '#93BFEF' : 'text.secondary',
-              minWidth: 36 
+              minWidth: 36
             }}>
               <LogoutIcon fontSize="small" />
             </ListItemIcon>
-            <ListItemText 
+            <ListItemText
               primary="Salir"
               primaryTypographyProps={{
                 variant: 'body2',
@@ -363,7 +388,7 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
           >
             <MenuIcon />
           </IconButton>
-          
+
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             Archivo - Notaría Segura
           </Typography>
@@ -375,8 +400,8 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
       {/* Sidebar - Desktop */}
       <Box
         component="nav"
-        sx={{ 
-          width: { md: sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH }, 
+        sx={{
+          width: { md: sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH },
           flexShrink: { md: 0 },
           transition: 'width 0.3s ease'
         }}
@@ -389,8 +414,8 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
           ModalProps={{ keepMounted: true }}
           sx={{
             display: { xs: 'block', md: 'none' },
-            '& .MuiDrawer-paper': { 
-              boxSizing: 'border-box', 
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
               width: DRAWER_WIDTH,
               border: 'none'
             },
@@ -404,8 +429,8 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
           variant="permanent"
           sx={{
             display: { xs: 'none', md: 'block' },
-            '& .MuiDrawer-paper': { 
-              boxSizing: 'border-box', 
+            '& .MuiDrawer-paper': {
+              boxSizing: 'border-box',
               width: sidebarCollapsed ? COLLAPSED_DRAWER_WIDTH : DRAWER_WIDTH,
               border: 'none',
               borderRight: '1px solid',
@@ -431,16 +456,16 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
         }}
       >
         {/* Espaciado para App Bar móvil */}
-        <Toolbar 
-          sx={{ 
+        <Toolbar
+          sx={{
             display: { md: 'none' }
-          }} 
+          }}
         />
-        
+
         {/* Área de contenido con scroll */}
-        <Container 
+        <Container
           maxWidth={false}
-          sx={{ 
+          sx={{
             flex: 1,
             py: 3,
             px: 3,
@@ -453,7 +478,7 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
       </Box>
 
       {/* Modal de cambio de contraseña */}
-      <ChangePassword 
+      <ChangePassword
         open={showChangePassword}
         onClose={() => setShowChangePassword(false)}
       />

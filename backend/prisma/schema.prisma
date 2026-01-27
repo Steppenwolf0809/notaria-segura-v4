@@ -28,6 +28,8 @@ model User {
   formularioUAFEAsignaciones FormularioUAFEAsignacion[]
   protocolosUAFE             ProtocoloUAFE[]
   importLogs                 ImportLog[]
+  mensajesEnviados           MensajeInterno[]           @relation("MensajesEnviados")
+  mensajesRecibidos          MensajeInterno[]           @relation("MensajesRecibidos")
 
   @@map("users")
 }
@@ -84,6 +86,7 @@ model Document {
   usuarioEntrega           User?                  @relation("DeliveredDocuments", fields: [usuarioEntregaId], references: [id])
   notifications            WhatsAppNotification[]
   invoices                  Invoice[]
+  mensajesInternos          MensajeInterno[]
 
   @@index([status])
   @@index([createdAt])
@@ -525,6 +528,50 @@ model EncuestaSatisfaccion {
   @@index([createdAt])
   @@index([calificacion])
   @@map("encuestas_satisfaccion")
+}
+
+// ========================================
+// SISTEMA DE MENSAJES INTERNOS
+// ========================================
+
+model MensajeInterno {
+  id              Int       @id @default(autoincrement())
+  
+  // Relaciones
+  remitenteId     Int
+  remitente       User      @relation("MensajesEnviados", fields: [remitenteId], references: [id])
+  
+  destinatarioId  Int
+  destinatario    User      @relation("MensajesRecibidos", fields: [destinatarioId], references: [id])
+  
+  // Contexto del mensaje
+  documentoId     String?
+  documento       Document? @relation(fields: [documentoId], references: [id])
+  
+  facturaId       Int?      // Para mensajes de cobro (futuro)
+  
+  // Contenido
+  tipo            String    // "SOLICITUD_ACTUALIZACION", "PRIORIZAR", "CLIENTE_ESPERANDO", "COBRO", "OTRO"
+  urgencia        String    @default("NORMAL") // "NORMAL", "URGENTE", "CRITICO"
+  mensaje         String?   // Mensaje personalizado opcional
+  
+  // Estado
+  leido           Boolean   @default(false)
+  leidoAt         DateTime?
+
+  // Resolución - cuando el matrizador completa la acción solicitada
+  resuelto        Boolean   @default(false)
+  resueltoAt      DateTime?
+  notaResolucion  String?   // Nota opcional de qué se hizo
+
+  // Timestamps
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("mensajes_internos")
+  @@index([destinatarioId, leido])
+  @@index([documentoId])
+  @@index([createdAt])
 }
 
 enum UserRole {

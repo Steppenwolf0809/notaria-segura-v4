@@ -56,14 +56,19 @@ import {
   Group as GroupIcon,
   Clear as ClearIcon,
   Delete as DeleteIcon,
-  Sort as SortIcon
+  Sort as SortIcon,
+  Chat as ChatIcon,
+  Send as SendIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { useDebounce } from '../../hooks/useDebounce';
 import useAuthStore from '../../store/auth-store';
 import adminService from '../../services/admin-service';
+import { getMatrizadores } from '../../services/admin-supervision-service';
 import DocumentStatusTimeline from './DocumentStatusTimeline';
 import BulkOperationsDialog from './BulkOperationsDialog';
+import EnviarMensajeModal from './EnviarMensajeModal';
+import EnviarMensajeMasivoModal from './EnviarMensajeMasivoModal';
 
 /**
  * Componente de supervisión integral de documentos para administradores
@@ -83,7 +88,7 @@ const DocumentOversight = () => {
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [totalCount, setTotalCount] = useState(0);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('EN_PROCESO');
   const [typeFilter, setTypeFilter] = useState('');
   const [matrizadorFilter, setMatrizadorFilter] = useState('');
   const [overdueOnly, setOverdueOnly] = useState(false);
@@ -106,6 +111,11 @@ const DocumentOversight = () => {
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Estados para mensajes internos
+  const [mensajeModalOpen, setMensajeModalOpen] = useState(false);
+  const [mensajeMasivoModalOpen, setMensajeMasivoModalOpen] = useState(false);
+  const [documentoParaMensaje, setDocumentoParaMensaje] = useState(null);
+
   // Debounce para búsqueda
   const debouncedSearch = useDebounce(search, 500);
 
@@ -114,6 +124,17 @@ const DocumentOversight = () => {
     PENDIENTE: 2,    // Pendiente más de 2 días
     EN_PROCESO: 5,   // En proceso más de 5 días
     LISTO: 7         // Listo más de 7 días sin entregar
+  };
+
+  // Mapeo de tipos de acto a badges de letra compactos
+  const actoBadges = {
+    'PROTOCOLO': { label: 'P', color: '#1976d2' },      // Azul
+    'CERTIFICACION': { label: 'C', color: '#2e7d32' },  // Verde
+    'ARRENDAMIENTO': { label: 'A', color: '#7b1fa2' },  // Morado
+    'DECLARACION': { label: 'D', color: '#ed6c02' },    // Naranja
+    'RECONOCIMIENTO': { label: 'R', color: '#757575' }, // Gris
+    'DILIGENCIA': { label: 'Di', color: '#0288d1' },    // Azul claro
+    'OTROS': { label: 'O', color: '#616161' }           // Gris oscuro
   };
 
   /**
@@ -168,29 +189,16 @@ const DocumentOversight = () => {
 
   /**
    * Cargar lista de matrizadores para filtro
+   * Usa el servicio centralizado que obtiene tanto MATRIZADOR como ARCHIVO
    */
   const loadMatrizadores = useCallback(async () => {
     try {
-      const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
-      // Fetch all users to ensure we capture everyone who might have a document assigned (including admins acting as matrixers)
-      const response = await fetch(`${API_BASE_URL}/admin/users?limit=200`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          // Filter to show only Matrizadores and Archivo as per user request
-          const filtered = data.data.filter(u => ['MATRIZADOR', 'ARCHIVO'].includes(u.role));
-          setMatrizadores(filtered);
-        }
-      }
+      const users = await getMatrizadores();
+      setMatrizadores(users);
     } catch (error) {
+      console.error('Error cargando matrizadores:', error);
     }
-  }, [token]);
+  }, []);
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -312,6 +320,28 @@ const DocumentOversight = () => {
   const showDocumentTimeline = (document) => {
     setSelectedDocumentForTimeline(document);
     setShowTimeline(true);
+  };
+
+  /**
+   * Abrir modal de mensaje individual
+   */
+  const openMensajeModal = (document) => {
+    setDocumentoParaMensaje(document);
+    setMensajeModalOpen(true);
+  };
+
+  /**
+   * Abrir modal de mensaje masivo
+   */
+  const openMensajeMasivoModal = () => {
+    setMensajeMasivoModalOpen(true);
+  };
+
+  /**
+   * Obtener documentos seleccionados (objetos completos)
+   */
+  const getSelectedDocumentos = () => {
+    return documents.filter(doc => selectedDocuments.includes(doc.id));
   };
 
   /**
@@ -708,9 +738,18 @@ const DocumentOversight = () => {
               <Box sx={{ display: 'flex', gap: 1 }}>
                 <Button
                   size="small"
+                  variant="contained"
+                  color="primary"
+                  startIcon={<SendIcon />}
+                  onClick={openMensajeMasivoModal}
+                >
+                  Mensaje Masivo
+                </Button>
+                <Button
+                  size="small"
                   onClick={() => setShowBulkOperations(true)}
                 >
-                  Acciones en Lote
+                  Otras Acciones
                 </Button>
                 <Button
                   size="small"
@@ -718,7 +757,7 @@ const DocumentOversight = () => {
                   startIcon={<DeleteIcon />}
                   onClick={openBulkDeleteDialog}
                 >
-                  Eliminar Seleccionados
+                  Eliminar
                 </Button>
               </Box>
             }
@@ -827,11 +866,25 @@ const DocumentOversight = () => {
                         </Box>
                       </TableCell>
                       <TableCell>
-                        <Chip
-                          label={document.documentType}
-                          size="small"
-                          variant="outlined"
-                        />
+                        <Tooltip title={document.documentType}>
+                          <Box
+                            sx={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              width: 28,
+                              height: 28,
+                              borderRadius: '4px',
+                              backgroundColor: actoBadges[document.documentType]?.color || '#9e9e9e',
+                              color: 'white',
+                              fontWeight: 'bold',
+                              fontSize: '0.75rem',
+                              cursor: 'default'
+                            }}
+                          >
+                            {actoBadges[document.documentType]?.label || '?'}
+                          </Box>
+                        </Tooltip>
                       </TableCell>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -889,6 +942,18 @@ const DocumentOversight = () => {
                       </TableCell>
                       <TableCell align="center">
                         <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                          <Tooltip title="Enviar mensaje al matrizador">
+                            <span>
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={() => openMensajeModal(document)}
+                                disabled={!document.assignedTo}
+                              >
+                                <ChatIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
                           <Tooltip title="Ver timeline">
                             <IconButton
                               size="small"
@@ -1047,6 +1112,29 @@ const DocumentOversight = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Modal de mensaje individual */}
+      <EnviarMensajeModal
+        open={mensajeModalOpen}
+        onClose={() => {
+          setMensajeModalOpen(false);
+          setDocumentoParaMensaje(null);
+        }}
+        documento={documentoParaMensaje}
+        onSuccess={() => {
+          // Opcional: recargar documentos o mostrar feedback adicional
+        }}
+      />
+
+      {/* Modal de mensaje masivo */}
+      <EnviarMensajeMasivoModal
+        open={mensajeMasivoModalOpen}
+        onClose={() => setMensajeMasivoModalOpen(false)}
+        documentos={getSelectedDocumentos()}
+        onSuccess={() => {
+          setSelectedDocuments([]);
+        }}
+      />
     </Box >
   );
 };

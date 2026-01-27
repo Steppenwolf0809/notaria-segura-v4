@@ -46,20 +46,29 @@ export const getSupervisionStats = async (filters = {}) => {
 };
 
 /**
- * Obtener lista de matrizadores para el filtro
+ * Obtener lista de matrizadores y archivadores para el filtro
+ * Incluye usuarios con rol MATRIZADOR y ARCHIVO
  */
 export const getMatrizadores = async () => {
     try {
         const token = localStorage.getItem('token');
-        const response = await axios.get(`${API_URL}/admin/users?role=MATRIZADOR`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
-        if (response.data.success) {
-            return response.data.data;
-        }
-        return [];
+        // Obtener tanto MATRIZADOR como ARCHIVO
+        const [matRes, archRes] = await Promise.all([
+            axios.get(`${API_URL}/admin/users?role=MATRIZADOR`, {
+                headers: { Authorization: `Bearer ${token}` }
+            }),
+            axios.get(`${API_URL}/admin/users?role=ARCHIVO`, {
+                headers: { Authorization: `Bearer ${token}` }
+            })
+        ]);
+
+        const matrizadores = matRes.data.success ? matRes.data.data : [];
+        const archivadores = archRes.data.success ? archRes.data.data : [];
+
+        // Combinar ambas listas
+        return [...matrizadores, ...archivadores];
     } catch (error) {
-        console.error('Error fetching matrizadores:', error);
+        console.error('Error fetching matrizadores/archivadores:', error);
         return [];
     }
 }

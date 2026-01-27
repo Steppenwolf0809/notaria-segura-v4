@@ -26,7 +26,7 @@ export const navItemsByRole = {
   MATRIZADOR: [
     { id: 'dashboard', label: 'Dashboard', view: 'dashboard', icon: 'Dashboard' },
     { id: 'documents', label: 'Documentos', view: 'documents', icon: 'Assignment' },
-    { id: 'notifications', label: 'Notificaciones', view: 'notifications', icon: 'WhatsApp' },
+    { id: 'notificaciones', label: 'Mis Mensajes', view: 'notificaciones', icon: 'Message' },
     { id: 'cartera-cobros', label: 'Cartera de Cobros', view: 'cartera-cobros', icon: 'AccountBalance' },
     { id: 'formularios-uafe', label: 'Formularios UAFE', view: 'formularios-uafe', icon: 'Description' },
     { id: 'generador-qr', label: 'Generador QR', view: 'generador-qr', icon: 'QrCode' }
@@ -35,6 +35,7 @@ export const navItemsByRole = {
     { id: 'dashboard', label: 'Panel de Control', view: 'dashboard', icon: 'Dashboard' },
     { id: 'users', label: 'Gestión de Usuarios', view: 'users', icon: 'Person' },
     { id: 'documents', label: 'Supervisión Documentos', view: 'documents', icon: 'Description' },
+    { id: 'seguimiento-mensajes', label: 'Seguimiento Mensajes', view: 'seguimiento-mensajes', icon: 'Send' },
     { id: 'qr-management', label: 'Gestor QR', view: 'qr-management', icon: 'QrCode' },
     { id: 'formularios-uafe', label: 'Gestión Formularios UAFE', view: 'formularios-uafe', icon: 'Description' },
     { id: 'analisis-uafe', label: 'Análisis UAFE', view: 'analisis-uafe', icon: 'Analytics' },

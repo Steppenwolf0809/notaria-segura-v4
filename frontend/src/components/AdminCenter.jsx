@@ -41,8 +41,13 @@ import {
   Error as ErrorIcon,
   Refresh as RefreshIcon,
   Visibility as VisibilityIcon,
+
   CheckCircle as CheckCircleIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  Chat as ChatIcon,
+  Pending as PendingIcon,
+  PlayArrow as InProgressIcon,
+  LocalShipping as DeliveredIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import AdminLayout from './AdminLayout';
@@ -60,6 +65,8 @@ import QROversight from './admin/QROversight';
 import EncuestasSatisfaccion from './admin/EncuestasSatisfaccion';
 import { getSupervisionStats, getMatrizadores } from '../services/admin-supervision-service';
 import DocumentTimeline from './Documents/DocumentTimeline';
+import EnviarMensajeModal from './admin/EnviarMensajeModal';
+import SeguimientoMensajes from './admin/SeguimientoMensajes';
 // Billing module components
 import ImportarDatos from './billing/ImportarDatos';
 import ListaFacturas from './billing/ListaFacturas';
@@ -101,6 +108,8 @@ const AdminCenter = () => {
         return <EncuestasSatisfaccion />;
       case 'settings':
         return <AdminSettings />;
+      case 'seguimiento-mensajes':
+        return <SeguimientoMensajes />;
       // === BILLING MODULE ROUTES ===
       case 'importar-datos':
         return <ImportarDatos />;
@@ -136,12 +145,34 @@ const AdminDashboard = () => {
   // Filtros
   const [thresholdDays, setThresholdDays] = useState(15);
   const [selectedMatrixer, setSelectedMatrixer] = useState('');
-  const [statusFilter, setStatusFilter] = useState(''); // Filtro de estado
+  const [statusFilter, setStatusFilter] = useState('EN_PROCESO'); // Filtro de estado por defecto EN_PROCESO
   const [billedTimeRange, setBilledTimeRange] = useState('current_month'); // Filtro Facturación
   // const [startDate, setStartDate] = useState(''); // Filtro fecha inicio (Removido por solicitud)
   // const [endDate, setEndDate] = useState(''); // Filtro fecha fin
   const [performanceTimeRange, setPerformanceTimeRange] = useState('current_month');
+
   const [matrizadores, setMatrizadores] = useState([]);
+
+  // Mapeo de tipos de acto a badges de letra compactos
+  const actoBadges = {
+    'PROTOCOLO': { label: 'P', color: '#1976d2' },      // Azul
+    'CERTIFICACION': { label: 'C', color: '#2e7d32' },  // Verde
+    'ARRENDAMIENTO': { label: 'A', color: '#7b1fa2' },  // Morado
+    'DECLARACION': { label: 'D', color: '#ed6c02' },    // Naranja
+    'RECONOCIMIENTO': { label: 'R', color: '#757575' }, // Gris
+    'DILIGENCIA': { label: 'Di', color: '#0288d1' },    // Azul claro
+    'OTROS': { label: 'O', color: '#616161' }           // Gris oscuro
+  };
+
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'PENDIENTE': return <PendingIcon fontSize="small" />;
+      case 'EN_PROCESO': return <InProgressIcon fontSize="small" />;
+      case 'LISTO': return <CheckCircleIcon fontSize="small" />;
+      case 'ENTREGADO': return <DeliveredIcon fontSize="small" />;
+      default: return <PendingIcon fontSize="small" />;
+    }
+  };
 
   // Paginación
   const [page, setPage] = useState(1);
@@ -152,6 +183,34 @@ const AdminDashboard = () => {
   // Menu para filtro de facturación
   const [billingAnchorEl, setBillingAnchorEl] = useState(null);
   const [performanceAnchorEl, setPerformanceAnchorEl] = useState(null);
+
+  // Modal de mensaje
+  const [mensajeModalOpen, setMensajeModalOpen] = useState(false);
+  const [documentoParaMensaje, setDocumentoParaMensaje] = useState(null);
+
+  const handleOpenMensajeModal = (doc) => {
+    // Necesitamos pasar un objeto compatible con lo que espera el modal (assignedTo es crucial)
+    const docAdaptado = {
+      ...doc,
+      id: doc.id,
+      protocolNumber: doc.protocol,
+      clientName: doc.client,
+      // Si el objeto row ya trae AssignedTo completo genial, si no, intentamos adaptarlo
+      // En getSupervisionStats el backend suele devolver matrixer como nombre string.
+      // El modal espera assignedTo: { id, firstName, lastName }
+      // Revisando el servicio, parece que row.matrixer es un string.
+      // OJO: Si row.matrixer es solo string, el modal fallará al intentar leer assignedTo.id
+      // En DocumentOversight funciona porque recibe el objeto completo de /admin/documents/oversight
+      // Aquí estamos recibiendo DTOs de estadísticas simplificados.
+      // SOLUCIÓN: Usaremos assignedTo si existe en row, o reconstruiremos un objeto básico si tenemos ID.
+      // Revisando getSupervisionStats en backend, devuelve: 
+      // id, protocol, client, type, status, daysDelayed, matrixer (nombre), matrixerId (id)
+      assignedTo: doc.matrixerId ? { id: doc.matrixerId, firstName: doc.matrixer, lastName: '' } : null
+    };
+
+    setDocumentoParaMensaje(docAdaptado);
+    setMensajeModalOpen(true);
+  };
 
   // Modal de detalles de documento
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
@@ -460,22 +519,47 @@ const AdminDashboard = () => {
 
                   return (
                     <TableRow key={row.id} hover>
-                      <TableCell sx={{ fontWeight: 'bold' }}>{row.protocol || 'S/N'}</TableCell>
-                      <TableCell>{row.client}</TableCell>
+                      <TableCell sx={{
+                        fontWeight: 'bold',
+                        color: isCritical ? 'error.main' : 'inherit'
+                      }}>
+                        {isCritical && <PriorityIcon sx={{ fontSize: 14, mr: 0.5, verticalAlign: 'middle' }} />}
+                        {row.protocol || 'S/N'}
+                      </TableCell>
+                      <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <Tooltip title={row.client}>
+                          <span>{row.client}</span>
+                        </Tooltip>
+                      </TableCell>
                       <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                          <Avatar sx={{ width: 24, height: 24, mr: 1, fontSize: 12 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Avatar sx={{ width: 24, height: 24, fontSize: 12, bgcolor: 'primary.main' }}>
                             {row.matrixer?.charAt(0) || '?'}
                           </Avatar>
-                          {row.matrixer}
+                          <Typography variant="caption" noWrap sx={{ maxWidth: 120 }}>
+                            {row.matrixer || 'Sin asignar'}
+                          </Typography>
                         </Box>
                       </TableCell>
-                      <TableCell><Chip label={row.type} size="small" variant="outlined" /></TableCell>
+                      <TableCell align="center">
+                        {(() => {
+                          const badge = actoBadges[row.type] || actoBadges['OTROS'];
+                          return (
+                            <Tooltip title={row.type}>
+                              <Avatar sx={{ bgcolor: badge.color, width: 24, height: 24, fontSize: 12, margin: '0 auto' }}>
+                                {badge.label}
+                              </Avatar>
+                            </Tooltip>
+                          );
+                        })()}
+                      </TableCell>
                       <TableCell>
                         <Chip
+                          icon={getStatusIcon(row.status)}
                           label={row.status}
                           size="small"
                           color={row.status === 'LISTO' ? 'success' : row.status === 'EN_PROCESO' ? 'info' : 'default'}
+                          sx={{ '& .MuiChip-label': { fontSize: '0.75rem' }, height: 24 }}
                         />
                       </TableCell>
                       <TableCell>
@@ -484,6 +568,7 @@ const AdminDashboard = () => {
                           color={(days > 15 && !['ENTREGADO'].includes(row.status)) ? "error" : "default"}
                           size="small"
                           variant="outlined"
+                          sx={{ height: 24 }}
                         />
                       </TableCell>
                       <TableCell>
@@ -494,6 +579,23 @@ const AdminDashboard = () => {
                             data-testid="btn-ver-detalles"
                           >
                             <VisibilityIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Enviar Mensaje Interno">
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() => {
+                              // Intentar encontrar ID si falta
+                              if (!row.matrixerId && row.matrixer) {
+                                const mat = matrizadores.find(m => `${m.firstName} ${m.lastName}` === row.matrixer || m.firstName === row.matrixer);
+                                if (mat) row.matrixerId = mat.id;
+                              }
+                              handleOpenMensajeModal(row);
+                            }}
+                            disabled={!row.matrixerId && !matrizadores.some(m => `${m.firstName} ${m.lastName}` === row.matrixer || m.firstName === row.matrixer)}
+                          >
+                            <ChatIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
                       </TableCell>
@@ -692,6 +794,15 @@ const AdminDashboard = () => {
           </Button>
         </DialogActions>
       </Dialog>
+      <EnviarMensajeModal
+        open={mensajeModalOpen}
+        onClose={() => setMensajeModalOpen(false)}
+        documento={documentoParaMensaje}
+        onSuccess={() => {
+          // Opcional: recargar estadísticas si queremos ver cambios inmediatos
+          loadStats(page, false);
+        }}
+      />
     </Box>
   );
 };
