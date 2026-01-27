@@ -10,7 +10,8 @@ import {
   Tooltip,
   Divider,
   IconButton,
-  Collapse
+  Collapse,
+  Badge
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -31,10 +32,13 @@ import {
   Receipt as ReceiptIcon,
   Payments as PaymentsIcon,
   ExpandMore as ExpandMoreIcon,
-  ExpandLess as ExpandLessIcon
+  ExpandLess as ExpandLessIcon,
+  Message as MessageIcon,
+  Send as SendIcon
 } from '@mui/icons-material';
 import useAuth from '../../hooks/use-auth';
 import { navItemsByRole } from '../../config/nav-items';
+import mensajesInternosService from '../../services/mensajes-internos-service';
 
 // Resolución de iconos por nombre declarativo (configurable desde nav-items)
 const iconMap = {
@@ -52,7 +56,9 @@ const iconMap = {
   Visibility: <VisibilityIcon />,
   AccountBalance: <AccountBalanceIcon />,
   Receipt: <ReceiptIcon />,
-  Payments: <PaymentsIcon />
+  Payments: <PaymentsIcon />,
+  Message: <MessageIcon />,
+  Send: <SendIcon />
 };
 
 const DRAWER_WIDTH = 240;
@@ -112,6 +118,26 @@ const Sidebar = ({
     if (!submenu || !currentActive) return false;
     return submenu.some(item => item.id === currentActive || item.view === currentActive);
   };
+
+  // Estado para contador de mensajes
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const fetchUnread = async () => {
+      try {
+        const res = await mensajesInternosService.contarNoLeidos();
+        if (res.success) setUnreadCount(res.data.count);
+      } catch (e) {
+        // Silencioso
+      }
+    };
+
+    if (role === 'MATRIZADOR' || role === 'RECEPCION' || role === 'ARCHIVO') {
+      fetchUnread();
+      const interval = setInterval(fetchUnread, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [role]);
 
   const DrawerContent = (
     <Box
@@ -197,7 +223,14 @@ const Sidebar = ({
                           justifyContent: 'center'
                         }}
                       >
-                        {iconMap[item.icon] || <DashboardIcon />}
+                        <Badge
+                          badgeContent={item.id === 'notificaciones' ? unreadCount : 0}
+                          color="error"
+                          invisible={item.id !== 'notificaciones' || unreadCount === 0}
+                          sx={{ '& .MuiBadge-badge': { right: -3, top: 3 } }}
+                        >
+                          {iconMap[item.icon] || <DashboardIcon />}
+                        </Badge>
                       </ListItemIcon>
                       {!collapsed && (
                         <>
