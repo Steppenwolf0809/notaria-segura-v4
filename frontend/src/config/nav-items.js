@@ -58,7 +58,7 @@ export const navItemsByRole = {
   ARCHIVO: [
     { id: 'dashboard', label: 'Dashboard', view: 'dashboard', icon: 'Dashboard' },
     { id: 'documentos', label: 'Mis Documentos', view: 'documentos', icon: 'FolderSpecial' },
-    { id: 'notificaciones', label: 'Notificaciones', view: 'notificaciones', icon: 'WhatsApp' },
+    { id: 'mensajes', label: 'Mis Mensajes', view: 'notificaciones', icon: 'Message' },
     { id: 'supervision', label: 'Supervisión General', view: 'supervision', icon: 'Visibility' }
   ]
 };
