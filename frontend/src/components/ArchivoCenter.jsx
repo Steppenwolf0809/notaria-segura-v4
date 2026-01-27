@@ -4,7 +4,8 @@ import ArchivoLayout from './ArchivoLayout';
 import ArchivoDashboard from './ArchivoDashboard';
 import GestionArchivo from './GestionArchivo';
 import SupervisionGeneral from './archivo/SupervisionGeneral';
-import NotificationCenter from './notifications/NotificationCenter';
+
+import MisMensajes from './MisMensajes';
 import archivoService from '../services/archivo-service';
 import useAuth from '../hooks/use-auth';
 
@@ -46,7 +47,7 @@ const ArchivoCenter = () => {
       } else {
         setError(response.message || 'Error cargando dashboard');
       }
-    } catch (error) {
+    } catch (err) {
       setError('Error de conexión');
     } finally {
       setLoading(false);
@@ -55,8 +56,12 @@ const ArchivoCenter = () => {
 
   /**
    * Manejar cambios de vista
+   * @param {string} view - Nombre de la vista
+   * @param {Object} params - Parámetros opcionales (ej: documento específico)
    */
-  const handleViewChange = (view) => {
+  const handleViewChange = (view, params = null) => {
+    console.log('ArchivoCenter: Changing view to:', view, params);
+    // Los params se pueden usar en el futuro para navegación con contexto
     setCurrentView(view);
     setError(null); // Limpiar errores al cambiar vista
   };
@@ -74,6 +79,19 @@ const ArchivoCenter = () => {
   const handleDataUpdate = () => {
     if (currentView === 'documentos' || currentView === 'dashboard') {
       cargarDashboard();
+    }
+  };
+
+  /**
+   * Función para navegar a un documento desde mensajes internos
+   * Nota: Archivo no tiene la misma estructura de navegación que Matrizador
+   * Por ahora mostramos un toast y cambiamos a documentos
+   */
+  const handleNavigateToDocumentFromMessage = (documento) => {
+    if (documento && documento.protocolNumber) {
+      // En Archivo, la navegación es diferente - mostramos mensaje y cambiamos vista
+      setCurrentView('documentos');
+      // El usuario puede buscar manualmente por número de protocolo
     }
   };
 
@@ -101,7 +119,8 @@ const ArchivoCenter = () => {
         );
 
       case 'notificaciones':
-        return <NotificationCenter />;
+      case 'mensajes':
+        return <MisMensajes onNavigateToDocument={handleNavigateToDocumentFromMessage} />;
 
       case 'supervision':
         return (

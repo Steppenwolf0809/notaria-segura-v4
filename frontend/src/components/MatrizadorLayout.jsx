@@ -34,13 +34,17 @@ import {
   QrCode as QrCodeIcon,
   Description as DescriptionIcon,
   WhatsApp as WhatsAppIcon,
-  AccountBalance as AccountBalanceIcon
+  AccountBalance as AccountBalanceIcon,
+  Message as MessageIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import useThemeStore from '../store/theme-store';
 import ChangePassword from './ChangePassword';
 import { navItemsByRole } from '../config/nav-items';
 import ThemeToggle from './ThemeToggle';
+import NotificacionesDropdown from './notifications/NotificacionesDropdown';
+import mensajesInternosService from '../services/mensajes-internos-service';
+import { Badge } from '@mui/material';
 
 // Anchos del sidebar
 const DRAWER_WIDTH = 240;
@@ -58,6 +62,23 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
   const [userMenuAnchor, setUserMenuAnchor] = useState(null);
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
   const { isDarkMode } = useThemeStore();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Polling de mensajes no leídos
+  useEffect(() => {
+    const fetchUnread = async () => {
+      try {
+        const res = await mensajesInternosService.contarNoLeidos();
+        if (res.success) setUnreadCount(res.data.count);
+      } catch (e) {
+        // Silencioso
+      }
+    };
+
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Trazas de verificación del layout
   useEffect(() => {
@@ -108,11 +129,16 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
     Description: <DescriptionIcon />,
     Article: <ArticleIcon />,
     QrCode: <QrCodeIcon />,
-    WhatsApp: <WhatsAppIcon />,
-    AccountBalance: <AccountBalanceIcon />
+    WhatsApp: (
+      <Badge badgeContent={unreadCount} color="error" invisible={unreadCount === 0}>
+        <WhatsAppIcon />
+      </Badge>
+    ),
+    AccountBalance: <AccountBalanceIcon />,
+    Message: <MessageIcon />
   };
   const navigationItems = useMemo(() => {
-    const allowed = ['dashboard', 'documents', 'notifications', 'cartera-cobros', 'history', 'formularios-uafe', 'generador-qr'];
+    const allowed = ['dashboard', 'documents', 'notificaciones', 'cartera-cobros', 'history', 'formularios-uafe', 'generador-qr'];
     const source = (navItemsByRole[role] || []).filter(i => allowed.includes(i.id));
     return source.map(i => ({
       text: i.label,
@@ -382,8 +408,10 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
             Centro de Control - Matrizador
           </Typography>
 
-          {/* Controles de usuario en header */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            {/* Notificaciones */}
+            <NotificacionesDropdown onNavigate={(view, params) => onViewChange(view, params)} />
+
             {/* Toggle de modo oscuro (usa ThemeCtx) */}
             <ThemeToggle />
 

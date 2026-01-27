@@ -42,7 +42,8 @@ import {
   CloudUpload as CloudUploadIcon,
   Receipt as ReceiptIcon,
   Payments as PaymentsIcon,
-  Assessment as AssessmentIcon
+  Assessment as AssessmentIcon,
+  Send as SendIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import { useThemeCtx } from '../contexts/theme-ctx';
@@ -158,7 +159,8 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
     WhatsApp: <WhatsAppIcon />,
     Analytics: <AnalyticsIcon />,
     Poll: <PollIcon />,
-    QrCode: <QrCodeIcon />
+    QrCode: <QrCodeIcon />,
+    Send: <SendIcon />
   };
   const allItems = (navItemsByRole[role] || []);
   const navigationItems = React.useMemo(() => {
@@ -271,7 +273,7 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
           {[
             {
               title: 'PRINCIPAL',
-              items: navigationItems.filter(i => ['dashboard', 'users', 'documents', 'qr-management'].includes(i.id))
+              items: navigationItems.filter(i => ['dashboard', 'users', 'documents', 'seguimiento-mensajes', 'qr-management'].includes(i.id))
             },
             {
               title: 'SUPERVISIÓN UAFE',

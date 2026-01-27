@@ -27,6 +27,7 @@ import adminRoutes from './src/routes/admin-routes.js'
 import archivoRoutes from './src/routes/archivo-routes.js'
 import receptionRoutes from './src/routes/reception-routes.js'
 import alertasRoutes from './src/routes/alertas-routes.js'
+import mensajesInternosRoutes from './src/routes/mensajes-internos-routes.js'
 
 import escriturasQRRoutes from './src/routes/escrituras-qr-routes.js'
 import pdfProxyRoutes from './src/routes/pdf-proxy-routes.js'
@@ -151,6 +152,8 @@ const corsOptions = {
         : [
           'http://localhost:5173',  // Frontend principal (Vite)
           'http://localhost:5174',  // Frontend backup
+          'http://localhost:5175',  // Frontend fallback 2
+          'http://localhost:5176',  // Frontend fallback 3
           'http://127.0.0.1:5173',  // Variante local
           'http://127.0.0.1:5174',  // Variante local backup
         ];
@@ -347,6 +350,7 @@ app.use('/api/reception', receptionRoutes)
 
 // RUTAS DE ALERTAS (/api/alertas/*)
 app.use('/api/alertas', alertasRoutes)
+app.use('/api/mensajes-internos', mensajesInternosRoutes)
 
 
 
