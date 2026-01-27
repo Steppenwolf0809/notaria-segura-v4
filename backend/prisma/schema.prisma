@@ -714,6 +714,7 @@ enum PaymentType {
   CHECK         // Cheque
   RETENTION     // Retención
   CREDIT_NOTE   // Nota de crédito
+  DISCOUNT      // Descuento
   OTHER         // Otro
 }
 

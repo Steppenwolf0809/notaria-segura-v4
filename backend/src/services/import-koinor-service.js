@@ -234,10 +234,24 @@ async function processInvoice(row, sourceFile) {
  * Process a single payment row (AB)
  */
 async function processPayment(row, invoiceMap, sourceFile) {
-    const receiptNumber = String(row.numdoc || '').trim();
+    let receiptNumber = String(row.numdoc || '').trim();
 
+    // If no receipt number, generate one for discounts/adjustments
     if (!receiptNumber) {
-        throw new Error('Missing receipt number (numdoc)');
+        const numtra = String(row.numtra || '').trim();
+        const concept = String(row.concep || '').toUpperCase();
+
+        // Check if it's a discount or adjustment
+        if (concept.includes('DESCUENTO') || concept.includes('DSCTO') || concept.includes('AJUSTE')) {
+            // Generate a unique receipt number: DESC-{numtra}-{hash of amount+date}
+            const amount = String(row.valcob || '0');
+            const date = String(row.fecemi || '0');
+            const hash = Buffer.from(`${amount}-${date}`).toString('base64').slice(0, 6);
+            receiptNumber = `DESC-${numtra}-${hash}`;
+            console.log(`[import-koinor] Generated receipt number for discount: ${receiptNumber}`);
+        } else {
+            throw new Error('Missing receipt number (numdoc)');
+        }
     }
 
     // Check if payment already exists (idempotency)
@@ -385,6 +399,9 @@ async function updateInvoiceStatuses() {
 function detectPaymentType(concept) {
     const text = (concept || '').toUpperCase();
 
+    if (text.includes('DESCUENTO') || text.includes('DSCTO')) {
+        return 'DISCOUNT';
+    }
     if (text.includes('TRANSFER') || text.includes('TRANSF')) {
         return 'TRANSFER';
     }
