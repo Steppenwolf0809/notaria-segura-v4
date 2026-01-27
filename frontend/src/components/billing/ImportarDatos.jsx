@@ -336,7 +336,7 @@ const ImportarDatos = () => {
                                 importLogs.map((log) => (
                                     <TableRow key={log.id} hover>
                                         <TableCell>
-                                            {billingService.formatDate(log.createdAt)}
+                                            {billingService.formatDate(log.startedAt)}
                                         </TableCell>
                                         <TableCell>{log.fileName || '-'}</TableCell>
                                         <TableCell>
