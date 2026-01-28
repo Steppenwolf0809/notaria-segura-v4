@@ -33,7 +33,7 @@ import billingService from '../../services/billing-service';
 
 /**
  * ImportarDatos Component
- * Permite importar archivos Excel/CSV de Koinor al sistema de facturación
+ * Permite importar archivos Excel/CSV/XML de Koinor al sistema de facturación
  */
 const ImportarDatos = () => {
     // Estado del archivo
@@ -82,7 +82,9 @@ const ImportarDatos = () => {
         accept: {
             'application/vnd.ms-excel': ['.xls'],
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-            'text/csv': ['.csv']
+            'text/csv': ['.csv'],
+            'text/xml': ['.xml'],
+            'application/xml': ['.xml']
         },
         maxFiles: 1,
         multiple: false
@@ -98,12 +100,26 @@ const ImportarDatos = () => {
         setResult(null);
 
         try {
-            const response = await billingService.importFile(
-                selectedFile,
-                dateFrom || null,
-                dateTo || null,
-                (progress) => setUploadProgress(progress)
-            );
+            // Detectar tipo de archivo por extensión
+            const fileExtension = selectedFile.name.toLowerCase().split('.').pop();
+            const isXml = fileExtension === 'xml';
+
+            let response;
+            if (isXml) {
+                // Usar endpoint nuevo para XML (recomendado)
+                response = await billingService.importXmlFile(
+                    selectedFile,
+                    (progress) => setUploadProgress(progress)
+                );
+            } else {
+                // Usar endpoint legacy para XLS/XLSX/CSV
+                response = await billingService.importFile(
+                    selectedFile,
+                    dateFrom || null,
+                    dateTo || null,
+                    (progress) => setUploadProgress(progress)
+                );
+            }
 
             setResult(response.data);
             setSelectedFile(null);
@@ -154,7 +170,7 @@ const ImportarDatos = () => {
                 Importar Datos de Koinor
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Carga archivos Excel (.xls, .xlsx) o CSV con datos de facturación del sistema Koinor.
+                Carga archivos Excel (.xls, .xlsx), CSV o XML con datos de facturación del sistema Koinor.
             </Typography>
 
             <Grid container spacing={3}>
@@ -199,7 +215,7 @@ const ImportarDatos = () => {
                                     o haz clic para seleccionar
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                                    Formatos aceptados: .xls, .xlsx, .csv
+                                    Formatos aceptados: .xls, .xlsx, .csv, .xml
                                 </Typography>
                             </Box>
                         )}

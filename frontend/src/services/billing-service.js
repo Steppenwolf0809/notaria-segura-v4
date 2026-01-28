@@ -134,7 +134,7 @@ async function getClientBalance(taxId) {
  */
 
 /**
- * Importar archivo Excel/CSV de Koinor
+ * Importar archivo Excel/CSV de Koinor (LEGACY - usar importXmlFile para nuevas importaciones)
  * @param {File} file - Archivo a importar
  * @param {string} dateFrom - Fecha desde (opcional, YYYY-MM-DD)
  * @param {string} dateTo - Fecha hasta (opcional, YYYY-MM-DD)
@@ -163,6 +163,34 @@ async function importFile(file, dateFrom = null, dateTo = null, onProgress = nul
     }
 
     const response = await apiClient.post('/billing/import', formData, config);
+    return response.data;
+}
+
+/**
+ * Importar archivo XML de Koinor (RECOMENDADO)
+ * @param {File} file - Archivo XML a importar
+ * @param {Function} onProgress - Callback de progreso (opcional)
+ * @returns {Promise<Object>} Resultado de la importación
+ */
+async function importXmlFile(file, onProgress = null) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const config = {
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        }
+    };
+
+    // Agregar callback de progreso si se proporciona
+    if (onProgress) {
+        config.onUploadProgress = (progressEvent) => {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            onProgress(percentCompleted);
+        };
+    }
+
+    const response = await apiClient.post('/billing/import-xml', formData, config);
     return response.data;
 }
 
@@ -352,6 +380,7 @@ const billingService = {
 
     // Importación
     importFile,
+    importXmlFile,
     getImportLogs,
 
     // Documentos
