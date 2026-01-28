@@ -32,10 +32,13 @@ async function getStats() {
 
 /**
  * Obtener resumen para dashboard
+ * @param {Object} params - Parámetros de filtro
+ * @param {string} params.dateFrom - Fecha desde (YYYY-MM-DD)
+ * @param {string} params.dateTo - Fecha hasta (YYYY-MM-DD)
  * @returns {Promise<Object>} Resumen de facturación
  */
-async function getSummary() {
-    const response = await apiClient.get('/billing/summary');
+async function getSummary(params = {}) {
+    const response = await apiClient.get('/billing/summary', { params });
     return response.data;
 }
 
