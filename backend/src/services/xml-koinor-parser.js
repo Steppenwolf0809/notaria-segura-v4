@@ -14,6 +14,18 @@ import sax from 'sax';
 import iconv from 'iconv-lite';
 
 /**
+ * Sanitiza un string XML reemplazando caracteres & por &amp;
+ * Solo reemplaza & que NO sean parte de entidades válidas
+ * @param {string} xmlString - String XML a sanitizar
+ * @returns {string} - XML sanitizado
+ */
+function sanitizeXMLString(xmlString) {
+    // Reemplaza & por &amp; solo cuando NO sea parte de una entidad válida
+    // Entidades válidas: &amp;, &lt;, &gt;, &quot;, &apos;, &#123;, etc.
+    return xmlString.replace(/&(?!(amp;|lt;|gt;|quot;|apos;|#\d+;))/g, '&amp;');
+}
+
+/**
  * Parsea archivo XML de Koinor por streaming usando SAX
  * @param {Buffer} fileBuffer - Buffer del archivo XML
  * @param {string} fileName - Nombre del archivo para logging
@@ -61,13 +73,18 @@ export async function parseKoinorXML(fileBuffer, fileName) {
             throw new Error(`Error detectando encoding del archivo: ${error.message}`);
         }
 
-        // 2. Validar estructura después de decodificar correctamente
+        // 2. Sanitizar XML para manejar caracteres & sin escapar
+        // Esto previene errores de parsing cuando el XML contiene & en nombres de empresas
+        console.log('[xml-koinor-parser] Sanitizing XML for special characters...');
+        xmlString = sanitizeXMLString(xmlString);
+
+        // 3. Validar estructura después de decodificar y sanitizar
         const validation = validateKoinorXMLStructure(xmlString);
         if (!validation.valid) {
             throw new Error(validation.error);
         }
 
-        // 3. Crear parser SAX en modo strict
+        // 4. Crear parser SAX en modo strict
         const parser = sax.parser(true, {
             trim: true,
             normalize: true,
@@ -82,7 +99,7 @@ export async function parseKoinorXML(fileBuffer, fileName) {
         let textBuffer = '';
         let inGroup1 = false;
 
-        // 4. Configurar eventos del parser SAX
+        // 5. Configurar eventos del parser SAX
         return new Promise((resolve, reject) => {
             parser.onerror = (err) => {
                 console.error('[xml-koinor-parser] SAX parser error:', err);
@@ -164,14 +181,14 @@ export async function parseKoinorXML(fileBuffer, fileName) {
                         paymentsFound: groupedPayments.length,
                         notasCreditoFound: notasCredito.length,
                         errors: errors.length,
-                        errorDetails: errors.slice(0, 10), // Solo primeros 10 errores
+                        errorDetails: errors.slice(0, 20), // Solo primeros 20 errores
                         processedAt: new Date(),
                         duration: `${duration}s`
                     }
                 });
             };
 
-            // 5. Procesar el XML
+            // 6. Procesar el XML
             try {
                 parser.write(xmlString).close();
             } catch (parseError) {

@@ -1656,3 +1656,72 @@ export async function getEntregasConSaldo(req, res) {
         });
     }
 }
+
+/**
+ * Import CXC (Cartera por Cobrar) from XML file
+ * Requires multipart/form-data with 'file' field
+ */
+export async function importCxcFile(req, res) {
+    try {
+        // Check if file was uploaded
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                error: 'No se proporcionó archivo',
+                message: 'Debe subir un archivo XML de CXC'
+            });
+        }
+
+        const { file } = req;
+        const userId = req.user?.id;
+
+        // Validate file type
+        const ext = file.originalname.toLowerCase().substring(
+            file.originalname.lastIndexOf('.')
+        );
+
+        if (ext !== '.xml') {
+            return res.status(400).json({
+                success: false,
+                error: 'Tipo de archivo no válido',
+                message: 'Solo se permiten archivos XML (.xml)'
+            });
+        }
+
+        // Validate file size (máximo 50MB)
+        const maxSize = 50 * 1024 * 1024;
+        if (file.size > maxSize) {
+            return res.status(400).json({
+                success: false,
+                error: 'Archivo demasiado grande',
+                message: 'El archivo no debe superar 50MB'
+            });
+        }
+
+        console.log(`[billing-controller] Starting CXC import of ${file.originalname} (${file.size} bytes)`);
+
+        // Import the service dynamically
+        const { importCxcFile: importCxc } = await import('../services/cxc-import-service.js');
+
+        // Process the file
+        const result = await importCxc(
+            file.buffer,
+            file.originalname,
+            userId
+        );
+
+        res.json({
+            success: true,
+            message: 'Importación de CXC completada',
+            ...result
+        });
+
+    } catch (error) {
+        console.error('[billing-controller] CXC import error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error durante la importación del archivo CXC',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+}

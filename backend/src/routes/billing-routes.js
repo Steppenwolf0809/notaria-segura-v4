@@ -104,6 +104,9 @@ router.get('/documents/:documentId/payment-status', validateParams(documentIdPar
 // Import XML endpoint (NUEVO - Sistema principal) - 🔒 SECURITY: CSRF protection
 router.post('/import-xml', csrfProtection, xmlUpload.single('file'), billingController.importXmlFile);
 
+// Import CXC endpoint (Cartera por Cobrar) - 🔒 SECURITY: CSRF protection
+router.post('/import-cxc', csrfProtection, xmlUpload.single('file'), billingController.importCxcFile);
+
 // Import XLS endpoint (LEGACY - Deprecado, mantener 1 mes)
 // TODO: Comentar después del 28 de febrero de 2026
 router.post('/import', csrfProtection, upload.single('file'), billingController.importFile);
