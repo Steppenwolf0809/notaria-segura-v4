@@ -50,15 +50,7 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId) {
     };
 
     try {
-        // 1. Validar estructura básica
-        const xmlString = fileBuffer.toString('utf8');
-        const validation = validateKoinorXMLStructure(xmlString);
-        
-        if (!validation.valid) {
-            throw new Error(validation.error);
-        }
-
-        // 2. Parsear XML por streaming
+        // 1. Parsear XML por streaming (incluye decodificación y validación)
         console.log('[import-koinor-xml] Parsing XML...');
         const parsed = await parseKoinorXML(fileBuffer, fileName);
         

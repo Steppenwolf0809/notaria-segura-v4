@@ -31,25 +31,44 @@ export async function parseKoinorXML(fileBuffer, fileName) {
     try {
         // 1. Detectar encoding - XML Koinor usa UTF-16LE
         let xmlString;
+        let detectedEncoding = 'unknown';
+        
         try {
             // Intentar decodificar como UTF-16LE (formato típico de Koinor)
             xmlString = iconv.decode(fileBuffer, 'utf-16le');
             
-            // Si no tiene declaración XML válida, intentar UTF-8
-            if (!xmlString.includes('<?xml') && !xmlString.includes('<d_vc_i_estado_cuenta')) {
-                xmlString = fileBuffer.toString('utf8');
-            }
-            
             // Limpiar BOM si existe
             xmlString = xmlString.replace(/^\uFEFF/, '');
+            
+            // Verificar si la decodificación fue exitosa
+            if (xmlString.includes('<?xml') || xmlString.includes('<d_vc_i_estado_cuenta')) {
+                detectedEncoding = 'UTF-16LE';
+                console.log('[xml-koinor-parser] Encoding detected: UTF-16LE');
+            } else {
+                // Intentar UTF-8
+                xmlString = fileBuffer.toString('utf8');
+                xmlString = xmlString.replace(/^\uFEFF/, '');
+                
+                if (xmlString.includes('<?xml') || xmlString.includes('<d_vc_i_estado_cuenta')) {
+                    detectedEncoding = 'UTF-8';
+                    console.log('[xml-koinor-parser] Encoding detected: UTF-8');
+                } else {
+                    throw new Error('No se pudo detectar el encoding del archivo XML');
+                }
+            }
         } catch (error) {
             console.error('[xml-koinor-parser] Encoding detection error:', error);
-            // Fallback a UTF-8
-            xmlString = fileBuffer.toString('utf8');
+            throw new Error(`Error detectando encoding del archivo: ${error.message}`);
         }
 
-        // 2. Crear parser SAX en modo strict
-        const parser = sax.parser(true, { 
+        // 2. Validar estructura después de decodificar correctamente
+        const validation = validateKoinorXMLStructure(xmlString);
+        if (!validation.valid) {
+            throw new Error(validation.error);
+        }
+
+        // 3. Crear parser SAX en modo strict
+        const parser = sax.parser(true, {
             trim: true,
             normalize: true,
             lowercase: false,
@@ -63,7 +82,7 @@ export async function parseKoinorXML(fileBuffer, fileName) {
         let textBuffer = '';
         let inGroup1 = false;
 
-        // 3. Configurar eventos del parser SAX
+        // 4. Configurar eventos del parser SAX
         return new Promise((resolve, reject) => {
             parser.onerror = (err) => {
                 console.error('[xml-koinor-parser] SAX parser error:', err);
@@ -152,7 +171,7 @@ export async function parseKoinorXML(fileBuffer, fileName) {
                 });
             };
 
-            // 4. Procesar el XML
+            // 5. Procesar el XML
             try {
                 parser.write(xmlString).close();
             } catch (parseError) {
