@@ -2,7 +2,7 @@
  * XML Koinor Parser
  * Parser por streaming para archivos XML de pagos Koinor
  * 
- * Dependencias: xml-stream, iconv-lite
+ * Dependencias: sax (Pure JavaScript - no requiere compilación nativa)
  * 
  * IMPORTANTE: Mantiene formato RAW del XML sin normalizar
  * - numtra se extrae tal cual: "001002-00123341" (formato RAW)
@@ -10,12 +10,11 @@
  * - La búsqueda en BD usa invoiceNumberRaw directamente
  */
 
-import XmlStream from 'xml-stream';
+import sax from 'sax';
 import iconv from 'iconv-lite';
-import { Readable } from 'stream';
 
 /**
- * Parsea archivo XML de Koinor por streaming
+ * Parsea archivo XML de Koinor por streaming usando SAX
  * @param {Buffer} fileBuffer - Buffer del archivo XML
  * @param {string} fileName - Nombre del archivo para logging
  * @returns {Promise<Object>} Resultado del parsing con payments y summary
@@ -40,82 +39,127 @@ export async function parseKoinorXML(fileBuffer, fileName) {
             if (!xmlString.includes('<?xml') && !xmlString.includes('<d_vc_i_estado_cuenta')) {
                 xmlString = fileBuffer.toString('utf8');
             }
+            
+            // Limpiar BOM si existe
+            xmlString = xmlString.replace(/^\uFEFF/, '');
         } catch (error) {
             console.error('[xml-koinor-parser] Encoding detection error:', error);
             // Fallback a UTF-8
             xmlString = fileBuffer.toString('utf8');
         }
 
-        // 2. Crear stream readable
-        const stream = Readable.from([xmlString]);
-        const xml = new XmlStream(stream);
-
-        // 3. Configurar parser
-        xml.preserve('d_vc_i_estado_cuenta_group1');
-        xml.collect('d_vc_i_estado_cuenta_group1');
-
-        // 4. Promesa para manejo de eventos async
-        await new Promise((resolve, reject) => {
-            // Procesar cada grupo (transacción)
-            xml.on('endElement: d_vc_i_estado_cuenta_group1', (group) => {
-                totalTransactions++;
-                
-                try {
-                    const tipdoc = String(group.tipdoc || '').trim().toUpperCase();
-                    
-                    // Filtrar solo AB (pagos) y NC (notas de crédito)
-                    if (tipdoc === 'AB') {
-                        const payment = parsePaymentTransaction(group);
-                        if (payment) {
-                            payments.push(payment);
-                        }
-                    } else if (tipdoc === 'NC') {
-                        const nc = parseNotaCreditoTransaction(group);
-                        if (nc) {
-                            notasCredito.push(nc);
-                        }
-                    }
-                    // FC (facturas) se ignoran - ya las tenemos en el sistema
-                } catch (error) {
-                    errors.push({
-                        transaction: totalTransactions,
-                        error: error.message,
-                        data: group
-                    });
-                    console.error(`[xml-koinor-parser] Error parsing transaction ${totalTransactions}:`, error);
-                }
-            });
-
-            xml.on('end', () => {
-                console.log(`[xml-koinor-parser] Parse completed - ${totalTransactions} transactions processed`);
-                resolve();
-            });
-
-            xml.on('error', (error) => {
-                console.error('[xml-koinor-parser] XML parsing error:', error);
-                reject(error);
-            });
+        // 2. Crear parser SAX en modo strict
+        const parser = sax.parser(true, { 
+            trim: true,
+            normalize: true,
+            lowercase: false,
+            xmlns: false,
+            position: true
         });
 
-        // 5. Agrupar pagos multi-factura
-        const groupedPayments = groupMultiInvoicePayments(payments);
+        // Variables de estado para el parser SAX
+        let currentElement = '';
+        let currentGroup = null;
+        let textBuffer = '';
+        let inGroup1 = false;
 
-        const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-        console.log(`[xml-koinor-parser] Parsed in ${duration}s: ${groupedPayments.length} payments, ${notasCredito.length} NC`);
+        // 3. Configurar eventos del parser SAX
+        return new Promise((resolve, reject) => {
+            parser.onerror = (err) => {
+                console.error('[xml-koinor-parser] SAX parser error:', err);
+                // Intentar continuar en lugar de rechazar inmediatamente
+                parser.resume();
+            };
 
-        return {
-            payments: groupedPayments,
-            notasCredito,
-            summary: {
-                totalTransactions,
-                paymentsFound: groupedPayments.length,
-                notasCreditoFound: notasCredito.length,
-                errors: errors.length,
-                errorDetails: errors.slice(0, 10), // Solo primeros 10 errores
-                processedAt: new Date(),
-                duration: `${duration}s`
+            parser.onopentag = (node) => {
+                currentElement = node.name;
+                textBuffer = '';
+                
+                if (node.name === 'd_vc_i_estado_cuenta_group1') {
+                    inGroup1 = true;
+                    currentGroup = {};
+                }
+            };
+
+            parser.ontext = (text) => {
+                if (inGroup1 && currentElement) {
+                    textBuffer += text;
+                }
+            };
+
+            parser.onclosetag = (tagName) => {
+                if (inGroup1 && currentGroup && currentElement) {
+                    // Guardar el valor del elemento actual en el grupo
+                    currentGroup[currentElement] = textBuffer.trim();
+                }
+
+                if (tagName === 'd_vc_i_estado_cuenta_group1') {
+                    // Procesar el grupo completo
+                    inGroup1 = false;
+                    totalTransactions++;
+                    
+                    try {
+                        const tipdoc = String(currentGroup.tipdoc || '').trim().toUpperCase();
+                        
+                        // Filtrar solo AB (pagos) y NC (notas de crédito)
+                        if (tipdoc === 'AB') {
+                            const payment = parsePaymentTransaction(currentGroup);
+                            if (payment) {
+                                payments.push(payment);
+                            }
+                        } else if (tipdoc === 'NC') {
+                            const nc = parseNotaCreditoTransaction(currentGroup);
+                            if (nc) {
+                                notasCredito.push(nc);
+                            }
+                        }
+                        // FC (facturas) se ignoran - ya las tenemos en el sistema
+                    } catch (error) {
+                        errors.push({
+                            transaction: totalTransactions,
+                            error: error.message,
+                            data: { ...currentGroup }
+                        });
+                        console.error(`[xml-koinor-parser] Error parsing transaction ${totalTransactions}:`, error);
+                    }
+                    
+                    currentGroup = null;
+                }
+                
+                currentElement = '';
+                textBuffer = '';
+            };
+
+            parser.onend = () => {
+                // Agrupar pagos multi-factura
+                const groupedPayments = groupMultiInvoicePayments(payments);
+
+                const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+                console.log(`[xml-koinor-parser] Parsed in ${duration}s: ${groupedPayments.length} payments, ${notasCredito.length} NC`);
+
+                resolve({
+                    payments: groupedPayments,
+                    notasCredito,
+                    summary: {
+                        totalTransactions,
+                        paymentsFound: groupedPayments.length,
+                        notasCreditoFound: notasCredito.length,
+                        errors: errors.length,
+                        errorDetails: errors.slice(0, 10), // Solo primeros 10 errores
+                        processedAt: new Date(),
+                        duration: `${duration}s`
+                    }
+                });
+            };
+
+            // 4. Procesar el XML
+            try {
+                parser.write(xmlString).close();
+            } catch (parseError) {
+                console.error('[xml-koinor-parser] Error writing to parser:', parseError);
+                reject(new Error(`Error parseando XML: ${parseError.message}`));
             }
-        };
+        });
 
     } catch (error) {
         console.error('[xml-koinor-parser] Fatal error:', error);

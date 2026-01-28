@@ -33,12 +33,16 @@
 
 ```bash
 cd backend
-npm install xml-stream iconv-lite
+npm install sax iconv-lite
 ```
 
-**Dependencias:**
-- `xml-stream@^0.5.0` - Parser XML por streaming
-- `iconv-lite@^0.6.3` - Decodificación UTF-16LE
+**Dependencias (Pure JavaScript - sin compilación nativa):**
+- `sax@^1.4.1` - Parser XML por streaming (Pure JS, sin node-gyp)
+- `iconv-lite@^0.6.3` - Decodificación UTF-16LE (Pure JS)
+
+**Nota:** Se usa `sax` en lugar de `xml-stream` porque `sax` es pure JavaScript
+y no requiere compilación con node-gyp, lo que facilita el despliegue en Windows
+y en producción.
 
 ### 2. Ejecutar Migración de Base de Datos
 
