@@ -353,6 +353,7 @@ const billingService = {
     // Importación
     importFile,
     getImportLogs,
+    autoLinkInvoices,
 
     // Documentos
     getDocumentPaymentStatus,

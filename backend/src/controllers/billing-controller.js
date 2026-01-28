@@ -582,12 +582,13 @@ export async function getStats(req, res) {
  */
 export async function autoLinkInvoices(req, res) {
     try {
+        const { dryRun } = req.body;
         const { autoLinkInvoicesToDocuments } = await import('../services/import-koinor-service.js');
-        const result = await autoLinkInvoicesToDocuments();
+        const result = await autoLinkInvoicesToDocuments({ dryRun });
 
         res.json({
             success: true,
-            message: `Se vincularon ${result.linked} facturas a documentos`,
+            message: `Se ${dryRun ? 'encontraron' : 'vincularon'} ${result.linked} facturas a documentos`,
             stats: result
         });
     } catch (error) {

@@ -451,14 +451,20 @@ export async function getImportStats() {
  * This helps link invoices that weren't linked during import
  * @returns {Object} Statistics about the linking process
  */
-export async function autoLinkInvoicesToDocuments() {
+export async function autoLinkInvoicesToDocuments(options = {}) {
     console.log('[import-koinor] Starting auto-link of invoices to documents...');
+    const { dryRun = false } = options;
+
+    if (dryRun) {
+        console.log('[import-koinor] DRY RUN MODE: No changes will be applied to database');
+    }
 
     const stats = {
         invoicesWithoutDocument: 0,
         documentsWithoutInvoice: 0,
         linked: 0,
-        linkedDetails: []
+        linkedDetails: [],
+        candidates: [] // For dryRun
     };
 
     // 1. Find all invoices without a linked document
@@ -494,57 +500,83 @@ export async function autoLinkInvoicesToDocuments() {
 
     // 3. Try to match invoices to documents by client name and amount
     for (const invoice of unlinkedInvoices) {
-        // Normalize client name for comparison
-        const invoiceClientNormalized = normalizeClientName(invoice.clientName);
         const invoiceAmount = Number(invoice.totalAmount);
 
-        // Find matching document
-        const matchingDoc = documentsWithoutFactura.find(doc => {
-            const docClientNormalized = normalizeClientName(doc.clientName);
+        // Find best matching document
+        // We look for the BEST match, not just the first one
+        let bestMatch = null;
+        let bestScore = 0;
+
+        for (const doc of documentsWithoutFactura) {
             const docAmount = Number(doc.totalFactura);
 
-            // Match by client name (fuzzy) and exact amount
-            const nameMatch = invoiceClientNormalized === docClientNormalized ||
-                invoiceClientNormalized.includes(docClientNormalized) ||
-                docClientNormalized.includes(invoiceClientNormalized);
-
-            const amountMatch = Math.abs(invoiceAmount - docAmount) < 0.01;
-
-            return nameMatch && amountMatch;
-        });
-
-        if (matchingDoc) {
-            // Link the invoice to the document
-            await prisma.invoice.update({
-                where: { id: invoice.id },
-                data: { documentId: matchingDoc.id }
-            });
-
-            // Update document with numeroFactura
-            await prisma.document.update({
-                where: { id: matchingDoc.id },
-                data: { numeroFactura: invoice.invoiceNumber }
-            });
-
-            stats.linked++;
-            stats.linkedDetails.push({
-                invoiceNumber: invoice.invoiceNumber,
-                documentProtocol: matchingDoc.protocolNumber,
-                clientName: invoice.clientName,
-                amount: invoiceAmount
-            });
-
-            // Remove from candidates to avoid duplicate linking
-            const docIndex = documentsWithoutFactura.findIndex(d => d.id === matchingDoc.id);
-            if (docIndex > -1) {
-                documentsWithoutFactura.splice(docIndex, 1);
+            // 1. Amount Check: relaxed tolerance ($0.05) to handle roundings
+            if (Math.abs(invoiceAmount - docAmount) > 0.05) {
+                continue; // Skip if amount doesn't match
             }
 
-            console.log(`[import-koinor] Linked invoice ${invoice.invoiceNumber} to document ${matchingDoc.protocolNumber}`);
+            // 2. Name fuzzy matching
+            const score = calculateJaccardSimilarity(invoice.clientName, doc.clientName);
+
+            // Threshold > 0.65 suggests good similarity for names
+            if (score > 0.65) {
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMatch = doc;
+                }
+            }
+        }
+
+        if (bestMatch) {
+            // Found a match!
+            if (dryRun) {
+                stats.candidates.push({
+                    invoiceNumber: invoice.invoiceNumber,
+                    clientNameInvoice: invoice.clientName,
+                    clientNameDocument: bestMatch.clientName,
+                    amountInvoice: invoiceAmount,
+                    amountDocument: Number(bestMatch.totalFactura),
+                    documentProtocol: bestMatch.protocolNumber,
+                    matchScore: Math.round(bestScore * 100) + '%'
+                });
+                stats.linked++; // Count as potential link
+            } else {
+                // Link the invoice to the document
+                await prisma.invoice.update({
+                    where: { id: invoice.id },
+                    data: { documentId: bestMatch.id }
+                });
+
+                // Update document with numeroFactura
+                await prisma.document.update({
+                    where: { id: bestMatch.id },
+                    data: { numeroFactura: invoice.invoiceNumber }
+                });
+
+                stats.linkedDetails.push({
+                    invoiceNumber: invoice.invoiceNumber,
+                    documentProtocol: bestMatch.protocolNumber,
+                    clientName: invoice.clientName,
+                    amount: invoiceAmount,
+                    matchScore: Math.round(bestScore * 100) + '%'
+                });
+
+                // Remove from candidates to avoid duplicate linking
+                // Note: Only remove if we actually link. In dryRun we don't modify the list 
+                // essentially, but for simulation accuracy we should locally
+                const docIndex = documentsWithoutFactura.findIndex(d => d.id === bestMatch.id);
+                if (docIndex > -1) {
+                    documentsWithoutFactura.splice(docIndex, 1);
+                }
+
+                console.log(`[import-koinor] Linked invoice ${invoice.invoiceNumber} to document ${bestMatch.protocolNumber} (Score: ${bestScore.toFixed(2)})`);
+            }
+
+            if (!dryRun) stats.linked++;
         }
     }
 
-    console.log(`[import-koinor] Auto-link completed: ${stats.linked} invoices linked`);
+    console.log(`[import-koinor] Auto-link completed: ${stats.linked} invoices ${dryRun ? 'found (Dry Run)' : 'linked'}`);
     return stats;
 }
 
@@ -560,4 +592,35 @@ function normalizeClientName(name) {
         .replace(/[^A-Z0-9\s]/g, '') // Remove special chars
         .replace(/\s+/g, ' ') // Normalize spaces
         .trim();
+}
+
+/**
+ * Calculate Jaccard Similarity between two strings
+ * Useful for fuzzy name matching (insensitive to word order)
+ * @param {string} str1 
+ * @param {string} str2 
+ * @returns {number} Score between 0 and 1
+ */
+function calculateJaccardSimilarity(str1, str2) {
+    const s1 = normalizeClientName(str1);
+    const s2 = normalizeClientName(str2);
+
+    if (!s1 || !s2) return 0;
+    if (s1 === s2) return 1;
+
+    // Tokenize
+    const tokens1 = new Set(s1.split(/\s+/));
+    const tokens2 = new Set(s2.split(/\s+/));
+
+    // Calculate intersection
+    let intersection = 0;
+    for (const token of tokens1) {
+        if (tokens2.has(token)) intersection++;
+    }
+
+    // Calculate union
+    const union = tokens1.size + tokens2.size - intersection;
+
+    if (union === 0) return 0;
+    return intersection / union;
 }

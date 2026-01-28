@@ -26,9 +26,20 @@ import {
     Refresh as RefreshIcon,
     CheckCircle as CheckCircleIcon,
     Error as ErrorIcon,
-    Warning as WarningIcon
+    Warning as WarningIcon,
+    Link as LinkIcon
 } from '@mui/icons-material';
 import { useDropzone } from 'react-dropzone';
+import {
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    List,
+    ListItem,
+    ListItemText,
+    Divider
+} from '@mui/material';
 import billingService from '../../services/billing-service';
 
 /**
@@ -50,6 +61,12 @@ const ImportarDatos = () => {
     // Historial de importaciones
     const [importLogs, setImportLogs] = useState([]);
     const [loadingLogs, setLoadingLogs] = useState(false);
+
+    // Auto-Link State
+    const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+    const [linkCandidates, setLinkCandidates] = useState([]);
+    const [processingLink, setProcessingLink] = useState(false);
+    const [linkResult, setLinkResult] = useState(null);
 
     // Cargar historial de importaciones
     const loadImportLogs = useCallback(async () => {
@@ -143,6 +160,47 @@ const ImportarDatos = () => {
             case 'PARTIAL': return <WarningIcon fontSize="small" />;
             case 'ERROR': return <ErrorIcon fontSize="small" />;
             default: return null;
+        }
+    };
+
+    // Auto-Link Handlers
+    const handleAutoLinkDryRun = async () => {
+        setProcessingLink(true);
+        setError(null);
+        setLinkResult(null);
+        try {
+            const response = await billingService.autoLinkInvoices({ dryRun: true });
+            if (response.success && response.stats) {
+                setLinkCandidates(response.stats.candidates || []);
+                setLinkDialogOpen(true);
+            }
+        } catch (err) {
+            console.error('Error auto-linking:', err);
+            setError('Error al buscar vinculaciones automáticas');
+        } finally {
+            setProcessingLink(false);
+        }
+    };
+
+    const handleConfirmLink = async () => {
+        setProcessingLink(true);
+        try {
+            const response = await billingService.autoLinkInvoices({ dryRun: false });
+            if (response.success) {
+                setLinkResult(response.stats);
+                setLinkDialogOpen(false);
+                // Mostrar éxito
+                setResult({
+                    ...result,
+                    message: `Se vincularon ${response.stats.linked} facturas correctamente`
+                });
+                loadImportLogs();
+            }
+        } catch (err) {
+            console.error('Error confirming auto-link:', err);
+            setError('Error al aplicar vinculaciones');
+        } finally {
+            setProcessingLink(false);
         }
     };
 
@@ -292,10 +350,103 @@ const ImportarDatos = () => {
                             >
                                 {uploading ? 'Procesando...' : 'Procesar Archivo'}
                             </Button>
+
+                            <Divider sx={{ my: 3 }} />
+
+                            <Typography variant="subtitle1" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <LinkIcon color="secondary" />
+                                Vinculación Automática
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
+                                Busca facturas huérfanas y trata de vincularlas a documentos por nombre y monto.
+                            </Typography>
+
+                            <Button
+                                variant="outlined"
+                                color="secondary"
+                                fullWidth
+                                size="large"
+                                startIcon={<LinkIcon />}
+                                onClick={handleAutoLinkDryRun}
+                                disabled={processingLink || uploading}
+                            >
+                                {processingLink ? 'Analizando...' : 'Buscar Vinculaciones'}
+                            </Button>
                         </CardContent>
                     </Card>
                 </Grid>
             </Grid>
+
+            {/* Dialogo de Confirmación de Vinculación */}
+            <Dialog
+                open={linkDialogOpen}
+                onClose={() => setLinkDialogOpen(false)}
+                maxWidth="md"
+                fullWidth
+            >
+                <DialogTitle>Vinculaciones Encontradas</DialogTitle>
+                <DialogContent dividers>
+                    {linkCandidates.length === 0 ? (
+                        <Alert severity="info">No se encontraron nuevas vinculaciones posibles.</Alert>
+                    ) : (
+                        <>
+                            <Alert severity="info" sx={{ mb: 2 }}>
+                                Se han encontrado <strong>{linkCandidates.length}</strong> posibles vinculaciones.
+                                Revise la lista y confirme si desea aplicarlas.
+                            </Alert>
+                            <TableContainer sx={{ maxHeight: 400 }}>
+                                <Table stickyHeader size="small">
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell>Factura</TableCell>
+                                            <TableCell>Cliente</TableCell>
+                                            <TableCell>Monto</TableCell>
+                                            <TableCell>Documento</TableCell>
+                                            <TableCell>Score</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {linkCandidates.map((cand, index) => (
+                                            <TableRow key={index} hover>
+                                                <TableCell><strong>{cand.invoiceNumber}</strong></TableCell>
+                                                <TableCell>
+                                                    <Box sx={{ fontSize: '0.85rem' }}>
+                                                        <div>Fac: {cand.clientNameInvoice}</div>
+                                                        <div style={{ color: 'green' }}>Doc: {cand.clientNameDocument}</div>
+                                                    </Box>
+                                                </TableCell>
+                                                <TableCell>${cand.amountInvoice.toFixed(2)}</TableCell>
+                                                <TableCell>{cand.documentProtocol}</TableCell>
+                                                <TableCell>
+                                                    <Chip
+                                                        label={cand.matchScore}
+                                                        size="small"
+                                                        color={parseInt(cand.matchScore) > 80 ? "success" : "warning"}
+                                                        variant="outlined"
+                                                    />
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setLinkDialogOpen(false)} color="inherit">
+                        Cancelar
+                    </Button>
+                    <Button
+                        onClick={handleConfirmLink}
+                        color="secondary"
+                        variant="contained"
+                        disabled={linkCandidates.length === 0 || processingLink}
+                    >
+                        {processingLink ? 'Vinculando...' : `Vincular ${linkCandidates.length} Facturas`}
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             {/* Historial de Importaciones */}
             <Box sx={{ mt: 4 }}>
