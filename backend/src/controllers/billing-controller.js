@@ -15,7 +15,12 @@ export async function getPaymentStatusForDocument(documentId) {
         const invoices = await prisma.invoice.findMany({
             where: { documentId },
             include: {
-                payments: true
+                payments: true,      // Legacy relation
+                allocations: {       // New relation (many-to-many)
+                    include: {
+                        payment: true
+                    }
+                }
             }
         });
 
@@ -34,10 +39,23 @@ export async function getPaymentStatusForDocument(documentId) {
         const invoiceDetails = [];
 
         for (const invoice of invoices) {
-            const paid = invoice.payments.reduce(
-                (sum, p) => sum + Number(p.amount),
-                0
-            );
+            // Calculate paid amount from allocations (preferred) OR legacy payments
+            let paid = 0;
+
+            if (invoice.allocations && invoice.allocations.length > 0) {
+                // Use new allocations system (many-to-many)
+                paid = invoice.allocations.reduce(
+                    (sum, a) => sum + Number(a.allocatedAmount),
+                    0
+                );
+            } else if (invoice.payments && invoice.payments.length > 0) {
+                // Fallback to legacy payments
+                paid = invoice.payments.reduce(
+                    (sum, p) => sum + Number(p.amount),
+                    0
+                );
+            }
+
             const balance = Number(invoice.totalAmount) - paid;
 
             totalAmount += Number(invoice.totalAmount);

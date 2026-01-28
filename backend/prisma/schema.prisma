@@ -621,8 +621,9 @@ model Invoice {
   sourceFile        String?                // Nombre del archivo de origen
   
   // Relaciones
-  payments          Payment[]
-  
+  payments          Payment[]              // Relación legacy (deprecated)
+  allocations       PaymentAllocation[]    @relation("InvoiceAllocations")  // Nueva relación
+
   @@map("invoices")
   @@index([invoiceNumber])
   @@index([clientTaxId])
@@ -633,35 +634,64 @@ model Invoice {
 
 model Payment {
   id              String      @id @default(uuid())
-  
+
   // Identificación (ÚNICO)
   receiptNumber   String      @unique  // numdoc: 001-2601000089
-  
-  // Monto
+
+  // Monto total del pago
   amount          Decimal     @db.Decimal(12, 2)  // valcob de AB
-  
+
   // Fechas
   paymentDate     DateTime               // fecemi
-  
+
   // Referencias
-  concept         String?                // concep (ej: "PAGO FACT 119478 05/09")
+  concept         String?                // concep (ej: "PAGO FACTS. 124369-70")
   accountingRef   String?                // numcco (comprobante contable)
-  
+
   // Tipo de pago
   paymentType     PaymentType @default(CASH)
-  
-  // Factura asociada
-  invoiceId       String
-  invoice         Invoice     @relation(fields: [invoiceId], references: [id])
-  
+
+  // Factura principal (backwards compatibility - deprecated, usar allocations)
+  invoiceId       String?                // Ahora opcional
+  invoice         Invoice?    @relation(fields: [invoiceId], references: [id])
+
+  // Relación muchos-a-muchos con facturas (nueva)
+  allocations     PaymentAllocation[]
+
   // Metadata
   importedAt      DateTime    @default(now())
   sourceFile      String?
-  
+
   @@map("payments")
   @@index([receiptNumber])
   @@index([invoiceId])
   @@index([paymentDate])
+}
+
+// Tabla intermedia para relación muchos-a-muchos entre pagos y facturas
+// Un pago puede aplicarse a múltiples facturas (ej: "PAGO FACTS. 124369-70")
+model PaymentAllocation {
+  id              String      @id @default(uuid())
+
+  // Pago
+  paymentId       String
+  payment         Payment     @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  // Factura
+  invoiceId       String
+  invoice         Invoice     @relation("InvoiceAllocations", fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  // Monto aplicado a esta factura específica
+  // Si un pago de $25 cubre 2 facturas, cada allocation tiene su monto
+  allocatedAmount Decimal     @db.Decimal(12, 2)
+
+  // Metadata
+  createdAt       DateTime    @default(now())
+
+  @@unique([paymentId, invoiceId])  // Un pago solo puede aplicarse una vez a cada factura
+  @@map("payment_allocations")
+  @@index([paymentId])
+  @@index([invoiceId])
 }
 
 model ImportLog {

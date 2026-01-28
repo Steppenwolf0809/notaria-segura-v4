@@ -260,61 +260,83 @@ async function processPayment(row, invoiceMap, sourceFile) {
     });
 
     if (existingPayment) {
+        // Payment exists - but maybe we need to add more allocations
+        // Check if concept mentions additional invoices
+        const concept = String(row.concep || '').trim();
+        const additionalInvoices = extractInvoiceNumbersFromConcept(concept, row.numtra);
+
+        if (additionalInvoices.length > 0) {
+            await addPaymentAllocations(existingPayment, additionalInvoices, invoiceMap, sourceFile);
+        }
+
         return { created: false, legacyInvoiceCreated: false };
     }
 
     const invoiceNumberRaw = String(row.numtra || '').trim();
     const invoiceNumber = normalizeInvoiceNumber(invoiceNumberRaw);
+    const concept = String(row.concep || '').trim();
 
-    // Find or create the invoice
-    let invoice = invoiceMap.get(invoiceNumberRaw);
-    let legacyInvoiceCreated = false;
+    // Extract all invoice numbers from concept (e.g., "PAGO FACTS. 124369-70")
+    const allInvoiceNumbers = extractInvoiceNumbersFromConcept(concept, invoiceNumberRaw);
 
-    if (!invoice) {
-        // Try to find in database
-        invoice = await prisma.invoice.findUnique({
-            where: { invoiceNumber }
-        });
+    // Ensure primary invoice is in the list
+    if (!allInvoiceNumbers.includes(invoiceNumber)) {
+        allInvoiceNumbers.unshift(invoiceNumber);
     }
 
-    if (!invoice) {
-        // Create legacy invoice from payment data
-        // Use fectra (original invoice date), NOT fecemi (payment date)
-        const invoiceDate = parseExcelDate(row.fectra) || parseExcelDate(row.fecemi) || new Date();
-        const clientTaxId = cleanTaxId(row.codcli);
-        const clientName = String(row.nomcli || '').trim() || 'Cliente sin nombre';
+    // Find or create all invoices
+    const invoices = [];
+    let legacyInvoiceCreated = false;
 
-        invoice = await prisma.invoice.create({
-            data: {
-                invoiceNumber,
-                invoiceNumberRaw,
-                clientTaxId,
-                clientName,
-                totalAmount: parseMoneyAmount(row.valcob), // Estimate from payment
-                issueDate: invoiceDate,
-                concept: `[LEGACY] Factura histórica creada desde pago`,
-                sourceFile,
-                status: 'PARTIAL', // Has payment, so at least partial
-                isLegacy: true
-            }
-        });
+    for (const invNum of allInvoiceNumbers) {
+        let invoice = invoiceMap.get(invNum) || invoiceMap.get(invNum.replace(/-/g, ''));
 
-        legacyInvoiceCreated = true;
-        invoiceMap.set(invoiceNumberRaw, invoice);
+        if (!invoice) {
+            invoice = await prisma.invoice.findUnique({
+                where: { invoiceNumber: invNum }
+            });
+        }
 
-        console.log(`[import-koinor] Created LEGACY invoice ${invoiceNumber} (date: ${invoiceDate.toISOString().split('T')[0]})`);
+        if (!invoice) {
+            // Create legacy invoice
+            const invoiceDate = parseExcelDate(row.fectra) || parseExcelDate(row.fecemi) || new Date();
+            const clientTaxId = cleanTaxId(row.codcli);
+            const clientName = String(row.nomcli || '').trim() || 'Cliente sin nombre';
 
-        // Try to link to document
-        await linkInvoiceToDocument(invoice);
+            invoice = await prisma.invoice.create({
+                data: {
+                    invoiceNumber: invNum,
+                    invoiceNumberRaw: invNum.replace(/-/g, ''),
+                    clientTaxId,
+                    clientName,
+                    totalAmount: parseMoneyAmount(row.valcob) / allInvoiceNumbers.length, // Estimate divided
+                    issueDate: invoiceDate,
+                    concept: `[LEGACY] Factura histórica creada desde pago`,
+                    sourceFile,
+                    status: 'PARTIAL',
+                    isLegacy: true
+                }
+            });
+
+            legacyInvoiceCreated = true;
+            invoiceMap.set(invNum, invoice);
+
+            console.log(`[import-koinor] Created LEGACY invoice ${invNum} (date: ${invoiceDate.toISOString().split('T')[0]})`);
+            await linkInvoiceToDocument(invoice);
+        }
+
+        invoices.push(invoice);
     }
 
     // Create payment
     const paymentDate = parseExcelDate(row.fecemi) || new Date();
     const amount = parseMoneyAmount(row.valcob);
-    const concept = String(row.concep || '').trim();
     const accountingRef = String(row.numcco || '').trim();
 
-    await prisma.payment.create({
+    // Use first invoice as primary (backwards compatibility)
+    const primaryInvoice = invoices[0];
+
+    const payment = await prisma.payment.create({
         data: {
             receiptNumber,
             amount,
@@ -322,12 +344,114 @@ async function processPayment(row, invoiceMap, sourceFile) {
             concept,
             accountingRef,
             paymentType: detectPaymentType(concept),
-            invoiceId: invoice.id,
+            invoiceId: primaryInvoice.id, // Keep for backwards compatibility
             sourceFile
         }
     });
 
+    // Create allocations for ALL invoices (including primary)
+    const allocatedAmountPerInvoice = amount / invoices.length;
+
+    for (const invoice of invoices) {
+        await prisma.paymentAllocation.create({
+            data: {
+                paymentId: payment.id,
+                invoiceId: invoice.id,
+                allocatedAmount: allocatedAmountPerInvoice
+            }
+        });
+    }
+
+    if (invoices.length > 1) {
+        console.log(`[import-koinor] Payment ${receiptNumber} allocated to ${invoices.length} invoices: ${invoices.map(i => i.invoiceNumber).join(', ')}`);
+    }
+
     return { created: true, legacyInvoiceCreated };
+}
+
+/**
+ * Extract invoice numbers from payment concept
+ * E.g., "PAGO FACTS. 124369-70" -> ['001-002-000124369', '001-002-000124370']
+ * E.g., "PAGO FACT 119478 05/09" -> ['001-002-000119478']
+ */
+function extractInvoiceNumbersFromConcept(concept, primaryNumtra) {
+    const results = [];
+    const text = (concept || '').toUpperCase();
+
+    // Pattern 1: "FACTS. 124369-70" or "FACTS 124369-70" (range)
+    const rangeMatch = text.match(/FACTS?\.?\s*(\d+)-(\d+)/);
+    if (rangeMatch) {
+        const baseNum = rangeMatch[1];
+        const endSuffix = rangeMatch[2];
+
+        // Calculate the range
+        const startNum = parseInt(baseNum);
+        const endNum = parseInt(baseNum.slice(0, -endSuffix.length) + endSuffix);
+
+        for (let i = startNum; i <= endNum; i++) {
+            results.push(normalizeInvoiceNumber(`001002-00${i}`));
+        }
+
+        return results;
+    }
+
+    // Pattern 2: "FACT 119478" (single)
+    const singleMatch = text.match(/FACT\.?\s*(\d{5,})/);
+    if (singleMatch) {
+        results.push(normalizeInvoiceNumber(`001002-00${singleMatch[1]}`));
+        return results;
+    }
+
+    // Pattern 3: Multiple numbers separated by comma or space
+    const multiMatch = text.match(/FACTS?\.?\s*([\d,\s]+)/);
+    if (multiMatch) {
+        const numbers = multiMatch[1].match(/\d{5,}/g);
+        if (numbers) {
+            for (const num of numbers) {
+                results.push(normalizeInvoiceNumber(`001002-00${num}`));
+            }
+            return results;
+        }
+    }
+
+    return results;
+}
+
+/**
+ * Add allocations to an existing payment for additional invoices
+ */
+async function addPaymentAllocations(payment, invoiceNumbers, invoiceMap, sourceFile) {
+    const existingAllocations = await prisma.paymentAllocation.findMany({
+        where: { paymentId: payment.id }
+    });
+
+    const existingInvoiceIds = new Set(existingAllocations.map(a => a.invoiceId));
+
+    for (const invNum of invoiceNumbers) {
+        let invoice = invoiceMap.get(invNum);
+
+        if (!invoice) {
+            invoice = await prisma.invoice.findUnique({
+                where: { invoiceNumber: invNum }
+            });
+        }
+
+        if (invoice && !existingInvoiceIds.has(invoice.id)) {
+            // Calculate allocated amount (divide equally among all invoices)
+            const totalInvoices = existingAllocations.length + 1;
+            const allocatedAmount = Number(payment.amount) / totalInvoices;
+
+            await prisma.paymentAllocation.create({
+                data: {
+                    paymentId: payment.id,
+                    invoiceId: invoice.id,
+                    allocatedAmount
+                }
+            });
+
+            console.log(`[import-koinor] Added allocation for payment ${payment.receiptNumber} to invoice ${invNum}`);
+        }
+    }
 }
 
 /**
@@ -355,26 +479,39 @@ async function linkInvoiceToDocument(invoice) {
 }
 
 /**
- * Update all invoice statuses based on payments
+ * Update all invoice statuses based on payments (using allocations)
  */
 async function updateInvoiceStatuses() {
     console.log('[import-koinor] Updating invoice statuses...');
 
-    // Get all invoices with their payments
+    // Get all invoices with their allocations (new) and legacy payments
     const invoices = await prisma.invoice.findMany({
         where: {
             status: { not: 'CANCELLED' }
         },
         include: {
-            payments: true
+            payments: true,          // Legacy relation
+            allocations: true        // New relation
         }
     });
 
     for (const invoice of invoices) {
-        const totalPaid = invoice.payments.reduce(
-            (sum, p) => sum + Number(p.amount),
-            0
-        );
+        // Calculate total paid from allocations (preferred) OR legacy payments
+        let totalPaid = 0;
+
+        if (invoice.allocations && invoice.allocations.length > 0) {
+            // Use new allocations system
+            totalPaid = invoice.allocations.reduce(
+                (sum, a) => sum + Number(a.allocatedAmount),
+                0
+            );
+        } else if (invoice.payments && invoice.payments.length > 0) {
+            // Fallback to legacy payments
+            totalPaid = invoice.payments.reduce(
+                (sum, p) => sum + Number(p.amount),
+                0
+            );
+        }
 
         const newStatus = calculateInvoiceStatus(
             Number(invoice.totalAmount),
