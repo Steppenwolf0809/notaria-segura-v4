@@ -603,15 +603,41 @@ export async function importXmlFile(req, res) {
 
         console.log(`[billing-controller] Starting XML import of ${file.originalname} (${file.size} bytes)`);
 
-        // Siempre usar el servicio de pagos XML (que ahora también extrae facturas FC)
-        // El parser unificado maneja AB (pagos), NC (notas de crédito) y FC (facturas)
-        console.log('[billing-controller] Using unified XML import service');
-        const { importKoinorXMLFile } = await import('../services/import-koinor-xml-service.js');
-        const result = await importKoinorXMLFile(
-            file.buffer,
-            file.originalname,
-            userId
-        );
+        // Detectar tipo de XML por contenido
+        let xmlPreview;
+        try {
+            // Intentar leer como UTF-16LE primero (formato típico de Koinor)
+            xmlPreview = file.buffer.toString('utf16le').substring(0, 500);
+            if (!xmlPreview.includes('<?xml')) {
+                xmlPreview = file.buffer.toString('utf8').substring(0, 500);
+            }
+        } catch (e) {
+            xmlPreview = file.buffer.toString('utf8').substring(0, 500);
+        }
+
+        // Detectar si es XML de CXC (tag raíz: cxc_YYYYMMDD)
+        const isCxcXml = /<cxc_\d{8}>/.test(xmlPreview);
+        
+        let result;
+        if (isCxcXml) {
+            // Usar servicio de CXC para archivos de cartera por cobrar
+            console.log('[billing-controller] Detected CXC XML format, using CXC import service');
+            const { importCxcFile } = await import('../services/cxc-import-service.js');
+            result = await importCxcFile(
+                file.buffer,
+                file.originalname,
+                userId
+            );
+        } else {
+            // Usar servicio de pagos para archivos de estado de cuenta
+            console.log('[billing-controller] Detected payment XML format, using payment import service');
+            const { importKoinorXMLFile } = await import('../services/import-koinor-xml-service.js');
+            result = await importKoinorXMLFile(
+                file.buffer,
+                file.originalname,
+                userId
+            );
+        }
 
         res.json({
             success: true,
