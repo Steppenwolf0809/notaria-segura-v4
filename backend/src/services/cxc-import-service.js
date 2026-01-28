@@ -10,7 +10,7 @@
  */
 
 import { db as prisma } from '../db.js';
-import { parseKoinorXML } from './xml-koinor-parser.js';
+import { parseCxcXML } from './xml-cxc-parser.js';
 import { normalizeInvoiceNumber, cleanTaxId } from '../utils/billing-utils.js';
 
 /**
@@ -45,11 +45,11 @@ export async function importCxcFile(fileBuffer, fileName, userId) {
     };
 
     try {
-        // 1. Parsear XML (incluye sanitización automática)
-        console.log('[cxc-import] Parsing XML...');
-        const parsed = await parseKoinorXML(fileBuffer, fileName);
+        // 1. Parsear XML CXC (incluye sanitización automática)
+        console.log('[cxc-import] Parsing CXC XML...');
+        const parsed = await parseCxcXML(fileBuffer, fileName);
 
-        // 2. Extraer facturas FC del XML parseado
+        // 2. Extraer facturas del XML parseado
         const facturas = parsed.invoices || [];
         
         stats.totalFacturas = facturas.length;
