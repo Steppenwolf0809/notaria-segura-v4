@@ -880,21 +880,29 @@ export async function getSummary(req, res) {
     try {
         const { dateFrom, dateTo } = req.query;
 
+        console.log('[billing-controller] getSummary called with:', { dateFrom, dateTo });
+
         // Build where clause for payments based on date range
         const paymentWhere = {};
         if (dateFrom || dateTo) {
             paymentWhere.paymentDate = {};
             if (dateFrom) {
+                // Parse date in local timezone (YYYY-MM-DD format from HTML date input)
                 const fromDate = new Date(dateFrom);
                 fromDate.setHours(0, 0, 0, 0);
                 paymentWhere.paymentDate.gte = fromDate;
+                console.log('[billing-controller] From date:', fromDate.toISOString());
             }
             if (dateTo) {
+                // Parse date in local timezone
                 const toDate = new Date(dateTo);
                 toDate.setHours(23, 59, 59, 999);
                 paymentWhere.paymentDate.lte = toDate;
+                console.log('[billing-controller] To date:', toDate.toISOString());
             }
         }
+
+        console.log('[billing-controller] Payment where clause:', JSON.stringify(paymentWhere, null, 2));
 
         // Get payments in range
         const paymentsInRange = await prisma.payment.findMany({
@@ -906,9 +914,22 @@ export async function getSummary(req, res) {
             }
         });
 
+        console.log(`[billing-controller] Found ${paymentsInRange.length} payments`);
+        if (paymentsInRange.length > 0) {
+            console.log('[billing-controller] Sample payment dates:',
+                paymentsInRange.slice(0, 3).map(p => ({
+                    id: p.id,
+                    date: p.paymentDate,
+                    amount: p.amount
+                }))
+            );
+        }
+
         // Calculate totals for filtered payments
         const totalPayments = paymentsInRange.length;
         const totalCollected = paymentsInRange.reduce((sum, p) => sum + Number(p.amount), 0);
+
+        console.log('[billing-controller] Totals:', { totalPayments, totalCollected });
 
         // Calculate today's payments
         const today = new Date();

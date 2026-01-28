@@ -55,7 +55,8 @@ const ListaPagos = () => {
                 dateTo: dateTo || undefined
             };
             const response = await billingService.getSummary(params);
-            setStats(response.data);
+            // billingService.getSummary ya devuelve response.data
+            setStats(response);
         } catch (err) {
             console.error('Error cargando estadísticas:', err);
         }
