@@ -26,7 +26,8 @@ export const navItemsByRole = {
   MATRIZADOR: [
     { id: 'dashboard', label: 'Dashboard', view: 'dashboard', icon: 'Dashboard' },
     { id: 'documents', label: 'Documentos', view: 'documents', icon: 'Assignment' },
-    { id: 'notificaciones', label: 'Mis Mensajes', view: 'notificaciones', icon: 'Message' },
+    { id: 'mensajes', label: 'Mis Mensajes', view: 'mensajes', icon: 'Message' },
+    { id: 'historial-notificaciones', label: 'Notificaciones', view: 'historial-notificaciones', icon: 'WhatsApp' },
     { id: 'cartera-cobros', label: 'Cartera de Cobros', view: 'cartera-cobros', icon: 'AccountBalance' },
     // { id: 'formularios-uafe', label: 'Formularios UAFE', view: 'formularios-uafe', icon: 'Description' },
     { id: 'generador-qr', label: 'Generador QR', view: 'generador-qr', icon: 'QrCode' }
