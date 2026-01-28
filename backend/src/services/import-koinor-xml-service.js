@@ -43,6 +43,7 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId) {
         paymentsCreated: 0,
         paymentsSkipped: 0,
         invoicesUpdated: 0,
+        invoicesCreatedLegacy: 0,
         documentsUpdated: 0,
         notasCreditoProcessed: 0,
         errors: 0,
@@ -66,7 +67,11 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId) {
                     stats.paymentsCreated += result.created;
                     stats.invoicesUpdated += result.invoicesUpdated;
                     stats.documentsUpdated += result.documentsUpdated;
-                } else if (result.skipped > 0) {
+                }
+                if (result.createdLegacy > 0) {
+                    stats.invoicesCreatedLegacy += result.createdLegacy;
+                }
+                if (result.skipped > 0) {
                     stats.paymentsSkipped += result.skipped;
                 }
             } catch (error) {
@@ -102,7 +107,7 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId) {
             where: { id: importLog.id },
             data: {
                 totalRows: stats.totalTransactions,
-                invoicesCreated: 0, // No creamos facturas desde XML
+                invoicesCreated: stats.invoicesCreatedLegacy,
                 invoicesUpdated: stats.invoicesUpdated,
                 paymentsCreated: stats.paymentsCreated,
                 paymentsSkipped: stats.paymentsSkipped,
@@ -120,8 +125,20 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId) {
         return {
             success: true,
             importLogId: importLog.id,
-            stats,
-            duration: `${duration}s`
+            stats: {
+                totalTransactions: stats.totalTransactions,
+                paymentsCreated: stats.paymentsCreated,
+                paymentsSkipped: stats.paymentsSkipped,
+                invoicesUpdated: stats.invoicesUpdated,
+                invoicesCreatedLegacy: stats.invoicesCreatedLegacy,
+                documentsUpdated: stats.documentsUpdated,
+                notasCreditoProcessed: stats.notasCreditoProcessed,
+                errors: stats.errors
+            },
+            duration: `${duration}s`,
+            info: stats.invoicesCreatedLegacy > 0 ? [
+                `${stats.invoicesCreatedLegacy} facturas legacy creadas automáticamente (pagos de facturas pre-sistema)`
+            ] : []
         };
 
     } catch (error) {
@@ -156,7 +173,8 @@ async function processPayment(payment, sourceFile, stats) {
         created: 0,
         skipped: 0,
         invoicesUpdated: 0,
-        documentsUpdated: 0
+        documentsUpdated: 0,
+        createdLegacy: 0
     };
 
     // Procesar cada factura en el pago (multi-factura)
@@ -172,6 +190,9 @@ async function processPayment(payment, sourceFile, stats) {
                 }
             } else if (singleResult.skipped) {
                 result.skipped++;
+            } else if (singleResult.createdLegacy) {
+                result.createdLegacy++;
+                result.created++; // También contar como pago creado
             }
         } catch (error) {
             // Error en factura específica - registrar pero continuar con las demás
@@ -198,17 +219,36 @@ async function processPayment(payment, sourceFile, stats) {
 async function processSinglePayment(payment, detail, sourceFile) {
     // 1. Buscar factura por invoiceNumberRaw (formato RAW del XML)
     // ⚠️ CRÍTICO: Buscar por invoiceNumberRaw, NO por invoiceNumber normalizado
-    const invoice = await prisma.invoice.findFirst({
-        where: { 
-            invoiceNumberRaw: detail.invoiceNumberRaw 
+    let invoice = await prisma.invoice.findFirst({
+        where: {
+            invoiceNumberRaw: detail.invoiceNumberRaw
         },
         include: { document: true }
     });
 
+    let createdLegacy = false;
+
     if (!invoice) {
-        // Factura no encontrada - warning, no error
-        console.warn(`[import-koinor-xml] Invoice not found: ${detail.invoiceNumberRaw}`);
-        return { created: false, skipped: false };
+        // Factura no encontrada - crear factura legacy automáticamente
+        console.log(`[import-koinor-xml] Creating legacy invoice for: ${detail.invoiceNumberRaw}`);
+        
+        // Crear factura legacy con los datos del pago
+        invoice = await prisma.invoice.create({
+            data: {
+                invoiceNumber: detail.invoiceNumberRaw.replace(/^0+/, ''), // Normalizado (sin ceros)
+                invoiceNumberRaw: detail.invoiceNumberRaw, // RAW del XML
+                clientName: payment.clientName || 'Cliente Legacy',
+                clientTaxId: payment.clientTaxId || '9999999999999',
+                issueDate: payment.paymentDate, // Usar fecha de pago como aproximación
+                totalAmount: detail.amount, // Asumir que el monto del pago es el total
+                paidAmount: 0, // Se actualizará al crear el pago
+                status: 'PENDING',
+                isLegacy: true, // Marcar como legacy
+                sourceFile
+            }
+        });
+        
+        createdLegacy = true;
     }
 
     // 2. Verificar idempotencia - combinación de 4 campos
@@ -277,12 +317,13 @@ async function processSinglePayment(payment, detail, sourceFile) {
         }
     });
 
-    console.log(`[import-koinor-xml] Payment processed: ${payment.receiptNumber} -> ${detail.invoiceNumberRaw} ($${detail.amount})`);
+    console.log(`[import-koinor-xml] Payment processed: ${payment.receiptNumber} -> ${detail.invoiceNumberRaw} ($${detail.amount})${createdLegacy ? ' [LEGACY INVOICE CREATED]' : ''}`);
 
-    return { 
-        created: true, 
-        skipped: false, 
-        documentUpdated 
+    return {
+        created: !createdLegacy, // Solo true si fue factura existente
+        createdLegacy, // True si creamos factura legacy
+        skipped: false,
+        documentUpdated
     };
 }
 

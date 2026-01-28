@@ -179,7 +179,10 @@ async function importXmlFile(file, onProgress = null) {
     const config = {
         headers: {
             'Content-Type': 'multipart/form-data'
-        }
+        },
+        // Aumentar timeout para archivos XML grandes (5 minutos)
+        // Archivos con 3000+ transacciones pueden tardar varios minutos
+        timeout: 300000 // 5 minutos en milisegundos
     };
 
     // Agregar callback de progreso si se proporciona
