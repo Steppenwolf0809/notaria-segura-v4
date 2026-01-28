@@ -555,6 +555,82 @@ export async function importFile(req, res) {
 }
 
 /**
+ * Import Koinor XML file (NUEVO - Reemplaza sistema XLS)
+ * Requires multipart/form-data with 'file' field
+ *
+ * Características:
+ * - Parser por streaming para archivos grandes
+ * - Idempotencia estricta (evita duplicados)
+ * - Búsqueda por invoiceNumberRaw (formato XML)
+ * - Actualización automática de estados
+ */
+export async function importXmlFile(req, res) {
+    try {
+        // Validar archivo
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                error: 'No se proporcionó archivo',
+                message: 'Debe subir un archivo XML (.xml)'
+            });
+        }
+
+        const { file } = req;
+        const userId = req.user?.id;
+
+        // Validar extensión
+        const ext = file.originalname.toLowerCase().substring(
+            file.originalname.lastIndexOf('.')
+        );
+
+        if (ext !== '.xml') {
+            return res.status(400).json({
+                success: false,
+                error: 'Tipo de archivo no válido',
+                message: 'Solo se permiten archivos XML (.xml)'
+            });
+        }
+
+        // Validar tamaño (máximo 50MB)
+        const maxSize = 50 * 1024 * 1024; // 50MB
+        if (file.size > maxSize) {
+            return res.status(400).json({
+                success: false,
+                error: 'Archivo demasiado grande',
+                message: 'El archivo no debe superar 50MB'
+            });
+        }
+
+        console.log(`[billing-controller] Starting XML import of ${file.originalname} (${file.size} bytes)`);
+
+        // Importar servicio dinámicamente
+        const { importKoinorXMLFile } = await import('../services/import-koinor-xml-service.js');
+
+        // Procesar el archivo
+        const result = await importKoinorXMLFile(
+            file.buffer,
+            file.originalname,
+            userId
+        );
+
+        res.json({
+            success: true,
+            message: 'Importación XML completada',
+            ...result
+        });
+
+    } catch (error) {
+        console.error('[billing-controller] XML import error:', error);
+        // 🔒 SECURITY: Never expose internal error details in production
+        res.status(500).json({
+            success: false,
+            message: 'Error durante la importación del archivo XML',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+}
+
+/**
  * Get billing statistics
  */
 export async function getStats(req, res) {

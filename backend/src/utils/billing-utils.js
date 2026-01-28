@@ -220,6 +220,97 @@ function formatMoneyDisplay(amount) {
     }).format(amount);
 }
 
+/**
+ * Normaliza número de recibo de pago del XML
+ * @param {string} raw - Número de recibo (numdoc)
+ * @returns {string|null} - Recibo normalizado (solo trim)
+ */
+function normalizeReceiptNumber(raw) {
+    if (!raw || typeof raw !== 'string') {
+        return null;
+    }
+    // Solo trim - mantener formato original del XML
+    return raw.trim();
+}
+
+/**
+ * Valida formato de número de recibo del XML
+ * @param {string} receiptNumber
+ * @returns {boolean}
+ */
+function validateReceiptNumber(receiptNumber) {
+    if (!receiptNumber) return false;
+    
+    // Formato esperado del XML: 001-2601000305
+    // 3 dígitos + guión + 10 dígitos
+    const pattern = /^\d{3}-\d{10}$/;
+    return pattern.test(receiptNumber);
+}
+
+/**
+ * Valida formato de numtra (número de factura RAW del XML)
+ * @param {string} numtra - Número de factura del XML
+ * @returns {boolean}
+ */
+function validateInvoiceNumberRaw(numtra) {
+    if (!numtra) return false;
+    
+    // Formato RAW del XML: 001002-00123341
+    // 6 dígitos + guión + 8 dígitos
+    const pattern = /^\d{6}-\d{8}$/;
+    return pattern.test(numtra);
+}
+
+/**
+ * Parsea fecha del formato Koinor XML: "2026-01-19 00:00:00"
+ * @param {string} dateString - Fecha en formato Koinor
+ * @returns {Date|null} - Fecha parseada o null si es inválida
+ */
+function parseKoinorDate(dateString) {
+    if (!dateString) return null;
+
+    try {
+        // Formato: "YYYY-MM-DD HH:MM:SS"
+        const parsed = new Date(dateString);
+        
+        if (isNaN(parsed.getTime())) {
+            return null;
+        }
+
+        return parsed;
+    } catch (error) {
+        return null;
+    }
+}
+
+/**
+ * Detecta tipo de pago basado en contexto XML
+ * @param {string} tipdoc - Tipo de documento (AB, NC, etc)
+ * @param {string} concep - Concepto del pago
+ * @returns {string} - Tipo de pago para el enum PaymentType
+ */
+function detectPaymentTypeFromXML(tipdoc, concep = '') {
+    if (tipdoc === 'NC') {
+        return 'CREDIT_NOTE';
+    }
+
+    // Analizar concepto para detectar tipo
+    const text = concep.toUpperCase();
+    
+    if (text.includes('CHEQUE') || text.includes('CHQ')) {
+        return 'CHECK';
+    }
+    if (text.includes('EFECTIVO') || text.includes('CASH')) {
+        return 'CASH';
+    }
+    if (text.includes('RETENCION') || text.includes('RET')) {
+        return 'RETENTION';
+    }
+
+    // Por defecto transferencia
+    return 'TRANSFER';
+}
+
 export {
     normalizeInvoiceNumber,
     denormalizeInvoiceNumber,
@@ -230,4 +321,10 @@ export {
     calculateInvoiceStatus,
     formatDateDisplay,
     formatMoneyDisplay,
+    // Funciones XML
+    normalizeReceiptNumber,
+    validateReceiptNumber,
+    validateInvoiceNumberRaw,
+    parseKoinorDate,
+    detectPaymentTypeFromXML,
 };

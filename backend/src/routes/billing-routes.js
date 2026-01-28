@@ -24,7 +24,7 @@ import {
 
 const router = express.Router();
 
-// Configure multer for file uploads (memory storage)
+// Configure multer for XLS file uploads (memory storage) - LEGACY
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
@@ -46,6 +46,25 @@ const upload = multer({
             cb(null, true);
         } else {
             cb(new Error('Tipo de archivo no permitido. Solo .xls, .xlsx, .csv'), false);
+        }
+    }
+});
+
+// Configure multer for XML file uploads (memory storage) - NUEVO SISTEMA
+const xmlUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 50 * 1024 * 1024 // 50MB limit para XMLs grandes (7000+ registros)
+    },
+    fileFilter: (req, file, cb) => {
+        const ext = file.originalname.toLowerCase().substring(
+            file.originalname.lastIndexOf('.')
+        );
+        
+        if (ext === '.xml') {
+            cb(null, true);
+        } else {
+            cb(new Error('Solo se permiten archivos XML (.xml)'), false);
         }
     }
 });
@@ -78,7 +97,15 @@ router.get('/import-logs', billingController.getImportLogs);
 // Document payment status (for integration with document views) - 🔒 SECURITY: UUID validation
 router.get('/documents/:documentId/payment-status', validateParams(documentIdParamSchema), billingController.getDocumentPaymentStatus);
 
-// Import endpoint - requires file upload - 🔒 SECURITY: CSRF protection added
+// ============================================================================
+// IMPORTACIÓN DE PAGOS
+// ============================================================================
+
+// Import XML endpoint (NUEVO - Sistema principal) - 🔒 SECURITY: CSRF protection
+router.post('/import-xml', csrfProtection, xmlUpload.single('file'), billingController.importXmlFile);
+
+// Import XLS endpoint (LEGACY - Deprecado, mantener 1 mes)
+// TODO: Comentar después del 28 de febrero de 2026
 router.post('/import', csrfProtection, upload.single('file'), billingController.importFile);
 
 // ============================================================================
