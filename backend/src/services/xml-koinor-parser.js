@@ -317,20 +317,44 @@ function parseKoinorDate(dateString) {
  * @returns {Object} - { valid: boolean, error: string }
  */
 export function validateKoinorXMLStructure(xmlString) {
-    // Verificar que tiene estructura esperada
-    if (!xmlString.includes('d_vc_i_estado_cuenta_row') && 
-        !xmlString.includes('d_vc_i_estado_cuenta_group1')) {
-        return {
-            valid: false,
-            error: 'El archivo no tiene la estructura XML de Koinor esperada'
-        };
-    }
-
     // Verificar que no está vacío
-    if (xmlString.length < 100) {
+    if (!xmlString || xmlString.length < 100) {
         return {
             valid: false,
             error: 'El archivo XML está vacío o es demasiado corto'
+        };
+    }
+
+    // Detectar el tag raíz del XML
+    const hasXMLDeclaration = xmlString.includes('<?xml');
+    const hasRowTag = xmlString.includes('d_vc_i_estado_cuenta_row');
+    const hasGroup1Tag = xmlString.includes('d_vc_i_estado_cuenta_group1');
+    const hasGroup1CloseTag = xmlString.includes('</d_vc_i_estado_cuenta_group1>');
+    
+    // Logging para diagnóstico
+    console.log('[xml-koinor-parser] Validation check:', {
+        hasXMLDeclaration,
+        hasRowTag,
+        hasGroup1Tag,
+        hasGroup1CloseTag,
+        length: xmlString.length,
+        firstChars: xmlString.substring(0, 200)
+    });
+
+    // Verificar que tiene al menos uno de los tags esperados
+    if (!hasRowTag && !hasGroup1Tag) {
+        return {
+            valid: false,
+            error: `El archivo no tiene la estructura XML de Koinor esperada. ` +
+                   `Primeros 200 caracteres: ${xmlString.substring(0, 200)}...`
+        };
+    }
+
+    // Verificar que tiene tags de cierre si tiene tags de apertura
+    if (hasGroup1Tag && !hasGroup1CloseTag) {
+        return {
+            valid: false,
+            error: 'El XML parece incompleto (falta tag de cierre d_vc_i_estado_cuenta_group1)'
         };
     }
 
