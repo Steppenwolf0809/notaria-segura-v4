@@ -260,13 +260,52 @@ async function processPayment(row, invoiceMap, sourceFile) {
     });
 
     if (existingPayment) {
-        // Payment exists - but maybe we need to add more allocations
-        // Check if concept mentions additional invoices
-        const concept = String(row.concep || '').trim();
-        const additionalInvoices = extractInvoiceNumbersFromConcept(concept, row.numtra);
+        // Payment exists - this row might be for a different invoice with the same receipt
+        // (Koinor exports one row per invoice even if it's the same payment)
+        const invoiceNumberRaw = String(row.numtra || '').trim();
+        const invoiceNumber = normalizeInvoiceNumber(invoiceNumberRaw);
+        const rowAmount = parseMoneyAmount(row.valcob);
 
-        if (additionalInvoices.length > 0) {
-            await addPaymentAllocations(existingPayment, additionalInvoices, invoiceMap, sourceFile);
+        // Check if we already have an allocation for this specific invoice
+        const existingAllocation = await prisma.paymentAllocation.findFirst({
+            where: {
+                paymentId: existingPayment.id,
+                invoice: { invoiceNumber }
+            }
+        });
+
+        if (!existingAllocation && invoiceNumber) {
+            // Find or get the invoice
+            let invoice = invoiceMap.get(invoiceNumberRaw);
+            if (!invoice) {
+                invoice = await prisma.invoice.findUnique({
+                    where: { invoiceNumber }
+                });
+            }
+
+            if (invoice) {
+                // Create allocation with the specific amount from this row
+                await prisma.paymentAllocation.create({
+                    data: {
+                        paymentId: existingPayment.id,
+                        invoiceId: invoice.id,
+                        allocatedAmount: rowAmount
+                    }
+                });
+
+                // Update payment total amount (sum of all allocations)
+                const allAllocations = await prisma.paymentAllocation.findMany({
+                    where: { paymentId: existingPayment.id }
+                });
+                const totalAmount = allAllocations.reduce((sum, a) => sum + Number(a.allocatedAmount), 0);
+
+                await prisma.payment.update({
+                    where: { id: existingPayment.id },
+                    data: { amount: totalAmount }
+                });
+
+                console.log(`[import-koinor] Added allocation for existing payment ${receiptNumber} -> ${invoiceNumber} ($${rowAmount})`);
+            }
         }
 
         return { created: false, legacyInvoiceCreated: false };
