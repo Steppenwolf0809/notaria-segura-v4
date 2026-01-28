@@ -51,12 +51,10 @@ export async function importCxcFile(fileBuffer, fileName, userId) {
         const parsed = await parseKoinorXML(fileBuffer, fileName);
 
         // 2. Extraer facturas FC del XML parseado
-        // Necesitamos modificar el parser para extraer FC también
-        // Por ahora, procesaremos las transacciones que tengan saldo pendiente
-        const facturas = extractInvoicesFromParsed(parsed);
+        const facturas = parsed.invoices || [];
         
         stats.totalFacturas = facturas.length;
-        console.log(`[cxc-import] Found ${facturas.length} invoices to process`);
+        console.log(`[cxc-import] Found ${facturas.length} invoices (FC) to process`);
 
         // 3. Procesar cada factura
         for (const factura of facturas) {
@@ -129,21 +127,8 @@ export async function importCxcFile(fileBuffer, fileName, userId) {
 }
 
 /**
- * Extrae facturas del resultado parseado
- * Por ahora retorna array vacío - necesitamos modificar el parser para extraer FC
- * @param {Object} parsed - Resultado del parseKoinorXML
- * @returns {Array} - Array de facturas
- */
-function extractInvoicesFromParsed(parsed) {
-    // TODO: Modificar xml-koinor-parser.js para extraer FC (facturas)
-    // Por ahora retornamos array vacío
-    console.warn('[cxc-import] Parser no extrae FC aún - retornando array vacío');
-    return [];
-}
-
-/**
  * Procesa una factura: upsert de cliente y factura
- * @param {Object} factura - Datos de la factura del XML
+ * @param {Object} factura - Datos de la factura del XML (parseados por parseInvoiceTransaction)
  * @param {string} sourceFile - Nombre del archivo origen
  * @returns {Promise<Object>} - {clienteCreado, facturaCreada, facturaVinculada}
  */
@@ -154,28 +139,20 @@ async function processInvoiceUpsert(factura, sourceFile) {
         facturaVinculada: false
     };
 
-    // Paso A: Buscar/crear cliente por RUC/Cédula
-    const clientTaxId = cleanTaxId(factura.identificacion || factura.codcli);
-    const clientName = String(factura.nombreCliente || factura.nomcli || '').trim();
-    
-    if (!clientTaxId) {
-        throw new Error('Cliente sin identificación válida');
-    }
-
-    // Buscar o crear cliente
-    // Nota: Necesitamos verificar si existe tabla Client en el schema
-    // Por ahora usamos Invoice directamente
+    // Paso A: Obtener datos del cliente del XML parseado
+    const clientTaxId = cleanTaxId(factura.clientTaxId);
+    const clientName = String(factura.clientName || '').trim();
     
     // Paso B: Buscar/crear factura
-    const invoiceNumberRaw = String(factura.numeroFactura || factura.numtra || '').trim();
+    const invoiceNumberRaw = String(factura.invoiceNumberRaw || factura.invoiceNumber || '').trim();
     const invoiceNumber = normalizeInvoiceNumber(invoiceNumberRaw);
     
     if (!invoiceNumber) {
         throw new Error('Factura sin número válido');
     }
 
-    const totalAmount = parseFloat(factura.saldo || factura.valcob || 0);
-    const issueDate = factura.fechaEmision ? new Date(factura.fechaEmision) : new Date();
+    const totalAmount = parseFloat(factura.totalAmount || 0);
+    const issueDate = factura.issueDate ? new Date(factura.issueDate) : new Date();
 
     // Buscar factura existente
     let invoice = await prisma.invoice.findFirst({
@@ -220,7 +197,7 @@ async function processInvoiceUpsert(factura, sourceFile) {
                 isLegacy: true,
                 sourceFile,
                 notes: `Importado desde CXC (Migración): ${sourceFile}`,
-                concept: factura.concepto || 'Factura importada de cartera'
+                concept: factura.concept || 'Factura importada de cartera'
             }
         });
         result.facturaCreada = true;
