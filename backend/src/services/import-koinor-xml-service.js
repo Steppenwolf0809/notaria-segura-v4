@@ -33,8 +33,7 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId) {
             fileType: 'XML_KOINOR',
             totalRows: 0,
             status: 'PROCESSING',
-            executedBy: userId,
-            startedAt: new Date()
+            executedBy: userId
         }
     });
 
