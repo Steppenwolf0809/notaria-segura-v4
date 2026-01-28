@@ -170,7 +170,9 @@ const ImportarDatos = () => {
                 Importar Datos de Koinor
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                Carga archivos Excel (.xls, .xlsx), CSV o XML con datos de facturación del sistema Koinor.
+                Importa datos de facturación y pagos desde archivos XML exportados del sistema Koinor.
+                <br />
+                📋 <strong>Recomendado:</strong> Exportar "Estado de Cuenta" como XML desde Koinor para importación automática de pagos.
             </Typography>
 
             <Grid container spacing={3}>
