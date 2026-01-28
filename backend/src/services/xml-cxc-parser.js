@@ -185,7 +185,7 @@ export async function parseCxcXML(fileBuffer, fileName) {
 }
 
 /**
- * Sanitiza el XML removiendo caracteres problemáticos
+ * Sanitiza el XML removiendo caracteres problemáticos y escapando entities
  */
 function sanitizeXML(xmlString) {
     // Remover BOM
@@ -194,6 +194,11 @@ function sanitizeXML(xmlString) {
     
     // Remover caracteres de control excepto tab, newline, carriage return
     xmlString = xmlString.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+    
+    // Escapar ampersands que no son parte de entities válidas
+    // Esto maneja casos como "PEREZ & ASOCIADOS" -> "PEREZ &amp; ASOCIADOS"
+    // Pero preserva entities válidas como &amp; &lt; &gt; &quot; &apos;
+    xmlString = xmlString.replace(/&(?!(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/g, '&amp;');
     
     return xmlString;
 }
