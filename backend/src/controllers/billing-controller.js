@@ -603,34 +603,19 @@ export async function importXmlFile(req, res) {
 
         console.log(`[billing-controller] Starting XML import of ${file.originalname} (${file.size} bytes)`);
 
-        // Detectar tipo de XML basado en el nombre del archivo o contenido
-        const fileName = file.originalname.toLowerCase();
-        const isCxcFile = fileName.includes('cxc') || fileName.includes('cartera') || fileName.includes('por_cobrar');
-
-        let result;
-        if (isCxcFile) {
-            // Usar servicio de CXC para archivos de cartera por cobrar
-            console.log('[billing-controller] Detected CXC file, using CXC import service');
-            const { importCxcFile } = await import('../services/cxc-import-service.js');
-            result = await importCxcFile(
-                file.buffer,
-                file.originalname,
-                userId
-            );
-        } else {
-            // Usar servicio de pagos para archivos de estado de cuenta
-            console.log('[billing-controller] Using payment import service');
-            const { importKoinorXMLFile } = await import('../services/import-koinor-xml-service.js');
-            result = await importKoinorXMLFile(
-                file.buffer,
-                file.originalname,
-                userId
-            );
-        }
+        // Siempre usar el servicio de pagos XML (que ahora también extrae facturas FC)
+        // El parser unificado maneja AB (pagos), NC (notas de crédito) y FC (facturas)
+        console.log('[billing-controller] Using unified XML import service');
+        const { importKoinorXMLFile } = await import('../services/import-koinor-xml-service.js');
+        const result = await importKoinorXMLFile(
+            file.buffer,
+            file.originalname,
+            userId
+        );
 
         res.json({
             success: true,
-            message: isCxcFile ? 'Importación de CXC completada' : 'Importación XML completada',
+            message: 'Importación XML completada',
             ...result
         });
 
