@@ -27,7 +27,7 @@ export const navItemsByRole = {
     { id: 'dashboard', label: 'Dashboard', view: 'dashboard', icon: 'Dashboard' },
     { id: 'documents', label: 'Documentos', view: 'documents', icon: 'Assignment' },
     { id: 'notificaciones', label: 'Mis Mensajes', view: 'notificaciones', icon: 'Message' },
-    // { id: 'cartera-cobros', label: 'Cartera de Cobros', view: 'cartera-cobros', icon: 'AccountBalance' },
+    { id: 'cartera-cobros', label: 'Cartera de Cobros', view: 'cartera-cobros', icon: 'AccountBalance' },
     // { id: 'formularios-uafe', label: 'Formularios UAFE', view: 'formularios-uafe', icon: 'Description' },
     { id: 'generador-qr', label: 'Generador QR', view: 'generador-qr', icon: 'QrCode' }
   ],
