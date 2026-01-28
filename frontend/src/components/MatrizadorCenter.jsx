@@ -6,6 +6,7 @@ import GeneradorQR from './matrizador/GeneradorQR';
 import GestionDocumentos from './GestionDocumentos';
 
 import MisMensajes from './MisMensajes';
+import NotificationsHistory from './Documents/NotificationsHistory';
 import FormulariosUAFE from './FormulariosUAFE';
 import CarteraCobros from './billing/CarteraCobros';
 import useDocumentStore from '../store/document-store';
@@ -115,6 +116,9 @@ const MatrizadorCenter = () => {
       case 'notificaciones':
       case 'mensajes':
         return <MisMensajes onNavigateToDocument={handleNavigateToDocumentFromMessage} />;
+
+      case 'historial-notificaciones':
+        return <NotificationsHistory />;
 
       case 'formularios-uafe':
         return <FormulariosUAFE />;

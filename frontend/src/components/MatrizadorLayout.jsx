@@ -129,16 +129,16 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
     Description: <DescriptionIcon />,
     Article: <ArticleIcon />,
     QrCode: <QrCodeIcon />,
-    WhatsApp: (
-      <Badge badgeContent={unreadCount} color="error" invisible={unreadCount === 0}>
-        <WhatsAppIcon />
-      </Badge>
-    ),
+    WhatsApp: <WhatsAppIcon />,
     AccountBalance: <AccountBalanceIcon />,
-    Message: <MessageIcon />
+    Message: (
+      <Badge badgeContent={unreadCount} color="error" invisible={unreadCount === 0}>
+        <MessageIcon />
+      </Badge>
+    )
   };
   const navigationItems = useMemo(() => {
-    const allowed = ['dashboard', 'documents', 'notificaciones', 'cartera-cobros', 'history', 'formularios-uafe', 'generador-qr'];
+    const allowed = ['dashboard', 'documents', 'notificaciones', 'mensajes', 'historial-notificaciones', 'cartera-cobros', 'history', 'formularios-uafe', 'generador-qr'];
     const source = (navItemsByRole[role] || []).filter(i => allowed.includes(i.id));
     return source.map(i => ({
       text: i.label,
