@@ -151,7 +151,9 @@ async function importFile(file, dateFrom = null, dateTo = null, onProgress = nul
     const config = {
         headers: {
             'Content-Type': 'multipart/form-data'
-        }
+        },
+        // Timeout extendido para archivos grandes (5 minutos)
+        timeout: 300000
     };
 
     // Agregar callback de progreso si se proporciona
