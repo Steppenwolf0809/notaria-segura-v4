@@ -81,6 +81,9 @@ router.get('/documents/:documentId/payment-status', validateParams(documentIdPar
 // Import endpoint - requires file upload - 🔒 SECURITY: CSRF protection added
 router.post('/import', csrfProtection, upload.single('file'), billingController.importFile);
 
+// Auto-link invoices to documents - 🔒 SECURITY: CSRF protection added
+router.post('/auto-link', csrfProtection, billingController.autoLinkInvoices);
+
 // ============================================================================
 // SPRINT 6: Cartera de Matrizadores
 // ============================================================================

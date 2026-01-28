@@ -445,3 +445,119 @@ export async function getImportStats() {
         }, {})
     };
 }
+
+/**
+ * Auto-link invoices to documents by matching client name and amount
+ * This helps link invoices that weren't linked during import
+ * @returns {Object} Statistics about the linking process
+ */
+export async function autoLinkInvoicesToDocuments() {
+    console.log('[import-koinor] Starting auto-link of invoices to documents...');
+
+    const stats = {
+        invoicesWithoutDocument: 0,
+        documentsWithoutInvoice: 0,
+        linked: 0,
+        linkedDetails: []
+    };
+
+    // 1. Find all invoices without a linked document
+    const unlinkedInvoices = await prisma.invoice.findMany({
+        where: { documentId: null },
+        select: {
+            id: true,
+            invoiceNumber: true,
+            clientName: true,
+            totalAmount: true
+        }
+    });
+
+    stats.invoicesWithoutDocument = unlinkedInvoices.length;
+    console.log(`[import-koinor] Found ${unlinkedInvoices.length} invoices without linked document`);
+
+    // 2. Find all documents without numeroFactura
+    const documentsWithoutFactura = await prisma.document.findMany({
+        where: {
+            numeroFactura: null,
+            status: { not: 'NOTA_CREDITO' }
+        },
+        select: {
+            id: true,
+            protocolNumber: true,
+            clientName: true,
+            totalFactura: true
+        }
+    });
+
+    stats.documentsWithoutInvoice = documentsWithoutFactura.length;
+    console.log(`[import-koinor] Found ${documentsWithoutFactura.length} documents without numeroFactura`);
+
+    // 3. Try to match invoices to documents by client name and amount
+    for (const invoice of unlinkedInvoices) {
+        // Normalize client name for comparison
+        const invoiceClientNormalized = normalizeClientName(invoice.clientName);
+        const invoiceAmount = Number(invoice.totalAmount);
+
+        // Find matching document
+        const matchingDoc = documentsWithoutFactura.find(doc => {
+            const docClientNormalized = normalizeClientName(doc.clientName);
+            const docAmount = Number(doc.totalFactura);
+
+            // Match by client name (fuzzy) and exact amount
+            const nameMatch = invoiceClientNormalized === docClientNormalized ||
+                invoiceClientNormalized.includes(docClientNormalized) ||
+                docClientNormalized.includes(invoiceClientNormalized);
+
+            const amountMatch = Math.abs(invoiceAmount - docAmount) < 0.01;
+
+            return nameMatch && amountMatch;
+        });
+
+        if (matchingDoc) {
+            // Link the invoice to the document
+            await prisma.invoice.update({
+                where: { id: invoice.id },
+                data: { documentId: matchingDoc.id }
+            });
+
+            // Update document with numeroFactura
+            await prisma.document.update({
+                where: { id: matchingDoc.id },
+                data: { numeroFactura: invoice.invoiceNumber }
+            });
+
+            stats.linked++;
+            stats.linkedDetails.push({
+                invoiceNumber: invoice.invoiceNumber,
+                documentProtocol: matchingDoc.protocolNumber,
+                clientName: invoice.clientName,
+                amount: invoiceAmount
+            });
+
+            // Remove from candidates to avoid duplicate linking
+            const docIndex = documentsWithoutFactura.findIndex(d => d.id === matchingDoc.id);
+            if (docIndex > -1) {
+                documentsWithoutFactura.splice(docIndex, 1);
+            }
+
+            console.log(`[import-koinor] Linked invoice ${invoice.invoiceNumber} to document ${matchingDoc.protocolNumber}`);
+        }
+    }
+
+    console.log(`[import-koinor] Auto-link completed: ${stats.linked} invoices linked`);
+    return stats;
+}
+
+/**
+ * Normalize client name for comparison
+ */
+function normalizeClientName(name) {
+    if (!name) return '';
+    return name
+        .toUpperCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '') // Remove accents
+        .replace(/[^A-Z0-9\s]/g, '') // Remove special chars
+        .replace(/\s+/g, ' ') // Normalize spaces
+        .trim();
+}

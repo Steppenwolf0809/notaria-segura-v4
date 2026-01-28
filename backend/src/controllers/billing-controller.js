@@ -577,6 +577,29 @@ export async function getStats(req, res) {
 }
 
 /**
+ * Auto-link invoices to documents by matching client name and amount
+ * POST /api/billing/auto-link
+ */
+export async function autoLinkInvoices(req, res) {
+    try {
+        const { autoLinkInvoicesToDocuments } = await import('../services/import-koinor-service.js');
+        const result = await autoLinkInvoicesToDocuments();
+
+        res.json({
+            success: true,
+            message: `Se vincularon ${result.linked} facturas a documentos`,
+            stats: result
+        });
+    } catch (error) {
+        console.error('[billing-controller] Auto-link error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al vincular facturas automáticamente'
+        });
+    }
+}
+
+/**
  * Get list of clients with balances
  * 🔒 OWASP Security: Migrated from $queryRaw to Prisma.sql with safe parametrization
  */
