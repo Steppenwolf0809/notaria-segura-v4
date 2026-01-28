@@ -37,6 +37,7 @@ export async function parseKoinorXML(fileBuffer, fileName) {
     const startTime = Date.now();
     const payments = [];
     const notasCredito = [];
+    const invoices = []; // Facturas FC para importación CXC
     let totalTransactions = 0;
     const errors = [];
 
@@ -137,7 +138,7 @@ export async function parseKoinorXML(fileBuffer, fileName) {
                     try {
                         const tipdoc = String(currentGroup.tipdoc || '').trim().toUpperCase();
                         
-                        // Filtrar solo AB (pagos) y NC (notas de crédito)
+                        // Filtrar AB (pagos), NC (notas de crédito) y FC (facturas)
                         if (tipdoc === 'AB') {
                             const payment = parsePaymentTransaction(currentGroup);
                             if (payment) {
@@ -148,8 +149,13 @@ export async function parseKoinorXML(fileBuffer, fileName) {
                             if (nc) {
                                 notasCredito.push(nc);
                             }
+                        } else if (tipdoc === 'FC') {
+                            // Facturas para importación CXC
+                            const invoice = parseInvoiceTransaction(currentGroup);
+                            if (invoice) {
+                                invoices.push(invoice);
+                            }
                         }
-                        // FC (facturas) se ignoran - ya las tenemos en el sistema
                     } catch (error) {
                         errors.push({
                             transaction: totalTransactions,
@@ -171,15 +177,17 @@ export async function parseKoinorXML(fileBuffer, fileName) {
                 const groupedPayments = groupMultiInvoicePayments(payments);
 
                 const duration = ((Date.now() - startTime) / 1000).toFixed(2);
-                console.log(`[xml-koinor-parser] Parsed in ${duration}s: ${groupedPayments.length} payments, ${notasCredito.length} NC`);
+                console.log(`[xml-koinor-parser] Parsed in ${duration}s: ${groupedPayments.length} payments, ${notasCredito.length} NC, ${invoices.length} FC`);
 
                 resolve({
                     payments: groupedPayments,
                     notasCredito,
+                    invoices, // Facturas FC para importación CXC
                     summary: {
                         totalTransactions,
                         paymentsFound: groupedPayments.length,
                         notasCreditoFound: notasCredito.length,
+                        invoicesFound: invoices.length,
                         errors: errors.length,
                         errorDetails: errors.slice(0, 20), // Solo primeros 20 errores
                         processedAt: new Date(),
@@ -246,6 +254,36 @@ function parsePaymentTransaction(group) {
         amount: valcob,
         sigdoc: String(group.sigdoc || '').trim(), // Debería ser "-" para pagos
         concept: String(group.concep || '').trim()
+    };
+}
+
+/**
+ * Parsea una transacción de tipo FC (factura) para importación CXC
+ * @param {Object} group - Nodo d_vc_i_estado_cuenta_group1
+ * @returns {Object|null} - Objeto de factura o null si es inválido
+ */
+function parseInvoiceTransaction(group) {
+    const invoiceNumber = String(group.numdoc || '').trim();
+    const numtra = String(group.numtra || '').trim();
+    const valcob = parseFloat(group.valcob || 0);
+
+    if (!invoiceNumber && !numtra) {
+        console.warn('[xml-koinor-parser] Skipping FC: missing numdoc and numtra');
+        return null;
+    }
+
+    // Parsear fecha de emisión
+    const issueDate = parseKoinorDate(group.fecemi);
+
+    return {
+        invoiceNumber: invoiceNumber || numtra,
+        invoiceNumberRaw: numtra || invoiceNumber,
+        clientTaxId: String(group.codcli || '').trim(),
+        clientName: String(group.nomcli || '').trim(),
+        totalAmount: Math.abs(valcob),
+        issueDate,
+        concept: String(group.concep || '').trim(),
+        type: 'FC'
     };
 }
 
