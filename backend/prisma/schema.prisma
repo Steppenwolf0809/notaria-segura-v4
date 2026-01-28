@@ -599,6 +599,7 @@ model Invoice {
   
   // Montos
   totalAmount       Decimal       @db.Decimal(12, 2)  // valcob de FC
+  paidAmount        Decimal?      @db.Decimal(12, 2) @default(0)  // Suma incremental de pagos
   
   // Fechas
   issueDate         DateTime               // fecemi (en FC) o fectra (en AB para legacy)
@@ -634,8 +635,8 @@ model Invoice {
 model Payment {
   id              String      @id @default(uuid())
   
-  // Identificación (ÚNICO)
-  receiptNumber   String      @unique  // numdoc: 001-2601000089
+  // Identificación (NO único - un recibo puede pagar múltiples facturas)
+  receiptNumber   String      // numdoc: 001-2601000089
   
   // Monto
   amount          Decimal     @db.Decimal(12, 2)  // valcob de AB
