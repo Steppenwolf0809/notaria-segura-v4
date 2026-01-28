@@ -50,12 +50,16 @@ const ListaPagos = () => {
     // Cargar estadísticas
     const loadStats = useCallback(async () => {
         try {
-            const response = await billingService.getSummary();
+            const params = {
+                dateFrom: dateFrom || undefined,
+                dateTo: dateTo || undefined
+            };
+            const response = await billingService.getSummary(params);
             setStats(response.data);
         } catch (err) {
             console.error('Error cargando estadísticas:', err);
         }
-    }, []);
+    }, [dateFrom, dateTo]);
 
     // Cargar pagos
     const loadPayments = useCallback(async () => {

@@ -874,21 +874,73 @@ export async function getInvoicePayments(req, res) {
 
 /**
  * Get billing summary for a date range (for dashboard)
+ * Calculates KPIs based on payment dates (not invoice issue dates)
  */
 export async function getSummary(req, res) {
     try {
         const { dateFrom, dateTo } = req.query;
 
-        const where = {};
+        // Build where clause for payments based on date range
+        const paymentWhere = {};
         if (dateFrom || dateTo) {
-            where.issueDate = {};
-            if (dateFrom) where.issueDate.gte = new Date(dateFrom);
-            if (dateTo) where.issueDate.lte = new Date(dateTo);
+            paymentWhere.paymentDate = {};
+            if (dateFrom) {
+                const fromDate = new Date(dateFrom);
+                fromDate.setHours(0, 0, 0, 0);
+                paymentWhere.paymentDate.gte = fromDate;
+            }
+            if (dateTo) {
+                const toDate = new Date(dateTo);
+                toDate.setHours(23, 59, 59, 999);
+                paymentWhere.paymentDate.lte = toDate;
+            }
         }
 
-        // Get invoices in range
+        // Get payments in range
+        const paymentsInRange = await prisma.payment.findMany({
+            where: paymentWhere,
+            select: {
+                id: true,
+                amount: true,
+                paymentDate: true
+            }
+        });
+
+        // Calculate totals for filtered payments
+        const totalPayments = paymentsInRange.length;
+        const totalCollected = paymentsInRange.reduce((sum, p) => sum + Number(p.amount), 0);
+
+        // Calculate today's payments
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const paymentsToday = await prisma.payment.findMany({
+            where: {
+                paymentDate: {
+                    gte: today,
+                    lt: tomorrow
+                }
+            },
+            select: {
+                amount: true
+            }
+        });
+
+        const paymentsCountToday = paymentsToday.length;
+        const collectedToday = paymentsToday.reduce((sum, p) => sum + Number(p.amount), 0);
+
+        // Get invoice stats (for overall context, not date-filtered)
+        const invoiceWhere = {};
+        if (dateFrom || dateTo) {
+            invoiceWhere.issueDate = {};
+            if (dateFrom) invoiceWhere.issueDate.gte = new Date(dateFrom);
+            if (dateTo) invoiceWhere.issueDate.lte = new Date(dateTo);
+        }
+
         const invoices = await prisma.invoice.findMany({
-            where,
+            where: invoiceWhere,
             include: { payments: true }
         });
 
@@ -930,6 +982,12 @@ export async function getSummary(req, res) {
                 from: dateFrom || 'all',
                 to: dateTo || 'all'
             },
+            // Payment-based KPIs (filtered by payment date)
+            totalPayments,
+            totalCollected,
+            paymentsToday: paymentsCountToday,
+            collectedToday,
+            // Invoice-based totals (filtered by issue date)
             totals: {
                 invoiced: totalInvoiced,
                 paid: totalPaid,
