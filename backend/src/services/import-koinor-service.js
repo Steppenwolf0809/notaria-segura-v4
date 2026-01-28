@@ -447,8 +447,17 @@ export async function getImportStats() {
 }
 
 /**
- * Auto-link invoices to documents by matching client name and amount
+ * Auto-link invoices to documents by matching client name, amount, and date
  * This helps link invoices that weren't linked during import
+ *
+ * Matching criteria:
+ * - Amount: Must match exactly (±$0.05 tolerance)
+ * - Client name: Jaccard similarity > 75%
+ * - Date: Invoice date within ±30 days of document creation
+ * - Uniqueness: Each document can only be linked to ONE invoice
+ *
+ * @param {Object} options - Configuration options
+ * @param {boolean} options.dryRun - If true, only shows candidates without applying changes
  * @returns {Object} Statistics about the linking process
  */
 export async function autoLinkInvoicesToDocuments(options = {}) {
@@ -463,6 +472,7 @@ export async function autoLinkInvoicesToDocuments(options = {}) {
         invoicesWithoutDocument: 0,
         documentsWithoutInvoice: 0,
         linked: 0,
+        skippedDuplicates: 0,
         linkedDetails: [],
         candidates: [] // For dryRun
     };
@@ -474,7 +484,8 @@ export async function autoLinkInvoicesToDocuments(options = {}) {
             id: true,
             invoiceNumber: true,
             clientName: true,
-            totalAmount: true
+            totalAmount: true,
+            issueDate: true
         }
     });
 
@@ -491,55 +502,91 @@ export async function autoLinkInvoicesToDocuments(options = {}) {
             id: true,
             protocolNumber: true,
             clientName: true,
-            totalFactura: true
+            totalFactura: true,
+            createdAt: true,
+            fechaFactura: true
         }
     });
 
     stats.documentsWithoutInvoice = documentsWithoutFactura.length;
     console.log(`[import-koinor] Found ${documentsWithoutFactura.length} documents without numeroFactura`);
 
-    // 3. Try to match invoices to documents by client name and amount
+    // Track used documents to prevent duplicates (even in dryRun)
+    const usedDocumentIds = new Set();
+
+    // 3. Try to match invoices to documents by client name, amount, and date
     for (const invoice of unlinkedInvoices) {
         const invoiceAmount = Number(invoice.totalAmount);
+        const invoiceDate = invoice.issueDate ? new Date(invoice.issueDate) : null;
 
         // Find best matching document
-        // We look for the BEST match, not just the first one
         let bestMatch = null;
         let bestScore = 0;
+        let bestDateDiff = Infinity;
 
         for (const doc of documentsWithoutFactura) {
-            const docAmount = Number(doc.totalFactura);
-
-            // 1. Amount Check: relaxed tolerance ($0.05) to handle roundings
-            if (Math.abs(invoiceAmount - docAmount) > 0.05) {
-                continue; // Skip if amount doesn't match
+            // Skip if document already used
+            if (usedDocumentIds.has(doc.id)) {
+                continue;
             }
 
-            // 2. Name fuzzy matching
+            const docAmount = Number(doc.totalFactura);
+
+            // 1. Amount Check: strict tolerance ($0.05) to handle roundings
+            if (Math.abs(invoiceAmount - docAmount) > 0.05) {
+                continue;
+            }
+
+            // 2. Name fuzzy matching with HTML entity normalization
             const score = calculateJaccardSimilarity(invoice.clientName, doc.clientName);
 
-            // Threshold > 0.65 suggests good similarity for names
-            if (score > 0.65) {
-                if (score > bestScore) {
-                    bestScore = score;
-                    bestMatch = doc;
+            // Higher threshold (75%) for better accuracy
+            if (score < 0.75) {
+                continue;
+            }
+
+            // 3. Date proximity check (±30 days)
+            let dateDiff = Infinity;
+            const docDate = doc.fechaFactura || doc.createdAt;
+            if (invoiceDate && docDate) {
+                const docDateTime = new Date(docDate);
+                dateDiff = Math.abs(invoiceDate.getTime() - docDateTime.getTime()) / (1000 * 60 * 60 * 24);
+
+                // Skip if dates are too far apart (more than 30 days)
+                if (dateDiff > 30) {
+                    continue;
                 }
+            }
+
+            // Calculate combined score (name similarity + date proximity bonus)
+            // Date proximity gives up to 0.1 bonus (closer = better)
+            const dateBonus = dateDiff < Infinity ? (1 - dateDiff / 30) * 0.1 : 0;
+            const combinedScore = score + dateBonus;
+
+            if (combinedScore > bestScore) {
+                bestScore = combinedScore;
+                bestMatch = doc;
+                bestDateDiff = dateDiff;
             }
         }
 
         if (bestMatch) {
-            // Found a match!
+            // Mark document as used
+            usedDocumentIds.add(bestMatch.id);
+
+            const matchData = {
+                invoiceNumber: invoice.invoiceNumber,
+                clientNameInvoice: invoice.clientName,
+                clientNameDocument: bestMatch.clientName,
+                amountInvoice: invoiceAmount,
+                amountDocument: Number(bestMatch.totalFactura),
+                documentProtocol: bestMatch.protocolNumber,
+                matchScore: Math.round(bestScore * 100) + '%',
+                dateDiff: bestDateDiff < Infinity ? Math.round(bestDateDiff) + ' días' : 'N/A'
+            };
+
             if (dryRun) {
-                stats.candidates.push({
-                    invoiceNumber: invoice.invoiceNumber,
-                    clientNameInvoice: invoice.clientName,
-                    clientNameDocument: bestMatch.clientName,
-                    amountInvoice: invoiceAmount,
-                    amountDocument: Number(bestMatch.totalFactura),
-                    documentProtocol: bestMatch.protocolNumber,
-                    matchScore: Math.round(bestScore * 100) + '%'
-                });
-                stats.linked++; // Count as potential link
+                stats.candidates.push(matchData);
             } else {
                 // Link the invoice to the document
                 await prisma.invoice.update({
@@ -553,26 +600,12 @@ export async function autoLinkInvoicesToDocuments(options = {}) {
                     data: { numeroFactura: invoice.invoiceNumber }
                 });
 
-                stats.linkedDetails.push({
-                    invoiceNumber: invoice.invoiceNumber,
-                    documentProtocol: bestMatch.protocolNumber,
-                    clientName: invoice.clientName,
-                    amount: invoiceAmount,
-                    matchScore: Math.round(bestScore * 100) + '%'
-                });
+                stats.linkedDetails.push(matchData);
 
-                // Remove from candidates to avoid duplicate linking
-                // Note: Only remove if we actually link. In dryRun we don't modify the list 
-                // essentially, but for simulation accuracy we should locally
-                const docIndex = documentsWithoutFactura.findIndex(d => d.id === bestMatch.id);
-                if (docIndex > -1) {
-                    documentsWithoutFactura.splice(docIndex, 1);
-                }
-
-                console.log(`[import-koinor] Linked invoice ${invoice.invoiceNumber} to document ${bestMatch.protocolNumber} (Score: ${bestScore.toFixed(2)})`);
+                console.log(`[import-koinor] Linked invoice ${invoice.invoiceNumber} to document ${bestMatch.protocolNumber} (Score: ${bestScore.toFixed(2)}, DateDiff: ${bestDateDiff < Infinity ? Math.round(bestDateDiff) + 'd' : 'N/A'})`);
             }
 
-            if (!dryRun) stats.linked++;
+            stats.linked++;
         }
     }
 
@@ -582,14 +615,21 @@ export async function autoLinkInvoicesToDocuments(options = {}) {
 
 /**
  * Normalize client name for comparison
+ * Handles HTML entities, accents, and special characters
  */
 function normalizeClientName(name) {
     if (!name) return '';
     return name
+        // Decode HTML entities
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
         .toUpperCase()
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '') // Remove accents
-        .replace(/[^A-Z0-9\s]/g, '') // Remove special chars
+        .replace(/[^A-Z0-9\s]/g, '') // Remove special chars (including &)
         .replace(/\s+/g, ' ') // Normalize spaces
         .trim();
 }
