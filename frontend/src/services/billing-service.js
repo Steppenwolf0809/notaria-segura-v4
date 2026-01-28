@@ -179,6 +179,17 @@ async function getImportLogs(params = {}) {
 }
 
 /**
+ * Auto-vincular facturas a documentos por nombre de cliente y monto
+ * @param {Object} options - Opciones
+ * @param {boolean} options.dryRun - Si es true, solo muestra candidatos sin aplicar cambios
+ * @returns {Promise<Object>} Resultado de la vinculación
+ */
+async function autoLinkInvoices(options = {}) {
+    const response = await apiClient.post('/billing/auto-link', options);
+    return response.data;
+}
+
+/**
  * ============================================================================
  * SECCIÓN 6: INTEGRACIÓN CON DOCUMENTOS
  * ============================================================================
