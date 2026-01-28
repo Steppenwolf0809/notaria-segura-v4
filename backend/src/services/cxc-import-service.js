@@ -31,8 +31,7 @@ export async function importCxcFile(fileBuffer, fileName, userId) {
             fileType: 'XML_CXC',
             totalRows: 0,
             status: 'PROCESSING',
-            executedBy: userId,
-            startedAt: new Date()
+            executedBy: userId
         }
     });
 
@@ -173,10 +172,7 @@ async function processInvoiceUpsert(factura, sourceFile) {
                 clientName,
                 totalAmount,
                 status: 'PENDING',
-                notes: invoice.notes 
-                    ? `${invoice.notes}\nActualizado desde CXC: ${sourceFile}`
-                    : `Actualizado desde CXC: ${sourceFile}`,
-                lastSyncAt: new Date()
+                sourceFile
             }
         });
         result.facturaVinculada = true;
@@ -196,7 +192,6 @@ async function processInvoiceUpsert(factura, sourceFile) {
                 status: 'PENDING',
                 isLegacy: true,
                 sourceFile,
-                notes: `Importado desde CXC (Migración): ${sourceFile}`,
                 concept: factura.concept || 'Factura importada de cartera'
             }
         });

@@ -636,11 +636,13 @@ export async function importXmlFile(req, res) {
 
     } catch (error) {
         console.error('[billing-controller] XML import error:', error);
+        console.error('[billing-controller] Error stack:', error.stack);
         // 🔒 SECURITY: Never expose internal error details in production
         res.status(500).json({
             success: false,
             message: 'Error durante la importación del archivo XML',
-            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+            error: error.message,
+            details: process.env.NODE_ENV !== 'production' ? error.stack : undefined
         });
     }
 }
