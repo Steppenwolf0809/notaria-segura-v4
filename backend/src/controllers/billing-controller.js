@@ -1374,7 +1374,8 @@ export async function getCarteraPorCobrar(req, res) {
                     balance: 0,
                     matrizador: invoice.document?.assignedTo
                         ? `${invoice.document.assignedTo.firstName} ${invoice.document.assignedTo.lastName}`
-                        : 'Sin asignar'
+                        : 'Sin asignar',
+                    invoices: [] // Detalle de facturas individuales
                 });
             }
 
@@ -1383,6 +1384,17 @@ export async function getCarteraPorCobrar(req, res) {
             client.totalInvoiced += Number(invoice.totalAmount);
             client.totalPaid += paid;
             client.balance += balance;
+            
+            // Agregar detalle de factura individual
+            client.invoices.push({
+                invoiceNumber: invoice.invoiceNumber,
+                issueDate: invoice.issueDate,
+                dueDate: invoice.dueDate,
+                totalAmount: Number(invoice.totalAmount),
+                paidAmount: paid,
+                balance: balance,
+                status: invoice.status
+            });
         }
 
         // Convert to array and sort by balance descending
