@@ -151,7 +151,9 @@ async function processInvoiceUpsert(factura, sourceFile) {
     }
 
     const totalAmount = parseFloat(factura.totalAmount || 0);
+    const balance = parseFloat(factura.balance || factura.totalAmount || 0);
     const issueDate = factura.issueDate ? new Date(factura.issueDate) : new Date();
+    const dueDate = factura.dueDate ? new Date(factura.dueDate) : null;
 
     // Buscar factura existente
     let invoice = await prisma.invoice.findFirst({
@@ -164,22 +166,31 @@ async function processInvoiceUpsert(factura, sourceFile) {
     });
 
     if (invoice) {
-        // Escenario 1: Factura existe - actualizar y vincular
+        // Escenario 1: Factura existe - actualizar datos del CXC
+        // Calcular paidAmount basado en la diferencia entre totalAmount y balance
+        const paidAmount = totalAmount - balance;
+        const newStatus = balance <= 0 ? 'PAID' : (paidAmount > 0 ? 'PARTIAL' : 'PENDING');
+        
         await prisma.invoice.update({
             where: { id: invoice.id },
             data: {
                 clientTaxId,
                 clientName,
                 totalAmount,
-                status: 'PENDING',
+                paidAmount: paidAmount > 0 ? paidAmount : 0,
+                dueDate,
+                status: newStatus,
                 sourceFile
             }
         });
         result.facturaVinculada = true;
-        console.log(`[cxc-import] Factura vinculada: ${invoiceNumber}`);
+        console.log(`[cxc-import] Factura actualizada: ${invoiceNumber} (total: ${totalAmount}, saldo: ${balance}, status: ${newStatus})`);
         
     } else {
         // Escenario 2: Factura no existe - crear como migración
+        // Calcular paidAmount basado en la diferencia entre totalAmount y balance
+        const paidAmount = totalAmount - balance;
+        
         await prisma.invoice.create({
             data: {
                 invoiceNumber,
@@ -187,16 +198,17 @@ async function processInvoiceUpsert(factura, sourceFile) {
                 clientTaxId,
                 clientName,
                 totalAmount,
-                paidAmount: 0,
+                paidAmount: paidAmount > 0 ? paidAmount : 0,
                 issueDate,
-                status: 'PENDING',
+                dueDate,
+                status: balance <= 0 ? 'PAID' : (paidAmount > 0 ? 'PARTIAL' : 'PENDING'),
                 isLegacy: true,
                 sourceFile,
                 concept: factura.concept || 'Factura importada de cartera'
             }
         });
         result.facturaCreada = true;
-        console.log(`[cxc-import] Factura creada (migración): ${invoiceNumber}`);
+        console.log(`[cxc-import] Factura creada: ${invoiceNumber} (total: ${totalAmount}, saldo: ${balance})`);
     }
 
     return result;
