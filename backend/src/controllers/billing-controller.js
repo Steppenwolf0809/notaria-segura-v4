@@ -1349,6 +1349,13 @@ export async function getCarteraPorCobrar(req, res) {
                             }
                         }
                     }
+                },
+                // Asignación directa de matrizador (para facturas sin documento)
+                assignedTo: {
+                    select: {
+                        firstName: true,
+                        lastName: true
+                    }
                 }
             },
             orderBy: { issueDate: 'desc' }
@@ -1363,6 +1370,12 @@ export async function getCarteraPorCobrar(req, res) {
 
             if (balance <= 0) continue; // Skip fully paid
 
+            // Determinar matrizador: primero del documento, luego asignación directa
+            const assignedUser = invoice.document?.assignedTo || invoice.assignedTo;
+            const matrizadorName = assignedUser
+                ? `${assignedUser.firstName} ${assignedUser.lastName}`
+                : 'Sin asignar';
+
             const key = invoice.clientTaxId;
             if (!clientMap.has(key)) {
                 clientMap.set(key, {
@@ -1372,9 +1385,8 @@ export async function getCarteraPorCobrar(req, res) {
                     totalInvoiced: 0,
                     totalPaid: 0,
                     balance: 0,
-                    matrizador: invoice.document?.assignedTo
-                        ? `${invoice.document.assignedTo.firstName} ${invoice.document.assignedTo.lastName}`
-                        : 'Sin asignar',
+                    matrizador: matrizadorName,
+                    canAssign: !invoice.documentId, // Solo se puede asignar si no tiene documento
                     invoices: [] // Detalle de facturas individuales
                 });
             }
@@ -1387,13 +1399,16 @@ export async function getCarteraPorCobrar(req, res) {
             
             // Agregar detalle de factura individual
             client.invoices.push({
+                id: invoice.id,
                 invoiceNumber: invoice.invoiceNumber,
                 issueDate: invoice.issueDate,
                 dueDate: invoice.dueDate,
                 totalAmount: Number(invoice.totalAmount),
                 paidAmount: paid,
                 balance: balance,
-                status: invoice.status
+                status: invoice.status,
+                hasDocument: !!invoice.documentId,
+                canAssign: !invoice.documentId
             });
         }
 
@@ -1762,6 +1777,130 @@ export async function importCxcFile(req, res) {
             success: false,
             message: 'Error durante la importación del archivo CXC',
             details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+}
+
+/**
+ * Asignar matrizador a una factura (para facturas sin documento)
+ * Solo CAJA y ADMIN pueden usar esta función
+ */
+export async function assignInvoiceMatrizador(req, res) {
+    try {
+        const { invoiceId } = req.params;
+        const { matrizadorId } = req.body;
+
+        console.log(`[billing-controller] Assigning matrizador ${matrizadorId} to invoice ${invoiceId}`);
+
+        // Validar que la factura existe
+        const invoice = await prisma.invoice.findUnique({
+            where: { id: invoiceId },
+            include: { document: true }
+        });
+
+        if (!invoice) {
+            return res.status(404).json({
+                success: false,
+                message: 'Factura no encontrada'
+            });
+        }
+
+        // Si la factura tiene documento, no permitir asignación directa
+        if (invoice.documentId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Esta factura está vinculada a un documento. Use la asignación del documento.'
+            });
+        }
+
+        // Validar que el matrizador existe y tiene rol MATRIZADOR o ARCHIVO
+        if (matrizadorId) {
+            const matrizador = await prisma.user.findUnique({
+                where: { id: parseInt(matrizadorId) }
+            });
+
+            if (!matrizador) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Matrizador no encontrado'
+                });
+            }
+
+            if (!['MATRIZADOR', 'ARCHIVO'].includes(matrizador.role)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'El usuario seleccionado no tiene rol de Matrizador o Archivo'
+                });
+            }
+        }
+
+        // Actualizar la factura
+        const updatedInvoice = await prisma.invoice.update({
+            where: { id: invoiceId },
+            data: {
+                assignedToId: matrizadorId ? parseInt(matrizadorId) : null
+            },
+            include: {
+                assignedTo: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true
+                    }
+                }
+            }
+        });
+
+        res.json({
+            success: true,
+            message: matrizadorId 
+                ? `Factura asignada a ${updatedInvoice.assignedTo.firstName} ${updatedInvoice.assignedTo.lastName}`
+                : 'Asignación de factura removida',
+            invoice: {
+                id: updatedInvoice.id,
+                invoiceNumber: updatedInvoice.invoiceNumber,
+                assignedTo: updatedInvoice.assignedTo
+            }
+        });
+
+    } catch (error) {
+        console.error('[billing-controller] assignInvoiceMatrizador error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al asignar matrizador a la factura'
+        });
+    }
+}
+
+/**
+ * Obtener lista de matrizadores disponibles para asignación
+ */
+export async function getMatrizadoresForAssignment(req, res) {
+    try {
+        const matrizadores = await prisma.user.findMany({
+            where: {
+                role: { in: ['MATRIZADOR', 'ARCHIVO'] },
+                isActive: true
+            },
+            select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                role: true
+            },
+            orderBy: { firstName: 'asc' }
+        });
+
+        res.json({
+            success: true,
+            data: matrizadores
+        });
+
+    } catch (error) {
+        console.error('[billing-controller] getMatrizadoresForAssignment error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener lista de matrizadores'
         });
     }
 }

@@ -30,6 +30,7 @@ model User {
   importLogs                 ImportLog[]
   mensajesEnviados           MensajeInterno[]           @relation("MensajesEnviados")
   mensajesRecibidos          MensajeInterno[]           @relation("MensajesRecibidos")
+  assignedInvoices           Invoice[]                  @relation("AssignedInvoices")
 
   @@map("users")
 }
@@ -615,6 +616,10 @@ model Invoice {
   // Vinculación con documento notarial (automática por numeroFactura)
   documentId        String?
   document          Document?     @relation(fields: [documentId], references: [id])
+  
+  // Asignación directa de matrizador (para facturas sin documento)
+  assignedToId      Int?
+  assignedTo        User?         @relation("AssignedInvoices", fields: [assignedToId], references: [id])
   
   // Metadata de importación
   importedAt        DateTime      @default(now())

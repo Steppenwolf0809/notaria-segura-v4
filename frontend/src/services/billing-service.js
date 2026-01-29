@@ -362,6 +362,34 @@ async function getReporteEntregasConSaldo() {
 
 /**
  * ============================================================================
+ * SECCIÓN 8: ASIGNACIÓN DE FACTURAS
+ * ============================================================================
+ */
+
+/**
+ * Obtener lista de matrizadores disponibles para asignación
+ * @returns {Promise<Object>} Lista de matrizadores
+ */
+async function getMatrizadoresForAssignment() {
+    const response = await apiClient.get('/billing/matrizadores');
+    return response.data;
+}
+
+/**
+ * Asignar matrizador a una factura (solo facturas sin documento)
+ * @param {string} invoiceId - ID de la factura
+ * @param {number|null} matrizadorId - ID del matrizador (null para desasignar)
+ * @returns {Promise<Object>} Resultado de la asignación
+ */
+async function assignInvoiceMatrizador(invoiceId, matrizadorId) {
+    const response = await apiClient.patch(`/billing/invoices/${invoiceId}/assign`, {
+        matrizadorId
+    });
+    return response.data;
+}
+
+/**
+ * ============================================================================
  * EXPORTAR SERVICIO
  * ============================================================================
  */
@@ -401,6 +429,10 @@ const billingService = {
     getReportePagosDelPeriodo,
     getReporteFacturasVencidas,
     getReporteEntregasConSaldo,
+
+    // Asignación de facturas
+    getMatrizadoresForAssignment,
+    assignInvoiceMatrizador,
 
     // Utilidades
     formatInvoiceStatus,
