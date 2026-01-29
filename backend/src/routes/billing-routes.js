@@ -137,5 +137,15 @@ router.get('/reports/facturas-vencidas', billingController.getFacturasVencidas);
 // Report: Entregas con Saldo Pendiente (Audit)
 router.get('/reports/entregas-con-saldo', billingController.getEntregasConSaldo);
 
+// ============================================================================
+// ASIGNACIÓN DE FACTURAS
+// ============================================================================
+
+// Obtener lista de matrizadores para asignación
+router.get('/matrizadores', billingController.getMatrizadoresForAssignment);
+
+// Asignar matrizador a una factura (solo facturas sin documento)
+router.patch('/invoices/:invoiceId/assign', csrfProtection, billingController.assignInvoiceMatrizador);
+
 export default router;
 
