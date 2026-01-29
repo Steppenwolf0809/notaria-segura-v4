@@ -250,13 +250,13 @@ async function processSinglePayment(payment, detail, sourceFile) {
         createdLegacy = true;
     }
 
-    // 2. Verificar idempotencia - combinación de 4 campos
-    const existingPayment = await prisma.payment.findFirst({
+    // 2. Verificar idempotencia - por receiptNumber único
+    const existingPayment = await prisma.payment.findUnique({
         where: {
-            receiptNumber: payment.receiptNumber,
-            invoiceId: invoice.id,
-            amount: detail.amount,
-            paymentDate: payment.paymentDate
+            receiptNumber: payment.receiptNumber
+        },
+        include: {
+            invoice: true
         }
     });
 
@@ -269,19 +269,24 @@ async function processSinglePayment(payment, detail, sourceFile) {
     // 3. Crear Payment y actualizar Invoice/Document en transacción
     let documentUpdated = false;
 
-    await prisma.$transaction(async (tx) => {
-        // Crear Payment
-        await tx.payment.create({
-            data: {
-                receiptNumber: payment.receiptNumber,
-                amount: detail.amount,
-                paymentDate: payment.paymentDate,
-                concept: payment.concept || payment.clientName,
-                paymentType: 'TRANSFER', // Por ahora siempre TRANSFER
-                invoiceId: invoice.id,
-                sourceFile
-            }
-        });
+    try {
+        await prisma.$transaction(async (tx) => {
+            // Crear Payment usando upsert para manejar race conditions
+            await tx.payment.upsert({
+                where: {
+                    receiptNumber: payment.receiptNumber
+                },
+                create: {
+                    receiptNumber: payment.receiptNumber,
+                    amount: detail.amount,
+                    paymentDate: payment.paymentDate,
+                    concept: payment.concept || payment.clientName,
+                    paymentType: 'TRANSFER',
+                    invoiceId: invoice.id,
+                    sourceFile
+                },
+                update: {}
+            });
 
         // Actualizar paidAmount de Invoice
         const currentPaid = parseFloat(invoice.paidAmount || 0);
@@ -316,14 +321,21 @@ async function processSinglePayment(payment, detail, sourceFile) {
         }
     });
 
-    console.log(`[import-koinor-xml] Payment processed: ${payment.receiptNumber} -> ${detail.invoiceNumberRaw} ($${detail.amount})${createdLegacy ? ' [LEGACY INVOICE CREATED]' : ''}`);
+        console.log(`[import-koinor-xml] Payment processed: ${payment.receiptNumber} -> ${detail.invoiceNumberRaw} ($${detail.amount})${createdLegacy ? ' [LEGACY INVOICE CREATED]' : ''}`);
 
-    return {
-        created: !createdLegacy, // Solo true si fue factura existente
-        createdLegacy, // True si creamos factura legacy
-        skipped: false,
-        documentUpdated
-    };
+        return {
+            created: !createdLegacy,
+            createdLegacy,
+            skipped: false,
+            documentUpdated
+        };
+    } catch (error) {
+        if (error.code === 'P2002' && error.meta?.target?.includes('receiptNumber')) {
+            console.log(`[import-koinor-xml] Payment already exists (race condition): ${payment.receiptNumber} -> ${detail.invoiceNumberRaw}`);
+            return { created: false, skipped: true };
+        }
+        throw error;
+    }
 }
 
 /**
