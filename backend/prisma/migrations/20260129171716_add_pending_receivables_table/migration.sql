@@ -7,57 +7,57 @@
 
 */
 -- DropForeignKey
-ALTER TABLE "concuerdo_audit_logs" DROP CONSTRAINT "concuerdo_audit_logs_createdBy_fkey";
+-- ALTER TABLE "concuerdo_audit_logs" DROP CONSTRAINT "concuerdo_audit_logs_createdBy_fkey";
 
 -- DropForeignKey
-ALTER TABLE "concuerdo_audit_logs" DROP CONSTRAINT "concuerdo_audit_logs_docId_fkey";
+-- ALTER TABLE "concuerdo_audit_logs" DROP CONSTRAINT "concuerdo_audit_logs_docId_fkey";
 
 -- DropForeignKey
-ALTER TABLE "whatsapp_notifications" DROP CONSTRAINT "whatsapp_notifications_groupId_fkey";
+ALTER TABLE "whatsapp_notifications" DROP CONSTRAINT IF EXISTS "whatsapp_notifications_groupId_fkey";
 
 -- DropIndex
-DROP INDEX "documents_assignedToId_idx";
+DROP INDEX IF EXISTS "documents_assignedToId_idx";
 
 -- DropIndex
-DROP INDEX "invoices_assignedToId_idx";
+DROP INDEX IF EXISTS "invoices_assignedToId_idx";
 
 -- DropIndex
-DROP INDEX "whatsapp_notifications_groupId_idx";
+DROP INDEX IF EXISTS "whatsapp_notifications_groupId_idx";
 
 -- AlterTable
 ALTER TABLE "document_events" ALTER COLUMN "eventType" SET DEFAULT 'UNKNOWN';
 
 -- AlterTable
-ALTER TABLE "documents" ADD COLUMN     "numeroFactura" TEXT;
+ALTER TABLE "documents" ADD COLUMN IF NOT EXISTS "numeroFactura" TEXT;
 
 -- AlterTable
-ALTER TABLE "escrituras_qr" ADD COLUMN     "fotoURL" TEXT;
+ALTER TABLE "escrituras_qr" ADD COLUMN IF NOT EXISTS "fotoURL" TEXT;
 
 -- AlterTable
-ALTER TABLE "invoices" ADD COLUMN     "paidAmount" DECIMAL(12,2) DEFAULT 0,
+ALTER TABLE "invoices" ADD COLUMN IF NOT EXISTS "paidAmount" DECIMAL(12,2) DEFAULT 0,
 ALTER COLUMN "lastSyncAt" DROP DEFAULT;
 
 -- AlterTable
-ALTER TABLE "protocolos_uafe" ADD COLUMN     "bienInmuebleDescripcion" TEXT,
-ADD COLUMN     "bienInmuebleUbicacion" TEXT,
-ADD COLUMN     "tipoActoOtro" TEXT,
-ADD COLUMN     "vehiculoAnio" TEXT,
-ADD COLUMN     "vehiculoMarca" TEXT,
-ADD COLUMN     "vehiculoModelo" TEXT,
-ADD COLUMN     "vehiculoPlaca" TEXT,
+ALTER TABLE "protocolos_uafe" ADD COLUMN IF NOT EXISTS "bienInmuebleDescripcion" TEXT,
+ADD COLUMN IF NOT EXISTS "bienInmuebleUbicacion" TEXT,
+ADD COLUMN IF NOT EXISTS "tipoActoOtro" TEXT,
+ADD COLUMN IF NOT EXISTS "vehiculoAnio" TEXT,
+ADD COLUMN IF NOT EXISTS "vehiculoMarca" TEXT,
+ADD COLUMN IF NOT EXISTS "vehiculoModelo" TEXT,
+ADD COLUMN IF NOT EXISTS "vehiculoPlaca" TEXT,
 ALTER COLUMN "identificadorTemporal" DROP DEFAULT;
 
 -- AlterTable
-ALTER TABLE "whatsapp_notifications" DROP COLUMN "groupId";
+ALTER TABLE "whatsapp_notifications" DROP COLUMN IF EXISTS "groupId";
 
 -- DropTable
-DROP TABLE "DocumentGroup";
+DROP TABLE IF EXISTS "DocumentGroup";
 
 -- DropTable
-DROP TABLE "concuerdo_audit_logs";
+DROP TABLE IF EXISTS "concuerdo_audit_logs";
 
 -- CreateTable
-CREATE TABLE "encuestas_satisfaccion" (
+CREATE TABLE IF NOT EXISTS "encuestas_satisfaccion" (
     "id" SERIAL NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "tramiteId" TEXT,
@@ -70,7 +70,7 @@ CREATE TABLE "encuestas_satisfaccion" (
 );
 
 -- CreateTable
-CREATE TABLE "mensajes_internos" (
+CREATE TABLE IF NOT EXISTS "mensajes_internos" (
     "id" SERIAL NOT NULL,
     "remitenteId" INTEGER NOT NULL,
     "destinatarioId" INTEGER NOT NULL,
@@ -91,7 +91,7 @@ CREATE TABLE "mensajes_internos" (
 );
 
 -- CreateTable
-CREATE TABLE "pending_receivables" (
+CREATE TABLE IF NOT EXISTS "pending_receivables" (
     "id" TEXT NOT NULL,
     "clientTaxId" TEXT NOT NULL,
     "clientName" TEXT NOT NULL,
@@ -112,52 +112,52 @@ CREATE TABLE "pending_receivables" (
 );
 
 -- CreateIndex
-CREATE INDEX "encuestas_satisfaccion_createdAt_idx" ON "encuestas_satisfaccion"("createdAt");
+CREATE INDEX IF NOT EXISTS "encuestas_satisfaccion_createdAt_idx" ON "encuestas_satisfaccion"("createdAt");
 
 -- CreateIndex
-CREATE INDEX "encuestas_satisfaccion_calificacion_idx" ON "encuestas_satisfaccion"("calificacion");
+CREATE INDEX IF NOT EXISTS "encuestas_satisfaccion_calificacion_idx" ON "encuestas_satisfaccion"("calificacion");
 
 -- CreateIndex
-CREATE INDEX "mensajes_internos_destinatarioId_leido_idx" ON "mensajes_internos"("destinatarioId", "leido");
+CREATE INDEX IF NOT EXISTS "mensajes_internos_destinatarioId_leido_idx" ON "mensajes_internos"("destinatarioId", "leido");
 
 -- CreateIndex
-CREATE INDEX "mensajes_internos_documentoId_idx" ON "mensajes_internos"("documentoId");
+CREATE INDEX IF NOT EXISTS "mensajes_internos_documentoId_idx" ON "mensajes_internos"("documentoId");
 
 -- CreateIndex
-CREATE INDEX "mensajes_internos_createdAt_idx" ON "mensajes_internos"("createdAt");
+CREATE INDEX IF NOT EXISTS "mensajes_internos_createdAt_idx" ON "mensajes_internos"("createdAt");
 
 -- CreateIndex
-CREATE INDEX "pending_receivables_clientTaxId_idx" ON "pending_receivables"("clientTaxId");
+CREATE INDEX IF NOT EXISTS "pending_receivables_clientTaxId_idx" ON "pending_receivables"("clientTaxId");
 
 -- CreateIndex
-CREATE INDEX "pending_receivables_dueDate_idx" ON "pending_receivables"("dueDate");
+CREATE INDEX IF NOT EXISTS "pending_receivables_dueDate_idx" ON "pending_receivables"("dueDate");
 
 -- CreateIndex
-CREATE INDEX "pending_receivables_balance_idx" ON "pending_receivables"("balance");
+CREATE INDEX IF NOT EXISTS "pending_receivables_balance_idx" ON "pending_receivables"("balance");
 
 -- CreateIndex
-CREATE INDEX "pending_receivables_status_idx" ON "pending_receivables"("status");
+CREATE INDEX IF NOT EXISTS "pending_receivables_status_idx" ON "pending_receivables"("status");
 
 -- CreateIndex
-CREATE INDEX "pending_receivables_reportDate_idx" ON "pending_receivables"("reportDate");
+CREATE INDEX IF NOT EXISTS "pending_receivables_reportDate_idx" ON "pending_receivables"("reportDate");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "pending_receivables_invoiceNumberRaw_reportDate_key" ON "pending_receivables"("invoiceNumberRaw", "reportDate");
+CREATE UNIQUE INDEX IF NOT EXISTS "pending_receivables_invoiceNumberRaw_reportDate_key" ON "pending_receivables"("invoiceNumberRaw", "reportDate");
 
 -- CreateIndex
-CREATE INDEX "document_events_eventType_idx" ON "document_events"("eventType");
+CREATE INDEX IF NOT EXISTS "document_events_eventType_idx" ON "document_events"("eventType");
 
 -- CreateIndex
-CREATE INDEX "documents_clientPhone_idx" ON "documents"("clientPhone");
+CREATE INDEX IF NOT EXISTS "documents_clientPhone_idx" ON "documents"("clientPhone");
 
 -- CreateIndex
-CREATE INDEX "documents_clientName_idx" ON "documents"("clientName");
+CREATE INDEX IF NOT EXISTS "documents_clientName_idx" ON "documents"("clientName");
 
 -- CreateIndex
-CREATE INDEX "documents_clientId_idx" ON "documents"("clientId");
+CREATE INDEX IF NOT EXISTS "documents_clientId_idx" ON "documents"("clientId");
 
 -- CreateIndex
-CREATE INDEX "protocolos_uafe_identificadorTemporal_idx" ON "protocolos_uafe"("identificadorTemporal");
+CREATE INDEX IF NOT EXISTS "protocolos_uafe_identificadorTemporal_idx" ON "protocolos_uafe"("identificadorTemporal");
 
 -- AddForeignKey
 ALTER TABLE "mensajes_internos" ADD CONSTRAINT "mensajes_internos_remitenteId_fkey" FOREIGN KEY ("remitenteId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

@@ -201,6 +201,55 @@ async function importXmlFile(file, onProgress = null) {
 }
 
 /**
+ * Importar archivo XLS/CSV de Cartera por Cobrar (CXC)
+ * @param {File} file - Archivo XLS/CSV a importar
+ * @param {Function} onProgress - Callback de progreso (opcional)
+ * @returns {Promise<Object>} Resultado de la importación
+ */
+async function importCxcXls(file, onProgress = null) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const config = {
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        },
+        timeout: 300000 // 5 minutos
+    };
+
+    if (onProgress) {
+        config.onUploadProgress = (progressEvent) => {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            onProgress(percentCompleted);
+        };
+    }
+
+    const response = await apiClient.post('/billing/import-cxc-xls', formData, config);
+    return response.data;
+}
+
+/**
+ * Obtener cartera pendiente (detalle)
+ * @param {Object} params - Parámetros de filtro
+ * @returns {Promise<Object>} Lista de receivables
+ */
+async function getCarteraPendiente(params = {}) {
+    const response = await apiClient.get('/billing/cartera-pendiente', { params });
+    return response.data;
+}
+
+/**
+ * Obtener resumen de cartera agrupado por cliente
+ * @param {string} reportDate - Fecha del reporte (opcional)
+ * @returns {Promise<Object>} Resumen agrupado
+ */
+async function getCarteraPendienteResumen(reportDate = null) {
+    const params = reportDate ? { reportDate } : {};
+    const response = await apiClient.get('/billing/cartera-pendiente/resumen', { params });
+    return response.data;
+}
+
+/**
  * Obtener historial de importaciones
  * @param {Object} params - Parámetros de búsqueda
  * @param {number} params.page - Página
@@ -415,7 +464,12 @@ const billingService = {
     // Importación
     importFile,
     importXmlFile,
+    importCxcXls,
     getImportLogs,
+
+    // CXC - Cartera por Cobrar
+    getCarteraPendiente,
+    getCarteraPendienteResumen,
 
     // Documentos
     getDocumentPaymentStatus,
