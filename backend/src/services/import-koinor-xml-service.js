@@ -250,13 +250,11 @@ async function processSinglePayment(payment, detail, sourceFile) {
         createdLegacy = true;
     }
 
-    // 2. Verificar idempotencia - por receiptNumber único
-    const existingPayment = await prisma.payment.findUnique({
+    // 2. Verificar idempotencia - buscar pago existente con mismo receiptNumber e invoiceId
+    const existingPayment = await prisma.payment.findFirst({
         where: {
-            receiptNumber: payment.receiptNumber
-        },
-        include: {
-            invoice: true
+            receiptNumber: payment.receiptNumber,
+            invoiceId: invoice.id
         }
     });
 
@@ -271,12 +269,9 @@ async function processSinglePayment(payment, detail, sourceFile) {
 
     try {
         await prisma.$transaction(async (tx) => {
-            // Crear Payment usando upsert para manejar race conditions
-            await tx.payment.upsert({
-                where: {
-                    receiptNumber: payment.receiptNumber
-                },
-                create: {
+            // Crear Payment
+            await tx.payment.create({
+                data: {
                     receiptNumber: payment.receiptNumber,
                     amount: detail.amount,
                     paymentDate: payment.paymentDate,
@@ -284,8 +279,7 @@ async function processSinglePayment(payment, detail, sourceFile) {
                     paymentType: 'TRANSFER',
                     invoiceId: invoice.id,
                     sourceFile
-                },
-                update: {}
+                }
             });
 
         // Actualizar paidAmount de Invoice
@@ -330,10 +324,8 @@ async function processSinglePayment(payment, detail, sourceFile) {
             documentUpdated
         };
     } catch (error) {
-        if (error.code === 'P2002' && error.meta?.target?.includes('receiptNumber')) {
-            console.log(`[import-koinor-xml] Payment already exists (race condition): ${payment.receiptNumber} -> ${detail.invoiceNumberRaw}`);
-            return { created: false, skipped: true };
-        }
+        // Log y re-throw para debugging
+        console.error(`[import-koinor-xml] Error creating payment ${payment.receiptNumber}:`, error.message);
         throw error;
     }
 }
