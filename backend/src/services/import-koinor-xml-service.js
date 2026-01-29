@@ -251,13 +251,12 @@ async function processSinglePayment(payment, detail, sourceFile) {
         createdLegacy = true;
     }
 
-    // 2. Verificar idempotencia - combinación de 4 campos (como en commit 53428e4)
+    // 2. Verificar idempotencia - solo receiptNumber + invoiceId
+    // No verificamos amount ni paymentDate porque pueden variar entre importaciones XLS/XML
     const existingPayment = await prisma.payment.findFirst({
         where: {
             receiptNumber: payment.receiptNumber,
-            invoiceId: invoice.id,
-            amount: detail.amount,
-            paymentDate: payment.paymentDate
+            invoiceId: invoice.id
         }
     });
 
