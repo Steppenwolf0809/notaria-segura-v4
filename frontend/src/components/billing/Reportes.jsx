@@ -41,7 +41,9 @@ import {
     Sort as SortIcon,
     ArrowUpward as AscIcon,
     ArrowDownward as DescIcon,
-    Clear as ClearIcon
+    Clear as ClearIcon,
+    KeyboardArrowDown as ExpandIcon,
+    KeyboardArrowUp as CollapseIcon
 } from '@mui/icons-material';
 import billingService from '../../services/billing-service';
 import * as XLSX from 'xlsx';
@@ -66,6 +68,9 @@ const Reportes = () => {
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     const [dateFrom, setDateFrom] = useState(firstDayOfMonth.toISOString().split('T')[0]);
     const [dateTo, setDateTo] = useState(today.toISOString().split('T')[0]);
+    
+    // Estado para filas expandidas en Cartera por Cobrar
+    const [expandedRows, setExpandedRows] = useState(new Set());
 
     // Enhanced filters
     const [searchTerm, setSearchTerm] = useState('');
@@ -644,6 +649,19 @@ const Reportes = () => {
             );
         }
 
+        // Función para toggle de fila expandida
+        const toggleRow = (clientTaxId) => {
+            setExpandedRows(prev => {
+                const newSet = new Set(prev);
+                if (newSet.has(clientTaxId)) {
+                    newSet.delete(clientTaxId);
+                } else {
+                    newSet.add(clientTaxId);
+                }
+                return newSet;
+            });
+        };
+
         switch (activeTab) {
             case 0:
                 return (
@@ -651,6 +669,7 @@ const Reportes = () => {
                         <Table size="small">
                             <TableHead>
                                 <TableRow sx={{ bgcolor: 'primary.main' }}>
+                                    <TableCell sx={{ color: 'white', fontWeight: 'bold', width: 50 }}></TableCell>
                                     <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Cédula/RUC</TableCell>
                                     <SortableHeader field="cliente" sx={{ color: 'white', fontWeight: 'bold' }}>Cliente</SortableHeader>
                                     <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="center">Facturas</TableCell>
@@ -662,19 +681,78 @@ const Reportes = () => {
                             </TableHead>
                             <TableBody>
                                 {filteredData.map((row, idx) => (
-                                    <TableRow key={idx} hover>
-                                        <TableCell>{row.clientTaxId}</TableCell>
-                                        <TableCell>{row.clientName}</TableCell>
-                                        <TableCell align="center">{row.invoiceCount}</TableCell>
-                                        <TableCell align="right">{formatCurrency(row.totalInvoiced)}</TableCell>
-                                        <TableCell align="right">{formatCurrency(row.totalPaid)}</TableCell>
-                                        <TableCell align="right" sx={{ color: 'error.main', fontWeight: 'bold' }}>
-                                            {formatCurrency(row.balance)}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Chip size="small" label={row.matrizador} variant="outlined" />
-                                        </TableCell>
-                                    </TableRow>
+                                    <React.Fragment key={idx}>
+                                        <TableRow 
+                                            hover 
+                                            onClick={() => toggleRow(row.clientTaxId)}
+                                            sx={{ cursor: 'pointer', '& > *': { borderBottom: expandedRows.has(row.clientTaxId) ? 'none' : undefined } }}
+                                        >
+                                            <TableCell>
+                                                <IconButton size="small">
+                                                    {expandedRows.has(row.clientTaxId) ? <CollapseIcon /> : <ExpandIcon />}
+                                                </IconButton>
+                                            </TableCell>
+                                            <TableCell>{row.clientTaxId}</TableCell>
+                                            <TableCell>{row.clientName}</TableCell>
+                                            <TableCell align="center">{row.invoiceCount}</TableCell>
+                                            <TableCell align="right">{formatCurrency(row.totalInvoiced)}</TableCell>
+                                            <TableCell align="right">{formatCurrency(row.totalPaid)}</TableCell>
+                                            <TableCell align="right" sx={{ color: 'error.main', fontWeight: 'bold' }}>
+                                                {formatCurrency(row.balance)}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Chip size="small" label={row.matrizador} variant="outlined" />
+                                            </TableCell>
+                                        </TableRow>
+                                        {/* Fila expandible con detalle de facturas */}
+                                        {expandedRows.has(row.clientTaxId) && row.invoices && (
+                                            <TableRow>
+                                                <TableCell colSpan={8} sx={{ py: 0, bgcolor: 'grey.50' }}>
+                                                    <Collapse in={expandedRows.has(row.clientTaxId)} timeout="auto" unmountOnExit>
+                                                        <Box sx={{ py: 2, px: 4 }}>
+                                                            <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
+                                                                Detalle de Facturas
+                                                            </Typography>
+                                                            <Table size="small">
+                                                                <TableHead>
+                                                                    <TableRow sx={{ bgcolor: 'grey.200' }}>
+                                                                        <TableCell sx={{ fontWeight: 'bold' }}>Factura</TableCell>
+                                                                        <TableCell sx={{ fontWeight: 'bold' }}>Fecha Emisión</TableCell>
+                                                                        <TableCell sx={{ fontWeight: 'bold' }}>Fecha Vencimiento</TableCell>
+                                                                        <TableCell sx={{ fontWeight: 'bold' }} align="right">Total</TableCell>
+                                                                        <TableCell sx={{ fontWeight: 'bold' }} align="right">Pagado</TableCell>
+                                                                        <TableCell sx={{ fontWeight: 'bold' }} align="right">Saldo</TableCell>
+                                                                        <TableCell sx={{ fontWeight: 'bold' }}>Estado</TableCell>
+                                                                    </TableRow>
+                                                                </TableHead>
+                                                                <TableBody>
+                                                                    {row.invoices.map((inv, invIdx) => (
+                                                                        <TableRow key={invIdx}>
+                                                                            <TableCell>{inv.invoiceNumber}</TableCell>
+                                                                            <TableCell>{formatDate(inv.issueDate)}</TableCell>
+                                                                            <TableCell>{formatDate(inv.dueDate)}</TableCell>
+                                                                            <TableCell align="right">{formatCurrency(inv.totalAmount)}</TableCell>
+                                                                            <TableCell align="right">{formatCurrency(inv.paidAmount)}</TableCell>
+                                                                            <TableCell align="right" sx={{ color: 'error.main', fontWeight: 'bold' }}>
+                                                                                {formatCurrency(inv.balance)}
+                                                                            </TableCell>
+                                                                            <TableCell>
+                                                                                <Chip 
+                                                                                    size="small" 
+                                                                                    label={inv.status}
+                                                                                    color={inv.status === 'PENDING' ? 'warning' : inv.status === 'PARTIAL' ? 'info' : 'error'}
+                                                                                />
+                                                                            </TableCell>
+                                                                        </TableRow>
+                                                                    ))}
+                                                                </TableBody>
+                                                            </Table>
+                                                        </Box>
+                                                    </Collapse>
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </React.Fragment>
                                 ))}
                             </TableBody>
                         </Table>
