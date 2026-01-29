@@ -33,7 +33,8 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId) {
             fileType: 'XML_KOINOR',
             totalRows: 0,
             status: 'PROCESSING',
-            executedBy: userId
+            executedBy: userId,
+            startedAt: new Date()
         }
     });
 
@@ -250,18 +251,20 @@ async function processSinglePayment(payment, detail, sourceFile) {
         createdLegacy = true;
     }
 
-    // 2. Verificar idempotencia - buscar pago existente con mismo receiptNumber e invoiceId
+    // 2. Verificar idempotencia - combinación de 4 campos (como en commit 53428e4)
     const existingPayment = await prisma.payment.findFirst({
         where: {
             receiptNumber: payment.receiptNumber,
-            invoiceId: invoice.id
+            invoiceId: invoice.id,
+            amount: detail.amount,
+            paymentDate: payment.paymentDate
         }
     });
 
     if (existingPayment) {
         // Pago ya existe - idempotencia
         console.log(`[import-koinor-xml] Payment already exists (idempotent): ${payment.receiptNumber} -> ${detail.invoiceNumberRaw}`);
-        return { created: false, skipped: true };
+        return { created: false, skipped: true, createdLegacy: false };
     }
 
     // 3. Crear Payment y actualizar Invoice/Document en transacción
@@ -324,7 +327,13 @@ async function processSinglePayment(payment, detail, sourceFile) {
             documentUpdated
         };
     } catch (error) {
-        // Log y re-throw para debugging
+        // Manejar error P2002 (unique constraint) como idempotencia
+        // Esto puede ocurrir si hay un constraint único en la DB que no está en el schema
+        if (error.code === 'P2002') {
+            console.log(`[import-koinor-xml] Payment already exists (P2002 constraint): ${payment.receiptNumber} -> ${detail.invoiceNumberRaw}`);
+            return { created: false, skipped: true, createdLegacy: false };
+        }
+        // Log y re-throw otros errores
         console.error(`[import-koinor-xml] Error creating payment ${payment.receiptNumber}:`, error.message);
         throw error;
     }
