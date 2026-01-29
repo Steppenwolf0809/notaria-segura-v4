@@ -147,5 +147,24 @@ router.get('/matrizadores', billingController.getMatrizadoresForAssignment);
 // Asignar matrizador a una factura (solo facturas sin documento)
 router.patch('/invoices/:invoiceId/assign', csrfProtection, billingController.assignInvoiceMatrizador);
 
+// ============================================================================
+// NUEVO MÓDULO CXC - CARTERA POR COBRAR (XLS/CSV)
+// ============================================================================
+
+// Importar CXC desde XLS/CSV
+router.post('/import-cxc-xls', csrfProtection, upload.single('file'), billingController.importCxcXls);
+
+// Obtener cartera pendiente (detalle)
+router.get('/cartera-pendiente', billingController.getCarteraPendiente);
+
+// Obtener resumen de cartera (agrupado por cliente)
+router.get('/cartera-pendiente/resumen', billingController.getCarteraPendienteResumen);
+
+// Obtener fechas de reportes disponibles
+router.get('/cartera-pendiente/fechas', billingController.getAvailableReportDates);
+
+// Limpiar datos antiguos (solo ADMIN)
+router.delete('/cartera-pendiente/limpiar', csrfProtection, billingController.limpiarCarteraAntigua);
+
 export default router;
 

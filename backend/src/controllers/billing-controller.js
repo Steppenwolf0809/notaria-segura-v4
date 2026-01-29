@@ -1904,3 +1904,179 @@ export async function getMatrizadoresForAssignment(req, res) {
         });
     }
 }
+
+/**
+ * ============================================================================
+ * NUEVO MÓDULO CXC - CARTERA POR COBRAR (XLS/CSV)
+ * ============================================================================
+ */
+
+/**
+ * Importar archivo XLS/CSV de Cartera por Cobrar
+ * Requires multipart/form-data with 'file' field
+ * Acepta: .xls, .xlsx, .csv
+ */
+export async function importCxcXls(req, res) {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                error: 'No se proporcionó archivo',
+                message: 'Debe subir un archivo Excel (.xls, .xlsx) o CSV (.csv)'
+            });
+        }
+
+        const { file } = req;
+        const userId = req.user?.id;
+
+        const allowedExtensions = ['.xls', '.xlsx', '.csv'];
+        const ext = file.originalname.toLowerCase().substring(file.originalname.lastIndexOf('.'));
+
+        if (!allowedExtensions.includes(ext)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Tipo de archivo no válido',
+                message: `Solo se permiten archivos: ${allowedExtensions.join(', ')}`
+            });
+        }
+
+        const maxSize = 50 * 1024 * 1024;
+        if (file.size > maxSize) {
+            return res.status(400).json({
+                success: false,
+                error: 'Archivo demasiado grande',
+                message: 'El archivo no debe superar 50MB'
+            });
+        }
+
+        console.log(`[billing-controller] Starting CXC XLS import of ${file.originalname} (${file.size} bytes)`);
+
+        const { importCxcXlsFile } = await import('../services/cxc-xls-import-service.js');
+
+        const result = await importCxcXlsFile(
+            file.buffer,
+            file.originalname,
+            userId
+        );
+
+        res.json({
+            success: true,
+            message: 'Importación de Cartera por Cobrar completada',
+            ...result
+        });
+
+    } catch (error) {
+        console.error('[billing-controller] CXC XLS import error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error durante la importación del archivo de CXC',
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+}
+
+/**
+ * Obtener cartera pendiente (detalle)
+ * GET /api/billing/cartera-pendiente
+ */
+export async function getCarteraPendiente(req, res) {
+    try {
+        const filters = {
+            clientTaxId: req.query.clientTaxId,
+            status: req.query.status,
+            reportDate: req.query.reportDate,
+            minBalance: req.query.minBalance,
+            limit: req.query.limit ? parseInt(req.query.limit) : 1000
+        };
+
+        const { getCarteraPendiente: getCartera } = await import('../services/cxc-xls-import-service.js');
+        const receivables = await getCartera(filters);
+
+        res.json({
+            success: true,
+            data: receivables,
+            count: receivables.length
+        });
+
+    } catch (error) {
+        console.error('[billing-controller] getCarteraPendiente error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener cartera pendiente'
+        });
+    }
+}
+
+/**
+ * Obtener resumen de cartera agrupado por cliente
+ * GET /api/billing/cartera-pendiente/resumen
+ */
+export async function getCarteraPendienteResumen(req, res) {
+    try {
+        const reportDate = req.query.reportDate ? new Date(req.query.reportDate) : null;
+
+        const { getCarteraPendienteResumen: getResumen } = await import('../services/cxc-xls-import-service.js');
+        const result = await getResumen(reportDate);
+
+        res.json({
+            success: true,
+            ...result
+        });
+
+    } catch (error) {
+        console.error('[billing-controller] getCarteraPendienteResumen error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener resumen de cartera pendiente'
+        });
+    }
+}
+
+/**
+ * Limpiar reportes antiguos de cartera
+ * DELETE /api/billing/cartera-pendiente/limpiar
+ */
+export async function limpiarCarteraAntigua(req, res) {
+    try {
+        const daysToKeep = req.query.days ? parseInt(req.query.days) : 60;
+
+        const { limpiarCarteraAntigua: limpiar } = await import('../services/cxc-xls-import-service.js');
+        const result = await limpiar(daysToKeep);
+
+        res.json({
+            success: true,
+            message: `Se eliminaron ${result.deletedCount} registros antiguos`,
+            ...result
+        });
+
+    } catch (error) {
+        console.error('[billing-controller] limpiarCarteraAntigua error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al limpiar reportes antiguos'
+        });
+    }
+}
+
+/**
+ * Obtener fechas de reportes disponibles
+ * GET /api/billing/cartera-pendiente/fechas
+ */
+export async function getAvailableReportDates(req, res) {
+    try {
+        const { getAvailableReportDates: getDates } = await import('../services/cxc-xls-import-service.js');
+        const dates = await getDates();
+
+        res.json({
+            success: true,
+            data: dates
+        });
+
+    } catch (error) {
+        console.error('[billing-controller] getAvailableReportDates error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener fechas de reportes'
+        });
+    }
+}

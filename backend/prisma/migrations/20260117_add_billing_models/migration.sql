@@ -68,7 +68,7 @@ CREATE TABLE "import_logs" (
 
 -- Add unique constraints
 ALTER TABLE "invoices" ADD CONSTRAINT "invoices_invoiceNumber_key" UNIQUE ("invoiceNumber");
-ALTER TABLE "payments" ADD CONSTRAINT "payments_receiptNumber_key" UNIQUE ("receiptNumber");
+
 
 -- Add foreign key constraints
 ALTER TABLE "invoices" ADD CONSTRAINT "invoices_documentId_fkey" FOREIGN KEY ("documentId") REFERENCES "documents"("id") ON DELETE SET NULL ON UPDATE CASCADE;
