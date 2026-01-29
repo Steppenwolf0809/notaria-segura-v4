@@ -125,6 +125,21 @@ export async function parseCxcXML(fileBuffer, fileName) {
                     inGroup = false;
                     
                     if (currentGroup && currentRow) {
+                        // Debug: Log del primer grupo para verificar campos
+                        if (invoices.length === 0 && totalRows === 0) {
+                            console.log(`[xml-cxc-parser] DEBUG - First group fields:`, Object.keys(currentGroup));
+                            console.log(`[xml-cxc-parser] DEBUG - First row fields:`, Object.keys(currentRow));
+                            console.log(`[xml-cxc-parser] DEBUG - Group data sample:`, {
+                                numtra: currentGroup.numtra,
+                                valcob: currentGroup.valcob,
+                                nomcli: currentGroup.nomcli,
+                                saldo: currentGroup.saldo
+                            });
+                            console.log(`[xml-cxc-parser] DEBUG - Row data sample:`, {
+                                codcli: currentRow.codcli
+                            });
+                        }
+                        
                         try {
                             const invoice = parseInvoiceFromGroup(currentRow, currentGroup);
                             if (invoice) {
@@ -155,6 +170,17 @@ export async function parseCxcXML(fileBuffer, fileName) {
             parser.onend = () => {
                 const duration = ((Date.now() - startTime) / 1000).toFixed(2);
                 console.log(`[xml-cxc-parser] Parsed in ${duration}s: ${invoices.length} invoices from ${totalRows} rows`);
+
+                // Debug: Si hay rows pero no invoices, registrar advertencia
+                if (totalRows > 0 && invoices.length === 0) {
+                    console.warn(`[xml-cxc-parser] WARNING: Found ${totalRows} rows but 0 invoices!`);
+                    console.warn(`[xml-cxc-parser] This may indicate a parsing issue with field names.`);
+                    errors.push({
+                        type: 'NO_INVOICES_FOUND',
+                        message: `Se encontraron ${totalRows} rows pero 0 facturas. Posible problema con los nombres de campos.`,
+                        detectedTags: { rowTag, groupTag }
+                    });
+                }
 
                 resolve({
                     invoices,
@@ -205,19 +231,51 @@ function sanitizeXML(xmlString) {
 
 /**
  * Normaliza nombres de campos removiendo prefijos de Koinor
+ * Mapea los campos del XML CXC a nombres estándar
  */
 function normalizeFieldName(elementName) {
     if (!elementName) return null;
     
-    // Remover prefijos comunes: clientes_, cxc_, etc.
-    const prefixes = ['clientes_', 'cxc_', 'cxc_20260128_'];
-    let fieldName = elementName.toLowerCase();
+    const fieldName = elementName.toLowerCase();
     
-    for (const prefix of prefixes) {
-        if (fieldName.startsWith(prefix)) {
-            fieldName = fieldName.substring(prefix.length);
-            break;
-        }
+    // Mapeo directo de campos del XML CXC a nombres estándar
+    const fieldMapping = {
+        // Campos de cliente
+        'clientes_codcli': 'codcli',      // RUC/Cédula
+        'clientes_nomcli': 'nomcli',      // Nombre cliente
+        'clientes_dircli': 'dircli',      // Dirección
+        'clientes_telcli': 'telcli',      // Teléfono
+        'clientes_codcta': 'codcta',      // Código cuenta
+        'clientes_faxcli': 'faxcli',      // Fax
+        
+        // Campos de factura (tmpfacturas_)
+        'tmpfacturas_numtra': 'numtra',   // Número de factura
+        'tmpfacturas_valcob': 'valcob',   // Valor total
+        'tmpfacturas_fecemi': 'fecemi',   // Fecha emisión
+        'tmpfacturas_fecven': 'fecven',   // Fecha vencimiento
+        'tmpfacturas_tipdoc': 'tipdoc',   // Tipo documento (FC)
+        'tmpfacturas_abomes': 'abomes',   // Abono del mes
+        'tmpfacturas_codven': 'codven',   // Código vendedor
+        
+        // Campos de saldo
+        'csaldo': 'saldo',                // Saldo pendiente
+        
+        // Campos de encabezado
+        'encabezadofacturas_codsol': 'codsol',
+        'encabezadofacturas_nomsol': 'nomsol',
+        'encabezadofacturas_codgru': 'codgru',
+        'encabezadofacturas_nomgru': 'nomgru'
+    };
+    
+    // Buscar en el mapeo
+    if (fieldMapping[fieldName]) {
+        return fieldMapping[fieldName];
+    }
+    
+    // Si no está en el mapeo, intentar remover prefijos dinámicos (cxc_YYYYMMDD_)
+    const dynamicPrefixMatch = fieldName.match(/^cxc_\d{8}_(.+)$/);
+    if (dynamicPrefixMatch) {
+        return dynamicPrefixMatch[1];
     }
     
     return fieldName;
@@ -225,48 +283,71 @@ function normalizeFieldName(elementName) {
 
 /**
  * Parsea una factura desde los datos del row y group
+ * 
+ * Estructura del XML CXC:
+ * - row contiene: codcli (RUC del cliente)
+ * - group contiene: nomcli, numtra, valcob, fecemi, saldo, tipdoc, etc.
  */
 function parseInvoiceFromGroup(row, group) {
-    // Obtener número de factura
-    const invoiceNumber = group.numtra || group.numdoc || '';
+    // Obtener número de factura (campo tmpfacturas_numtra -> numtra)
+    const invoiceNumber = (group.numtra || '').trim();
     if (!invoiceNumber) {
         return null; // Sin número de factura, no es válido
     }
 
-    // Obtener datos del cliente (pueden estar en row o group)
+    // Obtener datos del cliente
+    // codcli viene del row (clientes_codcli)
+    // nomcli viene del group (clientes_nomcli dentro del group)
     const clientTaxId = (row.codcli || group.codcli || '').trim();
-    const clientName = (row.nomcli || group.nomcli || '').trim();
+    const clientName = (group.nomcli || row.nomcli || '').trim();
 
-    // Obtener montos
-    const totalAmount = parseFloat(group.valcob || group.valor || 0);
+    // Obtener montos (tmpfacturas_valcob -> valcob, csaldo -> saldo)
+    const totalAmount = parseFloat(group.valcob || 0);
     const balance = parseFloat(group.saldo || group.valcob || 0);
 
-    // Parsear fecha
-    const issueDate = parseKoinorDate(group.fecemi || group.fecha);
+    // Parsear fecha (tmpfacturas_fecemi -> fecemi)
+    // Formato: "2025-12-01 00:00:00"
+    const issueDate = parseKoinorDate(group.fecemi);
+    const dueDate = parseKoinorDate(group.fecven);
 
-    // Concepto
-    const concept = (group.concep || group.concepto || '').trim();
+    // Tipo de documento (tmpfacturas_tipdoc -> tipdoc)
+    const docType = (group.tipdoc || 'FC').trim();
 
     return {
-        invoiceNumber: invoiceNumber.trim(),
-        invoiceNumberRaw: invoiceNumber.trim(),
+        invoiceNumber,
+        invoiceNumberRaw: invoiceNumber,
         clientTaxId,
         clientName,
         totalAmount: Math.abs(totalAmount),
         balance: Math.abs(balance),
         issueDate,
-        concept,
-        type: 'FC'
+        dueDate,
+        type: docType,
+        concept: `Factura ${invoiceNumber}`
     };
 }
 
 /**
- * Parsea fecha en formato Koinor (DD/MM/YYYY o YYYY-MM-DD)
+ * Parsea fecha en formato Koinor
+ * Formatos soportados:
+ * - "2025-12-01 00:00:00" (YYYY-MM-DD HH:mm:ss)
+ * - "2025-12-01" (YYYY-MM-DD)
+ * - "01/12/2025" (DD/MM/YYYY)
  */
 function parseKoinorDate(dateStr) {
     if (!dateStr) return null;
     
     dateStr = dateStr.trim();
+    
+    // Formato YYYY-MM-DD HH:mm:ss o YYYY-MM-DD
+    if (dateStr.includes('-')) {
+        // Extraer solo la parte de fecha si tiene hora
+        const datePart = dateStr.split(' ')[0];
+        const date = new Date(datePart);
+        if (!isNaN(date.getTime())) {
+            return date;
+        }
+    }
     
     // Formato DD/MM/YYYY
     if (dateStr.includes('/')) {
@@ -274,11 +355,6 @@ function parseKoinorDate(dateStr) {
         if (day && month && year) {
             return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
         }
-    }
-    
-    // Formato YYYY-MM-DD
-    if (dateStr.includes('-')) {
-        return new Date(dateStr);
     }
     
     return null;
