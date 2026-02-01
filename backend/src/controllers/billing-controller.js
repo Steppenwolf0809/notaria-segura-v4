@@ -663,7 +663,7 @@ export async function importXmlFile(req, res) {
  */
 export async function getStats(req, res) {
     try {
-        const { getImportStats } = await import('../services/import-koinor-service.js');
+        const { getImportStats } = await import('../services/import-koinor-service.legacy.js');
         const stats = await getImportStats();
 
         res.json({

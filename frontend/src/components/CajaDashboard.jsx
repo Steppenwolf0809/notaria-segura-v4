@@ -82,6 +82,28 @@ const CajaDashboard = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(50);
 
+  // Secuencia de protocolos: estado de análisis
+  const [seqDialogOpen, setSeqDialogOpen] = useState(false);
+  const [seqLoading, setSeqLoading] = useState(false);
+  const [seqResult, setSeqResult] = useState(null);
+
+  const handleOpenSeqDialog = async () => {
+    setSeqDialogOpen(true);
+    setSeqLoading(true);
+    const res = await documentService.getSequenceGaps();
+    if (res.success) {
+      setSeqResult(res.data);
+    } else {
+      toast.error(res.error || 'Error al analizar secuencias');
+      setSeqResult(null);
+    }
+    setSeqLoading(false);
+  };
+  const handleCloseSeqDialog = () => {
+    setSeqDialogOpen(false);
+    setSeqResult(null);
+  };
+
   /**
    * Cargar datos al montar el componente
    */
@@ -257,15 +279,24 @@ const CajaDashboard = () => {
             Gestión de Documentos
           </Typography>
         </Box>
-        <Button
-          variant="outlined"
-          onClick={handleRefresh}
-          disabled={loading || refreshing}
-          startIcon={<RefreshIcon />}
-          sx={{ color: 'primary.main', borderColor: 'primary.main' }}
-        >
-          {refreshing ? 'Actualizando...' : 'Actualizar'}
-        </Button>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button
+            variant="outlined"
+            onClick={handleRefresh}
+            disabled={loading || refreshing}
+            startIcon={<RefreshIcon />}
+            sx={{ color: 'primary.main', borderColor: 'primary.main' }}
+          >
+            {refreshing ? 'Actualizando...' : 'Actualizar'}
+          </Button>
+          <Button
+            variant="contained"
+            color="warning"
+            onClick={handleOpenSeqDialog}
+          >
+            Detectar huecos
+          </Button>
+        </Box>
       </Box>
 
       {/* Error Alert */}
@@ -592,6 +623,85 @@ const CajaDashboard = () => {
           >
             Asignar
           </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Diálogo: Huecos de secuencia */}
+      <Dialog open={seqDialogOpen} onClose={handleCloseSeqDialog} maxWidth="md" fullWidth>
+        <DialogTitle>Huecos en secuencia de protocolos</DialogTitle>
+        <DialogContent>
+          {seqLoading && (
+            <Box sx={{ py: 2 }}>
+              <LinearProgress />
+              <Typography variant="body2" sx={{ mt: 1 }}>
+                Analizando secuencias...
+              </Typography>
+            </Box>
+          )}
+          {!seqLoading && seqResult && (
+            <Box>
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+                <Chip label={`Grupos: ${seqResult.summary.groups}`} color="default" />
+                <Chip label={`Documentos: ${seqResult.summary.totalDocuments}`} color="default" />
+                <Chip label={`Huecos totales: ${seqResult.summary.totalMissing}`} color="warning" />
+                {seqResult.summary.invalidCodes > 0 && (
+                  <Chip label={`Códigos inválidos: ${seqResult.summary.invalidCodes}`} color="error" />
+                )}
+              </Box>
+              <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
+                <Table stickyHeader size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Prefijo</TableCell>
+                      <TableCell align="right">Min</TableCell>
+                      <TableCell align="right">Max</TableCell>
+                      <TableCell align="right">Faltantes</TableCell>
+                      <TableCell>Rangos</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {seqResult.groups.filter(g => g.missingCount > 0).slice(0, 100).map((g) => (
+                      <TableRow key={g.prefix}>
+                        <TableCell sx={{ fontFamily: 'monospace' }}>{g.prefix}</TableCell>
+                        <TableCell align="right">{g.minSeq}</TableCell>
+                        <TableCell align="right">{g.maxSeq}</TableCell>
+                        <TableCell align="right">
+                          <Chip label={g.missingCount} color="warning" size="small" />
+                        </TableCell>
+                        <TableCell>
+                          {g.missingRanges && g.missingRanges.length > 0
+                            ? g.missingRanges.slice(0, 5).map((r, idx) => (
+                                <Chip
+                                  key={idx}
+                                  label={r.to ? `${r.from}-${r.to}` : `${r.from}`}
+                                  size="small"
+                                  sx={{ mr: 0.5, mb: 0.5 }}
+                                />
+                              ))
+                            : '—'}
+                          {g.missingRanges && g.missingRanges.length > 5 && (
+                            <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                              +{g.missingRanges.length - 5} más
+                            </Typography>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {seqResult.groups.filter(g => g.missingCount > 0).length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5}>
+                          <Typography variant="body2">No se encontraron huecos.</Typography>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseSeqDialog}>Cerrar</Button>
         </DialogActions>
       </Dialog>
     </Box>

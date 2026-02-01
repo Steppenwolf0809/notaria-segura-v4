@@ -434,6 +434,124 @@ async function applyExtractionSuggestions(req, res) {
 }
 
 /**
+ * Detectar huecos en la secuencia numérica de los códigos de protocolo
+ * Agrupa por prefijo "<numeros><letra>" y encuentra faltantes en el sufijo numérico.
+ * Acceso: CAJA y ADMIN
+ */
+async function findProtocolSequenceGaps(req, res) {
+  try {
+    if (!['CAJA', 'ADMIN'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Acceso denegado' });
+    }
+
+    // Opcional: filtrar por tipo de letra (P, D, A, C, O) o por prefijo exacto
+    const { type, prefix } = req.query || {};
+    const typeFilter = typeof type === 'string' && type.trim().length === 1 ? type.trim().toUpperCase() : null;
+    const exactPrefix = typeof prefix === 'string' && prefix.trim().length > 0 ? prefix.trim() : null;
+
+    // Obtener solo lo necesario para el cálculo
+    const docs = await prisma.document.findMany({
+      select: { id: true, protocolNumber: true, createdAt: true },
+    });
+
+    const invalidCodes = [];
+    const groups = new Map(); // key: prefix, value: { seqSet:Set<number>, min:number, max:number }
+
+    for (const d of docs) {
+      const code = (d.protocolNumber || '').toString().trim().toUpperCase();
+      // Regex: (uno o más dígitos seguidos de una letra) + (sufijo de solo dígitos)
+      const m = code.match(/^(\d+[A-Z])(\d+)$/);
+      if (!m) {
+        invalidCodes.push({ id: d.id, protocolNumber: d.protocolNumber });
+        continue;
+      }
+      const groupKey = m[1];
+      const seqStr = m[2];
+
+      if (typeFilter && !groupKey.endsWith(typeFilter)) continue;
+      if (exactPrefix && groupKey !== exactPrefix) continue;
+
+      const seq = parseInt(seqStr, 10);
+      if (!Number.isFinite(seq)) continue;
+
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, { seqSet: new Set(), min: seq, max: seq });
+      }
+      const g = groups.get(groupKey);
+      g.seqSet.add(seq);
+      if (seq < g.min) g.min = seq;
+      if (seq > g.max) g.max = seq;
+    }
+
+    const results = [];
+    let totalMissing = 0;
+
+    function toRanges(nums) {
+      // nums: sorted array of numbers
+      const out = [];
+      if (nums.length === 0) return out;
+      let start = nums[0], prev = nums[0];
+      for (let i = 1; i < nums.length; i++) {
+        const n = nums[i];
+        if (n === prev + 1) {
+          prev = n;
+        } else {
+          out.push(start === prev ? { from: start } : { from: start, to: prev });
+          start = prev = n;
+        }
+      }
+      out.push(start === prev ? { from: start } : { from: start, to: prev });
+      return out;
+    }
+
+    for (const [key, g] of groups.entries()) {
+      const present = g.seqSet;
+      const missing = [];
+      // Evitar iterar rangos enormes accidentalmente
+      const span = g.max - g.min + 1;
+      if (span <= 0 || span > 200000) { // límite de seguridad
+        results.push({ prefix: key, count: present.size, minSeq: g.min, maxSeq: g.max, missingCount: 0, missingRanges: [], skipped: true });
+        continue;
+      }
+      for (let n = g.min; n <= g.max; n++) {
+        if (!present.has(n)) missing.push(n);
+      }
+      const ranges = toRanges(missing);
+      totalMissing += missing.length;
+      results.push({
+        prefix: key,
+        count: present.size,
+        minSeq: g.min,
+        maxSeq: g.max,
+        missingCount: missing.length,
+        missingRanges: ranges
+      });
+    }
+
+    // Ordenar por cantidad de faltantes desc y luego por prefijo
+    results.sort((a, b) => (b.missingCount - a.missingCount) || a.prefix.localeCompare(b.prefix));
+
+    return res.json({
+      success: true,
+      message: 'Secuencias analizadas',
+      data: {
+        summary: {
+          groups: results.length,
+          totalDocuments: docs.length,
+          totalMissing,
+          invalidCodes: invalidCodes.length
+        },
+        groups: results,
+        invalidCodes: invalidCodes.slice(0, 100) // limitar para respuesta
+      }
+    });
+  } catch (error) {
+    console.error('Error detectando huecos de secuencia:', error);
+    return res.status(500).json({ success: false, message: 'Error interno detectando huecos', error: error.message });
+  }
+}
+
+/**
  * Obtener todos los documentos para gestión de CAJA
  * @param {Object} req - Request object
  * @param {Object} res - Response object
@@ -3829,5 +3947,7 @@ export {
   // 📊 NUEVA FUNCIONALIDAD: Estadísticas de CAJA
   getCajaStats,
   // 📱 NUEVA FUNCIONALIDAD: Notificaciones WhatsApp masivas
-  bulkNotify
+  bulkNotify,
+  // 🔎 Herramientas de control para CAJA
+  findProtocolSequenceGaps
 };
