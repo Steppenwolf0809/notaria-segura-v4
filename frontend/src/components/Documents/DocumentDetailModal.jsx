@@ -600,6 +600,12 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
                           <Typography variant="body2" fontWeight="medium">{localDocument?.protocolNumber}</Typography>
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">N° Factura:</Typography>
+                          <Typography variant="body2" fontWeight="medium" color={localDocument?.numeroFactura ? 'text.primary' : 'text.disabled'}>
+                            {localDocument?.numeroFactura || 'Sin asignar'}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                           <Typography variant="body2" color="text.secondary">Matrizador:</Typography>
                           <Typography variant="body2" fontWeight="medium">{localDocument?.matrizadorName || 'N/A'}</Typography>
                         </Box>

@@ -352,29 +352,70 @@ async function listarTodosDocumentos(req, res) {
         const countRows = await prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${whereSql}`;
         const total = Array.isArray(countRows) ? (countRows[0]?.count || 0) : (countRows?.count || 0);
 
-        const formattedDocuments = documents.map(doc => ({
-          id: doc.id,
-          protocolNumber: doc.protocolNumber,
-          clientName: doc.clientName,
-          clientPhone: doc.clientPhone,
-          clientEmail: doc.clientEmail,
-          clientId: doc.clientId,
-          documentType: doc.documentType,
-          status: doc.status,
-          matrizador: doc._assignedToFirstName ? `${doc._assignedToFirstName} ${doc._assignedToLastName}` : 'No asignado',
-          matrizadorId: doc.assignedToId,
-          codigoRetiro: doc.codigoRetiro,
-          verificationCode: doc.verificationCode,
-          fechaCreacion: doc.createdAt,
-          fechaEntrega: doc.fechaEntrega,
-          actoPrincipalDescripcion: doc.actoPrincipalDescripcion,
-          actoPrincipalValor: doc.totalFactura,
-          totalFactura: doc.totalFactura,
-          matrizadorName: doc.matrizadorName,
+        // 💰 Obtener facturas para los documentos encontrados
+        const docIds = documents.map(d => d.id);
+        const invoicesMap = new Map();
+        if (docIds.length > 0) {
+          const invoices = await prisma.invoice.findMany({
+            where: { documentId: { in: docIds } },
+            select: { documentId: true, totalAmount: true, paidAmount: true, status: true }
+          });
+          invoices.forEach(inv => {
+            if (!invoicesMap.has(inv.documentId)) {
+              invoicesMap.set(inv.documentId, []);
+            }
+            invoicesMap.get(inv.documentId).push(inv);
+          });
+        }
 
-          detalle_documento: doc.detalle_documento,
-          comentarios_recepcion: doc.comentarios_recepcion
-        }));
+        const formattedDocuments = documents.map(doc => {
+          // 💰 Calcular estado de pago
+          const docInvoices = invoicesMap.get(doc.id) || [];
+          let paymentStatus = 'SIN_FACTURA';
+          let paymentInfo = null;
+          
+          if (docInvoices.length > 0) {
+            const totalFacturado = docInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
+            const totalPagado = docInvoices.reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
+            const saldoPendiente = totalFacturado - totalPagado;
+            
+            if (saldoPendiente <= 0) {
+              paymentStatus = 'PAGADO';
+            } else if (totalPagado > 0) {
+              paymentStatus = 'PARCIAL';
+            } else {
+              paymentStatus = 'PENDIENTE';
+            }
+            
+            paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: docInvoices.length };
+          }
+          
+          return {
+            id: doc.id,
+            protocolNumber: doc.protocolNumber,
+            clientName: doc.clientName,
+            clientPhone: doc.clientPhone,
+            clientEmail: doc.clientEmail,
+            clientId: doc.clientId,
+            documentType: doc.documentType,
+            status: doc.status,
+            matrizador: doc._assignedToFirstName ? `${doc._assignedToFirstName} ${doc._assignedToLastName}` : 'No asignado',
+            matrizadorId: doc.assignedToId,
+            codigoRetiro: doc.codigoRetiro,
+            verificationCode: doc.verificationCode,
+            fechaCreacion: doc.createdAt,
+            fechaEntrega: doc.fechaEntrega,
+            actoPrincipalDescripcion: doc.actoPrincipalDescripcion,
+            actoPrincipalValor: doc.totalFactura,
+            totalFactura: doc.totalFactura,
+            matrizadorName: doc.matrizadorName,
+            detalle_documento: doc.detalle_documento,
+            comentarios_recepcion: doc.comentarios_recepcion,
+            // 💰 NUEVO: Estado de pago
+            paymentStatus,
+            paymentInfo
+          };
+        });
 
         const totalPages = Math.ceil(total / take);
 
@@ -458,6 +499,16 @@ async function listarTodosDocumentos(req, res) {
               firstName: true,
               lastName: true
             }
+          },
+          // 💰 NUEVO: Incluir facturas para estado de pago
+          invoices: {
+            select: {
+              id: true,
+              invoiceNumber: true,
+              totalAmount: true,
+              paidAmount: true,
+              status: true
+            }
           }
         },
         orderBy: { [mappedSortField]: mappedSortOrder },
@@ -467,31 +518,58 @@ async function listarTodosDocumentos(req, res) {
       prisma.document.count({ where })
     ]);
 
-    const formattedDocuments = documents.map(doc => ({
-      id: doc.id,
-      protocolNumber: doc.protocolNumber,
-      clientName: doc.clientName,
-      clientPhone: doc.clientPhone,
-      clientEmail: doc.clientEmail,
-      clientId: doc.clientId,
-      documentType: doc.documentType,
-      status: doc.status,
-      matrizador: doc.assignedTo ? `${doc.assignedTo.firstName} ${doc.assignedTo.lastName}` : 'No asignado',
-      matrizadorId: doc.assignedToId,
-      codigoRetiro: doc.codigoRetiro,
-      verificationCode: doc.verificationCode, // 🔄 CONSERVADOR: Agregar verificationCode para frontend
-      fechaCreacion: doc.createdAt,
-      fechaEntrega: doc.fechaEntrega,
-      // ✅ AGREGADO: Información del acto principal para que RECEPCION la vea
-      actoPrincipalDescripcion: doc.actoPrincipalDescripcion,
-      actoPrincipalValor: doc.totalFactura, // ⭐ CAMBIO: Usar valor total de factura
-      totalFactura: doc.totalFactura,
-      matrizadorName: doc.matrizadorName,
-
-      // Campos editables
-      detalle_documento: doc.detalle_documento,
-      comentarios_recepcion: doc.comentarios_recepcion
-    }));
+    const formattedDocuments = documents.map(doc => {
+      // 💰 Calcular estado de pago
+      let paymentStatus = 'SIN_FACTURA';
+      let paymentInfo = null;
+      
+      if (doc.invoices && doc.invoices.length > 0) {
+        const totalFacturado = doc.invoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
+        const totalPagado = doc.invoices.reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
+        const saldoPendiente = totalFacturado - totalPagado;
+        
+        if (saldoPendiente <= 0) {
+          paymentStatus = 'PAGADO';
+        } else if (totalPagado > 0) {
+          paymentStatus = 'PARCIAL';
+        } else {
+          paymentStatus = 'PENDIENTE';
+        }
+        
+        paymentInfo = {
+          totalFacturado,
+          totalPagado,
+          saldoPendiente,
+          facturas: doc.invoices.length
+        };
+      }
+      
+      return {
+        id: doc.id,
+        protocolNumber: doc.protocolNumber,
+        clientName: doc.clientName,
+        clientPhone: doc.clientPhone,
+        clientEmail: doc.clientEmail,
+        clientId: doc.clientId,
+        documentType: doc.documentType,
+        status: doc.status,
+        matrizador: doc.assignedTo ? `${doc.assignedTo.firstName} ${doc.assignedTo.lastName}` : 'No asignado',
+        matrizadorId: doc.assignedToId,
+        codigoRetiro: doc.codigoRetiro,
+        verificationCode: doc.verificationCode,
+        fechaCreacion: doc.createdAt,
+        fechaEntrega: doc.fechaEntrega,
+        actoPrincipalDescripcion: doc.actoPrincipalDescripcion,
+        actoPrincipalValor: doc.totalFactura,
+        totalFactura: doc.totalFactura,
+        matrizadorName: doc.matrizadorName,
+        detalle_documento: doc.detalle_documento,
+        comentarios_recepcion: doc.comentarios_recepcion,
+        // 💰 NUEVO: Estado de pago
+        paymentStatus,
+        paymentInfo
+      };
+    });
 
     const totalPages = Math.ceil(total / take);
 

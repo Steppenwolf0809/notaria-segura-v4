@@ -107,6 +107,9 @@ router.post('/import-xml', csrfProtection, xmlUpload.single('file'), billingCont
 // Import CXC endpoint (Cartera por Cobrar) - 🔒 SECURITY: CSRF protection
 router.post('/import-cxc', csrfProtection, xmlUpload.single('file'), billingController.importCxcFile);
 
+// Import MOV endpoint (Movimientos de Caja - Facturas + Pagos Efectivo) - 🔒 SECURITY: CSRF protection
+router.post('/import-mov', csrfProtection, xmlUpload.single('file'), billingController.importMovFile);
+
 // Import XLS endpoint (LEGACY - Deprecado, mantener 1 mes)
 // TODO: Comentar después del 28 de febrero de 2026
 router.post('/import', csrfProtection, upload.single('file'), billingController.importFile);
@@ -117,6 +120,9 @@ router.post('/import', csrfProtection, upload.single('file'), billingController.
 
 // My portfolio - for users to see invoices from their assigned documents - 🔒 SECURITY: Input validation
 router.get('/my-portfolio', validateQuery(portfolioQuerySchema), billingController.getMyPortfolio);
+
+// Update client phone number - 🔒 SECURITY: Input validation
+router.put('/client/:clientTaxId/phone', validateParams(clientTaxIdParamSchema), billingController.updateClientPhone);
 
 // Generate collection reminder message for a client - 🔒 SECURITY: Input validation
 router.get('/collection-reminder/:clientTaxId', validateParams(clientTaxIdParamSchema), billingController.generateCollectionReminder);

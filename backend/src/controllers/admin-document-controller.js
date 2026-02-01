@@ -136,22 +136,58 @@ async function getAllDocumentsOversight(req, res) {
           const countRows = await prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${whereSql}`;
           totalCount = Array.isArray(countRows) ? (countRows[0]?.count || 0) : (countRows?.count || 0);
 
-          // Adaptar include manual
-          documents = documents.map(d => ({
-            ...d,
-            assignedTo: d._assignedToId ? {
-              id: d._assignedToId,
-              firstName: d._assignedToFirstName,
-              lastName: d._assignedToLastName,
-              email: d._assignedToEmail
-            } : null,
-            createdBy: d._createdById ? {
-              id: d._createdById,
-              firstName: d._createdByFirstName,
-              lastName: d._createdByLastName,
-              email: d._createdByEmail
-            } : null
-          }));
+          // 💰 Obtener facturas para calcular estado de pago
+          const docIds = documents.map(d => d.id);
+          const invoicesMap = new Map();
+          if (docIds.length > 0) {
+            const invoices = await prisma.invoice.findMany({
+              where: { documentId: { in: docIds } },
+              select: { documentId: true, totalAmount: true, paidAmount: true, status: true }
+            });
+            invoices.forEach(inv => {
+              if (!invoicesMap.has(inv.documentId)) {
+                invoicesMap.set(inv.documentId, []);
+              }
+              invoicesMap.get(inv.documentId).push(inv);
+            });
+          }
+
+          // Adaptar include manual + estado de pago
+          documents = documents.map(d => {
+            const docInvoices = invoicesMap.get(d.id) || [];
+            let paymentStatus = 'SIN_FACTURA';
+            let paymentInfo = null;
+            
+            if (docInvoices.length > 0) {
+              const totalFacturado = docInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
+              const totalPagado = docInvoices.reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
+              const saldoPendiente = totalFacturado - totalPagado;
+              
+              if (saldoPendiente <= 0) paymentStatus = 'PAGADO';
+              else if (totalPagado > 0) paymentStatus = 'PARCIAL';
+              else paymentStatus = 'PENDIENTE';
+              
+              paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: docInvoices.length };
+            }
+            
+            return {
+              ...d,
+              assignedTo: d._assignedToId ? {
+                id: d._assignedToId,
+                firstName: d._assignedToFirstName,
+                lastName: d._assignedToLastName,
+                email: d._assignedToEmail
+              } : null,
+              createdBy: d._createdById ? {
+                id: d._createdById,
+                firstName: d._createdByFirstName,
+                lastName: d._createdByLastName,
+                email: d._createdByEmail
+              } : null,
+              paymentStatus,
+              paymentInfo
+            };
+          });
         } else {
           // Fallback Prisma estándar
           where.OR = [
@@ -171,7 +207,8 @@ async function getAllDocumentsOversight(req, res) {
               orderBy,
               include: {
                 assignedTo: { select: { id: true, firstName: true, lastName: true, email: true } },
-                createdBy: { select: { id: true, firstName: true, lastName: true, email: true } }
+                createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+                invoices: { select: { totalAmount: true, paidAmount: true, status: true } }
               }
             }),
             prisma.document.count({ where })
@@ -187,12 +224,35 @@ async function getAllDocumentsOversight(req, res) {
             orderBy,
             include: {
               assignedTo: { select: { id: true, firstName: true, lastName: true, email: true } },
-              createdBy: { select: { id: true, firstName: true, lastName: true, email: true } }
+              createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+              invoices: { select: { totalAmount: true, paidAmount: true, status: true } }
             }
           }),
           prisma.document.count({ where })
         ]);
       }
+      
+      // 💰 Calcular estado de pago para documentos obtenidos via Prisma
+      documents = documents.map(doc => {
+        let paymentStatus = 'SIN_FACTURA';
+        let paymentInfo = null;
+        
+        if (doc.invoices && doc.invoices.length > 0) {
+          const totalFacturado = doc.invoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
+          const totalPagado = doc.invoices.reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
+          const saldoPendiente = totalFacturado - totalPagado;
+          
+          if (saldoPendiente <= 0) paymentStatus = 'PAGADO';
+          else if (totalPagado > 0) paymentStatus = 'PARCIAL';
+          else paymentStatus = 'PENDIENTE';
+          
+          paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: doc.invoices.length };
+        }
+        
+        const { invoices, ...docWithoutInvoices } = doc;
+        return { ...docWithoutInvoices, paymentStatus, paymentInfo };
+      });
+      
       // Guardar en caché
       await cache.set(cacheKey, { documents, totalCount }, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'search:admin:oversight'] });
     }

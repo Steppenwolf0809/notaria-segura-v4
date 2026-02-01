@@ -201,6 +201,35 @@ async function importXmlFile(file, onProgress = null) {
 }
 
 /**
+ * Importar archivo XML de Movimientos de Caja (MOV)
+ * Importa facturas y marca como PAGADAS las que fueron pagadas en efectivo
+ * @param {File} file - Archivo XML a importar
+ * @param {Function} onProgress - Callback de progreso (opcional)
+ * @returns {Promise<Object>} Resultado de la importación
+ */
+async function importMovFile(file, onProgress = null) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const config = {
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        },
+        timeout: 300000 // 5 minutos
+    };
+
+    if (onProgress) {
+        config.onUploadProgress = (progressEvent) => {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            onProgress(percentCompleted);
+        };
+    }
+
+    const response = await apiClient.post('/billing/import-mov', formData, config);
+    return response.data;
+}
+
+/**
  * Importar archivo XLS/CSV de Cartera por Cobrar (CXC)
  * @param {File} file - Archivo XLS/CSV a importar
  * @param {Function} onProgress - Callback de progreso (opcional)
@@ -363,6 +392,17 @@ async function generateCollectionReminder(clientTaxId, phone) {
 }
 
 /**
+ * Actualizar teléfono del cliente
+ * @param {string} clientTaxId - RUC/Cédula del cliente
+ * @param {string} phone - Nuevo número de teléfono
+ * @returns {Promise<Object>} Resultado de la actualización
+ */
+async function updateClientPhone(clientTaxId, phone) {
+    const response = await apiClient.put(`/billing/client/${encodeURIComponent(clientTaxId)}/phone`, { phone });
+    return response.data;
+}
+
+/**
  * ============================================================================
  * SECCIÓN 8: REPORTES (Sprint 7)
  * ============================================================================
@@ -464,6 +504,7 @@ const billingService = {
     // Importación
     importFile,
     importXmlFile,
+    importMovFile,
     importCxcXls,
     getImportLogs,
 
@@ -477,6 +518,7 @@ const billingService = {
     // Cartera de Matrizadores (Sprint 6)
     getMyPortfolio,
     generateCollectionReminder,
+    updateClientPhone,
 
     // Reportes (Sprint 7)
     getReporteCarteraPorCobrar,

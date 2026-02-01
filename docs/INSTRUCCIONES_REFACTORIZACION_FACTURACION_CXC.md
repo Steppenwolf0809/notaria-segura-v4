@@ -1,4 +1,4 @@
-# INSTRUCCIONES PARA CURSOR: Refactorización del Módulo de Facturación
+# INSTRUCCIONES PARA  Refactorización del Módulo de Facturación
 
 ## 🎯 OBJETIVO PRINCIPAL
 

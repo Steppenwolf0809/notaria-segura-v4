@@ -36,7 +36,10 @@ import {
     AttachMoney as MoneyIcon,
     Schedule as ScheduleIcon,
     Person as PersonIcon,
-    Edit as EditIcon
+    Edit as EditIcon,
+    Search as SearchIcon,
+    Sort as SortIcon,
+    Phone as PhoneIcon
 } from '@mui/icons-material';
 import billingService from '../../services/billing-service';
 
@@ -55,41 +58,82 @@ const CarteraCobros = () => {
 
     // Estado para filtros: 'TODOS', 'VENCIDAS', 'POR_VENCER'
     const [activeFilter, setActiveFilter] = useState('TODOS');
+    
+    // Estado para búsqueda y ordenamiento
+    const [searchTerm, setSearchTerm] = useState('');
+    const [sortBy, setSortBy] = useState('debt'); // 'debt', 'name', 'invoices'
 
-    // Estado para modal de edición de teléfono
+    // Estado para modal de edición de teléfono (envío recordatorio)
     const [phoneModalOpen, setPhoneModalOpen] = useState(false);
     const [selectedClient, setSelectedClient] = useState(null);
     const [editPhone, setEditPhone] = useState('');
+    
+    // Estado para modal de edición permanente de teléfono
+    const [editPhoneModalOpen, setEditPhoneModalOpen] = useState(false);
+    const [editingClient, setEditingClient] = useState(null);
+    const [newPhone, setNewPhone] = useState('');
 
-    // Filtrar clientes según el filtro activo
+    // Filtrar, buscar y ordenar clientes
     const getFilteredClients = () => {
         if (!portfolio?.data) return [];
 
-        const clients = portfolio.data;
+        let clients = portfolio.data;
 
+        // 1. Filtrar por estado (TODOS, VENCIDAS, POR_VENCER)
         switch (activeFilter) {
             case 'VENCIDAS':
-                // Filtrar clientes que tienen al menos una factura vencida
-                return clients
+                clients = clients
                     .map(client => ({
                         ...client,
                         invoices: client.invoices.filter(inv => inv.isOverdue)
                     }))
                     .filter(client => client.invoices.length > 0);
+                break;
 
             case 'POR_VENCER':
-                // Filtrar clientes con facturas NO vencidas (pendientes pero no vencidas)
-                return clients
+                clients = clients
                     .map(client => ({
                         ...client,
                         invoices: client.invoices.filter(inv => !inv.isOverdue)
                     }))
                     .filter(client => client.invoices.length > 0);
+                break;
 
             case 'TODOS':
             default:
-                return clients;
+                break;
         }
+
+        // 2. Búsqueda por nombre o RUC
+        if (searchTerm.trim()) {
+            const term = searchTerm.toLowerCase();
+            clients = clients.filter(client => 
+                client.clientName.toLowerCase().includes(term) ||
+                client.clientTaxId.toLowerCase().includes(term)
+            );
+        }
+
+        // 3. Ordenar
+        switch (sortBy) {
+            case 'name':
+                clients = [...clients].sort((a, b) => 
+                    a.clientName.localeCompare(b.clientName)
+                );
+                break;
+            case 'invoices':
+                clients = [...clients].sort((a, b) => 
+                    b.invoices.length - a.invoices.length
+                );
+                break;
+            case 'debt':
+            default:
+                clients = [...clients].sort((a, b) => 
+                    b.totalDebt - a.totalDebt
+                );
+                break;
+        }
+
+        return clients;
     };
 
     const filteredClients = getFilteredClients();
@@ -98,7 +142,7 @@ const CarteraCobros = () => {
         setLoading(true);
         setError(null);
         try {
-            const response = await billingService.getMyPortfolio();
+            const response = await billingService.getMyPortfolio({ page: 1, limit: 100 });
             setPortfolio(response);
         } catch (err) {
             console.error('Error loading portfolio:', err);
@@ -270,38 +314,71 @@ const CarteraCobros = () => {
                 </Grid>
             )}
 
-            {/* Filter Chips */}
+            {/* Búsqueda y Filtros */}
             {portfolio?.data?.length > 0 && (
-                <Box sx={{ mb: 3, display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <Typography variant="subtitle2" color="text.secondary" sx={{ mr: 1 }}>
-                        Filtrar:
-                    </Typography>
-                    <Chip
-                        label="Todos"
-                        onClick={() => setActiveFilter('TODOS')}
-                        color={activeFilter === 'TODOS' ? 'primary' : 'default'}
-                        variant={activeFilter === 'TODOS' ? 'filled' : 'outlined'}
-                    />
-                    <Chip
-                        icon={<WarningIcon />}
-                        label="Vencidas"
-                        onClick={() => setActiveFilter('VENCIDAS')}
-                        color={activeFilter === 'VENCIDAS' ? 'error' : 'default'}
-                        variant={activeFilter === 'VENCIDAS' ? 'filled' : 'outlined'}
-                    />
-                    <Chip
-                        icon={<ScheduleIcon />}
-                        label="Por Vencer"
-                        onClick={() => setActiveFilter('POR_VENCER')}
-                        color={activeFilter === 'POR_VENCER' ? 'warning' : 'default'}
-                        variant={activeFilter === 'POR_VENCER' ? 'filled' : 'outlined'}
-                    />
-                    {activeFilter !== 'TODOS' && (
-                        <Typography variant="caption" color="text.secondary" sx={{ ml: 2 }}>
-                            Mostrando {filteredClients.length} de {portfolio.data.length} clientes
+                <>
+                    {/* Barra de búsqueda y ordenamiento */}
+                    <Box sx={{ mb: 2, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <TextField
+                            size="small"
+                            placeholder="Buscar por cliente o RUC..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            InputProps={{
+                                startAdornment: <SearchIcon sx={{ mr: 1, color: 'action.active' }} />
+                            }}
+                            sx={{ flexGrow: 1, minWidth: 250 }}
+                        />
+                        <TextField
+                            select
+                            size="small"
+                            label="Ordenar por"
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value)}
+                            SelectProps={{ native: true }}
+                            InputProps={{
+                                startAdornment: <SortIcon sx={{ mr: 1, color: 'action.active' }} />
+                            }}
+                            sx={{ minWidth: 180 }}
+                        >
+                            <option value="debt">Mayor deuda</option>
+                            <option value="name">Nombre A-Z</option>
+                            <option value="invoices">Más facturas</option>
+                        </TextField>
+                    </Box>
+
+                    {/* Filter Chips */}
+                    <Box sx={{ mb: 3, display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <Typography variant="subtitle2" color="text.secondary" sx={{ mr: 1 }}>
+                            Filtrar:
                         </Typography>
-                    )}
-                </Box>
+                        <Chip
+                            label="Todos"
+                            onClick={() => setActiveFilter('TODOS')}
+                            color={activeFilter === 'TODOS' ? 'primary' : 'default'}
+                            variant={activeFilter === 'TODOS' ? 'filled' : 'outlined'}
+                        />
+                        <Chip
+                            icon={<WarningIcon />}
+                            label="Vencidas"
+                            onClick={() => setActiveFilter('VENCIDAS')}
+                            color={activeFilter === 'VENCIDAS' ? 'error' : 'default'}
+                            variant={activeFilter === 'VENCIDAS' ? 'filled' : 'outlined'}
+                        />
+                        <Chip
+                            icon={<ScheduleIcon />}
+                            label="Por Vencer"
+                            onClick={() => setActiveFilter('POR_VENCER')}
+                            color={activeFilter === 'POR_VENCER' ? 'warning' : 'default'}
+                            variant={activeFilter === 'POR_VENCER' ? 'filled' : 'outlined'}
+                        />
+                        {(activeFilter !== 'TODOS' || searchTerm.trim()) && (
+                            <Typography variant="caption" color="text.secondary" sx={{ ml: 2 }}>
+                                Mostrando {filteredClients.length} de {portfolio.data.length} clientes
+                            </Typography>
+                        )}
+                    </Box>
+                </>
             )}
 
             {/* Client List */}
@@ -342,11 +419,60 @@ const CarteraCobros = () => {
                                         <Typography fontWeight="bold">
                                             {client.clientName}
                                         </Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                            {client.clientTaxId} • {client.clientPhone || 'Sin teléfono'}
-                                        </Typography>
+                                        <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                                            <Typography variant="caption" color="text.secondary">
+                                                {client.clientTaxId} • {client.clientPhone || 'Sin teléfono'}
+                                            </Typography>
+                                            <Box
+                                                component="span"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setEditingClient(client);
+                                                    setNewPhone(client.clientPhone || '');
+                                                    setEditPhoneModalOpen(true);
+                                                }}
+                                                sx={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: 0.5,
+                                                    color: 'primary.main',
+                                                    cursor: 'pointer',
+                                                    typography: 'caption',
+                                                    fontWeight: 500,
+                                                    '&:hover': { textDecoration: 'underline' }
+                                                }}
+                                            >
+                                                <PhoneIcon fontSize="small" />
+                                                Editar teléfono
+                                            </Box>
+                                        </Box>
                                     </Box>
-                                    <Box display="flex" gap={2} alignItems="center">
+                                    <Box display="flex" gap={2} alignItems="center" flexWrap="wrap">
+                                        <Chip
+                                            label={`${client.invoices.length} facturas`}
+                                            size="small"
+                                            variant="outlined"
+                                        />
+                                        <Chip
+                                            label={`Facturado: ${formatCurrency(client.invoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0))}`}
+                                            size="small"
+                                            variant="outlined"
+                                        />
+                                        <Chip
+                                            label={`Pagado: ${formatCurrency(client.invoices.reduce((sum, inv) => sum + (inv.totalPaid || 0), 0))}`}
+                                            size="small"
+                                            variant="outlined"
+                                        />
+                                        <Chip
+                                            label={`% Pagado: ${(() => {
+                                                const totalFacturado = client.invoices.reduce((sum, inv) => sum + (inv.totalAmount || 0), 0);
+                                                const totalPagado = client.invoices.reduce((sum, inv) => sum + (inv.totalPaid || 0), 0);
+                                                if (!totalFacturado) return '0%';
+                                                return `${Math.round((totalPagado / totalFacturado) * 100)}%`;
+                                            })()}`}
+                                            size="small"
+                                            variant="outlined"
+                                        />
                                         {client.overdueDebt > 0 && (
                                             <Chip
                                                 icon={<WarningIcon />}
@@ -452,7 +578,7 @@ const CarteraCobros = () => {
                 </Alert>
             </Snackbar>
 
-            {/* Modal de edición de teléfono */}
+            {/* Modal de edición de teléfono para envío de recordatorio */}
             <Dialog open={phoneModalOpen} onClose={() => setPhoneModalOpen(false)} maxWidth="sm" fullWidth>
                 <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <WhatsAppIcon color="success" />
@@ -493,6 +619,68 @@ const CarteraCobros = () => {
                         disabled={!editPhone.trim()}
                     >
                         Enviar por WhatsApp
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Modal de edición permanente de teléfono */}
+            <Dialog open={editPhoneModalOpen} onClose={() => setEditPhoneModalOpen(false)} maxWidth="sm" fullWidth>
+                <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <PhoneIcon color="primary" />
+                    Editar Teléfono del Cliente
+                </DialogTitle>
+                <DialogContent>
+                    {editingClient && (
+                        <Box sx={{ mt: 1 }}>
+                            <Typography variant="subtitle2" gutterBottom>
+                                Cliente: <strong>{editingClient.clientName}</strong>
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" gutterBottom>
+                                RUC/Cédula: {editingClient.clientTaxId}
+                            </Typography>
+
+                            <TextField
+                                fullWidth
+                                label="Número de Teléfono"
+                                value={newPhone}
+                                onChange={(e) => setNewPhone(e.target.value)}
+                                placeholder="Ej: 0991234567"
+                                helperText="Este cambio se guardará en todos los documentos del cliente"
+                                sx={{ mt: 2 }}
+                                InputProps={{
+                                    startAdornment: <PhoneIcon color="action" sx={{ mr: 1 }} />
+                                }}
+                            />
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setEditPhoneModalOpen(false)}>Cancelar</Button>
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={async () => {
+                            try {
+                                await billingService.updateClientPhone(editingClient.clientTaxId, newPhone);
+                                
+                                setSnackbar({
+                                    open: true,
+                                    message: `Teléfono actualizado para ${editingClient.clientName}`,
+                                    severity: 'success'
+                                });
+                                setEditPhoneModalOpen(false);
+                                loadPortfolio(); // Recargar datos
+                            } catch (error) {
+                                console.error('Error updating phone:', error);
+                                setSnackbar({
+                                    open: true,
+                                    message: 'Error al actualizar teléfono',
+                                    severity: 'error'
+                                });
+                            }
+                        }}
+                    >
+                        Guardar
                     </Button>
                 </DialogActions>
             </Dialog>

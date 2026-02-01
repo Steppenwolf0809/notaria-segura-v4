@@ -57,48 +57,71 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId) {
         
         stats.totalTransactions = parsed.summary.totalTransactions;
 
-        // 3. Procesar pagos (AB)
-        console.log(`[import-koinor-xml] Processing ${parsed.payments.length} payments...`);
-        for (const payment of parsed.payments) {
-            try {
-                const result = await processPayment(payment, fileName, stats);
-                
-                if (result.created > 0) {
-                    stats.paymentsCreated += result.created;
-                    stats.invoicesUpdated += result.invoicesUpdated;
-                    stats.documentsUpdated += result.documentsUpdated;
+        // 3. Procesar pagos (AB) - OPTIMIZADO EN BATCHES
+        console.log(`[import-koinor-xml] Processing ${parsed.payments.length} payments in batches...`);
+        
+        const BATCH_SIZE = 50; // Procesar 50 pagos a la vez
+        const payments = parsed.payments;
+        
+        for (let i = 0; i < payments.length; i += BATCH_SIZE) {
+            const batch = payments.slice(i, i + BATCH_SIZE);
+            const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+            const totalBatches = Math.ceil(payments.length / BATCH_SIZE);
+            
+            console.log(`[import-koinor-xml] Processing batch ${batchNum}/${totalBatches} (${batch.length} payments)...`);
+            
+            // Procesar batch en paralelo (con límite de concurrencia)
+            const batchResults = await Promise.allSettled(
+                batch.map(payment => processPayment(payment, fileName, stats))
+            );
+            
+            // Agregar resultados
+            for (const result of batchResults) {
+                if (result.status === 'fulfilled') {
+                    const r = result.value;
+                    if (r.created > 0) {
+                        stats.paymentsCreated += r.created;
+                        stats.invoicesUpdated += r.invoicesUpdated;
+                        stats.documentsUpdated += r.documentsUpdated;
+                    }
+                    if (r.createdLegacy > 0) {
+                        stats.invoicesCreatedLegacy += r.createdLegacy;
+                    }
+                    if (r.skipped > 0) {
+                        stats.paymentsSkipped += r.skipped;
+                    }
+                } else {
+                    stats.errors++;
+                    stats.errorDetails.push({
+                        type: 'PAYMENT_BATCH',
+                        error: result.reason?.message || 'Unknown error'
+                    });
                 }
-                if (result.createdLegacy > 0) {
-                    stats.invoicesCreatedLegacy += result.createdLegacy;
-                }
-                if (result.skipped > 0) {
-                    stats.paymentsSkipped += result.skipped;
-                }
-            } catch (error) {
-                stats.errors++;
-                stats.errorDetails.push({
-                    type: 'PAYMENT',
-                    receiptNumber: payment.receiptNumber,
-                    error: error.message
-                });
-                console.error(`[import-koinor-xml] Error processing payment ${payment.receiptNumber}:`, error);
             }
         }
 
-        // 4. Procesar notas de crédito (NC)
-        console.log(`[import-koinor-xml] Processing ${parsed.notasCredito.length} credit notes...`);
-        for (const nc of parsed.notasCredito) {
-            try {
-                await processNotaCredito(nc, fileName);
-                stats.notasCreditoProcessed++;
-            } catch (error) {
-                stats.errors++;
-                stats.errorDetails.push({
-                    type: 'NC',
-                    receiptNumber: nc.receiptNumber,
-                    error: error.message
-                });
-                console.error(`[import-koinor-xml] Error processing NC ${nc.receiptNumber}:`, error);
+        // 4. Procesar notas de crédito (NC) - OPTIMIZADO EN BATCHES
+        if (parsed.notasCredito.length > 0) {
+            console.log(`[import-koinor-xml] Processing ${parsed.notasCredito.length} credit notes in batches...`);
+            
+            for (let i = 0; i < parsed.notasCredito.length; i += BATCH_SIZE) {
+                const batch = parsed.notasCredito.slice(i, i + BATCH_SIZE);
+                
+                const batchResults = await Promise.allSettled(
+                    batch.map(nc => processNotaCredito(nc, fileName))
+                );
+                
+                for (const result of batchResults) {
+                    if (result.status === 'fulfilled') {
+                        stats.notasCreditoProcessed++;
+                    } else {
+                        stats.errors++;
+                        stats.errorDetails.push({
+                            type: 'NC_BATCH',
+                            error: result.reason?.message || 'Unknown error'
+                        });
+                    }
+                }
             }
         }
 
@@ -217,11 +240,17 @@ async function processPayment(payment, sourceFile, stats) {
  * @returns {Promise<Object>} - {created, skipped, documentUpdated}
  */
 async function processSinglePayment(payment, detail, sourceFile) {
-    // 1. Buscar factura por invoiceNumberRaw (formato RAW del XML)
-    // ⚠️ CRÍTICO: Buscar por invoiceNumberRaw, NO por invoiceNumber normalizado
+    // 1. Buscar factura por invoiceNumberRaw O por invoiceNumber normalizado
+    // Esto evita duplicados cuando el formato varía entre importaciones
+    const normalizedNumber = detail.invoiceNumberRaw.replace(/^0+/, '');
+    
     let invoice = await prisma.invoice.findFirst({
         where: {
-            invoiceNumberRaw: detail.invoiceNumberRaw
+            OR: [
+                { invoiceNumberRaw: detail.invoiceNumberRaw },
+                { invoiceNumber: detail.invoiceNumberRaw },
+                { invoiceNumber: normalizedNumber }
+            ]
         },
         include: { document: true }
     });
@@ -232,18 +261,23 @@ async function processSinglePayment(payment, detail, sourceFile) {
         // Factura no encontrada - crear factura legacy automáticamente
         console.log(`[import-koinor-xml] Creating legacy invoice for: ${detail.invoiceNumberRaw}`);
         
-        // Crear factura legacy con los datos del pago
-        invoice = await prisma.invoice.create({
-            data: {
-                invoiceNumber: detail.invoiceNumberRaw.replace(/^0+/, ''), // Normalizado (sin ceros)
-                invoiceNumberRaw: detail.invoiceNumberRaw, // RAW del XML
+        // Usar upsert para evitar errores de unique constraint
+        invoice = await prisma.invoice.upsert({
+            where: { invoiceNumber: detail.invoiceNumberRaw },
+            update: {
+                // Si ya existe, solo actualizar invoiceNumberRaw si está vacío
+                invoiceNumberRaw: detail.invoiceNumberRaw
+            },
+            create: {
+                invoiceNumber: detail.invoiceNumberRaw, // Usar el RAW como número principal
+                invoiceNumberRaw: detail.invoiceNumberRaw,
                 clientName: payment.clientName || 'Cliente Legacy',
                 clientTaxId: payment.clientTaxId || '9999999999999',
-                issueDate: payment.paymentDate, // Usar fecha de pago como aproximación
-                totalAmount: detail.amount, // Asumir que el monto del pago es el total
-                paidAmount: 0, // Se actualizará al crear el pago
+                issueDate: payment.paymentDate,
+                totalAmount: detail.amount,
+                paidAmount: 0,
                 status: 'PENDING',
-                isLegacy: true, // Marcar como legacy
+                isLegacy: true,
                 sourceFile
             }
         });
