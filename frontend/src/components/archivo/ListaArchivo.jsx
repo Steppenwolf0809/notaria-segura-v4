@@ -67,6 +67,7 @@ import useBulkActions from '../../hooks/useBulkActions';
 import BulkActionToolbar from '../bulk/BulkActionToolbar';
 import BulkStatusChangeModal from '../bulk/BulkStatusChangeModal';
 import DateRangeFilter from '../shared/DateRangeFilter';
+import PaymentIndicator from '../shared/PaymentIndicator';
 import { toast } from 'react-toastify';
 
 /**
@@ -1089,8 +1090,12 @@ const ListaArchivo = ({
                         size="small"
                         sx={{ fontWeight: 600 }}
                       />
-
-
+                      {/* 💰 Indicador de estado de pago */}
+                      <PaymentIndicator 
+                        paymentStatus={documento.paymentStatus} 
+                        paymentInfo={documento.paymentInfo}
+                        documentStatus={documento.status}
+                      />
                     </Box>
                   </TableCell>
 

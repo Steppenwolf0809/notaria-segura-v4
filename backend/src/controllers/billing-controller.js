@@ -1079,73 +1079,122 @@ export async function getMyPortfolio(req, res) {
 
         console.log(`[billing-controller] getMyPortfolio for user ${userId}`);
 
-        // Get documents assigned to this user that have invoices
-        const documents = await prisma.document.findMany({
-            where: {
-                assignedToId: userId,
-                invoices: {
-                    some: {} // Has at least one invoice
-                }
-            },
-            include: {
-                invoices: {
-                    include: {
-                        payments: true
-                    }
-                }
-            }
+        // Get user info to match with CXC matrizador name
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { firstName: true, lastName: true }
         });
 
-        // Process invoices and calculate balances
+        const userFullName = user ? `${user.firstName} ${user.lastName}`.toUpperCase() : null;
+
+        // Mapeo de usuarios a nombres CXC (codven mapeado)
+        // Nota: firstName puede tener espacios (ej: "Jose Luis")
+        const USER_TO_CXC_MATRIZADOR = {
+            'Mayra Cristina': 'Mayra Corella',
+            'Mayra': 'Mayra Corella',
+            'Karol Daniela': 'Karol Velastegui',
+            'Karol': 'Karol Velastegui', 
+            'Jose Luis': 'Jose Zapata',
+            'Jose': 'Jose Zapata',
+            'Gissela Vanessa': 'Gissela Velastegui',
+            'Gissela': 'Gissela Velastegui',
+            'Maria Lucinda': 'Maria Diaz',
+            'Maria': 'Maria Diaz',
+            'Francisco Esteban': 'Esteban Proaño',
+            'Francisco': 'Esteban Proaño',
+            'Esteban': 'Esteban Proaño'
+        };
+        
+        // Buscar el nombre CXC correspondiente al usuario
+        const cxcMatrizadorName = USER_TO_CXC_MATRIZADOR[user.firstName] || user.firstName;
+
+        // Facturas pendientes asociadas al matrizador (por nombre CXC o por documento asignado)
+        const invoices = await prisma.invoice.findMany({
+            where: {
+                status: { in: ['PENDING', 'PARTIAL', 'OVERDUE'] },
+                OR: [
+                    { matrizador: cxcMatrizadorName },
+                    { assignedToId: userId },
+                    {
+                        matrizador: null,
+                        document: { is: { assignedToId: userId } }
+                    }
+                ]
+            },
+            include: {
+                payments: true,
+                document: {
+                    select: {
+                        id: true,
+                        protocolNumber: true,
+                        documentType: true,
+                        clientId: true,
+                        clientName: true,
+                        clientPhone: true,
+                        status: true
+                    }
+                }
+            },
+            orderBy: { issueDate: 'desc' }
+        });
+
         const clientMap = new Map();
         let totalDebt = 0;
         let totalOverdue = 0;
 
-        for (const doc of documents) {
-            for (const invoice of doc.invoices) {
-                const paid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
-                const balance = Number(invoice.totalAmount) - paid;
+        for (const invoice of invoices) {
+            if (invoice.document?.status === 'ANULADO_NOTA_CREDITO') continue;
 
-                if (balance <= 0) continue; // Skip fully paid
+            const paid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+            const totalAmount = Number(invoice.totalAmount || 0);
+            const balance = totalAmount - paid;
 
-                // Check if overdue
-                const isOverdue = invoice.dueDate && new Date(invoice.dueDate) < new Date();
-                if (isOverdue) totalOverdue += balance;
-                totalDebt += balance;
+            if (balance <= 0) continue;
 
-                // Group by client
-                const clientKey = invoice.clientTaxId;
-                if (!clientMap.has(clientKey)) {
-                    clientMap.set(clientKey, {
-                        clientTaxId: invoice.clientTaxId,
-                        clientName: invoice.clientName,
-                        clientPhone: doc.clientPhone,
-                        totalDebt: 0,
-                        overdueDebt: 0,
-                        invoices: []
-                    });
-                }
+            const isOverdue = invoice.dueDate && new Date(invoice.dueDate) < new Date();
+            if (isOverdue) totalOverdue += balance;
+            totalDebt += balance;
 
-                const client = clientMap.get(clientKey);
-                client.totalDebt += balance;
-                if (isOverdue) client.overdueDebt += balance;
-                client.invoices.push({
-                    id: invoice.id,
-                    invoiceNumber: invoice.invoiceNumber,
-                    documentId: doc.id,
-                    protocolNumber: doc.protocolNumber,
-                    documentType: doc.documentType,
-                    issueDate: invoice.issueDate,
-                    dueDate: invoice.dueDate,
-                    totalAmount: Number(invoice.totalAmount),
-                    totalPaid: paid,
-                    balance,
-                    isOverdue,
-                    daysOverdue: isOverdue
-                        ? Math.floor((new Date() - new Date(invoice.dueDate)) / (1000 * 60 * 60 * 24))
-                        : 0
+            const effectiveClientTaxId = (invoice.clientTaxId && invoice.clientTaxId.trim())
+                ? invoice.clientTaxId.trim()
+                : (invoice.document?.clientId || invoice.id);
+            const effectiveClientName = invoice.clientName || invoice.document?.clientName;
+            const clientPhone = invoice.document?.clientPhone || '';
+
+            if (!clientMap.has(effectiveClientTaxId)) {
+                clientMap.set(effectiveClientTaxId, {
+                    clientTaxId: effectiveClientTaxId,
+                    clientName: effectiveClientName,
+                    clientPhone,
+                    totalDebt: 0,
+                    overdueDebt: 0,
+                    invoices: []
                 });
             }
+
+            const client = clientMap.get(effectiveClientTaxId);
+            client.totalDebt += balance;
+            if (isOverdue) client.overdueDebt += balance;
+
+            const daysOverdue = isOverdue && invoice.dueDate
+                ? Math.floor((new Date() - new Date(invoice.dueDate)) / (1000 * 60 * 60 * 24))
+                : (invoice.issueDate ? Math.floor((new Date() - new Date(invoice.issueDate)) / (1000 * 60 * 60 * 24)) : 0);
+
+            client.invoices.push({
+                id: invoice.id,
+                invoiceNumber: invoice.invoiceNumber || invoice.invoiceNumberRaw,
+                documentId: invoice.document?.id || invoice.documentId,
+                protocolNumber: invoice.document?.protocolNumber || null,
+                documentType: invoice.document?.documentType || 'CXC',
+                issueDate: invoice.issueDate,
+                dueDate: invoice.dueDate,
+                totalAmount,
+                totalPaid: paid,
+                balance,
+                isOverdue,
+                daysOverdue,
+                source: invoice.document ? 'DOCUMENT' : 'CXC'
+            });
         }
 
         // Convert to array and sort by debt amount
@@ -1176,6 +1225,51 @@ export async function getMyPortfolio(req, res) {
         res.status(500).json({
             success: false,
             message: 'Error al obtener cartera de documentos'
+        });
+    }
+}
+
+/**
+ * Update client phone number in all documents
+ * Updates clientPhone for all documents with the given clientTaxId
+ */
+export async function updateClientPhone(req, res) {
+    try {
+        const { clientTaxId } = req.params;
+        const { phone } = req.body;
+
+        console.log(`[billing-controller] updateClientPhone for ${clientTaxId}: ${phone}`);
+
+        // Validar que el teléfono no esté vacío
+        if (!phone || !phone.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: 'El número de teléfono es requerido'
+            });
+        }
+
+        // Actualizar clientPhone en todos los documentos con ese clientTaxId
+        const result = await prisma.document.updateMany({
+            where: {
+                clientId: clientTaxId
+            },
+            data: {
+                clientPhone: phone.trim()
+            }
+        });
+
+        console.log(`[billing-controller] Updated ${result.count} documents`);
+
+        res.json({
+            success: true,
+            message: `Teléfono actualizado en ${result.count} documento(s)`,
+            updatedCount: result.count
+        });
+    } catch (error) {
+        console.error('[billing-controller] updateClientPhone error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al actualizar teléfono del cliente'
         });
     }
 }
@@ -1342,6 +1436,7 @@ export async function getCarteraPorCobrar(req, res) {
                 payments: true,
                 document: {
                     select: {
+                        status: true, // Para excluir documentos anulados por NC
                         assignedTo: {
                             select: {
                                 firstName: true,
@@ -1369,12 +1464,22 @@ export async function getCarteraPorCobrar(req, res) {
             const balance = Number(invoice.totalAmount) - paid;
 
             if (balance <= 0) continue; // Skip fully paid
+            
+            // 🚫 Excluir facturas de documentos anulados por nota de crédito
+            if (invoice.document?.status === 'ANULADO_NOTA_CREDITO') continue;
 
-            // Determinar matrizador: primero del documento, luego asignación directa
-            const assignedUser = invoice.document?.assignedTo || invoice.assignedTo;
-            const matrizadorName = assignedUser
-                ? `${assignedUser.firstName} ${assignedUser.lastName}`
-                : 'Sin asignar';
+            // Determinar matrizador: 
+            // 1. Campo matrizador directo de Invoice (CXC import)
+            // 2. Del documento asignado
+            // 3. Asignación directa de factura
+            let matrizadorName = 'Sin asignar';
+            if (invoice.matrizador) {
+                matrizadorName = invoice.matrizador;
+            } else if (invoice.document?.assignedTo) {
+                matrizadorName = `${invoice.document.assignedTo.firstName} ${invoice.document.assignedTo.lastName}`;
+            } else if (invoice.assignedTo) {
+                matrizadorName = `${invoice.assignedTo.firstName} ${invoice.assignedTo.lastName}`;
+            }
 
             const key = invoice.clientTaxId;
             if (!clientMap.has(key)) {
@@ -1782,6 +1887,76 @@ export async function importCxcFile(req, res) {
 }
 
 /**
+ * Import MOV (Movimientos de Caja) from XML file
+ * Importa facturas y marca como PAGADAS las que fueron pagadas en efectivo
+ * Requires multipart/form-data with 'file' field
+ */
+export async function importMovFile(req, res) {
+    try {
+        // Check if file was uploaded
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                error: 'No se proporcionó archivo',
+                message: 'Debe subir un archivo XML de Movimientos de Caja'
+            });
+        }
+
+        const { file } = req;
+        const userId = req.user?.id;
+
+        // Validate file type
+        const ext = file.originalname.toLowerCase().substring(
+            file.originalname.lastIndexOf('.')
+        );
+
+        if (ext !== '.xml') {
+            return res.status(400).json({
+                success: false,
+                error: 'Tipo de archivo no válido',
+                message: 'Solo se permiten archivos XML (.xml)'
+            });
+        }
+
+        // Validate file size (máximo 50MB)
+        const maxSize = 50 * 1024 * 1024;
+        if (file.size > maxSize) {
+            return res.status(400).json({
+                success: false,
+                error: 'Archivo demasiado grande',
+                message: 'El archivo no debe superar 50MB'
+            });
+        }
+
+        console.log(`[billing-controller] Starting MOV import of ${file.originalname} (${file.size} bytes)`);
+
+        // Import the service dynamically
+        const { importMovFile: importMov } = await import('../services/import-mov-service.js');
+
+        // Process the file
+        const result = await importMov(
+            file.buffer,
+            file.originalname,
+            userId
+        );
+
+        res.json({
+            success: true,
+            message: 'Importación de Movimientos completada',
+            ...result
+        });
+
+    } catch (error) {
+        console.error('[billing-controller] MOV import error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error durante la importación del archivo de Movimientos',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+}
+
+/**
  * Asignar matrizador a una factura (para facturas sin documento)
  * Solo CAJA y ADMIN pueden usar esta función
  */
@@ -1969,8 +2144,8 @@ export async function importCxcXls(req, res) {
         console.error('[billing-controller] CXC XLS import error:', error);
         res.status(500).json({
             success: false,
-            message: 'Error durante la importación del archivo de CXC',
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            message: 'Error en la importación',
+            error: error.message || 'Error al procesar el archivo. Verifique el formato.'
         });
     }
 }

@@ -30,7 +30,8 @@ import {
     Error as ErrorIcon,
     Warning as WarningIcon,
     Receipt as ReceiptIcon,
-    Assessment as AssessmentIcon
+    Assessment as AssessmentIcon,
+    PointOfSale as PointOfSaleIcon
 } from '@mui/icons-material';
 import { useDropzone } from 'react-dropzone';
 import billingService from '../../services/billing-service';
@@ -38,7 +39,8 @@ import billingService from '../../services/billing-service';
 /**
  * ImportarDatos Component
  * Permite importar archivos Excel/CSV/XML de Koinor al sistema de facturación
- * - Pestaña PAGOS: XML de Estado de Cuenta (transacciones de pagos)
+ * - Pestaña MOV: XML de Movimientos de Caja (facturas + pagos efectivo)
+ * - Pestaña PAGOS: XML de Estado de Cuenta (pagos posteriores)
  * - Pestaña CXC: XLS/CSV de Cartera por Cobrar (saldos pendientes)
  */
 const ImportarDatos = () => {
@@ -49,6 +51,7 @@ const ImportarDatos = () => {
     const [selectedFile, setSelectedFile] = useState(null);
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
+    const [processingStatus, setProcessingStatus] = useState(''); // Estado de procesamiento
     const [result, setResult] = useState(null);
     const [error, setError] = useState(null);
 
@@ -88,8 +91,8 @@ const ImportarDatos = () => {
 
     // Configurar formatos aceptados según la pestaña activa
     const getAcceptedFormats = () => {
-        if (activeTab === 0) {
-            // Pestaña PAGOS: solo XML
+        if (activeTab === 0 || activeTab === 1) {
+            // Pestaña MOV y PAGOS: solo XML
             return {
                 'text/xml': ['.xml'],
                 'application/xml': ['.xml']
@@ -117,6 +120,7 @@ const ImportarDatos = () => {
 
         setUploading(true);
         setUploadProgress(0);
+        setProcessingStatus('Subiendo archivo...');
         setError(null);
         setResult(null);
 
@@ -124,25 +128,51 @@ const ImportarDatos = () => {
             let response;
             
             if (activeTab === 0) {
-                // Pestaña PAGOS: importar XML de pagos
+                // Pestaña MOV: importar XML de movimientos (facturas + pagos efectivo)
+                setProcessingStatus('Procesando XML de Movimientos de Caja...');
+                response = await billingService.importMovFile(
+                    selectedFile,
+                    (progress) => {
+                        setUploadProgress(progress);
+                        if (progress >= 100) {
+                            setProcessingStatus('Analizando facturas y pagos en efectivo...');
+                        }
+                    }
+                );
+            } else if (activeTab === 1) {
+                // Pestaña PAGOS: importar XML de pagos posteriores
+                setProcessingStatus('Procesando XML de Estado de Cuenta...');
                 response = await billingService.importXmlFile(
                     selectedFile,
-                    (progress) => setUploadProgress(progress)
+                    (progress) => {
+                        setUploadProgress(progress);
+                        if (progress >= 100) {
+                            setProcessingStatus('Aplicando pagos a facturas...');
+                        }
+                    }
                 );
             } else {
                 // Pestaña CXC: importar XLS/CSV de cartera por cobrar
+                setProcessingStatus('Procesando archivo de Cartera por Cobrar...');
                 response = await billingService.importCxcXls(
                     selectedFile,
-                    (progress) => setUploadProgress(progress)
+                    (progress) => {
+                        setUploadProgress(progress);
+                        if (progress >= 100) {
+                            setProcessingStatus('Actualizando saldos pendientes...');
+                        }
+                    }
                 );
             }
 
-            setResult(response.data);
+            setProcessingStatus('¡Importación completada!');
+            setResult(response.data || response);
             setSelectedFile(null);
             loadImportLogs();
         } catch (err) {
             console.error('Error importando archivo:', err);
-            setError(err.response?.data?.message || 'Error al procesar el archivo');
+            setProcessingStatus('');
+            setError(err.response?.data?.message || err.response?.data?.error || 'Error al procesar el archivo. Verifique el formato.');
         } finally {
             setUploading(false);
             setUploadProgress(0);
@@ -202,8 +232,13 @@ const ImportarDatos = () => {
                     variant="fullWidth"
                 >
                     <Tab 
+                        icon={<PointOfSaleIcon />} 
+                        label="MOV - FACTURAS (XML)" 
+                        iconPosition="start"
+                    />
+                    <Tab 
                         icon={<ReceiptIcon />} 
-                        label="PAGOS (XML)" 
+                        label="PAGOS POSTERIORES (XML)" 
                         iconPosition="start"
                     />
                     <Tab 
@@ -218,9 +253,15 @@ const ImportarDatos = () => {
             <Alert severity="info" sx={{ mb: 3 }}>
                 {activeTab === 0 ? (
                     <>
-                        <strong>📄 PAGOS:</strong> Importa el archivo XML de "Estado de Cuenta" desde Koinor.
-                        Este archivo contiene las transacciones de pagos reales (AB) y actualiza automáticamente
-                        el estado de las facturas y documentos.
+                        <strong>� MOVIMIENTOS DE CAJA:</strong> Importa el archivo XML de "Diario de Caja" desde Koinor.
+                        Este archivo contiene las facturas del día y marca automáticamente como PAGADAS las que
+                        fueron pagadas en efectivo (conpag=E).
+                    </>
+                ) : activeTab === 1 ? (
+                    <>
+                        <strong>📄 PAGOS POSTERIORES:</strong> Importa el archivo XML de "Estado de Cuenta" desde Koinor.
+                        Este archivo contiene los pagos por transferencia/cheque y actualiza automáticamente
+                        el estado de las facturas existentes.
                     </>
                 ) : (
                     <>
@@ -273,7 +314,7 @@ const ImportarDatos = () => {
                                     o haz clic para seleccionar
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                                    {activeTab === 0 
+                                    {activeTab === 0 || activeTab === 1
                                         ? 'Formato aceptado: .xml' 
                                         : 'Formatos aceptados: .xls, .xlsx, .csv'
                                     }
@@ -282,20 +323,35 @@ const ImportarDatos = () => {
                         )}
                     </Paper>
 
-                    {/* Barra de progreso */}
+                    {/* Barra de progreso y estado */}
                     {uploading && (
                         <Box sx={{ mt: 2 }}>
-                            <LinearProgress variant="determinate" value={uploadProgress} />
-                            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                                Procesando... {uploadProgress}%
-                            </Typography>
+                            <LinearProgress 
+                                variant={uploadProgress >= 100 ? "indeterminate" : "determinate"} 
+                                value={uploadProgress} 
+                            />
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+                                <Typography variant="body2" color="primary.main" fontWeight="medium">
+                                    {processingStatus || `Subiendo... ${uploadProgress}%`}
+                                </Typography>
+                            </Box>
+                            {uploadProgress >= 100 && (
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                    Esto puede tomar varios minutos para archivos grandes...
+                                </Typography>
+                            )}
                         </Box>
                     )}
 
                     {/* Mensaje de error */}
                     {error && (
-                        <Alert severity="error" sx={{ mt: 2 }}>
-                            {error}
+                        <Alert severity="error" sx={{ mt: 2 }} icon={<ErrorIcon />}>
+                            <Typography variant="subtitle2" fontWeight="bold">
+                                Error en la importación
+                            </Typography>
+                            <Typography variant="body2">
+                                {error}
+                            </Typography>
                         </Alert>
                     )}
 
@@ -311,6 +367,22 @@ const ImportarDatos = () => {
                             </Typography>
                             <Box sx={{ mt: 1 }}>
                                 {activeTab === 0 ? (
+                                    // Resultado de importación de MOV (Movimientos)
+                                    <>
+                                        <Typography variant="body2">
+                                            • Facturas procesadas: {result.stats?.totalProcesados || 0}
+                                        </Typography>
+                                        <Typography variant="body2">
+                                            • Facturas nuevas: {result.stats?.facturasNuevas || 0}
+                                        </Typography>
+                                        <Typography variant="body2">
+                                            • Pagos efectivo aplicados: {result.stats?.pagosEfectivoAplicados || 0}
+                                        </Typography>
+                                        <Typography variant="body2">
+                                            • Facturas a crédito: {result.stats?.facturasCredito || 0}
+                                        </Typography>
+                                    </>
+                                ) : activeTab === 1 ? (
                                     // Resultado de importación de PAGOS
                                     <>
                                         <Typography variant="body2">
@@ -364,7 +436,7 @@ const ImportarDatos = () => {
                 <Grid size={{ xs: 12, md: 4 }}>
                     <Card>
                         <CardContent>
-                            {activeTab === 0 && (
+                            {(activeTab === 0 || activeTab === 1) && (
                                 <>
                                     <Typography variant="subtitle1" gutterBottom>
                                         Filtro de Fechas (Opcional)
@@ -397,7 +469,7 @@ const ImportarDatos = () => {
                                 </>
                             )}
 
-                            {activeTab === 1 && (
+                            {activeTab === 2 && (
                                 <>
                                     <Typography variant="subtitle1" gutterBottom>
                                         Información

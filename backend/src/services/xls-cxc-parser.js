@@ -19,7 +19,8 @@ const COLUMN_MAPPINGS = {
   totalAmount: ['VALCOB', 'valcob', 'Valor', 'VALOR', 'Total', 'TOTAL', 'Valor Total', 'VALOR_TOTAL'],
   balance: ['CSALDO', 'csaldo', 'Saldo', 'SALDO', 'POR_COBRAR', 'Por Cobrar', 'Saldo Pendiente'],
   issueDate: ['FECEMI', 'fecemi', 'F. Emisión', 'FECHA_EMISION', 'FechaEmision', 'Fecha Emisión', 'Fecha'],
-  dueDate: ['FECVEN', 'fecven', 'F. Vencimiento', 'FECHA_VENCIMIENTO', 'Vencimiento', 'Fecha Vencimiento']
+  dueDate: ['FECVEN', 'fecven', 'F. Vencimiento', 'FECHA_VENCIMIENTO', 'Vencimiento', 'Fecha Vencimiento'],
+  matrizadorName: ['MATRIZADOR', 'matrizador', 'Responsable', 'RESPONSABLE', 'Asignado', 'ASIGNADO', 'Usuario']
 };
 
 /**
@@ -262,6 +263,10 @@ function parseReceivableRow(row, columnMap, rowNumber) {
     ? parseDate(row[columnMap.dueDate])
     : null;
 
+  const matrizadorName = columnMap.matrizadorName !== undefined
+    ? String(row[columnMap.matrizadorName] || '').trim()
+    : null;
+
   const invoiceNumber = normalizeInvoiceNumber(invoiceNumberRaw);
 
   const { status, daysOverdue } = calculateStatus(balance, totalAmount, dueDate);
@@ -277,7 +282,8 @@ function parseReceivableRow(row, columnMap, rowNumber) {
     issueDate,
     dueDate,
     status,
-    daysOverdue
+    daysOverdue,
+    matrizadorName
   };
 }
 

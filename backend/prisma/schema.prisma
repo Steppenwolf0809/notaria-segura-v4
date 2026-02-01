@@ -625,6 +625,7 @@ model Invoice {
   importedAt        DateTime      @default(now())
   lastSyncAt        DateTime      @updatedAt
   sourceFile        String?                // Nombre del archivo de origen
+  matrizador        String?                // Nombre del matrizador (codven mapeado)
   
   // Relaciones
   payments          Payment[]
@@ -760,6 +761,9 @@ model PendingReceivable {
   status            String   @default("PENDING")  // PENDING, PARTIAL, PAID, OVERDUE
   daysOverdue       Int      @default(0)          // Días de mora (calculado)
   
+  // === ASIGNACIÓN ===
+  matrizadorName    String?                       // Nombre del matrizador responsable
+  
   // === METADATA DE IMPORTACIÓN ===
   importedAt        DateTime @default(now())      // Cuándo se importó
   sourceFile        String                        // Nombre del archivo XLS
@@ -772,5 +776,6 @@ model PendingReceivable {
   @@index([balance])
   @@index([status])
   @@index([reportDate])
+  @@index([matrizadorName])
   @@map("pending_receivables")
 }

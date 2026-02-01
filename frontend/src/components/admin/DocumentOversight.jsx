@@ -69,6 +69,7 @@ import DocumentStatusTimeline from './DocumentStatusTimeline';
 import BulkOperationsDialog from './BulkOperationsDialog';
 import EnviarMensajeModal from './EnviarMensajeModal';
 import EnviarMensajeMasivoModal from './EnviarMensajeMasivoModal';
+import PaymentIndicator from '../shared/PaymentIndicator';
 
 /**
  * Componente de supervisión integral de documentos para administradores
@@ -887,21 +888,29 @@ const DocumentOversight = () => {
                         </Tooltip>
                       </TableCell>
                       <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Chip
-                            label={document.status}
-                            size="small"
-                            icon={getStatusIcon(document.status)}
-                            sx={{
-                              bgcolor: getStatusColor(document.status),
-                              color: 'white'
-                            }}
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Chip
+                              label={document.status}
+                              size="small"
+                              icon={getStatusIcon(document.status)}
+                              sx={{
+                                bgcolor: getStatusColor(document.status),
+                                color: 'white'
+                              }}
+                            />
+                            {isOverdue && (
+                              <Tooltip title="Documento vencido">
+                                <WarningIcon color="error" fontSize="small" />
+                              </Tooltip>
+                            )}
+                          </Box>
+                          {/* 💰 Indicador de estado de pago */}
+                          <PaymentIndicator 
+                            paymentStatus={document.paymentStatus} 
+                            paymentInfo={document.paymentInfo} 
+                            documentStatus={document.status}
                           />
-                          {isOverdue && (
-                            <Tooltip title="Documento vencido">
-                              <WarningIcon color="error" fontSize="small" />
-                            </Tooltip>
-                          )}
                         </Box>
                       </TableCell>
                       <TableCell>
