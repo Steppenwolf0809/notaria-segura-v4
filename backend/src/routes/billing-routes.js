@@ -104,6 +104,9 @@ router.get('/documents/:documentId/payment-status', validateParams(documentIdPar
 // Import XML endpoint (NUEVO - Sistema principal) - 🔒 SECURITY: CSRF protection
 router.post('/import-xml', csrfProtection, xmlUpload.single('file'), billingController.importXmlFile);
 
+// Get XML import statistics - 🔒 SECURITY: CSRF protection
+router.get('/import-xml-stats', csrfProtection, billingController.getXMLImportStats);
+
 // Import CXC endpoint (Cartera por Cobrar) - 🔒 SECURITY: CSRF protection
 router.post('/import-cxc', csrfProtection, xmlUpload.single('file'), billingController.importCxcFile);
 

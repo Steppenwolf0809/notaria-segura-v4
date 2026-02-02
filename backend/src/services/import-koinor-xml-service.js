@@ -98,6 +98,8 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId) {
         paymentsSkipped: 0,
         invoicesUpdated: 0,
         invoicesCreatedLegacy: 0,
+        invoicesCreatedFromFC: 0,  // ⭐ NUEVO: Facturas FC creadas
+        invoicesSkipped: 0,         // ⭐ NUEVO: Facturas FC que ya existían
         documentsUpdated: 0,
         notasCreditoProcessed: 0,
         errors: 0,
@@ -110,6 +112,39 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId) {
         const parsed = await parseKoinorXML(fileBuffer, fileName);
         
         stats.totalTransactions = parsed.summary.totalTransactions;
+
+        // 2. ⭐ NUEVO: Procesar facturas FC primero (para que existan cuando se procesen los pagos)
+        if (parsed.invoices && parsed.invoices.length > 0) {
+            console.log(`[import-koinor-xml] Processing ${parsed.invoices.length} invoices (FC) in batches...`);
+            
+            const BATCH_SIZE = 50;
+            for (let i = 0; i < parsed.invoices.length; i += BATCH_SIZE) {
+                const batch = parsed.invoices.slice(i, i + BATCH_SIZE);
+                const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+                const totalBatches = Math.ceil(parsed.invoices.length / BATCH_SIZE);
+                
+                console.log(`[import-koinor-xml] Processing invoice batch ${batchNum}/${totalBatches} (${batch.length} invoices)...`);
+                
+                const batchResults = await Promise.allSettled(
+                    batch.map(invoice => processInvoiceFC(invoice, fileName))
+                );
+                
+                for (const result of batchResults) {
+                    if (result.status === 'fulfilled') {
+                        const r = result.value;
+                        if (r.created) stats.invoicesCreatedFromFC++;
+                        if (r.skipped) stats.invoicesSkipped++;
+                    } else {
+                        stats.errors++;
+                        stats.errorDetails.push({
+                            type: 'INVOICE_FC_BATCH',
+                            error: result.reason?.message || 'Unknown error'
+                        });
+                    }
+                }
+            }
+            console.log(`[import-koinor-xml] Invoice processing complete: ${stats.invoicesCreatedFromFC} created, ${stats.invoicesSkipped} skipped`);
+        }
 
         // 3. Procesar pagos (AB) - OPTIMIZADO EN BATCHES
         console.log(`[import-koinor-xml] Processing ${parsed.payments.length} payments in batches...`);
@@ -184,13 +219,23 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId) {
             where: { id: importLog.id },
             data: {
                 totalRows: stats.totalTransactions,
-                invoicesCreated: stats.invoicesCreatedLegacy,
+                invoicesCreated: stats.invoicesCreatedLegacy + stats.invoicesCreatedFromFC,  // Total facturas creadas
                 invoicesUpdated: stats.invoicesUpdated,
                 paymentsCreated: stats.paymentsCreated,
                 paymentsSkipped: stats.paymentsSkipped,
                 errors: stats.errors,
                 status: stats.errors > 0 ? 'COMPLETED_WITH_ERRORS' : 'COMPLETED',
                 errorDetails: stats.errorDetails.length > 0 ? stats.errorDetails : null,
+                metadata: {
+                    invoicesCreatedFromFC: stats.invoicesCreatedFromFC,
+                    invoicesSkipped: stats.invoicesSkipped,
+                    notasCreditoProcessed: stats.notasCreditoProcessed,
+                    documentsUpdated: stats.documentsUpdated,
+                    invoicesCreatedLegacy: stats.invoicesCreatedLegacy,
+                    paymentsCreated: stats.paymentsCreated,
+                    paymentsSkipped: stats.paymentsSkipped,
+                    source: 'XML_KOINOR'
+                },
                 completedAt: new Date()
             }
         });
@@ -208,14 +253,24 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId) {
                 paymentsSkipped: stats.paymentsSkipped,
                 invoicesUpdated: stats.invoicesUpdated,
                 invoicesCreatedLegacy: stats.invoicesCreatedLegacy,
+                invoicesCreatedFromFC: stats.invoicesCreatedFromFC,  // ⭐ NUEVO
+                invoicesSkipped: stats.invoicesSkipped,               // ⭐ NUEVO
                 documentsUpdated: stats.documentsUpdated,
                 notasCreditoProcessed: stats.notasCreditoProcessed,
                 errors: stats.errors
             },
             duration: `${duration}s`,
-            info: stats.invoicesCreatedLegacy > 0 ? [
-                `${stats.invoicesCreatedLegacy} facturas legacy creadas automáticamente (pagos de facturas pre-sistema)`
-            ] : []
+            info: [
+                ...(stats.invoicesCreatedLegacy > 0 ? [
+                    `${stats.invoicesCreatedLegacy} facturas legacy creadas automáticamente (pagos de facturas pre-sistema)`
+                ] : []),
+                ...(stats.invoicesCreatedFromFC > 0 ? [
+                    `${stats.invoicesCreatedFromFC} facturas importadas del XML (FC)`
+                ] : []),
+                ...(stats.invoicesSkipped > 0 ? [
+                    `${stats.invoicesSkipped} facturas del XML ya existían`
+                ] : [])
+            ]
         };
 
     } catch (error) {
@@ -529,6 +584,90 @@ async function processNotaCredito(nc, sourceFile) {
     });
 
     console.log(`[import-koinor-xml] Credit note processed: ${nc.receiptNumber} -> ${nc.invoiceNumberRaw}`);
+}
+
+/**
+ * ⭐ NUEVO: Procesa una factura FC del XML
+ * Crea o actualiza la factura en la base de datos
+ * @param {Object} invoiceData - Factura parseada del XML
+ * @param {string} sourceFile - Nombre del archivo origen
+ * @returns {Promise<Object>} - {created, skipped}
+ */
+async function processInvoiceFC(invoiceData, sourceFile) {
+    const result = { created: false, skipped: false };
+    
+    // Buscar si la factura ya existe
+    const existingInvoice = await prisma.invoice.findFirst({
+        where: {
+            OR: [
+                { invoiceNumberRaw: invoiceData.invoiceNumberRaw },
+                { invoiceNumber: invoiceData.invoiceNumber },
+                { invoiceNumber: invoiceData.invoiceNumberRaw }
+            ]
+        }
+    });
+    
+    if (existingInvoice) {
+        // Factura ya existe - solo actualizar invoiceNumberRaw si está vacío
+        if (!existingInvoice.invoiceNumberRaw && invoiceData.invoiceNumberRaw) {
+            await prisma.invoice.update({
+                where: { id: existingInvoice.id },
+                data: { 
+                    invoiceNumberRaw: invoiceData.invoiceNumberRaw,
+                    lastSyncAt: new Date()
+                }
+            });
+            console.log(`[import-koinor-xml] Updated existing invoice with RAW number: ${invoiceData.invoiceNumberRaw}`);
+        }
+        result.skipped = true;
+        return result;
+    }
+    
+    // ⭐ Buscar documento para vincular
+    let documentId = null;
+    const document = await findDocumentByInvoiceNumber(invoiceData.invoiceNumberRaw);
+    if (document) {
+        documentId = document.id;
+        console.log(`[import-koinor-xml] 🔍 Found document ${document.protocolNumber} for invoice ${invoiceData.invoiceNumberRaw}`);
+    }
+    
+    // Crear nueva factura desde el XML
+    await prisma.invoice.create({
+        data: {
+            invoiceNumber: invoiceData.invoiceNumberRaw,
+            invoiceNumberRaw: invoiceData.invoiceNumberRaw,
+            clientName: invoiceData.clientName || 'Cliente del XML',
+            clientTaxId: invoiceData.clientTaxId || '',
+            issueDate: invoiceData.issueDate,
+            totalAmount: invoiceData.totalAmount,
+            paidAmount: 0,
+            status: 'PENDING',
+            isLegacy: false,  // Es del XML, no legacy
+            sourceFile,
+            documentId,
+            // Si tiene documento, intentar obtener el actType
+            ...(documentId && {
+                actType: document.actType || 'OTROS'
+            })
+        }
+    });
+    
+    // Si se vinculó a un documento sin numeroFactura, actualizarlo
+    if (documentId && document) {
+        await prisma.document.update({
+            where: { id: documentId },
+            data: { 
+                numeroFactura: invoiceData.invoiceNumberRaw,
+                // Actualizar actType si está vacío
+                ...(document.actType && { actType: document.actType })
+            }
+        });
+        console.log(`[import-koinor-xml] ✅ Linked invoice ${invoiceData.invoiceNumberRaw} to document ${document.protocolNumber}`);
+    }
+    
+    console.log(`[import-koinor-xml] Invoice FC created: ${invoiceData.invoiceNumberRaw} ($${invoiceData.totalAmount})${documentId ? ' [LINKED TO DOCUMENT]' : ''}`);
+    result.created = true;
+    return result;
 }
 
 /**

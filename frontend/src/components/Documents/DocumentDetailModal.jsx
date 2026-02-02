@@ -95,6 +95,14 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
       // Si no hay ID o el modal está cerrado, no hacer nada
       if (!open || !documentId) return;
 
+      // DEBUG: Log initial document prop
+      console.log('[DocumentDetailModal] Initial document prop:', {
+        id: document?.id,
+        protocolNumber: document?.protocolNumber,
+        numeroFactura: document?.numeroFactura,
+        fechaFactura: document?.fechaFactura
+      });
+
       // Si ya tenemos datos suficientes, no recargar
       // Debe incluir al menos protocolNumber y datos de factura (numero/fecha)
       if (
@@ -102,6 +110,7 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
         localDocument?.protocolNumber &&
         (localDocument?.numeroFactura || localDocument?.fechaFactura)
       ) {
+        console.log('[DocumentDetailModal] Already have complete data, skipping reload');
         return;
       }
 
@@ -115,7 +124,12 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
         if (response.success && response.data) {
           // FIX: Handle both response structures { document: {...} } or direct document
           const documentData = response.data.document || response.data;
-          console.log('[DocumentDetailModal] Extracted document data:', documentData?.id, documentData?.protocolNumber);
+          console.log('[DocumentDetailModal] Extracted document data:', {
+            id: documentData?.id,
+            protocolNumber: documentData?.protocolNumber,
+            numeroFactura: documentData?.numeroFactura,
+            fechaFactura: documentData?.fechaFactura
+          });
 
           if (documentData && documentData.id) {
             setLocalDocument(documentData);
@@ -606,7 +620,12 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                           <Typography variant="body2" color="text.secondary">N° Factura:</Typography>
-                          <Typography variant="body2" fontWeight="medium" color={localDocument?.numeroFactura ? 'text.primary' : 'text.disabled'}>
+                          <Typography 
+                            variant="body2" 
+                            fontWeight="medium" 
+                            color={localDocument?.numeroFactura ? 'text.primary' : 'text.disabled'}
+                            title={localDocument?.numeroFactura ? `Factura: ${localDocument.numeroFactura}` : 'Sin número de factura asignado'}
+                          >
                             {localDocument?.numeroFactura || 'Sin asignar'}
                           </Typography>
                         </Box>

@@ -1613,6 +1613,16 @@ async function getDocumentById(req, res) {
       };
     }
 
+    // DEBUG: Log document fields
+    console.log('[DEBUG getDocumentById] Raw document from DB:', {
+      id: document.id,
+      protocolNumber: document.protocolNumber,
+      numeroFactura: document.numeroFactura,
+      fechaFactura: document.fechaFactura,
+      hasInvoices: document.invoices?.length > 0,
+      invoiceNumbers: document.invoices?.map(inv => inv.invoiceNumber)
+    });
+
     // Enriquecer con fallbacks desde facturas si faltan campos clave
     let numeroFactura = document.numeroFactura || null;
     let fechaFactura = document.fechaFactura || null;

@@ -1,0 +1,42 @@
+{
+  "timestamp": "2026-02-02T06:52:05.993Z",
+  "summary": {
+    "passed": 4,
+    "warnings": 0,
+    "failed": 2,
+    "total": 6
+  },
+  "results": [
+    {
+      "name": "Database Connection",
+      "status": "PASS",
+      "message": "Database connection OK"
+    },
+    {
+      "name": "Migration Status",
+      "status": "FAIL",
+      "message": "6 failed migrations: 20260201000000_add_paidamount_invoice, 20260113_add_formulario_uafe_tables, 20260106000001_add_hidden_pages_to_pdfs, 20260106000000_add_pdf_fields_to_escrituras, 20260117_add_billing_models, 20251117164900_add_formas_pago_array",
+      "failed": 6
+    },
+    {
+      "name": "Schema Consistency",
+      "status": "PASS",
+      "message": "Schema consistency OK"
+    },
+    {
+      "name": "Data Integrity",
+      "status": "FAIL",
+      "message": "Data integrity check failed: column \"created_by_id\" does not exist"
+    },
+    {
+      "name": "Enum Validation",
+      "status": "PASS",
+      "message": "Enum validation OK"
+    },
+    {
+      "name": "Application Health",
+      "status": "PASS",
+      "message": "Application health OK"
+    }
+  ]
+}
