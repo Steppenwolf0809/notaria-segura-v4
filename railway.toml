@@ -1,9 +1,4 @@
 [deploy]
 healthcheckPath = "/healthz"
-startCommand = "bash -lc 'cd backend && npx prisma generate && npx prisma migrate deploy && node server.js'"
-# enforce: healthcheckPath and startCommand set for Railway
-
-# Railway usará la variable de entorno PORT que inyecta al contenedor.
-# Nuestro servidor ya escucha en process.env.PORT, no hardcodeamos el puerto aquí.
-
-
+# Usar nixpacks para build completo (frontend + backend)
+# El comando start se maneja en nixpacks.toml
