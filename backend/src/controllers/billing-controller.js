@@ -1514,12 +1514,15 @@ export async function getCarteraPorCobrar(req, res) {
     try {
         console.log('[billing-controller] getCarteraPorCobrar');
 
+        // ⚠️ SOLO FACTURAS DEL CXC: Filtrar por sourceFile que contenga 'CXC'
         // Get all invoices with payments
         const invoices = await prisma.invoice.findMany({
             where: {
                 status: {
                     in: ['PENDING', 'PARTIAL', 'OVERDUE']
-                }
+                },
+                // Solo facturas importadas desde CXC (XLS o XML)
+                sourceFile: { contains: 'CXC', mode: 'insensitive' }
             },
             include: {
                 payments: true,
