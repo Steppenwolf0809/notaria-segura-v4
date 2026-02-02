@@ -69,6 +69,10 @@ async function uploadXmlDocument(req, res) {
     console.log('🔍 DEBUG createDocument - fechaEmision:', parsedData.fechaEmision);
     console.log('🔍 DEBUG createDocument - parsedData keys:', Object.keys(parsedData));
 
+    // ⭐ DEBUG: Verificar tipos de datos
+    console.log('🔍 DEBUG createDocument - typeof fechaEmision:', typeof parsedData.fechaEmision);
+    console.log('🔍 DEBUG createDocument - typeof numeroFactura:', typeof parsedData.numeroFactura);
+
     // Crear documento en la base de datos
     const document = await prisma.document.create({
       data: {
@@ -100,6 +104,11 @@ async function uploadXmlDocument(req, res) {
         }
       }
     });
+
+    // ⭐ DEBUG: Verificar qué se guardó realmente
+    console.log('🔍 DEBUG createDocument - document guardado:');
+    console.log('  numeroFactura:', document.numeroFactura);
+    console.log('  fechaFactura:', document.fechaFactura);
 
     // 📈 Registrar evento de creación de documento
     try {
