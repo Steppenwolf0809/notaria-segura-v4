@@ -318,7 +318,6 @@ async function listarTodosDocumentos(req, res) {
             unaccent(COALESCE(d."protocolNumber", '')::text) ILIKE unaccent(${pattern}) OR
             unaccent(COALESCE(d."actoPrincipalDescripcion", '')::text) ILIKE unaccent(${pattern}) OR
             unaccent(COALESCE(d."detalle_documento", '')::text) ILIKE unaccent(${pattern}) OR
-            unaccent(COALESCE(d."numeroFactura", '')::text) ILIKE unaccent(${pattern}) OR
             COALESCE(d."clientPhone", '')::text ILIKE ${pattern}
           )`;
 
@@ -1101,8 +1100,7 @@ async function getReceptionsUnified(req, res) {
         { clientName: { contains: searchTerm, mode: 'insensitive' } },
         { clientId: { contains: searchTerm, mode: 'insensitive' } },
         { documentType: { contains: searchTerm, mode: 'insensitive' } },
-        { actoPrincipalDescripcion: { contains: searchTerm, mode: 'insensitive' } },
-        { numeroFactura: { contains: searchTerm, mode: 'insensitive' } }
+        { actoPrincipalDescripcion: { contains: searchTerm, mode: 'insensitive' } }
       ];
     }
 
@@ -1261,8 +1259,7 @@ async function getReceptionsCounts(req, res) {
         { clientName: { contains: searchTerm, mode: 'insensitive' } },
         { clientId: { contains: searchTerm, mode: 'insensitive' } },
         { documentType: { contains: searchTerm, mode: 'insensitive' } },
-        { actoPrincipalDescripcion: { contains: searchTerm, mode: 'insensitive' } },
-        { numeroFactura: { contains: searchTerm, mode: 'insensitive' } }
+        { actoPrincipalDescripcion: { contains: searchTerm, mode: 'insensitive' } }
       ];
     }
 

@@ -66,7 +66,6 @@ import EncuestasSatisfaccion from './admin/EncuestasSatisfaccion';
 import { getSupervisionStats, getMatrizadores } from '../services/admin-supervision-service';
 import DocumentTimeline from './Documents/DocumentTimeline';
 import EnviarMensajeModal from './admin/EnviarMensajeModal';
-import documentService from '../services/document-service';
 import SeguimientoMensajes from './admin/SeguimientoMensajes';
 // Billing module components
 import ImportarDatos from './billing/ImportarDatos';
@@ -218,23 +217,9 @@ const AdminDashboard = () => {
   const [selectedDocument, setSelectedDocument] = useState(null);
 
   // Handler para ver detalles
-  const handleViewDetails = async (document) => {
-    // Abrir rápido con datos disponibles
+  const handleViewDetails = (document) => {
     setSelectedDocument(document);
     setDetailsModalOpen(true);
-
-    // En segundo plano, traer detalle completo (incluye fechaFactura)
-    try {
-      if (document?.id) {
-        const res = await documentService.getDocumentById(document.id);
-        if (res.success && res.data?.document) {
-          setSelectedDocument(prev => ({ ...prev, ...res.data.document }));
-        }
-      }
-    } catch (e) {
-      // Silencioso: mantenemos datos básicos si falla
-      console.warn('No se pudo refrescar detalle del documento:', e?.message);
-    }
   };
 
   const handleCloseDetails = () => {
@@ -756,14 +741,6 @@ const AdminDashboard = () => {
               <Grid item xs={12} sm={6}>
                 <Typography variant="overline" color="textSecondary">Tipo de Acto</Typography>
                 <Typography variant="body1">{selectedDocument.type || 'N/A'}</Typography>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="overline" color="textSecondary">Fecha de Factura</Typography>
-                <Typography variant="body1">
-                  {selectedDocument.fechaFactura
-                    ? new Date(selectedDocument.fechaFactura).toLocaleDateString('es-EC')
-                    : '—'}
-                </Typography>
               </Grid>
               <Grid item xs={12} sm={6}>
                 <Typography variant="overline" color="textSecondary">Matrizador Asignado</Typography>
