@@ -109,6 +109,7 @@ async function getAllDocumentsOversight(req, res) {
               unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
               unaccent(d."actoPrincipalDescripcion") ILIKE unaccent(${pattern}) OR
               unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
+              unaccent(COALESCE(d."numeroFactura", '')) ILIKE unaccent(${pattern}) OR
               d."clientPhone" ILIKE ${pattern} OR
               d."clientEmail" ILIKE ${pattern} OR
               unaccent(COALESCE(d."clientId", '')) ILIKE unaccent(${pattern})
@@ -195,6 +196,7 @@ async function getAllDocumentsOversight(req, res) {
             { clientName: { contains: searchTerm, mode: 'insensitive' } },
             { actoPrincipalDescripcion: { contains: searchTerm, mode: 'insensitive' } },
             { detalle_documento: { contains: searchTerm, mode: 'insensitive' } },
+            { numeroFactura: { contains: searchTerm, mode: 'insensitive' } },
             { clientPhone: { contains: searchTerm } },
             { clientEmail: { contains: searchTerm, mode: 'insensitive' } },
             { clientId: { contains: searchTerm, mode: 'insensitive' } }

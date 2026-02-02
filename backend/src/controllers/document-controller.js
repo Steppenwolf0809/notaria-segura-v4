@@ -64,6 +64,10 @@ async function uploadXmlDocument(req, res) {
       });
     }
 
+    // ⭐ DEBUG: Verificar numeroFactura antes de guardar
+    console.log('🔍 DEBUG createDocument - numeroFactura:', parsedData.numeroFactura);
+    console.log('🔍 DEBUG createDocument - parsedData keys:', Object.keys(parsedData));
+
     // Crear documento en la base de datos
     const document = await prisma.document.create({
       data: {
