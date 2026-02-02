@@ -75,7 +75,24 @@ export async function importCxcFile(fileBuffer, fileName, userId) {
             }
         }
 
-        // 4. Actualizar log con éxito
+        // 4. LIMPIEZA: Eliminar facturas del CXC que ya no están en el archivo XML
+        const fileInvoiceNumbers = facturas.map(f => f.invoiceNumberRaw).filter(Boolean);
+        
+        if (fileInvoiceNumbers.length > 0) {
+            const deletedInvoices = await prisma.invoice.deleteMany({
+                where: {
+                    status: { in: ['PENDING', 'PARTIAL', 'OVERDUE'] },
+                    invoiceNumberRaw: { notIn: fileInvoiceNumbers },
+                    sourceFile: { contains: 'CXC', mode: 'insensitive' }
+                }
+            });
+            
+            if (deletedInvoices.count > 0) {
+                console.log(`[cxc-import] 🗑️ Eliminadas ${deletedInvoices.count} facturas que ya no están en el CXC XML`);
+            }
+        }
+
+        // 5. Actualizar log con éxito
         await prisma.importLog.update({
             where: { id: importLog.id },
             data: {
