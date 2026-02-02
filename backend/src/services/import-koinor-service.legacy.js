@@ -38,8 +38,8 @@ export async function importKoinorFile(fileBuffer, fileName, userId, options = {
             fileType,
             totalRows: 0,
             status: 'PROCESSING',
-            executedBy: userId,
-            startedAt: new Date()
+            executedBy: userId
+            // startedAt se establece automáticamente por @default(now())
         }
     });
 

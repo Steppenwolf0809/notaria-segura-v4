@@ -507,13 +507,24 @@ async function findProtocolSequenceGaps(req, res) {
     for (const [key, g] of groups.entries()) {
       const present = g.seqSet;
       const missing = [];
+      // Detectar año desde el prefijo (primeros 4 dígitos)
+      let expectedMin = g.min;
+      const yearMatch = key.match(/^(\d{4})/);
+      if (yearMatch) {
+        const year = parseInt(yearMatch[1], 10);
+        // Regla: a partir del 2026, la secuencia reinicia desde 1
+        if (Number.isFinite(year) && year >= 2026) {
+          expectedMin = 1;
+        }
+      }
+
       // Evitar iterar rangos enormes accidentalmente
-      const span = g.max - g.min + 1;
+      const span = g.max - expectedMin + 1;
       if (span <= 0 || span > 200000) { // límite de seguridad
-        results.push({ prefix: key, count: present.size, minSeq: g.min, maxSeq: g.max, missingCount: 0, missingRanges: [], skipped: true });
+        results.push({ prefix: key, count: present.size, minSeq: expectedMin, maxSeq: g.max, missingCount: 0, missingRanges: [], skipped: true });
         continue;
       }
-      for (let n = g.min; n <= g.max; n++) {
+      for (let n = expectedMin; n <= g.max; n++) {
         if (!present.has(n)) missing.push(n);
       }
       const ranges = toRanges(missing);
@@ -521,7 +532,7 @@ async function findProtocolSequenceGaps(req, res) {
       results.push({
         prefix: key,
         count: present.size,
-        minSeq: g.min,
+        minSeq: expectedMin,
         maxSeq: g.max,
         missingCount: missing.length,
         missingRanges: ranges

@@ -648,12 +648,23 @@ export async function importXmlFile(req, res) {
     } catch (error) {
         console.error('[billing-controller] XML import error:', error);
         console.error('[billing-controller] Error stack:', error.stack);
+        console.error('[billing-controller] Error code:', error.code);
+        console.error('[billing-controller] Error meta:', error.meta);
+        
         // 🔒 SECURITY: Never expose internal error details in production
+        // Pero en staging, dar más información para debugging
+        const isStaging = process.env.NODE_ENV === 'staging' || process.env.RAILWAY_ENVIRONMENT === 'staging';
+        
         res.status(500).json({
             success: false,
             message: 'Error durante la importación del archivo XML',
             error: error.message,
-            details: process.env.NODE_ENV !== 'production' ? error.stack : undefined
+            code: error.code,
+            details: (isStaging || process.env.NODE_ENV === 'development') ? {
+                stack: error.stack,
+                meta: error.meta,
+                preview: xmlPreview?.substring(0, 200)
+            } : undefined
         });
     }
 }

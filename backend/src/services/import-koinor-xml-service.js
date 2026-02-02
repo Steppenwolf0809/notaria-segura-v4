@@ -33,8 +33,8 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId) {
             fileType: 'XML_KOINOR',
             totalRows: 0,
             status: 'PROCESSING',
-            executedBy: userId,
-            startedAt: new Date()
+            executedBy: userId
+            // startedAt se establece automáticamente por @default(now())
         }
     });
 
@@ -166,19 +166,28 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId) {
 
     } catch (error) {
         console.error('[import-koinor-xml] Import failed:', error);
+        console.error('[import-koinor-xml] Error code:', error.code);
+        console.error('[import-koinor-xml] Error meta:', error.meta);
 
-        // Actualizar log con fallo
-        await prisma.importLog.update({
-            where: { id: importLog.id },
-            data: {
-                status: 'FAILED',
-                errorDetails: { 
-                    message: error.message, 
-                    stack: error.stack 
-                },
-                completedAt: new Date()
+        // Actualizar log con fallo (solo si el log fue creado)
+        if (importLog && importLog.id) {
+            try {
+                await prisma.importLog.update({
+                    where: { id: importLog.id },
+                    data: {
+                        status: 'FAILED',
+                        errorDetails: { 
+                            message: error.message, 
+                            code: error.code,
+                            stack: error.stack 
+                        },
+                        completedAt: new Date()
+                    }
+                });
+            } catch (logError) {
+                console.error('[import-koinor-xml] Error updating import log:', logError);
             }
-        });
+        }
 
         throw error;
     }
