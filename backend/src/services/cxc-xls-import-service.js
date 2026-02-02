@@ -147,24 +147,24 @@ export async function importCxcXlsFile(fileBuffer, fileName, userId) {
       stats.updated += batch.length;
     }
 
-    // 4. LIMPIEZA AUTOMÁTICA (The "Missing Invoice" Rule)
+    // 4. LIMPIEZA AUTOMÁTICA: Eliminar facturas del CXC que ya no están en el archivo
+    // Esto mantiene la cartera sincronizada exactamente con el CXC (fuente de verdad)
     const fileInvoiceNumbers = Array.from(presentInvoiceNumbers);
 
-    // Marcar como PAID las que faltan
-    const missingInvoicesUpdate = await prisma.invoice.updateMany({
+    // 🗑️ ELIMINAR facturas del CXC que ya no aparecen en el archivo
+    // Solo eliminamos las que tienen sourceFile con 'CXC' para no afectar otras fuentes
+    const deletedInvoices = await prisma.invoice.deleteMany({
       where: {
-        status: { in: ['PENDING', 'PARTIAL'] },
-        invoiceNumberRaw: { notIn: fileInvoiceNumbers }
-      },
-      data: {
-        status: 'PAID',
-        // No podemos setear paidAmount a totalAmount en updateMany dinámicamente.
-        // reconcileInvoices lo arreglará.
-        lastSyncAt: new Date()
+        status: { in: ['PENDING', 'PARTIAL', 'OVERDUE'] },
+        invoiceNumberRaw: { notIn: fileInvoiceNumbers },
+        sourceFile: { contains: 'CXC', mode: 'insensitive' }
       }
     });
 
-    stats.wiped = missingInvoicesUpdate.count;
+    stats.wiped = deletedInvoices.count;
+    if (deletedInvoices.count > 0) {
+      console.log(`[cxc-xls-import] 🗑️ Eliminadas ${deletedInvoices.count} facturas que ya no están en el CXC`);
+    }
 
     // 5. Self-Healing
     await reconcileInvoices();
