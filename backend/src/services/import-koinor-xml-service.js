@@ -10,10 +10,64 @@
  * - Actualización automática de estados
  * - Soporte para pagos multi-factura
  * - Manejo de notas de crédito
+ * - Vinculación automática con documentos
  */
 
 import { db as prisma } from '../db.js';
 import { parseKoinorXML, validateKoinorXMLStructure } from './xml-koinor-parser.js';
+
+/**
+ * Extrae el secuencial de un número de factura
+ * Ejemplos: "001002-00124216" → "124216", "001-002-000124216" → "124216"
+ */
+function extractSecuencial(invoiceNumber) {
+    if (!invoiceNumber) return '';
+    const parts = String(invoiceNumber).split('-');
+    const lastPart = parts[parts.length - 1];
+    return lastPart.replace(/^0+/, '') || '0';
+}
+
+/**
+ * Compara dos números de factura por su secuencial
+ */
+function invoiceNumbersMatch(num1, num2) {
+    if (!num1 || !num2) return false;
+    const seq1 = extractSecuencial(num1);
+    const seq2 = extractSecuencial(num2);
+    return seq1 === seq2 && seq1.length >= 5;
+}
+
+/**
+ * Busca un documento por número de factura
+ * @param {string} invoiceNumber - Número de factura
+ * @returns {Promise<Object|null>} - Documento encontrado o null
+ */
+async function findDocumentByInvoiceNumber(invoiceNumber) {
+    if (!invoiceNumber) return null;
+    
+    const secuencial = extractSecuencial(invoiceNumber);
+    
+    // Buscar por numeroFactura exacto o por secuencial
+    let document = await prisma.document.findFirst({
+        where: {
+            OR: [
+                { numeroFactura: invoiceNumber },
+                { numeroFactura: { endsWith: secuencial } }
+            ]
+        },
+        select: { id: true, protocolNumber: true, numeroFactura: true }
+    });
+    
+    // Validar que el secuencial coincida exactamente
+    if (document && document.numeroFactura) {
+        const docSecuencial = extractSecuencial(document.numeroFactura);
+        if (docSecuencial !== secuencial) {
+            document = null;
+        }
+    }
+    
+    return document;
+}
 
 /**
  * Importa archivo XML de Koinor con pagos
@@ -309,11 +363,46 @@ async function processSinglePayment(payment, detail, sourceFile) {
         return { created: false, skipped: true, createdLegacy: false };
     }
 
+    // ⭐ NUEVO: Buscar documento para vincular si la factura no tiene uno
+    let documentId = invoice.documentId;
+    let linkedToDocument = false;
+    
+    if (!documentId) {
+        const document = await findDocumentByInvoiceNumber(detail.invoiceNumberRaw);
+        if (document) {
+            documentId = document.id;
+            linkedToDocument = true;
+            console.log(`[import-koinor-xml] 🔍 Found document ${document.protocolNumber} for invoice ${detail.invoiceNumberRaw}`);
+        }
+    }
+
     // 3. Crear Payment y actualizar Invoice/Document en transacción
     let documentUpdated = false;
 
     try {
         await prisma.$transaction(async (tx) => {
+            // ⭐ NUEVO: Vincular factura al documento si se encontró
+            if (linkedToDocument && documentId) {
+                await tx.invoice.update({
+                    where: { id: invoice.id },
+                    data: { documentId }
+                });
+                console.log(`[import-koinor-xml] ✅ Linked invoice ${detail.invoiceNumberRaw} to document (documentId: ${documentId})`);
+                
+                // Actualizar numeroFactura en el documento si está vacío
+                const document = await tx.document.findUnique({
+                    where: { id: documentId },
+                    select: { numeroFactura: true, protocolNumber: true }
+                });
+                if (document && !document.numeroFactura) {
+                    await tx.document.update({
+                        where: { id: documentId },
+                        data: { numeroFactura: detail.invoiceNumberRaw }
+                    });
+                    console.log(`[import-koinor-xml] ✅ Updated document ${document.protocolNumber} with numeroFactura: ${detail.invoiceNumberRaw}`);
+                }
+            }
+            
             // Crear Payment
             await tx.payment.create({
                 data: {
@@ -351,12 +440,28 @@ async function processSinglePayment(payment, detail, sourceFile) {
         });
 
         // Si está completamente pagada y tiene documento, actualizar pagoConfirmado
-        if (newStatus === 'PAID' && invoice.documentId) {
+        const finalDocumentId = documentId || invoice.documentId;
+        if (newStatus === 'PAID' && finalDocumentId) {
             await tx.document.update({
-                where: { id: invoice.documentId },
+                where: { id: finalDocumentId },
                 data: { pagoConfirmado: true }
             });
             documentUpdated = true;
+        }
+        
+        // ⭐ NUEVO: Si la factura ya tenía documento pero sin numeroFactura, actualizarlo
+        if (invoice.documentId && !linkedToDocument) {
+            const document = await tx.document.findUnique({
+                where: { id: invoice.documentId },
+                select: { numeroFactura: true, protocolNumber: true }
+            });
+            if (document && !document.numeroFactura) {
+                await tx.document.update({
+                    where: { id: invoice.documentId },
+                    data: { numeroFactura: detail.invoiceNumberRaw }
+                });
+                console.log(`[import-koinor-xml] ✅ Updated existing document ${document.protocolNumber} with numeroFactura: ${detail.invoiceNumberRaw}`);
+            }
         }
     });
 
