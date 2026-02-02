@@ -73,6 +73,11 @@ export async function parseKoinorXML(fileBuffer, fileName) {
             console.error('[xml-koinor-parser] Encoding detection error:', error);
             throw new Error(`Error detectando encoding del archivo: ${error.message}`);
         }
+        
+        // DEBUG: Mostrar primeros caracteres del XML
+        console.log(`[xml-koinor-parser] XML preview (first 300 chars):`, xmlString.substring(0, 300));
+        console.log(`[xml-koinor-parser] Has d_vc_i_estado_cuenta_group1:`, xmlString.includes('d_vc_i_estado_cuenta_group1'));
+        console.log(`[xml-koinor-parser] Has tipdoc:`, xmlString.includes('tipdoc'));
 
         // 2. Sanitizar XML para manejar caracteres & sin escapar
         // Esto previene errores de parsing cuando el XML contiene & en nombres de empresas
