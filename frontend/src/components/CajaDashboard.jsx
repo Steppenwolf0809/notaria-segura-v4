@@ -43,6 +43,7 @@ import useDocumentStore from '../store/document-store';
 import useDebounce from '../hooks/useDebounce';
 import { toast } from 'react-toastify';
 import documentService from '../services/document-service';
+import ImportSummaryDashboard from './billing/ImportSummaryDashboard';
 
 /**
  * Gestión de documentos para CAJA
@@ -309,6 +310,9 @@ const CajaDashboard = () => {
           {error}
         </Alert>
       )}
+
+      {/* Resumen de Importaciones XML */}
+      <ImportSummaryDashboard />
 
       {/* Barra de búsqueda */}
       <Box sx={{ mb: 3, display: 'flex', gap: 2, alignItems: 'center' }}>

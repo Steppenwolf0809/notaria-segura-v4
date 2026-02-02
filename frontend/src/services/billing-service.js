@@ -201,6 +201,15 @@ async function importXmlFile(file, onProgress = null) {
 }
 
 /**
+ * Obtener estadísticas de importaciones XML
+ * @returns {Promise<Object>} Estadísticas de importaciones recientes
+ */
+async function getXMLImportStats() {
+    const response = await apiClient.get('/billing/import-xml-stats');
+    return response.data;
+}
+
+/**
  * Importar archivo XML de Movimientos de Caja (MOV)
  * Importa facturas y marca como PAGADAS las que fueron pagadas en efectivo
  * @param {File} file - Archivo XML a importar
@@ -507,6 +516,7 @@ const billingService = {
     importMovFile,
     importCxcXls,
     getImportLogs,
+    getXMLImportStats,
 
     // CXC - Cartera por Cobrar
     getCarteraPendiente,

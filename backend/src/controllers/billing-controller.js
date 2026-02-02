@@ -12,12 +12,51 @@ import { db as prisma } from '../db.js';
  */
 export async function getPaymentStatusForDocument(documentId) {
     try {
-        const invoices = await prisma.invoice.findMany({
-            where: { documentId },
-            include: {
-                payments: true
-            }
+        // Obtener datos mínimos del documento para posibles estrategias de coincidencia
+        const doc = await prisma.document.findUnique({
+            where: { id: documentId },
+            select: { numeroFactura: true, protocolNumber: true }
         });
+
+        // Primero: facturas vinculadas directamente al documento
+        let invoices = await prisma.invoice.findMany({
+            where: { documentId },
+            include: { payments: true }
+        });
+
+        // Fallback: si no hay facturas vinculadas pero el documento tiene numeroFactura,
+        // buscar por invoiceNumber/invoiceNumberRaw considerando el secuencial
+        if (invoices.length === 0 && doc?.numeroFactura) {
+            const numero = doc.numeroFactura;
+            const seq = String(numero).split('-').pop()?.replace(/^0+/, '') || '';
+
+            const candidates = await prisma.invoice.findMany({
+                where: {
+                    OR: [
+                        { invoiceNumber: numero },
+                        { invoiceNumberRaw: numero },
+                        seq ? { invoiceNumber: { endsWith: seq } } : undefined,
+                        seq ? { invoiceNumberRaw: { endsWith: seq } } : undefined
+                    ].filter(Boolean)
+                },
+                include: { payments: true },
+                orderBy: { issueDate: 'desc' },
+                take: 3
+            });
+
+            if (candidates.length > 0) {
+                // Usar el candidato más reciente para cálculo del estado
+                invoices = [candidates[0]];
+
+                // Enlazar si no tiene documento y la coincidencia es exacta por numero o secuencial único
+                if (!candidates[0].documentId && (candidates.length === 1)) {
+                    await prisma.invoice.update({
+                        where: { id: candidates[0].id },
+                        data: { documentId }
+                    });
+                }
+            }
+        }
 
         if (invoices.length === 0) {
             return {
@@ -701,6 +740,28 @@ export async function getStats(req, res) {
         res.status(500).json({
             success: false,
             message: 'Error al obtener estadísticas'
+        });
+    }
+}
+
+/**
+ * Get XML import statistics
+ * Obtiene estadísticas detalladas de las últimas importaciones XML
+ */
+export async function getXMLImportStats(req, res) {
+    try {
+        const { getXMLImportStats: getStats } = await import('../services/import-koinor-xml-service.js');
+        const data = await getStats();
+
+        res.json({
+            success: true,
+            data
+        });
+    } catch (error) {
+        console.error('[billing-controller] Get XML import stats error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener estadísticas de importación'
         });
     }
 }

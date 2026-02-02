@@ -693,6 +693,7 @@ model ImportLog {
   // Estado
   status          ImportStatus @default(PROCESSING)
   errorDetails    Json?
+  metadata        Json?                // Estadísticas adicionales (FC, NC, etc.)
   
   // Usuario que ejecutó
   executedBy      Int?
