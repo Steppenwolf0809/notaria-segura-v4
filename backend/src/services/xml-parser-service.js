@@ -233,6 +233,9 @@ function extractFechaEmision(factura) {
  */
 function extractNumeroFactura(factura) {
   try {
+    // Debug: ver estructura de infoTributaria
+    console.log('🔍 Debug infoTributaria:', JSON.stringify(factura.infoTributaria, null, 2)?.substring(0, 500));
+    
     const infoTributaria = factura.infoTributaria?.[0];
     
     if (!infoTributaria) {
@@ -240,12 +243,15 @@ function extractNumeroFactura(factura) {
       return null;
     }
 
+    // Debug: ver campos disponibles
+    console.log('🔍 Debug infoTributaria keys:', Object.keys(infoTributaria));
+
     const estab = infoTributaria.estab?.[0] || '';
     const ptoEmi = infoTributaria.ptoEmi?.[0] || '';
     const secuencial = infoTributaria.secuencial?.[0] || '';
 
     if (!estab || !ptoEmi || !secuencial) {
-      console.log('⚠️ Faltan campos para construir número de factura');
+      console.log('⚠️ Faltan campos para construir número de factura:', { estab, ptoEmi, secuencial });
       return null;
     }
 
