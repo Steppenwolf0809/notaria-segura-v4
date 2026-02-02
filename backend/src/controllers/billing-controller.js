@@ -4,6 +4,48 @@
  */
 import { db as prisma } from '../db.js';
 
+// Normalización de nombres de matrizadores para evitar duplicados visuales
+const MATRIZADOR_NAME_NORMALIZATION = {
+  // Mayra Corella
+  'Mayra Cristina Corella Parra': 'Mayra Corella',
+  'Mayra Corella Parra': 'Mayra Corella',
+  'Mayra Cristina': 'Mayra Corella',
+  'Mayra': 'Mayra Corella',
+  
+  // Karol Velastegui
+  'Karol Daniela Velastegui Cadena': 'Karol Velastegui',
+  'Karol Daniela': 'Karol Velastegui',
+  'Karol': 'Karol Velastegui',
+  
+  // Jose Zapata
+  'Jose Luis Zapata Silva': 'Jose Zapata',
+  'Jose Luis': 'Jose Zapata',
+  'Jose': 'Jose Zapata',
+  
+  // Gissela Velastegui
+  'Gissela': 'Gissela Velastegui',
+  
+  // Maria Diaz
+  'Maria Lucinda': 'Maria Diaz',
+  'Maria': 'Maria Diaz',
+  
+  // Esteban Proaño
+  'Francisco Esteban': 'Esteban Proaño',
+  'Francisco': 'Esteban Proaño',
+  'Esteban': 'Esteban Proaño'
+};
+
+/**
+ * Normaliza el nombre del matrizador a un formato estándar
+ * @param {string} name - Nombre del matrizador
+ * @returns {string} - Nombre normalizado
+ */
+function normalizeMatrizadorName(name) {
+  if (!name) return 'Sin asignar';
+  const normalized = MATRIZADOR_NAME_NORMALIZATION[name.trim()] || name.trim();
+  return normalized;
+}
+
 /**
  * Helper function to get payment status for a document (internal use)
  * Can be called from other controllers without req/res
@@ -1282,7 +1324,8 @@ export async function getMyPortfolio(req, res) {
                 balance,
                 isOverdue,
                 daysOverdue,
-                source: invoice.document ? 'DOCUMENT' : 'CXC'
+                source: invoice.document ? 'DOCUMENT' : 'CXC',
+                matrizador: normalizeMatrizadorName(invoice.matrizador) || 'Sin asignar'
             });
         }
 
@@ -1566,11 +1609,11 @@ export async function getCarteraPorCobrar(req, res) {
             // 3. Asignación directa de factura
             let matrizadorName = 'Sin asignar';
             if (invoice.matrizador) {
-                matrizadorName = invoice.matrizador;
+                matrizadorName = normalizeMatrizadorName(invoice.matrizador);
             } else if (invoice.document?.assignedTo) {
-                matrizadorName = `${invoice.document.assignedTo.firstName} ${invoice.document.assignedTo.lastName}`;
+                matrizadorName = normalizeMatrizadorName(`${invoice.document.assignedTo.firstName} ${invoice.document.assignedTo.lastName}`);
             } else if (invoice.assignedTo) {
-                matrizadorName = `${invoice.assignedTo.firstName} ${invoice.assignedTo.lastName}`;
+                matrizadorName = normalizeMatrizadorName(`${invoice.assignedTo.firstName} ${invoice.assignedTo.lastName}`);
             }
 
             const key = invoice.clientTaxId;
