@@ -103,16 +103,9 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
         fechaFactura: document?.fechaFactura
       });
 
-      // Si ya tenemos datos suficientes, no recargar
-      // Debe incluir al menos protocolNumber y datos de factura (numero/fecha)
-      if (
-        localDocument?.id === documentId &&
-        localDocument?.protocolNumber &&
-        (localDocument?.numeroFactura || localDocument?.fechaFactura)
-      ) {
-        console.log('[DocumentDetailModal] Already have complete data, skipping reload');
-        return;
-      }
+      // ⭐ FIX: Siempre recargar documento completo del API para asegurar datos actualizados
+      // El documento de la lista puede tener datos incompletos (ej: tiene fechaFactura pero no numeroFactura)
+      // Invalidamos la condición anterior que causaba que se mostrara "Sin asignar" incorrectamente
 
       setDocumentLoading(true);
       setDocumentError(null);
