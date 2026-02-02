@@ -449,8 +449,13 @@ async function findProtocolSequenceGaps(req, res) {
     const typeFilter = typeof type === 'string' && type.trim().length === 1 ? type.trim().toUpperCase() : null;
     const exactPrefix = typeof prefix === 'string' && prefix.trim().length > 0 ? prefix.trim() : null;
 
-    // Obtener solo lo necesario para el cálculo
+    // Solo analizar documentos cuyo número de protocolo pertenezca al año 2026
     const docs = await prisma.document.findMany({
+      where: {
+        protocolNumber: {
+          startsWith: '2026'
+        }
+      },
       select: { id: true, protocolNumber: true, createdAt: true },
     });
 
