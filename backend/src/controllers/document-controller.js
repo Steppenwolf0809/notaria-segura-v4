@@ -2464,6 +2464,9 @@ async function getDocumentHistory(req, res) {
     if (events.length === 0 && parseInt(offset) === 0) {
       console.warn(`🩹 Documento ${id} sin eventos - inyectando evento DOCUMENT_CREATED sintético`);
 
+      // Usar fechaFactura si existe como referencia de creación; si no, createdAt
+      const baseCreatedAt = document.fechaFactura || document.createdAt;
+
       const syntheticCreatedEvent = {
         id: `synthetic-created-${id}`,
         documentId: id,
@@ -2477,7 +2480,7 @@ async function getDocumentHistory(req, res) {
           isSynthetic: true,
           reason: 'Evento recuperado automáticamente - documento sin historial inicial'
         }),
-        createdAt: document.createdAt,
+        createdAt: baseCreatedAt,
         user: document.createdBy || {
           id: 0,
           firstName: 'Sistema',
@@ -2501,7 +2504,8 @@ async function getDocumentHistory(req, res) {
           // No duplicar evento de entrega si ya lo agregamos arriba
           if (newStatus === 'ENTREGADO' && document.fechaEntrega) continue;
 
-          const transitionDate = new Date(document.createdAt);
+          const transitionBase = document.fechaFactura || document.createdAt;
+          const transitionDate = new Date(transitionBase);
           transitionDate.setHours(transitionDate.getHours() + (i * 24)); // Espaciar eventos
 
           events.push({
@@ -2601,7 +2605,8 @@ async function getDocumentHistory(req, res) {
       clientName: document.clientName,
       currentStatus: document.status,
       documentType: document.documentType,
-      createdAt: document.createdAt
+      createdAt: document.createdAt,
+      fechaFactura: document.fechaFactura
     };
 
     res.json({
