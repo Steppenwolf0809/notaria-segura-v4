@@ -607,16 +607,30 @@ export async function importXmlFile(req, res) {
         let xmlPreview;
         try {
             // Intentar leer como UTF-16LE primero (formato típico de Koinor)
-            xmlPreview = file.buffer.toString('utf16le').substring(0, 500);
+            xmlPreview = file.buffer.toString('utf16le').substring(0, 1000);
             if (!xmlPreview.includes('<?xml')) {
-                xmlPreview = file.buffer.toString('utf8').substring(0, 500);
+                xmlPreview = file.buffer.toString('utf8').substring(0, 1000);
             }
         } catch (e) {
-            xmlPreview = file.buffer.toString('utf8').substring(0, 500);
+            xmlPreview = file.buffer.toString('utf8').substring(0, 1000);
         }
 
         // Detectar si es XML de CXC (tag raíz: cxc_YYYYMMDD)
         const isCxcXml = /<cxc_\d{8}>/.test(xmlPreview);
+        
+        // Detectar si es XML de MOV (Movimientos de Caja)
+        const isMovXml = xmlPreview.includes('d_vc_i_diario_caja_detallado') || 
+                         xmlPreview.includes('<MOV_');
+        
+        // 🔍 VALIDACIÓN: No permitir archivos MOV en pestaña PAGOS
+        if (isMovXml) {
+            return res.status(400).json({
+                success: false,
+                error: 'Tipo de archivo incorrecto',
+                message: 'Este archivo es de Movimientos de Caja (contiene facturas pagadas en efectivo). ' +
+                         'Por favor use la pestaña "MOVIMIENTOS" en lugar de "PAGOS".'
+            });
+        }
         
         let result;
         if (isCxcXml) {
@@ -1898,6 +1912,38 @@ export async function importCxcFile(req, res) {
 }
 
 /**
+ * Detecta el tipo de archivo XML basado en su contenido
+ * @param {Buffer} fileBuffer - Buffer del archivo
+ * @returns {Object} - { type: 'MOV'|'PAGOS'|'CXC'|'UNKNOWN', preview: string }
+ */
+function detectXmlFileType(fileBuffer) {
+    let xmlPreview;
+    try {
+        // Intentar leer como UTF-16LE primero
+        xmlPreview = fileBuffer.toString('utf16le').substring(0, 1000);
+        if (!xmlPreview.includes('<?xml')) {
+            xmlPreview = fileBuffer.toString('utf8').substring(0, 1000);
+        }
+    } catch (e) {
+        xmlPreview = fileBuffer.toString('utf8').substring(0, 1000);
+    }
+
+    // Detectar tipo por tags
+    const hasMovTags = xmlPreview.includes('d_vc_i_diario_caja_detallado') || 
+                       xmlPreview.includes('<MOV_');
+    const hasPagosTags = xmlPreview.includes('<d_vc_i_estado_cuenta') || 
+                         xmlPreview.includes('<E>') ||
+                         xmlPreview.includes('<E_group1>');
+    const hasCxcTags = xmlPreview.includes('<cxc_');
+
+    if (hasMovTags) return { type: 'MOV', preview: xmlPreview.substring(0, 200) };
+    if (hasPagosTags) return { type: 'PAGOS', preview: xmlPreview.substring(0, 200) };
+    if (hasCxcTags) return { type: 'CXC', preview: xmlPreview.substring(0, 200) };
+    
+    return { type: 'UNKNOWN', preview: xmlPreview.substring(0, 200) };
+}
+
+/**
  * Import MOV (Movimientos de Caja) from XML file
  * Importa facturas y marca como PAGADAS las que fueron pagadas en efectivo
  * Requires multipart/form-data with 'file' field
@@ -1936,6 +1982,29 @@ export async function importMovFile(req, res) {
                 success: false,
                 error: 'Archivo demasiado grande',
                 message: 'El archivo no debe superar 50MB'
+            });
+        }
+
+        // 🔍 DETECTAR TIPO DE ARCHIVO
+        const detection = detectXmlFileType(file.buffer);
+        console.log(`[billing-controller] Detected XML type: ${detection.type}`);
+
+        // Si el archivo no es de tipo MOV, dar instrucciones claras
+        if (detection.type === 'PAGOS') {
+            return res.status(400).json({
+                success: false,
+                error: 'Tipo de archivo incorrecto',
+                message: 'Este archivo es un Estado de Cuenta (contiene pagos AB/FC/NC). ' +
+                         'Por favor use la pestaña "PAGOS" en lugar de "MOVIMIENTOS".'
+            });
+        }
+        
+        if (detection.type === 'CXC') {
+            return res.status(400).json({
+                success: false,
+                error: 'Tipo de archivo incorrecto',
+                message: 'Este archivo es de Cartera por Cobrar (CXC). ' +
+                         'Por favor use la pestaña "CXC" en lugar de "MOVIMIENTOS".'
             });
         }
 
