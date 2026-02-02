@@ -141,10 +141,10 @@ async function getAllDocumentsOversight(req, res) {
           const docIds = documents.map(d => d.id);
           const invoicesMap = new Map();
           if (docIds.length > 0) {
-            const invoices = await prisma.invoice.findMany({
-              where: { documentId: { in: docIds } },
-              select: { documentId: true, totalAmount: true, paidAmount: true, status: true }
-            });
+          const invoices = await prisma.invoice.findMany({
+            where: { documentId: { in: docIds } },
+            select: { documentId: true, totalAmount: true, paidAmount: true, status: true, issueDate: true, invoiceNumber: true }
+          });
             invoices.forEach(inv => {
               if (!invoicesMap.has(inv.documentId)) {
                 invoicesMap.set(inv.documentId, []);
@@ -158,6 +158,8 @@ async function getAllDocumentsOversight(req, res) {
             const docInvoices = invoicesMap.get(d.id) || [];
             let paymentStatus = 'SIN_FACTURA';
             let paymentInfo = null;
+            let computedFechaFactura = d.fechaFactura || null;
+            let computedNumeroFactura = d.numeroFactura || null;
             
             if (docInvoices.length > 0) {
               const totalFacturado = docInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
@@ -169,6 +171,17 @@ async function getAllDocumentsOversight(req, res) {
               else paymentStatus = 'PENDIENTE';
               
               paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: docInvoices.length };
+
+              // Fallbacks de factura: usar fecha/numero desde facturas si faltan en documento
+              if (!computedFechaFactura) {
+                const byDateAsc = [...docInvoices]
+                  .filter(inv => inv.issueDate)
+                  .sort((a, b) => new Date(a.issueDate) - new Date(b.issueDate));
+                computedFechaFactura = byDateAsc[0]?.issueDate || null;
+              }
+              if (!computedNumeroFactura) {
+                computedNumeroFactura = docInvoices[0]?.invoiceNumber || null;
+              }
             }
             
             return {
@@ -186,7 +199,9 @@ async function getAllDocumentsOversight(req, res) {
                 email: d._createdByEmail
               } : null,
               paymentStatus,
-              paymentInfo
+              paymentInfo,
+              fechaFactura: computedFechaFactura || d.createdAt,
+              numeroFactura: computedNumeroFactura || d.numeroFactura || null
             };
           });
         } else {
@@ -210,7 +225,7 @@ async function getAllDocumentsOversight(req, res) {
               include: {
                 assignedTo: { select: { id: true, firstName: true, lastName: true, email: true } },
                 createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
-                invoices: { select: { totalAmount: true, paidAmount: true, status: true } }
+                invoices: { select: { totalAmount: true, paidAmount: true, status: true, issueDate: true, invoiceNumber: true } }
               }
             }),
             prisma.document.count({ where })
@@ -238,6 +253,8 @@ async function getAllDocumentsOversight(req, res) {
       documents = documents.map(doc => {
         let paymentStatus = 'SIN_FACTURA';
         let paymentInfo = null;
+        let computedFechaFactura = doc.fechaFactura || null;
+        let computedNumeroFactura = doc.numeroFactura || null;
         
         if (doc.invoices && doc.invoices.length > 0) {
           const totalFacturado = doc.invoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
@@ -249,10 +266,26 @@ async function getAllDocumentsOversight(req, res) {
           else paymentStatus = 'PENDIENTE';
           
           paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: doc.invoices.length };
+
+          if (!computedFechaFactura) {
+            const byDateAsc = [...doc.invoices]
+              .filter(inv => inv.issueDate)
+              .sort((a, b) => new Date(a.issueDate) - new Date(b.issueDate));
+            computedFechaFactura = byDateAsc[0]?.issueDate || null;
+          }
+          if (!computedNumeroFactura) {
+            computedNumeroFactura = doc.invoices[0]?.invoiceNumber || null;
+          }
         }
         
         const { invoices, ...docWithoutInvoices } = doc;
-        return { ...docWithoutInvoices, paymentStatus, paymentInfo };
+        return {
+          ...docWithoutInvoices,
+          paymentStatus,
+          paymentInfo,
+          fechaFactura: computedFechaFactura || doc.createdAt,
+          numeroFactura: computedNumeroFactura || doc.numeroFactura || null
+        };
       });
       
       // Guardar en caché

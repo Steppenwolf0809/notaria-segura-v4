@@ -1613,13 +1613,25 @@ async function getDocumentById(req, res) {
       };
     }
 
-    // Remove invoices from document response (they're in paymentStatus)
+    // Enriquecer con fallbacks desde facturas si faltan campos clave
+    let numeroFactura = document.numeroFactura || null;
+    let fechaFactura = document.fechaFactura || null;
+    if ((!numeroFactura || !fechaFactura) && document.invoices && document.invoices.length > 0) {
+      const byDateAsc = [...document.invoices]
+        .filter(inv => inv.issueDate)
+        .sort((a, b) => new Date(a.issueDate) - new Date(b.issueDate));
+      if (!fechaFactura) fechaFactura = byDateAsc[0]?.issueDate || fechaFactura;
+      if (!numeroFactura) numeroFactura = document.invoices[0]?.invoiceNumber || numeroFactura;
+    }
+
+    // Remove invoices from document response (they're summarized in paymentStatus)
     const { invoices, ...documentWithoutInvoices } = document;
+    const documentEnriched = { ...documentWithoutInvoices, numeroFactura, fechaFactura };
 
     res.json({
       success: true,
       data: {
-        document: documentWithoutInvoices,
+        document: documentEnriched,
         paymentStatus
       }
     });
@@ -2882,6 +2894,47 @@ async function getDocumentHistory(req, res) {
       }
 
       // Reordenar por fecha descendente
+      events.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
+
+    // 🧾 Ajustar fecha del evento de creación al valor de fechaFactura cuando esté disponible
+    // y no alterar BD: solo la representación en el timeline.
+    if (document.fechaFactura) {
+      let hasCreatedEvent = false;
+
+      for (const ev of events) {
+        if (ev.eventType === 'DOCUMENT_CREATED') {
+          ev.createdAt = document.fechaFactura;
+          hasCreatedEvent = true;
+        }
+      }
+
+      // Si no existe evento DOCUMENT_CREATED y estamos en la primera página, inyectarlo
+      if (!hasCreatedEvent && parseInt(offset) === 0) {
+        events.push({
+          id: `synthetic-created-invoice-${id}`,
+          documentId: id,
+          userId: document.createdById || 0,
+          eventType: 'DOCUMENT_CREATED',
+          description: `Documento creado: ${document.documentType || 'Documento'} - ${document.protocolNumber || 'Sin protocolo'}`,
+          details: JSON.stringify({
+            documentType: document.documentType,
+            protocolNumber: document.protocolNumber,
+            clientName: document.clientName,
+            isSynthetic: true,
+            reason: 'Creación ajustada a fecha de factura'
+          }),
+          createdAt: document.fechaFactura,
+          user: document.createdBy || {
+            id: 0,
+            firstName: 'Sistema',
+            lastName: '(Recuperado)',
+            role: 'SYSTEM'
+          }
+        });
+      }
+
+      // Reordenar nuevamente por fecha descendente si hubo cambios/inyección
       events.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     }
 
