@@ -61,7 +61,7 @@ const CarteraCobros = () => {
     
     // Estado para búsqueda y ordenamiento
     const [searchTerm, setSearchTerm] = useState('');
-    const [sortBy, setSortBy] = useState('debt'); // 'debt', 'name', 'invoices'
+    const [sortBy, setSortBy] = useState('debt'); // 'debt', 'name', 'invoices', 'oldest'
 
     // Estado para modal de edición de teléfono (envío recordatorio)
     const [phoneModalOpen, setPhoneModalOpen] = useState(false);
@@ -124,6 +124,18 @@ const CarteraCobros = () => {
                 clients = [...clients].sort((a, b) => 
                     b.invoices.length - a.invoices.length
                 );
+                break;
+            case 'oldest':
+                // Ordenar por fecha de emisión más antigua de las facturas
+                clients = [...clients].sort((a, b) => {
+                    const oldestA = a.invoices.length > 0 
+                        ? Math.min(...a.invoices.map(inv => new Date(inv.issueDate).getTime())) 
+                        : Infinity;
+                    const oldestB = b.invoices.length > 0 
+                        ? Math.min(...b.invoices.map(inv => new Date(inv.issueDate).getTime())) 
+                        : Infinity;
+                    return oldestA - oldestB; // Más antiguas primero
+                });
                 break;
             case 'debt':
             default:
@@ -344,6 +356,7 @@ const CarteraCobros = () => {
                             <option value="debt">Mayor deuda</option>
                             <option value="name">Nombre A-Z</option>
                             <option value="invoices">Más facturas</option>
+                            <option value="oldest">Más antiguas</option>
                         </TextField>
                     </Box>
 
