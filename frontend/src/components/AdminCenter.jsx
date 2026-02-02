@@ -758,6 +758,12 @@ const AdminDashboard = () => {
                 <Typography variant="body1">{selectedDocument.type || 'N/A'}</Typography>
               </Grid>
               <Grid item xs={12} sm={6}>
+                <Typography variant="overline" color="textSecondary">N° Factura</Typography>
+                <Typography variant="body1" color={selectedDocument.numeroFactura ? 'textPrimary' : 'textSecondary'}>
+                  {selectedDocument.numeroFactura || 'Sin asignar'}
+                </Typography>
+              </Grid>
+              <Grid item xs={12} sm={6}>
                 <Typography variant="overline" color="textSecondary">Fecha de Factura</Typography>
                 <Typography variant="body1">
                   {selectedDocument.fechaFactura

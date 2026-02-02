@@ -609,8 +609,8 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
 
   // Documentos ordenados en memoria por fecha
   const documentosOrdenados = useMemo(() => {
-    const dateKeys = ['createdAt', 'fechaCreacion', 'created_at'];
-    const defaultDateKey = documentos[0]?.fechaCreacion ? 'fechaCreacion' : 'createdAt';
+    const dateKeys = ['fechaFactura', 'createdAt', 'fechaCreacion', 'created_at'];
+    const defaultDateKey = documentos[0]?.fechaFactura ? 'fechaFactura' : (documentos[0]?.fechaCreacion ? 'fechaCreacion' : 'createdAt');
     const field = sortBy || defaultDateKey;
     const sorted = [...documentos].sort((a, b) => {
       // 🆕 PRIORIDAD POR ESTADO: LISTO > EN_PROCESO > OTROS (para Recepción)
@@ -631,8 +631,8 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
       }
 
       // Si tienen misma prioridad, aplicar ordenamiento por campo seleccionado
-      let aVal = a[field] ?? a[defaultDateKey] ?? a.createdAt ?? a.fechaCreacion;
-      let bVal = b[field] ?? b[defaultDateKey] ?? b.createdAt ?? b.fechaCreacion;
+      let aVal = a[field] ?? a.fechaFactura ?? a.fechaCreacion ?? a.createdAt;
+      let bVal = b[field] ?? b.fechaFactura ?? b.fechaCreacion ?? b.createdAt;
 
       if (dateKeys.includes(field)) {
         aVal = new Date(aVal).getTime();
@@ -986,17 +986,17 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                 <TableCell sx={{ fontWeight: 'bold', py: 2 }}>Matrizador</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', py: 2 }}>
                   <TableSortLabel
-                    active={['createdAt', 'fechaCreacion'].includes(sortBy)}
-                    direction={['createdAt', 'fechaCreacion'].includes(sortBy) ? sortOrder : 'asc'}
+                    active={sortBy === 'fechaFactura'}
+                    direction={sortBy === 'fechaFactura' ? sortOrder : 'asc'}
                     onClick={() => {
-                      setSortBy(documentos[0]?.fechaCreacion ? 'fechaCreacion' : 'createdAt');
+                      setSortBy('fechaFactura');
                       toggleSortOrder();
                     }}
                   >
-                    Fecha Creación
+                    Fecha Factura
                   </TableSortLabel>
                 </TableCell>
-                <TableCell sx={{ fontWeight: 'bold', py: 2, minWidth: 120 }}>Estado / Agrupación</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', py: 2, minWidth: 120 }}>Estado</TableCell>
                 <TableCell sx={{ fontWeight: 'bold', textAlign: 'center', py: 2 }}>Acciones</TableCell>
               </TableRow>
             </TableHead>
@@ -1141,7 +1141,17 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                           color: (theme) => theme.palette.mode === 'dark' ? '#e2e8f0' : '#374151'
                         }}
                       >
-                        {formatLocalDate(documento.fechaCreacion)}
+                        {new Date(documento.fechaFactura || documento.fechaCreacion).toLocaleDateString('es-EC', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric'
+                        })}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {new Date(documento.fechaFactura || documento.fechaCreacion).toLocaleTimeString('es-EC', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
                       </Typography>
                     </TableCell>
                     <TableCell>

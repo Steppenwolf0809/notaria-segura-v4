@@ -357,10 +357,10 @@ async function listarTodosDocumentos(req, res) {
         const docIds = documents.map(d => d.id);
         const invoicesMap = new Map();
         if (docIds.length > 0) {
-          const invoices = await prisma.invoice.findMany({
-            where: { documentId: { in: docIds } },
-            select: { documentId: true, totalAmount: true, paidAmount: true, status: true }
-          });
+        const invoices = await prisma.invoice.findMany({
+          where: { documentId: { in: docIds } },
+          select: { documentId: true, totalAmount: true, paidAmount: true, status: true, issueDate: true, invoiceNumber: true }
+        });
           invoices.forEach(inv => {
             if (!invoicesMap.has(inv.documentId)) {
               invoicesMap.set(inv.documentId, []);
@@ -374,6 +374,8 @@ async function listarTodosDocumentos(req, res) {
           const docInvoices = invoicesMap.get(doc.id) || [];
           let paymentStatus = 'SIN_FACTURA';
           let paymentInfo = null;
+          let computedFechaFactura = doc.fechaFactura || null;
+          let computedNumeroFactura = doc.numeroFactura || null;
           
           if (docInvoices.length > 0) {
             const totalFacturado = docInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
@@ -389,6 +391,16 @@ async function listarTodosDocumentos(req, res) {
             }
             
             paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: docInvoices.length };
+
+            if (!computedFechaFactura) {
+              const byDateAsc = [...docInvoices]
+                .filter(inv => inv.issueDate)
+                .sort((a, b) => new Date(a.issueDate) - new Date(b.issueDate));
+              computedFechaFactura = byDateAsc[0]?.issueDate || null;
+            }
+            if (!computedNumeroFactura) {
+              computedNumeroFactura = docInvoices[0]?.invoiceNumber || null;
+            }
           }
           
           return {
@@ -404,11 +416,13 @@ async function listarTodosDocumentos(req, res) {
             matrizadorId: doc.assignedToId,
             codigoRetiro: doc.codigoRetiro,
             verificationCode: doc.verificationCode,
+            fechaFactura: computedFechaFactura,
             fechaCreacion: doc.createdAt,
             fechaEntrega: doc.fechaEntrega,
             actoPrincipalDescripcion: doc.actoPrincipalDescripcion,
             actoPrincipalValor: doc.totalFactura,
             totalFactura: doc.totalFactura,
+            numeroFactura: computedNumeroFactura || doc.numeroFactura || null,
             matrizadorName: doc.matrizadorName,
             detalle_documento: doc.detalle_documento,
             comentarios_recepcion: doc.comentarios_recepcion,
@@ -508,7 +522,8 @@ async function listarTodosDocumentos(req, res) {
               invoiceNumber: true,
               totalAmount: true,
               paidAmount: true,
-              status: true
+              status: true,
+              issueDate: true
             }
           }
         },
@@ -523,6 +538,7 @@ async function listarTodosDocumentos(req, res) {
       // 💰 Calcular estado de pago
       let paymentStatus = 'SIN_FACTURA';
       let paymentInfo = null;
+      let computedFechaFactura = doc.fechaFactura || null;
       
       if (doc.invoices && doc.invoices.length > 0) {
         const totalFacturado = doc.invoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
@@ -543,6 +559,14 @@ async function listarTodosDocumentos(req, res) {
           saldoPendiente,
           facturas: doc.invoices.length
         };
+        
+        // Calcular fechaFactura desde las facturas si no existe
+        if (!computedFechaFactura) {
+          const byDateAsc = [...doc.invoices]
+            .filter(inv => inv.issueDate)
+            .sort((a, b) => new Date(a.issueDate) - new Date(b.issueDate));
+          computedFechaFactura = byDateAsc[0]?.issueDate || null;
+        }
       }
       
       return {
@@ -558,6 +582,7 @@ async function listarTodosDocumentos(req, res) {
         matrizadorId: doc.assignedToId,
         codigoRetiro: doc.codigoRetiro,
         verificationCode: doc.verificationCode,
+        fechaFactura: computedFechaFactura,
         fechaCreacion: doc.createdAt,
         fechaEntrega: doc.fechaEntrega,
         actoPrincipalDescripcion: doc.actoPrincipalDescripcion,
@@ -1197,6 +1222,8 @@ async function getReceptionsUnified(req, res) {
         status: true,
         createdAt: true,
         updatedAt: true,
+        fechaFactura: true,
+        numeroFactura: true,
         actoPrincipalDescripcion: true,
         actoPrincipalValor: true,
         totalFactura: true,
@@ -1258,8 +1285,12 @@ async function getReceptionsUnified(req, res) {
     const pageGroups = allGroups.slice(start, start + limit);
 
     const items = pageGroups.map(arr => {
-      // Ordenar por createdAt desc para elegir líder estable
-      const sorted = [...arr].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      // Ordenar por fechaFactura desc (fallback createdAt) para elegir líder estable
+      const sorted = [...arr].sort((a, b) => {
+        const ad = new Date(a.fechaFactura || a.createdAt);
+        const bd = new Date(b.fechaFactura || b.createdAt);
+        return bd - ad;
+      });
       const leader = sorted[0];
 
       // Monto del grupo (suma de totalFactura o actoPrincipalValor)
@@ -1275,7 +1306,9 @@ async function getReceptionsUnified(req, res) {
         mainAct: leader.actoPrincipalDescripcion || '—',
         groupSize: arr.length,
         statusLabel: computeGroupStatus(arr),
-        receivedAtFmt: leader.createdAt ? new Date(leader.createdAt).toLocaleDateString('es-EC') : '-',
+        receivedAtFmt: leader.fechaFactura
+          ? new Date(leader.fechaFactura).toLocaleDateString('es-EC')
+          : '-',
         amountFmt: toCurrency(sumAmount),
         matrizador: leader.assignedTo
           ? `${leader.assignedTo.firstName} ${leader.assignedTo.lastName}`
