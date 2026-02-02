@@ -1194,10 +1194,13 @@ export async function getMyPortfolio(req, res) {
         // Buscar el nombre CXC correspondiente al usuario
         const cxcMatrizadorName = USER_TO_CXC_MATRIZADOR[user.firstName] || user.firstName;
 
-        // Facturas pendientes asociadas al matrizador (por nombre CXC o por documento asignado)
+        // ⚠️ SOLO FACTURAS DEL CXC: Filtrar por sourceFile que contenga 'CXC'
+        // y que tengan matrizador asignado (del CXC XLS)
         const invoices = await prisma.invoice.findMany({
             where: {
                 status: { in: ['PENDING', 'PARTIAL', 'OVERDUE'] },
+                // Solo facturas importadas desde CXC (XLS o XML)
+                sourceFile: { contains: 'CXC', mode: 'insensitive' },
                 OR: [
                     { matrizador: cxcMatrizadorName },
                     { assignedToId: userId },
