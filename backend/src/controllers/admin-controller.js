@@ -675,17 +675,17 @@ async function getDashboardStats(req, res) {
     const thresholdDate = new Date();
     thresholdDate.setDate(today.getDate() - parseInt(thresholdDays));
 
-    // Filtros de fecha base: usar fechaFactura para listados
+    // Filtros de fecha base
     const dateFilter = {};
     if (startDate && endDate) {
-      dateFilter.fechaFactura = {
+      dateFilter.createdAt = {
         gte: new Date(startDate),
         lte: new Date(endDate)
       };
     } else if (startDate) {
-      dateFilter.fechaFactura = { gte: new Date(startDate) };
+      dateFilter.createdAt = { gte: new Date(startDate) };
     } else if (endDate) {
-      dateFilter.fechaFactura = { lte: new Date(endDate) };
+      dateFilter.createdAt = { lte: new Date(endDate) };
     }
 
     // Filtros de fecha para PERFORMANCE (por defecto mes actual si no hay filtros)
@@ -737,11 +737,8 @@ async function getDashboardStats(req, res) {
     const criticalCount = await prisma.document.count({
       where: {
         status: { notIn: ['ENTREGADO', 'ANULADO_NOTA_CREDITO'] },
-        ...matrixerFilter,
-        OR: [
-          { fechaFactura: { lt: thresholdDate } },
-          { AND: [{ fechaFactura: null }, { createdAt: { lt: thresholdDate } }] }
-        ]
+        createdAt: { lt: thresholdDate },
+        ...matrixerFilter
       }
     });
 
@@ -754,23 +751,23 @@ async function getDashboardStats(req, res) {
     switch (billedTimeRange) {
       case 'current_month':
         startBilledDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        billedDateFilter.fechaFactura = { gte: startBilledDate };
+        billedDateFilter.createdAt = { gte: startBilledDate };
         break;
       case 'last_month':
         startBilledDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         const endBilledDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-        billedDateFilter.fechaFactura = { gte: startBilledDate, lte: endBilledDate };
+        billedDateFilter.createdAt = { gte: startBilledDate, lte: endBilledDate };
         break;
       case 'year_to_date':
         startBilledDate = new Date(now.getFullYear(), 0, 1);
-        billedDateFilter.fechaFactura = { gte: startBilledDate };
+        billedDateFilter.createdAt = { gte: startBilledDate };
         break;
       case 'all_time':
         // No filter
         break;
       default: // current_month default
         startBilledDate = new Date(now.getFullYear(), now.getMonth(), 1);
-        billedDateFilter.fechaFactura = { gte: startBilledDate };
+        billedDateFilter.createdAt = { gte: startBilledDate };
     }
 
     // Calcular suma de totalFactura (excluyendo anulados)
@@ -887,11 +884,7 @@ async function getDashboardStats(req, res) {
 
       const warningThresholdDate = new Date();
       warningThresholdDate.setDate(today.getDate() - 10);
-      // Considerar fechaFactura; si no hay, usar createdAt
-      docWhere.OR = [
-        { fechaFactura: { lt: warningThresholdDate } },
-        { AND: [{ fechaFactura: null }, { createdAt: { lt: warningThresholdDate } }] }
-      ];
+      docWhere.createdAt = { lt: warningThresholdDate };
     }
 
     // Paginación
@@ -906,10 +899,7 @@ async function getDashboardStats(req, res) {
             select: { firstName: true, lastName: true }
           }
         },
-        orderBy: [
-          { fechaFactura: 'asc' },
-          { createdAt: 'asc' }
-        ], // Más antiguos por fecha de factura; fallback a createdAt
+        orderBy: { createdAt: 'asc' }, // Los más antiguos primero (prioridad atención)
         skip,
         take
       }),
@@ -947,10 +937,7 @@ async function getDashboardStats(req, res) {
         where: {
           assignedToId: m.id,
           status: { notIn: ['ENTREGADO', 'ANULADO_NOTA_CREDITO'] },
-          OR: [
-            { fechaFactura: { lt: thresholdDate } },
-            { AND: [{ fechaFactura: null }, { createdAt: { lt: thresholdDate } }] }
-          ]
+          createdAt: { lt: thresholdDate }
         }
       });
 
@@ -1023,10 +1010,7 @@ async function getDashboardStats(req, res) {
           type: doc.documentType,
           status: doc.status,
           matrixer: doc.assignedTo ? `${doc.assignedTo.firstName} ${doc.assignedTo.lastName}` : 'Sin asignar',
-          daysDelayed: (() => {
-            const baseDate = doc.fechaFactura || doc.createdAt;
-            return Math.floor((new Date() - new Date(baseDate)) / (1000 * 60 * 60 * 24));
-          })()
+          daysDelayed: Math.floor((new Date() - new Date(doc.createdAt)) / (1000 * 60 * 60 * 24))
         })),
         pagination: {
           currentPage: parseInt(page),
