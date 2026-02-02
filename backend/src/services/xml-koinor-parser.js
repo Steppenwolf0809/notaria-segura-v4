@@ -27,6 +27,7 @@ function sanitizeXMLString(xmlString) {
 
 /**
  * Parsea archivo XML de Koinor por streaming usando SAX
+ * Soporta formatos: <d_vc_i_estado_cuenta> y <E>
  * @param {Buffer} fileBuffer - Buffer del archivo XML
  * @param {string} fileName - Nombre del archivo para logging
  * @returns {Promise<Object>} Resultado del parsing con payments y summary
@@ -54,7 +55,7 @@ export async function parseKoinorXML(fileBuffer, fileName) {
             xmlString = xmlString.replace(/^\uFEFF/, '');
             
             // Verificar si la decodificación fue exitosa
-            if (xmlString.includes('<?xml') || xmlString.includes('<d_vc_i_estado_cuenta')) {
+            if (xmlString.includes('<?xml') || xmlString.includes('<d_vc_i_estado_cuenta') || xmlString.includes('<E>')) {
                 detectedEncoding = 'UTF-16LE';
                 console.log('[xml-koinor-parser] Encoding detected: UTF-16LE');
             } else {
@@ -62,7 +63,7 @@ export async function parseKoinorXML(fileBuffer, fileName) {
                 xmlString = fileBuffer.toString('utf8');
                 xmlString = xmlString.replace(/^\uFEFF/, '');
                 
-                if (xmlString.includes('<?xml') || xmlString.includes('<d_vc_i_estado_cuenta')) {
+                if (xmlString.includes('<?xml') || xmlString.includes('<d_vc_i_estado_cuenta') || xmlString.includes('<E>')) {
                     detectedEncoding = 'UTF-8';
                     console.log('[xml-koinor-parser] Encoding detected: UTF-8');
                 } else {
@@ -77,19 +78,30 @@ export async function parseKoinorXML(fileBuffer, fileName) {
         // DEBUG: Mostrar primeros caracteres del XML
         console.log(`[xml-koinor-parser] XML preview (first 300 chars):`, xmlString.substring(0, 300));
         console.log(`[xml-koinor-parser] Has d_vc_i_estado_cuenta_group1:`, xmlString.includes('d_vc_i_estado_cuenta_group1'));
+        console.log(`[xml-koinor-parser] Has E_group1:`, xmlString.includes('E_group1'));
         console.log(`[xml-koinor-parser] Has tipdoc:`, xmlString.includes('tipdoc'));
 
         // 2. Sanitizar XML para manejar caracteres & sin escapar
-        // Esto previene errores de parsing cuando el XML contiene & en nombres de empresas
         console.log('[xml-koinor-parser] Sanitizing XML for special characters...');
         xmlString = sanitizeXMLString(xmlString);
 
-        // 3. Validar estructura después de decodificar y sanitizar
+        // 3. Detectar formato y validar estructura
+        const formatDetection = detectKoinorFormat(xmlString);
+        if (formatDetection.error) {
+            throw new Error(formatDetection.error);
+        }
+        
+        const xmlFormat = formatDetection.format;
+        console.log(`[xml-koinor-parser] Detected format: ${xmlFormat}`);
+
         const validation = validateKoinorXMLStructure(xmlString);
         if (!validation.valid) {
             throw new Error(validation.error);
         }
 
+        // Determinar los tags a usar según el formato
+        const groupTagName = xmlFormat === 'ESTADO_CUENTA_E' ? 'E_group1' : 'd_vc_i_estado_cuenta_group1';
+        
         // 4. Crear parser SAX en modo strict
         const parser = sax.parser(true, {
             trim: true,
@@ -117,7 +129,7 @@ export async function parseKoinorXML(fileBuffer, fileName) {
                 currentElement = node.name;
                 textBuffer = '';
                 
-                if (node.name === 'd_vc_i_estado_cuenta_group1') {
+                if (node.name === groupTagName) {
                     inGroup1 = true;
                     currentGroup = {};
                 }
@@ -135,7 +147,7 @@ export async function parseKoinorXML(fileBuffer, fileName) {
                     currentGroup[currentElement] = textBuffer.trim();
                 }
 
-                if (tagName === 'd_vc_i_estado_cuenta_group1') {
+                if (tagName === groupTagName) {
                     // Procesar el grupo completo
                     inGroup1 = false;
                     totalTransactions++;
@@ -196,7 +208,8 @@ export async function parseKoinorXML(fileBuffer, fileName) {
                         errors: errors.length,
                         errorDetails: errors.slice(0, 20), // Solo primeros 20 errores
                         processedAt: new Date(),
-                        duration: `${duration}s`
+                        duration: `${duration}s`,
+                        format: xmlFormat
                     }
                 });
             };
@@ -391,53 +404,92 @@ function parseKoinorDate(dateString) {
 }
 
 /**
- * Valida estructura básica del XML de Koinor
+ * Detecta el formato del XML de Koinor
  * @param {string} xmlString - Contenido del XML
- * @returns {Object} - { valid: boolean, error: string }
+ * @returns {Object} - { format: 'ESTADO_CUENTA'|'ESTADO_CUENTA_E', error: string|null }
  */
-export function validateKoinorXMLStructure(xmlString) {
+function detectKoinorFormat(xmlString) {
     // Verificar que no está vacío
     if (!xmlString || xmlString.length < 100) {
         return {
-            valid: false,
+            format: null,
             error: 'El archivo XML está vacío o es demasiado corto'
         };
     }
 
-    // Detectar el tag raíz del XML
-    const hasXMLDeclaration = xmlString.includes('<?xml');
-    const hasRowTag = xmlString.includes('d_vc_i_estado_cuenta_row');
+    // Detectar formato tradicional: <d_vc_i_estado_cuenta>
+    const hasEstadoCuentaTag = xmlString.includes('<d_vc_i_estado_cuenta>') || 
+                               xmlString.includes('<d_vc_i_estado_cuenta ');
     const hasGroup1Tag = xmlString.includes('d_vc_i_estado_cuenta_group1');
-    const hasGroup1CloseTag = xmlString.includes('</d_vc_i_estado_cuenta_group1>');
+    
+    // Detectar formato corto: <E>
+    const hasETag = xmlString.includes('<E>') || xmlString.includes('<E ');
+    const hasEGroup1Tag = xmlString.includes('<E_group1>') || xmlString.includes('<E_group1 ');
     
     // Logging para diagnóstico
-    console.log('[xml-koinor-parser] Validation check:', {
-        hasXMLDeclaration,
-        hasRowTag,
+    console.log('[xml-koinor-parser] Format detection:', {
+        hasEstadoCuentaTag,
         hasGroup1Tag,
-        hasGroup1CloseTag,
+        hasETag,
+        hasEGroup1Tag,
         length: xmlString.length,
         firstChars: xmlString.substring(0, 200)
     });
 
-    // Verificar que tiene al menos uno de los tags esperados
-    if (!hasRowTag && !hasGroup1Tag) {
+    if (hasEstadoCuentaTag && hasGroup1Tag) {
+        return { format: 'ESTADO_CUENTA', error: null };
+    }
+    
+    if (hasETag && hasEGroup1Tag) {
+        return { format: 'ESTADO_CUENTA_E', error: null };
+    }
+
+    return {
+        format: null,
+        error: `El archivo no tiene la estructura XML de Koinor esperada. ` +
+               `Formatos soportados: <d_vc_i_estado_cuenta> o <E>. ` +
+               `Primeros 200 caracteres: ${xmlString.substring(0, 200)}...`
+    };
+}
+
+/**
+ * Valida estructura básica del XML de Koinor
+ * @param {string} xmlString - Contenido del XML
+ * @returns {Object} - { valid: boolean, error: string, format: string|null }
+ */
+export function validateKoinorXMLStructure(xmlString) {
+    const detection = detectKoinorFormat(xmlString);
+    
+    if (detection.error) {
         return {
             valid: false,
-            error: `El archivo no tiene la estructura XML de Koinor esperada. ` +
-                   `Primeros 200 caracteres: ${xmlString.substring(0, 200)}...`
+            error: detection.error,
+            format: null
         };
     }
 
-    // Verificar que tiene tags de cierre si tiene tags de apertura
-    if (hasGroup1Tag && !hasGroup1CloseTag) {
-        return {
-            valid: false,
-            error: 'El XML parece incompleto (falta tag de cierre d_vc_i_estado_cuenta_group1)'
-        };
+    // Verificar que tiene tags de cierre
+    if (detection.format === 'ESTADO_CUENTA') {
+        const hasGroup1CloseTag = xmlString.includes('</d_vc_i_estado_cuenta_group1>');
+        if (!hasGroup1CloseTag) {
+            return {
+                valid: false,
+                error: 'El XML parece incompleto (falta tag de cierre d_vc_i_estado_cuenta_group1)',
+                format: null
+            };
+        }
+    } else if (detection.format === 'ESTADO_CUENTA_E') {
+        const hasEGroup1CloseTag = xmlString.includes('</E_group1>');
+        if (!hasEGroup1CloseTag) {
+            return {
+                valid: false,
+                error: 'El XML parece incompleto (falta tag de cierre E_group1)',
+                format: null
+            };
+        }
     }
 
-    return { valid: true };
+    return { valid: true, format: detection.format };
 }
 
 export default {
