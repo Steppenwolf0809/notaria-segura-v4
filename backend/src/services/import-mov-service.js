@@ -411,6 +411,19 @@ async function processMovInvoice(invoiceData, sourceFile) {
             result.documentProtocol = result.documentProtocol; // Ya fue asignado arriba
             console.log(`[import-mov] ✅ Linked existing invoice ${invoiceNumber} to document (documentId: ${documentId})`);
             result.updated = true;
+            
+            // ⭐ NUEVO: Actualizar numeroFactura en el documento si está vacío
+            const document = await prisma.document.findUnique({
+                where: { id: documentId },
+                select: { numeroFactura: true, protocolNumber: true }
+            });
+            if (document && !document.numeroFactura) {
+                await prisma.document.update({
+                    where: { id: documentId },
+                    data: { numeroFactura: invoiceNumber }
+                });
+                console.log(`[import-mov] ✅ Updated document ${document.protocolNumber} with numeroFactura: ${invoiceNumber}`);
+            }
         }
         
         // Solo crear pago si el pago en efectivo es nuevo
@@ -471,6 +484,21 @@ async function processMovInvoice(invoiceData, sourceFile) {
 
         result.created = true;
         console.log(`[import-mov] Invoice created: ${invoiceNumber} (status: ${status})`);
+        
+        // ⭐ NUEVO: Actualizar numeroFactura en el documento si está vacío
+        if (documentId) {
+            const document = await prisma.document.findUnique({
+                where: { id: documentId },
+                select: { numeroFactura: true, protocolNumber: true }
+            });
+            if (document && !document.numeroFactura) {
+                await prisma.document.update({
+                    where: { id: documentId },
+                    data: { numeroFactura: invoiceNumber }
+                });
+                console.log(`[import-mov] ✅ Updated document ${document.protocolNumber} with numeroFactura: ${invoiceNumber}`);
+            }
+        }
 
         // Si fue pagada en efectivo, crear el registro de pago
         if (invoiceData.isPaid && invoiceData.paymentMethod === 'CASH') {
