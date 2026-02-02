@@ -64,8 +64,9 @@ async function uploadXmlDocument(req, res) {
       });
     }
 
-    // ⭐ DEBUG: Verificar numeroFactura antes de guardar
+    // ⭐ DEBUG: Verificar datos antes de guardar
     console.log('🔍 DEBUG createDocument - numeroFactura:', parsedData.numeroFactura);
+    console.log('🔍 DEBUG createDocument - fechaEmision:', parsedData.fechaEmision);
     console.log('🔍 DEBUG createDocument - parsedData keys:', Object.keys(parsedData));
 
     // Crear documento en la base de datos

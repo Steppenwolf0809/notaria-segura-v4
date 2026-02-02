@@ -873,6 +873,7 @@ async function supervisionGeneral(req, res) {
             unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
             unaccent(d."actoPrincipalDescripcion") ILIKE unaccent(${pattern}) OR
             unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
+            unaccent(COALESCE(d."numeroFactura", '')) ILIKE unaccent(${pattern}) OR
             d."clientPhone" ILIKE ${pattern}
           )`
         ];
@@ -981,7 +982,8 @@ async function supervisionGeneral(req, res) {
           { clientPhone: { contains: searchTerm } },
           { protocolNumber: { contains: searchTerm, mode: 'insensitive' } },
           { actoPrincipalDescripcion: { contains: searchTerm, mode: 'insensitive' } },
-          { detalle_documento: { contains: searchTerm, mode: 'insensitive' } }
+          { detalle_documento: { contains: searchTerm, mode: 'insensitive' } },
+          { numeroFactura: { contains: searchTerm, mode: 'insensitive' } }
         ];
       }
     }
