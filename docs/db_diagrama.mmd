@@ -1,0 +1,206 @@
+erDiagram
+  USERS {
+    int id PK
+    string email
+    string password
+    string firstName
+    string lastName
+    string role
+    boolean isActive
+    datetime createdAt
+    datetime updatedAt
+    datetime lastLogin
+  }
+
+  DOCUMENTS {
+    string id PK
+    string protocolNumber
+    string clientName
+    string clientPhone
+    string clientEmail
+    string clientId
+    string documentType
+    string status
+    string verificationCode
+    string codigoRetiro
+    int assignedToId FK
+    int createdById FK
+    int usuarioEntregaId FK
+    string matrizadorName
+    float actoPrincipalValor
+    float totalFactura
+    string numeroFactura
+    datetime fechaFactura
+    datetime fechaListo
+    datetime fechaEntrega
+    boolean pagoConfirmado
+    boolean alertaInterna
+    string mensajeInterno
+    datetime createdAt
+    datetime updatedAt
+  }
+
+  DOCUMENT_EVENTS {
+    string id PK
+    string documentId FK
+    int userId FK
+    string eventType
+    string description
+    string details
+    string personaRetiro
+    string cedulaRetiro
+    string metodoVerificacion
+    string observacionesRetiro
+    string ipAddress
+    string userAgent
+    datetime createdAt
+  }
+
+  WHATSAPP_TEMPLATES {
+    string id PK
+    string tipo
+    string titulo
+    string mensaje
+    boolean activo
+    datetime createdAt
+    datetime updatedAt
+  }
+
+  WHATSAPP_NOTIFICATIONS {
+    string id PK
+    string documentId FK
+    string clientName
+    string clientPhone
+    string messageType
+    string messageBody
+    string status
+    string messageId
+    string errorMessage
+    datetime sentAt
+    datetime createdAt
+  }
+
+  ESCRITURAS_QR {
+    int id PK
+    string token
+    string numeroEscritura
+    string archivoOriginal
+    string extractoTextoCompleto
+    string pdfFileName
+    int pdfFileSize
+    int pdfViewCount
+    string pdfHiddenPages
+    int createdBy FK
+    string estado
+    boolean activo
+    datetime createdAt
+    datetime updatedAt
+  }
+
+  PERSONAS_REGISTRADAS {
+    string id PK
+    string numeroIdentificacion
+    string tipoPersona
+    string pinHash
+    boolean completado
+    jsonb datosPersonaNatural
+    jsonb datosPersonaJuridica
+    datetime createdAt
+    datetime updatedAt
+  }
+
+  FORMULARIO_UAFE_ASIGNACIONES {
+    string id PK
+    string personaId FK
+    string numeroMatriz
+    string actoContrato
+    string calidadPersona
+    string actuaPor
+    string token
+    string estado
+    datetime expiraEn
+    int matrizadorId FK
+    string respuestaId
+    datetime createdAt
+    datetime completadoEn
+  }
+
+  FORMULARIO_UAFE_RESPUESTAS {
+    string id PK
+    string asignacionId FK
+    string personaId FK
+    datetime fecha
+    string numeroMatriz
+    string actoContrato
+    float valorContrato
+    boolean formaPagoCheque
+    boolean formaPagoEfectivo
+    boolean formaPagoTransferencia
+    boolean formaPagoTarjeta
+    datetime completadoEn
+    string ipAddress
+    string userAgent
+  }
+
+  PERSONAS_PROTOCOLO {
+    string id PK
+    string protocoloId FK
+    string personaCedula
+    string representadoId
+    boolean completado
+    string estadoCompletitud
+    int porcentajeCompletitud
+    jsonb camposFaltantes
+    boolean compareceConyugeJunto
+    boolean esApoderado
+    int orden
+    datetime createdAt
+    datetime updatedAt
+  }
+
+  PROTOCOLOS_UAFE {
+    string id PK
+    string numeroProtocolo
+    datetime fecha
+    string actoContrato
+    numeric valorContrato
+    int createdBy FK
+    jsonb formasPago
+    datetime createdAt
+    datetime updatedAt
+  }
+
+  ENCUESTAS_SATISFACCION {
+    int id PK
+    string tramiteId
+    int calificacion
+    boolean infoClara
+    boolean tratoCordial
+    string sugerencia
+    datetime createdAt
+  }
+
+  AUDITORIA_PERSONAS {
+    string id PK
+    string personaId FK
+    string tipo
+    string descripcion
+    int matrizadorId FK
+    string ipAddress
+    string userAgent
+    datetime createdAt
+  }
+
+  USERS ||--o{ DOCUMENTS : createdBy
+  USERS ||--o{ DOCUMENTS : assignedTo
+  USERS ||--o{ DOCUMENTS : usuarioEntrega
+  DOCUMENTS ||--o{ DOCUMENT_EVENTS : has
+  USERS ||--o{ DOCUMENT_EVENTS : registers
+  DOCUMENTS ||--o{ WHATSAPP_NOTIFICATIONS : notifies
+  USERS ||--o{ PROTOCOLOS_UAFE : creates
+  PERSONAS_REGISTRADAS ||--o{ FORMULARIO_UAFE_ASIGNACIONES : has
+  FORMULARIO_UAFE_ASIGNACIONES ||--|| FORMULARIO_UAFE_RESPUESTAS : respuesta
+  PROTOCOLOS_UAFE ||--o{ PERSONAS_PROTOCOLO : incluye
+  USERS ||--o{ ESCRITURAS_QR : creates
+  PERSONAS_REGISTRADAS ||--o{ AUDITORIA_PERSONAS : eventos
+

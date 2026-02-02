@@ -1,7 +1,7 @@
 import { db as prisma } from '../db.js';
 import XLSX from 'xlsx';
 
-// Mapeo de códigos de vendedores a nombres
+// Mapeo de códigos de vendedores a nombres ESTÁNDAR
 const MATRIZADOR_MAPPING = {
   'MAY': 'Mayra Corella',
   'KAR': 'Karol Velastegui',
@@ -10,6 +10,52 @@ const MATRIZADOR_MAPPING = {
   'MD01': 'Maria Diaz',
   'FP': 'Esteban Proaño'
 };
+
+// Normalización de nombres de matrizadores para evitar duplicados visuales
+const MATRIZADOR_NAME_NORMALIZATION = {
+  // Mayra Corella
+  'Mayra Cristina Corella Parra': 'Mayra Corella',
+  'Mayra Corella Parra': 'Mayra Corella',
+  'Mayra Cristina': 'Mayra Corella',
+  'Mayra': 'Mayra Corella',
+  
+  // Karol Velastegui
+  'Karol Daniela Velastegui Cadena': 'Karol Velastegui',
+  'Karol Daniela': 'Karol Velastegui',
+  'Karol': 'Karol Velastegui',
+  
+  // Jose Zapata
+  'Jose Luis Zapata Silva': 'Jose Zapata',
+  'Jose Luis': 'Jose Zapata',
+  'Jose': 'Jose Zapata',
+  'JLZ': 'Jose Zapata',
+  
+  // Gissela Velastegui
+  'Gissela Velastegui': 'Gissela Velastegui',
+  'Gissela': 'Gissela Velastegui',
+  
+  // Maria Diaz
+  'Maria Lucinda': 'Maria Diaz',
+  'Maria': 'Maria Diaz',
+  'MD01': 'Maria Diaz',
+  
+  // Esteban Proaño
+  'Francisco Esteban': 'Esteban Proaño',
+  'Francisco': 'Esteban Proaño',
+  'Esteban': 'Esteban Proaño',
+  'FP': 'Esteban Proaño'
+};
+
+/**
+ * Normaliza el nombre del matrizador a un formato estándar
+ * @param {string} name - Nombre del matrizador
+ * @returns {string} - Nombre normalizado
+ */
+function normalizeMatrizadorName(name) {
+  if (!name) return 'Sin asignar';
+  const normalized = MATRIZADOR_NAME_NORMALIZATION[name.trim()] || name.trim();
+  return normalized;
+}
 
 /**
  * Servicio de Importación CXC (Cartera por Cobrar)
@@ -224,7 +270,8 @@ function normalizeRow(row) {
 
   const invoiceNumber = normalizeInvoiceNumber(numtra);
   const codven = getVal(['codven', 'CODVEN', 'Vendedor', 'vendedor', 'COD_VEN', 'cod_ven'])?.toString().trim();
-  const matrizador = MATRIZADOR_MAPPING[codven] || codven || 'Sin asignar';
+  const matrizadorRaw = MATRIZADOR_MAPPING[codven] || codven || 'Sin asignar';
+  const matrizador = normalizeMatrizadorName(matrizadorRaw); // Normalizar a nombre estándar
   
   // DEBUG: Log primeras facturas para ver codven
   if (numtra && numtra.includes('001002')) {
