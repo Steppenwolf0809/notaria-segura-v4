@@ -35,6 +35,7 @@
   },
   "dependencies": {
     "archiver": "^7.0.1",
+    "iconv-lite": "^0.7.2",
     "pdfkit": "^0.17.2"
   }
 }

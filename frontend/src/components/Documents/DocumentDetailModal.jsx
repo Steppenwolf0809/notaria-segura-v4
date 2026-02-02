@@ -95,8 +95,13 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
       // Si no hay ID o el modal está cerrado, no hacer nada
       if (!open || !documentId) return;
 
-      // Si ya tenemos datos completos, no recargar
-      if (localDocument?.id === documentId && localDocument?.protocolNumber) {
+      // Si ya tenemos datos suficientes, no recargar
+      // Debe incluir al menos protocolNumber y datos de factura (numero/fecha)
+      if (
+        localDocument?.id === documentId &&
+        localDocument?.protocolNumber &&
+        (localDocument?.numeroFactura || localDocument?.fechaFactura)
+      ) {
         return;
       }
 
@@ -598,6 +603,12 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                           <Typography variant="body2" color="text.secondary">Protocolo:</Typography>
                           <Typography variant="body2" fontWeight="medium">{localDocument?.protocolNumber}</Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Typography variant="body2" color="text.secondary">N° Factura:</Typography>
+                          <Typography variant="body2" fontWeight="medium" color={localDocument?.numeroFactura ? 'text.primary' : 'text.disabled'}>
+                            {localDocument?.numeroFactura || 'Sin asignar'}
+                          </Typography>
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                           <Typography variant="body2" color="text.secondary">Matrizador:</Typography>

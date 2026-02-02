@@ -88,3 +88,13 @@ Thumbs.db
 
 #claudecode
 CLAUDE.md
+ 
+# Docs: ignorar XML de ejemplo
+docs/*.xml
+docs/historial/*.xml
+docs/*.pdf
+docs/historial/*.pdf
+docs/*.zip
+docs/historial/*.zip
+docs/*.csv
+docs/historial/*.csv

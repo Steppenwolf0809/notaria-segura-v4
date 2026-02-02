@@ -42,6 +42,7 @@ import BulkActionToolbar from '../bulk/BulkActionToolbar';
 import BulkStatusChangeModal from '../bulk/BulkStatusChangeModal';
 import ReversionModal from '../recepcion/ReversionModal';
 import ModalEntregaMatrizador from '../matrizador/ModalEntregaMatrizador.jsx';
+import PaymentIndicator from '../shared/PaymentIndicator';
 import { toast } from 'react-toastify';
 
 /**
@@ -539,7 +540,12 @@ const ListView = ({
                           color={statusInfo.color}
                           variant="filled"
                         />
-                        {/* 🚫 AGRUPACIÓN ELIMINADA */}
+                        {/* � Indicador de estado de pago */}
+                        <PaymentIndicator 
+                          paymentStatus={document.paymentStatus} 
+                          paymentInfo={document.paymentInfo}
+                          documentStatus={document.status}
+                        />
                       </Box>
                     </TableCell>
                     <TableCell onClick={() => openDetailModal(document)}>

@@ -101,6 +101,12 @@ router.get('/counts', authenticateToken, getDocumentsCounts);
 // 📊 GET /api/documents/caja-stats - Estadísticas completas para dashboard de CAJA
 router.get('/caja-stats', authenticateToken, getCajaStats);
 
+// 🔎 GET /api/documents/sequence-gaps - CAJA/ADMIN: Detectar huecos en secuencias de protocolo
+router.get('/sequence-gaps', authenticateToken, async (req, res, next) => {
+  const { findProtocolSequenceGaps } = await import('../controllers/document-controller.js');
+  return findProtocolSequenceGaps(req, res, next);
+});
+
 // GET /api/documents/my-documents - MATRIZADOR: Documentos del usuario
 router.get('/my-documents', authenticateToken, getMyDocuments);
 

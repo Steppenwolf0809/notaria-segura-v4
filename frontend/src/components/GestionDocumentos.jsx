@@ -59,12 +59,12 @@ const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
   const handleInputChange = useCallback((e) => {
     setInputValue(e.target.value);
     setPage(0); // Reset página al buscar
-  }, []);
+  }, [setInputValue, setPage]);
 
   const handleClearInput = useCallback(() => {
     setInputValue('');
     setPage(0);
-  }, []);
+  }, [setInputValue, setPage]);
 
   const handleStatusFilterChange = useCallback((e) => {
     setStatusFilter(e.target.value);

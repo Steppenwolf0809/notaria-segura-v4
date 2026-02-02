@@ -79,7 +79,8 @@ const DocumentTimeline = ({
     loadMore,
     stats,
     usingRealData,
-    initialized
+    initialized,
+    document: timelineDocument
   } = timelineData;
 
   // Solo loguear en desarrollo para debugging
@@ -137,6 +138,17 @@ const DocumentTimeline = ({
       return format(new Date(timestamp), 'dd/MM/yyyy HH:mm', { locale: es });
     } catch {
       return 'Fecha inválida';
+    }
+  };
+
+  /**
+   * Formatear fecha (solo día) para encabezados
+   */
+  const formatShortDate = (date) => {
+    try {
+      return format(new Date(date), 'dd/MM/yyyy', { locale: es });
+    } catch {
+      return '-';
     }
   };
 
@@ -397,13 +409,21 @@ const DocumentTimeline = ({
             </IconButton>
           )}
         </Box>
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
           <Typography variant="body2" color="text.secondary">
             {timelineHistory?.length || 0} eventos mostrados
             {stats?.totalEvents && stats.totalEvents !== timelineHistory?.length &&
               ` de ${stats.totalEvents} totales`
             }
           </Typography>
+          {timelineDocument?.fechaFactura && (
+            <Chip
+              label={`Factura: ${formatShortDate(timelineDocument.fechaFactura)}`}
+              size="small"
+              color="default"
+              variant="outlined"
+            />
+          )}
           {usingRealData ? (
             <Chip
               label="Datos en vivo"

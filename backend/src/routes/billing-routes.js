@@ -24,7 +24,7 @@ import {
 
 const router = express.Router();
 
-// Configure multer for file uploads (memory storage)
+// Configure multer for XLS file uploads (memory storage) - LEGACY
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
@@ -46,6 +46,25 @@ const upload = multer({
             cb(null, true);
         } else {
             cb(new Error('Tipo de archivo no permitido. Solo .xls, .xlsx, .csv'), false);
+        }
+    }
+});
+
+// Configure multer for XML file uploads (memory storage) - NUEVO SISTEMA
+const xmlUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+        fileSize: 50 * 1024 * 1024 // 50MB limit para XMLs grandes (7000+ registros)
+    },
+    fileFilter: (req, file, cb) => {
+        const ext = file.originalname.toLowerCase().substring(
+            file.originalname.lastIndexOf('.')
+        );
+        
+        if (ext === '.xml') {
+            cb(null, true);
+        } else {
+            cb(new Error('Solo se permiten archivos XML (.xml)'), false);
         }
     }
 });
@@ -78,7 +97,21 @@ router.get('/import-logs', billingController.getImportLogs);
 // Document payment status (for integration with document views) - 🔒 SECURITY: UUID validation
 router.get('/documents/:documentId/payment-status', validateParams(documentIdParamSchema), billingController.getDocumentPaymentStatus);
 
-// Import endpoint - requires file upload - 🔒 SECURITY: CSRF protection added
+// ============================================================================
+// IMPORTACIÓN DE PAGOS
+// ============================================================================
+
+// Import XML endpoint (NUEVO - Sistema principal) - 🔒 SECURITY: CSRF protection
+router.post('/import-xml', csrfProtection, xmlUpload.single('file'), billingController.importXmlFile);
+
+// Import CXC endpoint (Cartera por Cobrar) - 🔒 SECURITY: CSRF protection
+router.post('/import-cxc', csrfProtection, xmlUpload.single('file'), billingController.importCxcFile);
+
+// Import MOV endpoint (Movimientos de Caja - Facturas + Pagos Efectivo) - 🔒 SECURITY: CSRF protection
+router.post('/import-mov', csrfProtection, xmlUpload.single('file'), billingController.importMovFile);
+
+// Import XLS endpoint (LEGACY - Deprecado, mantener 1 mes)
+// TODO: Comentar después del 28 de febrero de 2026
 router.post('/import', csrfProtection, upload.single('file'), billingController.importFile);
 
 // ============================================================================
@@ -87,6 +120,9 @@ router.post('/import', csrfProtection, upload.single('file'), billingController.
 
 // My portfolio - for users to see invoices from their assigned documents - 🔒 SECURITY: Input validation
 router.get('/my-portfolio', validateQuery(portfolioQuerySchema), billingController.getMyPortfolio);
+
+// Update client phone number - 🔒 SECURITY: Input validation
+router.put('/client/:clientTaxId/phone', validateParams(clientTaxIdParamSchema), billingController.updateClientPhone);
 
 // Generate collection reminder message for a client - 🔒 SECURITY: Input validation
 router.get('/collection-reminder/:clientTaxId', validateParams(clientTaxIdParamSchema), billingController.generateCollectionReminder);
@@ -106,6 +142,35 @@ router.get('/reports/facturas-vencidas', billingController.getFacturasVencidas);
 
 // Report: Entregas con Saldo Pendiente (Audit)
 router.get('/reports/entregas-con-saldo', billingController.getEntregasConSaldo);
+
+// ============================================================================
+// ASIGNACIÓN DE FACTURAS
+// ============================================================================
+
+// Obtener lista de matrizadores para asignación
+router.get('/matrizadores', billingController.getMatrizadoresForAssignment);
+
+// Asignar matrizador a una factura (solo facturas sin documento)
+router.patch('/invoices/:invoiceId/assign', csrfProtection, billingController.assignInvoiceMatrizador);
+
+// ============================================================================
+// NUEVO MÓDULO CXC - CARTERA POR COBRAR (XLS/CSV)
+// ============================================================================
+
+// Importar CXC desde XLS/CSV
+router.post('/import-cxc-xls', csrfProtection, upload.single('file'), billingController.importCxcXls);
+
+// Obtener cartera pendiente (detalle)
+router.get('/cartera-pendiente', billingController.getCarteraPendiente);
+
+// Obtener resumen de cartera (agrupado por cliente)
+router.get('/cartera-pendiente/resumen', billingController.getCarteraPendienteResumen);
+
+// Obtener fechas de reportes disponibles
+router.get('/cartera-pendiente/fechas', billingController.getAvailableReportDates);
+
+// Limpiar datos antiguos (solo ADMIN)
+router.delete('/cartera-pendiente/limpiar', csrfProtection, billingController.limpiarCarteraAntigua);
 
 export default router;
 
