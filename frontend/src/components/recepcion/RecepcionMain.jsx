@@ -942,7 +942,7 @@ function RecepcionMain() {
                     {/* Fecha */}
                     <TableCell>
                       <Typography variant="body2">
-                        {formatDate(documento.fechaFactura || documento.createdAt || documento.fechaCreacion)}
+                        {documento.fechaFactura ? formatDate(documento.fechaFactura) : '—'}
                       </Typography>
                     </TableCell>
 

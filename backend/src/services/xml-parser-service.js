@@ -84,6 +84,9 @@ async function parseXmlDocument(xmlContent) {
     // 7. Extraer fecha de emisión de la factura
     const fechaEmision = extractFechaEmision(factura);
 
+    // 8. Extraer número de factura (estab-ptoEmi-secuencial)
+    const numeroFactura = extractNumeroFactura(factura);
+
     return {
       protocolNumber,
       clientName: clientData.clientName,
@@ -96,6 +99,7 @@ async function parseXmlDocument(xmlContent) {
       totalFactura,
       matrizadorName,
       fechaEmision, // ⭐ NUEVO: Fecha de emisión de la factura
+      numeroFactura, // ⭐ NUEVO: Número de factura para vinculación con pagos
       itemsSecundarios: JSON.stringify(processedDetails.itemsSecundarios), // ⭐ FIX: Convertir a JSON string
       xmlOriginal: xmlContent // Guardar XML completo
     };
@@ -218,6 +222,46 @@ function extractFechaEmision(factura) {
     return null;
   } catch (error) {
     console.error('Error extrayendo fecha de emisión:', error);
+    return null;
+  }
+}
+
+/**
+ * Extrae el número de factura del XML (formato: estab-ptoEmi-secuencial)
+ * @param {Object} factura - Objeto factura del XML parseado
+ * @returns {string|null} Número de factura normalizado (ej: 001002-00124518)
+ */
+function extractNumeroFactura(factura) {
+  try {
+    // Debug: ver estructura de infoTributaria
+    console.log('🔍 Debug infoTributaria:', JSON.stringify(factura.infoTributaria, null, 2)?.substring(0, 500));
+    
+    const infoTributaria = factura.infoTributaria?.[0];
+    
+    if (!infoTributaria) {
+      console.log('⚠️ No se encontró infoTributaria en el XML');
+      return null;
+    }
+
+    // Debug: ver campos disponibles
+    console.log('🔍 Debug infoTributaria keys:', Object.keys(infoTributaria));
+
+    const estab = infoTributaria.estab?.[0] || '';
+    const ptoEmi = infoTributaria.ptoEmi?.[0] || '';
+    const secuencial = infoTributaria.secuencial?.[0] || '';
+
+    if (!estab || !ptoEmi || !secuencial) {
+      console.log('⚠️ Faltan campos para construir número de factura:', { estab, ptoEmi, secuencial });
+      return null;
+    }
+
+    // Formato estándar: 001-002-000124216 (con guiones)
+    const numeroFactura = `${estab}-${ptoEmi}-${secuencial}`;
+    
+    console.log(`🧾 Número de factura extraído: ${numeroFactura}`);
+    return numeroFactura;
+  } catch (error) {
+    console.error('Error extrayendo número de factura:', error);
     return null;
   }
 }

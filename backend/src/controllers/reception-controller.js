@@ -318,6 +318,7 @@ async function listarTodosDocumentos(req, res) {
             unaccent(COALESCE(d."protocolNumber", '')::text) ILIKE unaccent(${pattern}) OR
             unaccent(COALESCE(d."actoPrincipalDescripcion", '')::text) ILIKE unaccent(${pattern}) OR
             unaccent(COALESCE(d."detalle_documento", '')::text) ILIKE unaccent(${pattern}) OR
+            unaccent(COALESCE(d."numeroFactura", '')::text) ILIKE unaccent(${pattern}) OR
             COALESCE(d."clientPhone", '')::text ILIKE ${pattern}
           )`;
 
@@ -352,29 +353,84 @@ async function listarTodosDocumentos(req, res) {
         const countRows = await prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${whereSql}`;
         const total = Array.isArray(countRows) ? (countRows[0]?.count || 0) : (countRows?.count || 0);
 
-        const formattedDocuments = documents.map(doc => ({
-          id: doc.id,
-          protocolNumber: doc.protocolNumber,
-          clientName: doc.clientName,
-          clientPhone: doc.clientPhone,
-          clientEmail: doc.clientEmail,
-          clientId: doc.clientId,
-          documentType: doc.documentType,
-          status: doc.status,
-          matrizador: doc._assignedToFirstName ? `${doc._assignedToFirstName} ${doc._assignedToLastName}` : 'No asignado',
-          matrizadorId: doc.assignedToId,
-          codigoRetiro: doc.codigoRetiro,
-          verificationCode: doc.verificationCode,
-          fechaCreacion: doc.createdAt,
-          fechaEntrega: doc.fechaEntrega,
-          actoPrincipalDescripcion: doc.actoPrincipalDescripcion,
-          actoPrincipalValor: doc.totalFactura,
-          totalFactura: doc.totalFactura,
-          matrizadorName: doc.matrizadorName,
+        // 💰 Obtener facturas para los documentos encontrados
+        const docIds = documents.map(d => d.id);
+        const invoicesMap = new Map();
+        if (docIds.length > 0) {
+        const invoices = await prisma.invoice.findMany({
+          where: { documentId: { in: docIds } },
+          select: { documentId: true, totalAmount: true, paidAmount: true, status: true, issueDate: true, invoiceNumber: true }
+        });
+          invoices.forEach(inv => {
+            if (!invoicesMap.has(inv.documentId)) {
+              invoicesMap.set(inv.documentId, []);
+            }
+            invoicesMap.get(inv.documentId).push(inv);
+          });
+        }
 
-          detalle_documento: doc.detalle_documento,
-          comentarios_recepcion: doc.comentarios_recepcion
-        }));
+        const formattedDocuments = documents.map(doc => {
+          // 💰 Calcular estado de pago
+          const docInvoices = invoicesMap.get(doc.id) || [];
+          let paymentStatus = 'SIN_FACTURA';
+          let paymentInfo = null;
+          let computedFechaFactura = doc.fechaFactura || null;
+          let computedNumeroFactura = doc.numeroFactura || null;
+          
+          if (docInvoices.length > 0) {
+            const totalFacturado = docInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
+            const totalPagado = docInvoices.reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
+            const saldoPendiente = totalFacturado - totalPagado;
+            
+            if (saldoPendiente <= 0) {
+              paymentStatus = 'PAGADO';
+            } else if (totalPagado > 0) {
+              paymentStatus = 'PARCIAL';
+            } else {
+              paymentStatus = 'PENDIENTE';
+            }
+            
+            paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: docInvoices.length };
+
+            if (!computedFechaFactura) {
+              const byDateAsc = [...docInvoices]
+                .filter(inv => inv.issueDate)
+                .sort((a, b) => new Date(a.issueDate) - new Date(b.issueDate));
+              computedFechaFactura = byDateAsc[0]?.issueDate || null;
+            }
+            if (!computedNumeroFactura) {
+              computedNumeroFactura = docInvoices[0]?.invoiceNumber || null;
+            }
+          }
+          
+          return {
+            id: doc.id,
+            protocolNumber: doc.protocolNumber,
+            clientName: doc.clientName,
+            clientPhone: doc.clientPhone,
+            clientEmail: doc.clientEmail,
+            clientId: doc.clientId,
+            documentType: doc.documentType,
+            status: doc.status,
+            matrizador: doc._assignedToFirstName ? `${doc._assignedToFirstName} ${doc._assignedToLastName}` : 'No asignado',
+            matrizadorId: doc.assignedToId,
+            codigoRetiro: doc.codigoRetiro,
+            verificationCode: doc.verificationCode,
+            fechaFactura: computedFechaFactura,
+            fechaCreacion: doc.createdAt,
+            fechaEntrega: doc.fechaEntrega,
+            actoPrincipalDescripcion: doc.actoPrincipalDescripcion,
+            actoPrincipalValor: doc.totalFactura,
+            totalFactura: doc.totalFactura,
+            numeroFactura: computedNumeroFactura || doc.numeroFactura || null,
+            matrizadorName: doc.matrizadorName,
+            detalle_documento: doc.detalle_documento,
+            comentarios_recepcion: doc.comentarios_recepcion,
+            // 💰 NUEVO: Estado de pago
+            paymentStatus,
+            paymentInfo
+          };
+        });
 
         const totalPages = Math.ceil(total / take);
 
@@ -458,6 +514,17 @@ async function listarTodosDocumentos(req, res) {
               firstName: true,
               lastName: true
             }
+          },
+          // 💰 NUEVO: Incluir facturas para estado de pago
+          invoices: {
+            select: {
+              id: true,
+              invoiceNumber: true,
+              totalAmount: true,
+              paidAmount: true,
+              status: true,
+              issueDate: true
+            }
           }
         },
         orderBy: { [mappedSortField]: mappedSortOrder },
@@ -467,31 +534,68 @@ async function listarTodosDocumentos(req, res) {
       prisma.document.count({ where })
     ]);
 
-    const formattedDocuments = documents.map(doc => ({
-      id: doc.id,
-      protocolNumber: doc.protocolNumber,
-      clientName: doc.clientName,
-      clientPhone: doc.clientPhone,
-      clientEmail: doc.clientEmail,
-      clientId: doc.clientId,
-      documentType: doc.documentType,
-      status: doc.status,
-      matrizador: doc.assignedTo ? `${doc.assignedTo.firstName} ${doc.assignedTo.lastName}` : 'No asignado',
-      matrizadorId: doc.assignedToId,
-      codigoRetiro: doc.codigoRetiro,
-      verificationCode: doc.verificationCode, // 🔄 CONSERVADOR: Agregar verificationCode para frontend
-      fechaCreacion: doc.createdAt,
-      fechaEntrega: doc.fechaEntrega,
-      // ✅ AGREGADO: Información del acto principal para que RECEPCION la vea
-      actoPrincipalDescripcion: doc.actoPrincipalDescripcion,
-      actoPrincipalValor: doc.totalFactura, // ⭐ CAMBIO: Usar valor total de factura
-      totalFactura: doc.totalFactura,
-      matrizadorName: doc.matrizadorName,
-
-      // Campos editables
-      detalle_documento: doc.detalle_documento,
-      comentarios_recepcion: doc.comentarios_recepcion
-    }));
+    const formattedDocuments = documents.map(doc => {
+      // 💰 Calcular estado de pago
+      let paymentStatus = 'SIN_FACTURA';
+      let paymentInfo = null;
+      let computedFechaFactura = doc.fechaFactura || null;
+      
+      if (doc.invoices && doc.invoices.length > 0) {
+        const totalFacturado = doc.invoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
+        const totalPagado = doc.invoices.reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
+        const saldoPendiente = totalFacturado - totalPagado;
+        
+        if (saldoPendiente <= 0) {
+          paymentStatus = 'PAGADO';
+        } else if (totalPagado > 0) {
+          paymentStatus = 'PARCIAL';
+        } else {
+          paymentStatus = 'PENDIENTE';
+        }
+        
+        paymentInfo = {
+          totalFacturado,
+          totalPagado,
+          saldoPendiente,
+          facturas: doc.invoices.length
+        };
+        
+        // Calcular fechaFactura desde las facturas si no existe
+        if (!computedFechaFactura) {
+          const byDateAsc = [...doc.invoices]
+            .filter(inv => inv.issueDate)
+            .sort((a, b) => new Date(a.issueDate) - new Date(b.issueDate));
+          computedFechaFactura = byDateAsc[0]?.issueDate || null;
+        }
+      }
+      
+      return {
+        id: doc.id,
+        protocolNumber: doc.protocolNumber,
+        clientName: doc.clientName,
+        clientPhone: doc.clientPhone,
+        clientEmail: doc.clientEmail,
+        clientId: doc.clientId,
+        documentType: doc.documentType,
+        status: doc.status,
+        matrizador: doc.assignedTo ? `${doc.assignedTo.firstName} ${doc.assignedTo.lastName}` : 'No asignado',
+        matrizadorId: doc.assignedToId,
+        codigoRetiro: doc.codigoRetiro,
+        verificationCode: doc.verificationCode,
+        fechaFactura: computedFechaFactura,
+        fechaCreacion: doc.createdAt,
+        fechaEntrega: doc.fechaEntrega,
+        actoPrincipalDescripcion: doc.actoPrincipalDescripcion,
+        actoPrincipalValor: doc.totalFactura,
+        totalFactura: doc.totalFactura,
+        matrizadorName: doc.matrizadorName,
+        detalle_documento: doc.detalle_documento,
+        comentarios_recepcion: doc.comentarios_recepcion,
+        // 💰 NUEVO: Estado de pago
+        paymentStatus,
+        paymentInfo
+      };
+    });
 
     const totalPages = Math.ceil(total / take);
 
@@ -1100,7 +1204,8 @@ async function getReceptionsUnified(req, res) {
         { clientName: { contains: searchTerm, mode: 'insensitive' } },
         { clientId: { contains: searchTerm, mode: 'insensitive' } },
         { documentType: { contains: searchTerm, mode: 'insensitive' } },
-        { actoPrincipalDescripcion: { contains: searchTerm, mode: 'insensitive' } }
+        { actoPrincipalDescripcion: { contains: searchTerm, mode: 'insensitive' } },
+        { numeroFactura: { contains: searchTerm, mode: 'insensitive' } }
       ];
     }
 
@@ -1117,6 +1222,8 @@ async function getReceptionsUnified(req, res) {
         status: true,
         createdAt: true,
         updatedAt: true,
+        fechaFactura: true,
+        numeroFactura: true,
         actoPrincipalDescripcion: true,
         actoPrincipalValor: true,
         totalFactura: true,
@@ -1178,8 +1285,12 @@ async function getReceptionsUnified(req, res) {
     const pageGroups = allGroups.slice(start, start + limit);
 
     const items = pageGroups.map(arr => {
-      // Ordenar por createdAt desc para elegir líder estable
-      const sorted = [...arr].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      // Ordenar por fechaFactura desc (fallback createdAt) para elegir líder estable
+      const sorted = [...arr].sort((a, b) => {
+        const ad = new Date(a.fechaFactura || a.createdAt);
+        const bd = new Date(b.fechaFactura || b.createdAt);
+        return bd - ad;
+      });
       const leader = sorted[0];
 
       // Monto del grupo (suma de totalFactura o actoPrincipalValor)
@@ -1195,7 +1306,9 @@ async function getReceptionsUnified(req, res) {
         mainAct: leader.actoPrincipalDescripcion || '—',
         groupSize: arr.length,
         statusLabel: computeGroupStatus(arr),
-        receivedAtFmt: leader.createdAt ? new Date(leader.createdAt).toLocaleDateString('es-EC') : '-',
+        receivedAtFmt: leader.fechaFactura
+          ? new Date(leader.fechaFactura).toLocaleDateString('es-EC')
+          : '-',
         amountFmt: toCurrency(sumAmount),
         matrizador: leader.assignedTo
           ? `${leader.assignedTo.firstName} ${leader.assignedTo.lastName}`
@@ -1259,7 +1372,8 @@ async function getReceptionsCounts(req, res) {
         { clientName: { contains: searchTerm, mode: 'insensitive' } },
         { clientId: { contains: searchTerm, mode: 'insensitive' } },
         { documentType: { contains: searchTerm, mode: 'insensitive' } },
-        { actoPrincipalDescripcion: { contains: searchTerm, mode: 'insensitive' } }
+        { actoPrincipalDescripcion: { contains: searchTerm, mode: 'insensitive' } },
+        { numeroFactura: { contains: searchTerm, mode: 'insensitive' } }
       ];
     }
 

@@ -64,6 +64,15 @@ async function uploadXmlDocument(req, res) {
       });
     }
 
+    // ⭐ DEBUG: Verificar datos antes de guardar
+    console.log('🔍 DEBUG createDocument - numeroFactura:', parsedData.numeroFactura);
+    console.log('🔍 DEBUG createDocument - fechaEmision:', parsedData.fechaEmision);
+    console.log('🔍 DEBUG createDocument - parsedData keys:', Object.keys(parsedData));
+
+    // ⭐ DEBUG: Verificar tipos de datos
+    console.log('🔍 DEBUG createDocument - typeof fechaEmision:', typeof parsedData.fechaEmision);
+    console.log('🔍 DEBUG createDocument - typeof numeroFactura:', typeof parsedData.numeroFactura);
+
     // Crear documento en la base de datos
     const document = await prisma.document.create({
       data: {
@@ -79,7 +88,8 @@ async function uploadXmlDocument(req, res) {
         matrizadorName: parsedData.matrizadorName,
         itemsSecundarios: parsedData.itemsSecundarios,
         xmlOriginal: parsedData.xmlOriginal,
-        fechaFactura: parsedData.fechaEmision, // ⭐ NUEVO: Fecha de emisión de la factura
+        fechaFactura: parsedData.fechaEmision,
+        numeroFactura: parsedData.numeroFactura, // ⭐ NUEVO: Guardar número de factura
         createdById: req.user.id
         // assignedToId será null inicialmente, se asignará automáticamente después
       },
@@ -94,6 +104,11 @@ async function uploadXmlDocument(req, res) {
         }
       }
     });
+
+    // ⭐ DEBUG: Verificar qué se guardó realmente
+    console.log('🔍 DEBUG createDocument - document guardado:');
+    console.log('  numeroFactura:', document.numeroFactura);
+    console.log('  fechaFactura:', document.fechaFactura);
 
     // 📈 Registrar evento de creación de documento
     try {
@@ -170,6 +185,58 @@ async function uploadXmlDocument(req, res) {
       console.warn('No se pudo crear snapshot de extracción avanzada en uploadXmlDocument:', snapErr?.message || snapErr);
     }
 
+    // 🧾 VINCULAR FACTURA EXISTENTE SI EXISTE
+    let invoiceLinked = false;
+    if (parsedData.numeroFactura) {
+      try {
+        console.log(`🔍 Buscando factura existente: ${parsedData.numeroFactura}`);
+        
+        // Buscar factura por número (formato normalizado)
+        const existingInvoice = await prisma.invoice.findFirst({
+          where: {
+            invoiceNumber: parsedData.numeroFactura
+          }
+        });
+
+        if (existingInvoice) {
+          // Vincular factura con documento
+          await prisma.invoice.update({
+            where: { id: existingInvoice.id },
+            data: {
+              documentId: document.id,
+              clientTaxId: parsedData.clientId || existingInvoice.clientTaxId
+            }
+          });
+
+          console.log(`✅ Factura ${parsedData.numeroFactura} vinculada automáticamente al documento ${parsedData.protocolNumber}`);
+          invoiceLinked = true;
+
+          // Registrar evento de vinculación
+          await prisma.documentEvent.create({
+            data: {
+              documentId: document.id,
+              userId: req.user.id,
+              eventType: 'INVOICE_LINKED',
+              description: `Factura ${parsedData.numeroFactura} vinculada automáticamente al subir XML`,
+              details: JSON.stringify({
+                invoiceId: existingInvoice.id,
+                invoiceNumber: parsedData.numeroFactura,
+                totalAmount: existingInvoice.totalAmount,
+                timestamp: new Date().toISOString()
+              }),
+              ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+              userAgent: req.get('User-Agent') || 'unknown'
+            }
+          });
+        } else {
+          console.log(`⚠️ No se encontró factura con número ${parsedData.numeroFactura}`);
+        }
+      } catch (linkError) {
+        console.error('Error vinculando factura:', linkError);
+        // No fallar la creación del documento si hay error vinculando factura
+      }
+    }
+
     // ⭐ FIX: Invalidar caché de documentos para que se muestren los nuevos
     try {
       const cache = (await import('../services/cache-service.js')).default;
@@ -184,7 +251,7 @@ async function uploadXmlDocument(req, res) {
     res.status(201).json({
       success: true,
       message: assignmentResult.assigned
-        ? `Documento XML procesado y asignado automáticamente a ${assignmentResult.matrizador.firstName} ${assignmentResult.matrizador.lastName}`
+        ? `Documento XML procesado y asignado automáticamente a ${assignmentResult.matrizador.firstName} ${assignmentResult.matrizador.lastName}${invoiceLinked ? '. Factura vinculada automáticamente' : ''}`
         : 'Documento XML procesado exitosamente (sin asignación automática)',
       data: {
         document: finalDocument,
@@ -381,6 +448,140 @@ async function applyExtractionSuggestions(req, res) {
 }
 
 /**
+ * Detectar huecos en la secuencia numérica de los códigos de protocolo
+ * Agrupa por prefijo "<numeros><letra>" y encuentra faltantes en el sufijo numérico.
+ * Acceso: CAJA y ADMIN
+ */
+async function findProtocolSequenceGaps(req, res) {
+  try {
+    if (!['CAJA', 'ADMIN'].includes(req.user.role)) {
+      return res.status(403).json({ success: false, message: 'Acceso denegado' });
+    }
+
+    // Opcional: filtrar por tipo de letra (P, D, A, C, O) o por prefijo exacto
+    const { type, prefix } = req.query || {};
+    const typeFilter = typeof type === 'string' && type.trim().length === 1 ? type.trim().toUpperCase() : null;
+    const exactPrefix = typeof prefix === 'string' && prefix.trim().length > 0 ? prefix.trim() : null;
+
+    // Solo analizar documentos cuyo número de protocolo pertenezca al año 2026
+    const docs = await prisma.document.findMany({
+      where: {
+        protocolNumber: {
+          startsWith: '2026'
+        }
+      },
+      select: { id: true, protocolNumber: true, createdAt: true },
+    });
+
+    const invalidCodes = [];
+    const groups = new Map(); // key: prefix, value: { seqSet:Set<number>, min:number, max:number }
+
+    for (const d of docs) {
+      const code = (d.protocolNumber || '').toString().trim().toUpperCase();
+      // Regex: (uno o más dígitos seguidos de una letra) + (sufijo de solo dígitos)
+      const m = code.match(/^(\d+[A-Z])(\d+)$/);
+      if (!m) {
+        invalidCodes.push({ id: d.id, protocolNumber: d.protocolNumber });
+        continue;
+      }
+      const groupKey = m[1];
+      const seqStr = m[2];
+
+      if (typeFilter && !groupKey.endsWith(typeFilter)) continue;
+      if (exactPrefix && groupKey !== exactPrefix) continue;
+
+      const seq = parseInt(seqStr, 10);
+      if (!Number.isFinite(seq)) continue;
+
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, { seqSet: new Set(), min: seq, max: seq });
+      }
+      const g = groups.get(groupKey);
+      g.seqSet.add(seq);
+      if (seq < g.min) g.min = seq;
+      if (seq > g.max) g.max = seq;
+    }
+
+    const results = [];
+    let totalMissing = 0;
+
+    function toRanges(nums) {
+      // nums: sorted array of numbers
+      const out = [];
+      if (nums.length === 0) return out;
+      let start = nums[0], prev = nums[0];
+      for (let i = 1; i < nums.length; i++) {
+        const n = nums[i];
+        if (n === prev + 1) {
+          prev = n;
+        } else {
+          out.push(start === prev ? { from: start } : { from: start, to: prev });
+          start = prev = n;
+        }
+      }
+      out.push(start === prev ? { from: start } : { from: start, to: prev });
+      return out;
+    }
+
+    for (const [key, g] of groups.entries()) {
+      const present = g.seqSet;
+      const missing = [];
+      // Detectar año desde el prefijo (primeros 4 dígitos)
+      let expectedMin = g.min;
+      const yearMatch = key.match(/^(\d{4})/);
+      if (yearMatch) {
+        const year = parseInt(yearMatch[1], 10);
+        // Regla: a partir del 2026, la secuencia reinicia desde 1
+        if (Number.isFinite(year) && year >= 2026) {
+          expectedMin = 1;
+        }
+      }
+
+      // Evitar iterar rangos enormes accidentalmente
+      const span = g.max - expectedMin + 1;
+      if (span <= 0 || span > 200000) { // límite de seguridad
+        results.push({ prefix: key, count: present.size, minSeq: expectedMin, maxSeq: g.max, missingCount: 0, missingRanges: [], skipped: true });
+        continue;
+      }
+      for (let n = expectedMin; n <= g.max; n++) {
+        if (!present.has(n)) missing.push(n);
+      }
+      const ranges = toRanges(missing);
+      totalMissing += missing.length;
+      results.push({
+        prefix: key,
+        count: present.size,
+        minSeq: expectedMin,
+        maxSeq: g.max,
+        missingCount: missing.length,
+        missingRanges: ranges
+      });
+    }
+
+    // Ordenar por cantidad de faltantes desc y luego por prefijo
+    results.sort((a, b) => (b.missingCount - a.missingCount) || a.prefix.localeCompare(b.prefix));
+
+    return res.json({
+      success: true,
+      message: 'Secuencias analizadas',
+      data: {
+        summary: {
+          groups: results.length,
+          totalDocuments: docs.length,
+          totalMissing,
+          invalidCodes: invalidCodes.length
+        },
+        groups: results,
+        invalidCodes: invalidCodes.slice(0, 100) // limitar para respuesta
+      }
+    });
+  } catch (error) {
+    console.error('Error detectando huecos de secuencia:', error);
+    return res.status(500).json({ success: false, message: 'Error interno detectando huecos', error: error.message });
+  }
+}
+
+/**
  * Obtener todos los documentos para gestión de CAJA
  * @param {Object} req - Request object
  * @param {Object} res - Response object
@@ -400,8 +601,101 @@ async function getAllDocuments(req, res) {
     const limit = Math.min(500, Math.max(10, parseInt(req.query.limit || String(limitDefault), 10)));
     const skip = (page - 1) * limit;
 
-    // Clave de caché simple (paginada)
-    const cacheKey = `caja:all:${page}:${limit}`;
+    // Parámetros de búsqueda
+    const searchTerm = (req.query.search || '').trim();
+    const status = req.query.status;
+    const tipo = req.query.tipo;
+
+    // Construir filtros
+    const where = {};
+
+    if (status && status !== 'TODOS') {
+      where.status = status;
+    }
+
+    if (tipo && tipo !== 'TODOS') {
+      where.documentType = tipo;
+    }
+
+    // Si hay búsqueda, usar raw query con unaccent
+    if (searchTerm) {
+      const supportsUnaccent = await supportsUnaccentFn();
+      if (supportsUnaccent) {
+        let statusFilter = Prisma.sql``;
+        if (status && status !== 'TODOS') {
+          statusFilter = Prisma.sql`AND d."status" = ${status}`;
+        }
+
+        let typeFilter = Prisma.sql``;
+        if (tipo && tipo !== 'TODOS') {
+          typeFilter = Prisma.sql`AND d."documentType" = ${tipo}`;
+        }
+
+        const pattern = `%${searchTerm}%`;
+
+        const documents = await prisma.$queryRaw`
+          SELECT d.*
+          FROM "documents" d
+          WHERE 1=1
+          ${statusFilter}
+          ${typeFilter}
+          AND (
+            unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
+            unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
+            unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
+            d."clientPhone" ILIKE ${pattern}
+          )
+          ORDER BY d."createdAt" DESC
+          OFFSET ${skip} LIMIT ${limit}
+        `;
+
+        const countRows = await prisma.$queryRaw`
+          SELECT COUNT(*)::int AS count
+          FROM "documents" d
+          WHERE 1=1
+          ${statusFilter}
+          ${typeFilter}
+          AND (
+            unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
+            unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
+            unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
+            d."clientPhone" ILIKE ${pattern}
+          )
+        `;
+        const total = Array.isArray(countRows) ? (countRows[0]?.count || 0) : (countRows?.count || 0);
+
+        // Hydrate authors and assignedTo
+        const createdByIds = [...new Set(documents.map(d => d.createdById).filter(Boolean))];
+        const assignedToIds = [...new Set(documents.map(d => d.assignedToId).filter(Boolean))];
+        const allUserIds = [...new Set([...createdByIds, ...assignedToIds])];
+
+        const users = await prisma.user.findMany({
+          where: { id: { in: allUserIds } },
+          select: { id: true, firstName: true, lastName: true, email: true }
+        });
+        const userMap = new Map(users.map(u => [u.id, u]));
+
+        documents.forEach(doc => {
+          doc.createdBy = userMap.get(doc.createdById) || null;
+          doc.assignedTo = userMap.get(doc.assignedToId) || null;
+        });
+
+        const payload = {
+          documents,
+          total,
+          pagination: {
+            currentPage: page,
+            totalPages: Math.max(1, Math.ceil(total / limit)),
+            pageSize: limit
+          }
+        };
+
+        return res.json({ success: true, data: payload });
+      }
+    }
+
+    // Sin búsqueda: consulta normal con caché
+    const cacheKey = `caja:all:${page}:${limit}:${status || 'all'}:${tipo || 'all'}`;
     const cached = await (await import('../services/cache-service.js')).default.get(cacheKey);
     if (cached) {
       return res.json({ success: true, data: cached });
@@ -409,10 +703,7 @@ async function getAllDocuments(req, res) {
 
     const [documents, total] = await Promise.all([
       prisma.document.findMany({
-        where: {
-          // 🔥 NOTA DE CRÉDITO: Por defecto CAJA ve todos incluyendo NC
-          // Si quiere solo activos, puede usar filtros en frontend
-        },
+        where,
         include: {
           createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
           assignedTo: { select: { id: true, firstName: true, lastName: true, email: true } }
@@ -421,9 +712,7 @@ async function getAllDocuments(req, res) {
         skip,
         take: limit
       }),
-      prisma.document.count({
-        // CAJA ve el total incluyendo Notas de Crédito
-      })
+      prisma.document.count({ where })
     ]);
 
     const payload = {
@@ -720,10 +1009,40 @@ async function getMyDocuments(req, res) {
         });
         const authorMap = new Map(authors.map(a => [a.id, a]));
 
-        const hydratedDocs = documents.map(d => ({
-          ...d,
-          createdBy: d.createdById ? authorMap.get(d.createdById) : null
-        }));
+        // 💰 Obtener facturas para calcular estado de pago
+        const docIds = documents.map(d => d.id);
+        const invoicesMap = new Map();
+        if (docIds.length > 0) {
+          const invoices = await prisma.invoice.findMany({
+            where: { documentId: { in: docIds } },
+            select: { documentId: true, totalAmount: true, paidAmount: true, status: true }
+          });
+          invoices.forEach(inv => {
+            if (!invoicesMap.has(inv.documentId)) invoicesMap.set(inv.documentId, []);
+            invoicesMap.get(inv.documentId).push(inv);
+          });
+        }
+
+        const hydratedDocs = documents.map(d => {
+          const docInvoices = invoicesMap.get(d.id) || [];
+          let paymentStatus = 'SIN_FACTURA';
+          let paymentInfo = null;
+          if (docInvoices.length > 0) {
+            const totalFacturado = docInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
+            const totalPagado = docInvoices.reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
+            const saldoPendiente = totalFacturado - totalPagado;
+            if (saldoPendiente <= 0) paymentStatus = 'PAGADO';
+            else if (totalPagado > 0) paymentStatus = 'PARCIAL';
+            else paymentStatus = 'PENDIENTE';
+            paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: docInvoices.length };
+          }
+          return {
+            ...d,
+            createdBy: d.createdById ? authorMap.get(d.createdById) : null,
+            paymentStatus,
+            paymentInfo
+          };
+        });
 
         return res.json({
           success: true,
@@ -786,12 +1105,19 @@ async function getMyDocuments(req, res) {
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
+    // DEBUG: Log filtros aplicados
+    console.log(`[getMyDocuments] userId=${userId}, page=${page}, limit=${limit}, where.status=`, where.status);
+
     const [documents, total] = await Promise.all([
       prisma.document.findMany({
         where,
         include: {
           createdBy: {
             select: { id: true, firstName: true, lastName: true, email: true }
+          },
+          // 💰 Incluir facturas para estado de pago
+          invoices: {
+            select: { totalAmount: true, paidAmount: true, status: true, invoiceNumber: true }
           }
         },
         orderBy: prismaOrderBy,
@@ -800,6 +1126,9 @@ async function getMyDocuments(req, res) {
       }),
       prisma.document.count({ where })
     ]);
+
+    // DEBUG: Log resultado
+    console.log(`[getMyDocuments] Found ${documents.length} documents, total=${total}`);
 
     // También necesitamos los conteos por estado para el dashboard rápido (opcional, o en otra llamada)
     // El frontend actualmente los usa en "byStatus".
@@ -820,10 +1149,31 @@ async function getMyDocuments(req, res) {
       });
     }
 
+    // 💰 Calcular estado de pago para cada documento
+    const documentsWithPayment = documents.map(doc => {
+      let paymentStatus = 'SIN_FACTURA';
+      let paymentInfo = null;
+      
+      if (doc.invoices && doc.invoices.length > 0) {
+        const totalFacturado = doc.invoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
+        const totalPagado = doc.invoices.reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
+        const saldoPendiente = totalFacturado - totalPagado;
+        
+        if (saldoPendiente <= 0) paymentStatus = 'PAGADO';
+        else if (totalPagado > 0) paymentStatus = 'PARCIAL';
+        else paymentStatus = 'PENDIENTE';
+        
+        paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: doc.invoices.length };
+      }
+      
+      const { invoices, ...docWithoutInvoices } = doc;
+      return { ...docWithoutInvoices, paymentStatus, paymentInfo };
+    });
+
     res.json({
       success: true,
       data: {
-        documents,
+        documents: documentsWithPayment,
         total,
         pagination: {
           page: parseInt(page),
@@ -1263,13 +1613,25 @@ async function getDocumentById(req, res) {
       };
     }
 
-    // Remove invoices from document response (they're in paymentStatus)
+    // Enriquecer con fallbacks desde facturas si faltan campos clave
+    let numeroFactura = document.numeroFactura || null;
+    let fechaFactura = document.fechaFactura || null;
+    if ((!numeroFactura || !fechaFactura) && document.invoices && document.invoices.length > 0) {
+      const byDateAsc = [...document.invoices]
+        .filter(inv => inv.issueDate)
+        .sort((a, b) => new Date(a.issueDate) - new Date(b.issueDate));
+      if (!fechaFactura) fechaFactura = byDateAsc[0]?.issueDate || fechaFactura;
+      if (!numeroFactura) numeroFactura = document.invoices[0]?.invoiceNumber || numeroFactura;
+    }
+
+    // Remove invoices from document response (they're summarized in paymentStatus)
     const { invoices, ...documentWithoutInvoices } = document;
+    const documentEnriched = { ...documentWithoutInvoices, numeroFactura, fechaFactura };
 
     res.json({
       success: true,
       data: {
-        document: documentWithoutInvoices,
+        document: documentEnriched,
         paymentStatus
       }
     });
@@ -2464,6 +2826,9 @@ async function getDocumentHistory(req, res) {
     if (events.length === 0 && parseInt(offset) === 0) {
       console.warn(`🩹 Documento ${id} sin eventos - inyectando evento DOCUMENT_CREATED sintético`);
 
+      // Usar fechaFactura si existe como referencia de creación; si no, createdAt
+      const baseCreatedAt = document.fechaFactura || document.createdAt;
+
       const syntheticCreatedEvent = {
         id: `synthetic-created-${id}`,
         documentId: id,
@@ -2477,7 +2842,7 @@ async function getDocumentHistory(req, res) {
           isSynthetic: true,
           reason: 'Evento recuperado automáticamente - documento sin historial inicial'
         }),
-        createdAt: document.createdAt,
+        createdAt: baseCreatedAt,
         user: document.createdBy || {
           id: 0,
           firstName: 'Sistema',
@@ -2501,7 +2866,8 @@ async function getDocumentHistory(req, res) {
           // No duplicar evento de entrega si ya lo agregamos arriba
           if (newStatus === 'ENTREGADO' && document.fechaEntrega) continue;
 
-          const transitionDate = new Date(document.createdAt);
+          const transitionBase = document.fechaFactura || document.createdAt;
+          const transitionDate = new Date(transitionBase);
           transitionDate.setHours(transitionDate.getHours() + (i * 24)); // Espaciar eventos
 
           events.push({
@@ -2528,6 +2894,47 @@ async function getDocumentHistory(req, res) {
       }
 
       // Reordenar por fecha descendente
+      events.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
+
+    // 🧾 Ajustar fecha del evento de creación al valor de fechaFactura cuando esté disponible
+    // y no alterar BD: solo la representación en el timeline.
+    if (document.fechaFactura) {
+      let hasCreatedEvent = false;
+
+      for (const ev of events) {
+        if (ev.eventType === 'DOCUMENT_CREATED') {
+          ev.createdAt = document.fechaFactura;
+          hasCreatedEvent = true;
+        }
+      }
+
+      // Si no existe evento DOCUMENT_CREATED y estamos en la primera página, inyectarlo
+      if (!hasCreatedEvent && parseInt(offset) === 0) {
+        events.push({
+          id: `synthetic-created-invoice-${id}`,
+          documentId: id,
+          userId: document.createdById || 0,
+          eventType: 'DOCUMENT_CREATED',
+          description: `Documento creado: ${document.documentType || 'Documento'} - ${document.protocolNumber || 'Sin protocolo'}`,
+          details: JSON.stringify({
+            documentType: document.documentType,
+            protocolNumber: document.protocolNumber,
+            clientName: document.clientName,
+            isSynthetic: true,
+            reason: 'Creación ajustada a fecha de factura'
+          }),
+          createdAt: document.fechaFactura,
+          user: document.createdBy || {
+            id: 0,
+            firstName: 'Sistema',
+            lastName: '(Recuperado)',
+            role: 'SYSTEM'
+          }
+        });
+      }
+
+      // Reordenar nuevamente por fecha descendente si hubo cambios/inyección
       events.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     }
 
@@ -2601,7 +3008,8 @@ async function getDocumentHistory(req, res) {
       clientName: document.clientName,
       currentStatus: document.status,
       documentType: document.documentType,
-      createdAt: document.createdAt
+      createdAt: document.createdAt,
+      fechaFactura: document.fechaFactura
     };
 
     res.json({
@@ -3627,5 +4035,7 @@ export {
   // 📊 NUEVA FUNCIONALIDAD: Estadísticas de CAJA
   getCajaStats,
   // 📱 NUEVA FUNCIONALIDAD: Notificaciones WhatsApp masivas
-  bulkNotify
+  bulkNotify,
+  // 🔎 Herramientas de control para CAJA
+  findProtocolSequenceGaps
 };

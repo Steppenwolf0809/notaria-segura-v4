@@ -555,11 +555,140 @@ export async function importFile(req, res) {
 }
 
 /**
+ * Import Koinor XML file (NUEVO - Reemplaza sistema XLS)
+ * Requires multipart/form-data with 'file' field
+ *
+ * Características:
+ * - Parser por streaming para archivos grandes
+ * - Idempotencia estricta (evita duplicados)
+ * - Búsqueda por invoiceNumberRaw (formato XML)
+ * - Actualización automática de estados
+ */
+export async function importXmlFile(req, res) {
+    try {
+        // Validar archivo
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                error: 'No se proporcionó archivo',
+                message: 'Debe subir un archivo XML (.xml)'
+            });
+        }
+
+        const { file } = req;
+        const userId = req.user?.id;
+
+        // Validar extensión
+        const ext = file.originalname.toLowerCase().substring(
+            file.originalname.lastIndexOf('.')
+        );
+
+        if (ext !== '.xml') {
+            return res.status(400).json({
+                success: false,
+                error: 'Tipo de archivo no válido',
+                message: 'Solo se permiten archivos XML (.xml)'
+            });
+        }
+
+        // Validar tamaño (máximo 50MB)
+        const maxSize = 50 * 1024 * 1024; // 50MB
+        if (file.size > maxSize) {
+            return res.status(400).json({
+                success: false,
+                error: 'Archivo demasiado grande',
+                message: 'El archivo no debe superar 50MB'
+            });
+        }
+
+        console.log(`[billing-controller] Starting XML import of ${file.originalname} (${file.size} bytes)`);
+
+        // Detectar tipo de XML por contenido
+        let xmlPreview;
+        try {
+            // Intentar leer como UTF-16LE primero (formato típico de Koinor)
+            xmlPreview = file.buffer.toString('utf16le').substring(0, 1000);
+            if (!xmlPreview.includes('<?xml')) {
+                xmlPreview = file.buffer.toString('utf8').substring(0, 1000);
+            }
+        } catch (e) {
+            xmlPreview = file.buffer.toString('utf8').substring(0, 1000);
+        }
+
+        // Detectar si es XML de CXC (tag raíz: cxc_YYYYMMDD)
+        const isCxcXml = /<cxc_\d{8}>/.test(xmlPreview);
+        
+        // Detectar si es XML de MOV (Movimientos de Caja)
+        const isMovXml = xmlPreview.includes('d_vc_i_diario_caja_detallado') || 
+                         xmlPreview.includes('<MOV_');
+        
+        // 🔍 VALIDACIÓN: No permitir archivos MOV en pestaña PAGOS
+        if (isMovXml) {
+            return res.status(400).json({
+                success: false,
+                error: 'Tipo de archivo incorrecto',
+                message: 'Este archivo es de Movimientos de Caja (contiene facturas pagadas en efectivo). ' +
+                         'Por favor use la pestaña "MOVIMIENTOS" en lugar de "PAGOS".'
+            });
+        }
+        
+        let result;
+        if (isCxcXml) {
+            // Usar servicio de CXC para archivos de cartera por cobrar
+            console.log('[billing-controller] Detected CXC XML format, using CXC import service');
+            const { importCxcFile } = await import('../services/cxc-import-service.js');
+            result = await importCxcFile(
+                file.buffer,
+                file.originalname,
+                userId
+            );
+        } else {
+            // Usar servicio de pagos para archivos de estado de cuenta
+            console.log('[billing-controller] Detected payment XML format, using payment import service');
+            const { importKoinorXMLFile } = await import('../services/import-koinor-xml-service.js');
+            result = await importKoinorXMLFile(
+                file.buffer,
+                file.originalname,
+                userId
+            );
+        }
+
+        res.json({
+            success: true,
+            message: 'Importación XML completada',
+            ...result
+        });
+
+    } catch (error) {
+        console.error('[billing-controller] XML import error:', error);
+        console.error('[billing-controller] Error stack:', error.stack);
+        console.error('[billing-controller] Error code:', error.code);
+        console.error('[billing-controller] Error meta:', error.meta);
+        
+        // 🔒 SECURITY: Never expose internal error details in production
+        // Pero en staging, dar más información para debugging
+        const isStaging = process.env.NODE_ENV === 'staging' || process.env.RAILWAY_ENVIRONMENT === 'staging';
+        
+        res.status(500).json({
+            success: false,
+            message: 'Error durante la importación del archivo XML',
+            error: error.message,
+            code: error.code,
+            details: (isStaging || process.env.NODE_ENV === 'development') ? {
+                stack: error.stack,
+                meta: error.meta,
+                preview: xmlPreview?.substring(0, 200)
+            } : undefined
+        });
+    }
+}
+
+/**
  * Get billing statistics
  */
 export async function getStats(req, res) {
     try {
-        const { getImportStats } = await import('../services/import-koinor-service.js');
+        const { getImportStats } = await import('../services/import-koinor-service.legacy.js');
         const stats = await getImportStats();
 
         res.json({
@@ -798,21 +927,94 @@ export async function getInvoicePayments(req, res) {
 
 /**
  * Get billing summary for a date range (for dashboard)
+ * Calculates KPIs based on payment dates (not invoice issue dates)
  */
 export async function getSummary(req, res) {
     try {
         const { dateFrom, dateTo } = req.query;
 
-        const where = {};
+        console.log('[billing-controller] getSummary called with:', { dateFrom, dateTo });
+
+        // Build where clause for payments based on date range
+        const paymentWhere = {};
         if (dateFrom || dateTo) {
-            where.issueDate = {};
-            if (dateFrom) where.issueDate.gte = new Date(dateFrom);
-            if (dateTo) where.issueDate.lte = new Date(dateTo);
+            paymentWhere.paymentDate = {};
+            if (dateFrom) {
+                // Parse date in local timezone (YYYY-MM-DD format from HTML date input)
+                const fromDate = new Date(dateFrom);
+                fromDate.setHours(0, 0, 0, 0);
+                paymentWhere.paymentDate.gte = fromDate;
+                console.log('[billing-controller] From date:', fromDate.toISOString());
+            }
+            if (dateTo) {
+                // Parse date in local timezone
+                const toDate = new Date(dateTo);
+                toDate.setHours(23, 59, 59, 999);
+                paymentWhere.paymentDate.lte = toDate;
+                console.log('[billing-controller] To date:', toDate.toISOString());
+            }
         }
 
-        // Get invoices in range
+        console.log('[billing-controller] Payment where clause:', JSON.stringify(paymentWhere, null, 2));
+
+        // Get payments in range
+        const paymentsInRange = await prisma.payment.findMany({
+            where: paymentWhere,
+            select: {
+                id: true,
+                amount: true,
+                paymentDate: true
+            }
+        });
+
+        console.log(`[billing-controller] Found ${paymentsInRange.length} payments`);
+        if (paymentsInRange.length > 0) {
+            console.log('[billing-controller] Sample payment dates:',
+                paymentsInRange.slice(0, 3).map(p => ({
+                    id: p.id,
+                    date: p.paymentDate,
+                    amount: p.amount
+                }))
+            );
+        }
+
+        // Calculate totals for filtered payments
+        const totalPayments = paymentsInRange.length;
+        const totalCollected = paymentsInRange.reduce((sum, p) => sum + Number(p.amount), 0);
+
+        console.log('[billing-controller] Totals:', { totalPayments, totalCollected });
+
+        // Calculate today's payments
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const paymentsToday = await prisma.payment.findMany({
+            where: {
+                paymentDate: {
+                    gte: today,
+                    lt: tomorrow
+                }
+            },
+            select: {
+                amount: true
+            }
+        });
+
+        const paymentsCountToday = paymentsToday.length;
+        const collectedToday = paymentsToday.reduce((sum, p) => sum + Number(p.amount), 0);
+
+        // Get invoice stats (for overall context, not date-filtered)
+        const invoiceWhere = {};
+        if (dateFrom || dateTo) {
+            invoiceWhere.issueDate = {};
+            if (dateFrom) invoiceWhere.issueDate.gte = new Date(dateFrom);
+            if (dateTo) invoiceWhere.issueDate.lte = new Date(dateTo);
+        }
+
         const invoices = await prisma.invoice.findMany({
-            where,
+            where: invoiceWhere,
             include: { payments: true }
         });
 
@@ -854,6 +1056,12 @@ export async function getSummary(req, res) {
                 from: dateFrom || 'all',
                 to: dateTo || 'all'
             },
+            // Payment-based KPIs (filtered by payment date)
+            totalPayments,
+            totalCollected,
+            paymentsToday: paymentsCountToday,
+            collectedToday,
+            // Invoice-based totals (filtered by issue date)
             totals: {
                 invoiced: totalInvoiced,
                 paid: totalPaid,
@@ -896,73 +1104,122 @@ export async function getMyPortfolio(req, res) {
 
         console.log(`[billing-controller] getMyPortfolio for user ${userId}`);
 
-        // Get documents assigned to this user that have invoices
-        const documents = await prisma.document.findMany({
-            where: {
-                assignedToId: userId,
-                invoices: {
-                    some: {} // Has at least one invoice
-                }
-            },
-            include: {
-                invoices: {
-                    include: {
-                        payments: true
-                    }
-                }
-            }
+        // Get user info to match with CXC matrizador name
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { firstName: true, lastName: true }
         });
 
-        // Process invoices and calculate balances
+        const userFullName = user ? `${user.firstName} ${user.lastName}`.toUpperCase() : null;
+
+        // Mapeo de usuarios a nombres CXC (codven mapeado)
+        // Nota: firstName puede tener espacios (ej: "Jose Luis")
+        const USER_TO_CXC_MATRIZADOR = {
+            'Mayra Cristina': 'Mayra Corella',
+            'Mayra': 'Mayra Corella',
+            'Karol Daniela': 'Karol Velastegui',
+            'Karol': 'Karol Velastegui', 
+            'Jose Luis': 'Jose Zapata',
+            'Jose': 'Jose Zapata',
+            'Gissela Vanessa': 'Gissela Velastegui',
+            'Gissela': 'Gissela Velastegui',
+            'Maria Lucinda': 'Maria Diaz',
+            'Maria': 'Maria Diaz',
+            'Francisco Esteban': 'Esteban Proaño',
+            'Francisco': 'Esteban Proaño',
+            'Esteban': 'Esteban Proaño'
+        };
+        
+        // Buscar el nombre CXC correspondiente al usuario
+        const cxcMatrizadorName = USER_TO_CXC_MATRIZADOR[user.firstName] || user.firstName;
+
+        // Facturas pendientes asociadas al matrizador (por nombre CXC o por documento asignado)
+        const invoices = await prisma.invoice.findMany({
+            where: {
+                status: { in: ['PENDING', 'PARTIAL', 'OVERDUE'] },
+                OR: [
+                    { matrizador: cxcMatrizadorName },
+                    { assignedToId: userId },
+                    {
+                        matrizador: null,
+                        document: { is: { assignedToId: userId } }
+                    }
+                ]
+            },
+            include: {
+                payments: true,
+                document: {
+                    select: {
+                        id: true,
+                        protocolNumber: true,
+                        documentType: true,
+                        clientId: true,
+                        clientName: true,
+                        clientPhone: true,
+                        status: true
+                    }
+                }
+            },
+            orderBy: { issueDate: 'desc' }
+        });
+
         const clientMap = new Map();
         let totalDebt = 0;
         let totalOverdue = 0;
 
-        for (const doc of documents) {
-            for (const invoice of doc.invoices) {
-                const paid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
-                const balance = Number(invoice.totalAmount) - paid;
+        for (const invoice of invoices) {
+            if (invoice.document?.status === 'ANULADO_NOTA_CREDITO') continue;
 
-                if (balance <= 0) continue; // Skip fully paid
+            const paid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+            const totalAmount = Number(invoice.totalAmount || 0);
+            const balance = totalAmount - paid;
 
-                // Check if overdue
-                const isOverdue = invoice.dueDate && new Date(invoice.dueDate) < new Date();
-                if (isOverdue) totalOverdue += balance;
-                totalDebt += balance;
+            if (balance <= 0) continue;
 
-                // Group by client
-                const clientKey = invoice.clientTaxId;
-                if (!clientMap.has(clientKey)) {
-                    clientMap.set(clientKey, {
-                        clientTaxId: invoice.clientTaxId,
-                        clientName: invoice.clientName,
-                        clientPhone: doc.clientPhone,
-                        totalDebt: 0,
-                        overdueDebt: 0,
-                        invoices: []
-                    });
-                }
+            const isOverdue = invoice.dueDate && new Date(invoice.dueDate) < new Date();
+            if (isOverdue) totalOverdue += balance;
+            totalDebt += balance;
 
-                const client = clientMap.get(clientKey);
-                client.totalDebt += balance;
-                if (isOverdue) client.overdueDebt += balance;
-                client.invoices.push({
-                    id: invoice.id,
-                    invoiceNumber: invoice.invoiceNumber,
-                    documentId: doc.id,
-                    protocolNumber: doc.protocolNumber,
-                    documentType: doc.documentType,
-                    issueDate: invoice.issueDate,
-                    dueDate: invoice.dueDate,
-                    totalAmount: Number(invoice.totalAmount),
-                    totalPaid: paid,
-                    balance,
-                    isOverdue,
-                    daysOverdue: isOverdue
-                        ? Math.floor((new Date() - new Date(invoice.dueDate)) / (1000 * 60 * 60 * 24))
-                        : 0
+            const effectiveClientTaxId = (invoice.clientTaxId && invoice.clientTaxId.trim())
+                ? invoice.clientTaxId.trim()
+                : (invoice.document?.clientId || invoice.id);
+            const effectiveClientName = invoice.clientName || invoice.document?.clientName;
+            const clientPhone = invoice.document?.clientPhone || '';
+
+            if (!clientMap.has(effectiveClientTaxId)) {
+                clientMap.set(effectiveClientTaxId, {
+                    clientTaxId: effectiveClientTaxId,
+                    clientName: effectiveClientName,
+                    clientPhone,
+                    totalDebt: 0,
+                    overdueDebt: 0,
+                    invoices: []
                 });
             }
+
+            const client = clientMap.get(effectiveClientTaxId);
+            client.totalDebt += balance;
+            if (isOverdue) client.overdueDebt += balance;
+
+            const daysOverdue = isOverdue && invoice.dueDate
+                ? Math.floor((new Date() - new Date(invoice.dueDate)) / (1000 * 60 * 60 * 24))
+                : (invoice.issueDate ? Math.floor((new Date() - new Date(invoice.issueDate)) / (1000 * 60 * 60 * 24)) : 0);
+
+            client.invoices.push({
+                id: invoice.id,
+                invoiceNumber: invoice.invoiceNumber || invoice.invoiceNumberRaw,
+                documentId: invoice.document?.id || invoice.documentId,
+                protocolNumber: invoice.document?.protocolNumber || null,
+                documentType: invoice.document?.documentType || 'CXC',
+                issueDate: invoice.issueDate,
+                dueDate: invoice.dueDate,
+                totalAmount,
+                totalPaid: paid,
+                balance,
+                isOverdue,
+                daysOverdue,
+                source: invoice.document ? 'DOCUMENT' : 'CXC'
+            });
         }
 
         // Convert to array and sort by debt amount
@@ -993,6 +1250,51 @@ export async function getMyPortfolio(req, res) {
         res.status(500).json({
             success: false,
             message: 'Error al obtener cartera de documentos'
+        });
+    }
+}
+
+/**
+ * Update client phone number in all documents
+ * Updates clientPhone for all documents with the given clientTaxId
+ */
+export async function updateClientPhone(req, res) {
+    try {
+        const { clientTaxId } = req.params;
+        const { phone } = req.body;
+
+        console.log(`[billing-controller] updateClientPhone for ${clientTaxId}: ${phone}`);
+
+        // Validar que el teléfono no esté vacío
+        if (!phone || !phone.trim()) {
+            return res.status(400).json({
+                success: false,
+                message: 'El número de teléfono es requerido'
+            });
+        }
+
+        // Actualizar clientPhone en todos los documentos con ese clientTaxId
+        const result = await prisma.document.updateMany({
+            where: {
+                clientId: clientTaxId
+            },
+            data: {
+                clientPhone: phone.trim()
+            }
+        });
+
+        console.log(`[billing-controller] Updated ${result.count} documents`);
+
+        res.json({
+            success: true,
+            message: `Teléfono actualizado en ${result.count} documento(s)`,
+            updatedCount: result.count
+        });
+    } catch (error) {
+        console.error('[billing-controller] updateClientPhone error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al actualizar teléfono del cliente'
         });
     }
 }
@@ -1159,12 +1461,20 @@ export async function getCarteraPorCobrar(req, res) {
                 payments: true,
                 document: {
                     select: {
+                        status: true, // Para excluir documentos anulados por NC
                         assignedTo: {
                             select: {
                                 firstName: true,
                                 lastName: true
                             }
                         }
+                    }
+                },
+                // Asignación directa de matrizador (para facturas sin documento)
+                assignedTo: {
+                    select: {
+                        firstName: true,
+                        lastName: true
                     }
                 }
             },
@@ -1179,6 +1489,22 @@ export async function getCarteraPorCobrar(req, res) {
             const balance = Number(invoice.totalAmount) - paid;
 
             if (balance <= 0) continue; // Skip fully paid
+            
+            // 🚫 Excluir facturas de documentos anulados por nota de crédito
+            if (invoice.document?.status === 'ANULADO_NOTA_CREDITO') continue;
+
+            // Determinar matrizador: 
+            // 1. Campo matrizador directo de Invoice (CXC import)
+            // 2. Del documento asignado
+            // 3. Asignación directa de factura
+            let matrizadorName = 'Sin asignar';
+            if (invoice.matrizador) {
+                matrizadorName = invoice.matrizador;
+            } else if (invoice.document?.assignedTo) {
+                matrizadorName = `${invoice.document.assignedTo.firstName} ${invoice.document.assignedTo.lastName}`;
+            } else if (invoice.assignedTo) {
+                matrizadorName = `${invoice.assignedTo.firstName} ${invoice.assignedTo.lastName}`;
+            }
 
             const key = invoice.clientTaxId;
             if (!clientMap.has(key)) {
@@ -1189,9 +1515,9 @@ export async function getCarteraPorCobrar(req, res) {
                     totalInvoiced: 0,
                     totalPaid: 0,
                     balance: 0,
-                    matrizador: invoice.document?.assignedTo
-                        ? `${invoice.document.assignedTo.firstName} ${invoice.document.assignedTo.lastName}`
-                        : 'Sin asignar'
+                    matrizador: matrizadorName,
+                    canAssign: !invoice.documentId, // Solo se puede asignar si no tiene documento
+                    invoices: [] // Detalle de facturas individuales
                 });
             }
 
@@ -1200,6 +1526,20 @@ export async function getCarteraPorCobrar(req, res) {
             client.totalInvoiced += Number(invoice.totalAmount);
             client.totalPaid += paid;
             client.balance += balance;
+            
+            // Agregar detalle de factura individual
+            client.invoices.push({
+                id: invoice.id,
+                invoiceNumber: invoice.invoiceNumber,
+                issueDate: invoice.issueDate,
+                dueDate: invoice.dueDate,
+                totalAmount: Number(invoice.totalAmount),
+                paidAmount: paid,
+                balance: balance,
+                status: invoice.status,
+                hasDocument: !!invoice.documentId,
+                canAssign: !invoice.documentId
+            });
         }
 
         // Convert to array and sort by balance descending
@@ -1498,6 +1838,500 @@ export async function getEntregasConSaldo(req, res) {
         res.status(500).json({
             success: false,
             message: 'Error al generar reporte de entregas con saldo pendiente'
+        });
+    }
+}
+
+/**
+ * Import CXC (Cartera por Cobrar) from XML file
+ * Requires multipart/form-data with 'file' field
+ */
+export async function importCxcFile(req, res) {
+    try {
+        // Check if file was uploaded
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                error: 'No se proporcionó archivo',
+                message: 'Debe subir un archivo XML de CXC'
+            });
+        }
+
+        const { file } = req;
+        const userId = req.user?.id;
+
+        // Validate file type
+        const ext = file.originalname.toLowerCase().substring(
+            file.originalname.lastIndexOf('.')
+        );
+
+        if (ext !== '.xml') {
+            return res.status(400).json({
+                success: false,
+                error: 'Tipo de archivo no válido',
+                message: 'Solo se permiten archivos XML (.xml)'
+            });
+        }
+
+        // Validate file size (máximo 50MB)
+        const maxSize = 50 * 1024 * 1024;
+        if (file.size > maxSize) {
+            return res.status(400).json({
+                success: false,
+                error: 'Archivo demasiado grande',
+                message: 'El archivo no debe superar 50MB'
+            });
+        }
+
+        console.log(`[billing-controller] Starting CXC import of ${file.originalname} (${file.size} bytes)`);
+
+        // Import the service dynamically
+        const { importCxcFile: importCxc } = await import('../services/cxc-import-service.js');
+
+        // Process the file
+        const result = await importCxc(
+            file.buffer,
+            file.originalname,
+            userId
+        );
+
+        res.json({
+            success: true,
+            message: 'Importación de CXC completada',
+            ...result
+        });
+
+    } catch (error) {
+        console.error('[billing-controller] CXC import error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error durante la importación del archivo CXC',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+}
+
+/**
+ * Detecta el tipo de archivo XML basado en su contenido
+ * @param {Buffer} fileBuffer - Buffer del archivo
+ * @returns {Object} - { type: 'MOV'|'PAGOS'|'CXC'|'UNKNOWN', preview: string }
+ */
+function detectXmlFileType(fileBuffer) {
+    let xmlPreview;
+    try {
+        // Intentar leer como UTF-16LE primero
+        xmlPreview = fileBuffer.toString('utf16le').substring(0, 1000);
+        if (!xmlPreview.includes('<?xml')) {
+            xmlPreview = fileBuffer.toString('utf8').substring(0, 1000);
+        }
+    } catch (e) {
+        xmlPreview = fileBuffer.toString('utf8').substring(0, 1000);
+    }
+
+    // Detectar tipo por tags
+    const hasMovTags = xmlPreview.includes('d_vc_i_diario_caja_detallado') || 
+                       xmlPreview.includes('<MOV_');
+    const hasPagosTags = xmlPreview.includes('<d_vc_i_estado_cuenta') || 
+                         xmlPreview.includes('<E>') ||
+                         xmlPreview.includes('<E_group1>');
+    const hasCxcTags = xmlPreview.includes('<cxc_');
+
+    if (hasMovTags) return { type: 'MOV', preview: xmlPreview.substring(0, 200) };
+    if (hasPagosTags) return { type: 'PAGOS', preview: xmlPreview.substring(0, 200) };
+    if (hasCxcTags) return { type: 'CXC', preview: xmlPreview.substring(0, 200) };
+    
+    return { type: 'UNKNOWN', preview: xmlPreview.substring(0, 200) };
+}
+
+/**
+ * Import MOV (Movimientos de Caja) from XML file
+ * Importa facturas y marca como PAGADAS las que fueron pagadas en efectivo
+ * Requires multipart/form-data with 'file' field
+ */
+export async function importMovFile(req, res) {
+    try {
+        // Check if file was uploaded
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                error: 'No se proporcionó archivo',
+                message: 'Debe subir un archivo XML de Movimientos de Caja'
+            });
+        }
+
+        const { file } = req;
+        const userId = req.user?.id;
+
+        // Validate file type
+        const ext = file.originalname.toLowerCase().substring(
+            file.originalname.lastIndexOf('.')
+        );
+
+        if (ext !== '.xml') {
+            return res.status(400).json({
+                success: false,
+                error: 'Tipo de archivo no válido',
+                message: 'Solo se permiten archivos XML (.xml)'
+            });
+        }
+
+        // Validate file size (máximo 50MB)
+        const maxSize = 50 * 1024 * 1024;
+        if (file.size > maxSize) {
+            return res.status(400).json({
+                success: false,
+                error: 'Archivo demasiado grande',
+                message: 'El archivo no debe superar 50MB'
+            });
+        }
+
+        // 🔍 DETECTAR TIPO DE ARCHIVO
+        const detection = detectXmlFileType(file.buffer);
+        console.log(`[billing-controller] Detected XML type: ${detection.type}`);
+
+        // Si el archivo no es de tipo MOV, dar instrucciones claras
+        if (detection.type === 'PAGOS') {
+            return res.status(400).json({
+                success: false,
+                error: 'Tipo de archivo incorrecto',
+                message: 'Este archivo es un Estado de Cuenta (contiene pagos AB/FC/NC). ' +
+                         'Por favor use la pestaña "PAGOS" en lugar de "MOVIMIENTOS".'
+            });
+        }
+        
+        if (detection.type === 'CXC') {
+            return res.status(400).json({
+                success: false,
+                error: 'Tipo de archivo incorrecto',
+                message: 'Este archivo es de Cartera por Cobrar (CXC). ' +
+                         'Por favor use la pestaña "CXC" en lugar de "MOVIMIENTOS".'
+            });
+        }
+
+        console.log(`[billing-controller] Starting MOV import of ${file.originalname} (${file.size} bytes)`);
+
+        // Import the service dynamically
+        const { importMovFile: importMov } = await import('../services/import-mov-service.js');
+
+        // Process the file
+        const result = await importMov(
+            file.buffer,
+            file.originalname,
+            userId
+        );
+
+        res.json({
+            success: true,
+            message: 'Importación de Movimientos completada',
+            ...result
+        });
+
+    } catch (error) {
+        console.error('[billing-controller] MOV import error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error durante la importación del archivo de Movimientos',
+            details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
+    }
+}
+
+/**
+ * Asignar matrizador a una factura (para facturas sin documento)
+ * Solo CAJA y ADMIN pueden usar esta función
+ */
+export async function assignInvoiceMatrizador(req, res) {
+    try {
+        const { invoiceId } = req.params;
+        const { matrizadorId } = req.body;
+
+        console.log(`[billing-controller] Assigning matrizador ${matrizadorId} to invoice ${invoiceId}`);
+
+        // Validar que la factura existe
+        const invoice = await prisma.invoice.findUnique({
+            where: { id: invoiceId },
+            include: { document: true }
+        });
+
+        if (!invoice) {
+            return res.status(404).json({
+                success: false,
+                message: 'Factura no encontrada'
+            });
+        }
+
+        // Si la factura tiene documento, no permitir asignación directa
+        if (invoice.documentId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Esta factura está vinculada a un documento. Use la asignación del documento.'
+            });
+        }
+
+        // Validar que el matrizador existe y tiene rol MATRIZADOR o ARCHIVO
+        if (matrizadorId) {
+            const matrizador = await prisma.user.findUnique({
+                where: { id: parseInt(matrizadorId) }
+            });
+
+            if (!matrizador) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'Matrizador no encontrado'
+                });
+            }
+
+            if (!['MATRIZADOR', 'ARCHIVO'].includes(matrizador.role)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'El usuario seleccionado no tiene rol de Matrizador o Archivo'
+                });
+            }
+        }
+
+        // Actualizar la factura
+        const updatedInvoice = await prisma.invoice.update({
+            where: { id: invoiceId },
+            data: {
+                assignedToId: matrizadorId ? parseInt(matrizadorId) : null
+            },
+            include: {
+                assignedTo: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true
+                    }
+                }
+            }
+        });
+
+        res.json({
+            success: true,
+            message: matrizadorId 
+                ? `Factura asignada a ${updatedInvoice.assignedTo.firstName} ${updatedInvoice.assignedTo.lastName}`
+                : 'Asignación de factura removida',
+            invoice: {
+                id: updatedInvoice.id,
+                invoiceNumber: updatedInvoice.invoiceNumber,
+                assignedTo: updatedInvoice.assignedTo
+            }
+        });
+
+    } catch (error) {
+        console.error('[billing-controller] assignInvoiceMatrizador error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al asignar matrizador a la factura'
+        });
+    }
+}
+
+/**
+ * Obtener lista de matrizadores disponibles para asignación
+ */
+export async function getMatrizadoresForAssignment(req, res) {
+    try {
+        const matrizadores = await prisma.user.findMany({
+            where: {
+                role: { in: ['MATRIZADOR', 'ARCHIVO'] },
+                isActive: true
+            },
+            select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                role: true
+            },
+            orderBy: { firstName: 'asc' }
+        });
+
+        res.json({
+            success: true,
+            data: matrizadores
+        });
+
+    } catch (error) {
+        console.error('[billing-controller] getMatrizadoresForAssignment error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener lista de matrizadores'
+        });
+    }
+}
+
+/**
+ * ============================================================================
+ * NUEVO MÓDULO CXC - CARTERA POR COBRAR (XLS/CSV)
+ * ============================================================================
+ */
+
+/**
+ * Importar archivo XLS/CSV de Cartera por Cobrar
+ * Requires multipart/form-data with 'file' field
+ * Acepta: .xls, .xlsx, .csv
+ */
+export async function importCxcXls(req, res) {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                success: false,
+                error: 'No se proporcionó archivo',
+                message: 'Debe subir un archivo Excel (.xls, .xlsx) o CSV (.csv)'
+            });
+        }
+
+        const { file } = req;
+        const userId = req.user?.id;
+
+        const allowedExtensions = ['.xls', '.xlsx', '.csv'];
+        const ext = file.originalname.toLowerCase().substring(file.originalname.lastIndexOf('.'));
+
+        if (!allowedExtensions.includes(ext)) {
+            return res.status(400).json({
+                success: false,
+                error: 'Tipo de archivo no válido',
+                message: `Solo se permiten archivos: ${allowedExtensions.join(', ')}`
+            });
+        }
+
+        const maxSize = 50 * 1024 * 1024;
+        if (file.size > maxSize) {
+            return res.status(400).json({
+                success: false,
+                error: 'Archivo demasiado grande',
+                message: 'El archivo no debe superar 50MB'
+            });
+        }
+
+        console.log(`[billing-controller] Starting CXC XLS import of ${file.originalname} (${file.size} bytes)`);
+
+        const { importCxcXlsFile } = await import('../services/cxc-xls-import-service.js');
+
+        const result = await importCxcXlsFile(
+            file.buffer,
+            file.originalname,
+            userId
+        );
+
+        res.json({
+            success: true,
+            message: 'Importación de Cartera por Cobrar completada',
+            ...result
+        });
+
+    } catch (error) {
+        console.error('[billing-controller] CXC XLS import error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error en la importación',
+            error: error.message || 'Error al procesar el archivo. Verifique el formato.'
+        });
+    }
+}
+
+/**
+ * Obtener cartera pendiente (detalle)
+ * GET /api/billing/cartera-pendiente
+ */
+export async function getCarteraPendiente(req, res) {
+    try {
+        const filters = {
+            clientTaxId: req.query.clientTaxId,
+            status: req.query.status,
+            reportDate: req.query.reportDate,
+            minBalance: req.query.minBalance,
+            limit: req.query.limit ? parseInt(req.query.limit) : 1000
+        };
+
+        const { getCarteraPendiente: getCartera } = await import('../services/cxc-xls-import-service.js');
+        const receivables = await getCartera(filters);
+
+        res.json({
+            success: true,
+            data: receivables,
+            count: receivables.length
+        });
+
+    } catch (error) {
+        console.error('[billing-controller] getCarteraPendiente error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener cartera pendiente'
+        });
+    }
+}
+
+/**
+ * Obtener resumen de cartera agrupado por cliente
+ * GET /api/billing/cartera-pendiente/resumen
+ */
+export async function getCarteraPendienteResumen(req, res) {
+    try {
+        const reportDate = req.query.reportDate ? new Date(req.query.reportDate) : null;
+
+        const { getCarteraPendienteResumen: getResumen } = await import('../services/cxc-xls-import-service.js');
+        const result = await getResumen(reportDate);
+
+        res.json({
+            success: true,
+            ...result
+        });
+
+    } catch (error) {
+        console.error('[billing-controller] getCarteraPendienteResumen error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener resumen de cartera pendiente'
+        });
+    }
+}
+
+/**
+ * Limpiar reportes antiguos de cartera
+ * DELETE /api/billing/cartera-pendiente/limpiar
+ */
+export async function limpiarCarteraAntigua(req, res) {
+    try {
+        const daysToKeep = req.query.days ? parseInt(req.query.days) : 60;
+
+        const { limpiarCarteraAntigua: limpiar } = await import('../services/cxc-xls-import-service.js');
+        const result = await limpiar(daysToKeep);
+
+        res.json({
+            success: true,
+            message: `Se eliminaron ${result.deletedCount} registros antiguos`,
+            ...result
+        });
+
+    } catch (error) {
+        console.error('[billing-controller] limpiarCarteraAntigua error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al limpiar reportes antiguos'
+        });
+    }
+}
+
+/**
+ * Obtener fechas de reportes disponibles
+ * GET /api/billing/cartera-pendiente/fechas
+ */
+export async function getAvailableReportDates(req, res) {
+    try {
+        const { getAvailableReportDates: getDates } = await import('../services/cxc-xls-import-service.js');
+        const dates = await getDates();
+
+        res.json({
+            success: true,
+            data: dates
+        });
+
+    } catch (error) {
+        console.error('[billing-controller] getAvailableReportDates error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener fechas de reportes'
         });
     }
 }

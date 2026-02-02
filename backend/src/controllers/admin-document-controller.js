@@ -109,6 +109,7 @@ async function getAllDocumentsOversight(req, res) {
               unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
               unaccent(d."actoPrincipalDescripcion") ILIKE unaccent(${pattern}) OR
               unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
+              unaccent(COALESCE(d."numeroFactura", '')) ILIKE unaccent(${pattern}) OR
               d."clientPhone" ILIKE ${pattern} OR
               d."clientEmail" ILIKE ${pattern} OR
               unaccent(COALESCE(d."clientId", '')) ILIKE unaccent(${pattern})
@@ -136,22 +137,73 @@ async function getAllDocumentsOversight(req, res) {
           const countRows = await prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${whereSql}`;
           totalCount = Array.isArray(countRows) ? (countRows[0]?.count || 0) : (countRows?.count || 0);
 
-          // Adaptar include manual
-          documents = documents.map(d => ({
-            ...d,
-            assignedTo: d._assignedToId ? {
-              id: d._assignedToId,
-              firstName: d._assignedToFirstName,
-              lastName: d._assignedToLastName,
-              email: d._assignedToEmail
-            } : null,
-            createdBy: d._createdById ? {
-              id: d._createdById,
-              firstName: d._createdByFirstName,
-              lastName: d._createdByLastName,
-              email: d._createdByEmail
-            } : null
-          }));
+          // 💰 Obtener facturas para calcular estado de pago
+          const docIds = documents.map(d => d.id);
+          const invoicesMap = new Map();
+          if (docIds.length > 0) {
+          const invoices = await prisma.invoice.findMany({
+            where: { documentId: { in: docIds } },
+            select: { documentId: true, totalAmount: true, paidAmount: true, status: true, issueDate: true, invoiceNumber: true }
+          });
+            invoices.forEach(inv => {
+              if (!invoicesMap.has(inv.documentId)) {
+                invoicesMap.set(inv.documentId, []);
+              }
+              invoicesMap.get(inv.documentId).push(inv);
+            });
+          }
+
+          // Adaptar include manual + estado de pago
+          documents = documents.map(d => {
+            const docInvoices = invoicesMap.get(d.id) || [];
+            let paymentStatus = 'SIN_FACTURA';
+            let paymentInfo = null;
+            let computedFechaFactura = d.fechaFactura || null;
+            let computedNumeroFactura = d.numeroFactura || null;
+            
+            if (docInvoices.length > 0) {
+              const totalFacturado = docInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
+              const totalPagado = docInvoices.reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
+              const saldoPendiente = totalFacturado - totalPagado;
+              
+              if (saldoPendiente <= 0) paymentStatus = 'PAGADO';
+              else if (totalPagado > 0) paymentStatus = 'PARCIAL';
+              else paymentStatus = 'PENDIENTE';
+              
+              paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: docInvoices.length };
+
+              // Fallbacks de factura: usar fecha/numero desde facturas si faltan en documento
+              if (!computedFechaFactura) {
+                const byDateAsc = [...docInvoices]
+                  .filter(inv => inv.issueDate)
+                  .sort((a, b) => new Date(a.issueDate) - new Date(b.issueDate));
+                computedFechaFactura = byDateAsc[0]?.issueDate || null;
+              }
+              if (!computedNumeroFactura) {
+                computedNumeroFactura = docInvoices[0]?.invoiceNumber || null;
+              }
+            }
+            
+            return {
+              ...d,
+              assignedTo: d._assignedToId ? {
+                id: d._assignedToId,
+                firstName: d._assignedToFirstName,
+                lastName: d._assignedToLastName,
+                email: d._assignedToEmail
+              } : null,
+              createdBy: d._createdById ? {
+                id: d._createdById,
+                firstName: d._createdByFirstName,
+                lastName: d._createdByLastName,
+                email: d._createdByEmail
+              } : null,
+              paymentStatus,
+              paymentInfo,
+              fechaFactura: computedFechaFactura || d.createdAt,
+              numeroFactura: computedNumeroFactura || d.numeroFactura || null
+            };
+          });
         } else {
           // Fallback Prisma estándar
           where.OR = [
@@ -159,6 +211,7 @@ async function getAllDocumentsOversight(req, res) {
             { clientName: { contains: searchTerm, mode: 'insensitive' } },
             { actoPrincipalDescripcion: { contains: searchTerm, mode: 'insensitive' } },
             { detalle_documento: { contains: searchTerm, mode: 'insensitive' } },
+            { numeroFactura: { contains: searchTerm, mode: 'insensitive' } },
             { clientPhone: { contains: searchTerm } },
             { clientEmail: { contains: searchTerm, mode: 'insensitive' } },
             { clientId: { contains: searchTerm, mode: 'insensitive' } }
@@ -171,7 +224,8 @@ async function getAllDocumentsOversight(req, res) {
               orderBy,
               include: {
                 assignedTo: { select: { id: true, firstName: true, lastName: true, email: true } },
-                createdBy: { select: { id: true, firstName: true, lastName: true, email: true } }
+                createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+                invoices: { select: { totalAmount: true, paidAmount: true, status: true, issueDate: true, invoiceNumber: true } }
               }
             }),
             prisma.document.count({ where })
@@ -187,12 +241,53 @@ async function getAllDocumentsOversight(req, res) {
             orderBy,
             include: {
               assignedTo: { select: { id: true, firstName: true, lastName: true, email: true } },
-              createdBy: { select: { id: true, firstName: true, lastName: true, email: true } }
+              createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+              invoices: { select: { totalAmount: true, paidAmount: true, status: true } }
             }
           }),
           prisma.document.count({ where })
         ]);
       }
+      
+      // 💰 Calcular estado de pago para documentos obtenidos via Prisma
+      documents = documents.map(doc => {
+        let paymentStatus = 'SIN_FACTURA';
+        let paymentInfo = null;
+        let computedFechaFactura = doc.fechaFactura || null;
+        let computedNumeroFactura = doc.numeroFactura || null;
+        
+        if (doc.invoices && doc.invoices.length > 0) {
+          const totalFacturado = doc.invoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
+          const totalPagado = doc.invoices.reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
+          const saldoPendiente = totalFacturado - totalPagado;
+          
+          if (saldoPendiente <= 0) paymentStatus = 'PAGADO';
+          else if (totalPagado > 0) paymentStatus = 'PARCIAL';
+          else paymentStatus = 'PENDIENTE';
+          
+          paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: doc.invoices.length };
+
+          if (!computedFechaFactura) {
+            const byDateAsc = [...doc.invoices]
+              .filter(inv => inv.issueDate)
+              .sort((a, b) => new Date(a.issueDate) - new Date(b.issueDate));
+            computedFechaFactura = byDateAsc[0]?.issueDate || null;
+          }
+          if (!computedNumeroFactura) {
+            computedNumeroFactura = doc.invoices[0]?.invoiceNumber || null;
+          }
+        }
+        
+        const { invoices, ...docWithoutInvoices } = doc;
+        return {
+          ...docWithoutInvoices,
+          paymentStatus,
+          paymentInfo,
+          fechaFactura: computedFechaFactura || doc.createdAt,
+          numeroFactura: computedNumeroFactura || doc.numeroFactura || null
+        };
+      });
+      
       // Guardar en caché
       await cache.set(cacheKey, { documents, totalCount }, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'search:admin:oversight'] });
     }

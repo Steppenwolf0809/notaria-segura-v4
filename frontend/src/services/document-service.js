@@ -50,6 +50,24 @@ const documentService = {
   },
 
   /**
+   * CAJA/ADMIN: Detectar huecos en la secuencia de protocolNumber
+   * @param {{type?: string, prefix?: string}} params
+   */
+  async getSequenceGaps(params = {}) {
+    try {
+      const res = await api.get('/documents/sequence-gaps', { params });
+      return { success: true, data: res.data?.data, message: res.data?.message };
+    } catch (error) {
+      const status = error?.response?.status;
+      const message = error?.response?.data?.message || error.message || 'Error al analizar secuencias';
+      if (status === 401 || status === 403) {
+        return { success: false, error: 'Sesión expirada o sin permisos' };
+      }
+      return { success: false, error: message };
+    }
+  },
+
+  /**
    * CAJA: Subir múltiples XML y crear documentos automáticamente (LOTE)
    * @param {File[]} xmlFiles - Array de archivos XML a procesar
    * @param {Function} onProgress - Callback para progreso (opcional)

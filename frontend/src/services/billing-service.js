@@ -32,10 +32,13 @@ async function getStats() {
 
 /**
  * Obtener resumen para dashboard
+ * @param {Object} params - Parámetros de filtro
+ * @param {string} params.dateFrom - Fecha desde (YYYY-MM-DD)
+ * @param {string} params.dateTo - Fecha hasta (YYYY-MM-DD)
  * @returns {Promise<Object>} Resumen de facturación
  */
-async function getSummary() {
-    const response = await apiClient.get('/billing/summary');
+async function getSummary(params = {}) {
+    const response = await apiClient.get('/billing/summary', { params });
     return response.data;
 }
 
@@ -134,7 +137,7 @@ async function getClientBalance(taxId) {
  */
 
 /**
- * Importar archivo Excel/CSV de Koinor
+ * Importar archivo Excel/CSV de Koinor (LEGACY - usar importXmlFile para nuevas importaciones)
  * @param {File} file - Archivo a importar
  * @param {string} dateFrom - Fecha desde (opcional, YYYY-MM-DD)
  * @param {string} dateTo - Fecha hasta (opcional, YYYY-MM-DD)
@@ -163,6 +166,115 @@ async function importFile(file, dateFrom = null, dateTo = null, onProgress = nul
     }
 
     const response = await apiClient.post('/billing/import', formData, config);
+    return response.data;
+}
+
+/**
+ * Importar archivo XML de Koinor (RECOMENDADO)
+ * @param {File} file - Archivo XML a importar
+ * @param {Function} onProgress - Callback de progreso (opcional)
+ * @returns {Promise<Object>} Resultado de la importación
+ */
+async function importXmlFile(file, onProgress = null) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const config = {
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        },
+        // Aumentar timeout para archivos XML grandes (5 minutos)
+        // Archivos con 3000+ transacciones pueden tardar varios minutos
+        timeout: 300000 // 5 minutos en milisegundos
+    };
+
+    // Agregar callback de progreso si se proporciona
+    if (onProgress) {
+        config.onUploadProgress = (progressEvent) => {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            onProgress(percentCompleted);
+        };
+    }
+
+    const response = await apiClient.post('/billing/import-xml', formData, config);
+    return response.data;
+}
+
+/**
+ * Importar archivo XML de Movimientos de Caja (MOV)
+ * Importa facturas y marca como PAGADAS las que fueron pagadas en efectivo
+ * @param {File} file - Archivo XML a importar
+ * @param {Function} onProgress - Callback de progreso (opcional)
+ * @returns {Promise<Object>} Resultado de la importación
+ */
+async function importMovFile(file, onProgress = null) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const config = {
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        },
+        timeout: 300000 // 5 minutos
+    };
+
+    if (onProgress) {
+        config.onUploadProgress = (progressEvent) => {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            onProgress(percentCompleted);
+        };
+    }
+
+    const response = await apiClient.post('/billing/import-mov', formData, config);
+    return response.data;
+}
+
+/**
+ * Importar archivo XLS/CSV de Cartera por Cobrar (CXC)
+ * @param {File} file - Archivo XLS/CSV a importar
+ * @param {Function} onProgress - Callback de progreso (opcional)
+ * @returns {Promise<Object>} Resultado de la importación
+ */
+async function importCxcXls(file, onProgress = null) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const config = {
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        },
+        timeout: 300000 // 5 minutos
+    };
+
+    if (onProgress) {
+        config.onUploadProgress = (progressEvent) => {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            onProgress(percentCompleted);
+        };
+    }
+
+    const response = await apiClient.post('/billing/import-cxc-xls', formData, config);
+    return response.data;
+}
+
+/**
+ * Obtener cartera pendiente (detalle)
+ * @param {Object} params - Parámetros de filtro
+ * @returns {Promise<Object>} Lista de receivables
+ */
+async function getCarteraPendiente(params = {}) {
+    const response = await apiClient.get('/billing/cartera-pendiente', { params });
+    return response.data;
+}
+
+/**
+ * Obtener resumen de cartera agrupado por cliente
+ * @param {string} reportDate - Fecha del reporte (opcional)
+ * @returns {Promise<Object>} Resumen agrupado
+ */
+async function getCarteraPendienteResumen(reportDate = null) {
+    const params = reportDate ? { reportDate } : {};
+    const response = await apiClient.get('/billing/cartera-pendiente/resumen', { params });
     return response.data;
 }
 
@@ -280,6 +392,17 @@ async function generateCollectionReminder(clientTaxId, phone) {
 }
 
 /**
+ * Actualizar teléfono del cliente
+ * @param {string} clientTaxId - RUC/Cédula del cliente
+ * @param {string} phone - Nuevo número de teléfono
+ * @returns {Promise<Object>} Resultado de la actualización
+ */
+async function updateClientPhone(clientTaxId, phone) {
+    const response = await apiClient.put(`/billing/client/${encodeURIComponent(clientTaxId)}/phone`, { phone });
+    return response.data;
+}
+
+/**
  * ============================================================================
  * SECCIÓN 8: REPORTES (Sprint 7)
  * ============================================================================
@@ -328,6 +451,34 @@ async function getReporteEntregasConSaldo() {
 
 /**
  * ============================================================================
+ * SECCIÓN 8: ASIGNACIÓN DE FACTURAS
+ * ============================================================================
+ */
+
+/**
+ * Obtener lista de matrizadores disponibles para asignación
+ * @returns {Promise<Object>} Lista de matrizadores
+ */
+async function getMatrizadoresForAssignment() {
+    const response = await apiClient.get('/billing/matrizadores');
+    return response.data;
+}
+
+/**
+ * Asignar matrizador a una factura (solo facturas sin documento)
+ * @param {string} invoiceId - ID de la factura
+ * @param {number|null} matrizadorId - ID del matrizador (null para desasignar)
+ * @returns {Promise<Object>} Resultado de la asignación
+ */
+async function assignInvoiceMatrizador(invoiceId, matrizadorId) {
+    const response = await apiClient.patch(`/billing/invoices/${invoiceId}/assign`, {
+        matrizadorId
+    });
+    return response.data;
+}
+
+/**
+ * ============================================================================
  * EXPORTAR SERVICIO
  * ============================================================================
  */
@@ -352,7 +503,14 @@ const billingService = {
 
     // Importación
     importFile,
+    importXmlFile,
+    importMovFile,
+    importCxcXls,
     getImportLogs,
+
+    // CXC - Cartera por Cobrar
+    getCarteraPendiente,
+    getCarteraPendienteResumen,
 
     // Documentos
     getDocumentPaymentStatus,
@@ -360,12 +518,17 @@ const billingService = {
     // Cartera de Matrizadores (Sprint 6)
     getMyPortfolio,
     generateCollectionReminder,
+    updateClientPhone,
 
     // Reportes (Sprint 7)
     getReporteCarteraPorCobrar,
     getReportePagosDelPeriodo,
     getReporteFacturasVencidas,
     getReporteEntregasConSaldo,
+
+    // Asignación de facturas
+    getMatrizadoresForAssignment,
+    assignInvoiceMatrizador,
 
     // Utilidades
     formatInvoiceStatus,

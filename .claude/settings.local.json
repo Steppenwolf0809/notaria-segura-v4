@@ -51,7 +51,12 @@
       "Bash(git commit -m \"$\\(cat <<''EOF''\nfix: cargar documento completo al abrir modal para resolver historial vacío\n\nEl modal ahora carga el documento completo desde la API al abrirse,\nen lugar de depender únicamente de los datos parciales de la tabla.\n\nCambios:\n- Agregar carga asíncrona del documento por ID al abrir el modal\n- Mostrar estado de carga mientras se obtiene el documento\n- Usar datos parciales como fallback si la carga falla\n- Mejorar validación del documentId para el timeline\n\nEsto resuelve el problema donde el historial no se mostraba porque\nel documento pasado desde la tabla podía estar incompleto.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git push:*)",
       "Bash(git commit:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(PGPASSWORD=vzdzHHIVerdjgzWlmfARWiSsbTBSJfvw psql:*)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:vzdzHHIVerdjgzWlmfARWiSsbTBSJfvw@gondola.proxy.rlwy.net:39316/railway\" npx prisma db push:*)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:vzdzHHIVerdjgzWlmfARWiSsbTBSJfvw@gondola.proxy.rlwy.net:39316/railway\" node scripts/migrate-payment-allocations.js:*)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:vzdzHHIVerdjgzWlmfARWiSsbTBSJfvw@gondola.proxy.rlwy.net:39316/railway\" node:*)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:vzdzHHIVerdjgzWlmfARWiSsbTBSJfvw@gondola.proxy.rlwy.net:39316/railway\" node scripts/check-allocations.js:*)"
     ],
     "deny": []
   }
