@@ -41,6 +41,7 @@ const NotificationCenter = () => {
     const { user } = useAuth();
     const [activeTab, setActiveTab] = useState(0); // 0: Por Notificar, 1: Para Recordar, 2: Enviados
     const [documents, setDocuments] = useState([]);
+    const [clientStats, setClientStats] = useState({});
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -64,6 +65,7 @@ const NotificationCenter = () => {
 
             if (result.success) {
                 setDocuments(result.data || []);
+                setClientStats(result.clientStats || {});
             } else {
                 setError(result.message || 'Error cargando cola de notificaciones');
             }
@@ -252,6 +254,7 @@ const NotificationCenter = () => {
                             isReminder={activeTab === 1 || activeTab === 2}
                             onPhoneUpdated={() => loadQueue()}
                             onDismiss={() => loadQueue()}
+                            clientStats={clientStats[group.cliente.telefono]}
                         />
                     ))}
                 </Box>

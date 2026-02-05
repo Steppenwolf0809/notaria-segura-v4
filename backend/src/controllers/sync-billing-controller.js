@@ -1,0 +1,423 @@
+/**
+ * Sync Billing Controller
+ * Handles synchronization of billing data from Koinor Sync Agent
+ * 
+ * Endpoints:
+ * - POST /api/sync/billing - Receive invoices from Sync Agent
+ * - GET /api/sync/billing/status - Get last sync status
+ * - GET /api/sync/billing/history - Get sync history (last 20)
+ */
+
+import { db as prisma } from '../db.js';
+import { normalizeInvoiceNumber } from '../utils/billing-utils.js';
+
+// Constants
+const BATCH_SIZE = 50; // Process invoices in batches for better transaction handling
+const MAX_RECORDS_PER_REQUEST = 2000; // Limit per sync request for safety
+
+// Valid payment states from Koinor
+const VALID_PAYMENT_STATES = ['PAGADA', 'PARCIAL', 'PENDIENTE', 'ANULADA'];
+
+/**
+ * Map Koinor payment state to InvoiceStatus enum
+ */
+function mapPaymentStateToStatus(estadoPago) {
+    const mapping = {
+        'PAGADA': 'PAID',
+        'PARCIAL': 'PARTIAL',
+        'PENDIENTE': 'PENDING',
+        'ANULADA': 'CANCELLED'
+    };
+    return mapping[estadoPago] || 'PENDING';
+}
+
+/**
+ * Validate incoming invoice data
+ */
+function validateInvoiceData(data) {
+    const errors = [];
+
+    if (!data.numero_factura) {
+        errors.push('numero_factura es requerido');
+    }
+
+    if (data.total_factura === undefined || data.total_factura === null) {
+        errors.push('total_factura es requerido');
+    } else if (typeof data.total_factura !== 'number' || data.total_factura < 0) {
+        errors.push('total_factura debe ser un número positivo');
+    }
+
+    if (data.estado_pago && !VALID_PAYMENT_STATES.includes(data.estado_pago)) {
+        errors.push(`estado_pago debe ser uno de: ${VALID_PAYMENT_STATES.join(', ')}`);
+    }
+
+    return errors;
+}
+
+/**
+ * POST /api/sync/billing
+ * Receive billing data from Koinor Sync Agent and update database
+ */
+export async function syncBilling(req, res) {
+    const startTime = Date.now();
+
+    try {
+        const { agentVersion, syncStartedAt, data } = req.body;
+
+        // Validate request structure
+        if (!Array.isArray(data)) {
+            return res.status(400).json({
+                success: false,
+                message: 'El campo "data" debe ser un array de facturas'
+            });
+        }
+
+        if (data.length > MAX_RECORDS_PER_REQUEST) {
+            return res.status(400).json({
+                success: false,
+                message: `Máximo ${MAX_RECORDS_PER_REQUEST} registros por request`
+            });
+        }
+
+        // Initialize counters
+        const metrics = {
+            totalReceived: data.length,
+            created: 0,
+            updated: 0,
+            unchanged: 0,
+            errors: 0,
+            documentsLinked: 0
+        };
+
+        const errorDetails = [];
+
+        // Process in batches
+        for (let i = 0; i < data.length; i += BATCH_SIZE) {
+            const batch = data.slice(i, i + BATCH_SIZE);
+
+            try {
+                await prisma.$transaction(async (tx) => {
+                    for (const invoiceData of batch) {
+                        try {
+                            const result = await processInvoice(tx, invoiceData);
+
+                            if (result.action === 'created') metrics.created++;
+                            else if (result.action === 'updated') metrics.updated++;
+                            else if (result.action === 'unchanged') metrics.unchanged++;
+
+                            if (result.documentLinked) metrics.documentsLinked++;
+
+                        } catch (invoiceError) {
+                            metrics.errors++;
+                            errorDetails.push({
+                                numero_factura: invoiceData.numero_factura || 'UNKNOWN',
+                                error: invoiceError.message
+                            });
+                            console.error(`[sync-billing] Error processing invoice ${invoiceData.numero_factura}:`, invoiceError.message);
+                        }
+                    }
+                });
+            } catch (batchError) {
+                console.error(`[sync-billing] Batch transaction error:`, batchError.message);
+                // Continue with next batch
+            }
+        }
+
+        const durationMs = Date.now() - startTime;
+
+        // Determine overall status
+        let status = 'SUCCESS';
+        if (metrics.errors > 0 && metrics.errors === metrics.totalReceived) {
+            status = 'ERROR';
+        } else if (metrics.errors > 0) {
+            status = 'PARTIAL';
+        }
+
+        // Create SyncLog entry
+        const syncLog = await prisma.syncLog.create({
+            data: {
+                status,
+                totalReceived: metrics.totalReceived,
+                created: metrics.created,
+                updated: metrics.updated,
+                unchanged: metrics.unchanged,
+                errors: metrics.errors,
+                documentsLinked: metrics.documentsLinked,
+                syncStartedAt: syncStartedAt ? new Date(syncStartedAt) : new Date(startTime),
+                durationMs,
+                agentVersion: agentVersion || null,
+                errorDetails: errorDetails.length > 0 ? JSON.stringify(errorDetails) : null
+            }
+        });
+
+        console.log(`[sync-billing] Sync completed: ${status}, received=${metrics.totalReceived}, created=${metrics.created}, updated=${metrics.updated}, errors=${metrics.errors}, duration=${durationMs}ms`);
+
+        res.json({
+            success: true,
+            message: 'Sincronización completada',
+            data: {
+                syncId: syncLog.id,
+                ...metrics,
+                durationMs,
+                errorDetails: errorDetails.length > 0 ? errorDetails.slice(0, 10) : undefined // Limit error details in response
+            }
+        });
+
+    } catch (error) {
+        console.error('[sync-billing] Sync error:', error);
+
+        // Try to log the failed sync
+        try {
+            await prisma.syncLog.create({
+                data: {
+                    status: 'ERROR',
+                    syncStartedAt: new Date(),
+                    durationMs: Date.now() - startTime,
+                    errorDetails: JSON.stringify([{ error: error.message }])
+                }
+            });
+        } catch (logError) {
+            console.error('[sync-billing] Failed to create error log:', logError);
+        }
+
+        res.status(500).json({
+            success: false,
+            message: 'Error durante la sincronización'
+        });
+    }
+}
+
+/**
+ * Process a single invoice from sync data
+ */
+async function processInvoice(tx, invoiceData) {
+    // Validate data
+    const validationErrors = validateInvoiceData(invoiceData);
+    if (validationErrors.length > 0) {
+        throw new Error(validationErrors.join('; '));
+    }
+
+    // Normalize invoice number
+    const invoiceNumberRaw = invoiceData.numero_factura.trim();
+    const invoiceNumber = normalizeInvoiceNumber(invoiceNumberRaw) || invoiceNumberRaw;
+
+    // Parse dates
+    const issueDate = invoiceData.fecha_emision ? new Date(invoiceData.fecha_emision) : new Date();
+    const dueDate = invoiceData.fecha_vencimiento ? new Date(invoiceData.fecha_vencimiento) : null;
+    const fechaUltimoPago = invoiceData.fecha_ultimo_pago ? new Date(invoiceData.fecha_ultimo_pago) : null;
+    const koinorModifiedAt = invoiceData.ultima_modificacion ? new Date(invoiceData.ultima_modificacion) : null;
+
+    // Check if invoice exists
+    const existingInvoice = await tx.invoice.findFirst({
+        where: {
+            OR: [
+                { invoiceNumberRaw: invoiceNumberRaw },
+                { invoiceNumber: invoiceNumber }
+            ]
+        }
+    });
+
+    let action = 'unchanged';
+    let documentLinked = false;
+    let invoice;
+
+    if (!existingInvoice) {
+        // Create new invoice
+        invoice = await tx.invoice.create({
+            data: {
+                invoiceNumber,
+                invoiceNumberRaw,
+                clientTaxId: String(invoiceData.cliente_cedula || '').trim(),
+                clientName: String(invoiceData.cliente_nombre || '').trim(),
+                totalAmount: invoiceData.total_factura,
+                paidAmount: invoiceData.total_pagado || 0,
+                issueDate,
+                dueDate,
+                status: mapPaymentStateToStatus(invoiceData.estado_pago),
+
+                // Koinor sync fields
+                numeroProtocolo: invoiceData.numero_protocolo || null,
+                condicionPago: invoiceData.condicion_pago || null,
+                pagoEfectivo: invoiceData.pago_efectivo || 0,
+                pagoCheque: invoiceData.pago_cheque || 0,
+                pagoTarjeta: invoiceData.pago_tarjeta || 0,
+                pagoDeposito: invoiceData.pago_deposito || 0,
+                pagoDirecto: invoiceData.pago_directo || 0,
+                montoPagadoCxc: invoiceData.monto_pagado_cxc || 0,
+                montoNotaCredito: invoiceData.monto_nota_credito || 0,
+                tieneNotaCredito: invoiceData.tiene_nota_credito === 'SI',
+                fechaUltimoPago,
+                saldoPendiente: invoiceData.saldo_pendiente || 0,
+                koinorModifiedAt,
+                syncSource: 'KOINOR_SYNC'
+            }
+        });
+
+        action = 'created';
+    } else {
+        // Check if update is needed (compare modification dates)
+        const needsUpdate = !existingInvoice.koinorModifiedAt ||
+            !koinorModifiedAt ||
+            koinorModifiedAt > existingInvoice.koinorModifiedAt;
+
+        if (needsUpdate) {
+            invoice = await tx.invoice.update({
+                where: { id: existingInvoice.id },
+                data: {
+                    // Update payment-related fields only
+                    paidAmount: invoiceData.total_pagado || existingInvoice.paidAmount,
+                    status: mapPaymentStateToStatus(invoiceData.estado_pago),
+
+                    // Koinor sync fields
+                    numeroProtocolo: invoiceData.numero_protocolo || existingInvoice.numeroProtocolo,
+                    condicionPago: invoiceData.condicion_pago || existingInvoice.condicionPago,
+                    pagoEfectivo: invoiceData.pago_efectivo ?? existingInvoice.pagoEfectivo,
+                    pagoCheque: invoiceData.pago_cheque ?? existingInvoice.pagoCheque,
+                    pagoTarjeta: invoiceData.pago_tarjeta ?? existingInvoice.pagoTarjeta,
+                    pagoDeposito: invoiceData.pago_deposito ?? existingInvoice.pagoDeposito,
+                    pagoDirecto: invoiceData.pago_directo ?? existingInvoice.pagoDirecto,
+                    montoPagadoCxc: invoiceData.monto_pagado_cxc ?? existingInvoice.montoPagadoCxc,
+                    montoNotaCredito: invoiceData.monto_nota_credito ?? existingInvoice.montoNotaCredito,
+                    tieneNotaCredito: invoiceData.tiene_nota_credito === 'SI',
+                    fechaUltimoPago: fechaUltimoPago || existingInvoice.fechaUltimoPago,
+                    saldoPendiente: invoiceData.saldo_pendiente ?? existingInvoice.saldoPendiente,
+                    koinorModifiedAt,
+                    syncSource: 'KOINOR_SYNC'
+                }
+            });
+
+            action = 'updated';
+        } else {
+            invoice = existingInvoice;
+        }
+    }
+
+    // Try to link with Document by protocol number
+    if (invoiceData.numero_protocolo && !invoice.documentId) {
+        const document = await tx.document.findFirst({
+            where: {
+                protocolNumber: invoiceData.numero_protocolo
+            }
+        });
+
+        if (document) {
+            await tx.invoice.update({
+                where: { id: invoice.id },
+                data: { documentId: document.id }
+            });
+
+            // Update document payment status if invoice is paid
+            if (invoiceData.estado_pago === 'PAGADA') {
+                await tx.document.update({
+                    where: { id: document.id },
+                    data: { pagoConfirmado: true }
+                });
+            }
+
+            documentLinked = true;
+        }
+    }
+
+    return { action, documentLinked };
+}
+
+/**
+ * GET /api/sync/billing/status
+ * Get status of the last sync operation
+ */
+export async function getSyncStatus(req, res) {
+    try {
+        const lastSync = await prisma.syncLog.findFirst({
+            orderBy: { syncCompletedAt: 'desc' }
+        });
+
+        if (!lastSync) {
+            return res.json({
+                success: true,
+                data: {
+                    lastSync: null,
+                    syncHealthy: false,
+                    minutesSinceLastSync: null
+                }
+            });
+        }
+
+        const minutesSinceLastSync = Math.floor(
+            (Date.now() - lastSync.syncCompletedAt.getTime()) / 60000
+        );
+
+        // Sync is healthy if last sync was within 20 minutes and successful
+        const syncHealthy = minutesSinceLastSync < 20 &&
+            (lastSync.status === 'SUCCESS' || lastSync.status === 'PARTIAL');
+
+        res.json({
+            success: true,
+            data: {
+                lastSync: {
+                    id: lastSync.id,
+                    status: lastSync.status,
+                    totalReceived: lastSync.totalReceived,
+                    created: lastSync.created,
+                    updated: lastSync.updated,
+                    unchanged: lastSync.unchanged,
+                    errors: lastSync.errors,
+                    documentsLinked: lastSync.documentsLinked,
+                    syncCompletedAt: lastSync.syncCompletedAt,
+                    durationMs: lastSync.durationMs
+                },
+                syncHealthy,
+                minutesSinceLastSync
+            }
+        });
+    } catch (error) {
+        console.error('[sync-billing] Get status error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener estado de sincronización'
+        });
+    }
+}
+
+/**
+ * GET /api/sync/billing/history
+ * Get history of sync operations (last 20)
+ */
+export async function getSyncHistory(req, res) {
+    try {
+        const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+
+        const syncLogs = await prisma.syncLog.findMany({
+            orderBy: { syncCompletedAt: 'desc' },
+            take: limit,
+            select: {
+                id: true,
+                status: true,
+                totalReceived: true,
+                created: true,
+                updated: true,
+                unchanged: true,
+                errors: true,
+                documentsLinked: true,
+                syncStartedAt: true,
+                syncCompletedAt: true,
+                durationMs: true,
+                agentVersion: true
+                // Exclude errorDetails for list view to reduce payload
+            }
+        });
+
+        res.json({
+            success: true,
+            data: {
+                syncLogs,
+                count: syncLogs.length
+            }
+        });
+    } catch (error) {
+        console.error('[sync-billing] Get history error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener historial de sincronización'
+        });
+    }
+}

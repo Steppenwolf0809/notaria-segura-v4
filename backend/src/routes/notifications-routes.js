@@ -380,11 +380,41 @@ router.get('/queue', authenticateToken, async (req, res) => {
 
     console.log(`📱 Queue (${tab}): ${documents.length} documents found for ${userRole}`);
 
+    // 🔄 NUEVO: Calcular estadísticas por cliente para mostrar totales
+    const clientStats = {};
+    if (tab === 'pending' && documents.length > 0) {
+      // Extraer teléfonos únicos
+      const clientPhones = [...new Set(documents.filter(d => d.clientPhone).map(d => d.clientPhone.trim()))];
+      
+      // Para cada cliente, contar documentos LISTO totales
+      for (const phone of clientPhones) {
+        const totalListo = await prisma.document.count({
+          where: {
+            clientPhone: phone,
+            status: 'LISTO',
+            // Filtro por rol
+            ...(userRole === 'MATRIZADOR' || userRole === 'ARCHIVO'
+              ? { assignedToId: userId }
+              : {})
+          }
+        });
+        
+        const pendingCount = documents.filter(d => d.clientPhone === phone).length;
+        
+        clientStats[phone] = {
+          totalListo,
+          withPendingNotification: pendingCount,
+          alreadyNotified: totalListo - pendingCount
+        };
+      }
+    }
+
     res.json({
       success: true,
       data: documents,
       count: documents.length,
-      tab
+      tab,
+      clientStats: Object.keys(clientStats).length > 0 ? clientStats : undefined
     });
 
   } catch (error) {

@@ -49,8 +49,13 @@ const daysSince = (date) => {
  * Card que muestra un cliente con sus documentos agrupados
  * para notificación WhatsApp
  */
-const ClientNotificationCard = ({ group, onNotify, isReminder = false, onPhoneUpdated, onDismiss }) => {
+const ClientNotificationCard = ({ group, onNotify, isReminder = false, onPhoneUpdated, onDismiss, clientStats }) => {
     const { cliente, documentos, stats } = group;
+    
+    // 🔄 Verificar si hay más documentos de los que se muestran
+    const totalDocs = clientStats?.totalListo || documentos?.length || 0;
+    const showingDocs = documentos?.length || 0;
+    const additionalDocs = totalDocs - showingDocs;
     const [editingPhone, setEditingPhone] = useState(false);
     const [phoneValue, setPhoneValue] = useState(cliente?.telefono || '');
     const [saving, setSaving] = useState(false);
@@ -279,6 +284,17 @@ const ClientNotificationCard = ({ group, onNotify, isReminder = false, onPhoneUp
                         );
                     })}
                 </Box>
+
+                {/* 🔄 Indicador de documentos adicionales */}
+                {additionalDocs > 0 && !isReminder && (
+                    <Alert severity="info" sx={{ py: 0.5, mb: 1 }}>
+                        <Typography variant="caption">
+                            <strong>📦 Nota:</strong> Este cliente tiene {totalDocs} documentos listos en total. 
+                            {additionalDocs > 0 && ` ${additionalDocs} ya ${additionalDocs === 1 ? 'fue notificado' : 'fueron notificados'} anteriormente. `}
+                            Al enviar esta notificación se incluirán todos.
+                        </Typography>
+                    </Alert>
+                )}
 
                 {/* Warnings */}
                 {!hasPhone && (
