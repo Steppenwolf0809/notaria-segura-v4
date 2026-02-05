@@ -160,6 +160,19 @@ const WhatsAppNotificationModal = ({
                             ✅ Listo
                         </Typography>
 
+                        {/* 🔄 Mostrar información de consolidación si aplica */}
+                        {result?.consolidacion?.documentosAdicionales > 0 && (
+                            <Alert severity="info" sx={{ mb: 2, textAlign: 'left' }}>
+                                <Typography variant="body2">
+                                    <strong>📦 Consolidación:</strong> {result.consolidacion.mensaje}
+                                </Typography>
+                                <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
+                                    Seleccionados: {result.consolidacion.documentosSeleccionados} | 
+                                    Totales incluidos: {result.consolidacion.documentosTotales}
+                                </Typography>
+                            </Alert>
+                        )}
+
                         {/* Display the code prominently */}
                         <Paper
                             sx={{

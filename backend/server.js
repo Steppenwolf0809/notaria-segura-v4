@@ -35,6 +35,7 @@ import personalRoutes from './src/routes/personal-routes.js'
 import formularioUAFERoutes from './src/routes/formulario-uafe-routes.js'
 import encuestaRoutes from './src/routes/encuesta-routes.js'
 import billingRoutes from './src/routes/billing-routes.js'
+import syncRoutes from './src/routes/sync-routes.js'
 
 // Cargar variables de entorno
 dotenv.config({ path: './.env' })
@@ -372,6 +373,9 @@ app.use('/api/encuesta', encuestaRoutes)
 
 // RUTAS DE FACTURACIÓN (/api/billing/*)
 app.use('/api/billing', billingRoutes)
+
+// RUTAS DE SINCRONIZACIÓN KOINOR (/api/sync/*)
+app.use('/api/sync', syncRoutes)
 
 // ============================================================================
 // SERVIR ARCHIVOS ESTÁTICOS DEL FRONTEND

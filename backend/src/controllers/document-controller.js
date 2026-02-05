@@ -1405,15 +1405,46 @@ async function updateDocumentStatus(req, res) {
     updatedDocuments = [updatedDocument];
 
 
-    // NUEVA FUNCIONALIDAD: Enviar notificación WhatsApp si se marca como LISTO
-    // ℹ️ NOTA: El sistema usa wa.me para notificaciones manuales, no envío automático
+    // NUEVA FUNCIONALIDAD: Crear notificación WhatsApp automática si se marca como LISTO
+    // 📱 Se crea una notificación PENDING que aparecerá en el Centro de Notificaciones
     let whatsappSent = false;
     let whatsappError = null;
     let whatsappResults = [];
+    let notificacionCreada = null;
 
     if (status === 'LISTO') {
-      // Las notificaciones se gestionan manualmente a través del Centro de Notificaciones
-      console.log('ℹ️ Cambio a LISTO: Use el Centro de Notificaciones para enviar mensajes vía wa.me');
+      try {
+        // Buscar si ya existe una notificación PENDING para este documento
+        const notificacionExistente = await prisma.whatsAppNotification.findFirst({
+          where: {
+            documentId: id,
+            status: { in: ['PENDING', 'PREPARED'] },
+            messageType: 'DOCUMENTO_LISTO'
+          }
+        });
+
+        if (!notificacionExistente) {
+          // Crear nueva notificación PENDING
+          notificacionCreada = await prisma.whatsAppNotification.create({
+            data: {
+              documentId: id,
+              clientName: updatedDocument.clientName || document.clientName,
+              clientPhone: (updatedDocument.clientPhone || document.clientPhone || '').trim(),
+              messageType: 'DOCUMENTO_LISTO',
+              messageBody: `Su documento ${updatedDocument.protocolNumber || document.protocolNumber} está listo para retiro.`,
+              status: 'PENDING',
+              sentAt: null
+            }
+          });
+          console.log(`📱 Notificación PENDING creada para documento ${id}`);
+        } else {
+          console.log(`ℹ️ Ya existe notificación PENDING para documento ${id}`);
+        }
+      } catch (notifError) {
+        console.error('Error creando notificación automática:', notifError);
+        whatsappError = notifError.message;
+        // No fallar la operación principal si falla la creación de notificación
+      }
     }
 
 
@@ -1458,21 +1489,10 @@ async function updateDocumentStatus(req, res) {
       : 'Estado del documento actualizado exitosamente';
 
     if (status === 'LISTO') {
-      if (groupAffected) {
-        if (whatsappSent) {
-          const successCount = whatsappResults.filter(r => r.success).length;
-          message += ` y notificaciones WhatsApp enviadas (${successCount}/${whatsappResults.length} clientes)`;
-        } else if (whatsappError) {
-          message += ', pero fallaron las notificaciones WhatsApp';
-        }
-      } else {
-        if (whatsappSent) {
-          message += ' y notificación WhatsApp enviada';
-        } else if (updatedDocument.clientPhone && whatsappError) {
-          message += ', pero falló la notificación WhatsApp';
-        } else if (!updatedDocument.clientPhone) {
-          message += ' (sin teléfono para notificación WhatsApp)';
-        }
+      if (notificacionCreada) {
+        message += '. Notificación preparada para envío vía Centro de Notificaciones';
+      } else if (whatsappError) {
+        message += ' (advertencia: no se pudo crear la notificación automática)';
       }
     }
 
@@ -1494,7 +1514,9 @@ async function updateDocumentStatus(req, res) {
           sent: whatsappSent,
           error: whatsappError,
           phone: updatedDocument.clientPhone,
-          groupResults: whatsappResults.length > 0 ? whatsappResults : undefined
+          groupResults: whatsappResults.length > 0 ? whatsappResults : undefined,
+          notificationCreated: !!notificacionCreada,
+          notificationId: notificacionCreada?.id || null
         }
       }
     });
@@ -3732,11 +3754,11 @@ async function bulkNotify(req, res) {
       });
     }
 
-    // Obtener documentos con información necesaria
-    const documents = await prisma.document.findMany({
+    // Obtener documentos seleccionados
+    const selectedDocuments = await prisma.document.findMany({
       where: {
         id: { in: documentIds },
-        status: { in: ['LISTO', 'EN_PROCESO'] } // Solo documentos que pueden notificarse
+        status: { in: ['LISTO', 'EN_PROCESO'] }
       },
       include: {
         assignedTo: {
@@ -3745,12 +3767,72 @@ async function bulkNotify(req, res) {
       }
     });
 
-    if (documents.length === 0) {
+    if (selectedDocuments.length === 0) {
       return res.status(404).json({
         success: false,
         message: 'No se encontraron documentos válidos para notificar'
       });
     }
+
+    // 🔄 NUEVO: Consolidar TODOS los documentos LISTO de los clientes seleccionados
+    // Extraer teléfonos únicos de los documentos seleccionados
+    const clientPhones = [...new Set(
+      selectedDocuments
+        .filter(d => d.clientPhone && d.clientPhone.trim())
+        .map(d => d.clientPhone.trim())
+    )];
+
+    const clientIds = [...new Set(
+      selectedDocuments
+        .filter(d => d.clientId && d.clientId.trim())
+        .map(d => d.clientId.trim())
+    )];
+
+    // Buscar TODOS los documentos LISTO de estos clientes (incluyendo los ya notificados)
+    // Esto asegura que el mensaje siempre incluya todos los documentos pendientes
+    let allClientDocuments = [];
+    if (clientPhones.length > 0 || clientIds.length > 0) {
+      const whereClause = {
+        status: 'LISTO',
+        OR: [
+          ...(clientPhones.length > 0 ? [{ clientPhone: { in: clientPhones } }] : []),
+          ...(clientIds.length > 0 ? [{ clientId: { in: clientIds } }] : [])
+        ]
+      };
+
+      // Aplicar filtro por rol para matrizadores/archivo
+      if (req.user.role === 'MATRIZADOR' || req.user.role === 'ARCHIVO') {
+        whereClause.assignedToId = req.user.id;
+      }
+
+      allClientDocuments = await prisma.document.findMany({
+        where: whereClause,
+        include: {
+          assignedTo: {
+            select: { firstName: true, lastName: true }
+          }
+        }
+      });
+    }
+
+    // Combinar documentos seleccionados con todos los del cliente (evitar duplicados)
+    const documentMap = new Map();
+    
+    // Primero agregar los documentos del cliente (LISTO)
+    for (const doc of allClientDocuments) {
+      documentMap.set(doc.id, doc);
+    }
+    
+    // Luego agregar los seleccionados (pueden ser EN_PROCESO)
+    for (const doc of selectedDocuments) {
+      if (!documentMap.has(doc.id)) {
+        documentMap.set(doc.id, doc);
+      }
+    }
+
+    const documents = Array.from(documentMap.values());
+
+    console.log(`📱 Consolidación: ${selectedDocuments.length} documentos seleccionados → ${documents.length} totales incluyendo todos los LISTO del cliente`);
 
     // Agrupar documentos por cliente (clientPhone) para anti-spam
     const groupedByClient = {};
@@ -3766,7 +3848,10 @@ async function bulkNotify(req, res) {
             documents: []
           };
         }
-        groupedByClient[phone].documents.push(doc);
+        // Evitar duplicados en el grupo
+        if (!groupedByClient[phone].documents.find(d => d.id === doc.id)) {
+          groupedByClient[phone].documents.push(doc);
+        }
       } else {
         documentsWithoutPhone.push(doc);
       }
@@ -3797,7 +3882,22 @@ async function bulkNotify(req, res) {
           data: {
             codigoRetiro: codigoRetiro,
             ultimoRecordatorio: now,
-            fechaListo: { set: now } // Solo si es la primera vez
+            fechaListo: { set: now }
+          }
+        });
+
+        // 🔄 NUEVO: Marcar como PREPARED todas las notificaciones PENDING de estos documentos
+        // Esto evita duplicados y asegura que todos queden marcados como enviados
+        await prisma.whatsAppNotification.updateMany({
+          where: {
+            documentId: { in: documentIdsToUpdate },
+            status: 'PENDING',
+            messageType: 'DOCUMENTO_LISTO'
+          },
+          data: {
+            status: sendWhatsApp ? 'PREPARED' : 'PENDING',
+            sentAt: sendWhatsApp ? now : null,
+            messageBody: `Consolidado - Código: ${codigoRetiro}. Total documentos: ${documentIdsToUpdate.length}`
           }
         });
 
@@ -3808,28 +3908,40 @@ async function bulkNotify(req, res) {
               documentId: doc.id,
               userId: req.user.id,
               eventType: 'WHATSAPP_NOTIFICATION',
-              description: `Notificación WhatsApp preparada. Código: ${codigoRetiro}`,
+              description: `Notificación WhatsApp preparada/consolidada. Código: ${codigoRetiro}`,
               details: JSON.stringify({
                 codigoRetiro,
                 clientPhone: phone,
                 documentosEnLote: documentIdsToUpdate.length,
+                consolidado: true,
                 timestamp: now.toISOString()
               })
             }
           });
 
-          // Registrar en tabla WhatsAppNotification para historial
-          await prisma.whatsAppNotification.create({
-            data: {
+          // Verificar si ya existe notificación PREPARED para este documento
+          const existingPrepared = await prisma.whatsAppNotification.findFirst({
+            where: {
               documentId: doc.id,
-              clientName: clientGroup.clientName,
-              clientPhone: phone,
-              messageType: 'DOCUMENTO_LISTO',
-              messageBody: `Código de retiro: ${codigoRetiro}. Documentos en lote: ${documentIdsToUpdate.length}`,
-              status: sendWhatsApp ? 'PREPARED' : 'PENDING',
-              sentAt: sendWhatsApp ? now : null
+              status: { in: ['PREPARED', 'SENT'] },
+              messageType: 'DOCUMENTO_LISTO'
             }
           });
+
+          // Solo crear nueva notificación si no existe una PREPARED/SENT reciente
+          if (!existingPrepared) {
+            await prisma.whatsAppNotification.create({
+              data: {
+                documentId: doc.id,
+                clientName: clientGroup.clientName,
+                clientPhone: phone,
+                messageType: 'DOCUMENTO_LISTO',
+                messageBody: `Código de retiro: ${codigoRetiro}. Documentos en lote: ${documentIdsToUpdate.length}`,
+                status: sendWhatsApp ? 'PREPARED' : 'PENDING',
+                sentAt: sendWhatsApp ? now : null
+              }
+            });
+          }
         }
 
         // Generar URL wa.me si se solicita envío
@@ -3996,10 +4108,26 @@ async function bulkNotify(req, res) {
       errores: results.errores.length
     });
 
+    // Calcular totales de consolidación
+    const totalSelected = selectedDocuments.length;
+    const totalConsolidated = documents.length;
+    const consolidatedCount = totalConsolidated - totalSelected;
+
     res.json({
       success: true,
-      message: `Notificación procesada: ${results.notificados.length} clientes notificados, ${results.sinTelefono.length} sin teléfono`,
-      data: results
+      message: `Notificación procesada: ${results.notificados.length} clientes notificados, ${results.sinTelefono.length} sin teléfono` +
+               (consolidatedCount > 0 ? ` (${consolidatedCount} documentos adicionales consolidados)` : ''),
+      data: {
+        ...results,
+        consolidacion: {
+          documentosSeleccionados: totalSelected,
+          documentosTotales: totalConsolidated,
+          documentosAdicionales: consolidatedCount,
+          mensaje: consolidatedCount > 0 
+            ? `Se incluyeron ${consolidatedCount} documentos adicionales del mismo cliente que ya estaban listos`
+            : null
+        }
+      }
     });
 
   } catch (error) {

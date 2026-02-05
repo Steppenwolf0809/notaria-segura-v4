@@ -627,15 +627,49 @@ model Invoice {
   sourceFile        String?                // Nombre del archivo de origen
   matrizador        String?                // Nombre del matrizador (codven mapeado)
   
+  // ========================================
+  // CAMPOS DE SINCRONIZACIÓN KOINOR
+  // ========================================
+  
+  // Vinculación por protocolo (para match con Document.protocolNumber)
+  numeroProtocolo     String?               // "20261701018P00252" - del campo observ de Koinor
+  
+  // Condición de pago
+  condicionPago       String?               // "C" = crédito, "E" = contado
+  
+  // Desglose de pagos al contado (pagos directos en facturación)
+  pagoEfectivo        Decimal? @db.Decimal(12, 2) @default(0)
+  pagoCheque          Decimal? @db.Decimal(12, 2) @default(0)
+  pagoTarjeta         Decimal? @db.Decimal(12, 2) @default(0)
+  pagoDeposito        Decimal? @db.Decimal(12, 2) @default(0)
+  pagoDirecto         Decimal? @db.Decimal(12, 2) @default(0)  // Suma de pagos al contado
+  
+  // Pagos posteriores (via CxC)
+  montoPagadoCxc      Decimal? @db.Decimal(12, 2) @default(0)  // Pagos posteriores via CxC
+  
+  // Notas de crédito
+  montoNotaCredito    Decimal? @db.Decimal(12, 2) @default(0)
+  tieneNotaCredito    Boolean  @default(false)
+  
+  // Saldo y fechas de pago
+  fechaUltimoPago     DateTime?
+  saldoPendiente      Decimal? @db.Decimal(12, 2) @default(0)
+  
+  // Metadata de sincronización Koinor
+  koinorModifiedAt    DateTime?             // ultima_modificacion de la VIEW de Koinor
+  syncSource          String?  @default("MANUAL")  // "MANUAL", "KOINOR_SYNC", "XML_IMPORT"
+  
   // Relaciones
   payments          Payment[]
   
   @@map("invoices")
   @@index([invoiceNumber])
+  @@index([invoiceNumberRaw])
   @@index([clientTaxId])
   @@index([status])
   @@index([issueDate])
   @@index([documentId])
+  @@index([numeroProtocolo])
 }
 
 model Payment {
@@ -780,3 +814,37 @@ model PendingReceivable {
   @@index([matrizadorName])
   @@map("pending_receivables")
 }
+
+// ============================================
+// SINCRONIZACIÓN KOINOR → RAILWAY
+// Registro de cada sincronización del Sync Agent
+// ============================================
+
+model SyncLog {
+  id                String   @id @default(uuid())
+  
+  // === RESULTADO ===
+  status            String   // "SUCCESS", "PARTIAL", "ERROR"
+  
+  // === MÉTRICAS ===
+  totalReceived     Int      @default(0)   // Registros recibidos
+  created           Int      @default(0)   // Nuevos registros creados
+  updated           Int      @default(0)   // Registros actualizados
+  unchanged         Int      @default(0)   // Sin cambios (skipped)
+  errors            Int      @default(0)   // Errores individuales
+  documentsLinked   Int      @default(0)   // Documents vinculados por protocolo
+  
+  // === TIMING ===
+  syncStartedAt     DateTime               // Cuándo empezó
+  syncCompletedAt   DateTime @default(now()) // Cuándo terminó
+  durationMs        Int      @default(0)   // Duración en milisegundos
+  
+  // === METADATA ===
+  agentVersion      String?                // Versión del Sync Agent
+  errorDetails      String?  @db.Text      // Detalles de errores (JSON string)
+  
+  @@map("sync_logs")
+  @@index([syncCompletedAt])
+  @@index([status])
+}
+
