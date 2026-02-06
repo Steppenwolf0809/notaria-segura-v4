@@ -79,12 +79,14 @@ function BulkDeliveryDialog({ open, onClose, documentIds, documents, onDeliveryC
 
     try {
       // Usar el servicio en lugar de fetch directo para incluir CSRF token
+      // Los nombres de campo deben coincidir con lo que espera el backend (entregaGrupal)
       const result = await receptionService.procesarEntregaGrupal({
         documentIds: documentIds,
-        deliveredTo: formData.personaRetira,
-        receptorId: formData.cedulaRetira || null,
-        relationType: formData.relacionTitular,
-        observations: formData.observaciones || null
+        entregadoA: formData.personaRetira,
+        cedulaReceptor: formData.cedulaRetira || null,
+        relacionTitular: formData.relacionTitular,
+        observaciones: formData.observaciones || null,
+        verificacionManual: true
       });
 
       if (result.success) {
