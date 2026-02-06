@@ -1009,33 +1009,69 @@ async function getMyDocuments(req, res) {
         });
         const authorMap = new Map(authors.map(a => [a.id, a]));
 
-        // 💰 Obtener facturas para calcular estado de pago
+        // 💰 Obtener facturas y pagos para calcular estado de pago
         const docIds = documents.map(d => d.id);
         const invoicesMap = new Map();
+        const paymentsMap = new Map();
+        
         if (docIds.length > 0) {
+          // Obtener facturas
           const invoices = await prisma.invoice.findMany({
             where: { documentId: { in: docIds } },
-            select: { documentId: true, totalAmount: true, paidAmount: true, status: true }
+            select: { 
+              id: true,
+              documentId: true, 
+              totalAmount: true, 
+              paidAmount: true, 
+              status: true 
+            }
           });
+          
           invoices.forEach(inv => {
             if (!invoicesMap.has(inv.documentId)) invoicesMap.set(inv.documentId, []);
             invoicesMap.get(inv.documentId).push(inv);
           });
+          
+          // Obtener pagos de la tabla payments
+          const invoiceIds = invoices.map(inv => inv.id);
+          if (invoiceIds.length > 0) {
+            const payments = await prisma.payment.findMany({
+              where: { invoiceId: { in: invoiceIds } },
+              select: { invoiceId: true, amount: true }
+            });
+            
+            payments.forEach(payment => {
+              if (!paymentsMap.has(payment.invoiceId)) paymentsMap.set(payment.invoiceId, 0);
+              paymentsMap.set(payment.invoiceId, paymentsMap.get(payment.invoiceId) + Number(payment.amount));
+            });
+          }
         }
 
         const hydratedDocs = documents.map(d => {
           const docInvoices = invoicesMap.get(d.id) || [];
           let paymentStatus = 'SIN_FACTURA';
           let paymentInfo = null;
+          
           if (docInvoices.length > 0) {
             const totalFacturado = docInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
-            const totalPagado = docInvoices.reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
+            
+            // Calcular total pagado usando ambas fuentes:
+            // 1. paidAmount del invoice (sync de Koinor)
+            // 2. payments de la tabla payments (importaciones manuales)
+            const totalPagado = docInvoices.reduce((sum, inv) => {
+              const syncedPaid = Number(inv.paidAmount || 0);
+              const paymentsTotal = paymentsMap.get(inv.id) || 0;
+              return sum + Math.max(syncedPaid, paymentsTotal);
+            }, 0);
+            
             const saldoPendiente = totalFacturado - totalPagado;
             if (saldoPendiente <= 0) paymentStatus = 'PAGADO';
             else if (totalPagado > 0) paymentStatus = 'PARCIAL';
             else paymentStatus = 'PENDIENTE';
+            
             paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: docInvoices.length };
           }
+          
           return {
             ...d,
             createdBy: d.createdById ? authorMap.get(d.createdById) : null,
@@ -1115,9 +1151,18 @@ async function getMyDocuments(req, res) {
           createdBy: {
             select: { id: true, firstName: true, lastName: true, email: true }
           },
-          // 💰 Incluir facturas para estado de pago
+          // 💰 Incluir facturas y pagos para estado de pago
           invoices: {
-            select: { totalAmount: true, paidAmount: true, status: true, invoiceNumber: true }
+            select: { 
+              id: true,
+              totalAmount: true, 
+              paidAmount: true, 
+              status: true, 
+              invoiceNumber: true,
+              payments: {
+                select: { amount: true }
+              }
+            }
           }
         },
         orderBy: prismaOrderBy,
@@ -1156,7 +1201,16 @@ async function getMyDocuments(req, res) {
       
       if (doc.invoices && doc.invoices.length > 0) {
         const totalFacturado = doc.invoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
-        const totalPagado = doc.invoices.reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
+        
+        // Calcular total pagado usando ambas fuentes:
+        // 1. paidAmount del invoice (sync de Koinor)
+        // 2. payments de la tabla payments (importaciones manuales)
+        const totalPagado = doc.invoices.reduce((sum, inv) => {
+          const syncedPaid = Number(inv.paidAmount || 0);
+          const paymentsTotal = inv.payments?.reduce((pSum, p) => pSum + Number(p.amount || 0), 0) || 0;
+          return sum + Math.max(syncedPaid, paymentsTotal);
+        }, 0);
+        
         const saldoPendiente = totalFacturado - totalPagado;
         
         if (saldoPendiente <= 0) paymentStatus = 'PAGADO';
