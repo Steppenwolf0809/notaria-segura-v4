@@ -16,7 +16,9 @@ import {
   Button,
   Container,
   Tooltip,
-  Switch
+  Switch,
+  Collapse,
+  Badge
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -43,28 +45,28 @@ import {
   Receipt as ReceiptIcon,
   Payments as PaymentsIcon,
   Assessment as AssessmentIcon,
-  Send as SendIcon
+  Send as SendIcon,
+  FolderOpen as FolderOpenIcon,
+  Message as MessageIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import { useThemeCtx } from '../contexts/theme-ctx';
 import { ThemeProvider } from '@mui/material/styles';
 import { getAppTheme } from '../config/theme';
 import ChangePassword from './ChangePassword';
-import { navItemsByRole } from '../config/nav-items';
 
 // Anchos del sidebar
-const DRAWER_WIDTH = 240;
-const COLLAPSED_DRAWER_WIDTH = 60;
+const DRAWER_WIDTH = 260;
+const COLLAPSED_DRAWER_WIDTH = 72;
 
 /**
- * Layout principal del Administrador siguiendo el patrón de otros layouts
- * Incluye sidebar de navegación y área de contenido
+ * Layout principal del Administrador - Diseño refinado y elegante
+ * Sidebar simplificado con jerarquía clara y estilo institucional
  */
 const AdminLayout = ({ children, currentView, onViewChange }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const [configMenuOpen, setConfigMenuOpen] = useState(false);
   const [billingMenuOpen, setBillingMenuOpen] = useState(false);
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
   const { resolvedIsDark: isDarkMode, setMode } = useThemeCtx();
@@ -73,35 +75,17 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
     setMode(isDarkMode ? 'light' : 'dark');
   };
 
-  // Trazas de verificación del layout
-  useEffect(() => {
-    // eslint-disable-next-line no-console
-  }, [user?.role]);
-
   // Cargar estado del sidebar desde localStorage
   useEffect(() => {
     const savedCollapsed = localStorage.getItem('admin-sidebar-collapsed');
     if (savedCollapsed !== null) {
       setSidebarCollapsed(JSON.parse(savedCollapsed));
     }
-
-    const savedConfigOpen = localStorage.getItem('admin-config-menu-open');
-    if (savedConfigOpen !== null) {
-      setConfigMenuOpen(JSON.parse(savedConfigOpen));
-    }
-
     const savedBillingOpen = localStorage.getItem('admin-billing-menu-open');
     if (savedBillingOpen !== null) {
       setBillingMenuOpen(JSON.parse(savedBillingOpen));
     }
   }, []);
-
-  // Mantener submenu de configuración abierto si estamos en una vista de configuración
-  useEffect(() => {
-    if (currentView === 'settings' || currentView === 'whatsapp-templates') {
-      setConfigMenuOpen(true);
-    }
-  }, [currentView]);
 
   // Mantener submenu de facturación abierto si estamos en una vista de facturación
   useEffect(() => {
@@ -111,272 +95,293 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
     }
   }, [currentView]);
 
-  // Guardar estado del sidebar en localStorage
+  // Guardar estado en localStorage
   useEffect(() => {
     localStorage.setItem('admin-sidebar-collapsed', JSON.stringify(sidebarCollapsed));
   }, [sidebarCollapsed]);
 
-  // Guardar estado del submenu de configuración
-  useEffect(() => {
-    localStorage.setItem('admin-config-menu-open', JSON.stringify(configMenuOpen));
-  }, [configMenuOpen]);
-
-  // Guardar estado del submenu de facturación
   useEffect(() => {
     localStorage.setItem('admin-billing-menu-open', JSON.stringify(billingMenuOpen));
   }, [billingMenuOpen]);
 
-  /**
-   * Toggle del drawer móvil
-   */
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
 
-  /**
-   * Toggle del sidebar colapsable
-   */
   const handleSidebarToggle = () => {
     setSidebarCollapsed(!sidebarCollapsed);
   };
 
-  /**
-   * Navegación entre vistas
-   */
   const handleNavigation = (view) => {
     onViewChange(view);
-    setMobileOpen(false); // Cerrar drawer en móvil
+    setMobileOpen(false);
   };
 
-  // Fuente única desde config + mapeo de iconos
-  const role = user?.role || 'ADMIN';
-  const iconMap = {
-    Dashboard: <DashboardIcon />,
-    Person: <PersonIcon />,
-    Description: <DescriptionIcon />,
-    Notifications: <NotificationsIcon />,
-    Settings: <SettingsIcon />,
-    WhatsApp: <WhatsAppIcon />,
-    Analytics: <AnalyticsIcon />,
-    Poll: <PollIcon />,
-    QrCode: <QrCodeIcon />,
-    Send: <SendIcon />
+  // Estructura de navegación simplificada
+  const mainNavItems = [
+    { id: 'dashboard', label: 'Dashboard', icon: <DashboardIcon />, view: 'dashboard' },
+    { id: 'users', label: 'Usuarios', icon: <PersonIcon />, view: 'users' },
+    { id: 'documents', label: 'Documentos', icon: <DocumentIcon />, view: 'documents' },
+    { id: 'seguimiento-mensajes', label: 'Mensajes', icon: <MessageIcon />, view: 'seguimiento-mensajes' },
+  ];
+
+  const secondaryNavItems = [
+    { id: 'formularios-uafe', label: 'Formularios UAFE', icon: <DescriptionIcon />, view: 'formularios-uafe' },
+    { id: 'analisis-uafe', label: 'Análisis UAFE', icon: <AnalyticsIcon />, view: 'analisis-uafe' },
+    { id: 'notifications', label: 'Notificaciones', icon: <NotificationsIcon />, view: 'notifications' },
+    { id: 'encuestas-satisfaccion', label: 'Encuestas', icon: <PollIcon />, view: 'encuestas-satisfaccion' },
+    { id: 'qr-management', label: 'Códigos QR', icon: <QrCodeIcon />, view: 'qr-management' },
+  ];
+
+  const billingSubItems = [
+    { view: 'importar-datos', label: 'Importar Datos', icon: <CloudUploadIcon fontSize="small" /> },
+    { view: 'facturas', label: 'Facturas', icon: <ReceiptIcon fontSize="small" /> },
+    { view: 'pagos', label: 'Pagos', icon: <PaymentsIcon fontSize="small" /> },
+    { view: 'reportes', label: 'Reportes', icon: <AssessmentIcon fontSize="small" /> },
+  ];
+
+  const configItems = [
+    { id: 'settings', label: 'Configuración', icon: <SettingsIcon />, view: 'settings' },
+    { id: 'whatsapp-templates', label: 'Templates WhatsApp', icon: <WhatsAppIcon />, view: 'whatsapp-templates' },
+  ];
+
+  const isItemActive = (view) => currentView === view;
+  const isBillingActive = billingSubItems.some(item => currentView === item.view);
+
+  const NavItem = ({ item, collapsed }) => {
+    const active = isItemActive(item.view);
+    return (
+      <ListItem disablePadding sx={{ mb: 0.5 }}>
+        <Tooltip title={collapsed ? item.label : ''} placement="right">
+          <ListItemButton
+            onClick={() => handleNavigation(item.view)}
+            sx={{
+              borderRadius: 2,
+              minHeight: 44,
+              justifyContent: collapsed ? 'center' : 'flex-start',
+              px: collapsed ? 1.5 : 2,
+              mx: collapsed ? 0.5 : 1,
+              backgroundColor: active
+                ? (isDarkMode ? 'rgba(30, 58, 95, 0.4)' : 'rgba(30, 58, 95, 0.08)')
+                : 'transparent',
+              color: active
+                ? (isDarkMode ? '#93c5fd' : '#1e3a5f')
+                : (isDarkMode ? '#94a3b8' : '#64748b'),
+              borderLeft: active ? '3px solid' : '3px solid transparent',
+              borderColor: active ? 'primary.main' : 'transparent',
+              '&:hover': {
+                backgroundColor: active
+                  ? (isDarkMode ? 'rgba(30, 58, 95, 0.5)' : 'rgba(30, 58, 95, 0.12)')
+                  : (isDarkMode ? 'rgba(148, 163, 184, 0.08)' : 'rgba(30, 58, 95, 0.04)'),
+              },
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <ListItemIcon
+              sx={{
+                color: active ? 'primary.main' : 'inherit',
+                minWidth: collapsed ? 'auto' : 36,
+                justifyContent: 'center',
+                mr: collapsed ? 0 : 1.5,
+              }}
+            >
+              {item.id === 'notifications' && !collapsed ? (
+                <Badge badgeContent={0} color="error" variant="dot" invisible>
+                  {item.icon}
+                </Badge>
+              ) : item.icon}
+            </ListItemIcon>
+            {!collapsed && (
+              <ListItemText
+                primary={item.label}
+                primaryTypographyProps={{
+                  fontSize: '0.875rem',
+                  fontWeight: active ? 600 : 500,
+                  color: 'inherit'
+                }}
+              />
+            )}
+          </ListItemButton>
+        </Tooltip>
+      </ListItem>
+    );
   };
-  const allItems = (navItemsByRole[role] || []);
-  const navigationItems = React.useMemo(() => {
-    // Excluir ítems que van en submenu de configuración
-    const exclude = new Set(['settings', 'whatsapp-templates']);
-    return allItems
-      .filter(i => !exclude.has(i.id))
-      .map(i => ({
-        id: i.id,
-        text: i.label,
-        icon: iconMap[i.icon] || <DashboardIcon />,
-        view: i.view,
-        active: currentView === i.view
-      }));
-  }, [allItems, currentView]);
 
-  /**
-   * Items del submenu de Configuración
-   */
-  const configSubmenuItems = React.useMemo(() => {
-    const include = new Set(['settings', 'whatsapp-templates']);
-    return allItems
-      .filter(i => include.has(i.id))
-      .map(i => ({
-        text: i.label,
-        view: i.view,
-        active: currentView === i.view
-      }));
-  }, [allItems, currentView]);
-
-  /**
-   * Contenido del drawer
-   */
   const drawer = (
     <Box sx={{
       height: '100%',
       display: 'flex',
       flexDirection: 'column',
-      bgcolor: isDarkMode ? 'background.paper' : '#1e40af', // Fondo azul en modo claro
-      color: isDarkMode ? 'text.primary' : 'white', // Texto blanco en modo claro
-      transition: 'all 0.3s ease'
+      backgroundColor: isDarkMode ? '#1a1d23' : '#fafaf9',
+      color: isDarkMode ? '#e2e8f0' : '#475569',
     }}>
-      {/* Header del sidebar con botón de colapso */}
+      {/* Header del sidebar */}
       <Box sx={{
-        p: 2,
-        bgcolor: isDarkMode ? 'grey.900' : 'rgba(0, 0, 0, 0.1)', // Ligeramente más oscuro en modo claro
-        color: 'inherit',
-        minHeight: '64px',
+        p: sidebarCollapsed ? 2 : 2.5,
+        minHeight: 72,
         display: 'flex',
         alignItems: 'center',
         justifyContent: sidebarCollapsed ? 'center' : 'space-between',
-        flexShrink: 0,
-        gap: 1,
+        borderBottom: '1px solid',
+        borderColor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.2)',
       }}>
-        {!sidebarCollapsed && (
-          <Box sx={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+        {!sidebarCollapsed ? (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Avatar sx={{
-              bgcolor: 'white',
-              color: '#1e40af',
-              mr: 1,
+              bgcolor: 'primary.main',
+              color: 'white',
+              width: 36,
+              height: 36,
               fontSize: '1rem',
-              width: 32,
-              height: 32
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
             }}>
-              <SecurityIcon />
+              <SecurityIcon fontSize="small" />
             </Avatar>
             <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 'bold', lineHeight: 1.2 }}>
+              <Typography variant="subtitle2" sx={{ 
+                fontWeight: 700, 
+                color: isDarkMode ? '#f1f5f9' : '#0f172a',
+                letterSpacing: '-0.01em'
+              }}>
                 Notaría Segura
               </Typography>
-              <Typography variant="caption" sx={{ opacity: 0.9, lineHeight: 1 }}>
-                Administrador
+              <Typography variant="caption" sx={{ 
+                color: isDarkMode ? '#64748b' : '#94a3b8',
+                fontWeight: 500
+              }}>
+                Sistema Administrativo
               </Typography>
             </Box>
           </Box>
-        )}
-        {sidebarCollapsed && (
+        ) : (
           <Avatar sx={{
-            bgcolor: 'white',
-            color: '#1e40af',
-            fontSize: '1rem',
-            width: 32,
-            height: 32
+            bgcolor: 'primary.main',
+            color: 'white',
+            width: 40,
+            height: 40,
+            fontSize: '1.1rem',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
           }}>
             <SecurityIcon />
           </Avatar>
         )}
-        <Tooltip title={sidebarCollapsed ? 'Expandir sidebar' : 'Colapsar sidebar'} placement="right">
-          <IconButton
-            onClick={handleSidebarToggle}
-            sx={{
-              color: 'white',
-              bgcolor: 'rgba(255, 255, 255, 0.1)',
-              '&:hover': {
-                bgcolor: 'rgba(255, 255, 255, 0.2)',
-              },
-              transition: 'all 0.2s ease',
-            }}
-            size="small"
-          >
-            {sidebarCollapsed ? <ExpandIcon /> : <CollapseIcon />}
-          </IconButton>
-        </Tooltip>
+        
+        {!sidebarCollapsed && (
+          <Tooltip title="Colapsar menú" placement="right">
+            <IconButton
+              onClick={handleSidebarToggle}
+              size="small"
+              sx={{
+                color: isDarkMode ? '#64748b' : '#94a3b8',
+                '&:hover': { color: isDarkMode ? '#94a3b8' : '#64748b' }
+              }}
+            >
+              <CollapseIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        )}
       </Box>
 
       {/* Navegación principal */}
-      <Box sx={{ flex: 1, overflow: 'auto' }}>
-        <List sx={{ px: 1, py: 2 }}>
-          {/* Grupos de Navegación */}
-          {[
-            {
-              title: 'PRINCIPAL',
-              items: navigationItems.filter(i => ['dashboard', 'users', 'documents', 'seguimiento-mensajes', 'qr-management'].includes(i.id))
-            },
-            {
-              title: 'SUPERVISIÓN UAFE',
-              items: navigationItems.filter(i => ['formularios-uafe', 'analisis-uafe'].includes(i.id))
-            },
-            {
-              title: 'OPCIONES',
-              items: navigationItems.filter(i => ['notifications', 'encuestas-satisfaccion'].includes(i.id))
-            }
-          ].map((group, groupIdx) => (
-            <React.Fragment key={groupIdx}>
-              {!sidebarCollapsed && group.items.length > 0 && (
-                <Typography
-                  variant="caption"
-                  sx={{
-                    px: 3,
-                    py: 1,
-                    display: 'block',
-                    fontWeight: 700,
-                    color: 'rgba(255, 255, 255, 0.5)',
-                    letterSpacing: '0.05rem',
-                    mt: groupIdx === 0 ? 0 : 2
-                  }}
-                >
-                  {group.title}
-                </Typography>
-              )}
-              {group.items.map((item) => (
-                <ListItem key={item.id || item.view} disablePadding sx={{ mb: 0.5 }}>
-                  <Tooltip title={sidebarCollapsed ? item.text : ''} placement="right">
-                    <ListItemButton
-                      onClick={() => handleNavigation(item.view)}
-                      sx={{
-                        borderRadius: 1,
-                        minHeight: 48,
-                        justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                        px: sidebarCollapsed ? 1 : 2,
-                        backgroundColor: item.active
-                          ? (isDarkMode ? 'primary.dark' : 'rgba(255, 255, 255, 0.25)')
-                          : 'transparent',
-                        color: 'inherit',
-                        '&:hover': {
-                          backgroundColor: item.active
-                            ? (isDarkMode ? 'primary.main' : 'rgba(255, 255, 255, 0.35)')
-                            : (isDarkMode ? 'action.hover' : 'rgba(255, 255, 255, 0.15)'),
-                        },
-                        transition: 'all 0.2s ease',
-                      }}
-                    >
-                      <ListItemIcon
-                        sx={{
-                          color: 'inherit',
-                          minWidth: sidebarCollapsed ? 'auto' : 40,
-                          justifyContent: 'center',
-                        }}
-                      >
-                        {item.icon}
-                      </ListItemIcon>
-                      {!sidebarCollapsed && (
-                        <ListItemText
-                          primary={item.text}
-                          primaryTypographyProps={{
-                            fontSize: '0.875rem',
-                            fontWeight: item.active ? 600 : 400,
-                            color: 'inherit'
-                          }}
-                        />
-                      )}
-                    </ListItemButton>
-                  </Tooltip>
-                </ListItem>
-              ))}
-            </React.Fragment>
+      <Box sx={{ flex: 1, overflow: 'auto', py: 2 }}>
+        {/* Sección Principal */}
+        {!sidebarCollapsed && (
+          <Typography 
+            variant="overline" 
+            sx={{ 
+              px: 3, 
+              py: 1, 
+              display: 'block',
+              color: isDarkMode ? '#64748b' : '#94a3b8',
+              fontSize: '0.6875rem',
+              fontWeight: 700,
+              letterSpacing: '0.08em'
+            }}
+          >
+            PRINCIPAL
+          </Typography>
+        )}
+        <List sx={{ px: sidebarCollapsed ? 1 : 1.5, py: 0.5 }}>
+          {mainNavItems.map((item) => (
+            <NavItem key={item.id} item={item} collapsed={sidebarCollapsed} />
           ))}
+        </List>
 
-          {/* Facturación con submenu */}
+        {/* Sección Gestión */}
+        {!sidebarCollapsed && (
+          <Typography 
+            variant="overline" 
+            sx={{ 
+              px: 3, 
+              py: 1, 
+              display: 'block',
+              color: isDarkMode ? '#64748b' : '#94a3b8',
+              fontSize: '0.6875rem',
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              mt: 2
+            }}
+          >
+            GESTIÓN
+          </Typography>
+        )}
+        <List sx={{ px: sidebarCollapsed ? 1 : 1.5, py: 0.5 }}>
+          {secondaryNavItems.map((item) => (
+            <NavItem key={item.id} item={item} collapsed={sidebarCollapsed} />
+          ))}
+        </List>
+
+        {/* Facturación con submenu */}
+        {!sidebarCollapsed && (
+          <Typography 
+            variant="overline" 
+            sx={{ 
+              px: 3, 
+              py: 1, 
+              display: 'block',
+              color: isDarkMode ? '#64748b' : '#94a3b8',
+              fontSize: '0.6875rem',
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              mt: 2
+            }}
+          >
+            FINANCIERO
+          </Typography>
+        )}
+        <List sx={{ px: sidebarCollapsed ? 1 : 1.5, py: 0.5 }}>
           <ListItem disablePadding sx={{ mb: 0.5, flexDirection: 'column' }}>
             <Tooltip title={sidebarCollapsed ? 'Facturación' : ''} placement="right">
               <ListItemButton
                 onClick={() => setBillingMenuOpen(!billingMenuOpen)}
                 sx={{
-                  borderRadius: 1,
-                  minHeight: 48,
+                  borderRadius: 2,
+                  minHeight: 44,
                   justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                  px: sidebarCollapsed ? 1 : 2,
-                  backgroundColor: ['importar-datos', 'facturas', 'pagos', 'reportes'].includes(currentView)
-                    ? (isDarkMode ? 'primary.dark' : 'rgba(255, 255, 255, 0.25)')
+                  px: sidebarCollapsed ? 1.5 : 2,
+                  mx: sidebarCollapsed ? 0.5 : 1,
+                  width: '100%',
+                  backgroundColor: isBillingActive
+                    ? (isDarkMode ? 'rgba(30, 58, 95, 0.4)' : 'rgba(30, 58, 95, 0.08)')
                     : 'transparent',
-                  color: 'inherit',
+                  color: isBillingActive
+                    ? (isDarkMode ? '#93c5fd' : '#1e3a5f')
+                    : (isDarkMode ? '#94a3b8' : '#64748b'),
+                  borderLeft: isBillingActive ? '3px solid' : '3px solid transparent',
+                  borderColor: isBillingActive ? 'primary.main' : 'transparent',
                   '&:hover': {
-                    backgroundColor: ['importar-datos', 'facturas', 'pagos', 'reportes'].includes(currentView)
-                      ? (isDarkMode ? 'primary.main' : 'rgba(255, 255, 255, 0.35)')
-                      : (isDarkMode ? 'action.hover' : 'rgba(255, 255, 255, 0.15)'),
+                    backgroundColor: isBillingActive
+                      ? (isDarkMode ? 'rgba(30, 58, 95, 0.5)' : 'rgba(30, 58, 95, 0.12)')
+                      : (isDarkMode ? 'rgba(148, 163, 184, 0.08)' : 'rgba(30, 58, 95, 0.04)'),
                   },
-                  transition: 'all 0.2s ease',
-                  width: '100%'
                 }}
               >
                 <ListItemIcon
                   sx={{
-                    color: 'inherit',
-                    minWidth: sidebarCollapsed ? 'auto' : 40,
+                    color: isBillingActive ? 'primary.main' : 'inherit',
+                    minWidth: sidebarCollapsed ? 'auto' : 36,
                     justifyContent: 'center',
+                    mr: sidebarCollapsed ? 0 : 1.5,
                   }}
                 >
                   <AccountBalanceIcon />
@@ -387,12 +392,19 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
                       primary="Facturación"
                       primaryTypographyProps={{
                         fontSize: '0.875rem',
-                        fontWeight: ['importar-datos', 'facturas', 'pagos', 'reportes'].includes(currentView) ? 600 : 400,
+                        fontWeight: isBillingActive ? 600 : 500,
                         color: 'inherit'
                       }}
                     />
-                    <IconButton size="small" sx={{ color: 'inherit' }}>
-                      {billingMenuOpen ? <ExpandMoreIcon /> : <ChevronRightIcon />}
+                    <IconButton 
+                      size="small" 
+                      sx={{ 
+                        color: 'inherit',
+                        transform: billingMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.2s ease'
+                      }}
+                    >
+                      <ExpandMoreIcon fontSize="small" />
                     </IconButton>
                   </>
                 )}
@@ -400,165 +412,123 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
             </Tooltip>
 
             {/* Submenu de Facturación */}
-            {!sidebarCollapsed && billingMenuOpen && (
-              <List sx={{ pl: 2, width: '100%' }}>
-                {[
-                  { view: 'importar-datos', text: 'Importar Datos', icon: <CloudUploadIcon fontSize="small" /> },
-                  { view: 'facturas', text: 'Facturas', icon: <ReceiptIcon fontSize="small" /> },
-                  { view: 'pagos', text: 'Pagos', icon: <PaymentsIcon fontSize="small" /> },
-                  { view: 'reportes', text: 'Reportes', icon: <AssessmentIcon fontSize="small" /> }
-                ].map((subItem) => (
-                  <ListItem key={subItem.view} disablePadding>
-                    <ListItemButton
-                      onClick={() => handleNavigation(subItem.view)}
-                      sx={{
-                        borderRadius: 1,
-                        minHeight: 40,
-                        px: 2,
-                        backgroundColor: currentView === subItem.view
-                          ? (isDarkMode ? 'primary.main' : 'rgba(255, 255, 255, 0.35)')
-                          : 'transparent',
-                        color: 'inherit',
-                        '&:hover': {
-                          backgroundColor: currentView === subItem.view
-                            ? (isDarkMode ? 'primary.light' : 'rgba(255, 255, 255, 0.45)')
-                            : (isDarkMode ? 'action.hover' : 'rgba(255, 255, 255, 0.25)'),
-                        },
-                        transition: 'all 0.2s ease',
-                      }}
-                    >
-                      <ListItemIcon sx={{ color: 'inherit', minWidth: 30 }}>
-                        {subItem.icon}
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={subItem.text}
-                        primaryTypographyProps={{
-                          fontSize: '0.8rem',
-                          fontWeight: currentView === subItem.view ? 600 : 400,
-                          color: 'inherit'
+            <Collapse in={billingMenuOpen && !sidebarCollapsed} timeout="auto" unmountOnExit>
+              <List sx={{ pl: 2, width: '100%', mt: 0.5 }}>
+                {billingSubItems.map((subItem) => {
+                  const isSubActive = currentView === subItem.view;
+                  return (
+                    <ListItem key={subItem.view} disablePadding sx={{ mb: 0.5 }}>
+                      <ListItemButton
+                        onClick={() => handleNavigation(subItem.view)}
+                        sx={{
+                          borderRadius: 2,
+                          minHeight: 36,
+                          px: 2,
+                          mx: 1,
+                          backgroundColor: isSubActive
+                            ? (isDarkMode ? 'rgba(30, 58, 95, 0.3)' : 'rgba(30, 58, 95, 0.06)')
+                            : 'transparent',
+                          color: isSubActive
+                            ? (isDarkMode ? '#93c5fd' : '#1e3a5f')
+                            : (isDarkMode ? '#94a3b8' : '#64748b'),
+                          '&:hover': {
+                            backgroundColor: isSubActive
+                              ? (isDarkMode ? 'rgba(30, 58, 95, 0.4)' : 'rgba(30, 58, 95, 0.1)')
+                              : (isDarkMode ? 'rgba(148, 163, 184, 0.06)' : 'rgba(30, 58, 95, 0.03)'),
+                          },
                         }}
-                      />
-                    </ListItemButton>
-                  </ListItem>
-                ))}
+                      >
+                        <ListItemIcon sx={{ 
+                          color: isSubActive ? 'primary.main' : 'inherit',
+                          minWidth: 28 
+                        }}>
+                          {subItem.icon}
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={subItem.label}
+                          primaryTypographyProps={{
+                            fontSize: '0.8125rem',
+                            fontWeight: isSubActive ? 500 : 400,
+                            color: 'inherit'
+                          }}
+                        />
+                      </ListItemButton>
+                    </ListItem>
+                  );
+                })}
               </List>
-            )}
+            </Collapse>
           </ListItem>
+        </List>
 
-          {/* Configuración con submenu */}
-          <ListItem disablePadding sx={{ mb: 0.5, flexDirection: 'column' }}>
-            {/* Botón principal de Configuración */}
-            <Tooltip title={sidebarCollapsed ? 'Configuración' : ''} placement="right">
-              <ListItemButton
-                onClick={() => setConfigMenuOpen(!configMenuOpen)}
-                sx={{
-                  borderRadius: 1,
-                  minHeight: 48,
-                  justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                  px: sidebarCollapsed ? 1 : 2,
-                  backgroundColor: (currentView === 'settings' || currentView === 'whatsapp-templates')
-                    ? (isDarkMode ? 'primary.dark' : 'rgba(255, 255, 255, 0.25)')
-                    : 'transparent',
-                  color: 'inherit',
-                  '&:hover': {
-                    backgroundColor: (currentView === 'settings' || currentView === 'whatsapp-templates')
-                      ? (isDarkMode ? 'primary.main' : 'rgba(255, 255, 255, 0.35)')
-                      : (isDarkMode ? 'action.hover' : 'rgba(255, 255, 255, 0.15)'),
-                  },
-                  transition: 'all 0.2s ease',
-                  width: '100%'
-                }}
-              >
-                <ListItemIcon
-                  sx={{
-                    color: 'inherit',
-                    minWidth: sidebarCollapsed ? 'auto' : 40,
-                    justifyContent: 'center',
-                  }}
-                >
-                  <SettingsIcon />
-                </ListItemIcon>
-                {!sidebarCollapsed && (
-                  <>
-                    <ListItemText
-                      primary="Configuración"
-                      primaryTypographyProps={{
-                        fontSize: '0.875rem',
-                        fontWeight: (currentView === 'settings' || currentView === 'whatsapp-templates') ? 600 : 400,
-                        color: 'inherit'
-                      }}
-                    />
-                    <IconButton size="small" sx={{ color: 'inherit' }}>
-                      {configMenuOpen ? <ExpandMoreIcon /> : <ChevronRightIcon />}
-                    </IconButton>
-                  </>
-                )}
-              </ListItemButton>
-            </Tooltip>
-
-            {/* Submenu de Configuración */}
-            {!sidebarCollapsed && configMenuOpen && (
-              <List sx={{ pl: 2, width: '100%' }}>
-                {configSubmenuItems.map((subItem) => (
-                  <ListItem key={subItem.view} disablePadding>
-                    <ListItemButton
-                      onClick={() => handleNavigation(subItem.view)}
-                      sx={{
-                        borderRadius: 1,
-                        minHeight: 40,
-                        px: 2,
-                        backgroundColor: subItem.active
-                          ? (isDarkMode ? 'primary.main' : 'rgba(255, 255, 255, 0.35)')
-                          : 'transparent',
-                        color: 'inherit',
-                        '&:hover': {
-                          backgroundColor: subItem.active
-                            ? (isDarkMode ? 'primary.light' : 'rgba(255, 255, 255, 0.45)')
-                            : (isDarkMode ? 'action.hover' : 'rgba(255, 255, 255, 0.25)'),
-                        },
-                        transition: 'all 0.2s ease',
-                      }}
-                    >
-                      <ListItemText
-                        primary={subItem.text}
-                        primaryTypographyProps={{
-                          fontSize: '0.8rem',
-                          fontWeight: subItem.active ? 600 : 400,
-                          color: 'inherit'
-                        }}
-                      />
-                    </ListItemButton>
-                  </ListItem>
-                ))}
-              </List>
-            )}
-          </ListItem>
+        {/* Configuración */}
+        {!sidebarCollapsed && (
+          <Typography 
+            variant="overline" 
+            sx={{ 
+              px: 3, 
+              py: 1, 
+              display: 'block',
+              color: isDarkMode ? '#64748b' : '#94a3b8',
+              fontSize: '0.6875rem',
+              fontWeight: 700,
+              letterSpacing: '0.08em',
+              mt: 2
+            }}
+          >
+            SISTEMA
+          </Typography>
+        )}
+        <List sx={{ px: sidebarCollapsed ? 1 : 1.5, py: 0.5 }}>
+          {configItems.map((item) => (
+            <NavItem key={item.id} item={item} collapsed={sidebarCollapsed} />
+          ))}
         </List>
       </Box>
 
-      <Divider />
+      <Divider sx={{ borderColor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.2)' }} />
 
-      {/* Sección de controles */}
-      <Box sx={{ p: sidebarCollapsed ? 1 : 2 }}>
+      {/* Sección inferior - Usuario y controles */}
+      <Box sx={{ p: sidebarCollapsed ? 1.5 : 2 }}>
         {/* Usuario actual */}
         {!sidebarCollapsed && (
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+          <Box sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            mb: 2,
+            p: 1.5,
+            borderRadius: 2,
+            backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.5)' : 'rgba(241, 245, 249, 0.8)',
+          }}>
             <Avatar
               sx={{
                 bgcolor: getUserRoleColor(),
-                width: 32,
-                height: 32,
-                mr: 1,
-                fontSize: '0.875rem'
+                width: 36,
+                height: 36,
+                mr: 1.5,
+                fontSize: '0.875rem',
+                fontWeight: 600
               }}
             >
               {getUserInitials()}
             </Avatar>
             <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+              <Typography variant="body2" sx={{ 
+                fontWeight: 600,
+                color: isDarkMode ? '#f1f5f9' : '#1e293b',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis'
+              }}>
                 {getFullName()}
               </Typography>
-              <Typography variant="caption" color="text.secondary">
+              <Typography variant="caption" sx={{ 
+                color: isDarkMode ? '#64748b' : '#94a3b8',
+                textTransform: 'uppercase',
+                fontWeight: 600,
+                fontSize: '0.6875rem',
+                letterSpacing: '0.05em'
+              }}>
                 {user?.role}
               </Typography>
             </Box>
@@ -570,71 +540,106 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
           display: 'flex',
           alignItems: 'center',
           justifyContent: sidebarCollapsed ? 'center' : 'space-between',
-          mb: 1
+          mb: 1.5,
+          px: sidebarCollapsed ? 0 : 1
         }}>
           {!sidebarCollapsed && (
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              {isDarkMode ? <DarkModeIcon sx={{ mr: 1, fontSize: 20 }} /> : <LightModeIcon sx={{ mr: 1, fontSize: 20 }} />}
-              <Typography variant="body2">
-                {isDarkMode ? 'Modo Oscuro' : 'Modo Claro'}
+              {isDarkMode ? (
+                <DarkModeIcon sx={{ mr: 1, fontSize: 18, color: '#64748b' }} />
+              ) : (
+                <LightModeIcon sx={{ mr: 1, fontSize: 18, color: '#94a3b8' }} />
+              )}
+              <Typography variant="body2" sx={{ color: isDarkMode ? '#94a3b8' : '#64748b' }}>
+                {isDarkMode ? 'Oscuro' : 'Claro'}
               </Typography>
             </Box>
           )}
-          <Tooltip title={sidebarCollapsed ? `Cambiar a ${isDarkMode ? 'modo claro' : 'modo oscuro'}` : ''} placement="right">
-            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-              {sidebarCollapsed && (isDarkMode ? <DarkModeIcon sx={{ mr: 0.5, fontSize: 20 }} /> : <LightModeIcon sx={{ mr: 0.5, fontSize: 20 }} />)}
-              <Switch
-                checked={!!isDarkMode}
-                onChange={toggleTheme}
-                size="small"
-                color="default"
-              />
-            </Box>
-          </Tooltip>
-        </Box>
-
-        {/* Botones de acción */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
-          <Tooltip title={sidebarCollapsed ? 'Cambiar Contraseña' : ''} placement="right">
-            <Button
-              variant="outlined"
-              startIcon={!sidebarCollapsed ? <SettingsIcon /> : null}
-              onClick={() => setShowChangePassword(true)}
-              size="small"
-              fullWidth={!sidebarCollapsed}
-              sx={{
-                minWidth: sidebarCollapsed ? 36 : 'auto',
-                px: sidebarCollapsed ? 0 : undefined
-              }}
-            >
-              {sidebarCollapsed ? <SettingsIcon /> : 'Cambiar Contraseña'}
-            </Button>
-          </Tooltip>
-        </Box>
-      </Box>
-
-      {/* Footer con Botón de Cerrar Sesión Prominente */}
-      <Box sx={{ p: sidebarCollapsed ? 1 : 2, mt: 'auto', borderTop: '1px solid', borderColor: 'divider', bgcolor: isDarkMode ? 'rgba(255,0,0,0.05)' : 'rgba(255,0,0,0.02)' }}>
-        <Tooltip title={sidebarCollapsed ? 'Cerrar Sesión' : ''} placement="right">
-          <Button
-            variant="contained"
-            startIcon={!sidebarCollapsed ? <LogoutIcon /> : <LogoutIcon />}
-            onClick={logout}
-            size="medium"
-            fullWidth
-            color="error"
+          <Switch
+            checked={!!isDarkMode}
+            onChange={toggleTheme}
+            size="small"
             sx={{
-              minWidth: sidebarCollapsed ? 36 : 'auto',
-              px: sidebarCollapsed ? 0 : 2,
-              py: 1,
-              fontWeight: 'bold',
-              boxShadow: 2
+              '& .MuiSwitch-switchBase.Mui-checked': {
+                color: 'primary.main',
+              },
+              '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                backgroundColor: 'primary.main',
+              },
+            }}
+          />
+        </Box>
+
+        {/* Botón cambiar contraseña */}
+        {!sidebarCollapsed && (
+          <Button
+            variant="outlined"
+            size="small"
+            fullWidth
+            onClick={() => setShowChangePassword(true)}
+            startIcon={<SettingsIcon fontSize="small" />}
+            sx={{
+              mb: 1.5,
+              borderColor: isDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(148, 163, 184, 0.3)',
+              color: isDarkMode ? '#94a3b8' : '#64748b',
+              '&:hover': {
+                borderColor: isDarkMode ? 'rgba(148, 163, 184, 0.4)' : 'rgba(30, 58, 95, 0.4)',
+                backgroundColor: isDarkMode ? 'rgba(148, 163, 184, 0.05)' : 'rgba(30, 58, 95, 0.03)',
+              }
             }}
           >
-            {!sidebarCollapsed && 'Cerrar Sesión'}
+            Cambiar Contraseña
           </Button>
-        </Tooltip>
+        )}
+
+        {/* Botón de Cerrar Sesión */}
+        <Button
+          variant="contained"
+          size="small"
+          fullWidth
+          onClick={logout}
+          startIcon={sidebarCollapsed ? null : <LogoutIcon fontSize="small" />}
+          sx={{
+            minWidth: sidebarCollapsed ? 44 : 'auto',
+            height: sidebarCollapsed ? 44 : 36,
+            px: sidebarCollapsed ? 0 : 2,
+            background: isDarkMode 
+              ? 'linear-gradient(135deg, #991b1b 0%, #7f1d1d 100%)'
+              : 'linear-gradient(135deg, #be123c 0%, #9f1239 100%)',
+            '&:hover': {
+              background: isDarkMode 
+                ? 'linear-gradient(135deg, #7f1d1d 0%, #641e1e 100%)'
+                : 'linear-gradient(135deg, #9f1239 0%, #881337 100%)',
+            }
+          }}
+        >
+          {sidebarCollapsed ? <LogoutIcon fontSize="small" /> : 'Cerrar Sesión'}
+        </Button>
       </Box>
+
+      {/* Botón expandir cuando está colapsado */}
+      {sidebarCollapsed && (
+        <Box sx={{ 
+          p: 1.5, 
+          display: 'flex', 
+          justifyContent: 'center',
+          borderTop: '1px solid',
+          borderColor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.2)',
+        }}>
+          <Tooltip title="Expandir menú" placement="right">
+            <IconButton
+              onClick={handleSidebarToggle}
+              size="small"
+              sx={{
+                color: isDarkMode ? '#64748b' : '#94a3b8',
+                '&:hover': { color: isDarkMode ? '#94a3b8' : '#64748b' }
+              }}
+            >
+              <ExpandIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      )}
     </Box>
   );
 
@@ -643,7 +648,7 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
 
   return (
     <ThemeProvider theme={theme}>
-      <Box sx={{ display: 'flex', minHeight: '100vh' }} style={{ backgroundColor: isDarkMode ? '#0f1419' : '#E9F5FF' }}>
+      <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
         {/* App Bar */}
         <AppBar
           position="fixed"
@@ -651,13 +656,9 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
             width: { sm: `calc(100% - ${currentDrawerWidth}px)` },
             ml: { sm: `${currentDrawerWidth}px` },
             transition: 'all 0.3s ease',
-            bgcolor: isDarkMode ? '#1a1f2e' : '#ffffff',
-            color: isDarkMode ? '#ffffff' : 'text.primary',
-            borderBottom: isDarkMode ? '1px solid #334155' : 'none',
-            boxShadow: isDarkMode ? '0 1px 3px 0 rgba(0, 0, 0, 0.3)' : 1
           }}
         >
-          <Toolbar>
+          <Toolbar sx={{ minHeight: 64 }}>
             <IconButton
               color="inherit"
               aria-label="open drawer"
@@ -667,7 +668,10 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
             >
               <MenuIcon />
             </IconButton>
-            <Typography variant="h6" noWrap component="div">
+            <Typography variant="h6" noWrap component="div" sx={{ 
+              fontWeight: 600,
+              color: 'text.primary'
+            }}>
               Panel de Administración
             </Typography>
           </Toolbar>
@@ -677,16 +681,13 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
         <Box
           component="nav"
           sx={{ width: { sm: currentDrawerWidth }, flexShrink: { sm: 0 } }}
-          aria-label="navigation folders"
         >
           {/* Drawer móvil */}
           <Drawer
             variant="temporary"
             open={mobileOpen}
             onClose={handleDrawerToggle}
-            ModalProps={{
-              keepMounted: true, // Mejor performance en móvil
-            }}
+            ModalProps={{ keepMounted: true }}
             sx={{
               display: { xs: 'block', sm: 'none' },
               '& .MuiDrawer-paper': {
@@ -706,7 +707,11 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
               '& .MuiDrawer-paper': {
                 boxSizing: 'border-box',
                 width: currentDrawerWidth,
-                transition: 'width 0.3s ease'
+                transition: 'width 0.3s ease',
+                border: 'none',
+                boxShadow: isDarkMode 
+                  ? '4px 0 24px rgba(0, 0, 0, 0.2)'
+                  : '4px 0 24px rgba(0, 0, 0, 0.04)',
               },
             }}
             open
@@ -725,10 +730,9 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
             overflow: 'auto',
             transition: 'all 0.3s ease'
           }}
-          style={{ backgroundColor: isDarkMode ? '#0f1419' : '#E9F5FF' }}
         >
-          <Toolbar /> {/* Espaciado para el AppBar */}
-          <Container maxWidth="xl" sx={{ py: 3 }}>
+          <Toolbar sx={{ minHeight: 64 }} />
+          <Container maxWidth="xl" sx={{ py: 4, px: { xs: 2, sm: 3, md: 4 } }}>
             {children}
           </Container>
         </Box>

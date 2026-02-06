@@ -1,98 +1,177 @@
 import { createTheme } from '@mui/material/styles';
 
 /**
- * Genera el tema de la aplicación basado en el modo (light/dark)
- * @param {boolean} isDark - Si el modo oscuro está activo
- * @returns {Theme} Objeto de tema MUI
+ * Tema refinado de Notaría Segura
+ * Estilo: Elegancia institucional con toques modernos
+ * Paleta: Tonos neutros cálidos con acentos en azul marino y verde bosque
  */
+
 export const getAppTheme = (isDark) => {
+    // Paleta de colores refinada
+    const colors = {
+        // Neutros elegantes
+        charcoal: '#2d3748',
+        slate: '#64748b',
+        warmGray: '#f5f5f4',
+        stone: '#e7e5e4',
+        
+        // Acentos sofisticados
+        navy: '#1e3a5f',
+        navyLight: '#2c5282',
+        forest: '#2f5233',
+        forestLight: '#3d6b42',
+        
+        // Estados sutiles
+        amber: '#d97706',
+        ruby: '#be123c',
+        emerald: '#047857',
+        
+        // Fondos
+        cream: '#fafaf9',
+        ivory: '#ffffff',
+        darkBg: '#1a1d23',
+        darkSurface: '#242830',
+    };
+
     return createTheme({
         palette: {
             mode: isDark ? 'dark' : 'light',
 
             primary: {
-                main: isDark ? '#3b82f6' : '#468BE6',
-                light: isDark ? '#60a5fa' : '#93BFEF',
-                dark: isDark ? '#1d4ed8' : '#1A5799',
+                main: isDark ? colors.navyLight : colors.navy,
+                light: isDark ? '#3d6b9c' : colors.navyLight,
+                dark: isDark ? colors.navy : '#152a45',
                 contrastText: '#ffffff'
             },
 
             secondary: {
-                main: isDark ? '#10b981' : '#22c55e',
-                light: isDark ? '#34d399' : '#86efac',
-                dark: isDark ? '#047857' : '#166534',
+                main: isDark ? colors.forestLight : colors.forest,
+                light: isDark ? '#4a7a4f' : colors.forestLight,
+                dark: isDark ? colors.forest : '#1f3d22',
                 contrastText: '#ffffff'
             },
 
             background: {
-                default: isDark ? '#0f1419' : '#E9F5FF',
-                paper: isDark ? '#1e2530' : '#FFFFFF',
+                default: isDark ? colors.darkBg : colors.cream,
+                paper: isDark ? colors.darkSurface : colors.ivory,
             },
 
             surface: {
-                main: isDark ? '#1e2530' : '#FFFFFF',
-                elevated: isDark ? '#2a3441' : '#F8FAFC',
-                interactive: isDark ? '#334155' : '#E2E8F0'
+                main: isDark ? colors.darkSurface : colors.ivory,
+                elevated: isDark ? '#2d333c' : colors.warmGray,
+                interactive: isDark ? '#3d4450' : colors.stone
             },
 
             text: {
-                primary: isDark ? '#f8fafc' : '#1F1F1F',
-                secondary: isDark ? '#cbd5e1' : '#64748b',
-                tertiary: isDark ? '#94a3b8' : '#94a3b8',
-                disabled: isDark ? '#64748b' : '#cbd5e1'
+                primary: isDark ? '#f1f5f9' : '#1e293b',
+                secondary: isDark ? '#94a3b8' : colors.slate,
+                tertiary: isDark ? '#64748b' : '#94a3b8',
+                disabled: isDark ? '#475569' : '#cbd5e1'
             },
 
             error: {
-                main: isDark ? '#ef4444' : '#dc2626',
-                light: isDark ? '#f87171' : '#fca5a5',
-                dark: isDark ? '#dc2626' : '#991b1b',
+                main: colors.ruby,
+                light: isDark ? '#fb7185' : '#fecdd3',
+                dark: '#9f1239',
                 contrastText: '#ffffff'
             },
             warning: {
-                main: isDark ? '#f59e0b' : '#d97706',
-                light: isDark ? '#fbbf24' : '#fcd34d',
-                dark: isDark ? '#d97706' : '#92400e',
+                main: colors.amber,
+                light: isDark ? '#fbbf24' : '#fde68a',
+                dark: '#92400e',
                 contrastText: '#ffffff'
             },
             info: {
-                main: isDark ? '#06b6d4' : '#0891b2',
-                light: isDark ? '#22d3ee' : '#67e8f9',
-                dark: isDark ? '#0891b2' : '#164e63',
+                main: isDark ? '#38bdf8' : '#0284c7',
+                light: isDark ? '#7dd3fc' : '#bae6fd',
+                dark: '#0369a1',
                 contrastText: '#ffffff'
             },
             success: {
-                main: isDark ? '#10b981' : '#059669',
-                light: isDark ? '#34d399' : '#6ee7b7',
-                dark: isDark ? '#047857' : '#047857',
+                main: colors.emerald,
+                light: isDark ? '#34d399' : '#a7f3d0',
+                dark: '#065f46',
                 contrastText: '#ffffff'
             },
 
-            divider: isDark ? '#334155' : '#e2e8f0',
+            divider: isDark ? 'rgba(148, 163, 184, 0.12)' : 'rgba(148, 163, 184, 0.2)',
 
             action: {
-                hover: isDark ? 'rgba(59, 130, 246, 0.08)' : 'rgba(59, 130, 246, 0.04)',
-                selected: isDark ? 'rgba(59, 130, 246, 0.12)' : 'rgba(59, 130, 246, 0.08)',
+                hover: isDark ? 'rgba(148, 163, 184, 0.08)' : 'rgba(30, 58, 95, 0.04)',
+                selected: isDark ? 'rgba(148, 163, 184, 0.12)' : 'rgba(30, 58, 95, 0.08)',
                 disabled: isDark ? 'rgba(148, 163, 184, 0.3)' : 'rgba(148, 163, 184, 0.5)',
-                disabledBackground: 'rgba(148, 163, 184, 0.12)',
+                disabledBackground: isDark ? 'rgba(30, 41, 59, 0.5)' : 'rgba(241, 245, 249, 0.8)',
             }
         },
 
         typography: {
-            fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+            fontFamily: '"Plus Jakarta Sans", "Inter", "Helvetica", "Arial", sans-serif',
             fontWeightLight: 300,
             fontWeightRegular: 400,
             fontWeightMedium: 500,
             fontWeightBold: 600,
 
-            h1: { color: isDark ? '#f8fafc' : '#1f2937', fontWeight: 600, letterSpacing: '-0.025em' },
-            h2: { color: isDark ? '#f8fafc' : '#1f2937', fontWeight: 600, letterSpacing: '-0.025em' },
-            h3: { color: isDark ? '#f8fafc' : '#1f2937', fontWeight: 500, letterSpacing: '-0.025em' },
-            h4: { color: isDark ? '#f8fafc' : '#1f2937', fontWeight: 500, letterSpacing: '-0.025em' },
-            h5: { color: isDark ? '#f8fafc' : '#1f2937', fontWeight: 500 },
-            h6: { color: isDark ? '#f8fafc' : '#1f2937', fontWeight: 500 },
+            h1: { 
+                color: isDark ? '#f8fafc' : '#0f172a', 
+                fontWeight: 600, 
+                letterSpacing: '-0.02em',
+                lineHeight: 1.2
+            },
+            h2: { 
+                color: isDark ? '#f8fafc' : '#0f172a', 
+                fontWeight: 600, 
+                letterSpacing: '-0.02em',
+                lineHeight: 1.25
+            },
+            h3: { 
+                color: isDark ? '#f8fafc' : '#0f172a', 
+                fontWeight: 600, 
+                letterSpacing: '-0.01em',
+                lineHeight: 1.3
+            },
+            h4: { 
+                color: isDark ? '#f8fafc' : '#1e293b', 
+                fontWeight: 600, 
+                letterSpacing: '-0.01em',
+                lineHeight: 1.35
+            },
+            h5: { 
+                color: isDark ? '#f8fafc' : '#1e293b', 
+                fontWeight: 600,
+                lineHeight: 1.4
+            },
+            h6: { 
+                color: isDark ? '#f8fafc' : '#334155', 
+                fontWeight: 600,
+                lineHeight: 1.4
+            },
 
-            body1: { color: isDark ? '#cbd5e1' : '#374151', lineHeight: 1.6 },
-            body2: { color: isDark ? '#94a3b8' : '#6b7280', lineHeight: 1.5 }
+            body1: { 
+                color: isDark ? '#cbd5e1' : '#475569', 
+                lineHeight: 1.7,
+                fontSize: '0.9375rem'
+            },
+            body2: { 
+                color: isDark ? '#94a3b8' : '#64748b', 
+                lineHeight: 1.6,
+                fontSize: '0.875rem'
+            },
+            caption: {
+                color: isDark ? '#94a3b8' : '#64748b',
+                fontSize: '0.75rem',
+                letterSpacing: '0.025em'
+            },
+            overline: {
+                color: isDark ? '#94a3b8' : '#64748b',
+                fontSize: '0.6875rem',
+                fontWeight: 600,
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase'
+            }
+        },
+
+        shape: {
+            borderRadius: 10
         },
 
         components: {
@@ -100,11 +179,17 @@ export const getAppTheme = (isDark) => {
                 styleOverrides: {
                     root: {
                         borderRadius: 12,
-                        border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-                        transition: 'all 0.2s ease-in-out',
+                        border: isDark ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.2)',
+                        backgroundColor: isDark ? colors.darkSurface : colors.ivory,
+                        boxShadow: isDark 
+                            ? '0 1px 3px rgba(0, 0, 0, 0.2), 0 1px 2px rgba(0, 0, 0, 0.15)'
+                            : '0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03)',
+                        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                         '&:hover': {
-                            transform: 'translateY(-2px)',
-                            borderColor: isDark ? 'rgba(59, 130, 246, 0.4)' : 'rgba(59, 130, 246, 0.2)'
+                            transform: 'translateY(-1px)',
+                            boxShadow: isDark 
+                                ? '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.2)'
+                                : '0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.04)',
                         }
                     }
                 }
@@ -112,41 +197,41 @@ export const getAppTheme = (isDark) => {
 
             MuiChip: {
                 styleOverrides: {
-                    root: { fontWeight: 500, fontSize: '0.75rem', borderRadius: 6 },
+                    root: { 
+                        fontWeight: 500, 
+                        fontSize: '0.75rem', 
+                        borderRadius: 6,
+                        height: 26,
+                    },
                     colorPrimary: {
-                        backgroundColor: isDark ? 'rgba(59, 130, 246, 0.2)' : 'rgba(59, 130, 246, 0.1)',
-                        color: isDark ? '#93c5fd' : '#1d4ed8',
-                        border: isDark ? '1px solid rgba(59, 130, 246, 0.3)' : '1px solid rgba(59, 130, 246, 0.2)',
+                        backgroundColor: isDark ? 'rgba(30, 58, 95, 0.25)' : 'rgba(30, 58, 95, 0.08)',
+                        color: isDark ? '#93c5fd' : colors.navy,
+                        border: isDark ? '1px solid rgba(30, 58, 95, 0.4)' : '1px solid rgba(30, 58, 95, 0.15)',
                     },
                     colorSecondary: {
-                        backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.1)',
-                        color: isDark ? '#6ee7b7' : '#047857',
-                        border: isDark ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(16, 185, 129, 0.2)',
+                        backgroundColor: isDark ? 'rgba(47, 82, 51, 0.25)' : 'rgba(47, 82, 51, 0.08)',
+                        color: isDark ? '#86efac' : colors.forest,
+                        border: isDark ? '1px solid rgba(47, 82, 51, 0.4)' : '1px solid rgba(47, 82, 51, 0.15)',
                     },
                     colorSuccess: {
-                        backgroundColor: isDark ? 'rgba(34, 197, 94, 0.2)' : 'rgba(34, 197, 94, 0.1)',
-                        color: isDark ? '#86efac' : '#166534',
-                        border: isDark ? '1px solid rgba(34, 197, 94, 0.3)' : '1px solid rgba(34, 197, 94, 0.2)',
+                        backgroundColor: isDark ? 'rgba(4, 120, 87, 0.2)' : 'rgba(4, 120, 87, 0.08)',
+                        color: isDark ? '#6ee7b7' : colors.emerald,
+                        border: isDark ? '1px solid rgba(4, 120, 87, 0.3)' : '1px solid rgba(4, 120, 87, 0.15)',
                     },
                     colorWarning: {
-                        backgroundColor: isDark ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.1)',
-                        color: isDark ? '#fcd34d' : '#92400e',
-                        border: isDark ? '1px solid rgba(245, 158, 11, 0.3)' : '1px solid rgba(245, 158, 11, 0.2)',
+                        backgroundColor: isDark ? 'rgba(217, 119, 6, 0.2)' : 'rgba(217, 119, 6, 0.08)',
+                        color: isDark ? '#fcd34d' : colors.amber,
+                        border: isDark ? '1px solid rgba(217, 119, 6, 0.3)' : '1px solid rgba(217, 119, 6, 0.15)',
                     },
                     colorError: {
-                        backgroundColor: isDark ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.1)',
-                        color: isDark ? '#fca5a5' : '#991b1b',
-                        border: isDark ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(239, 68, 68, 0.2)',
-                    },
-                    colorInfo: {
-                        backgroundColor: isDark ? 'rgba(6, 182, 212, 0.2)' : 'rgba(6, 182, 212, 0.1)',
-                        color: isDark ? '#22d3ee' : '#164e63',
-                        border: isDark ? '1px solid rgba(6, 182, 212, 0.3)' : '1px solid rgba(6, 182, 212, 0.2)',
+                        backgroundColor: isDark ? 'rgba(190, 18, 60, 0.2)' : 'rgba(190, 18, 60, 0.08)',
+                        color: isDark ? '#fda4af' : colors.ruby,
+                        border: isDark ? '1px solid rgba(190, 18, 60, 0.3)' : '1px solid rgba(190, 18, 60, 0.15)',
                     },
                     colorDefault: {
-                        backgroundColor: isDark ? 'rgba(100, 116, 139, 0.2)' : 'rgba(100, 116, 139, 0.1)',
-                        color: isDark ? '#cbd5e1' : '#475569',
-                        border: isDark ? '1px solid rgba(100, 116, 139, 0.3)' : '1px solid rgba(100, 116, 139, 0.2)',
+                        backgroundColor: isDark ? 'rgba(100, 116, 139, 0.2)' : 'rgba(100, 116, 139, 0.08)',
+                        color: isDark ? '#cbd5e1' : colors.slate,
+                        border: isDark ? '1px solid rgba(100, 116, 139, 0.25)' : '1px solid rgba(100, 116, 139, 0.15)',
                     }
                 }
             },
@@ -157,34 +242,45 @@ export const getAppTheme = (isDark) => {
                         borderRadius: 8,
                         textTransform: 'none',
                         fontWeight: 500,
+                        fontSize: '0.875rem',
                         boxShadow: 'none',
-                        transition: 'all 0.2s ease-in-out',
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                         '&:hover': {
                             boxShadow: isDark
-                                ? '0 4px 6px -1px rgba(0, 0, 0, 0.3)'
-                                : '0 2px 4px -1px rgba(0, 0, 0, 0.1)',
+                                ? '0 2px 4px -1px rgba(0, 0, 0, 0.3)'
+                                : '0 2px 4px -1px rgba(0, 0, 0, 0.08)',
+                            transform: 'translateY(-0.5px)'
+                        },
+                        '&:active': {
+                            transform: 'translateY(0)'
                         }
                     },
                     containedPrimary: {
                         background: isDark
-                            ? 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
-                            : 'linear-gradient(135deg, #468BE6 0%, #1A5799 100%)',
+                            ? `linear-gradient(135deg, ${colors.navyLight} 0%, ${colors.navy} 100%)`
+                            : `linear-gradient(135deg, ${colors.navy} 0%, #152a45 100%)`,
                         color: '#ffffff',
                         '&:hover': {
                             background: isDark
-                                ? 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)'
-                                : 'linear-gradient(135deg, #1A5799 0%, #1e3a8a 100%)',
+                                ? `linear-gradient(135deg, ${colors.navy} 0%, #152a45 100%)`
+                                : `linear-gradient(135deg, #152a45 0%, #0f1f33 100%)`,
                         }
                     },
                     containedSecondary: {
                         background: isDark
-                            ? 'linear-gradient(135deg, #10b981 0%, #047857 100%)'
-                            : 'linear-gradient(135deg, #22c55e 0%, #166534 100%)',
+                            ? `linear-gradient(135deg, ${colors.forestLight} 0%, ${colors.forest} 100%)`
+                            : `linear-gradient(135deg, ${colors.forest} 0%, #1f3d22 100%)`,
                         color: '#ffffff',
                         '&:hover': {
                             background: isDark
-                                ? 'linear-gradient(135deg, #047857 0%, #065f46 100%)'
-                                : 'linear-gradient(135deg, #166534 0%, #14532d 100%)',
+                                ? `linear-gradient(135deg, ${colors.forest} 0%, #1f3d22 100%)`
+                                : `linear-gradient(135deg, #1f3d22 0%, #152e18 100%)`,
+                        }
+                    },
+                    outlined: {
+                        borderWidth: '1.5px',
+                        '&:hover': {
+                            borderWidth: '1.5px',
                         }
                     }
                 }
@@ -193,11 +289,9 @@ export const getAppTheme = (isDark) => {
             MuiAppBar: {
                 styleOverrides: {
                     root: {
-                        backgroundColor: isDark ? '#1a1f2e' : '#ffffff',
-                        borderBottom: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-                        boxShadow: isDark
-                            ? '0 1px 3px 0 rgba(0, 0, 0, 0.3)'
-                            : '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
+                        backgroundColor: isDark ? colors.darkSurface : colors.ivory,
+                        borderBottom: isDark ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.2)',
+                        boxShadow: 'none',
                     }
                 }
             },
@@ -205,11 +299,11 @@ export const getAppTheme = (isDark) => {
             MuiPaper: {
                 styleOverrides: {
                     root: {
-                        backgroundColor: isDark ? '#1e2530' : '#ffffff',
-                        borderRadius: 8,
-                        border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
+                        backgroundColor: isDark ? colors.darkSurface : colors.ivory,
+                        borderRadius: 10,
+                        border: isDark ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.15)',
                         '&.MuiTableContainer-root': {
-                            backgroundColor: isDark ? '#1e2530' : '#ffffff',
+                            backgroundColor: isDark ? colors.darkSurface : colors.ivory,
                         }
                     }
                 }
@@ -218,9 +312,12 @@ export const getAppTheme = (isDark) => {
             MuiTableContainer: {
                 styleOverrides: {
                     root: {
-                        backgroundColor: isDark ? '#1e2530' : '#ffffff',
-                        border: isDark ? '1px solid #334155' : '1px solid #e2e8f0',
-                        borderRadius: 8,
+                        backgroundColor: isDark ? colors.darkSurface : colors.ivory,
+                        border: isDark ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.15)',
+                        borderRadius: 10,
+                        boxShadow: isDark 
+                            ? '0 1px 3px rgba(0, 0, 0, 0.15)'
+                            : '0 1px 3px rgba(0, 0, 0, 0.04)',
                     }
                 }
             },
@@ -228,18 +325,24 @@ export const getAppTheme = (isDark) => {
             MuiTableHead: {
                 styleOverrides: {
                     root: {
-                        backgroundColor: isDark ? '#242b3d' : '#f8fafc',
+                        backgroundColor: isDark ? 'rgba(30, 41, 59, 0.5)' : colors.warmGray,
                     }
                 }
             },
 
             MuiTableCell: {
                 styleOverrides: {
-                    root: { borderBottomColor: isDark ? '#334155' : '#e2e8f0' },
+                    root: { 
+                        borderBottomColor: isDark ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.15)',
+                        padding: '14px 16px',
+                    },
                     head: {
-                        backgroundColor: isDark ? '#242b3d' : '#f8fafc',
-                        color: isDark ? '#f8fafc' : '#1f2937',
+                        backgroundColor: isDark ? 'rgba(30, 41, 59, 0.5)' : colors.warmGray,
+                        color: isDark ? '#f1f5f9' : '#1e293b',
                         fontWeight: 600,
+                        fontSize: '0.75rem',
+                        letterSpacing: '0.025em',
+                        textTransform: 'uppercase',
                     }
                 }
             },
@@ -248,10 +351,20 @@ export const getAppTheme = (isDark) => {
                 styleOverrides: {
                     root: {
                         '& .MuiOutlinedInput-root': {
-                            backgroundColor: isDark ? '#242b3d' : '#f8fafc',
-                            '& fieldset': { borderColor: isDark ? '#334155' : '#e2e8f0' },
-                            '& .MuiSvgIcon-root': { color: isDark ? '#94a3b8' : '#6b7280' },
-                            '& input::placeholder': { color: isDark ? '#94a3b8' : '#6b7280', opacity: 1 },
+                            backgroundColor: isDark ? 'rgba(30, 41, 59, 0.5)' : '#f8fafc',
+                            borderRadius: 8,
+                            '& fieldset': { 
+                                borderColor: isDark ? 'rgba(148, 163, 184, 0.2)' : 'rgba(148, 163, 184, 0.3)',
+                                borderWidth: '1.5px',
+                            },
+                            '&:hover fieldset': {
+                                borderColor: isDark ? 'rgba(148, 163, 184, 0.4)' : 'rgba(30, 58, 95, 0.4)',
+                            },
+                            '&.Mui-focused fieldset': {
+                                borderWidth: '1.5px',
+                            },
+                            '& .MuiSvgIcon-root': { color: isDark ? '#94a3b8' : colors.slate },
+                            '& input::placeholder': { color: isDark ? '#64748b' : '#94a3b8', opacity: 1 },
                         },
                     },
                 },
@@ -259,16 +372,73 @@ export const getAppTheme = (isDark) => {
 
             MuiAlert: {
                 styleOverrides: {
+                    root: {
+                        borderRadius: 10,
+                    },
                     filledSuccess: { color: '#fff' },
                     filledError: { color: '#fff' },
                     filledInfo: { color: '#fff' },
                     filledWarning: { color: '#fff' },
-                    standardSuccess: { color: isDark ? '#86efac' : '#166534' },
-                    standardError: { color: isDark ? '#fca5a5' : '#991b1b' },
-                    standardWarning: { color: isDark ? '#fcd34d' : '#92400e' },
-                    standardInfo: { color: isDark ? '#67e8f9' : '#164e63' },
+                    standardSuccess: { 
+                        color: isDark ? '#86efac' : colors.emerald,
+                        backgroundColor: isDark ? 'rgba(4, 120, 87, 0.15)' : 'rgba(4, 120, 87, 0.08)',
+                    },
+                    standardError: { 
+                        color: isDark ? '#fda4af' : colors.ruby,
+                        backgroundColor: isDark ? 'rgba(190, 18, 60, 0.15)' : 'rgba(190, 18, 60, 0.08)',
+                    },
+                    standardWarning: { 
+                        color: isDark ? '#fcd34d' : colors.amber,
+                        backgroundColor: isDark ? 'rgba(217, 119, 6, 0.15)' : 'rgba(217, 119, 6, 0.08)',
+                    },
+                    standardInfo: { 
+                        color: isDark ? '#7dd3fc' : '#0369a1',
+                        backgroundColor: isDark ? 'rgba(2, 132, 199, 0.15)' : 'rgba(2, 132, 199, 0.08)',
+                    },
                 },
             },
+
+            MuiListItemButton: {
+                styleOverrides: {
+                    root: {
+                        borderRadius: 8,
+                        transition: 'all 0.2s ease',
+                    }
+                }
+            },
+
+            MuiDrawer: {
+                styleOverrides: {
+                    paper: {
+                        borderRight: isDark ? '1px solid rgba(148, 163, 184, 0.1)' : '1px solid rgba(148, 163, 184, 0.15)',
+                    }
+                }
+            },
+
+            MuiBadge: {
+                styleOverrides: {
+                    badge: {
+                        fontWeight: 600,
+                        fontSize: '0.6875rem',
+                    }
+                }
+            },
+
+            MuiIconButton: {
+                styleOverrides: {
+                    root: {
+                        transition: 'all 0.2s ease',
+                    }
+                }
+            },
+
+            MuiAvatar: {
+                styleOverrides: {
+                    root: {
+                        fontWeight: 500,
+                    }
+                }
+            }
         }
     });
 };
