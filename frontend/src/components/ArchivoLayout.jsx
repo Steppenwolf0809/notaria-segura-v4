@@ -24,6 +24,7 @@ import {
   FolderSpecial as ArchiveIcon,
   Visibility as SupervisionIcon,
   Message as MessageIcon,
+  WhatsApp as WhatsAppIcon,
   AccountBalance as BillingIcon,
   Logout as LogoutIcon,
   Settings as SettingsIcon,
@@ -126,10 +127,11 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
       </Badge>
     ),
     AccountBalance: <BillingIcon />,
+    WhatsApp: <WhatsAppIcon />,
     Visibility: <SupervisionIcon />
   };
   const navigationItems = useMemo(() => {
-    const allowed = ['dashboard', 'documentos', 'mensajes', 'cartera-cobros', 'supervision'];
+    const allowed = ['dashboard', 'documentos', 'mensajes', 'historial-notificaciones', 'cartera-cobros', 'supervision'];
     const source = (navItemsByRole[role] || []).filter(i => allowed.includes(i.id));
     return source.map(i => ({
       text: i.label,

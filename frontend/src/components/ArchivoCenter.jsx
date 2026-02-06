@@ -7,6 +7,7 @@ import SupervisionGeneral from './archivo/SupervisionGeneral';
 import CarteraCobros from './billing/CarteraCobros';
 
 import MisMensajes from './MisMensajes';
+import NotificationCenter from './notifications/NotificationCenter';
 import archivoService from '../services/archivo-service';
 import useAuth from '../hooks/use-auth';
 
@@ -122,6 +123,9 @@ const ArchivoCenter = () => {
       case 'notificaciones':
       case 'mensajes':
         return <MisMensajes onNavigateToDocument={handleNavigateToDocumentFromMessage} />;
+
+      case 'historial-notificaciones':
+        return <NotificationCenter />;
 
       case 'cartera-cobros':
         return <CarteraCobros />;

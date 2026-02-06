@@ -168,7 +168,11 @@ const EstadoPago = ({ documentId, paymentStatus: externalStatus, compact = false
             ]);
             setInvoiceDetail(invoiceData);
             setInvoicePayments(paymentsData.payments || []);
-            setInvoiceTotalPaid(paymentsData.totalPaid || 0); // Guardar el totalPaid del backend
+            // Usar el mayor entre: totalPaid del endpoint de pagos y paidAmount del invoice
+            // Number() defensivo para Prisma Decimals que llegan como string
+            const backendTotalPaid = Number(paymentsData.totalPaid) || 0;
+            const invoicePaidAmount = Number(invoiceData.paidAmount) || 0;
+            setInvoiceTotalPaid(Math.max(backendTotalPaid, invoicePaidAmount));
         } catch (err) {
             console.error('Error cargando factura:', err);
             setInvoiceDetail(null);
@@ -223,10 +227,11 @@ const EstadoPago = ({ documentId, paymentStatus: externalStatus, compact = false
             return null; // No mostrar nada si no hay factura en modo compacto
         }
 
+        const debt = Number(status.totalDebt) || 0;
         return (
             <Tooltip
-                title={status.totalDebt > 0
-                    ? `Saldo: ${billingService.formatCurrency(status.totalDebt)}`
+                title={debt > 0
+                    ? `Saldo: ${billingService.formatCurrency(debt)}`
                     : 'Pagado completamente'
                 }
             >
@@ -270,20 +275,20 @@ const EstadoPago = ({ documentId, paymentStatus: externalStatus, compact = false
                     {status.hasInvoice && (
                         <Box sx={{ mt: 0.5 }}>
                             <Typography variant="body2" component="span">
-                                Total: {billingService.formatCurrency(status.totalAmount)}
+                                Total: {billingService.formatCurrency(Number(status.totalAmount) || 0)}
                             </Typography>
-                            {status.totalPaid > 0 && (
+                            {(Number(status.totalPaid) || 0) > 0 && (
                                 <Typography variant="body2" component="span" sx={{ ml: 2 }}>
-                                    Pagado: {billingService.formatCurrency(status.totalPaid)}
+                                    Pagado: {billingService.formatCurrency(Number(status.totalPaid) || 0)}
                                 </Typography>
                             )}
-                            {status.totalDebt > 0 && (
+                            {(Number(status.totalDebt) || 0) > 0 && (
                                 <Typography
                                     variant="body2"
                                     component="span"
                                     sx={{ ml: 2, fontWeight: 600 }}
                                 >
-                                    Pendiente: {billingService.formatCurrency(status.totalDebt)}
+                                    Pendiente: {billingService.formatCurrency(Number(status.totalDebt) || 0)}
                                 </Typography>
                             )}
                         </Box>
@@ -360,40 +365,48 @@ const EstadoPago = ({ documentId, paymentStatus: externalStatus, compact = false
                             <Divider sx={{ my: 2 }} />
 
                             {/* Resumen Financiero */}
-                            <Grid container spacing={2} sx={{ mb: 3 }}>
-                                <Grid item xs={4}>
-                                    <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'primary.soft', borderRadius: 1 }}>
-                                        <Typography variant="caption" color="text.secondary">Total</Typography>
-                                        <Typography variant="h6" color="primary.main">
-                                            {billingService.formatCurrency(invoiceDetail.totalAmount)}
-                                        </Typography>
-                                    </Box>
-                                </Grid>
-                                <Grid item xs={4}>
-                                    <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'success.soft', borderRadius: 1 }}>
-                                        <Typography variant="caption" color="text.secondary">Pagado</Typography>
-                                        <Typography variant="h6" color="success.main">
-                                            {billingService.formatCurrency(invoiceTotalPaid)}
-                                        </Typography>
-                                    </Box>
-                                </Grid>
-                                <Grid item xs={4}>
-                                    <Box sx={{
-                                        textAlign: 'center',
-                                        p: 1.5,
-                                        bgcolor: status.totalDebt > 0 ? 'error.soft' : 'success.soft',
-                                        borderRadius: 1
-                                    }}>
-                                        <Typography variant="caption" color="text.secondary">Pendiente</Typography>
-                                        <Typography
-                                            variant="h6"
-                                            color={status.totalDebt > 0 ? 'error.main' : 'success.main'}
-                                        >
-                                            {billingService.formatCurrency(status.totalDebt)}
-                                        </Typography>
-                                    </Box>
-                                </Grid>
-                            </Grid>
+                            {(() => {
+                                // Calcular saldo pendiente localmente con Number() defensivo
+                                // en lugar de usar status.totalDebt (que viene de otra fuente de datos)
+                                const totalAmt = Number(invoiceDetail.totalAmount) || 0;
+                                const invoiceBalance = Math.max(0, totalAmt - invoiceTotalPaid);
+                                return (
+                                    <Grid container spacing={2} sx={{ mb: 3 }}>
+                                        <Grid item xs={4}>
+                                            <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'primary.soft', borderRadius: 1 }}>
+                                                <Typography variant="caption" color="text.secondary">Total</Typography>
+                                                <Typography variant="h6" color="primary.main">
+                                                    {billingService.formatCurrency(totalAmt)}
+                                                </Typography>
+                                            </Box>
+                                        </Grid>
+                                        <Grid item xs={4}>
+                                            <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'success.soft', borderRadius: 1 }}>
+                                                <Typography variant="caption" color="text.secondary">Pagado</Typography>
+                                                <Typography variant="h6" color="success.main">
+                                                    {billingService.formatCurrency(invoiceTotalPaid)}
+                                                </Typography>
+                                            </Box>
+                                        </Grid>
+                                        <Grid item xs={4}>
+                                            <Box sx={{
+                                                textAlign: 'center',
+                                                p: 1.5,
+                                                bgcolor: invoiceBalance > 0 ? 'error.soft' : 'success.soft',
+                                                borderRadius: 1
+                                            }}>
+                                                <Typography variant="caption" color="text.secondary">Pendiente</Typography>
+                                                <Typography
+                                                    variant="h6"
+                                                    color={invoiceBalance > 0 ? 'error.main' : 'success.main'}
+                                                >
+                                                    {billingService.formatCurrency(invoiceBalance)}
+                                                </Typography>
+                                            </Box>
+                                        </Grid>
+                                    </Grid>
+                                );
+                            })()}
 
                             {/* Historial de Pagos */}
                             <Typography variant="subtitle2" sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>

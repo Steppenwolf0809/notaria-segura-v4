@@ -920,61 +920,48 @@ async function marcarComoListo(req, res) {
       });
 
       // 📱 CREAR NOTIFICACIÓN AUTOMÁTICAMENTE
-      // Solo si el cliente tiene teléfono
+      // Siempre crear WhatsAppNotification para que aparezca en el Centro de Notificaciones
+      // (matrizador/archivo pueden agregar el teléfono después si falta)
       let notificacion = null;
-      if (document.clientPhone && document.clientPhone.trim()) {
-        const cantidadDocumentos = documentosAgrupados.length + 1;
+      const cantidadDocumentos = documentosAgrupados.length + 1;
+      const clientPhone = (document.clientPhone || '').trim();
 
-        notificacion = await tx.whatsAppNotification.create({
-          data: {
-            documentId: id,
-            clientName: document.clientName,
-            clientPhone: document.clientPhone.trim(),
-            messageType: 'DOCUMENTO_LISTO',
-            messageBody: `Código de retiro: ${codigoRetiro}. Documentos en lote: ${cantidadDocumentos}`,
-            status: 'PENDING', // Pendiente hasta que se envíe por WhatsApp
-            sentAt: null
-          }
-        });
+      notificacion = await tx.whatsAppNotification.create({
+        data: {
+          documentId: id,
+          clientName: document.clientName,
+          clientPhone: clientPhone,
+          messageType: 'DOCUMENTO_LISTO',
+          messageBody: `Código de retiro: ${codigoRetiro}. Documentos en lote: ${cantidadDocumentos}`,
+          status: 'PENDING',
+          sentAt: null
+        }
+      });
 
-        // Registrar evento de notificación preparada
-        await tx.documentEvent.create({
-          data: {
-            documentId: id,
-            userId: req.user.id,
-            eventType: 'WHATSAPP_NOTIFICATION',
-            description: notificacionExistente
+      // Registrar evento de notificación preparada
+      await tx.documentEvent.create({
+        data: {
+          documentId: id,
+          userId: req.user.id,
+          eventType: clientPhone ? 'WHATSAPP_NOTIFICATION' : 'CODIGO_GENERADO',
+          description: clientPhone
+            ? (notificacionExistente
               ? `Documento agregado a notificación existente. Código: ${codigoRetiro}`
-              : `Notificación WhatsApp preparada automáticamente. Código: ${codigoRetiro}`,
-            details: JSON.stringify({
-              codigoRetiro,
-              clientPhone: document.clientPhone.trim(),
-              documentosEnLote: cantidadDocumentos,
-              agrupadoConExistente: !!notificacionExistente,
-              notificacionId: notificacion.id,
-              timestamp: now.toISOString()
-            })
-          }
-        });
+              : `Notificación WhatsApp preparada automáticamente. Código: ${codigoRetiro}`)
+            : `Notificación preparada (cliente sin teléfono). Código: ${codigoRetiro}`,
+          details: JSON.stringify({
+            codigoRetiro,
+            clientPhone: clientPhone || null,
+            documentosEnLote: cantidadDocumentos,
+            agrupadoConExistente: !!notificacionExistente,
+            notificacionId: notificacion.id,
+            sinTelefono: !clientPhone,
+            timestamp: now.toISOString()
+          })
+        }
+      });
 
-        logger.info(`📱 Notificación creada para documento ${docActualizado.protocolNumber}. Código: ${codigoRetiro}${notificacionExistente ? ' (agrupado)' : ''}`);
-      } else {
-        // Sin teléfono: registrar evento de código interno
-        await tx.documentEvent.create({
-          data: {
-            documentId: id,
-            userId: req.user.id,
-            eventType: 'CODIGO_GENERADO',
-            description: `Código interno generado (cliente sin teléfono): ${codigoRetiro}`,
-            details: JSON.stringify({
-              codigoRetiro,
-              sinTelefono: true,
-              timestamp: now.toISOString()
-            })
-          }
-        });
-        logger.info(`📋 Código interno generado para documento ${docActualizado.protocolNumber} (sin teléfono). Código: ${codigoRetiro}`);
-      }
+      logger.info(`📱 Notificación creada para documento ${docActualizado.protocolNumber}. Código: ${codigoRetiro}${notificacionExistente ? ' (agrupado)' : ''}${!clientPhone ? ' (sin teléfono)' : ''}`);
 
       return { docActualizado, notificacion };
     });
