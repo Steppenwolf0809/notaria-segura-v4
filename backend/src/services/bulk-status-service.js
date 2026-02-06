@@ -189,62 +189,48 @@ export async function bulkMarkReady({ documentIds, actor, sendNotifications = tr
           }
         });
 
-        // 📱 Crear notificación automáticamente si el cliente tiene teléfono
-        if (d.clientPhone && d.clientPhone.trim()) {
-          const cantidadTotal = docs.length + documentosExistentesEnGrupo;
+        // 📱 Crear notificación automáticamente (siempre, para que aparezca en el Centro de Notificaciones)
+        const cantidadTotal = docs.length + documentosExistentesEnGrupo;
+        const clientPhone = (d.clientPhone || '').trim();
 
-          const notificacion = await tx.whatsAppNotification.create({
-            data: {
-              documentId: d.id,
-              clientName: d.clientName,
-              clientPhone: d.clientPhone.trim(),
-              messageType: 'DOCUMENTO_LISTO',
-              messageBody: `Código de retiro: ${codigoRetiro}. Documentos en lote: ${cantidadTotal}`,
-              status: 'PENDING',
-              sentAt: null
-            }
-          });
+        const notificacion = await tx.whatsAppNotification.create({
+          data: {
+            documentId: d.id,
+            clientName: d.clientName,
+            clientPhone: clientPhone,
+            messageType: 'DOCUMENTO_LISTO',
+            messageBody: `Código de retiro: ${codigoRetiro}. Documentos en lote: ${cantidadTotal}`,
+            status: 'PENDING',
+            sentAt: null
+          }
+        });
 
-          notificacionesCreadas.push(notificacion);
+        notificacionesCreadas.push(notificacion);
 
-          // Evento de notificación preparada
-          await tx.documentEvent.create({
-            data: {
-              documentId: d.id,
-              userId: actor.id,
-              eventType: 'WHATSAPP_NOTIFICATION',
-              description: agrupadoConExistente
+        // Evento de notificación preparada
+        await tx.documentEvent.create({
+          data: {
+            documentId: d.id,
+            userId: actor.id,
+            eventType: clientPhone ? 'WHATSAPP_NOTIFICATION' : 'CODIGO_GENERADO',
+            description: clientPhone
+              ? (agrupadoConExistente
                 ? `Documento agregado a notificación existente. Código: ${codigoRetiro}`
-                : `Notificación WhatsApp preparada automáticamente. Código: ${codigoRetiro}`,
-              details: JSON.stringify({
-                codigoRetiro,
-                clientPhone: d.clientPhone.trim(),
-                documentosEnLote: cantidadTotal,
-                agrupadoConExistente: agrupadoConExistente,
-                notificacionId: notificacion.id,
-                timestamp: now.toISOString()
-              }),
-              createdAt: now
-            }
-          });
-        } else {
-          // Sin teléfono: registrar evento de código interno
-          await tx.documentEvent.create({
-            data: {
-              documentId: d.id,
-              userId: actor.id,
-              eventType: 'CODIGO_GENERADO',
-              description: `Código interno generado (cliente sin teléfono): ${codigoRetiro}`,
-              details: JSON.stringify({
-                codigoRetiro,
-                sinTelefono: true,
-                bulk: true,
-                timestamp: now.toISOString()
-              }),
-              createdAt: now
-            }
-          });
-        }
+                : `Notificación WhatsApp preparada automáticamente. Código: ${codigoRetiro}`)
+              : `Notificación preparada (cliente sin teléfono). Código: ${codigoRetiro}`,
+            details: JSON.stringify({
+              codigoRetiro,
+              clientPhone: clientPhone || null,
+              documentosEnLote: cantidadTotal,
+              agrupadoConExistente: agrupadoConExistente,
+              notificacionId: notificacion.id,
+              sinTelefono: !clientPhone,
+              bulk: true,
+              timestamp: now.toISOString()
+            }),
+            createdAt: now
+          }
+        });
       }
     }
 
