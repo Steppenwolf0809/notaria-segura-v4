@@ -553,10 +553,17 @@ export async function getDocumentPaymentStatus(req, res) {
         const invoiceDetails = [];
 
         for (const invoice of invoices) {
-            const paid = invoice.payments.reduce(
+            // Calculate paid amount from both sources:
+            // 1. Payments table (manual imports/XML)
+            const paymentsTotal = invoice.payments.reduce(
                 (sum, p) => sum + Number(p.amount),
                 0
             );
+            // 2. paidAmount from Koinor sync (sync-billing)
+            const syncedPaidAmount = Number(invoice.paidAmount || 0);
+            // Use the higher value (sync might have more recent data)
+            const paid = Math.max(paymentsTotal, syncedPaidAmount);
+            
             const balance = Number(invoice.totalAmount) - paid;
 
             totalAmount += Number(invoice.totalAmount);
