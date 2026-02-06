@@ -695,6 +695,29 @@ export async function syncCxc(req, res) {
                                 where: { id: invoice.documentId },
                                 data: { pagoConfirmado: true }
                             });
+                            
+                            // 📝 Create event in document history
+                            try {
+                                await prisma.documentEvent.create({
+                                    data: {
+                                        documentId: invoice.documentId,
+                                        userId: 1, // System user
+                                        eventType: 'PAGO_REGISTRADO',
+                                        description: `Factura ${invoice.invoiceNumber} marcada como pagada por sincronización CXC`,
+                                        details: JSON.stringify({
+                                            invoiceNumber: invoice.invoiceNumber,
+                                            invoiceId: invoice.id,
+                                            amount: paidInvoice.totalAmount || invoice.totalAmount,
+                                            paymentDate: new Date().toISOString(),
+                                            syncSource: 'KOINOR_SYNC_CXC',
+                                            syncedAt: syncedAt.toISOString()
+                                        })
+                                    }
+                                });
+                                console.log(`[sync-cxc] Created payment event for document ${invoice.documentId}`);
+                            } catch (eventError) {
+                                console.error(`[sync-cxc] Error creating payment event:`, eventError.message);
+                            }
                         }
                         
                         invoiceSyncCount++;

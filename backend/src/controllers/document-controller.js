@@ -951,13 +951,13 @@ async function getMyDocuments(req, res) {
           dateFilter = Prisma.sql`AND d."fechaFactura" < ${endDate}`;
         }
 
-        // Construcción dinámica de ORDER BY SQL
-        let orderSql = Prisma.sql`d."updatedAt" DESC`;
+        // Construcción dinámica de ORDER BY SQL - usar Prisma.raw para strings seguros
+        let orderSql = Prisma.raw('d."updatedAt" DESC');
         if (orderBy !== 'prioridad') {
           const allowedCols = ['createdAt', 'updatedAt', 'clientName', 'protocolNumber', 'totalFactura', 'status', 'fechaFactura'];
           const safeCol = allowedCols.includes(orderBy) ? orderBy : 'updatedAt';
-          const safeDir = orderDirection.toLowerCase() === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
-          orderSql = Prisma.sql([`d."${safeCol}" ${safeDir === Prisma.sql`ASC` ? 'ASC' : 'DESC'}`]);
+          const safeDirStr = orderDirection.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+          orderSql = Prisma.raw(`d."${safeCol}" ${safeDirStr}`);
         }
 
         const pattern = `%${searchTerm}%`;

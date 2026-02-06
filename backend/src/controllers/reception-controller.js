@@ -326,17 +326,17 @@ async function listarTodosDocumentos(req, res) {
           whereSql = Prisma.sql`${whereSql} AND ${clause}`;
         }
 
-        // Preparar ORDER BY seguro (solo campos permitidos)
-        const fieldSql = (() => {
+        // Preparar ORDER BY seguro (solo campos permitidos) - usar Prisma.raw para strings
+        const fieldName = (() => {
           switch (mappedSortField) {
-            case 'createdAt': return Prisma.sql`d."createdAt"`;
-            case 'updatedAt': return Prisma.sql`d."updatedAt"`;
-            case 'clientName': return Prisma.sql`d."clientName"`;
-            case 'protocolNumber': return Prisma.sql`d."protocolNumber"`;
-            case 'documentType': return Prisma.sql`d."documentType"`;
-            case 'status': return Prisma.sql`d."status"`;
-            case 'fechaEntrega': return Prisma.sql`d."fechaEntrega"`;
-            default: return Prisma.sql`d."createdAt"`;
+            case 'createdAt': return 'd."createdAt"';
+            case 'updatedAt': return 'd."updatedAt"';
+            case 'clientName': return 'd."clientName"';
+            case 'protocolNumber': return 'd."protocolNumber"';
+            case 'documentType': return 'd."documentType"';
+            case 'status': return 'd."status"';
+            case 'fechaEntrega': return 'd."fechaEntrega"';
+            default: return 'd."createdAt"';
           }
         })();
         // Use string for direction since ASC/DESC are safe SQL keywords
@@ -347,7 +347,7 @@ async function listarTodosDocumentos(req, res) {
           FROM "documents" d
           LEFT JOIN "users" u ON u.id = d."assignedToId"
           WHERE ${whereSql}
-          ORDER BY ${fieldSql} ${Prisma.raw(direction)}
+          ORDER BY ${Prisma.raw(fieldName)} ${Prisma.raw(direction)}
           OFFSET ${skip} LIMIT ${take}
         `;
         const countRows = await prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${whereSql}`;

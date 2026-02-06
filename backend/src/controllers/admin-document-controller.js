@@ -117,10 +117,8 @@ async function getAllDocumentsOversight(req, res) {
             ...filterClauses
           ], Prisma.sql` AND `)}`;
 
-          const fieldSql = (sortBy === 'updatedAt')
-            ? Prisma.sql`d."updatedAt"`
-            : Prisma.sql`d."createdAt"`;
-          // Use string for direction since ASC/DESC are safe SQL keywords
+          // Use Prisma.raw for field name and direction since they are safe SQL keywords
+          const fieldName = (sortBy === 'updatedAt') ? 'd."updatedAt"' : 'd."createdAt"';
           const direction = sortOrder === 'asc' ? 'ASC' : 'DESC';
 
           documents = await prisma.$queryRaw`
@@ -131,7 +129,7 @@ async function getAllDocumentsOversight(req, res) {
             LEFT JOIN "users" au ON au.id = d."assignedToId"
             LEFT JOIN "users" cu ON cu.id = d."createdById"
             WHERE ${whereSql}
-            ORDER BY ${fieldSql} ${Prisma.raw(direction)}
+            ORDER BY ${Prisma.raw(fieldName)} ${Prisma.raw(direction)}
             OFFSET ${offset} LIMIT ${limitNum}
           `;
           const countRows = await prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${whereSql}`;

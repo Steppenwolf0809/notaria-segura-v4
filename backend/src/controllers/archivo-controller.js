@@ -212,7 +212,7 @@ async function listarMisDocumentos(req, res) {
         const safeCol = allowedCols.includes(orderBy) ? orderBy : 'updatedAt';
         const safeDirStr = orderDirection.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
 
-        orderSql = Prisma.sql([`${statusPriorityOrder.strings[0]} ASC, d."${safeCol}" ${safeDirStr}`]);
+        orderSql = Prisma.raw(`${statusPriorityOrder.strings[0]} ASC, d."${safeCol}" ${safeDirStr}`);
 
         const pattern = `%${searchTerm}%`;
 
@@ -909,9 +909,10 @@ async function supervisionGeneral(req, res) {
 
         const sortLower = String(sortDias || '').toLowerCase();
         // Mapear: días desc => updatedAt ASC, días asc => updatedAt DESC
-        const orderSql = sortDias
-          ? (sortLower === 'desc' ? Prisma.sql`d."updatedAt" ASC` : Prisma.sql`d."updatedAt" DESC`)
-          : Prisma.sql`d."updatedAt" DESC`;
+        const orderStr = sortDias
+          ? (sortLower === 'desc' ? 'd."updatedAt" ASC' : 'd."updatedAt" DESC')
+          : 'd."updatedAt" DESC';
+        const orderSql = Prisma.raw(orderStr);
 
         const documentos = await prisma.$queryRaw`
           SELECT d.*, au.id as "_assignedToId", au."firstName" as "_assignedToFirstName", au."lastName" as "_assignedToLastName"
