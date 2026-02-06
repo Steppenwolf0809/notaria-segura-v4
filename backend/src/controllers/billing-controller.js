@@ -1381,7 +1381,7 @@ export async function getMyPortfolio(req, res) {
                 isOverdue,
                 daysOverdue,
                 source: 'CXC',
-                matrizador: receivable.matrizador || 'Sin asignar'
+                matrizador: 'Sin asignar'  // TODO: use receivable.matrizador after migration
             });
         }
 
