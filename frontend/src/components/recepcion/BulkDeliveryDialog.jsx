@@ -38,22 +38,20 @@ function BulkDeliveryDialog({ open, onClose, documentIds, documents, onDeliveryC
     observaciones: ''
   });
 
-  // Debug: Log document IDs on mount/change
+  // Pre-llenar formulario solo al abrir el modal (no en cada re-render)
+  const prevOpenRef = React.useRef(false);
   useEffect(() => {
-    if (open) {
+    if (open && !prevOpenRef.current) {
       console.log('[BulkDeliveryDialog] documentIds recibidos:', documentIds?.length, documentIds);
-      // ✅ Pre-llenar con nombre del primer cliente si todos son del mismo
-      if (documents && documents.length > 0) {
-        const firstClient = documents[0]?.clientName || '';
-        const allSameClient = documents.every(d => d.clientName === firstClient);
-        if (allSameClient && firstClient) {
-          setFormData(prev => ({
-            ...prev,
-            personaRetira: firstClient
-          }));
-        }
-      }
+      const firstClient = String(documents?.[0]?.clientName || '');
+      setFormData(prev => ({
+        ...prev,
+        personaRetira: firstClient,
+        observaciones: ''
+      }));
+      setError(null);
     }
+    prevOpenRef.current = open;
   }, [open, documentIds, documents]);
 
   const handleChange = (e) => {
@@ -65,7 +63,7 @@ function BulkDeliveryDialog({ open, onClose, documentIds, documents, onDeliveryC
 
   const handleSubmit = async () => {
     // Validaciones
-    if (!formData.personaRetira) {
+    if (!String(formData.personaRetira || '').trim()) {
       setError('El nombre de quien retira es obligatorio');
       return;
     }
