@@ -613,12 +613,32 @@ export async function syncCxc(req, res) {
 
         // If fullSync, mark invoices not in the received list as PAID
         // IMPORTANT: Exclude failed records from this operation - we don't know their true status
+        let markedAsPaidInvoiceNumbers = [];
         if (fullSync === true && receivedInvoiceNumbers.length > 0) {
             try {
                 // Combine received and failed to determine what NOT to mark as paid
                 const excludeFromMarkAsPaid = [...receivedInvoiceNumbers, ...failedInvoiceNumbers];
                 
                 console.log(`[sync-cxc] FullSync: ${receivedInvoiceNumbers.length} received, ${failedInvoiceNumbers.length} failed, marking others as PAID`);
+                
+                // First, get the list of invoices that will be marked as PAID
+                const invoicesToMarkAsPaid = await prisma.pendingReceivable.findMany({
+                    where: {
+                        invoiceNumberRaw: { notIn: excludeFromMarkAsPaid },
+                        status: { notIn: ['PAID', 'CANCELLED'] }
+                    },
+                    select: {
+                        invoiceNumberRaw: true,
+                        invoiceNumber: true,
+                        totalAmount: true
+                    }
+                });
+                
+                markedAsPaidInvoiceNumbers = invoicesToMarkAsPaid.map(inv => ({
+                    invoiceNumberRaw: inv.invoiceNumberRaw,
+                    invoiceNumber: inv.invoiceNumber,
+                    totalAmount: inv.totalAmount
+                }));
                 
                 const result = await prisma.pendingReceivable.updateMany({
                     where: {
@@ -632,10 +652,59 @@ export async function syncCxc(req, res) {
                     }
                 });
                 metrics.markedAsPaid = result.count;
-                console.log(`[sync-cxc] Marked ${result.count} records as PAID`);
+                console.log(`[sync-cxc] Marked ${result.count} records as PAID in PendingReceivable`);
             } catch (markError) {
                 console.error('[sync-cxc] Error marking paid invoices:', markError.message);
             }
+        }
+        
+        // ALSO update Invoice table to keep it in sync with PendingReceivable
+        // This fixes the desync between CXC and Invoice tables
+        if (markedAsPaidInvoiceNumbers.length > 0) {
+            console.log(`[sync-cxc] Syncing ${markedAsPaidInvoiceNumbers.length} PAID invoices to Invoice table...`);
+            let invoiceSyncCount = 0;
+            
+            for (const paidInvoice of markedAsPaidInvoiceNumbers) {
+                try {
+                    // Try to find and update the corresponding Invoice
+                    const invoice = await prisma.invoice.findFirst({
+                        where: {
+                            OR: [
+                                { invoiceNumberRaw: paidInvoice.invoiceNumberRaw },
+                                { invoiceNumberRaw: paidInvoice.invoiceNumberRaw?.replace(/-/g, '') },
+                                { invoiceNumber: paidInvoice.invoiceNumber }
+                            ]
+                        }
+                    });
+                    
+                    if (invoice && invoice.status !== 'PAID') {
+                        await prisma.invoice.update({
+                            where: { id: invoice.id },
+                            data: {
+                                status: 'PAID',
+                                paidAmount: paidInvoice.totalAmount || invoice.totalAmount,
+                                saldoPendiente: 0,
+                                lastSyncAt: syncedAt,
+                                syncSource: 'KOINOR_SYNC_CXC'
+                            }
+                        });
+                        
+                        // Also update Document if linked
+                        if (invoice.documentId) {
+                            await prisma.document.update({
+                                where: { id: invoice.documentId },
+                                data: { pagoConfirmado: true }
+                            });
+                        }
+                        
+                        invoiceSyncCount++;
+                    }
+                } catch (invoiceSyncError) {
+                    console.error(`[sync-cxc] Error syncing invoice ${paidInvoice.invoiceNumberRaw}:`, invoiceSyncError.message);
+                }
+            }
+            
+            console.log(`[sync-cxc] Synced ${invoiceSyncCount} invoices to PAID status`);
         }
 
         const durationMs = Date.now() - startTime;
