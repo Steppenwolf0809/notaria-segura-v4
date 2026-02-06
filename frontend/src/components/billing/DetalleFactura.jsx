@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
     Box,
     Paper,
@@ -14,7 +14,6 @@ import {
     TableContainer,
     TableHead,
     TableRow,
-    Divider,
     Skeleton,
     IconButton,
     Tooltip,
@@ -26,13 +25,70 @@ import {
     Person as PersonIcon,
     CalendarToday as CalendarIcon,
     AttachMoney as MoneyIcon,
-    Link as LinkIcon
+    Link as LinkIcon,
+    AccountBalanceWallet as WalletIcon
 } from '@mui/icons-material';
 import billingService from '../../services/billing-service';
 
+// regex: hoisted outside component per js-hoist-regexp
+const INVOICE_HASH_RE = /#\/factura-detalle\/([a-f0-9-]+)/i;
+
+/**
+ * Convierte de forma segura un valor (string, Decimal, number) a Number.
+ * Prisma Decimal llega como string en JSON; esto evita concatenaciones.
+ */
+function toNum(value) {
+    if (value == null) return 0;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * Formateador de moneda con Intl.NumberFormat (instanciado una sola vez).
+ * rerender-lazy-state-init / js-cache-function-results
+ */
+const currencyFmt = new Intl.NumberFormat('es-EC', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+});
+
+/**
+ * Parsea el campo formas de pago del invoice.
+ * Maneja: Array, string CSV, null/undefined.
+ * Retorna array de strings (vacío si no hay datos).
+ */
+function parseFormasPago(invoice) {
+    const LABELS = {
+        pagoEfectivo: 'Efectivo',
+        pagoCheque: 'Cheque',
+        pagoTarjeta: 'Tarjeta',
+        pagoDeposito: 'Dep/Transferencia',
+        pagoDirecto: 'Pago Directo',
+        montoPagadoCxc: 'CxC',
+    };
+
+    const formas = [];
+    for (const [field, label] of Object.entries(LABELS)) {
+        const val = toNum(invoice[field]);
+        if (val > 0) {
+            formas.push({ label, amount: val });
+        }
+    }
+    return formas;
+}
+
 /**
  * DetalleFactura Component
- * Muestra el detalle de una factura específica con historial de pagos
+ * Muestra el detalle de una factura con historial de pagos y formas de pago.
+ *
+ * Vercel best-practices applied:
+ * - async-parallel: Promise.all para carga paralela
+ * - rerender-functional-setstate: no aplica (estados independientes)
+ * - js-hoist-regexp: regex fuera del componente
+ * - js-cache-function-results: currencyFmt instanciado una sola vez
+ * - rendering-conditional-render: ternarios en lugar de &&
+ * - rerender-derived-state-no-effect: cálculos derivados en useMemo
  */
 const DetalleFactura = ({ invoiceId }) => {
     const [invoice, setInvoice] = useState(null);
@@ -40,20 +96,17 @@ const DetalleFactura = ({ invoiceId }) => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    // Extraer ID del hash si no se provee como prop
     const getInvoiceId = useCallback(() => {
         if (invoiceId) return invoiceId;
-        const hash = window.location.hash;
-        // Match UUID format (alphanumeric + dashes) or simple numeric ID
-        const match = hash.match(/#\/factura-detalle\/([a-f0-9-]+)/i);
+        const match = window.location.hash.match(INVOICE_HASH_RE);
         return match ? match[1] : null;
     }, [invoiceId]);
 
-    // Cargar datos de la factura
+    // async-parallel: carga factura y pagos en paralelo
     const loadInvoiceData = useCallback(async () => {
         const id = getInvoiceId();
         if (!id) {
-            setError('ID de factura no válido');
+            setError('ID de factura no valido');
             setLoading(false);
             return;
         }
@@ -62,13 +115,11 @@ const DetalleFactura = ({ invoiceId }) => {
         setError(null);
 
         try {
-            // Cargar factura y pagos en paralelo
             const [invoiceResponse, paymentsResponse] = await Promise.all([
                 billingService.getInvoiceById(id),
                 billingService.getInvoicePayments(id)
             ]);
 
-            // billing-service ya devuelve response.data, no hay que acceder a .data otra vez
             setInvoice(invoiceResponse);
             setPayments(paymentsResponse.payments || []);
         } catch (err) {
@@ -83,28 +134,41 @@ const DetalleFactura = ({ invoiceId }) => {
         loadInvoiceData();
     }, [loadInvoiceData]);
 
-    // Volver a lista de facturas
+    // rerender-derived-state-no-effect: cálculos derivados en render, no en effect
+    const { totalAmount, totalPaid, balance, formasPago } = useMemo(() => {
+        if (!invoice) return { totalAmount: 0, totalPaid: 0, balance: 0, formasPago: [] };
+
+        const ta = toNum(invoice.totalAmount);
+
+        // El backend ya calcula totalPaid como max(syncedPaidAmount, paymentsSum),
+        // pero si hay pagos en la tabla de payments recalculamos por seguridad.
+        const paymentsSum = payments.reduce((sum, p) => sum + toNum(p.amount), 0);
+        const syncedPaid = toNum(invoice.paidAmount);
+        const tp = Math.max(syncedPaid, paymentsSum);
+
+        // Nunca mostrar saldo negativo
+        const bal = Math.max(0, ta - tp);
+
+        const fp = parseFormasPago(invoice);
+
+        return { totalAmount: ta, totalPaid: tp, balance: bal, formasPago: fp };
+    }, [invoice, payments]);
+
+    // Calcular si la factura esta vencida (derivado, sin state)
+    const isOverdue = useMemo(() => {
+        if (!invoice?.dueDate || balance <= 0) return false;
+        return new Date(invoice.dueDate) < new Date();
+    }, [invoice?.dueDate, balance]);
+
     const handleBack = () => {
         window.location.hash = '#/facturas';
     };
 
-    // Ver documento vinculado
     const handleViewDocument = (documentId) => {
-        // Navegar a vista de documento (ajustar según la ruta de tu app)
         window.location.hash = `#/documentos/${documentId}`;
     };
 
-    // Renderizar estado de factura
-    const renderStatus = (status) => {
-        const { label, color, icon } = billingService.formatInvoiceStatus(status);
-        return (
-            <Chip
-                label={`${icon} ${label}`}
-                color={color}
-                sx={{ fontWeight: 600, fontSize: '1rem', py: 2, px: 1 }}
-            />
-        );
-    };
+    // --- Early returns para loading / error / empty ---
 
     if (loading) {
         return (
@@ -138,13 +202,12 @@ const DetalleFactura = ({ invoiceId }) => {
         );
     }
 
-    // Calcular totales
-    const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-    const balance = Number(invoice.totalAmount || 0) - totalPaid;
+    const { label: statusLabel, color: statusColor, icon: statusIcon } =
+        billingService.formatInvoiceStatus(invoice.status);
 
     return (
         <Box sx={{ p: 3 }}>
-            {/* Header con botón volver */}
+            {/* Header */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
                 <Tooltip title="Volver a lista">
                     <IconButton onClick={handleBack}>
@@ -160,11 +223,15 @@ const DetalleFactura = ({ invoiceId }) => {
                         Detalle de factura y pagos
                     </Typography>
                 </Box>
-                {renderStatus(invoice.status)}
+                <Chip
+                    label={`${statusIcon} ${statusLabel}`}
+                    color={statusColor}
+                    sx={{ fontWeight: 600, fontSize: '1rem', py: 2, px: 1 }}
+                />
             </Box>
 
             <Grid container spacing={3}>
-                {/* Información del cliente */}
+                {/* Informacion del cliente */}
                 <Grid size={{ xs: 12, md: 6 }}>
                     <Card>
                         <CardContent>
@@ -178,16 +245,45 @@ const DetalleFactura = ({ invoiceId }) => {
                             <Typography variant="body2" color="text.secondary">
                                 {invoice.clientTaxId}
                             </Typography>
-                            {invoice.clientEmail && (
+                            {invoice.clientEmail ? (
                                 <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                                    📧 {invoice.clientEmail}
+                                    Correo: {invoice.clientEmail}
                                 </Typography>
-                            )}
-                            {invoice.clientPhone && (
+                            ) : null}
+                            {invoice.clientPhone ? (
                                 <Typography variant="body2" color="text.secondary">
-                                    📱 {invoice.clientPhone}
+                                    Tel: {invoice.clientPhone}
                                 </Typography>
-                            )}
+                            ) : null}
+
+                            {/* Formas de Pago - rendering-conditional-render */}
+                            {formasPago.length > 0 ? (
+                                <Box sx={{ mt: 2 }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                        <WalletIcon fontSize="small" color="primary" />
+                                        <Typography variant="subtitle2" color="text.secondary">
+                                            Formas de Pago
+                                        </Typography>
+                                    </Box>
+                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                        {formasPago.map((fp) => (
+                                            <Chip
+                                                key={fp.label}
+                                                label={`${fp.label}: ${currencyFmt.format(fp.amount)}`}
+                                                size="small"
+                                                sx={{
+                                                    bgcolor: 'primary.50',
+                                                    color: 'primary.dark',
+                                                    border: '1px solid',
+                                                    borderColor: 'primary.200',
+                                                    fontWeight: 500,
+                                                    fontSize: '0.75rem',
+                                                }}
+                                            />
+                                        ))}
+                                    </Box>
+                                </Box>
+                            ) : null}
                         </CardContent>
                     </Card>
                 </Grid>
@@ -202,25 +298,30 @@ const DetalleFactura = ({ invoiceId }) => {
                             </Box>
                             <Grid container spacing={2}>
                                 <Grid size={{ xs: 6 }}>
-                                    <Typography variant="caption" color="text.secondary">Emisión</Typography>
+                                    <Typography variant="caption" color="text.secondary">Emision</Typography>
                                     <Typography variant="body1" fontWeight={500}>
                                         {billingService.formatDate(invoice.issueDate)}
                                     </Typography>
                                 </Grid>
                                 <Grid size={{ xs: 6 }}>
-                                    <Typography
-                                        variant="caption"
-                                        color="text.secondary"
-                                    >Vencimiento</Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        Vencimiento
+                                    </Typography>
                                     <Typography
                                         variant="body1"
                                         fontWeight={500}
-                                        color={new Date(invoice.dueDate) < new Date() && balance > 0 ? 'error.main' : 'text.primary'}
+                                        color={isOverdue ? 'error.main' : 'text.primary'}
                                     >
                                         {billingService.formatDate(invoice.dueDate)}
                                     </Typography>
                                 </Grid>
                             </Grid>
+                            {/* Condicion de pago si existe */}
+                            {invoice.condicionPago ? (
+                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
+                                    Condicion: {invoice.condicionPago === 'C' ? 'Credito' : invoice.condicionPago === 'E' ? 'Contado' : invoice.condicionPago}
+                                </Typography>
+                            ) : null}
                         </CardContent>
                     </Card>
                 </Grid>
@@ -239,7 +340,7 @@ const DetalleFactura = ({ invoiceId }) => {
                                     <Box sx={{ textAlign: 'center', p: 2 }}>
                                         <Typography variant="caption" color="text.secondary">Total Factura</Typography>
                                         <Typography variant="h4" color="primary.main">
-                                            {billingService.formatCurrency(invoice.totalAmount)}
+                                            {currencyFmt.format(totalAmount)}
                                         </Typography>
                                     </Box>
                                 </Grid>
@@ -247,25 +348,37 @@ const DetalleFactura = ({ invoiceId }) => {
                                     <Box sx={{ textAlign: 'center', p: 2 }}>
                                         <Typography variant="caption" color="text.secondary">Total Pagado</Typography>
                                         <Typography variant="h4" color="success.main">
-                                            -{billingService.formatCurrency(totalPaid)}
+                                            -{currencyFmt.format(totalPaid)}
                                         </Typography>
                                     </Box>
                                 </Grid>
                                 <Grid size={{ xs: 4 }}>
-                                    <Box sx={{ textAlign: 'center', p: 2, bgcolor: balance > 0 ? 'error.light' : 'success.light', borderRadius: 2 }}>
+                                    <Box sx={{
+                                        textAlign: 'center',
+                                        p: 2,
+                                        bgcolor: balance > 0 ? 'error.light' : 'success.light',
+                                        borderRadius: 2,
+                                    }}>
                                         <Typography variant="caption" color="text.secondary">Saldo Pendiente</Typography>
                                         <Typography variant="h4" color={balance > 0 ? 'error.main' : 'success.main'}>
-                                            {billingService.formatCurrency(balance)}
+                                            {currencyFmt.format(balance)}
                                         </Typography>
                                     </Box>
                                 </Grid>
                             </Grid>
+
+                            {/* Nota de credito si existe */}
+                            {toNum(invoice.montoNotaCredito) > 0 ? (
+                                <Alert severity="info" sx={{ mt: 2 }}>
+                                    Nota de credito aplicada: {currencyFmt.format(toNum(invoice.montoNotaCredito))}
+                                </Alert>
+                            ) : null}
                         </CardContent>
                     </Card>
                 </Grid>
 
-                {/* Documento vinculado */}
-                {invoice.documentId && (
+                {/* Documento vinculado - rendering-conditional-render: ternary */}
+                {invoice.documentId ? (
                     <Grid size={{ xs: 12 }}>
                         <Alert
                             severity="info"
@@ -280,16 +393,16 @@ const DetalleFactura = ({ invoiceId }) => {
                                 </Button>
                             }
                         >
-                            Esta factura está vinculada al documento ID: {invoice.documentId}
+                            Esta factura esta vinculada al documento ID: {invoice.documentId}
                         </Alert>
                     </Grid>
-                )}
+                ) : null}
 
                 {/* Historial de pagos */}
                 <Grid size={{ xs: 12 }}>
                     <Paper sx={{ p: 2 }}>
                         <Typography variant="h6" gutterBottom>
-                            💵 Historial de Pagos
+                            Historial de Pagos
                         </Typography>
 
                         <TableContainer>
@@ -322,7 +435,7 @@ const DetalleFactura = ({ invoiceId }) => {
                                                 </TableCell>
                                                 <TableCell align="right">
                                                     <Typography variant="body2" color="success.main" fontWeight={500}>
-                                                        {billingService.formatCurrency(payment.amount)}
+                                                        {currencyFmt.format(toNum(payment.amount))}
                                                     </Typography>
                                                 </TableCell>
                                                 <TableCell>

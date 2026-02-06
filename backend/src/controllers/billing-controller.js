@@ -1278,19 +1278,26 @@ export async function getMyPortfolio(req, res) {
         // Buscar el nombre CXC correspondiente al usuario
         const cxcMatrizadorName = USER_TO_CXC_MATRIZADOR[user.firstName] || user.firstName;
 
-        // ⚠️ SOLO FACTURAS DEL CXC: Filtrar por sourceFile que contenga 'CXC'
-        // y que tengan matrizador asignado (del CXC XLS)
+        // Facturas del CXC: importadas manualmente (sourceFile='CXC') O sincronizadas (syncSource='KOINOR_SYNC')
         const invoices = await prisma.invoice.findMany({
             where: {
                 status: { in: ['PENDING', 'PARTIAL', 'OVERDUE'] },
-                // Solo facturas importadas desde CXC (XLS o XML)
-                sourceFile: { contains: 'CXC', mode: 'insensitive' },
-                OR: [
-                    { matrizador: cxcMatrizadorName },
-                    { assignedToId: userId },
+                AND: [
                     {
-                        matrizador: null,
-                        document: { is: { assignedToId: userId } }
+                        OR: [
+                            { sourceFile: { contains: 'CXC', mode: 'insensitive' } },
+                            { syncSource: 'KOINOR_SYNC' }
+                        ]
+                    },
+                    {
+                        OR: [
+                            { matrizador: cxcMatrizadorName },
+                            { assignedToId: userId },
+                            {
+                                matrizador: null,
+                                document: { is: { assignedToId: userId } }
+                            }
+                        ]
                     }
                 ]
             },
@@ -1599,15 +1606,16 @@ export async function getCarteraPorCobrar(req, res) {
     try {
         console.log('[billing-controller] getCarteraPorCobrar');
 
-        // ⚠️ SOLO FACTURAS DEL CXC: Filtrar por sourceFile que contenga 'CXC'
-        // Get all invoices with payments
+        // Facturas del CXC: importadas manualmente (sourceFile='CXC') O sincronizadas (syncSource='KOINOR_SYNC')
         const invoices = await prisma.invoice.findMany({
             where: {
                 status: {
                     in: ['PENDING', 'PARTIAL', 'OVERDUE']
                 },
-                // Solo facturas importadas desde CXC (XLS o XML)
-                sourceFile: { contains: 'CXC', mode: 'insensitive' }
+                OR: [
+                    { sourceFile: { contains: 'CXC', mode: 'insensitive' } },
+                    { syncSource: 'KOINOR_SYNC' }
+                ]
             },
             include: {
                 payments: true,

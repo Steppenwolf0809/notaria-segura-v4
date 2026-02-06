@@ -60,6 +60,7 @@ export const navItemsByRole = {
     { id: 'dashboard', label: 'Dashboard', view: 'dashboard', icon: 'Dashboard' },
     { id: 'documentos', label: 'Mis Documentos', view: 'documentos', icon: 'FolderSpecial' },
     { id: 'mensajes', label: 'Mis Mensajes', view: 'notificaciones', icon: 'Message' },
+    { id: 'cartera-cobros', label: 'Cartera de Cobros', view: 'cartera-cobros', icon: 'AccountBalance' },
     { id: 'supervision', label: 'Supervisión General', view: 'supervision', icon: 'Visibility' }
   ]
 };
