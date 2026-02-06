@@ -2341,26 +2341,85 @@ export async function importCxcXls(req, res) {
 }
 
 /**
- * Obtener cartera pendiente (detalle)
+ * Obtener cartera pendiente (detalle) - NUEVA VERSIÓN (Sync Agent)
  * GET /api/billing/cartera-pendiente
+ *
+ * Query params:
+ *   page (default 1), limit (default 20, max 100),
+ *   status (PENDING, PARTIAL, OVERDUE, PAID, CANCELLED),
+ *   search (clientName or clientTaxId),
+ *   sortBy (balance, daysOverdue, dueDate, clientName) default: balance,
+ *   sortOrder (asc, desc) default: desc
  */
 export async function getCarteraPendiente(req, res) {
     try {
-        const filters = {
-            clientTaxId: req.query.clientTaxId,
-            status: req.query.status,
-            reportDate: req.query.reportDate,
-            minBalance: req.query.minBalance,
-            limit: req.query.limit ? parseInt(req.query.limit) : 1000
-        };
+        const page = Math.max(parseInt(req.query.page) || 1, 1);
+        const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
+        const skip = (page - 1) * limit;
+        const status = req.query.status || null;
+        const search = req.query.search ? String(req.query.search).trim() : null;
+        const sortBy = ['balance', 'daysOverdue', 'dueDate', 'clientName'].includes(req.query.sortBy)
+            ? req.query.sortBy
+            : 'balance';
+        const sortOrder = req.query.sortOrder === 'asc' ? 'asc' : 'desc';
 
-        const { getCarteraPendiente: getCartera } = await import('../services/cxc-xls-import-service.js');
-        const receivables = await getCartera(filters);
+        // Build where clause
+        const where = {};
+        if (status) {
+            where.status = status;
+        }
+        if (search) {
+            where.OR = [
+                { clientName: { contains: search, mode: 'insensitive' } },
+                { clientTaxId: { contains: search } }
+            ];
+        }
+
+        // Query data + count in parallel
+        const [receivables, total, summaryAgg] = await Promise.all([
+            prisma.pendingReceivable.findMany({
+                where,
+                orderBy: { [sortBy]: sortOrder },
+                skip,
+                take: limit
+            }),
+            prisma.pendingReceivable.count({ where }),
+            prisma.pendingReceivable.aggregate({
+                where: { balance: { gt: 0 } },
+                _sum: { balance: true },
+                _count: { id: true }
+            })
+        ]);
+
+        // Compute summary breakdown
+        const [countPending, countPartial, countOverdue, totalOverdueAgg] = await Promise.all([
+            prisma.pendingReceivable.count({ where: { status: 'PENDING', balance: { gt: 0 } } }),
+            prisma.pendingReceivable.count({ where: { status: 'PARTIAL' } }),
+            prisma.pendingReceivable.count({ where: { status: 'OVERDUE' } }),
+            prisma.pendingReceivable.aggregate({
+                where: { status: 'OVERDUE' },
+                _sum: { balance: true }
+            })
+        ]);
 
         res.json({
             success: true,
-            data: receivables,
-            count: receivables.length
+            data: {
+                receivables,
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    totalPages: Math.ceil(total / limit)
+                },
+                summary: {
+                    totalBalance: Number(summaryAgg._sum.balance || 0),
+                    totalOverdue: Number(totalOverdueAgg._sum.balance || 0),
+                    countPending,
+                    countPartial,
+                    countOverdue
+                }
+            }
         });
 
     } catch (error) {
@@ -2373,19 +2432,115 @@ export async function getCarteraPendiente(req, res) {
 }
 
 /**
- * Obtener resumen de cartera agrupado por cliente
+ * Obtener resumen de cartera agrupado por cliente - NUEVA VERSIÓN (Sync Agent)
  * GET /api/billing/cartera-pendiente/resumen
+ *
+ * Query params:
+ *   page (default 1), limit (default 20, max 100),
+ *   search (clientName or clientTaxId),
+ *   sortBy (totalBalance, invoicesCount, maxDaysOverdue) default: totalBalance,
+ *   sortOrder (asc, desc) default: desc,
+ *   detail (true to include invoices list)
  */
 export async function getCarteraPendienteResumen(req, res) {
     try {
-        const reportDate = req.query.reportDate ? new Date(req.query.reportDate) : null;
+        const page = Math.max(parseInt(req.query.page) || 1, 1);
+        const limit = Math.min(Math.max(parseInt(req.query.limit) || 20, 1), 100);
+        const search = req.query.search ? String(req.query.search).trim() : null;
+        const detail = req.query.detail === 'true';
 
-        const { getCarteraPendienteResumen: getResumen } = await import('../services/cxc-xls-import-service.js');
-        const result = await getResumen(reportDate);
+        // Use raw SQL for groupBy with sorting and pagination
+        // Build search filter
+        const searchFilter = search
+            ? `AND (LOWER("clientName") LIKE LOWER('%${search.replace(/'/g, "''")}%') OR "clientTaxId" LIKE '%${search.replace(/'/g, "''")}%')`
+            : '';
+
+        // Get grouped data via raw query for full control
+        const clientsRaw = await prisma.$queryRawUnsafe(`
+            SELECT
+                "clientTaxId",
+                MAX("clientName") AS "clientName",
+                COUNT(*)::int AS "invoicesCount",
+                SUM(balance)::float AS "totalBalance",
+                MIN("dueDate") AS "oldestDueDate",
+                MAX("daysOverdue")::int AS "maxDaysOverdue"
+            FROM pending_receivables
+            WHERE balance > 0 ${searchFilter}
+            GROUP BY "clientTaxId"
+            ORDER BY SUM(balance) DESC
+            LIMIT ${limit}
+            OFFSET ${(page - 1) * limit}
+        `);
+
+        // Get total distinct clients count
+        const countResult = await prisma.$queryRawUnsafe(`
+            SELECT COUNT(DISTINCT "clientTaxId")::int AS total
+            FROM pending_receivables
+            WHERE balance > 0 ${searchFilter}
+        `);
+        const totalClients = countResult[0]?.total || 0;
+
+        // Get overall summary
+        const overallSummary = await prisma.pendingReceivable.aggregate({
+            where: { balance: { gt: 0 } },
+            _sum: { balance: true }
+        });
+        const totalOverdueAgg = await prisma.pendingReceivable.aggregate({
+            where: { status: 'OVERDUE' },
+            _sum: { balance: true }
+        });
+
+        // Optionally include detail invoices per client
+        let clients = clientsRaw.map(c => ({
+            clientTaxId: c.clientTaxId,
+            clientName: c.clientName,
+            invoicesCount: c.invoicesCount,
+            totalBalance: c.totalBalance,
+            oldestDueDate: c.oldestDueDate,
+            maxDaysOverdue: c.maxDaysOverdue
+        }));
+
+        if (detail && clients.length > 0) {
+            const taxIds = clients.map(c => c.clientTaxId);
+            const invoices = await prisma.pendingReceivable.findMany({
+                where: {
+                    clientTaxId: { in: taxIds },
+                    balance: { gt: 0 }
+                },
+                orderBy: { balance: 'desc' }
+            });
+
+            // Group invoices by clientTaxId
+            const invoicesByClient = {};
+            for (const inv of invoices) {
+                if (!invoicesByClient[inv.clientTaxId]) {
+                    invoicesByClient[inv.clientTaxId] = [];
+                }
+                invoicesByClient[inv.clientTaxId].push(inv);
+            }
+
+            clients = clients.map(c => ({
+                ...c,
+                invoices: invoicesByClient[c.clientTaxId] || []
+            }));
+        }
 
         res.json({
             success: true,
-            ...result
+            data: {
+                clients,
+                pagination: {
+                    page,
+                    limit,
+                    total: totalClients,
+                    totalPages: Math.ceil(totalClients / limit)
+                },
+                summary: {
+                    totalClients,
+                    totalBalance: Number(overallSummary._sum.balance || 0),
+                    totalOverdue: Number(totalOverdueAgg._sum.balance || 0)
+                }
+            }
         });
 
     } catch (error) {
@@ -2393,6 +2548,50 @@ export async function getCarteraPendienteResumen(req, res) {
         res.status(500).json({
             success: false,
             message: 'Error al obtener resumen de cartera pendiente'
+        });
+    }
+}
+
+/**
+ * Estado de sync CXC
+ * GET /api/billing/cartera-pendiente/sync-status
+ */
+export async function getCxcSyncStatus(req, res) {
+    try {
+        // Get latest sync timestamp
+        const latest = await prisma.pendingReceivable.aggregate({
+            _max: { lastSyncAt: true },
+            _count: { id: true },
+            _sum: { balance: true }
+        });
+
+        // Status breakdown
+        const [pending, partial, overdue, paid] = await Promise.all([
+            prisma.pendingReceivable.count({ where: { status: 'PENDING' } }),
+            prisma.pendingReceivable.count({ where: { status: 'PARTIAL' } }),
+            prisma.pendingReceivable.count({ where: { status: 'OVERDUE' } }),
+            prisma.pendingReceivable.count({ where: { status: 'PAID' } })
+        ]);
+
+        res.json({
+            success: true,
+            data: {
+                lastSyncAt: latest._max.lastSyncAt,
+                totalRecords: latest._count.id,
+                totalBalance: Number(latest._sum.balance || 0),
+                breakdown: {
+                    PENDING: pending,
+                    PARTIAL: partial,
+                    OVERDUE: overdue,
+                    PAID: paid
+                }
+            }
+        });
+    } catch (error) {
+        console.error('[billing-controller] getCxcSyncStatus error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error al obtener estado de sincronización CXC'
         });
     }
 }

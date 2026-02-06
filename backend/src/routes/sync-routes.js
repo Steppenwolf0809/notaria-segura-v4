@@ -1,13 +1,14 @@
 /**
  * Sync Routes
  * API routes for Koinor Sync Agent communication
- * 
+ *
  * All routes require Sync API Key authentication (X-Sync-Api-Key header)
- * 
+ *
  * Routes:
  * - POST /api/sync/billing - Receive billing data from Sync Agent
  * - GET /api/sync/billing/status - Get last sync status
  * - GET /api/sync/billing/history - Get sync history
+ * - POST /api/sync/cxc - Receive CXC (accounts receivable) data from Sync Agent
  */
 
 import express from 'express';
@@ -49,5 +50,22 @@ router.get('/billing/status', syncBillingController.getSyncStatus);
  * - limit: number (default: 20, max: 50)
  */
 router.get('/billing/history', syncBillingController.getSyncHistory);
+
+// ============================================================================
+// CXC (CUENTAS POR COBRAR) SYNC ENDPOINTS
+// ============================================================================
+
+/**
+ * POST /api/sync/cxc
+ * Receive CXC (accounts receivable) data from Koinor Sync Agent
+ *
+ * Body: {
+ *   type: "cxc",
+ *   fullSync: boolean,
+ *   timestamp: ISO date string,
+ *   data: CxcRecord[]
+ * }
+ */
+router.post('/cxc', syncBillingController.syncCxc);
 
 export default router;

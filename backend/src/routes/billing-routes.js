@@ -6,7 +6,7 @@
 import express from 'express';
 import multer from 'multer';
 import * as billingController from '../controllers/billing-controller.js';
-import { authenticateToken } from '../middleware/auth-middleware.js';
+import { authenticateToken, requireRoles } from '../middleware/auth-middleware.js';
 import { csrfProtection } from '../middleware/csrf-protection.js';
 import {
     validateQuery,
@@ -157,23 +157,29 @@ router.get('/matrizadores', billingController.getMatrizadoresForAssignment);
 router.patch('/invoices/:invoiceId/assign', csrfProtection, billingController.assignInvoiceMatrizador);
 
 // ============================================================================
-// NUEVO MÓDULO CXC - CARTERA POR COBRAR (XLS/CSV)
+// MÓDULO CXC - CARTERA POR COBRAR (Sync Agent + Legacy XLS)
 // ============================================================================
 
-// Importar CXC desde XLS/CSV
+// --- Legacy XLS import (se deprecará) ---
 router.post('/import-cxc-xls', csrfProtection, upload.single('file'), billingController.importCxcXls);
-
-// Obtener cartera pendiente (detalle)
-router.get('/cartera-pendiente', billingController.getCarteraPendiente);
-
-// Obtener resumen de cartera (agrupado por cliente)
-router.get('/cartera-pendiente/resumen', billingController.getCarteraPendienteResumen);
-
-// Obtener fechas de reportes disponibles
 router.get('/cartera-pendiente/fechas', billingController.getAvailableReportDates);
-
-// Limpiar datos antiguos (solo ADMIN)
 router.delete('/cartera-pendiente/limpiar', csrfProtection, billingController.limpiarCarteraAntigua);
+
+// --- Cartera Pendiente (nueva versión - Sync Agent) ---
+router.get('/cartera-pendiente',
+    requireRoles(['ADMIN', 'CAJA', 'RECEPCION']),
+    billingController.getCarteraPendiente
+);
+
+router.get('/cartera-pendiente/resumen',
+    requireRoles(['ADMIN', 'CAJA']),
+    billingController.getCarteraPendienteResumen
+);
+
+router.get('/cartera-pendiente/sync-status',
+    requireRoles(['ADMIN']),
+    billingController.getCxcSyncStatus
+);
 
 export default router;
 

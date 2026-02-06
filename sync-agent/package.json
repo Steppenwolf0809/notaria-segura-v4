@@ -1,0 +1,20 @@
+{
+  "name": "koinor-sync-agent",
+  "version": "1.0.0",
+  "description": "Agente de sincronización Koinor SQL Server → Railway",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "sync-once": "node src/index.js --once",
+    "install-service": "node install-service.js",
+    "uninstall-service": "node uninstall-service.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.0",
+    "mssql": "^10.0.0",
+    "node-windows": "^1.0.0-beta.8",
+    "winston": "^3.11.0",
+    "winston-daily-rotate-file": "^4.7.0"
+  }
+}
