@@ -59,7 +59,16 @@
       "Bash(DATABASE_URL=\"postgresql://postgres:vzdzHHIVerdjgzWlmfARWiSsbTBSJfvw@gondola.proxy.rlwy.net:39316/railway\" node scripts/check-allocations.js:*)",
       "Bash(dir /s /b C:notaria-segurasync-agent)",
       "Bash(findstr:*)",
-      "Bash(DATABASE_URL=\"postgresql://postgres:uXwrkbpPDVXrEngsRCMHdIKkOUDXipic@switchback.proxy.rlwy.net:25513/railway\" npx prisma db push:*)"
+      "Bash(DATABASE_URL=\"postgresql://postgres:uXwrkbpPDVXrEngsRCMHdIKkOUDXipic@switchback.proxy.rlwy.net:25513/railway\" npx prisma db push:*)",
+      "Bash(git -C \"C:\\\\notaria-segura\" status)",
+      "Bash(git -C \"C:\\\\notaria-segura\" diff frontend/src/components/bulk/BulkDeliveryModal.jsx frontend/src/components/recepcion/BulkDeliveryDialog.jsx)",
+      "Bash(git -C \"C:\\\\notaria-segura\" log --oneline -5)",
+      "Bash(git -C \"C:\\\\notaria-segura\" add frontend/src/components/bulk/BulkDeliveryModal.jsx frontend/src/components/recepcion/BulkDeliveryDialog.jsx)",
+      "Bash(git -C \"C:\\\\notaria-segura\" commit -m \"$\\(cat <<''EOF''\nfix: entrega grupal validaba nombre obligatorio pese a estar pre-llenado\n\n- Evitar que re-renders del useEffect reseteen el formulario usando ref\n- Asegurar que entregadoA/personaRetira siempre sea string \\(no null/undefined\\)\n- Pre-llenar siempre con el nombre del primer cliente disponible\n- Robustecer validación con String\\(\\) antes de .trim\\(\\)\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git -C \"C:\\\\notaria-segura\" push origin main)",
+      "Bash(git -C \"C:\\\\notaria-segura\" diff frontend/src/components/recepcion/BulkDeliveryDialog.jsx)",
+      "Bash(git -C \"C:\\\\notaria-segura\" add frontend/src/components/recepcion/BulkDeliveryDialog.jsx)",
+      "Bash(git -C \"C:\\\\notaria-segura\" commit -m \"$\\(cat <<''EOF''\nfix: corregir nombres de campos en payload de entrega grupal\n\nEl frontend enviaba deliveredTo/receptorId/relationType/observations\npero el backend esperaba entregadoA/cedulaReceptor/relacionTitular/observaciones.\nEste mismatch causaba que entregadoA fuera undefined y la validación\nsiempre rechazara con \"nombre de quien retira es obligatorio\".\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")"
     ],
     "deny": []
   }

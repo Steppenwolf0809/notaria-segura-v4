@@ -4,6 +4,7 @@ import ArchivoLayout from './ArchivoLayout';
 import ArchivoDashboard from './ArchivoDashboard';
 import GestionArchivo from './GestionArchivo';
 import SupervisionGeneral from './archivo/SupervisionGeneral';
+import CarteraCobros from './billing/CarteraCobros';
 
 import MisMensajes from './MisMensajes';
 import archivoService from '../services/archivo-service';
@@ -121,6 +122,9 @@ const ArchivoCenter = () => {
       case 'notificaciones':
       case 'mensajes':
         return <MisMensajes onNavigateToDocument={handleNavigateToDocumentFromMessage} />;
+
+      case 'cartera-cobros':
+        return <CarteraCobros />;
 
       case 'supervision':
         return (
