@@ -14,9 +14,18 @@ import { normalizeInvoiceNumber } from '../utils/billing-utils.js';
 // Constants
 const BATCH_SIZE = 50; // Process invoices in batches for better transaction handling
 const MAX_RECORDS_PER_REQUEST = 2000; // Limit per sync request for safety
+const CXC_BATCH_SIZE = 100; // CXC can handle larger batches (simpler upsert)
 
 // Valid payment states from Koinor
 const VALID_PAYMENT_STATES = ['PAGADA', 'PARCIAL', 'PENDIENTE', 'ANULADA'];
+
+// Map Koinor estado_pago to PendingReceivable status
+const CXC_STATUS_MAP = {
+    'PAGADA': 'PAID',
+    'PARCIAL': 'PARTIAL',
+    'PENDIENTE': 'PENDING',   // Will be upgraded to OVERDUE if overdue
+    'ANULADA': 'CANCELLED'
+};
 
 /**
  * Map Koinor payment state to InvoiceStatus enum
@@ -418,6 +427,216 @@ export async function getSyncHistory(req, res) {
         res.status(500).json({
             success: false,
             message: 'Error al obtener historial de sincronización'
+        });
+    }
+}
+
+// ============================================================================
+// CXC (CUENTAS POR COBRAR) SYNC ENDPOINTS
+// ============================================================================
+
+/**
+ * Validate CXC record data
+ */
+function validateCxcRecord(record) {
+    const errors = [];
+
+    if (!record.invoiceNumberRaw) {
+        errors.push('invoiceNumberRaw es requerido');
+    }
+    if (!record.clientTaxId) {
+        errors.push('clientTaxId es requerido');
+    }
+    if (record.balance === undefined || record.balance === null) {
+        errors.push('balance es requerido');
+    } else if (typeof record.balance !== 'number' || record.balance < 0) {
+        errors.push('balance debe ser un número >= 0');
+    }
+    if (record.totalAmount !== undefined && (typeof record.totalAmount !== 'number' || record.totalAmount < 0)) {
+        errors.push('totalAmount debe ser un número >= 0');
+    }
+    if (record.totalPaid !== undefined && (typeof record.totalPaid !== 'number' || record.totalPaid < 0)) {
+        errors.push('totalPaid debe ser un número >= 0');
+    }
+
+    return errors;
+}
+
+/**
+ * Map Koinor status to PendingReceivable status
+ * Handles OVERDUE detection for PENDIENTE records
+ */
+function mapCxcStatus(status, daysOverdue) {
+    const mapped = CXC_STATUS_MAP[status] || 'PENDING';
+    // Upgrade PENDING to OVERDUE if days overdue > 0
+    if (mapped === 'PENDING' && daysOverdue > 0) {
+        return 'OVERDUE';
+    }
+    return mapped;
+}
+
+/**
+ * POST /api/sync/cxc
+ * Receive CXC (accounts receivable) data from Koinor Sync Agent
+ * Performs UPSERT by invoiceNumberRaw
+ * Optionally marks missing invoices as PAID when fullSync=true
+ */
+export async function syncCxc(req, res) {
+    const startTime = Date.now();
+
+    try {
+        const { type, fullSync, timestamp, data } = req.body;
+
+        // Validate request structure
+        if (type !== 'cxc') {
+            return res.status(400).json({
+                success: false,
+                message: 'El campo "type" debe ser "cxc"'
+            });
+        }
+
+        if (!Array.isArray(data) || data.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'El campo "data" debe ser un array no vacío'
+            });
+        }
+
+        if (data.length > MAX_RECORDS_PER_REQUEST) {
+            return res.status(400).json({
+                success: false,
+                message: `Máximo ${MAX_RECORDS_PER_REQUEST} registros por request`
+            });
+        }
+
+        // Initialize counters
+        const metrics = {
+            received: data.length,
+            created: 0,
+            updated: 0,
+            markedAsPaid: 0,
+            errors: 0
+        };
+
+        const errorDetails = [];
+        const receivedInvoiceNumbers = [];
+        const syncedAt = new Date();
+
+        // Process in batches
+        for (let i = 0; i < data.length; i += CXC_BATCH_SIZE) {
+            const batch = data.slice(i, i + CXC_BATCH_SIZE);
+
+            try {
+                await prisma.$transaction(async (tx) => {
+                    for (const record of batch) {
+                        try {
+                            // Validate
+                            const validationErrors = validateCxcRecord(record);
+                            if (validationErrors.length > 0) {
+                                throw new Error(validationErrors.join('; '));
+                            }
+
+                            const invoiceNumberRaw = String(record.invoiceNumberRaw).trim();
+                            const invoiceNumber = normalizeInvoiceNumber(invoiceNumberRaw) || null;
+                            const status = mapCxcStatus(record.status, record.daysOverdue || 0);
+
+                            receivedInvoiceNumbers.push(invoiceNumberRaw);
+
+                            const upsertData = {
+                                clientTaxId: String(record.clientTaxId).trim(),
+                                clientName: String(record.clientName || '').trim(),
+                                invoiceNumber,
+                                totalAmount: record.totalAmount || 0,
+                                balance: record.balance,
+                                totalPaid: record.totalPaid || 0,
+                                issueDate: record.issueDate ? new Date(record.issueDate) : null,
+                                dueDate: record.dueDate ? new Date(record.dueDate) : null,
+                                lastPaymentDate: record.lastPaymentDate ? new Date(record.lastPaymentDate) : null,
+                                status,
+                                daysOverdue: record.daysOverdue || 0,
+                                hasCreditNote: record.hasCreditNote === true,
+                                lastSyncAt: syncedAt,
+                                syncSource: 'SYNC_AGENT'
+                            };
+
+                            const existing = await tx.pendingReceivable.findUnique({
+                                where: { invoiceNumberRaw },
+                                select: { id: true }
+                            });
+
+                            if (existing) {
+                                await tx.pendingReceivable.update({
+                                    where: { invoiceNumberRaw },
+                                    data: upsertData
+                                });
+                                metrics.updated++;
+                            } else {
+                                await tx.pendingReceivable.create({
+                                    data: {
+                                        invoiceNumberRaw,
+                                        ...upsertData
+                                    }
+                                });
+                                metrics.created++;
+                            }
+
+                        } catch (recordError) {
+                            metrics.errors++;
+                            errorDetails.push({
+                                invoiceNumberRaw: record.invoiceNumberRaw || 'UNKNOWN',
+                                error: recordError.message
+                            });
+                            console.error(`[sync-cxc] Error processing record ${record.invoiceNumberRaw}:`, recordError.message);
+                        }
+                    }
+                });
+            } catch (batchError) {
+                console.error('[sync-cxc] Batch transaction error:', batchError.message);
+            }
+        }
+
+        // If fullSync, mark invoices not in the received list as PAID
+        if (fullSync === true && receivedInvoiceNumbers.length > 0) {
+            try {
+                const result = await prisma.pendingReceivable.updateMany({
+                    where: {
+                        invoiceNumberRaw: { notIn: receivedInvoiceNumbers },
+                        status: { notIn: ['PAID', 'CANCELLED'] }
+                    },
+                    data: {
+                        status: 'PAID',
+                        balance: 0,
+                        lastSyncAt: syncedAt
+                    }
+                });
+                metrics.markedAsPaid = result.count;
+            } catch (markError) {
+                console.error('[sync-cxc] Error marking paid invoices:', markError.message);
+            }
+        }
+
+        const durationMs = Date.now() - startTime;
+
+        console.log(
+            `[sync-cxc] Sync completed: received=${metrics.received}, created=${metrics.created}, ` +
+            `updated=${metrics.updated}, markedAsPaid=${metrics.markedAsPaid}, errors=${metrics.errors}, ` +
+            `fullSync=${!!fullSync}, duration=${durationMs}ms`
+        );
+
+        res.json({
+            success: true,
+            message: 'CXC sincronizada',
+            data: {
+                ...metrics,
+                syncedAt: syncedAt.toISOString()
+            }
+        });
+
+    } catch (error) {
+        console.error('[sync-cxc] Sync error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error durante la sincronización de CXC'
         });
     }
 }

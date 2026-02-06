@@ -767,51 +767,53 @@ enum ImportStatus {
 }
 
 // ============================================
-// TABLA SEPARADA PARA REPORTE CXC (CARTERA POR COBRAR)
-// Esta tabla almacena la "foto" del saldo pendiente
-// importada desde el reporte XLS/CSV de Koinor
+// CUENTAS POR COBRAR (CXC) - CARTERA PENDIENTE
+// Tabla separada de invoices.
+// Almacena la foto completa de saldos pendientes
+// sincronizada automáticamente desde Koinor.
+// Incluye deudas históricas que invoices no conoce.
 // ============================================
 
 model PendingReceivable {
   id                String   @id @default(uuid())
-  
+
   // === IDENTIFICACIÓN DEL CLIENTE ===
-  clientTaxId       String   // Cédula/RUC del cliente
-  clientName        String   // Nombre del cliente
-  
+  clientTaxId       String                        // Cédula/RUC del cliente
+  clientName        String                        // Nombre del cliente
+
   // === IDENTIFICACIÓN DE LA FACTURA ===
-  invoiceNumberRaw  String   // Número factura original (ej: "001002-00124369")
-  invoiceNumber     String?  // Número normalizado (ej: "001-002-000124369")
-  
+  invoiceNumberRaw  String   @unique              // Número factura original (ej: "001002-00124369")
+  invoiceNumber     String?                       // Número normalizado (ej: "001-002-000124369")
+
   // === MONTOS ===
-  totalAmount       Decimal  @db.Decimal(12, 2)  // Valor original de la factura
-  balance           Decimal  @db.Decimal(12, 2)  // Saldo pendiente actual
-  paidAmount        Decimal  @db.Decimal(12, 2) @default(0)  // Calculado: totalAmount - balance
-  
+  totalAmount       Decimal  @db.Decimal(12, 2)   // Valor original de la factura
+  balance           Decimal  @db.Decimal(12, 2)   // Saldo pendiente actual
+  totalPaid         Decimal  @db.Decimal(12, 2) @default(0)  // Monto total pagado
+
   // === FECHAS ===
-  issueDate         DateTime?  // Fecha de emisión de la factura
-  dueDate           DateTime?  // Fecha de vencimiento
-  
-  // === ESTADO CALCULADO ===
-  status            String   @default("PENDING")  // PENDING, PARTIAL, PAID, OVERDUE
-  daysOverdue       Int      @default(0)          // Días de mora (calculado)
-  
-  // === ASIGNACIÓN ===
-  matrizadorName    String?                       // Nombre del matrizador responsable
-  
-  // === METADATA DE IMPORTACIÓN ===
-  importedAt        DateTime @default(now())      // Cuándo se importó
-  sourceFile        String                        // Nombre del archivo XLS
-  reportDate        DateTime                      // Fecha del reporte CXC
-  
-  // === ÍNDICES Y CONSTRAINTS ===
-  @@unique([invoiceNumberRaw, reportDate])  // Evita duplicados del mismo reporte
+  issueDate         DateTime?                     // Fecha de emisión de la factura
+  dueDate           DateTime?                     // Fecha de vencimiento
+  lastPaymentDate   DateTime?                     // Fecha del último pago recibido
+
+  // === ESTADO ===
+  status            String   @default("PENDING")  // PENDING, PARTIAL, PAID, OVERDUE, CANCELLED
+  daysOverdue       Int      @default(0)          // Días de mora (calculado en cada sync)
+  hasCreditNote     Boolean  @default(false)      // Tiene nota de crédito aplicada
+
+  // === METADATA DE SINCRONIZACIÓN ===
+  lastSyncAt        DateTime @default(now())      // Última vez que se actualizó desde Koinor
+  syncSource        String   @default("SYNC_AGENT") // SYNC_AGENT o MANUAL_XLS
+
+  // === TIMESTAMPS ===
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // === ÍNDICES ===
   @@index([clientTaxId])
-  @@index([dueDate])
-  @@index([balance])
   @@index([status])
-  @@index([reportDate])
-  @@index([matrizadorName])
+  @@index([balance])
+  @@index([dueDate])
+  @@index([lastSyncAt])
   @@map("pending_receivables")
 }
 
