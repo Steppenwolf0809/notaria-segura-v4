@@ -1219,16 +1219,16 @@ const FormulariosUAFE = ({ adminMode = false }) => {
       <TableContainer component={Paper} elevation={2}>
         <Table>
           <TableHead>
-            <TableRow sx={{ backgroundColor: 'primary.main' }}>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold', width: 50 }}></TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>No. Protocolo</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Fecha</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Acto/Contrato</TableCell>
-              {adminMode && <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Matrizador</TableCell>}
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Valor</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Personas</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Progreso</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="center">Acciones</TableCell>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 600, width: 50 }}></TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>No. Protocolo</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>Fecha</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>Acto/Contrato</TableCell>
+              {adminMode && <TableCell sx={{ fontWeight: 600 }}>Matrizador</TableCell>}
+              <TableCell sx={{ fontWeight: 600 }}>Valor</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>Personas</TableCell>
+              <TableCell sx={{ fontWeight: 600 }}>Progreso</TableCell>
+              <TableCell sx={{ fontWeight: 600 }} align="center">Acciones</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -1464,7 +1464,7 @@ const FormulariosUAFE = ({ adminMode = false }) => {
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle sx={{ backgroundColor: 'primary.main', color: 'white' }}>
+        <DialogTitle>
           {modoEditarProtocolo ? 'Editar Protocolo UAFE' : 'Crear Nuevo Protocolo UAFE'}
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
@@ -1783,7 +1783,7 @@ const FormulariosUAFE = ({ adminMode = false }) => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle sx={{ backgroundColor: 'success.main', color: 'white' }}>
+        <DialogTitle>
           Agregar Persona al Protocolo
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
@@ -1970,7 +1970,7 @@ const FormulariosUAFE = ({ adminMode = false }) => {
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle sx={{ backgroundColor: 'info.main', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span>Detalles del Protocolo</span>
           {protocoloSeleccionado && !modoEditarProtocolo && (
             <Box>

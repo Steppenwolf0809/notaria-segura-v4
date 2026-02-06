@@ -154,15 +154,15 @@ const AdminDashboard = () => {
 
   const [matrizadores, setMatrizadores] = useState([]);
 
-  // Mapeo de tipos de acto a badges de letra compactos
+  // Mapeo de tipos de acto a badges - Paleta refinada y elegante
   const actoBadges = {
-    'PROTOCOLO': { label: 'P', color: '#1976d2' },      // Azul
-    'CERTIFICACION': { label: 'C', color: '#2e7d32' },  // Verde
-    'ARRENDAMIENTO': { label: 'A', color: '#7b1fa2' },  // Morado
-    'DECLARACION': { label: 'D', color: '#ed6c02' },    // Naranja
-    'RECONOCIMIENTO': { label: 'R', color: '#757575' }, // Gris
-    'DILIGENCIA': { label: 'Di', color: '#0288d1' },    // Azul claro
-    'OTROS': { label: 'O', color: '#616161' }           // Gris oscuro
+    'PROTOCOLO': { label: 'P', color: '#1e3a5f', bgColor: 'rgba(30, 58, 95, 0.1)' },      // Azul marino
+    'CERTIFICACION': { label: 'C', color: '#2f5233', bgColor: 'rgba(47, 82, 51, 0.1)' },  // Verde bosque
+    'ARRENDAMIENTO': { label: 'A', color: '#5b4a6c', bgColor: 'rgba(91, 74, 108, 0.1)' }, // Púrpura grisáceo
+    'DECLARACION': { label: 'D', color: '#8b5a2b', bgColor: 'rgba(139, 90, 43, 0.1)' },   // Marrón arcilla
+    'RECONOCIMIENTO': { label: 'R', color: '#5a6572', bgColor: 'rgba(90, 101, 114, 0.1)' }, // Gris pizarra
+    'DILIGENCIA': { label: 'Di', color: '#2c5f6f', bgColor: 'rgba(44, 95, 111, 0.1)' },    // Azul petróleo
+    'OTROS': { label: 'O', color: '#6b7280', bgColor: 'rgba(107, 114, 128, 0.1)' }        // Gris neutro
   };
 
   const getStatusIcon = (status) => {
@@ -573,8 +573,35 @@ const AdminDashboard = () => {
                           icon={getStatusIcon(row.status)}
                           label={row.status}
                           size="small"
-                          color={row.status === 'LISTO' ? 'success' : row.status === 'EN_PROCESO' ? 'info' : 'default'}
-                          sx={{ '& .MuiChip-label': { fontSize: '0.75rem' }, height: 24 }}
+                          sx={{ 
+                            '& .MuiChip-label': { fontSize: '0.75rem', fontWeight: 500 }, 
+                            height: 26,
+                            backgroundColor: row.status === 'LISTO' 
+                              ? 'rgba(4, 120, 87, 0.1)' 
+                              : row.status === 'EN_PROCESO' 
+                                ? 'rgba(2, 132, 199, 0.1)' 
+                                : row.status === 'ENTREGADO'
+                                  ? 'rgba(100, 116, 139, 0.1)'
+                                  : 'rgba(217, 119, 6, 0.1)',
+                            color: row.status === 'LISTO' 
+                              ? '#047857' 
+                              : row.status === 'EN_PROCESO' 
+                                ? '#0284c7' 
+                                : row.status === 'ENTREGADO'
+                                  ? '#64748b'
+                                  : '#d97706',
+                            border: '1px solid',
+                            borderColor: row.status === 'LISTO' 
+                              ? 'rgba(4, 120, 87, 0.2)' 
+                              : row.status === 'EN_PROCESO' 
+                                ? 'rgba(2, 132, 199, 0.2)' 
+                                : row.status === 'ENTREGADO'
+                                  ? 'rgba(100, 116, 139, 0.2)'
+                                  : 'rgba(217, 119, 6, 0.2)',
+                            '& .MuiChip-icon': {
+                              color: 'inherit'
+                            }
+                          }}
                         />
                       </TableCell>
                       <TableCell>
@@ -836,23 +863,90 @@ const AdminDashboard = () => {
   );
 };
 
-const SummaryCard = ({ title, value, icon, color, subtext }) => (
-  <Card sx={{ height: '100%' }}>
-    <CardContent>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <Box>
-          <Typography color="textSecondary" gutterBottom variant="overline">{title}</Typography>
-          <Typography variant="h4" component="div" sx={{ fontWeight: 'bold', color: `${color}.main` }}>{value}</Typography>
+// Paleta de colores refinada para KPIs
+const kpiColors = {
+  primary: { main: '#1e3a5f', light: 'rgba(30, 58, 95, 0.08)', contrast: '#fff' },
+  success: { main: '#047857', light: 'rgba(4, 120, 87, 0.08)', contrast: '#fff' },
+  warning: { main: '#d97706', light: 'rgba(217, 119, 6, 0.08)', contrast: '#fff' },
+  error: { main: '#be123c', light: 'rgba(190, 18, 60, 0.08)', contrast: '#fff' },
+  info: { main: '#0284c7', light: 'rgba(2, 132, 199, 0.08)', contrast: '#fff' },
+  neutral: { main: '#64748b', light: 'rgba(100, 116, 139, 0.08)', contrast: '#fff' }
+};
+
+const SummaryCard = ({ title, value, icon, color = 'primary', subtext }) => {
+  const themeColor = kpiColors[color] || kpiColors.primary;
+  
+  return (
+    <Card 
+      sx={{ 
+        height: '100%',
+        background: 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.95) 100%)',
+        border: '1px solid rgba(148, 163, 184, 0.15)',
+        '&:hover': {
+          boxShadow: '0 8px 25px -5px rgba(0, 0, 0, 0.08), 0 4px 10px -5px rgba(0, 0, 0, 0.02)',
+        }
+      }}
+    >
+      <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <Box sx={{ flex: 1 }}>
+            <Typography 
+              variant="overline" 
+              sx={{ 
+                color: 'text.secondary',
+                fontSize: '0.6875rem',
+                fontWeight: 600,
+                letterSpacing: '0.08em',
+                mb: 0.5,
+                display: 'block'
+              }}
+            >
+              {title}
+            </Typography>
+            <Typography 
+              variant="h4" 
+              component="div" 
+              sx={{ 
+                fontWeight: 700, 
+                color: themeColor.main,
+                fontSize: '1.875rem',
+                lineHeight: 1.2,
+                letterSpacing: '-0.02em'
+              }}
+            >
+              {value}
+            </Typography>
+          </Box>
+          <Box sx={{ 
+            p: 1.25, 
+            borderRadius: 2.5, 
+            backgroundColor: themeColor.light,
+            color: themeColor.main,
+            display: 'flex',
+            boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.03)'
+          }}>
+            {React.cloneElement(icon, { 
+              fontSize: 'small',
+              sx: { opacity: 0.9 }
+            })}
+          </Box>
         </Box>
-        <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: `${color}.light`, color: `${color}.contrastText`, display: 'flex' }}>
-          {React.cloneElement(icon, { fontSize: 'medium' })}
-        </Box>
-      </Box>
-      {subtext && (
-        <Typography variant="caption" color="textSecondary" sx={{ mt: 1, display: 'block' }}>{subtext}</Typography>
-      )}
-    </CardContent>
-  </Card>
-);
+        {subtext && (
+          <Typography 
+            variant="caption" 
+            sx={{ 
+              mt: 1.5, 
+              display: 'block',
+              color: 'text.secondary',
+              fontWeight: 500
+            }}
+          >
+            {subtext}
+          </Typography>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
 
 export default AdminCenter;

@@ -58,7 +58,8 @@ import {
   Delete as DeleteIcon,
   Sort as SortIcon,
   Chat as ChatIcon,
-  Send as SendIcon
+  Send as SendIcon,
+  Description as DescriptionIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { useDebounce } from '../../hooks/useDebounce';
@@ -127,15 +128,15 @@ const DocumentOversight = () => {
     LISTO: 7         // Listo más de 7 días sin entregar
   };
 
-  // Mapeo de tipos de acto a badges de letra compactos
+  // Mapeo de tipos de acto a badges - Paleta refinada institucional
   const actoBadges = {
-    'PROTOCOLO': { label: 'P', color: '#1976d2' },      // Azul
-    'CERTIFICACION': { label: 'C', color: '#2e7d32' },  // Verde
-    'ARRENDAMIENTO': { label: 'A', color: '#7b1fa2' },  // Morado
-    'DECLARACION': { label: 'D', color: '#ed6c02' },    // Naranja
-    'RECONOCIMIENTO': { label: 'R', color: '#757575' }, // Gris
-    'DILIGENCIA': { label: 'Di', color: '#0288d1' },    // Azul claro
-    'OTROS': { label: 'O', color: '#616161' }           // Gris oscuro
+    'PROTOCOLO': { label: 'P', color: '#1e3a5f', bgColor: 'rgba(30, 58, 95, 0.1)' },      // Azul marino
+    'CERTIFICACION': { label: 'C', color: '#2f5233', bgColor: 'rgba(47, 82, 51, 0.1)' },  // Verde bosque
+    'ARRENDAMIENTO': { label: 'A', color: '#5b4a6c', bgColor: 'rgba(91, 74, 108, 0.1)' }, // Púrpura grisáceo
+    'DECLARACION': { label: 'D', color: '#8b5a2b', bgColor: 'rgba(139, 90, 43, 0.1)' },   // Marrón arcilla
+    'RECONOCIMIENTO': { label: 'R', color: '#5a6572', bgColor: 'rgba(90, 101, 114, 0.1)' }, // Gris pizarra
+    'DILIGENCIA': { label: 'Di', color: '#2c5f6f', bgColor: 'rgba(44, 95, 111, 0.1)' },    // Azul petróleo
+    'OTROS': { label: 'O', color: '#6b7280', bgColor: 'rgba(107, 114, 128, 0.1)' }        // Gris neutro
   };
 
   /**
@@ -263,16 +264,45 @@ const DocumentOversight = () => {
   };
 
   /**
-   * Obtener color del estado
+   * Obtener color del estado - Paleta refinada
    */
   const getStatusColor = (status) => {
     const colors = {
-      PENDIENTE: '#f59e0b',
-      EN_PROCESO: '#3b82f6',
-      LISTO: '#22c55e',
-      ENTREGADO: '#6b7280'
+      PENDIENTE: '#d97706',      // Ámbar
+      EN_PROCESO: '#0284c7',     // Azul petróleo
+      LISTO: '#047857',          // Verde bosque
+      ENTREGADO: '#64748b'       // Gris pizarra
     };
-    return colors[status] || '#6b7280';
+    return colors[status] || '#64748b';
+  };
+
+  /**
+   * Obtener estilos refinados del estado para Chips
+   */
+  const getStatusChipStyles = (status) => {
+    const styles = {
+      PENDIENTE: {
+        bgcolor: 'rgba(217, 119, 6, 0.1)',
+        color: '#d97706',
+        borderColor: 'rgba(217, 119, 6, 0.2)'
+      },
+      EN_PROCESO: {
+        bgcolor: 'rgba(2, 132, 199, 0.1)',
+        color: '#0284c7',
+        borderColor: 'rgba(2, 132, 199, 0.2)'
+      },
+      LISTO: {
+        bgcolor: 'rgba(4, 120, 87, 0.1)',
+        color: '#047857',
+        borderColor: 'rgba(4, 120, 87, 0.2)'
+      },
+      ENTREGADO: {
+        bgcolor: 'rgba(100, 116, 139, 0.1)',
+        color: '#64748b',
+        borderColor: 'rgba(100, 116, 139, 0.2)'
+      }
+    };
+    return styles[status] || styles.ENTREGADO;
   };
 
   /**
@@ -462,62 +492,75 @@ const DocumentOversight = () => {
     }
   };
 
+  // Colores refinados para KPIs
+  const kpiColors = {
+    primary: { main: '#1e3a5f', light: 'rgba(30, 58, 95, 0.08)' },
+    warning: { main: '#d97706', light: 'rgba(217, 119, 6, 0.08)' },
+    info: { main: '#0284c7', light: 'rgba(2, 132, 199, 0.08)' },
+    error: { main: '#be123c', light: 'rgba(190, 18, 60, 0.08)' },
+  };
+
   /**
-   * Renderizar estadísticas
+   * Renderizar estadísticas con estilo refinado
    */
   const renderStats = () => {
     if (!stats) return null;
 
+    const kpiData = [
+      { value: stats.total, label: 'Total Documentos', color: kpiColors.primary, icon: <DescriptionIcon /> },
+      { value: stats.pending, label: 'Pendientes', color: kpiColors.warning, icon: <PendingIcon /> },
+      { value: stats.inProgress, label: 'En Proceso', color: kpiColors.info, icon: <InProgressIcon /> },
+      { value: stats.overdue, label: 'Vencidos', color: kpiColors.error, icon: <WarningIcon /> },
+    ];
+
     return (
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={6} md={3}>
-          <Card>
-            <CardContent sx={{ textAlign: 'center', py: 2 }}>
-              <Typography variant="h5" color="primary">
-                {stats.total}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Total Documentos
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={6} md={3}>
-          <Card>
-            <CardContent sx={{ textAlign: 'center', py: 2 }}>
-              <Typography variant="h5" color="warning.main">
-                {stats.pending}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Pendientes
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={6} md={3}>
-          <Card>
-            <CardContent sx={{ textAlign: 'center', py: 2 }}>
-              <Typography variant="h5" color="info.main">
-                {stats.inProgress}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                En Proceso
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={6} md={3}>
-          <Card>
-            <CardContent sx={{ textAlign: 'center', py: 2 }}>
-              <Typography variant="h5" color="error.main">
-                {stats.overdue}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Vencidos
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
+        {kpiData.map((kpi, index) => (
+          <Grid item xs={6} md={3} key={index}>
+            <Card sx={{
+              background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.9) 100%)',
+              border: '1px solid rgba(148, 163, 184, 0.12)',
+            }}>
+              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <Box>
+                    <Typography 
+                      variant="overline" 
+                      sx={{ 
+                        fontSize: '0.625rem', 
+                        fontWeight: 600,
+                        letterSpacing: '0.08em',
+                        color: 'text.secondary'
+                      }}
+                    >
+                      {kpi.label}
+                    </Typography>
+                    <Typography 
+                      variant="h5" 
+                      sx={{ 
+                        fontWeight: 700, 
+                        color: kpi.color.main,
+                        mt: 0.5,
+                        fontSize: '1.625rem'
+                      }}
+                    >
+                      {kpi.value}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ 
+                    p: 1, 
+                    borderRadius: 2,
+                    backgroundColor: kpi.color.light,
+                    color: kpi.color.main,
+                    display: 'flex'
+                  }}>
+                    {React.cloneElement(kpi.icon, { fontSize: 'small' })}
+                  </Box>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
       </Grid>
     );
   };
@@ -834,8 +877,10 @@ const DocumentOversight = () => {
                       key={document.id}
                       hover
                       sx={{
-                        bgcolor: isOverdue ? 'error.light' : 'inherit',
-                        opacity: isOverdue ? 0.9 : 1
+                        bgcolor: isOverdue ? 'rgba(190, 18, 60, 0.04)' : 'inherit',
+                        '&:hover': {
+                          bgcolor: isOverdue ? 'rgba(190, 18, 60, 0.08)' : undefined
+                        }
                       }}
                     >
                       <TableCell padding="checkbox">
@@ -875,12 +920,16 @@ const DocumentOversight = () => {
                               justifyContent: 'center',
                               width: 28,
                               height: 28,
-                              borderRadius: '4px',
-                              backgroundColor: actoBadges[document.documentType]?.color || '#9e9e9e',
-                              color: 'white',
-                              fontWeight: 'bold',
-                              fontSize: '0.75rem',
-                              cursor: 'default'
+                              borderRadius: '6px',
+                              backgroundColor: actoBadges[document.documentType]?.bgColor || 'rgba(107, 114, 128, 0.1)',
+                              color: actoBadges[document.documentType]?.color || '#6b7280',
+                              fontWeight: 700,
+                              fontSize: '0.6875rem',
+                              cursor: 'default',
+                              border: '1px solid',
+                              borderColor: actoBadges[document.documentType]?.color 
+                                ? `${actoBadges[document.documentType].color}30`
+                                : 'rgba(107, 114, 128, 0.2)'
                             }}
                           >
                             {actoBadges[document.documentType]?.label || '?'}
@@ -895,13 +944,19 @@ const DocumentOversight = () => {
                               size="small"
                               icon={getStatusIcon(document.status)}
                               sx={{
-                                bgcolor: getStatusColor(document.status),
-                                color: 'white'
+                                bgcolor: getStatusChipStyles(document.status).bgcolor,
+                                color: getStatusChipStyles(document.status).color,
+                                border: '1px solid',
+                                borderColor: getStatusChipStyles(document.status).borderColor,
+                                fontWeight: 500,
+                                '& .MuiChip-icon': {
+                                  color: 'inherit'
+                                }
                               }}
                             />
                             {isOverdue && (
                               <Tooltip title="Documento vencido">
-                                <WarningIcon color="error" fontSize="small" />
+                                <WarningIcon sx={{ color: '#be123c' }} fontSize="small" />
                               </Tooltip>
                             )}
                           </Box>
@@ -934,11 +989,13 @@ const DocumentOversight = () => {
                       </TableCell>
                       <TableCell>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <TimeIcon fontSize="small" color="action" />
+                          <TimeIcon fontSize="small" sx={{ color: isOverdue ? '#be123c' : '#94a3b8' }} />
                           <Typography
                             variant="body2"
-                            color={isOverdue ? 'error.main' : 'inherit'}
-                            fontWeight={isOverdue ? 'bold' : 'normal'}
+                            sx={{
+                              color: isOverdue ? '#be123c' : 'text.secondary',
+                              fontWeight: isOverdue ? 600 : 400,
+                            }}
                           >
                             {timeInStatus}
                           </Typography>
