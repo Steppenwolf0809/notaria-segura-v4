@@ -800,6 +800,9 @@ model PendingReceivable {
   daysOverdue       Int      @default(0)          // Días de mora (calculado en cada sync)
   hasCreditNote     Boolean  @default(false)      // Tiene nota de crédito aplicada
 
+  // === ASIGNACIÓN ===
+  matrizador        String?                       // Nombre del matrizador (codven mapeado desde Koinor)
+
   // === METADATA DE SINCRONIZACIÓN ===
   lastSyncAt        DateTime @default(now())      // Última vez que se actualizó desde Koinor
   syncSource        String   @default("SYNC_AGENT") // SYNC_AGENT o MANUAL_XLS
@@ -814,6 +817,7 @@ model PendingReceivable {
   @@index([balance])
   @@index([dueDate])
   @@index([lastSyncAt])
+  @@index([matrizador])
   @@map("pending_receivables")
 }
 
