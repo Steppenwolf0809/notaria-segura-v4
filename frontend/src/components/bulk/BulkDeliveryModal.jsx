@@ -37,21 +37,22 @@ const BulkDeliveryModal = ({
   const [error, setError] = useState('');
 
   // Resetear formulario cuando se abre el modal
+  // Usar ref para solo pre-llenar al abrir (evita que re-renders reseteen el form)
+  const prevOpenRef = React.useRef(false);
   useEffect(() => {
-    if (open) {
-      // Si todos los documentos son del mismo cliente, pre-llenar con su nombre
-      const firstClientName = documents[0]?.clientName || documents[0]?.documents?.[0]?.clientName;
-      const allSameClient = documents.every(doc => {
-        const name = doc?.clientName || doc?.documents?.[0]?.clientName;
-        return name === firstClientName;
-      });
+    if (open && !prevOpenRef.current) {
+      // Solo pre-llenar cuando el modal pasa de cerrado a abierto
+      const firstClientName = String(
+        documents[0]?.clientName || documents[0]?.documents?.[0]?.clientName || ''
+      );
 
       setFormData({
-        entregadoA: allSameClient ? firstClientName : '',
+        entregadoA: firstClientName,
         observacionesEntrega: ''
       });
       setError('');
     }
+    prevOpenRef.current = open;
   }, [open, documents]);
 
   /**
@@ -69,16 +70,17 @@ const BulkDeliveryModal = ({
    * Validar y confirmar entrega
    */
   const handleConfirm = () => {
-    // Validaciones
-    if (!formData.entregadoA.trim()) {
+    // Validaciones - asegurar que entregadoA es string antes de trim
+    const nombre = String(formData.entregadoA || '').trim();
+    if (!nombre) {
       setError('El nombre de quien retira es obligatorio');
       return;
     }
 
     // Llamar al callback con los datos
     onConfirm({
-      entregadoA: formData.entregadoA.trim(),
-      observacionesEntrega: formData.observacionesEntrega.trim()
+      entregadoA: nombre,
+      observacionesEntrega: String(formData.observacionesEntrega || '').trim()
     });
   };
 
@@ -133,7 +135,7 @@ const BulkDeliveryModal = ({
                 fullWidth
                 required
                 label="Persona que Retira"
-                value={formData.entregadoA}
+                value={formData.entregadoA || ''}
                 onChange={(e) => handleFieldChange('entregadoA', e.target.value)}
                 placeholder="Nombre completo de quien retira"
                 disabled={loading}
@@ -207,7 +209,7 @@ const BulkDeliveryModal = ({
         </Button>
         <Button
           onClick={handleConfirm}
-          disabled={loading || !formData.entregadoA.trim()}
+          disabled={loading || !String(formData.entregadoA || '').trim()}
           variant="contained"
           color="primary"
           startIcon={loading ? <CircularProgress size={16} /> : <DeliveryIcon />}
