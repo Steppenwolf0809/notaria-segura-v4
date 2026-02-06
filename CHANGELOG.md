@@ -9,6 +9,14 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **Documentación para usuarios** completa en `docs/user-guides/`
+  - `README.md` - Índice y primeros pasos
+  - `GUIA-ADMIN.md` - Guía completa para administradores
+  - `GUIA-CAJA.md` - Guía para personal de caja
+  - `GUIA-MATRIZADOR.md` - Guía para matrizadores
+  - `GUIA-RECEPCION.md` - Guía para recepción
+  - `GUIA-ARCHIVO.md` - Guía para archivo
+  - `FAQ.md` - Preguntas frecuentes
 - Documentación técnica completa en carpeta `docs/`
   - `README.md` - Índice de documentación
   - `TECHNICAL-GUIDE.md` - Guía técnica del sistema

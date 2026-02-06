@@ -23,6 +23,17 @@
 | [SYNC_AGENT_PLAN.md](./SYNC_AGENT_PLAN.md) | Plan del agente de sincronización |
 | [koinhor_acceso_lectura_mysql.md](./koinhor_acceso_lectura_mysql.md) | Acceso a base de datos Koinor |
 
+### 👤 Guías de Usuario
+| Documento | Descripción |
+|-----------|-------------|
+| [user-guides/README.md](./user-guides/README.md) | Índice de guías de usuario |
+| [user-guides/GUIA-ADMIN.md](./user-guides/GUIA-ADMIN.md) | Guía para administradores |
+| [user-guides/GUIA-CAJA.md](./user-guides/GUIA-CAJA.md) | Guía para personal de caja |
+| [user-guides/GUIA-MATRIZADOR.md](./user-guides/GUIA-MATRIZADOR.md) | Guía para matrizadores |
+| [user-guides/GUIA-RECEPCION.md](./user-guides/GUIA-RECEPCION.md) | Guía para recepción |
+| [user-guides/GUIA-ARCHIVO.md](./user-guides/GUIA-ARCHIVO.md) | Guía para archivo |
+| [user-guides/FAQ.md](./user-guides/FAQ.md) | Preguntas frecuentes para usuarios |
+
 ### 🛠️ Guías de Desarrollo
 | Documento | Descripción |
 |-----------|-------------|
