@@ -1257,15 +1257,70 @@ export async function getMyPortfolio(req, res) {
         // =====================================================================
 
         // Admin, CAJA and RECEPCION can see all receivables
-        // Matrizadores only see receivables - for now all until we add matrizador field to PendingReceivable
         const isFullAccess = ['ADMIN', 'CAJA', 'RECEPCION'].includes(userRole);
 
-        // Query PendingReceivable directly - the single source of truth for CXC
+        // For matrizadores, we need to filter by their assigned invoices
+        let allowedInvoiceNumbers = null;
+
+        if (!isFullAccess) {
+            // Get user info to match with CXC matrizador name
+            const user = await prisma.user.findUnique({
+                where: { id: userId },
+                select: { firstName: true, lastName: true }
+            });
+
+            // Mapeo de usuarios a nombres CXC (codven mapeado)
+            const USER_TO_CXC_MATRIZADOR = {
+                'Mayra Cristina': 'Mayra Corella',
+                'Mayra': 'Mayra Corella',
+                'Karol Daniela': 'Karol Velastegui',
+                'Karol': 'Karol Velastegui',
+                'Jose Luis': 'Jose Zapata',
+                'Jose': 'Jose Zapata',
+                'Gissela Vanessa': 'Gissela Velastegui',
+                'Gissela': 'Gissela Velastegui',
+                'Maria Lucinda': 'Maria Diaz',
+                'Maria': 'Maria Diaz',
+                'Francisco Esteban': 'Esteban Proaño',
+                'Francisco': 'Esteban Proaño',
+                'Esteban': 'Esteban Proaño'
+            };
+
+            const cxcMatrizadorName = USER_TO_CXC_MATRIZADOR[user?.firstName] || user?.firstName;
+            console.log(`[billing-controller] Filtering by matrizador: ${cxcMatrizadorName}`);
+
+            // Find all invoice numbers assigned to this matrizador in Invoice table
+            const assignedInvoices = await prisma.invoice.findMany({
+                where: {
+                    OR: [
+                        { matrizador: cxcMatrizadorName },
+                        { assignedToId: userId },
+                        {
+                            matrizador: null,
+                            document: { is: { assignedToId: userId } }
+                        }
+                    ]
+                },
+                select: { invoiceNumberRaw: true }
+            });
+
+            allowedInvoiceNumbers = assignedInvoices.map(inv => inv.invoiceNumberRaw);
+            console.log(`[billing-controller] Found ${allowedInvoiceNumbers.length} invoices assigned to matrizador`);
+        }
+
+        // Query PendingReceivable with optional filter for matrizador
+        const whereClause = {
+            status: { in: ['PENDING', 'PARTIAL', 'OVERDUE'] },
+            balance: { gt: 0 }
+        };
+
+        // If matrizador, filter by their allowed invoice numbers
+        if (allowedInvoiceNumbers !== null) {
+            whereClause.invoiceNumberRaw = { in: allowedInvoiceNumbers };
+        }
+
         const receivables = await prisma.pendingReceivable.findMany({
-            where: {
-                status: { in: ['PENDING', 'PARTIAL', 'OVERDUE'] },
-                balance: { gt: 0 }  // Only receivables with outstanding balance
-            },
+            where: whereClause,
             orderBy: { issueDate: 'desc' }
         });
 
@@ -1296,7 +1351,7 @@ export async function getMyPortfolio(req, res) {
                 clientMap.set(clientTaxId, {
                     clientTaxId,
                     clientName,
-                    clientPhone: '',  // PendingReceivable doesn't have phone, will be empty
+                    clientPhone: '',  // PendingReceivable doesn't have phone
                     totalDebt: 0,
                     overdueDebt: 0,
                     invoices: []
@@ -1315,9 +1370,9 @@ export async function getMyPortfolio(req, res) {
             client.invoices.push({
                 id: receivable.id,
                 invoiceNumber: receivable.invoiceNumber || receivable.invoiceNumberRaw,
-                documentId: null,  // PendingReceivable is not linked to documents
+                documentId: null,
                 protocolNumber: null,
-                documentType: 'CXC',  // All from CXC sync
+                documentType: 'CXC',
                 issueDate: receivable.issueDate,
                 dueDate: receivable.dueDate,
                 totalAmount,
@@ -1326,7 +1381,7 @@ export async function getMyPortfolio(req, res) {
                 isOverdue,
                 daysOverdue,
                 source: 'CXC',
-                matrizador: 'Sin asignar'  // PendingReceivable doesn't have matrizador field yet
+                matrizador: receivable.matrizador || 'Sin asignar'
             });
         }
 
