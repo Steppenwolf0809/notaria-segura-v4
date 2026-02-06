@@ -283,13 +283,17 @@ export async function getInvoices(req, res) {
 
         // Calculate balance for each invoice
         const invoicesWithBalance = invoices.map(invoice => {
-            const totalPaid = invoice.payments.reduce(
+            const paymentsTotal = invoice.payments.reduce(
                 (sum, p) => sum + Number(p.amount),
                 0
             );
+            // Use the higher value between synced paidAmount and payments table sum
+            const syncedPaidAmount = Number(invoice.paidAmount || 0);
+            const totalPaid = Math.max(syncedPaidAmount, paymentsTotal);
             return {
                 ...invoice,
                 totalAmount: Number(invoice.totalAmount),
+                paidAmount: totalPaid,
                 totalPaid,
                 balance: Number(invoice.totalAmount) - totalPaid
             };
@@ -364,10 +368,16 @@ export async function getInvoiceById(req, res) {
             }
         }
 
-        const totalPaid = invoice.payments.reduce(
+        // Calculate total from payments table
+        const paymentsTotal = invoice.payments.reduce(
             (sum, p) => sum + Number(p.amount),
             0
         );
+
+        // Use the higher value between synced paidAmount and payments table sum
+        // This handles both Koinor sync (updates paidAmount directly) and manual payments
+        const syncedPaidAmount = Number(invoice.paidAmount || 0);
+        const totalPaid = Math.max(syncedPaidAmount, paymentsTotal);
 
         // Remove assignedToId from response (internal use only)
         const { assignedToId, ...documentData } = invoice.document || {};
@@ -376,6 +386,7 @@ export async function getInvoiceById(req, res) {
             ...invoice,
             document: documentData,
             totalAmount: Number(invoice.totalAmount),
+            paidAmount: totalPaid, // Override with calculated value
             totalPaid,
             balance: Number(invoice.totalAmount) - totalPaid
         });
