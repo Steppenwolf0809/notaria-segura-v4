@@ -520,6 +520,7 @@ export async function syncCxc(req, res) {
 
         const errorDetails = [];
         const receivedInvoiceNumbers = [];
+        const failedInvoiceNumbers = [];  // Track failed records to exclude from "mark as paid"
         const syncedAt = new Date();
 
         // Process in batches
@@ -582,11 +583,26 @@ export async function syncCxc(req, res) {
 
                         } catch (recordError) {
                             metrics.errors++;
-                            errorDetails.push({
-                                invoiceNumberRaw: record.invoiceNumberRaw || 'UNKNOWN',
-                                error: recordError.message
-                            });
-                            console.error(`[sync-cxc] Error processing record ${record.invoiceNumberRaw}:`, recordError.message);
+                            const invoiceNumberRaw = record.invoiceNumberRaw || 'UNKNOWN';
+                            failedInvoiceNumbers.push(invoiceNumberRaw);  // Track failed invoice
+                            
+                            const errorDetail = {
+                                invoiceNumberRaw,
+                                error: recordError.message,
+                                stack: recordError.stack,
+                                code: recordError.code,
+                                meta: recordError.meta,
+                                recordData: {
+                                    clientTaxId: record.clientTaxId,
+                                    clientName: record.clientName?.substring(0, 50),
+                                    totalAmount: record.totalAmount,
+                                    balance: record.balance,
+                                    status: record.status
+                                }
+                            };
+                            errorDetails.push(errorDetail);
+                            console.error(`[sync-cxc] Error processing record ${invoiceNumberRaw}:`, recordError.message);
+                            console.error(`[sync-cxc] Error details:`, JSON.stringify(errorDetail, null, 2));
                         }
                     }
                 });
@@ -596,11 +612,17 @@ export async function syncCxc(req, res) {
         }
 
         // If fullSync, mark invoices not in the received list as PAID
+        // IMPORTANT: Exclude failed records from this operation - we don't know their true status
         if (fullSync === true && receivedInvoiceNumbers.length > 0) {
             try {
+                // Combine received and failed to determine what NOT to mark as paid
+                const excludeFromMarkAsPaid = [...receivedInvoiceNumbers, ...failedInvoiceNumbers];
+                
+                console.log(`[sync-cxc] FullSync: ${receivedInvoiceNumbers.length} received, ${failedInvoiceNumbers.length} failed, marking others as PAID`);
+                
                 const result = await prisma.pendingReceivable.updateMany({
                     where: {
-                        invoiceNumberRaw: { notIn: receivedInvoiceNumbers },
+                        invoiceNumberRaw: { notIn: excludeFromMarkAsPaid },
                         status: { notIn: ['PAID', 'CANCELLED'] }
                     },
                     data: {
@@ -610,6 +632,7 @@ export async function syncCxc(req, res) {
                     }
                 });
                 metrics.markedAsPaid = result.count;
+                console.log(`[sync-cxc] Marked ${result.count} records as PAID`);
             } catch (markError) {
                 console.error('[sync-cxc] Error marking paid invoices:', markError.message);
             }
