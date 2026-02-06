@@ -6,33 +6,33 @@ import { db as prisma } from '../db.js';
 
 // Normalización de nombres de matrizadores para evitar duplicados visuales
 const MATRIZADOR_NAME_NORMALIZATION = {
-  // Mayra Corella
-  'Mayra Cristina Corella Parra': 'Mayra Corella',
-  'Mayra Corella Parra': 'Mayra Corella',
-  'Mayra Cristina': 'Mayra Corella',
-  'Mayra': 'Mayra Corella',
-  
-  // Karol Velastegui
-  'Karol Daniela Velastegui Cadena': 'Karol Velastegui',
-  'Karol Daniela': 'Karol Velastegui',
-  'Karol': 'Karol Velastegui',
-  
-  // Jose Zapata
-  'Jose Luis Zapata Silva': 'Jose Zapata',
-  'Jose Luis': 'Jose Zapata',
-  'Jose': 'Jose Zapata',
-  
-  // Gissela Velastegui
-  'Gissela': 'Gissela Velastegui',
-  
-  // Maria Diaz
-  'Maria Lucinda': 'Maria Diaz',
-  'Maria': 'Maria Diaz',
-  
-  // Esteban Proaño
-  'Francisco Esteban': 'Esteban Proaño',
-  'Francisco': 'Esteban Proaño',
-  'Esteban': 'Esteban Proaño'
+    // Mayra Corella
+    'Mayra Cristina Corella Parra': 'Mayra Corella',
+    'Mayra Corella Parra': 'Mayra Corella',
+    'Mayra Cristina': 'Mayra Corella',
+    'Mayra': 'Mayra Corella',
+
+    // Karol Velastegui
+    'Karol Daniela Velastegui Cadena': 'Karol Velastegui',
+    'Karol Daniela': 'Karol Velastegui',
+    'Karol': 'Karol Velastegui',
+
+    // Jose Zapata
+    'Jose Luis Zapata Silva': 'Jose Zapata',
+    'Jose Luis': 'Jose Zapata',
+    'Jose': 'Jose Zapata',
+
+    // Gissela Velastegui
+    'Gissela': 'Gissela Velastegui',
+
+    // Maria Diaz
+    'Maria Lucinda': 'Maria Diaz',
+    'Maria': 'Maria Diaz',
+
+    // Esteban Proaño
+    'Francisco Esteban': 'Esteban Proaño',
+    'Francisco': 'Esteban Proaño',
+    'Esteban': 'Esteban Proaño'
 };
 
 /**
@@ -41,9 +41,9 @@ const MATRIZADOR_NAME_NORMALIZATION = {
  * @returns {string} - Nombre normalizado
  */
 function normalizeMatrizadorName(name) {
-  if (!name) return 'Sin asignar';
-  const normalized = MATRIZADOR_NAME_NORMALIZATION[name.trim()] || name.trim();
-  return normalized;
+    if (!name) return 'Sin asignar';
+    const normalized = MATRIZADOR_NAME_NORMALIZATION[name.trim()] || name.trim();
+    return normalized;
 }
 
 /**
@@ -698,21 +698,21 @@ export async function importXmlFile(req, res) {
 
         // Detectar si es XML de CXC (tag raíz: cxc_YYYYMMDD)
         const isCxcXml = /<cxc_\d{8}>/.test(xmlPreview);
-        
+
         // Detectar si es XML de MOV (Movimientos de Caja)
-        const isMovXml = xmlPreview.includes('d_vc_i_diario_caja_detallado') || 
-                         xmlPreview.includes('<MOV_');
-        
+        const isMovXml = xmlPreview.includes('d_vc_i_diario_caja_detallado') ||
+            xmlPreview.includes('<MOV_');
+
         // 🔍 VALIDACIÓN: No permitir archivos MOV en pestaña PAGOS
         if (isMovXml) {
             return res.status(400).json({
                 success: false,
                 error: 'Tipo de archivo incorrecto',
                 message: 'Este archivo es de Movimientos de Caja (contiene facturas pagadas en efectivo). ' +
-                         'Por favor use la pestaña "MOVIMIENTOS" en lugar de "PAGOS".'
+                    'Por favor use la pestaña "MOVIMIENTOS" en lugar de "PAGOS".'
             });
         }
-        
+
         let result;
         if (isCxcXml) {
             // Usar servicio de CXC para archivos de cartera por cobrar
@@ -745,11 +745,11 @@ export async function importXmlFile(req, res) {
         console.error('[billing-controller] Error stack:', error.stack);
         console.error('[billing-controller] Error code:', error.code);
         console.error('[billing-controller] Error meta:', error.meta);
-        
+
         // 🔒 SECURITY: Never expose internal error details in production
         // Pero en staging, dar más información para debugging
         const isStaging = process.env.NODE_ENV === 'staging' || process.env.RAILWAY_ENVIRONMENT === 'staging';
-        
+
         res.status(500).json({
             success: false,
             message: 'Error durante la importación del archivo XML',
@@ -988,6 +988,13 @@ export async function getClientBalance(req, res) {
 
 /**
  * Get payments for a specific invoice
+ * 
+ * IMPORTANTE: Soporta dos fuentes de datos de pagos:
+ * 1. Tabla payments: Pagos registrados manualmente o por importación XML
+ * 2. Campo paidAmount: Monto pagado sincronizado desde Koinor (Sync Agent)
+ * 
+ * Cuando no hay registros en payments pero sí hay paidAmount > 0,
+ * se genera un "pago virtual" para mostrar en el historial.
  */
 export async function getInvoicePayments(req, res) {
     try {
@@ -1006,17 +1013,41 @@ export async function getInvoicePayments(req, res) {
             return res.status(404).json({ error: 'Factura no encontrada' });
         }
 
-        const totalPaid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+        let totalPaid = 0;
+        let payments = [];
+
+        if (invoice.payments.length > 0) {
+            // Caso 1: Hay pagos registrados en la tabla payments
+            totalPaid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+            payments = invoice.payments.map(p => ({
+                ...p,
+                amount: Number(p.amount),
+                isVirtual: false
+            }));
+        } else if (Number(invoice.paidAmount) > 0) {
+            // Caso 2: No hay pagos en tabla pero sí hay paidAmount (del Sync Agent)
+            totalPaid = Number(invoice.paidAmount);
+
+            // Generar pago virtual para mostrar en historial
+            payments = [{
+                id: `sync-${invoice.id}`,
+                receiptNumber: 'Sincronizado desde Koinor',
+                amount: totalPaid,
+                paymentDate: invoice.fechaUltimoPago || invoice.lastSyncAt || invoice.issueDate,
+                concept: invoice.condicionPago === 'E'
+                    ? 'Pago al contado (sincronizado)'
+                    : 'Pago sincronizado automáticamente',
+                isVirtual: true,  // Marcador para indicar que viene del sync
+                syncSource: invoice.syncSource || 'KOINOR_SYNC'
+            }];
+        }
 
         res.json({
             invoiceNumber: invoice.invoiceNumber,
             totalAmount: Number(invoice.totalAmount),
             totalPaid,
             balance: Number(invoice.totalAmount) - totalPaid,
-            payments: invoice.payments.map(p => ({
-                ...p,
-                amount: Number(p.amount)
-            }))
+            payments
         });
     } catch (error) {
         console.error('[billing-controller] Get invoice payments error:', error);
@@ -1221,7 +1252,7 @@ export async function getMyPortfolio(req, res) {
             'Mayra Cristina': 'Mayra Corella',
             'Mayra': 'Mayra Corella',
             'Karol Daniela': 'Karol Velastegui',
-            'Karol': 'Karol Velastegui', 
+            'Karol': 'Karol Velastegui',
             'Jose Luis': 'Jose Zapata',
             'Jose': 'Jose Zapata',
             'Gissela Vanessa': 'Gissela Velastegui',
@@ -1232,7 +1263,7 @@ export async function getMyPortfolio(req, res) {
             'Francisco': 'Esteban Proaño',
             'Esteban': 'Esteban Proaño'
         };
-        
+
         // Buscar el nombre CXC correspondiente al usuario
         const cxcMatrizadorName = USER_TO_CXC_MATRIZADOR[user.firstName] || user.firstName;
 
@@ -1599,7 +1630,7 @@ export async function getCarteraPorCobrar(req, res) {
             const balance = Number(invoice.totalAmount) - paid;
 
             if (balance <= 0) continue; // Skip fully paid
-            
+
             // 🚫 Excluir facturas de documentos anulados por nota de crédito
             if (invoice.document?.status === 'ANULADO_NOTA_CREDITO') continue;
 
@@ -1636,7 +1667,7 @@ export async function getCarteraPorCobrar(req, res) {
             client.totalInvoiced += Number(invoice.totalAmount);
             client.totalPaid += paid;
             client.balance += balance;
-            
+
             // Agregar detalle de factura individual
             client.invoices.push({
                 id: invoice.id,
@@ -2039,17 +2070,17 @@ function detectXmlFileType(fileBuffer) {
     }
 
     // Detectar tipo por tags
-    const hasMovTags = xmlPreview.includes('d_vc_i_diario_caja_detallado') || 
-                       xmlPreview.includes('<MOV_');
-    const hasPagosTags = xmlPreview.includes('<d_vc_i_estado_cuenta') || 
-                         xmlPreview.includes('<E>') ||
-                         xmlPreview.includes('<E_group1>');
+    const hasMovTags = xmlPreview.includes('d_vc_i_diario_caja_detallado') ||
+        xmlPreview.includes('<MOV_');
+    const hasPagosTags = xmlPreview.includes('<d_vc_i_estado_cuenta') ||
+        xmlPreview.includes('<E>') ||
+        xmlPreview.includes('<E_group1>');
     const hasCxcTags = xmlPreview.includes('<cxc_');
 
     if (hasMovTags) return { type: 'MOV', preview: xmlPreview.substring(0, 200) };
     if (hasPagosTags) return { type: 'PAGOS', preview: xmlPreview.substring(0, 200) };
     if (hasCxcTags) return { type: 'CXC', preview: xmlPreview.substring(0, 200) };
-    
+
     return { type: 'UNKNOWN', preview: xmlPreview.substring(0, 200) };
 }
 
@@ -2105,16 +2136,16 @@ export async function importMovFile(req, res) {
                 success: false,
                 error: 'Tipo de archivo incorrecto',
                 message: 'Este archivo es un Estado de Cuenta (contiene pagos AB/FC/NC). ' +
-                         'Por favor use la pestaña "PAGOS" en lugar de "MOVIMIENTOS".'
+                    'Por favor use la pestaña "PAGOS" en lugar de "MOVIMIENTOS".'
             });
         }
-        
+
         if (detection.type === 'CXC') {
             return res.status(400).json({
                 success: false,
                 error: 'Tipo de archivo incorrecto',
                 message: 'Este archivo es de Cartera por Cobrar (CXC). ' +
-                         'Por favor use la pestaña "CXC" en lugar de "MOVIMIENTOS".'
+                    'Por favor use la pestaña "CXC" en lugar de "MOVIMIENTOS".'
             });
         }
 
@@ -2218,7 +2249,7 @@ export async function assignInvoiceMatrizador(req, res) {
 
         res.json({
             success: true,
-            message: matrizadorId 
+            message: matrizadorId
                 ? `Factura asignada a ${updatedInvoice.assignedTo.firstName} ${updatedInvoice.assignedTo.lastName}`
                 : 'Asignación de factura removida',
             invoice: {

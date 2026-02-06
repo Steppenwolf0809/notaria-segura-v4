@@ -56,6 +56,7 @@ const EstadoPago = ({ documentId, paymentStatus: externalStatus, compact = false
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [invoiceDetail, setInvoiceDetail] = useState(null);
     const [invoicePayments, setInvoicePayments] = useState([]);
+    const [invoiceTotalPaid, setInvoiceTotalPaid] = useState(0); // Total pagado del backend
     const [loadingInvoice, setLoadingInvoice] = useState(false);
 
     // Cargar estado de pago si no se proporciona externamente
@@ -167,6 +168,7 @@ const EstadoPago = ({ documentId, paymentStatus: externalStatus, compact = false
             ]);
             setInvoiceDetail(invoiceData);
             setInvoicePayments(paymentsData.payments || []);
+            setInvoiceTotalPaid(paymentsData.totalPaid || 0); // Guardar el totalPaid del backend
         } catch (err) {
             console.error('Error cargando factura:', err);
             setInvoiceDetail(null);
@@ -180,6 +182,7 @@ const EstadoPago = ({ documentId, paymentStatus: externalStatus, compact = false
         setShowInvoiceModal(false);
         setInvoiceDetail(null);
         setInvoicePayments([]);
+        setInvoiceTotalPaid(0);
     };
 
     // Loading state
@@ -370,9 +373,7 @@ const EstadoPago = ({ documentId, paymentStatus: externalStatus, compact = false
                                     <Box sx={{ textAlign: 'center', p: 1.5, bgcolor: 'success.soft', borderRadius: 1 }}>
                                         <Typography variant="caption" color="text.secondary">Pagado</Typography>
                                         <Typography variant="h6" color="success.main">
-                                            {billingService.formatCurrency(
-                                                invoicePayments.reduce((sum, p) => sum + Number(p.amount || 0), 0)
-                                            )}
+                                            {billingService.formatCurrency(invoiceTotalPaid)}
                                         </Typography>
                                     </Box>
                                 </Grid>
@@ -415,9 +416,15 @@ const EstadoPago = ({ documentId, paymentStatus: externalStatus, compact = false
                                     </TableHead>
                                     <TableBody>
                                         {invoicePayments.map((payment) => (
-                                            <TableRow key={payment.id} hover>
+                                            <TableRow key={payment.id} hover sx={payment.isVirtual ? { bgcolor: 'action.hover' } : {}}>
                                                 <TableCell>{billingService.formatDate(payment.paymentDate)}</TableCell>
-                                                <TableCell>{payment.receiptNumber || '-'}</TableCell>
+                                                <TableCell>
+                                                    {payment.isVirtual ? (
+                                                        <Chip size="small" label="Koinor" color="info" variant="outlined" />
+                                                    ) : (
+                                                        payment.receiptNumber || '-'
+                                                    )}
+                                                </TableCell>
                                                 <TableCell align="right">
                                                     <Typography color="success.main" fontWeight={500}>
                                                         {billingService.formatCurrency(payment.amount)}

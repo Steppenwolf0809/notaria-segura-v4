@@ -56,7 +56,10 @@
       "Bash(DATABASE_URL=\"postgresql://postgres:vzdzHHIVerdjgzWlmfARWiSsbTBSJfvw@gondola.proxy.rlwy.net:39316/railway\" npx prisma db push:*)",
       "Bash(DATABASE_URL=\"postgresql://postgres:vzdzHHIVerdjgzWlmfARWiSsbTBSJfvw@gondola.proxy.rlwy.net:39316/railway\" node scripts/migrate-payment-allocations.js:*)",
       "Bash(DATABASE_URL=\"postgresql://postgres:vzdzHHIVerdjgzWlmfARWiSsbTBSJfvw@gondola.proxy.rlwy.net:39316/railway\" node:*)",
-      "Bash(DATABASE_URL=\"postgresql://postgres:vzdzHHIVerdjgzWlmfARWiSsbTBSJfvw@gondola.proxy.rlwy.net:39316/railway\" node scripts/check-allocations.js:*)"
+      "Bash(DATABASE_URL=\"postgresql://postgres:vzdzHHIVerdjgzWlmfARWiSsbTBSJfvw@gondola.proxy.rlwy.net:39316/railway\" node scripts/check-allocations.js:*)",
+      "Bash(dir /s /b C:notaria-segurasync-agent)",
+      "Bash(findstr:*)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:uXwrkbpPDVXrEngsRCMHdIKkOUDXipic@switchback.proxy.rlwy.net:25513/railway\" npx prisma db push:*)"
     ],
     "deny": []
   }
