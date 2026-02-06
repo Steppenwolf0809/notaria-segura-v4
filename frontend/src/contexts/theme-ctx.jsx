@@ -67,8 +67,6 @@ export const ThemeCtxProvider = ({ children }) => {
   // 6) Cambiar modo explícito
   const setModeSafe = useCallback((next) => {
     const safe = MODES.includes(next) ? next : 'system';
-    // eslint-disable-next-line no-console
-    console.info('[THEME]', { nextTheme: safe });
     setMode(safe);
   }, []);
 
@@ -76,8 +74,6 @@ export const ThemeCtxProvider = ({ children }) => {
   const cycleMode = useCallback(() => {
     const idx = MODES.indexOf(mode);
     const next = MODES[(idx + 1) % MODES.length];
-    // eslint-disable-next-line no-console
-    console.info('[THEME]', { nextTheme: next });
     setMode(next);
   }, [mode]);
 
