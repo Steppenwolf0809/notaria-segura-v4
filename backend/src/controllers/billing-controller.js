@@ -1243,138 +1243,90 @@ export async function getSummary(req, res) {
 export async function getMyPortfolio(req, res) {
     try {
         const userId = req.user.id;
+        const userRole = req.user.role;
         const { page = 1, limit = 50, status, groupByClient = 'true' } = req.query;
         const skip = (parseInt(page) - 1) * parseInt(limit);
         const take = parseInt(limit);
 
-        console.log(`[billing-controller] getMyPortfolio for user ${userId}`);
+        console.log(`[billing-controller] getMyPortfolio for user ${userId} (role: ${userRole})`);
 
-        // Get user info to match with CXC matrizador name
-        const user = await prisma.user.findUnique({
-            where: { id: userId },
-            select: { firstName: true, lastName: true }
-        });
+        // =====================================================================
+        // FUENTE ÚNICA DE VERDAD: PendingReceivable (sincronizado desde Koinor)
+        // La tabla PendingReceivable contiene los datos del informe CXC
+        // sincronizados automáticamente por el sync-agent.
+        // =====================================================================
 
-        const userFullName = user ? `${user.firstName} ${user.lastName}`.toUpperCase() : null;
+        // Admin, CAJA and RECEPCION can see all receivables
+        // Matrizadores only see receivables - for now all until we add matrizador field to PendingReceivable
+        const isFullAccess = ['ADMIN', 'CAJA', 'RECEPCION'].includes(userRole);
 
-        // Mapeo de usuarios a nombres CXC (codven mapeado)
-        // Nota: firstName puede tener espacios (ej: "Jose Luis")
-        const USER_TO_CXC_MATRIZADOR = {
-            'Mayra Cristina': 'Mayra Corella',
-            'Mayra': 'Mayra Corella',
-            'Karol Daniela': 'Karol Velastegui',
-            'Karol': 'Karol Velastegui',
-            'Jose Luis': 'Jose Zapata',
-            'Jose': 'Jose Zapata',
-            'Gissela Vanessa': 'Gissela Velastegui',
-            'Gissela': 'Gissela Velastegui',
-            'Maria Lucinda': 'Maria Diaz',
-            'Maria': 'Maria Diaz',
-            'Francisco Esteban': 'Esteban Proaño',
-            'Francisco': 'Esteban Proaño',
-            'Esteban': 'Esteban Proaño'
-        };
-
-        // Buscar el nombre CXC correspondiente al usuario
-        const cxcMatrizadorName = USER_TO_CXC_MATRIZADOR[user.firstName] || user.firstName;
-
-        // Facturas del CXC: importadas manualmente (sourceFile='CXC') O sincronizadas (syncSource='KOINOR_SYNC')
-        const invoices = await prisma.invoice.findMany({
+        // Query PendingReceivable directly - the single source of truth for CXC
+        const receivables = await prisma.pendingReceivable.findMany({
             where: {
                 status: { in: ['PENDING', 'PARTIAL', 'OVERDUE'] },
-                AND: [
-                    {
-                        OR: [
-                            { sourceFile: { contains: 'CXC', mode: 'insensitive' } },
-                            { syncSource: 'KOINOR_SYNC' }
-                        ]
-                    },
-                    {
-                        OR: [
-                            { matrizador: cxcMatrizadorName },
-                            { assignedToId: userId },
-                            {
-                                matrizador: null,
-                                document: { is: { assignedToId: userId } }
-                            }
-                        ]
-                    }
-                ]
-            },
-            include: {
-                payments: true,
-                document: {
-                    select: {
-                        id: true,
-                        protocolNumber: true,
-                        documentType: true,
-                        clientId: true,
-                        clientName: true,
-                        clientPhone: true,
-                        status: true
-                    }
-                }
+                balance: { gt: 0 }  // Only receivables with outstanding balance
             },
             orderBy: { issueDate: 'desc' }
         });
 
+        console.log(`[billing-controller] Found ${receivables.length} pending receivables`);
+
+        // Build client map grouped by clientTaxId
         const clientMap = new Map();
         let totalDebt = 0;
         let totalOverdue = 0;
 
-        for (const invoice of invoices) {
-            if (invoice.document?.status === 'ANULADO_NOTA_CREDITO') continue;
-
-            const paid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
-            const totalAmount = Number(invoice.totalAmount || 0);
-            const balance = totalAmount - paid;
+        for (const receivable of receivables) {
+            const balance = Number(receivable.balance) || 0;
+            const totalAmount = Number(receivable.totalAmount) || 0;
+            const totalPaid = Number(receivable.totalPaid) || 0;
 
             if (balance <= 0) continue;
 
-            const isOverdue = invoice.dueDate && new Date(invoice.dueDate) < new Date();
+            const isOverdue = receivable.daysOverdue > 0 ||
+                (receivable.dueDate && new Date(receivable.dueDate) < new Date());
+
             if (isOverdue) totalOverdue += balance;
             totalDebt += balance;
 
-            const effectiveClientTaxId = (invoice.clientTaxId && invoice.clientTaxId.trim())
-                ? invoice.clientTaxId.trim()
-                : (invoice.document?.clientId || invoice.id);
-            const effectiveClientName = invoice.clientName || invoice.document?.clientName;
-            const clientPhone = invoice.document?.clientPhone || '';
+            const clientTaxId = (receivable.clientTaxId || '').trim();
+            const clientName = (receivable.clientName || '').trim();
 
-            if (!clientMap.has(effectiveClientTaxId)) {
-                clientMap.set(effectiveClientTaxId, {
-                    clientTaxId: effectiveClientTaxId,
-                    clientName: effectiveClientName,
-                    clientPhone,
+            if (!clientMap.has(clientTaxId)) {
+                clientMap.set(clientTaxId, {
+                    clientTaxId,
+                    clientName,
+                    clientPhone: '',  // PendingReceivable doesn't have phone, will be empty
                     totalDebt: 0,
                     overdueDebt: 0,
                     invoices: []
                 });
             }
 
-            const client = clientMap.get(effectiveClientTaxId);
+            const client = clientMap.get(clientTaxId);
             client.totalDebt += balance;
             if (isOverdue) client.overdueDebt += balance;
 
-            const daysOverdue = isOverdue && invoice.dueDate
-                ? Math.floor((new Date() - new Date(invoice.dueDate)) / (1000 * 60 * 60 * 24))
-                : (invoice.issueDate ? Math.floor((new Date() - new Date(invoice.issueDate)) / (1000 * 60 * 60 * 24)) : 0);
+            const daysOverdue = receivable.daysOverdue ||
+                (isOverdue && receivable.dueDate
+                    ? Math.floor((new Date() - new Date(receivable.dueDate)) / (1000 * 60 * 60 * 24))
+                    : 0);
 
             client.invoices.push({
-                id: invoice.id,
-                invoiceNumber: invoice.invoiceNumber || invoice.invoiceNumberRaw,
-                documentId: invoice.document?.id || invoice.documentId,
-                protocolNumber: invoice.document?.protocolNumber || null,
-                documentType: invoice.document?.documentType || 'CXC',
-                issueDate: invoice.issueDate,
-                dueDate: invoice.dueDate,
+                id: receivable.id,
+                invoiceNumber: receivable.invoiceNumber || receivable.invoiceNumberRaw,
+                documentId: null,  // PendingReceivable is not linked to documents
+                protocolNumber: null,
+                documentType: 'CXC',  // All from CXC sync
+                issueDate: receivable.issueDate,
+                dueDate: receivable.dueDate,
                 totalAmount,
-                totalPaid: paid,
+                totalPaid,
                 balance,
                 isOverdue,
                 daysOverdue,
-                source: invoice.document ? 'DOCUMENT' : 'CXC',
-                matrizador: normalizeMatrizadorName(invoice.matrizador) || 'Sin asignar'
+                source: 'CXC',
+                matrizador: 'Sin asignar'  // PendingReceivable doesn't have matrizador field yet
             });
         }
 
@@ -1409,6 +1361,7 @@ export async function getMyPortfolio(req, res) {
         });
     }
 }
+
 
 /**
  * Update client phone number in all documents
@@ -1601,104 +1554,72 @@ export async function generateCollectionReminder(req, res) {
 /**
  * Report: Cartera por Cobrar (Accounts Receivable by Client)
  * Groups unpaid invoices by client with totals
+ * FUENTE ÚNICA DE VERDAD: PendingReceivable (sincronizado desde Koinor)
  */
 export async function getCarteraPorCobrar(req, res) {
     try {
         console.log('[billing-controller] getCarteraPorCobrar');
 
-        // Facturas del CXC: importadas manualmente (sourceFile='CXC') O sincronizadas (syncSource='KOINOR_SYNC')
-        const invoices = await prisma.invoice.findMany({
+        // =====================================================================
+        // FUENTE ÚNICA DE VERDAD: PendingReceivable (sincronizado desde Koinor)
+        // La tabla PendingReceivable contiene los datos del informe CXC
+        // sincronizados automáticamente por el sync-agent.
+        // =====================================================================
+        const receivables = await prisma.pendingReceivable.findMany({
             where: {
-                status: {
-                    in: ['PENDING', 'PARTIAL', 'OVERDUE']
-                },
-                OR: [
-                    { sourceFile: { contains: 'CXC', mode: 'insensitive' } },
-                    { syncSource: 'KOINOR_SYNC' }
-                ]
-            },
-            include: {
-                payments: true,
-                document: {
-                    select: {
-                        status: true, // Para excluir documentos anulados por NC
-                        assignedTo: {
-                            select: {
-                                firstName: true,
-                                lastName: true
-                            }
-                        }
-                    }
-                },
-                // Asignación directa de matrizador (para facturas sin documento)
-                assignedTo: {
-                    select: {
-                        firstName: true,
-                        lastName: true
-                    }
-                }
+                status: { in: ['PENDING', 'PARTIAL', 'OVERDUE'] },
+                balance: { gt: 0 }
             },
             orderBy: { issueDate: 'desc' }
         });
 
+        console.log(`[billing-controller] Found ${receivables.length} pending receivables for report`);
+
         // Group by client
         const clientMap = new Map();
 
-        for (const invoice of invoices) {
-            const paid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
-            const balance = Number(invoice.totalAmount) - paid;
+        for (const receivable of receivables) {
+            const balance = Number(receivable.balance) || 0;
+            const totalAmount = Number(receivable.totalAmount) || 0;
+            const totalPaid = Number(receivable.totalPaid) || 0;
 
             if (balance <= 0) continue; // Skip fully paid
 
-            // 🚫 Excluir facturas de documentos anulados por nota de crédito
-            if (invoice.document?.status === 'ANULADO_NOTA_CREDITO') continue;
+            const clientTaxId = (receivable.clientTaxId || '').trim();
+            const clientName = (receivable.clientName || '').trim();
 
-            // Determinar matrizador: 
-            // 1. Campo matrizador directo de Invoice (CXC import)
-            // 2. Del documento asignado
-            // 3. Asignación directa de factura
-            let matrizadorName = 'Sin asignar';
-            if (invoice.matrizador) {
-                matrizadorName = normalizeMatrizadorName(invoice.matrizador);
-            } else if (invoice.document?.assignedTo) {
-                matrizadorName = normalizeMatrizadorName(`${invoice.document.assignedTo.firstName} ${invoice.document.assignedTo.lastName}`);
-            } else if (invoice.assignedTo) {
-                matrizadorName = normalizeMatrizadorName(`${invoice.assignedTo.firstName} ${invoice.assignedTo.lastName}`);
-            }
-
-            const key = invoice.clientTaxId;
-            if (!clientMap.has(key)) {
-                clientMap.set(key, {
-                    clientTaxId: invoice.clientTaxId,
-                    clientName: invoice.clientName,
+            if (!clientMap.has(clientTaxId)) {
+                clientMap.set(clientTaxId, {
+                    clientTaxId,
+                    clientName,
                     invoiceCount: 0,
                     totalInvoiced: 0,
                     totalPaid: 0,
                     balance: 0,
-                    matrizador: matrizadorName,
-                    canAssign: !invoice.documentId, // Solo se puede asignar si no tiene documento
-                    invoices: [] // Detalle de facturas individuales
+                    matrizador: 'Sin asignar',  // PendingReceivable doesn't have matrizador yet
+                    canAssign: false,
+                    invoices: []
                 });
             }
 
-            const client = clientMap.get(key);
+            const client = clientMap.get(clientTaxId);
             client.invoiceCount++;
-            client.totalInvoiced += Number(invoice.totalAmount);
-            client.totalPaid += paid;
+            client.totalInvoiced += totalAmount;
+            client.totalPaid += totalPaid;
             client.balance += balance;
 
-            // Agregar detalle de factura individual
+            // Add invoice detail
             client.invoices.push({
-                id: invoice.id,
-                invoiceNumber: invoice.invoiceNumber,
-                issueDate: invoice.issueDate,
-                dueDate: invoice.dueDate,
-                totalAmount: Number(invoice.totalAmount),
-                paidAmount: paid,
-                balance: balance,
-                status: invoice.status,
-                hasDocument: !!invoice.documentId,
-                canAssign: !invoice.documentId
+                id: receivable.id,
+                invoiceNumber: receivable.invoiceNumber || receivable.invoiceNumberRaw,
+                issueDate: receivable.issueDate,
+                dueDate: receivable.dueDate,
+                totalAmount,
+                paidAmount: totalPaid,
+                balance,
+                status: receivable.status,
+                hasDocument: false,
+                canAssign: false
             });
         }
 
@@ -1731,6 +1652,7 @@ export async function getCarteraPorCobrar(req, res) {
         });
     }
 }
+
 
 /**
  * Report: Pagos del Período (Payments in Date Range)
