@@ -103,8 +103,8 @@ async function getAllDocumentsOversight(req, res) {
             filterClauses.push(Prisma.sql`d."assignedToId" = ${where.assignedToId}`);
           }
 
-          const whereSql = Prisma.sql`${Prisma.join([
-            Prisma.sql`(
+          // Construir cláusulas WHERE de forma segura
+          const searchClause = Prisma.sql`(
               unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
               unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
               unaccent(d."actoPrincipalDescripcion") ILIKE unaccent(${pattern}) OR
@@ -113,9 +113,11 @@ async function getAllDocumentsOversight(req, res) {
               d."clientPhone" ILIKE ${pattern} OR
               d."clientEmail" ILIKE ${pattern} OR
               unaccent(COALESCE(d."clientId", '')) ILIKE unaccent(${pattern})
-            )`,
-            ...filterClauses
-          ], Prisma.sql` AND `)}`;
+            )`;
+          
+          const whereSql = filterClauses.length > 0
+            ? Prisma.sql`${searchClause} AND ${Prisma.join(filterClauses, Prisma.sql` AND `)}`
+            : searchClause;
 
           // Use Prisma.raw for field name and direction since they are safe SQL keywords
           const fieldName = (sortBy === 'updatedAt') ? 'd."updatedAt"' : 'd."createdAt"';
@@ -661,15 +663,16 @@ async function exportDocuments(req, res) {
       } else if (matrizador) {
         filterClauses.push(Prisma.sql`d."assignedToId" = ${parseInt(matrizador)}`);
       }
-      const whereSql = Prisma.sql`${Prisma.join([
-        Prisma.sql`(
+      const searchClause = Prisma.sql`(
           unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
           unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
           unaccent(d."actoPrincipalDescripcion") ILIKE unaccent(${pattern}) OR
           unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern})
-        )`,
-        ...filterClauses
-      ], Prisma.sql` AND `)}`;
+        )`;
+      
+      const whereSql = filterClauses.length > 0
+        ? Prisma.sql`${searchClause} AND ${Prisma.join(filterClauses, Prisma.sql` AND `)}`
+        : searchClause;
       documents = await prisma.$queryRaw`
         SELECT d.*, 
                au."firstName" AS "_assignedToFirstName", au."lastName" AS "_assignedToLastName",
