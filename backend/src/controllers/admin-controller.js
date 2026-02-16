@@ -986,18 +986,18 @@ async function getDashboardStats(req, res) {
       const recentDeliveries = await prisma.document.findMany({
         where: {
           assignedToId: m.id,
-          status: 'ENTREGADO',
-          ...(Object.keys(performanceDateFilter).length > 0 ? { updatedAt: performanceDateFilter } : {})
+          fechaListo: { not: null }, // Usar fechaListo en vez de status ENTREGADO
+          ...(Object.keys(performanceDateFilter).length > 0 ? { fechaListo: performanceDateFilter } : {})
         },
-        select: { createdAt: true, updatedAt: true },
-        take: 20, // Aumentar muestra para mejor promedio si hay filtros largos
-        orderBy: { updatedAt: 'desc' }
+        select: { createdAt: true, fechaListo: true },
+        take: 20,
+        orderBy: { fechaListo: 'desc' }
       });
 
       let avgDays = 0;
       if (recentDeliveries.length > 0) {
         const totalTime = recentDeliveries.reduce((acc, doc) => {
-          return acc + (new Date(doc.updatedAt) - new Date(doc.createdAt));
+          return acc + (new Date(doc.fechaListo) - new Date(doc.createdAt));
         }, 0);
         avgDays = Math.round(totalTime / recentDeliveries.length / (1000 * 60 * 60 * 24));
       }
