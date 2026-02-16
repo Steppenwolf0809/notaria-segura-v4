@@ -31,8 +31,64 @@ model User {
   mensajesEnviados           MensajeInterno[]           @relation("MensajesEnviados")
   mensajesRecibidos          MensajeInterno[]           @relation("MensajesRecibidos")
   assignedInvoices           Invoice[]                  @relation("AssignedInvoices")
-
+  
+  // Multi-tenant relation
+  notary                     Notary?                    @relation(fields: [notaryId], references: [id])
+  notaryId                   String?
+  
   @@map("users")
+  @@index([notaryId])
+}
+
+model Notary {
+  id        String   @id @default(uuid())
+  name      String
+  code      String   @unique // "N18"
+  slug      String   @unique // "n18" - subdomain
+  ruc       String?  @unique
+  address   String?
+  city      String?  @default("Quito")
+  province  String?  @default("Pichincha")
+  phone     String?
+  email     String?
+  logoUrl   String?
+  isActive  Boolean  @default(true)
+  tier      String   @default("BASIC")  // BASIC, PREMIUM, ENTERPRISE
+  
+  // Configuración por notaría (S3, WhatsApp, Auth0, Koinor)
+  config    Json?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relaciones
+  users     User[]
+  auditLogs AuditLog[]
+
+  @@map("notaries")
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  notaryId    String?
+  userId      Int?
+  action      String   // LOGIN, LOGOUT, CREATE, UPDATE, DELETE, CONFIG_CHANGE, MODULE_TOGGLE
+  resource    String   // notary, user, document, invoice, config
+  resourceId  String?
+  details     Json?    // { before: {...}, after: {...} }
+  ipAddress   String?
+  userAgent   String?
+  severity    String   @default("INFO") // INFO, WARNING, CRITICAL
+  createdAt   DateTime @default(now())
+  
+  notary      Notary?  @relation(fields: [notaryId], references: [id])
+  
+  @@index([notaryId, createdAt])
+  @@index([action])
+  @@index([resource, resourceId])
+  @@index([severity])
+  @@index([createdAt])
+  @@map("audit_logs")
 }
 
 model Document {
@@ -576,6 +632,7 @@ model MensajeInterno {
 }
 
 enum UserRole {
+  SUPER_ADMIN
   ADMIN
   CAJA
   MATRIZADOR
