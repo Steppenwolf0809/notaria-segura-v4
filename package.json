@@ -30,7 +30,7 @@
   "author": "Notaría Segura",
   "license": "PRIVATE",
   "engines": {
-    "node": "20.x",
+    "node": ">=20.19.0 || >=22.12.0",
     "npm": ">=9.0.0"
   },
   "dependencies": {
