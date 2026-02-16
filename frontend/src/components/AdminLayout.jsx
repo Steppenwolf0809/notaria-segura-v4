@@ -47,7 +47,9 @@ import {
   Assessment as AssessmentIcon,
   Send as SendIcon,
   FolderOpen as FolderOpenIcon,
-  Message as MessageIcon
+  Message as MessageIcon,
+  Shield as ShieldIcon,
+  AdminPanelSettings as AdminPanelSettingsIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import { useThemeCtx } from '../contexts/theme-ctx';
@@ -68,6 +70,8 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [billingMenuOpen, setBillingMenuOpen] = useState(false);
+  const [complianceMenuOpen, setComplianceMenuOpen] = useState(false);
+  const [adminMenuOpen, setAdminMenuOpen] = useState(false);
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
   const { resolvedIsDark: isDarkMode, setMode } = useThemeCtx();
 
@@ -85,14 +89,24 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
     if (savedBillingOpen !== null) {
       setBillingMenuOpen(JSON.parse(savedBillingOpen));
     }
+    const savedComplianceOpen = localStorage.getItem('admin-compliance-menu-open');
+    if (savedComplianceOpen !== null) {
+      setComplianceMenuOpen(JSON.parse(savedComplianceOpen));
+    }
+    const savedAdminOpen = localStorage.getItem('admin-admin-menu-open');
+    if (savedAdminOpen !== null) {
+      setAdminMenuOpen(JSON.parse(savedAdminOpen));
+    }
   }, []);
 
-  // Mantener submenu de facturación abierto si estamos en una vista de facturación
+  // Mantener submenus abiertos si estamos en una vista correspondiente
   useEffect(() => {
     const billingViews = ['importar-datos', 'facturas', 'pagos', 'reportes'];
-    if (billingViews.includes(currentView)) {
-      setBillingMenuOpen(true);
-    }
+    if (billingViews.includes(currentView)) setBillingMenuOpen(true);
+    const complianceViews = ['formularios-uafe', 'analisis-uafe'];
+    if (complianceViews.includes(currentView)) setComplianceMenuOpen(true);
+    const adminViews = ['users', 'notifications', 'encuestas-satisfaccion', 'qr-management', 'whatsapp-templates', 'settings'];
+    if (adminViews.includes(currentView)) setAdminMenuOpen(true);
   }, [currentView]);
 
   // Guardar estado en localStorage
@@ -103,6 +117,14 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
   useEffect(() => {
     localStorage.setItem('admin-billing-menu-open', JSON.stringify(billingMenuOpen));
   }, [billingMenuOpen]);
+
+  useEffect(() => {
+    localStorage.setItem('admin-compliance-menu-open', JSON.stringify(complianceMenuOpen));
+  }, [complianceMenuOpen]);
+
+  useEffect(() => {
+    localStorage.setItem('admin-admin-menu-open', JSON.stringify(adminMenuOpen));
+  }, [adminMenuOpen]);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -117,22 +139,21 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
     setMobileOpen(false);
   };
 
-  // Estructura de navegación simplificada
+  // === ESTRUCTURA DE NAVEGACIÓN REORGANIZADA ===
+  // Top-level: lo que el notario usa cada día
   const mainNavItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <DashboardIcon />, view: 'dashboard' },
-    { id: 'users', label: 'Usuarios', icon: <PersonIcon />, view: 'users' },
     { id: 'documents', label: 'Documentos', icon: <DocumentIcon />, view: 'documents' },
     { id: 'seguimiento-mensajes', label: 'Mensajes', icon: <MessageIcon />, view: 'seguimiento-mensajes' },
   ];
 
-  const secondaryNavItems = [
-    { id: 'formularios-uafe', label: 'Formularios UAFE', icon: <DescriptionIcon />, view: 'formularios-uafe' },
-    { id: 'analisis-uafe', label: 'Análisis UAFE', icon: <AnalyticsIcon />, view: 'analisis-uafe' },
-    { id: 'notifications', label: 'Notificaciones', icon: <NotificationsIcon />, view: 'notifications' },
-    { id: 'encuestas-satisfaccion', label: 'Encuestas', icon: <PollIcon />, view: 'encuestas-satisfaccion' },
-    { id: 'qr-management', label: 'Códigos QR', icon: <QrCodeIcon />, view: 'qr-management' },
+  // Cumplimiento regulatorio (UAFE)
+  const complianceSubItems = [
+    { view: 'formularios-uafe', label: 'Formularios UAFE', icon: <DescriptionIcon fontSize="small" /> },
+    { view: 'analisis-uafe', label: 'Análisis UAFE', icon: <AnalyticsIcon fontSize="small" /> },
   ];
 
+  // Facturación (ya existente)
   const billingSubItems = [
     { view: 'importar-datos', label: 'Importar Datos', icon: <CloudUploadIcon fontSize="small" /> },
     { view: 'facturas', label: 'Facturas', icon: <ReceiptIcon fontSize="small" /> },
@@ -140,13 +161,20 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
     { view: 'reportes', label: 'Reportes', icon: <AssessmentIcon fontSize="small" /> },
   ];
 
-  const configItems = [
-    { id: 'settings', label: 'Configuración', icon: <SettingsIcon />, view: 'settings' },
-    { id: 'whatsapp-templates', label: 'Templates WhatsApp', icon: <WhatsAppIcon />, view: 'whatsapp-templates' },
+  // Administración (uso infrecuente)
+  const adminSubItems = [
+    { view: 'users', label: 'Usuarios', icon: <PersonIcon fontSize="small" /> },
+    { view: 'notifications', label: 'Notificaciones', icon: <NotificationsIcon fontSize="small" /> },
+    { view: 'encuestas-satisfaccion', label: 'Encuestas', icon: <PollIcon fontSize="small" /> },
+    { view: 'qr-management', label: 'Códigos QR', icon: <QrCodeIcon fontSize="small" /> },
+    { view: 'whatsapp-templates', label: 'Templates WhatsApp', icon: <WhatsAppIcon fontSize="small" /> },
+    { view: 'settings', label: 'Configuración', icon: <SettingsIcon fontSize="small" /> },
   ];
 
   const isItemActive = (view) => currentView === view;
   const isBillingActive = billingSubItems.some(item => currentView === item.view);
+  const isComplianceActive = complianceSubItems.some(item => currentView === item.view);
+  const isAdminActive = adminSubItems.some(item => currentView === item.view);
 
   const NavItem = ({ item, collapsed }) => {
     const active = isItemActive(item.view);
@@ -284,82 +312,87 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
 
       {/* Navegación principal */}
       <Box sx={{ flex: 1, overflow: 'auto', py: 2 }}>
-        {/* Sección Principal */}
-        {!sidebarCollapsed && (
-          <Typography
-            variant="overline"
-            sx={{
-              px: 3,
-              py: 1,
-              display: 'block',
-              color: isDarkMode ? '#64748b' : '#94a3b8',
-              fontSize: '0.6875rem',
-              fontWeight: 700,
-              letterSpacing: '0.08em'
-            }}
-          >
-            PRINCIPAL
-          </Typography>
-        )}
+        {/* === TOP-LEVEL: Uso diario === */}
         <List sx={{ px: sidebarCollapsed ? 1 : 1.5, py: 0.5 }}>
           {mainNavItems.map((item) => (
             <NavItem key={item.id} item={item} collapsed={sidebarCollapsed} />
           ))}
         </List>
 
-        {/* Sección Gestión */}
-        {!sidebarCollapsed && (
-          <Typography
-            variant="overline"
-            sx={{
-              px: 3,
-              py: 1,
-              display: 'block',
-              color: isDarkMode ? '#64748b' : '#94a3b8',
-              fontSize: '0.6875rem',
-              fontWeight: 700,
-              letterSpacing: '0.08em',
-              mt: 2
-            }}
-          >
-            GESTIÓN
-          </Typography>
-        )}
+        <Divider sx={{ my: 1.5, mx: 2, borderColor: isDarkMode ? 'rgba(148, 163, 184, 0.08)' : 'rgba(148, 163, 184, 0.12)' }} />
+
+        {/* === SUBMENU: Cumplimiento === */}
         <List sx={{ px: sidebarCollapsed ? 1 : 1.5, py: 0.5 }}>
-          {secondaryNavItems.map((item) => (
-            <NavItem key={item.id} item={item} collapsed={sidebarCollapsed} />
-          ))}
+          <ListItem disablePadding sx={{ mb: 0.5, flexDirection: 'column' }}>
+            <Tooltip title={sidebarCollapsed ? 'Cumplimiento' : ''} placement="right">
+              <ListItemButton
+                onClick={() => setComplianceMenuOpen(!complianceMenuOpen)}
+                sx={{
+                  borderRadius: 3,
+                  minHeight: 48,
+                  justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                  px: sidebarCollapsed ? 1.5 : 2.5,
+                  mx: sidebarCollapsed ? 0.5 : 1.5,
+                  width: '100%',
+                  backgroundColor: isComplianceActive
+                    ? (isDarkMode ? 'rgba(30, 58, 95, 0.4)' : 'rgba(30, 58, 95, 0.08)')
+                    : 'transparent',
+                  color: isComplianceActive
+                    ? (isDarkMode ? '#93c5fd' : '#1e3a5f')
+                    : (isDarkMode ? '#94a3b8' : '#64748b'),
+                  borderLeft: isComplianceActive ? '3px solid' : '3px solid transparent',
+                  borderColor: isComplianceActive ? 'primary.main' : 'transparent',
+                  '&:hover': {
+                    backgroundColor: isComplianceActive
+                      ? (isDarkMode ? 'rgba(30, 58, 95, 0.5)' : 'rgba(30, 58, 95, 0.12)')
+                      : (isDarkMode ? 'rgba(148, 163, 184, 0.08)' : 'rgba(30, 58, 95, 0.04)'),
+                  },
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <ListItemIcon sx={{ color: isComplianceActive ? 'primary.main' : 'inherit', minWidth: sidebarCollapsed ? 'auto' : 36, justifyContent: 'center', mr: sidebarCollapsed ? 0 : 1.5 }}>
+                  <ShieldIcon />
+                </ListItemIcon>
+                {!sidebarCollapsed && (
+                  <>
+                    <ListItemText primary="Cumplimiento" primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: isComplianceActive ? 600 : 500, color: 'inherit' }} />
+                    <IconButton size="small" sx={{ color: 'inherit', transform: complianceMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}>
+                      <ExpandMoreIcon fontSize="small" />
+                    </IconButton>
+                  </>
+                )}
+              </ListItemButton>
+            </Tooltip>
+            <Collapse in={complianceMenuOpen && !sidebarCollapsed} timeout="auto" unmountOnExit>
+              <List sx={{ pl: 2, width: '100%', mt: 0.5 }}>
+                {complianceSubItems.map((subItem) => {
+                  const isSubActive = currentView === subItem.view;
+                  return (
+                    <ListItem key={subItem.view} disablePadding sx={{ mb: 0.5 }}>
+                      <ListItemButton onClick={() => handleNavigation(subItem.view)} sx={{ borderRadius: 3, minHeight: 36, px: 2, mx: 1, backgroundColor: isSubActive ? (isDarkMode ? 'rgba(30, 58, 95, 0.3)' : 'rgba(30, 58, 95, 0.06)') : 'transparent', color: isSubActive ? (isDarkMode ? '#93c5fd' : '#1e3a5f') : (isDarkMode ? '#94a3b8' : '#64748b'), '&:hover': { backgroundColor: isSubActive ? (isDarkMode ? 'rgba(30, 58, 95, 0.4)' : 'rgba(30, 58, 95, 0.1)') : (isDarkMode ? 'rgba(148, 163, 184, 0.06)' : 'rgba(30, 58, 95, 0.03)') } }}>
+                        <ListItemIcon sx={{ color: isSubActive ? 'primary.main' : 'inherit', minWidth: 28 }}>{subItem.icon}</ListItemIcon>
+                        <ListItemText primary={subItem.label} primaryTypographyProps={{ fontSize: '0.8125rem', fontWeight: isSubActive ? 500 : 400, color: 'inherit' }} />
+                      </ListItemButton>
+                    </ListItem>
+                  );
+                })}
+              </List>
+            </Collapse>
+          </ListItem>
         </List>
 
-        {/* Facturación con submenu */}
-        {!sidebarCollapsed && (
-          <Typography
-            variant="overline"
-            sx={{
-              px: 3,
-              py: 1,
-              display: 'block',
-              color: isDarkMode ? '#64748b' : '#94a3b8',
-              fontSize: '0.6875rem',
-              fontWeight: 700,
-              letterSpacing: '0.08em',
-              mt: 2
-            }}
-          >
-            FINANCIERO
-          </Typography>
-        )}
+        {/* === SUBMENU: Facturación === */}
         <List sx={{ px: sidebarCollapsed ? 1 : 1.5, py: 0.5 }}>
           <ListItem disablePadding sx={{ mb: 0.5, flexDirection: 'column' }}>
             <Tooltip title={sidebarCollapsed ? 'Facturación' : ''} placement="right">
               <ListItemButton
                 onClick={() => setBillingMenuOpen(!billingMenuOpen)}
                 sx={{
-                  borderRadius: 2,
-                  minHeight: 44,
+                  borderRadius: 3,
+                  minHeight: 48,
                   justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
-                  px: sidebarCollapsed ? 1.5 : 2,
-                  mx: sidebarCollapsed ? 0.5 : 1,
+                  px: sidebarCollapsed ? 1.5 : 2.5,
+                  mx: sidebarCollapsed ? 0.5 : 1.5,
                   width: '100%',
                   backgroundColor: isBillingActive
                     ? (isDarkMode ? 'rgba(30, 58, 95, 0.4)' : 'rgba(30, 58, 95, 0.08)')
@@ -374,84 +407,31 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
                       ? (isDarkMode ? 'rgba(30, 58, 95, 0.5)' : 'rgba(30, 58, 95, 0.12)')
                       : (isDarkMode ? 'rgba(148, 163, 184, 0.08)' : 'rgba(30, 58, 95, 0.04)'),
                   },
+                  transition: 'all 0.2s ease',
                 }}
               >
-                <ListItemIcon
-                  sx={{
-                    color: isBillingActive ? 'primary.main' : 'inherit',
-                    minWidth: sidebarCollapsed ? 'auto' : 36,
-                    justifyContent: 'center',
-                    mr: sidebarCollapsed ? 0 : 1.5,
-                  }}
-                >
+                <ListItemIcon sx={{ color: isBillingActive ? 'primary.main' : 'inherit', minWidth: sidebarCollapsed ? 'auto' : 36, justifyContent: 'center', mr: sidebarCollapsed ? 0 : 1.5 }}>
                   <AccountBalanceIcon />
                 </ListItemIcon>
                 {!sidebarCollapsed && (
                   <>
-                    <ListItemText
-                      primary="Facturación"
-                      primaryTypographyProps={{
-                        fontSize: '0.875rem',
-                        fontWeight: isBillingActive ? 600 : 500,
-                        color: 'inherit'
-                      }}
-                    />
-                    <IconButton
-                      size="small"
-                      sx={{
-                        color: 'inherit',
-                        transform: billingMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                        transition: 'transform 0.2s ease'
-                      }}
-                    >
+                    <ListItemText primary="Facturación" primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: isBillingActive ? 600 : 500, color: 'inherit' }} />
+                    <IconButton size="small" sx={{ color: 'inherit', transform: billingMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}>
                       <ExpandMoreIcon fontSize="small" />
                     </IconButton>
                   </>
                 )}
               </ListItemButton>
             </Tooltip>
-
-            {/* Submenu de Facturación */}
             <Collapse in={billingMenuOpen && !sidebarCollapsed} timeout="auto" unmountOnExit>
               <List sx={{ pl: 2, width: '100%', mt: 0.5 }}>
                 {billingSubItems.map((subItem) => {
                   const isSubActive = currentView === subItem.view;
                   return (
                     <ListItem key={subItem.view} disablePadding sx={{ mb: 0.5 }}>
-                      <ListItemButton
-                        onClick={() => handleNavigation(subItem.view)}
-                        sx={{
-                          borderRadius: 2,
-                          minHeight: 36,
-                          px: 2,
-                          mx: 1,
-                          backgroundColor: isSubActive
-                            ? (isDarkMode ? 'rgba(30, 58, 95, 0.3)' : 'rgba(30, 58, 95, 0.06)')
-                            : 'transparent',
-                          color: isSubActive
-                            ? (isDarkMode ? '#93c5fd' : '#1e3a5f')
-                            : (isDarkMode ? '#94a3b8' : '#64748b'),
-                          '&:hover': {
-                            backgroundColor: isSubActive
-                              ? (isDarkMode ? 'rgba(30, 58, 95, 0.4)' : 'rgba(30, 58, 95, 0.1)')
-                              : (isDarkMode ? 'rgba(148, 163, 184, 0.06)' : 'rgba(30, 58, 95, 0.03)'),
-                          },
-                        }}
-                      >
-                        <ListItemIcon sx={{
-                          color: isSubActive ? 'primary.main' : 'inherit',
-                          minWidth: 28
-                        }}>
-                          {subItem.icon}
-                        </ListItemIcon>
-                        <ListItemText
-                          primary={subItem.label}
-                          primaryTypographyProps={{
-                            fontSize: '0.8125rem',
-                            fontWeight: isSubActive ? 500 : 400,
-                            color: 'inherit'
-                          }}
-                        />
+                      <ListItemButton onClick={() => handleNavigation(subItem.view)} sx={{ borderRadius: 3, minHeight: 36, px: 2, mx: 1, backgroundColor: isSubActive ? (isDarkMode ? 'rgba(30, 58, 95, 0.3)' : 'rgba(30, 58, 95, 0.06)') : 'transparent', color: isSubActive ? (isDarkMode ? '#93c5fd' : '#1e3a5f') : (isDarkMode ? '#94a3b8' : '#64748b'), '&:hover': { backgroundColor: isSubActive ? (isDarkMode ? 'rgba(30, 58, 95, 0.4)' : 'rgba(30, 58, 95, 0.1)') : (isDarkMode ? 'rgba(148, 163, 184, 0.06)' : 'rgba(30, 58, 95, 0.03)') } }}>
+                        <ListItemIcon sx={{ color: isSubActive ? 'primary.main' : 'inherit', minWidth: 28 }}>{subItem.icon}</ListItemIcon>
+                        <ListItemText primary={subItem.label} primaryTypographyProps={{ fontSize: '0.8125rem', fontWeight: isSubActive ? 500 : 400, color: 'inherit' }} />
                       </ListItemButton>
                     </ListItem>
                   );
@@ -461,28 +441,64 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
           </ListItem>
         </List>
 
-        {/* Configuración */}
-        {!sidebarCollapsed && (
-          <Typography
-            variant="overline"
-            sx={{
-              px: 3,
-              py: 1,
-              display: 'block',
-              color: isDarkMode ? '#64748b' : '#94a3b8',
-              fontSize: '0.6875rem',
-              fontWeight: 700,
-              letterSpacing: '0.08em',
-              mt: 2
-            }}
-          >
-            SISTEMA
-          </Typography>
-        )}
+        {/* === SUBMENU: Administración === */}
         <List sx={{ px: sidebarCollapsed ? 1 : 1.5, py: 0.5 }}>
-          {configItems.map((item) => (
-            <NavItem key={item.id} item={item} collapsed={sidebarCollapsed} />
-          ))}
+          <ListItem disablePadding sx={{ mb: 0.5, flexDirection: 'column' }}>
+            <Tooltip title={sidebarCollapsed ? 'Administración' : ''} placement="right">
+              <ListItemButton
+                onClick={() => setAdminMenuOpen(!adminMenuOpen)}
+                sx={{
+                  borderRadius: 3,
+                  minHeight: 48,
+                  justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+                  px: sidebarCollapsed ? 1.5 : 2.5,
+                  mx: sidebarCollapsed ? 0.5 : 1.5,
+                  width: '100%',
+                  backgroundColor: isAdminActive
+                    ? (isDarkMode ? 'rgba(30, 58, 95, 0.4)' : 'rgba(30, 58, 95, 0.08)')
+                    : 'transparent',
+                  color: isAdminActive
+                    ? (isDarkMode ? '#93c5fd' : '#1e3a5f')
+                    : (isDarkMode ? '#94a3b8' : '#64748b'),
+                  borderLeft: isAdminActive ? '3px solid' : '3px solid transparent',
+                  borderColor: isAdminActive ? 'primary.main' : 'transparent',
+                  '&:hover': {
+                    backgroundColor: isAdminActive
+                      ? (isDarkMode ? 'rgba(30, 58, 95, 0.5)' : 'rgba(30, 58, 95, 0.12)')
+                      : (isDarkMode ? 'rgba(148, 163, 184, 0.08)' : 'rgba(30, 58, 95, 0.04)'),
+                  },
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <ListItemIcon sx={{ color: isAdminActive ? 'primary.main' : 'inherit', minWidth: sidebarCollapsed ? 'auto' : 36, justifyContent: 'center', mr: sidebarCollapsed ? 0 : 1.5 }}>
+                  <AdminPanelSettingsIcon />
+                </ListItemIcon>
+                {!sidebarCollapsed && (
+                  <>
+                    <ListItemText primary="Administración" primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: isAdminActive ? 600 : 500, color: 'inherit' }} />
+                    <IconButton size="small" sx={{ color: 'inherit', transform: adminMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}>
+                      <ExpandMoreIcon fontSize="small" />
+                    </IconButton>
+                  </>
+                )}
+              </ListItemButton>
+            </Tooltip>
+            <Collapse in={adminMenuOpen && !sidebarCollapsed} timeout="auto" unmountOnExit>
+              <List sx={{ pl: 2, width: '100%', mt: 0.5 }}>
+                {adminSubItems.map((subItem) => {
+                  const isSubActive = currentView === subItem.view;
+                  return (
+                    <ListItem key={subItem.view} disablePadding sx={{ mb: 0.5 }}>
+                      <ListItemButton onClick={() => handleNavigation(subItem.view)} sx={{ borderRadius: 3, minHeight: 36, px: 2, mx: 1, backgroundColor: isSubActive ? (isDarkMode ? 'rgba(30, 58, 95, 0.3)' : 'rgba(30, 58, 95, 0.06)') : 'transparent', color: isSubActive ? (isDarkMode ? '#93c5fd' : '#1e3a5f') : (isDarkMode ? '#94a3b8' : '#64748b'), '&:hover': { backgroundColor: isSubActive ? (isDarkMode ? 'rgba(30, 58, 95, 0.4)' : 'rgba(30, 58, 95, 0.1)') : (isDarkMode ? 'rgba(148, 163, 184, 0.06)' : 'rgba(30, 58, 95, 0.03)') } }}>
+                        <ListItemIcon sx={{ color: isSubActive ? 'primary.main' : 'inherit', minWidth: 28 }}>{subItem.icon}</ListItemIcon>
+                        <ListItemText primary={subItem.label} primaryTypographyProps={{ fontSize: '0.8125rem', fontWeight: isSubActive ? 500 : 400, color: 'inherit' }} />
+                      </ListItemButton>
+                    </ListItem>
+                  );
+                })}
+              </List>
+            </Collapse>
+          </ListItem>
         </List>
       </Box>
 
