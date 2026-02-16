@@ -643,6 +643,123 @@ export const obtenerEstadisticasEnviados = async (req, res) => {
     }
 };
 
+/**
+ * Listar TODOS los mensajes del sistema (Vista global Admin)
+ * GET /api/mensajes-internos/todos?page=1&limit=20&estado=pendientes&remitenteId=5&destinatarioId=3
+ */
+export const listarTodosMensajes = async (req, res) => {
+    try {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        const skip = (page - 1) * limit;
+
+        // Filtro por estado de resolución
+        let resueltoFilter = {};
+        if (req.query.estado === 'pendientes') {
+            resueltoFilter = { resuelto: false };
+        } else if (req.query.estado === 'resueltos') {
+            resueltoFilter = { resuelto: true };
+        }
+
+        // Filtro por remitente específico
+        let remitenteFilter = {};
+        if (req.query.remitenteId) {
+            remitenteFilter = { remitenteId: parseInt(req.query.remitenteId) };
+        }
+
+        // Filtro por destinatario específico
+        let destinatarioFilter = {};
+        if (req.query.destinatarioId) {
+            destinatarioFilter = { destinatarioId: parseInt(req.query.destinatarioId) };
+        }
+
+        const where = {
+            ...resueltoFilter,
+            ...remitenteFilter,
+            ...destinatarioFilter
+        };
+
+        const [mensajes, total] = await Promise.all([
+            prisma.mensajeInterno.findMany({
+                where,
+                include: {
+                    remitente: {
+                        select: { id: true, firstName: true, lastName: true, role: true }
+                    },
+                    destinatario: {
+                        select: { id: true, firstName: true, lastName: true, role: true }
+                    },
+                    documento: {
+                        select: {
+                            id: true,
+                            protocolNumber: true,
+                            clientName: true,
+                            status: true
+                        }
+                    }
+                },
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: limit
+            }),
+            prisma.mensajeInterno.count({ where })
+        ]);
+
+        res.json({
+            success: true,
+            data: {
+                mensajes,
+                pagination: {
+                    page,
+                    limit,
+                    total,
+                    totalPages: Math.ceil(total / limit)
+                }
+            }
+        });
+
+    } catch (error) {
+        console.error('Error al listar todos los mensajes:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error al obtener los mensajes'
+        });
+    }
+};
+
+/**
+ * Obtener estadísticas globales de mensajes (Admin)
+ * GET /api/mensajes-internos/todos/estadisticas
+ */
+export const obtenerEstadisticasGlobales = async (req, res) => {
+    try {
+        const [pendientes, resueltos, total] = await Promise.all([
+            prisma.mensajeInterno.count({ where: { resuelto: false } }),
+            prisma.mensajeInterno.count({ where: { resuelto: true } }),
+            prisma.mensajeInterno.count()
+        ]);
+
+        const tasaResolucion = total > 0 ? Math.round((resueltos / total) * 100) : 0;
+
+        res.json({
+            success: true,
+            data: {
+                pendientes,
+                resueltos,
+                total,
+                tasaResolucion
+            }
+        });
+
+    } catch (error) {
+        console.error('Error al obtener estadísticas globales:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Error al obtener estadísticas'
+        });
+    }
+};
+
 export default {
     enviarMensaje,
     enviarMensajeMasivo,
@@ -653,5 +770,7 @@ export default {
     marcarResuelto,
     obtenerEstadisticas,
     listarMensajesEnviados,
-    obtenerEstadisticasEnviados
+    obtenerEstadisticasEnviados,
+    listarTodosMensajes,
+    obtenerEstadisticasGlobales
 };

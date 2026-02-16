@@ -168,6 +168,40 @@ const mensajesInternosService = {
   },
 
   /**
+   * Listar todos los mensajes del sistema (Admin - vista global)
+   * @param {Object} params - Parámetros de consulta
+   * @param {number} params.page - Página
+   * @param {number} params.limit - Límite por página
+   * @param {string} params.estado - Filtrar por estado
+   * @param {number} params.remitenteId - Filtrar por remitente
+   * @param {number} params.destinatarioId - Filtrar por destinatario
+   * @returns {Promise<Object>} Lista de mensajes con paginación
+   */
+  listarTodosMensajes: async (params = {}) => {
+    try {
+      const response = await apiClient.get('/mensajes-internos/todos', { params });
+      return response.data;
+    } catch (error) {
+      console.error('[MensajesInternos] Error listando todos los mensajes:', error.response?.data || error.message);
+      throw mensajesInternosService.handleError(error);
+    }
+  },
+
+  /**
+   * Obtener estadísticas globales de mensajes (Admin)
+   * @returns {Promise<Object>} Estadísticas globales
+   */
+  obtenerEstadisticasGlobales: async () => {
+    try {
+      const response = await apiClient.get('/mensajes-internos/todos/estadisticas');
+      return response.data;
+    } catch (error) {
+      console.error('[MensajesInternos] Error obteniendo estadísticas globales:', error.response?.data || error.message);
+      throw mensajesInternosService.handleError(error);
+    }
+  },
+
+  /**
    * Obtener tipos de mensaje disponibles
    * @returns {Array} Lista de tipos con labels e iconos
    */
