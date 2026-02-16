@@ -156,11 +156,11 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
           <ListItemButton
             onClick={() => handleNavigation(item.view)}
             sx={{
-              borderRadius: 2,
-              minHeight: 44,
+              borderRadius: 3,
+              minHeight: 48,
               justifyContent: collapsed ? 'center' : 'flex-start',
-              px: collapsed ? 1.5 : 2,
-              mx: collapsed ? 0.5 : 1,
+              px: collapsed ? 1.5 : 2.5,
+              mx: collapsed ? 0.5 : 1.5,
               backgroundColor: active
                 ? (isDarkMode ? 'rgba(30, 58, 95, 0.4)' : 'rgba(30, 58, 95, 0.08)')
                 : 'transparent',
@@ -238,14 +238,14 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
               <SecurityIcon fontSize="small" />
             </Avatar>
             <Box>
-              <Typography variant="subtitle2" sx={{ 
-                fontWeight: 700, 
+              <Typography variant="subtitle2" sx={{
+                fontWeight: 700,
                 color: isDarkMode ? '#f1f5f9' : '#0f172a',
                 letterSpacing: '-0.01em'
               }}>
                 Notaría Segura
               </Typography>
-              <Typography variant="caption" sx={{ 
+              <Typography variant="caption" sx={{
                 color: isDarkMode ? '#64748b' : '#94a3b8',
                 fontWeight: 500
               }}>
@@ -265,7 +265,7 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
             <SecurityIcon />
           </Avatar>
         )}
-        
+
         {!sidebarCollapsed && (
           <Tooltip title="Colapsar menú" placement="right">
             <IconButton
@@ -286,11 +286,11 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
       <Box sx={{ flex: 1, overflow: 'auto', py: 2 }}>
         {/* Sección Principal */}
         {!sidebarCollapsed && (
-          <Typography 
-            variant="overline" 
-            sx={{ 
-              px: 3, 
-              py: 1, 
+          <Typography
+            variant="overline"
+            sx={{
+              px: 3,
+              py: 1,
               display: 'block',
               color: isDarkMode ? '#64748b' : '#94a3b8',
               fontSize: '0.6875rem',
@@ -309,11 +309,11 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
 
         {/* Sección Gestión */}
         {!sidebarCollapsed && (
-          <Typography 
-            variant="overline" 
-            sx={{ 
-              px: 3, 
-              py: 1, 
+          <Typography
+            variant="overline"
+            sx={{
+              px: 3,
+              py: 1,
               display: 'block',
               color: isDarkMode ? '#64748b' : '#94a3b8',
               fontSize: '0.6875rem',
@@ -333,11 +333,11 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
 
         {/* Facturación con submenu */}
         {!sidebarCollapsed && (
-          <Typography 
-            variant="overline" 
-            sx={{ 
-              px: 3, 
-              py: 1, 
+          <Typography
+            variant="overline"
+            sx={{
+              px: 3,
+              py: 1,
               display: 'block',
               color: isDarkMode ? '#64748b' : '#94a3b8',
               fontSize: '0.6875rem',
@@ -396,9 +396,9 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
                         color: 'inherit'
                       }}
                     />
-                    <IconButton 
-                      size="small" 
-                      sx={{ 
+                    <IconButton
+                      size="small"
+                      sx={{
                         color: 'inherit',
                         transform: billingMenuOpen ? 'rotate(180deg)' : 'rotate(0deg)',
                         transition: 'transform 0.2s ease'
@@ -438,9 +438,9 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
                           },
                         }}
                       >
-                        <ListItemIcon sx={{ 
+                        <ListItemIcon sx={{
                           color: isSubActive ? 'primary.main' : 'inherit',
-                          minWidth: 28 
+                          minWidth: 28
                         }}>
                           {subItem.icon}
                         </ListItemIcon>
@@ -463,11 +463,11 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
 
         {/* Configuración */}
         {!sidebarCollapsed && (
-          <Typography 
-            variant="overline" 
-            sx={{ 
-              px: 3, 
-              py: 1, 
+          <Typography
+            variant="overline"
+            sx={{
+              px: 3,
+              py: 1,
               display: 'block',
               color: isDarkMode ? '#64748b' : '#94a3b8',
               fontSize: '0.6875rem',
@@ -492,9 +492,9 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
       <Box sx={{ p: sidebarCollapsed ? 1.5 : 2 }}>
         {/* Usuario actual */}
         {!sidebarCollapsed && (
-          <Box sx={{ 
-            display: 'flex', 
-            alignItems: 'center', 
+          <Box sx={{
+            display: 'flex',
+            alignItems: 'center',
             mb: 2,
             p: 1.5,
             borderRadius: 2,
@@ -513,7 +513,7 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
               {getUserInitials()}
             </Avatar>
             <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography variant="body2" sx={{ 
+              <Typography variant="body2" sx={{
                 fontWeight: 600,
                 color: isDarkMode ? '#f1f5f9' : '#1e293b',
                 whiteSpace: 'nowrap',
@@ -522,7 +522,7 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
               }}>
                 {getFullName()}
               </Typography>
-              <Typography variant="caption" sx={{ 
+              <Typography variant="caption" sx={{
                 color: isDarkMode ? '#64748b' : '#94a3b8',
                 textTransform: 'uppercase',
                 fontWeight: 600,
@@ -603,11 +603,11 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
             minWidth: sidebarCollapsed ? 44 : 'auto',
             height: sidebarCollapsed ? 44 : 36,
             px: sidebarCollapsed ? 0 : 2,
-            background: isDarkMode 
+            background: isDarkMode
               ? 'linear-gradient(135deg, #991b1b 0%, #7f1d1d 100%)'
               : 'linear-gradient(135deg, #be123c 0%, #9f1239 100%)',
             '&:hover': {
-              background: isDarkMode 
+              background: isDarkMode
                 ? 'linear-gradient(135deg, #7f1d1d 0%, #641e1e 100%)'
                 : 'linear-gradient(135deg, #9f1239 0%, #881337 100%)',
             }
@@ -619,9 +619,9 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
 
       {/* Botón expandir cuando está colapsado */}
       {sidebarCollapsed && (
-        <Box sx={{ 
-          p: 1.5, 
-          display: 'flex', 
+        <Box sx={{
+          p: 1.5,
+          display: 'flex',
           justifyContent: 'center',
           borderTop: '1px solid',
           borderColor: isDarkMode ? 'rgba(148, 163, 184, 0.1)' : 'rgba(148, 163, 184, 0.2)',
@@ -668,7 +668,7 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
             >
               <MenuIcon />
             </IconButton>
-            <Typography variant="h6" noWrap component="div" sx={{ 
+            <Typography variant="h6" noWrap component="div" sx={{
               fontWeight: 600,
               color: 'text.primary'
             }}>
@@ -709,7 +709,7 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
                 width: currentDrawerWidth,
                 transition: 'width 0.3s ease',
                 border: 'none',
-                boxShadow: isDarkMode 
+                boxShadow: isDarkMode
                   ? '4px 0 24px rgba(0, 0, 0, 0.2)'
                   : '4px 0 24px rgba(0, 0, 0, 0.04)',
               },

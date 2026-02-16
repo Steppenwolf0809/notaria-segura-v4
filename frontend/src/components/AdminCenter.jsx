@@ -74,6 +74,7 @@ import ListaFacturas from './billing/ListaFacturas';
 import DetalleFactura from './billing/DetalleFactura';
 import ListaPagos from './billing/ListaPagos';
 import Reportes from './billing/Reportes';
+import FinancialHealthCard from './admin/FinancialHealthCard';
 
 /**
  * Centro de administración - Panel principal para ADMIN
@@ -418,90 +419,91 @@ const AdminDashboard = () => {
         </Box>
       </Box>
 
-      {/* KPIs */}
+      {/* ═══ KPIs AGRUPADOS ═══ */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={4}>
-          <SummaryCard
-            title="Total Activos"
-            value={kpis?.activeCount || 0}
-            icon={<DescriptionIcon />}
-            color="primary"
-            subtext="Trámites en curso"
-          />
+        {/* ── GRUPO GESTIÓN ── */}
+        <Grid item xs={12} md={7}>
+          <Box sx={{
+            p: 2.5,
+            borderRadius: 3,
+            border: '1px solid rgba(148, 163, 184, 0.12)',
+            bgcolor: 'rgba(248, 250, 252, 0.5)',
+          }}>
+            <Typography
+              variant="overline"
+              sx={{ color: 'text.secondary', fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.08em', mb: 2, display: 'block' }}
+            >
+              GESTIÓN OPERATIVA
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={6} sm={3}>
+                <SummaryCard title="Activos" value={kpis?.activeCount || 0} icon={<DescriptionIcon />} color="primary" subtext="En curso" />
+              </Grid>
+              <Grid item xs={6} sm={3}>
+                <SummaryCard title={`Críticos`} value={kpis?.criticalCount || 0} icon={<WarningIcon />} color="error" subtext={`> ${thresholdDays}d`} />
+              </Grid>
+              <Grid item xs={6} sm={3}>
+                <SummaryCard title="Pendientes" value={kpis?.pendingCount || 0} icon={<DocumentIcon />} color="warning" subtext="Por iniciar" />
+              </Grid>
+              <Grid item xs={6} sm={3}>
+                <SummaryCard title="Listos" value={kpis?.readyCount || 0} icon={<CheckCircleIcon />} color="success" subtext="Para entregar" />
+              </Grid>
+            </Grid>
+          </Box>
         </Grid>
-        <Grid item xs={12} sm={6} md={4}>
-          <SummaryCard
-            title={`Críticos (> ${thresholdDays}d)`}
-            value={kpis?.criticalCount || 0}
-            icon={<WarningIcon />}
-            color="error"
-            subtext="Requieren atención"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4}>
-          <SummaryCard
-            title="Pendientes"
-            value={kpis?.pendingCount || 0}
-            icon={<DocumentIcon />}
-            color="warning"
-            subtext="Por iniciar"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4}>
-          <SummaryCard
-            title="Listos"
-            value={kpis?.readyCount || 0}
-            icon={<CheckCircleIcon />}
-            color="success"
-            subtext="Para entregar"
-          />
-        </Grid>
-        {/* Nueva Tarjeta Facturación */}
-        <Grid item xs={12} sm={6} md={4}>
-          <Card sx={{ height: '100%' }}>
-            <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={(e) => setBillingAnchorEl(e.currentTarget)}>
-                    <Typography color="textSecondary" gutterBottom variant="overline">
-                      FACTURADO ({billingIntervals[billedTimeRange]})
-                    </Typography>
-                    <RefreshIcon sx={{ fontSize: 14, ml: 0.5, color: 'text.secondary' }} />
-                  </Box>
-                  {/* Menu Dropdown para Facturación */}
-                  <Menu
-                    anchorEl={billingAnchorEl}
-                    open={Boolean(billingAnchorEl)}
-                    onClose={() => setBillingAnchorEl(null)}
-                  >
-                    <MenuItem onClick={() => handleBillingIntervalChange('current_month')}>Mes Actual</MenuItem>
-                    <MenuItem onClick={() => handleBillingIntervalChange('last_month')}>Mes Anterior</MenuItem>
-                    <MenuItem onClick={() => handleBillingIntervalChange('year_to_date')}>Año Actual</MenuItem>
-                    <MenuItem onClick={() => handleBillingIntervalChange('all_time')}>Histórico</MenuItem>
-                  </Menu>
 
-                  <Typography variant="h4" component="div" sx={{ fontWeight: 'bold', color: 'success.main' }}>
-                    ${(kpis?.totalBilled || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                  </Typography>
-                </Box>
-                <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'success.light', color: 'success.contrastText', display: 'flex' }}>
-                  <MoneyIcon />
-                </Box>
-              </Box>
-              <Typography variant="caption" color="textSecondary" sx={{ mt: 1, display: 'block' }}>
-                Excluye anulados
+        {/* ── GRUPO FINANZAS ── */}
+        <Grid item xs={12} md={5}>
+          <Box sx={{
+            p: 2.5,
+            borderRadius: 3,
+            border: '1px solid rgba(148, 163, 184, 0.12)',
+            bgcolor: 'rgba(248, 250, 252, 0.5)',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+          }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+              <Typography
+                variant="overline"
+                sx={{ color: 'text.secondary', fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.08em' }}
+              >
+                INTELIGENCIA FINANCIERA
               </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={4}>
-          <SummaryCard
-            title="Eficiencia Semanal"
-            value={`${kpis?.weeklyEfficiency || 0}%`}
-            icon={<TrendingUpIcon />}
-            color={kpis?.weeklyEfficiency > 80 ? "success" : "warning"}
-            subtext="Entregados / Ingresados"
-          />
+              <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={(e) => setBillingAnchorEl(e.currentTarget)}>
+                <Typography variant="caption" sx={{ color: 'text.secondary', mr: 0.5 }}>
+                  {billingIntervals[billedTimeRange]}
+                </Typography>
+                <RefreshIcon sx={{ fontSize: 14, color: 'text.secondary' }} />
+              </Box>
+              <Menu
+                anchorEl={billingAnchorEl}
+                open={Boolean(billingAnchorEl)}
+                onClose={() => setBillingAnchorEl(null)}
+              >
+                <MenuItem onClick={() => handleBillingIntervalChange('current_month')}>Mes Actual</MenuItem>
+                <MenuItem onClick={() => handleBillingIntervalChange('last_month')}>Mes Anterior</MenuItem>
+                <MenuItem onClick={() => handleBillingIntervalChange('year_to_date')}>Año Actual</MenuItem>
+                <MenuItem onClick={() => handleBillingIntervalChange('all_time')}>Histórico</MenuItem>
+              </Menu>
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <FinancialHealthCard
+                totalBilled={kpis?.totalBilled || kpis?.totalInvoiceBilled || 0}
+                totalCollected={kpis?.totalCollected || 0}
+                periodLabel={billingIntervals[billedTimeRange]}
+              />
+            </Box>
+            <Box sx={{ mt: 2 }}>
+              <SummaryCard
+                title="Eficiencia Semanal"
+                value={`${kpis?.weeklyEfficiency || 0}%`}
+                icon={<TrendingUpIcon />}
+                color={kpis?.weeklyEfficiency > 80 ? "success" : "warning"}
+                subtext="Entregados / Ingresados"
+              />
+            </Box>
+          </Box>
         </Grid>
       </Grid>
 
@@ -573,28 +575,28 @@ const AdminDashboard = () => {
                           icon={getStatusIcon(row.status)}
                           label={row.status}
                           size="small"
-                          sx={{ 
-                            '& .MuiChip-label': { fontSize: '0.75rem', fontWeight: 500 }, 
+                          sx={{
+                            '& .MuiChip-label': { fontSize: '0.75rem', fontWeight: 500 },
                             height: 26,
-                            backgroundColor: row.status === 'LISTO' 
-                              ? 'rgba(4, 120, 87, 0.1)' 
-                              : row.status === 'EN_PROCESO' 
-                                ? 'rgba(2, 132, 199, 0.1)' 
+                            backgroundColor: row.status === 'LISTO'
+                              ? 'rgba(4, 120, 87, 0.1)'
+                              : row.status === 'EN_PROCESO'
+                                ? 'rgba(2, 132, 199, 0.1)'
                                 : row.status === 'ENTREGADO'
                                   ? 'rgba(100, 116, 139, 0.1)'
                                   : 'rgba(217, 119, 6, 0.1)',
-                            color: row.status === 'LISTO' 
-                              ? '#047857' 
-                              : row.status === 'EN_PROCESO' 
-                                ? '#0284c7' 
+                            color: row.status === 'LISTO'
+                              ? '#047857'
+                              : row.status === 'EN_PROCESO'
+                                ? '#0284c7'
                                 : row.status === 'ENTREGADO'
                                   ? '#64748b'
                                   : '#d97706',
                             border: '1px solid',
-                            borderColor: row.status === 'LISTO' 
-                              ? 'rgba(4, 120, 87, 0.2)' 
-                              : row.status === 'EN_PROCESO' 
-                                ? 'rgba(2, 132, 199, 0.2)' 
+                            borderColor: row.status === 'LISTO'
+                              ? 'rgba(4, 120, 87, 0.2)'
+                              : row.status === 'EN_PROCESO'
+                                ? 'rgba(2, 132, 199, 0.2)'
                                 : row.status === 'ENTREGADO'
                                   ? 'rgba(100, 116, 139, 0.2)'
                                   : 'rgba(217, 119, 6, 0.2)',
@@ -712,21 +714,58 @@ const AdminDashboard = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {teamPerformance?.map((member) => (
-                  <TableRow key={member.id}>
-                    <TableCell sx={{ fontWeight: 'bold' }}>{member.name}</TableCell>
-                    <TableCell align="center">{member.activeLoad}</TableCell>
-                    <TableCell align="center">
-                      <Typography color={member.criticalCount > 0 ? "error" : "textPrimary"} fontWeight={member.criticalCount > 0 ? "bold" : "regular"}>
-                        {member.criticalCount}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="center">{member.deliveredMonth}</TableCell>
-                    <TableCell align="center">
-                      {member.avgVelocityDays > 0 ? `${member.avgVelocityDays}d` : '-'}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {teamPerformance?.map((member) => {
+                  const isSaturated = member.avgVelocityDays > 15 || member.activeLoad > 300;
+                  return (
+                    <Tooltip
+                      key={member.id}
+                      title={isSaturated ? '⚠ Riesgo de incumplimiento legal por saturación' : ''}
+                      placement="left"
+                      arrow
+                    >
+                      <TableRow
+                        sx={{
+                          ...(isSaturated && {
+                            bgcolor: 'rgba(220, 38, 38, 0.04)',
+                            borderLeft: '3px solid #dc2626',
+                            '& td': { color: '#991b1b' },
+                          }),
+                          transition: 'background-color 0.2s ease',
+                          '&:hover': { bgcolor: isSaturated ? 'rgba(220, 38, 38, 0.08)' : 'rgba(0,0,0,0.02)' },
+                        }}
+                      >
+                        <TableCell sx={{ fontWeight: 'bold' }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            {member.name}
+                            {isSaturated && <WarningIcon sx={{ fontSize: 16, color: '#dc2626' }} />}
+                          </Box>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Typography
+                            fontWeight={member.activeLoad > 300 ? 'bold' : 'regular'}
+                            color={member.activeLoad > 300 ? 'error' : 'textPrimary'}
+                          >
+                            {member.activeLoad}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Typography color={member.criticalCount > 0 ? "error" : "textPrimary"} fontWeight={member.criticalCount > 0 ? "bold" : "regular"}>
+                            {member.criticalCount}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="center">{member.deliveredMonth}</TableCell>
+                        <TableCell align="center">
+                          <Typography
+                            fontWeight={member.avgVelocityDays > 15 ? 'bold' : 'regular'}
+                            color={member.avgVelocityDays > 15 ? 'error' : 'textPrimary'}
+                          >
+                            {member.avgVelocityDays > 0 ? `${member.avgVelocityDays}d` : '-'}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    </Tooltip>
+                  );
+                })}
               </TableBody>
             </Table>
           </TableContainer>
@@ -875,10 +914,10 @@ const kpiColors = {
 
 const SummaryCard = ({ title, value, icon, color = 'primary', subtext }) => {
   const themeColor = kpiColors[color] || kpiColors.primary;
-  
+
   return (
-    <Card 
-      sx={{ 
+    <Card
+      sx={{
         height: '100%',
         background: 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.95) 100%)',
         border: '1px solid rgba(148, 163, 184, 0.15)',
@@ -890,9 +929,9 @@ const SummaryCard = ({ title, value, icon, color = 'primary', subtext }) => {
       <CardContent sx={{ p: 2.5, '&:last-child': { pb: 2.5 } }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <Box sx={{ flex: 1 }}>
-            <Typography 
-              variant="overline" 
-              sx={{ 
+            <Typography
+              variant="overline"
+              sx={{
                 color: 'text.secondary',
                 fontSize: '0.6875rem',
                 fontWeight: 600,
@@ -903,11 +942,11 @@ const SummaryCard = ({ title, value, icon, color = 'primary', subtext }) => {
             >
               {title}
             </Typography>
-            <Typography 
-              variant="h4" 
-              component="div" 
-              sx={{ 
-                fontWeight: 700, 
+            <Typography
+              variant="h4"
+              component="div"
+              sx={{
+                fontWeight: 700,
                 color: themeColor.main,
                 fontSize: '1.875rem',
                 lineHeight: 1.2,
@@ -917,25 +956,25 @@ const SummaryCard = ({ title, value, icon, color = 'primary', subtext }) => {
               {value}
             </Typography>
           </Box>
-          <Box sx={{ 
-            p: 1.25, 
-            borderRadius: 2.5, 
+          <Box sx={{
+            p: 1.25,
+            borderRadius: 2.5,
             backgroundColor: themeColor.light,
             color: themeColor.main,
             display: 'flex',
             boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.03)'
           }}>
-            {React.cloneElement(icon, { 
+            {React.cloneElement(icon, {
               fontSize: 'small',
               sx: { opacity: 0.9 }
             })}
           </Box>
         </Box>
         {subtext && (
-          <Typography 
-            variant="caption" 
-            sx={{ 
-              mt: 1.5, 
+          <Typography
+            variant="caption"
+            sx={{
+              mt: 1.5,
               display: 'block',
               color: 'text.secondary',
               fontWeight: 500
