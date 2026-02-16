@@ -98,3 +98,4 @@ docs/*.zip
 docs/historial/*.zip
 docs/*.csv
 docs/historial/*.csv
+*.dump
