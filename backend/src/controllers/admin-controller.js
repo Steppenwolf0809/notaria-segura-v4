@@ -787,6 +787,27 @@ async function getDashboardStats(req, res) {
 
     const totalBilled = billedAggregate._sum.totalFactura || 0;
 
+    // === INTELIGENCIA FINANCIERA: Facturado vs Cobrado (desde Invoice model) ===
+    const invoiceDateFilter = {};
+    if (billedDateFilter.fechaFactura) {
+      // Reutilizar el mismo rango temporal, mapeado a issueDate de Invoice
+      invoiceDateFilter.issueDate = billedDateFilter.fechaFactura;
+    }
+
+    const [invoiceBilledAgg, invoiceCollectedAgg] = await Promise.all([
+      prisma.invoice.aggregate({
+        _sum: { totalAmount: true },
+        where: { status: { not: 'CANCELLED' }, ...invoiceDateFilter }
+      }),
+      prisma.invoice.aggregate({
+        _sum: { paidAmount: true },
+        where: { status: { not: 'CANCELLED' }, ...invoiceDateFilter }
+      })
+    ]);
+
+    const totalInvoiceBilled = Number(invoiceBilledAgg._sum.totalAmount || 0);
+    const totalCollected = Number(invoiceCollectedAgg._sum.paidAmount || 0);
+
 
     // Eficiencia Semanal (Entregados vs Ingresados esta semana)
     const startOfWeek = new Date();
@@ -1013,6 +1034,8 @@ async function getDashboardStats(req, res) {
           pendingCount,
           readyCount,
           totalBilled,
+          totalInvoiceBilled,
+          totalCollected,
           weeklyEfficiency,
           qrStats
         },
