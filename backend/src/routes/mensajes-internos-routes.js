@@ -10,7 +10,9 @@ import {
     marcarResuelto,
     obtenerEstadisticas,
     listarMensajesEnviados,
-    obtenerEstadisticasEnviados
+    obtenerEstadisticasEnviados,
+    listarTodosMensajes,
+    obtenerEstadisticasGlobales
 } from '../controllers/mensajes-internos-controller.js';
 
 const router = express.Router();
@@ -35,6 +37,29 @@ const router = express.Router();
 router.get('/estadisticas',
     authenticateToken,
     obtenerEstadisticas
+);
+
+/**
+ * @route GET /api/mensajes-internos/todos/estadisticas
+ * @desc Obtener estadísticas globales de todos los mensajes
+ * @access Private (ADMIN only)
+ */
+router.get('/todos/estadisticas',
+    authenticateToken,
+    requireRoles(['ADMIN']),
+    obtenerEstadisticasGlobales
+);
+
+/**
+ * @route GET /api/mensajes-internos/todos
+ * @desc Listar todos los mensajes del sistema (vista global Admin)
+ * @access Private (ADMIN only)
+ * @query page, limit, estado, remitenteId, destinatarioId
+ */
+router.get('/todos',
+    authenticateToken,
+    requireRoles(['ADMIN']),
+    listarTodosMensajes
 );
 
 /**

@@ -20,7 +20,9 @@ import {
     Grid,
     CircularProgress,
     Alert,
-    LinearProgress
+    LinearProgress,
+    Tabs,
+    Tab
 } from '@mui/material';
 import {
     Send as SendIcon,
@@ -33,15 +35,20 @@ import {
     Refresh as RefreshIcon,
     TaskAlt as ResolvedIcon,
     HourglassEmpty as PendingIcon,
-    TrendingUp as StatsIcon
+    TrendingUp as StatsIcon,
+    Visibility as VisibilityIcon
 } from '@mui/icons-material';
 import mensajesInternosService from '../../services/mensajes-internos-service';
 
 /**
- * Vista de seguimiento de mensajes enviados (Admin)
- * Permite ver el estado de los mensajes que ha enviado y si fueron resueltos
+ * Vista de seguimiento de mensajes (Admin)
+ * Tab 1: Todos los mensajes del sistema (vista global)
+ * Tab 2: Solo mensajes enviados por el admin actual
  */
 const SeguimientoMensajes = () => {
+    // Tab activo
+    const [activeTab, setActiveTab] = useState(0); // 0 = Todos, 1 = Mis Enviados
+
     // Estados de datos
     const [mensajes, setMensajes] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -52,21 +59,27 @@ const SeguimientoMensajes = () => {
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(10);
     const [totalCount, setTotalCount] = useState(0);
-    const [filtroEstado, setFiltroEstado] = useState('todos'); // 'todos', 'pendientes', 'resueltos'
+    const [filtroEstado, setFiltroEstado] = useState('todos');
+    const [filtroRemitente, setFiltroRemitente] = useState('todos');
 
-    // Cargar estadísticas
+    // Lista de remitentes únicos (se construye desde los datos)
+    const [remitentes, setRemitentes] = useState([]);
+
+    // Cargar estadísticas según tab
     const loadEstadisticas = useCallback(async () => {
         try {
-            const result = await mensajesInternosService.obtenerEstadisticasEnviados();
+            const result = activeTab === 0
+                ? await mensajesInternosService.obtenerEstadisticasGlobales()
+                : await mensajesInternosService.obtenerEstadisticasEnviados();
             if (result.success) {
                 setEstadisticas(result.data);
             }
         } catch (err) {
             console.error('Error cargando estadísticas:', err);
         }
-    }, []);
+    }, [activeTab]);
 
-    // Cargar mensajes enviados
+    // Cargar mensajes según tab
     const loadMensajes = useCallback(async () => {
         try {
             setLoading(true);
@@ -78,11 +91,35 @@ const SeguimientoMensajes = () => {
                 estado: filtroEstado !== 'todos' ? filtroEstado : undefined
             };
 
-            const result = await mensajesInternosService.listarMensajesEnviados(params);
+            let result;
+            if (activeTab === 0) {
+                // Tab "Todos" — vista global
+                if (filtroRemitente !== 'todos') {
+                    params.remitenteId = filtroRemitente;
+                }
+                result = await mensajesInternosService.listarTodosMensajes(params);
+            } else {
+                // Tab "Mis Enviados" — solo los del admin actual
+                result = await mensajesInternosService.listarMensajesEnviados(params);
+            }
 
             if (result.success) {
-                setMensajes(result.data?.mensajes || []);
+                const msgs = result.data?.mensajes || [];
+                setMensajes(msgs);
                 setTotalCount(result.data?.pagination?.total || 0);
+
+                // Extraer remitentes únicos (solo en tab "Todos")
+                if (activeTab === 0 && msgs.length > 0) {
+                    setRemitentes(prev => {
+                        const map = new Map(prev.map(r => [r.id, r]));
+                        msgs.forEach(m => {
+                            if (m.remitente && !map.has(m.remitente.id)) {
+                                map.set(m.remitente.id, m.remitente);
+                            }
+                        });
+                        return Array.from(map.values());
+                    });
+                }
             }
         } catch (err) {
             console.error('Error cargando mensajes:', err);
@@ -90,12 +127,20 @@ const SeguimientoMensajes = () => {
         } finally {
             setLoading(false);
         }
-    }, [page, rowsPerPage, filtroEstado]);
+    }, [page, rowsPerPage, filtroEstado, filtroRemitente, activeTab]);
 
     useEffect(() => {
         loadMensajes();
         loadEstadisticas();
     }, [loadMensajes, loadEstadisticas]);
+
+    // Reset de paginación y filtros al cambiar de tab
+    const handleTabChange = (event, newValue) => {
+        setActiveTab(newValue);
+        setPage(0);
+        setFiltroEstado('todos');
+        setFiltroRemitente('todos');
+    };
 
     // Manejadores de paginación
     const handleChangePage = (event, newPage) => {
@@ -156,6 +201,18 @@ const SeguimientoMensajes = () => {
         return 'Menos de 1 hora';
     };
 
+    const getRolLabel = (role) => {
+        switch (role) {
+            case 'ADMIN': return 'Admin';
+            case 'MATRIZADOR': return 'Matrizador';
+            case 'ARCHIVADOR': return 'Archivador';
+            default: return role;
+        }
+    };
+
+    // Determinar si se muestra columna "De" (remitente) — solo en tab Todos
+    const showRemitente = activeTab === 0;
+
     return (
         <Box sx={{ p: 3 }}>
             {/* Header */}
@@ -175,6 +232,27 @@ const SeguimientoMensajes = () => {
                     Actualizar
                 </Button>
             </Box>
+
+            {/* Tabs */}
+            <Paper sx={{ mb: 3 }}>
+                <Tabs
+                    value={activeTab}
+                    onChange={handleTabChange}
+                    variant="fullWidth"
+                    sx={{ borderBottom: 1, borderColor: 'divider' }}
+                >
+                    <Tab
+                        icon={<VisibilityIcon />}
+                        iconPosition="start"
+                        label="Todos los Mensajes"
+                    />
+                    <Tab
+                        icon={<SendIcon />}
+                        iconPosition="start"
+                        label="Mis Enviados"
+                    />
+                </Tabs>
+            </Paper>
 
             {/* Estadísticas rápidas */}
             {estadisticas && (
@@ -197,7 +275,9 @@ const SeguimientoMensajes = () => {
                         <Paper sx={{ p: 2, textAlign: 'center', bgcolor: 'grey.200' }}>
                             <SendIcon sx={{ fontSize: 32, mb: 1, color: 'grey.600' }} />
                             <Typography variant="h4">{estadisticas.total}</Typography>
-                            <Typography variant="body2">Total Enviados</Typography>
+                            <Typography variant="body2">
+                                {activeTab === 0 ? 'Total Sistema' : 'Total Enviados'}
+                            </Typography>
                         </Paper>
                     </Grid>
                     <Grid item xs={6} sm={3}>
@@ -233,6 +313,25 @@ const SeguimientoMensajes = () => {
                             </Select>
                         </FormControl>
                     </Grid>
+                    {showRemitente && (
+                        <Grid item xs={12} md={4}>
+                            <FormControl fullWidth size="small">
+                                <InputLabel>Remitente</InputLabel>
+                                <Select
+                                    value={filtroRemitente}
+                                    label="Remitente"
+                                    onChange={(e) => { setFiltroRemitente(e.target.value); setPage(0); }}
+                                >
+                                    <MenuItem value="todos">Todos los remitentes</MenuItem>
+                                    {remitentes.map(r => (
+                                        <MenuItem key={r.id} value={r.id}>
+                                            {r.firstName} {r.lastName} ({getRolLabel(r.role)})
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Grid>
+                    )}
                 </Grid>
             </Paper>
 
@@ -246,7 +345,8 @@ const SeguimientoMensajes = () => {
                             <TableRow>
                                 <TableCell width="60">Estado</TableCell>
                                 <TableCell>Tipo</TableCell>
-                                <TableCell>Destinatario</TableCell>
+                                {showRemitente && <TableCell>De</TableCell>}
+                                <TableCell>{showRemitente ? 'Para' : 'Destinatario'}</TableCell>
                                 <TableCell>Documento</TableCell>
                                 <TableCell>Mensaje</TableCell>
                                 <TableCell>Enviado</TableCell>
@@ -256,14 +356,18 @@ const SeguimientoMensajes = () => {
                         <TableBody>
                             {loading ? (
                                 <TableRow>
-                                    <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
+                                    <TableCell colSpan={showRemitente ? 8 : 7} align="center" sx={{ py: 3 }}>
                                         <CircularProgress />
                                     </TableCell>
                                 </TableRow>
                             ) : mensajes.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={7} align="center" sx={{ py: 3 }}>
-                                        <Typography color="text.secondary">No has enviado mensajes</Typography>
+                                    <TableCell colSpan={showRemitente ? 8 : 7} align="center" sx={{ py: 3 }}>
+                                        <Typography color="text.secondary">
+                                            {activeTab === 0
+                                                ? 'No hay mensajes en el sistema'
+                                                : 'No has enviado mensajes'}
+                                        </Typography>
                                     </TableCell>
                                 </TableRow>
                             ) : (
@@ -314,6 +418,24 @@ const SeguimientoMensajes = () => {
                                                     )}
                                                 </Box>
                                             </TableCell>
+                                            {showRemitente && (
+                                                <TableCell>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                        <PersonIcon fontSize="small" color="action" />
+                                                        <Box>
+                                                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                                                {mensaje.remitente?.firstName} {mensaje.remitente?.lastName}
+                                                            </Typography>
+                                                            <Chip
+                                                                label={getRolLabel(mensaje.remitente?.role)}
+                                                                size="small"
+                                                                variant="outlined"
+                                                                sx={{ height: 18, fontSize: '0.6rem' }}
+                                                            />
+                                                        </Box>
+                                                    </Box>
+                                                </TableCell>
+                                            )}
                                             <TableCell>
                                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                                     <PersonIcon fontSize="small" color="action" />
@@ -322,7 +444,7 @@ const SeguimientoMensajes = () => {
                                                             {mensaje.destinatario?.firstName} {mensaje.destinatario?.lastName}
                                                         </Typography>
                                                         <Typography variant="caption" color="text.secondary">
-                                                            {mensaje.destinatario?.role}
+                                                            {getRolLabel(mensaje.destinatario?.role)}
                                                         </Typography>
                                                     </Box>
                                                 </Box>
