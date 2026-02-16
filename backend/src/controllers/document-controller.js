@@ -190,7 +190,7 @@ async function uploadXmlDocument(req, res) {
     if (parsedData.numeroFactura) {
       try {
         console.log(`🔍 Buscando factura existente: ${parsedData.numeroFactura}`);
-        
+
         // Buscar factura por número (formato normalizado)
         const existingInvoice = await prisma.invoice.findFirst({
           where: {
@@ -1013,25 +1013,25 @@ async function getMyDocuments(req, res) {
         const docIds = documents.map(d => d.id);
         const invoicesMap = new Map();
         const paymentsMap = new Map();
-        
+
         if (docIds.length > 0) {
           // Obtener facturas
           const invoices = await prisma.invoice.findMany({
             where: { documentId: { in: docIds } },
-            select: { 
+            select: {
               id: true,
-              documentId: true, 
-              totalAmount: true, 
-              paidAmount: true, 
-              status: true 
+              documentId: true,
+              totalAmount: true,
+              paidAmount: true,
+              status: true
             }
           });
-          
+
           invoices.forEach(inv => {
             if (!invoicesMap.has(inv.documentId)) invoicesMap.set(inv.documentId, []);
             invoicesMap.get(inv.documentId).push(inv);
           });
-          
+
           // Obtener pagos de la tabla payments
           const invoiceIds = invoices.map(inv => inv.id);
           if (invoiceIds.length > 0) {
@@ -1039,7 +1039,7 @@ async function getMyDocuments(req, res) {
               where: { invoiceId: { in: invoiceIds } },
               select: { invoiceId: true, amount: true }
             });
-            
+
             payments.forEach(payment => {
               if (!paymentsMap.has(payment.invoiceId)) paymentsMap.set(payment.invoiceId, 0);
               paymentsMap.set(payment.invoiceId, paymentsMap.get(payment.invoiceId) + Number(payment.amount));
@@ -1051,10 +1051,10 @@ async function getMyDocuments(req, res) {
           const docInvoices = invoicesMap.get(d.id) || [];
           let paymentStatus = 'SIN_FACTURA';
           let paymentInfo = null;
-          
+
           if (docInvoices.length > 0) {
             const totalFacturado = docInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
-            
+
             // Calcular total pagado usando ambas fuentes:
             // 1. paidAmount del invoice (sync de Koinor)
             // 2. payments de la tabla payments (importaciones manuales)
@@ -1063,15 +1063,15 @@ async function getMyDocuments(req, res) {
               const paymentsTotal = paymentsMap.get(inv.id) || 0;
               return sum + Math.max(syncedPaid, paymentsTotal);
             }, 0);
-            
+
             const saldoPendiente = totalFacturado - totalPagado;
             if (saldoPendiente <= 0) paymentStatus = 'PAGADO';
             else if (totalPagado > 0) paymentStatus = 'PARCIAL';
             else paymentStatus = 'PENDIENTE';
-            
+
             paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: docInvoices.length };
           }
-          
+
           return {
             ...d,
             createdBy: d.createdById ? authorMap.get(d.createdById) : null,
@@ -1153,11 +1153,11 @@ async function getMyDocuments(req, res) {
           },
           // 💰 Incluir facturas y pagos para estado de pago
           invoices: {
-            select: { 
+            select: {
               id: true,
-              totalAmount: true, 
-              paidAmount: true, 
-              status: true, 
+              totalAmount: true,
+              paidAmount: true,
+              status: true,
               invoiceNumber: true,
               payments: {
                 select: { amount: true }
@@ -1198,10 +1198,10 @@ async function getMyDocuments(req, res) {
     const documentsWithPayment = documents.map(doc => {
       let paymentStatus = 'SIN_FACTURA';
       let paymentInfo = null;
-      
+
       if (doc.invoices && doc.invoices.length > 0) {
         const totalFacturado = doc.invoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
-        
+
         // Calcular total pagado usando ambas fuentes:
         // 1. paidAmount del invoice (sync de Koinor)
         // 2. payments de la tabla payments (importaciones manuales)
@@ -1210,16 +1210,16 @@ async function getMyDocuments(req, res) {
           const paymentsTotal = inv.payments?.reduce((pSum, p) => pSum + Number(p.amount || 0), 0) || 0;
           return sum + Math.max(syncedPaid, paymentsTotal);
         }, 0);
-        
+
         const saldoPendiente = totalFacturado - totalPagado;
-        
+
         if (saldoPendiente <= 0) paymentStatus = 'PAGADO';
         else if (totalPagado > 0) paymentStatus = 'PARCIAL';
         else paymentStatus = 'PENDIENTE';
-        
+
         paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: doc.invoices.length };
       }
-      
+
       const { invoices, ...docWithoutInvoices } = doc;
       return { ...docWithoutInvoices, paymentStatus, paymentInfo };
     });
@@ -1403,6 +1403,7 @@ async function updateDocumentStatus(req, res) {
     // Generar código de verificación si se marca como LISTO Y no tiene código
     if (status === 'LISTO' && !document.verificationCode) {
       updateData.verificationCode = generateVerificationCode();
+      updateData.fechaListo = new Date(); // ⏱️ Registrar timestamp de "listo"
 
       // 📈 Registrar evento de generación de código de verificación
       try {
@@ -1425,6 +1426,9 @@ async function updateDocumentStatus(req, res) {
       } catch (auditError) {
         console.error('Error registrando evento de generación de código:', auditError);
       }
+    } else if (status === 'LISTO' && !document.fechaListo) {
+      // Si ya tenía código pero no tenía fechaListo (caso edge), setear igualmente
+      updateData.fechaListo = new Date();
     }
 
     // NUEVA FUNCIONALIDAD: Manejar propagación de estado en documentos agrupados
@@ -1662,7 +1666,7 @@ async function getDocumentById(req, res) {
 
       for (const invoice of document.invoices) {
         totalAmount += Number(invoice.totalAmount);
-        
+
         // Calculate paid amount from both sources:
         // 1. Payments table (manual imports/XML)
         const paymentsTotal = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
@@ -1670,7 +1674,7 @@ async function getDocumentById(req, res) {
         const syncedPaidAmount = Number(invoice.paidAmount || 0);
         // Use the higher value (sync might have more recent data)
         const paid = Math.max(paymentsTotal, syncedPaidAmount);
-        
+
         totalPaid += paid;
       }
 
@@ -3880,12 +3884,12 @@ async function bulkNotify(req, res) {
 
     // Combinar documentos seleccionados con todos los del cliente (evitar duplicados)
     const documentMap = new Map();
-    
+
     // Primero agregar los documentos del cliente (LISTO)
     for (const doc of allClientDocuments) {
       documentMap.set(doc.id, doc);
     }
-    
+
     // Luego agregar los seleccionados (pueden ser EN_PROCESO)
     for (const doc of selectedDocuments) {
       if (!documentMap.has(doc.id)) {
@@ -4179,14 +4183,14 @@ async function bulkNotify(req, res) {
     res.json({
       success: true,
       message: `Notificación procesada: ${results.notificados.length} clientes notificados, ${results.sinTelefono.length} sin teléfono` +
-               (consolidatedCount > 0 ? ` (${consolidatedCount} documentos adicionales consolidados)` : ''),
+        (consolidatedCount > 0 ? ` (${consolidatedCount} documentos adicionales consolidados)` : ''),
       data: {
         ...results,
         consolidacion: {
           documentosSeleccionados: totalSelected,
           documentosTotales: totalConsolidated,
           documentosAdicionales: consolidatedCount,
-          mensaje: consolidatedCount > 0 
+          mensaje: consolidatedCount > 0
             ? `Se incluyeron ${consolidatedCount} documentos adicionales del mismo cliente que ya estaban listos`
             : null
         }
