@@ -164,6 +164,12 @@ const ParticipationWidget = ({ onViewChange, subtotal, loading }) => {
   const formatMoney = (value) =>
     '$' + Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+  const formatMoneyShort = (value) => {
+    const n = Number(value || 0);
+    if (n >= 1000) return '$' + (n / 1000).toFixed(1) + 'k';
+    return '$' + n.toFixed(0);
+  };
+
   const calc = calculateStateParticipation(subtotal || 0);
   const progress = calculateBracketProgress(subtotal || 0, calc.bracketInfo);
   const semaphore = getSemaphoreState(progress.remaining, progress.isTopBracket);
@@ -240,22 +246,65 @@ const ParticipationWidget = ({ onViewChange, subtotal, loading }) => {
         )}
       </Box>
 
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
-        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-          Esquema {calc.bracketLevel} • {semaphore.label}
-        </Typography>
-        <Chip
-          size="small"
-          label={semaphore.label}
-          sx={{
-            height: 20,
-            fontSize: '0.6rem',
-            bgcolor: `${semaphore.color}18`,
-            color: semaphore.color,
-            fontWeight: 700
-          }}
-        />
-      </Box>
+      {/* ── Bracket Progress Bar ── */}
+      {!loading && (
+        <Box sx={{ mt: 1.5, mb: 1 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+              Esquema {calc.bracketLevel}
+            </Typography>
+            {progress.isTopBracket ? (
+              <Chip
+                size="small"
+                label="Tramo máximo"
+                sx={{
+                  height: 18,
+                  fontSize: '0.6rem',
+                  bgcolor: 'rgba(100, 116, 139, 0.12)',
+                  color: '#64748b',
+                  fontWeight: 700,
+                }}
+              />
+            ) : (
+              <Typography variant="caption" sx={{ color: semaphore.color, fontWeight: 700 }}>
+                {formatMoney(progress.remaining)} para Esquema {calc.bracketLevel + 1}
+              </Typography>
+            )}
+          </Box>
+
+          {/* Progress bar */}
+          <Box sx={{
+            height: 8,
+            borderRadius: 4,
+            bgcolor: 'rgba(148, 163, 184, 0.12)',
+            overflow: 'hidden',
+          }}>
+            <Box sx={{
+              height: '100%',
+              borderRadius: 4,
+              width: `${Math.min(progress.percent, 100)}%`,
+              bgcolor: semaphore.color,
+              transition: 'width 0.6s ease-in-out',
+              boxShadow: `0 0 6px ${semaphore.color}40`,
+            }} />
+          </Box>
+
+          {/* Range labels */}
+          {!progress.isTopBracket && (
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.3 }}>
+              <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.6rem' }}>
+                {formatMoneyShort(calc.bracketInfo.lowerLimit)}
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.6rem', fontWeight: 600 }}>
+                {Math.round(progress.percent)}%
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.6rem' }}>
+                {formatMoneyShort(calc.bracketInfo.nextBracketAt)}
+              </Typography>
+            </Box>
+          )}
+        </Box>
+      )}
 
       <Typography variant="caption" sx={{ color: '#6366f1', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
         <ScheduleIcon sx={{ fontSize: 14 }} />
@@ -264,6 +313,7 @@ const ParticipationWidget = ({ onViewChange, subtotal, loading }) => {
     </Paper>
   );
 };
+
 const AdminDashboard = ({ onViewChange }) => {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
