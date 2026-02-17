@@ -39,7 +39,8 @@ import {
     Visibility as VisibilityIcon,
     Refresh as RefreshIcon,
     Close as CloseIcon,
-    FilterList as FilterIcon
+    FilterList as FilterIcon,
+    OpenInNew as OpenInNewIcon
 } from '@mui/icons-material';
 import { getSupervisionStats } from '../../services/admin-supervision-service';
 import { getEscrituras } from '../../services/escrituras-qr-service';
@@ -368,6 +369,18 @@ const QROversight = () => {
                                                                 <VisibilityIcon fontSize="small" />
                                                             </IconButton>
                                                         </Tooltip>
+                                                        <Tooltip title="Ver Verificación Pública">
+                                                            <IconButton
+                                                                size="small"
+                                                                component="a"
+                                                                href={`/verify/${qr.token}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                data-testid="btn-ver-verificacion"
+                                                            >
+                                                                <OpenInNewIcon fontSize="small" />
+                                                            </IconButton>
+                                                        </Tooltip>
                                                     </TableCell>
                                                 </TableRow>
                                             ))
@@ -519,7 +532,18 @@ const QROversight = () => {
                         );
                     })()}
                 </DialogContent>
-                <DialogActions sx={{ px: 3, py: 2 }}>
+                <DialogActions sx={{ px: 3, py: 2, justifyContent: 'space-between' }}>
+                    <Button
+                        component="a"
+                        href={selectedQR ? `/verify/${selectedQR.token}` : '#'}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        variant="contained"
+                        startIcon={<OpenInNewIcon />}
+                        size="small"
+                    >
+                        Ver Verificación Pública
+                    </Button>
                     <Button onClick={handleCloseDetails} variant="outlined" startIcon={<CloseIcon />}>
                         Cerrar
                     </Button>
