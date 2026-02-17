@@ -10,6 +10,7 @@ cmds = [
 [phases.build]
 cmds = [
     "chmod +x node_modules/.bin/* || true",
+    "chmod +x frontend/node_modules/.bin/* || true",
     "npm run build:frontend",
     "cd backend && npx prisma generate"
 ]
