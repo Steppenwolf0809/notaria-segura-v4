@@ -40,6 +40,7 @@ export const navItemsByRole = {
     { id: 'qr-management', label: 'Gestor QR', view: 'qr-management', icon: 'QrCode' },
     { id: 'formularios-uafe', label: 'Gestión Formularios UAFE', view: 'formularios-uafe', icon: 'Description' },
     { id: 'analisis-uafe', label: 'Análisis UAFE', view: 'analisis-uafe', icon: 'Analytics' },
+    { id: 'participacion-estado', label: 'Participación al Estado', view: 'participacion-estado', icon: 'Gavel' },
     {
       id: 'facturacion',
       label: 'Facturación',

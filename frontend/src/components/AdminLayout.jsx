@@ -42,7 +42,8 @@ import {
   Assessment as AssessmentIcon,
   Lock as LockIcon,
   Message as MessageIcon,
-  Style as StyleIcon
+  Style as StyleIcon,
+  Gavel as GavelIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import { useThemeCtx } from '../contexts/theme-ctx';
@@ -123,6 +124,7 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
     {
       label: 'Financiero',
       items: [
+        { view: 'participacion-estado', label: 'Participación Estado', icon: <GavelIcon /> },
         {
           view: '_billing', label: 'Facturación', icon: <AccountBalanceIcon />,
           submenu: [
