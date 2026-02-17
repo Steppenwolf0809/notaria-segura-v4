@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --port 5173",
-    "build": "vite build",
+    "build": "npx vite build",
     "preview": "vite preview",
     "start": "vite preview --host --port $PORT"
   },
