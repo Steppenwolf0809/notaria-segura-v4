@@ -43,12 +43,15 @@ import {
     calculateStateParticipation,
     getAlertState,
     applyPenalty,
-    buildParticipationProjection,
+    calculateBracketProgress,
+    getSemaphoreState,
+    extractSubtotal,
     getMonthRange,
 } from '../../utils/stateParticipationCalculator';
 import {
     TAX_BRACKETS,
     SBU_CURRENT,
+    IVA_RATE,
 } from '../../config/state_participation_config';
 
 // ── Helpers ──
@@ -59,6 +62,8 @@ const fmtPct = (val) => `${(val * 100).toFixed(0)}%`;
 
 const PAYMENT_STORAGE_KEY = 'state_participation_payments_v1';
 const MONTHS_TO_SHOW = 6;
+
+const TOOLTIP_LEGAL = `Calculo basado en la Resolucion 005-2023 del Consejo de la Judicatura.\n\nBase Imponible = Subtotal facturado (sin IVA) del mes en curso.\nFormula: Base Fija (SBU x $${SBU_CURRENT}) + Tasa Variable x (Facturado - Limite Inferior del tramo).\n\nEste valor refleja unicamente lo facturado hasta la fecha de corte, sin proyecciones a futuro. El IVA (${(IVA_RATE * 100).toFixed(0)}%) se excluye automaticamente del monto total registrado en el sistema.`;
 
 const createMonthOptions = (monthsBack = MONTHS_TO_SHOW) => {
     const today = new Date();
@@ -110,16 +115,16 @@ const AlertBanner = ({ alertState }) => {
             <Box sx={{ flex: 1 }}>
                 <Typography variant="subtitle2" sx={{ color, fontWeight: 700, fontSize: '0.8125rem' }}>
                     {status === 'normal' && 'Estado: Normal'}
-                    {status === 'critical' && '⚠️ Estado: CRÍTICO'}
-                    {status === 'deadline' && '🔴 Estado: ÚLTIMO DÍA'}
-                    {status === 'overdue' && '🚨 Estado: EN MORA'}
+                    {status === 'critical' && 'Estado: CRITICO'}
+                    {status === 'deadline' && 'Estado: ULTIMO DIA'}
+                    {status === 'overdue' && 'Estado: EN MORA'}
                 </Typography>
                 <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.25 }}>
                     {message}
                 </Typography>
             </Box>
             <Chip
-                label={`Día ${new Date().getDate()} del mes`}
+                label={`Dia ${new Date().getDate()} del mes`}
                 size="small"
                 sx={{
                     bgcolor: `${color}18`,
@@ -151,7 +156,7 @@ const BracketReferenceTable = ({ currentBracket }) => {
             >
                 <InfoIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
                 <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
-                    Tabla de Referencia — Resolución 005-2023
+                    Tabla de Referencia — Resolucion 005-2023
                 </Typography>
                 {open ? <CollapseIcon sx={{ fontSize: 16, color: 'text.secondary' }} /> : <ExpandIcon sx={{ fontSize: 16, color: 'text.secondary' }} />}
             </Box>
@@ -256,20 +261,24 @@ const ParticipacionEstado = () => {
                         dateFrom: range.fromISO,
                         dateTo: range.toISO,
                     });
-                    const gross = Number(summary?.totals?.invoiced || 0);
-                    const closedProjection = buildParticipationProjection(gross, range.isCurrentMonth ? new Date() : range.to, {
-                        projectToMonthEnd: false,
-                    });
+                    const totalWithIVA = Number(summary?.totals?.invoiced || 0);
+                    // Usar subtotal directo de la BD; fallback a estimación
+                    const subtotalFromDB = Number(summary?.totals?.subtotalInvoiced || 0);
+                    const subtotal = subtotalFromDB > 0 ? subtotalFromDB : Number(extractSubtotal(totalWithIVA));
+
+                    const calc = calculateStateParticipation(subtotal);
+                    const progress = calculateBracketProgress(subtotal, calc.bracketInfo);
 
                     return {
                         key: option.key,
                         monthLabel: option.label,
-                        gross,
+                        gross: subtotal,
+                        totalWithIVA,
                         isCurrentMonth: range.isCurrentMonth,
-                        paymentEstimate: Number(closedProjection.estimatedPayment || 0),
-                        bracketLevel: closedProjection.bracketLevel,
-                        bracketProgressPercent: closedProjection.bracketProgress.percent,
-                        remainingToNextBracket: closedProjection.bracketProgress.remaining,
+                        paymentEstimate: Number(calc.totalToPay || 0),
+                        bracketLevel: calc.bracketLevel,
+                        bracketProgressPercent: progress.percent,
+                        remainingToNextBracket: progress.remaining,
                     };
                 })
             );
@@ -315,18 +324,12 @@ const ParticipacionEstado = () => {
     }, [alertState.isOverdue, calculation.totalToPay]);
 
     const selectedSnapshot = monthSnapshots[selectedMonthKey];
-    const isCurrentMonthSelection = selectedSnapshot?.isCurrentMonth ?? true;
-
-    const currentMonthProjection = useMemo(() => {
-        if (!isCurrentMonthSelection) return null;
-        return buildParticipationProjection(parseFloat(grossIncome) || 0, new Date(), { projectToMonthEnd: true });
-    }, [grossIncome, isCurrentMonthSelection]);
 
     // ── Progress towards next bracket ──
     const bracketProgress = useMemo(() => {
         const income = parseFloat(grossIncome) || 0;
         const { bracketInfo } = calculation;
-        if (!bracketInfo.nextBracketAt) return { value: 100, label: 'Tramo máximo', remaining: 0 };
+        if (!bracketInfo.nextBracketAt) return { value: 100, label: 'Tramo maximo', remaining: 0, isTopBracket: true };
 
         const rangeStart = bracketInfo.lowerLimit;
         const rangeEnd = bracketInfo.nextBracketAt;
@@ -334,8 +337,13 @@ const ParticipacionEstado = () => {
         const clamped = Math.max(0, Math.min(progress, 100));
         const remaining = Math.max(0, rangeEnd - income);
 
-        return { value: clamped, label: `${fmt(remaining)} hasta el siguiente tramo`, remaining };
+        return { value: clamped, label: `${fmt(remaining)} hasta el siguiente tramo`, remaining, isTopBracket: false };
     }, [grossIncome, calculation]);
+
+    // ── Semaphore ──
+    const semaphore = useMemo(() => {
+        return getSemaphoreState(bracketProgress.remaining, bracketProgress.isTopBracket);
+    }, [bracketProgress]);
 
     // ── Handlers ──
     const handleIncomeChange = useCallback((e) => {
@@ -370,7 +378,7 @@ const ParticipacionEstado = () => {
     const finalAmount = penaltyInfo ? penaltyInfo.totalWithPenalty : calculation.totalToPay;
 
     // ── Bracket Progress Color ──
-    const progressColor = bracketProgress.value > 85 ? '#dc2626' : bracketProgress.value > 60 ? '#d97706' : '#0284c7';
+    const progressColor = semaphore.color;
 
     const paidByMonthKey = useMemo(() => {
         return completedMonths.reduce((acc, item) => {
@@ -414,10 +422,10 @@ const ParticipacionEstado = () => {
                 </Box>
                 <Box>
                     <Typography variant="h5" sx={{ fontWeight: 800, color: 'text.primary', letterSpacing: '-0.02em' }}>
-                        Participación al Estado
+                        Participacion al Estado
                     </Typography>
                     <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                        Consejo de la Judicatura · Resolución 005-2023 · SBU {new Date().getFullYear()}: {fmt(SBU_CURRENT)}
+                        Consejo de la Judicatura · Resolucion 005-2023 · SBU {new Date().getFullYear()}: {fmt(SBU_CURRENT)}
                     </Typography>
                 </Box>
             </Box>
@@ -446,7 +454,7 @@ const ParticipacionEstado = () => {
                         value={selectedMonthKey}
                         label="Mes de facturacion"
                         onChange={(e) => setSelectedMonthKey(e.target.value)}
-                        helperText="La prevision solo aplica al mes actual. Los meses anteriores muestran cierre real."
+                        helperText="Los valores corresponden a la Base Imponible (sin IVA) facturada al corte de cada mes."
                     >
                         {monthOptions.map((option) => (
                             <MenuItem key={option.key} value={option.key}>
@@ -461,56 +469,6 @@ const ParticipacionEstado = () => {
                     )}
                 </CardContent>
             </Card>
-
-            {isCurrentMonthSelection && currentMonthProjection && (
-                <Card
-                    sx={{
-                        mb: 3,
-                        borderRadius: 3,
-                        border: '1px solid',
-                        borderColor: 'divider',
-                    }}
-                >
-                    <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
-                        <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.08em', fontSize: '0.6875rem' }}>
-                            PREVISION DEL MES ACTUAL
-                        </Typography>
-                        <Box sx={{ mt: 1.5, display: 'grid', gap: 0.5 }}>
-                            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                Facturado al dia {currentMonthProjection.daysElapsed}: <strong>{fmt(currentMonthProjection.grossToDate)}</strong>
-                            </Typography>
-                            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                Proyeccion al cierre del mes: <strong>{fmt(currentMonthProjection.projectedGross)}</strong>
-                            </Typography>
-                            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                                Pago estimado para {currentMonthProjection.paymentMonthLabel}: <strong>{fmt(currentMonthProjection.estimatedPayment)}</strong>
-                            </Typography>
-                        </Box>
-                        <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-                            <Chip
-                                size="small"
-                                label={currentMonthProjection.nextLevelAlert.label}
-                                sx={{
-                                    bgcolor: `${currentMonthProjection.nextLevelAlert.color}18`,
-                                    color: currentMonthProjection.nextLevelAlert.color,
-                                    fontWeight: 700,
-                                }}
-                            />
-                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                                {currentMonthProjection.bracketProgress.isTopBracket
-                                    ? 'Tramo maximo alcanzado.'
-                                    : `Margen al siguiente tramo: ${fmt(currentMonthProjection.bracketProgress.remaining)}`}
-                            </Typography>
-                        </Box>
-                    </CardContent>
-                </Card>
-            )}
-
-            {!isCurrentMonthSelection && selectedSnapshot && (
-                <Alert severity="info" sx={{ mb: 3 }}>
-                    Vista historica de {selectedSnapshot.monthLabel}. Sin prevision, solo valores cerrados.
-                </Alert>
-            )}
 
             <Box sx={{ display: 'flex', gap: 3, mb: 3, flexWrap: { xs: 'wrap', md: 'nowrap' } }}>
                 {/* Input Card */}
@@ -527,8 +485,11 @@ const ParticipacionEstado = () => {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                             <MoneyIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
                             <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.08em', fontSize: '0.6875rem' }}>
-                                INGRESO BRUTO MENSUAL (SIN IVA)
+                                BASE IMPONIBLE MENSUAL (SIN IVA)
                             </Typography>
+                            <Tooltip title={TOOLTIP_LEGAL} placement="top" arrow>
+                                <InfoIcon sx={{ fontSize: 16, color: 'text.disabled', cursor: 'help' }} />
+                            </Tooltip>
                         </Box>
                         <TextField
                             fullWidth
@@ -563,29 +524,51 @@ const ParticipacionEstado = () => {
                             <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                                 {calculation.bracketInfo.variableRate > 0
                                     ? `Base: ${calculation.bracketInfo.fixedSBU} SBU + ${fmtPct(calculation.bracketInfo.variableRate)} sobre excedente`
-                                    : 'Sin participación (tramo exento)'}
+                                    : 'Sin participacion (tramo exento)'}
                             </Typography>
                         </Box>
+                        {selectedSnapshot?.totalWithIVA > 0 && (
+                            <Typography variant="caption" sx={{ color: 'text.disabled', display: 'block', mt: 1.5 }}>
+                                Total facturado con IVA: {fmt(selectedSnapshot.totalWithIVA)} → Base Imponible: {fmt(grossIncome)}
+                            </Typography>
+                        )}
                     </CardContent>
                 </Card>
 
-                {/* Result Card */}
+                {/* Result Card — Deuda al corte de hoy */}
                 <Card
                     sx={{
                         flex: 1,
                         minWidth: 280,
                         borderRadius: 3,
-                        border: '1px solid',
-                        borderColor: alertState.isOverdue ? 'error.main' : 'divider',
+                        border: '2px solid',
+                        borderColor: alertState.isOverdue ? 'error.main' : semaphore.color,
                     }}
                 >
                     <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                            <TrendingIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
-                            <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.08em', fontSize: '0.6875rem' }}>
-                                {alertState.isOverdue ? 'TOTAL CON RECARGO (3%)' : 'TOTAL A PAGAR'}
-                            </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <TrendingIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
+                                <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.08em', fontSize: '0.6875rem' }}>
+                                    {alertState.isOverdue ? 'DEUDA AL CORTE + RECARGO (3%)' : 'DEUDA AL CORTE DE HOY'}
+                                </Typography>
+                            </Box>
+                            {/* Semaphore dot */}
+                            <Tooltip title={semaphore.label}>
+                                <Box sx={{
+                                    width: 14,
+                                    height: 14,
+                                    borderRadius: '50%',
+                                    bgcolor: semaphore.color,
+                                    boxShadow: `0 0 6px ${semaphore.color}60`,
+                                    flexShrink: 0,
+                                }} />
+                            </Tooltip>
                         </Box>
+
+                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 0.5 }}>
+                            A pagar por lo facturado hasta hoy
+                        </Typography>
 
                         <Typography
                             variant="h3"
@@ -593,7 +576,7 @@ const ParticipacionEstado = () => {
                                 fontWeight: 800,
                                 color: alertState.isOverdue ? 'error.main' : 'text.primary',
                                 letterSpacing: '-0.03em',
-                                fontSize: '2.25rem',
+                                fontSize: '2.5rem',
                                 mb: 1.5,
                             }}
                         >
@@ -637,7 +620,7 @@ const ParticipacionEstado = () => {
                 </Card>
             </Box>
 
-            {/* ── Bracket Progress Bar ── */}
+            {/* ── Bracket Progress Bar + Semaphore ── */}
             <Card
                 sx={{
                     mb: 3,
@@ -651,9 +634,22 @@ const ParticipacionEstado = () => {
                         <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.08em', fontSize: '0.6875rem' }}>
                             PROXIMIDAD AL SIGUIENTE TRAMO
                         </Typography>
-                        <Typography variant="caption" sx={{ color: progressColor, fontWeight: 700, fontSize: '0.8125rem' }}>
-                            {bracketProgress.value.toFixed(0)}%
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Chip
+                                size="small"
+                                label={semaphore.label}
+                                sx={{
+                                    height: 22,
+                                    fontSize: '0.65rem',
+                                    bgcolor: `${semaphore.color}18`,
+                                    color: semaphore.color,
+                                    fontWeight: 700,
+                                }}
+                            />
+                            <Typography variant="caption" sx={{ color: progressColor, fontWeight: 700, fontSize: '0.8125rem' }}>
+                                {bracketProgress.value.toFixed(0)}%
+                            </Typography>
+                        </Box>
                     </Box>
                     <LinearProgress
                         variant="determinate"
@@ -816,7 +812,7 @@ const ParticipacionEstado = () => {
             >
                 <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
                     <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.08em', fontSize: '0.6875rem', display: 'block', mb: 1.5 }}>
-                        PROGRESION HISTORICA DE FACTURACION
+                        PROGRESION HISTORICA (BASE IMPONIBLE)
                     </Typography>
                     {loadingSnapshots ? (
                         <Box sx={{ py: 3, display: 'flex', justifyContent: 'center' }}>
@@ -828,7 +824,7 @@ const ParticipacionEstado = () => {
                                 <TableHead>
                                     <TableRow>
                                         <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', color: 'text.secondary' }}>Mes</TableCell>
-                                        <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem', color: 'text.secondary' }}>Facturado</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem', color: 'text.secondary' }}>Base Imponible</TableCell>
                                         <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem', color: 'text.secondary' }}>Pago Estado</TableCell>
                                         <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem', color: 'text.secondary' }}>Progreso Tramo</TableCell>
                                         <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem', color: 'text.secondary' }}>Margen Tramo</TableCell>

@@ -4,12 +4,25 @@ import {
     TAX_BRACKETS,
     ALERT_STATES,
     PENALTY_RATE,
+    IVA_RATE,
+    BRACKET_PROXIMITY_THRESHOLD,
 } from '../config/state_participation_config';
 
 Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP });
 
 /**
- * Calcula la participacion al Estado para un ingreso bruto mensual.
+ * Extrae la Base Imponible (subtotal sin IVA) de un monto total facturado.
+ * La BD almacena totalAmount (valcob del XML Koinor) que INCLUYE IVA.
+ * Redondeo a 2 decimales solo al final (Decimal.js).
+ */
+export function extractSubtotal(totalWithIVA) {
+    const total = new Decimal(totalWithIVA || 0);
+    const divisor = new Decimal(1).plus(new Decimal(IVA_RATE));
+    return total.div(divisor).toFixed(2);
+}
+
+/**
+ * Calcula la participacion al Estado para un ingreso bruto mensual (Base Imponible, sin IVA).
  */
 export function calculateStateParticipation(monthlyGrossIncome) {
     const income = new Decimal(monthlyGrossIncome || 0);
@@ -144,28 +157,19 @@ export function calculateBracketProgress(monthlyGrossIncome, bracketInfo) {
     };
 }
 
-function getProjectionAlert(progressPercent) {
-    if (progressPercent >= 95) {
-        return {
-            level: 'critical',
-            label: 'Muy cerca del siguiente tramo',
-            color: '#be123c',
-        };
+/**
+ * Semaforo de proximidad al siguiente tramo.
+ * Verde: lejos del techo del rango actual.
+ * Rojo: falta menos de $BRACKET_PROXIMITY_THRESHOLD para saltar de tramo.
+ */
+export function getSemaphoreState(remaining, isTopBracket) {
+    if (isTopBracket) {
+        return { color: '#64748b', label: 'Tramo maximo', level: 'top' };
     }
-
-    if (progressPercent >= 80) {
-        return {
-            level: 'warning',
-            label: 'Zona de atencion',
-            color: '#d97706',
-        };
+    if (remaining < BRACKET_PROXIMITY_THRESHOLD) {
+        return { color: '#dc2626', label: 'Proximo a cambiar de tramo', level: 'danger' };
     }
-
-    return {
-        level: 'normal',
-        label: 'Margen saludable',
-        color: '#0284c7',
-    };
+    return { color: '#047857', label: 'Margen saludable', level: 'safe' };
 }
 
 function formatMonthLabel(date) {
@@ -176,22 +180,12 @@ function formatMonthLabel(date) {
 }
 
 /**
- * Construye una proyeccion/lectura de participacion para un mes.
- * `projectToMonthEnd` debe usarse SOLO para mes actual.
+ * Construye el resumen de participacion para un mes.
+ * NO proyecta a futuro: calcula estrictamente sobre lo facturado al corte.
+ * La entrada monthlySubtotal debe ser la Base Imponible (sin IVA).
  */
-export function buildParticipationProjection(
-    monthlyGrossIncome,
-    referenceDate = new Date(),
-    options = {}
-) {
-    const { projectToMonthEnd = false } = options;
-
+export function buildParticipationSummary(monthlySubtotal, referenceDate = new Date()) {
     const currentDate = new Date(referenceDate);
-    const today = new Date();
-    const isCurrentMonth =
-        currentDate.getFullYear() === today.getFullYear() &&
-        currentDate.getMonth() === today.getMonth();
-    const shouldProject = projectToMonthEnd && isCurrentMonth;
 
     const daysInMonth = new Date(
         currentDate.getFullYear(),
@@ -200,16 +194,14 @@ export function buildParticipationProjection(
     ).getDate();
     const daysElapsed = Math.max(1, Math.min(currentDate.getDate(), daysInMonth));
 
-    const grossToDate = new Decimal(monthlyGrossIncome || 0);
-    const projectedGross = shouldProject
-        ? grossToDate.div(daysElapsed).times(daysInMonth)
-        : grossToDate;
+    const grossToDate = new Decimal(monthlySubtotal || 0);
 
-    const calculation = calculateStateParticipation(projectedGross.toNumber());
+    const calculation = calculateStateParticipation(grossToDate.toNumber());
     const bracketProgress = calculateBracketProgress(
-        projectedGross.toNumber(),
+        grossToDate.toNumber(),
         calculation.bracketInfo
     );
+    const semaphore = getSemaphoreState(bracketProgress.remaining, bracketProgress.isTopBracket);
 
     const nextPaymentMonthDate = new Date(
         currentDate.getFullYear(),
@@ -221,16 +213,13 @@ export function buildParticipationProjection(
         billingMonthLabel: formatMonthLabel(currentDate),
         paymentMonthLabel: formatMonthLabel(nextPaymentMonthDate),
         grossToDate: grossToDate.toFixed(2),
-        projectedGross: projectedGross.toFixed(2),
-        averageDailyGross: grossToDate.div(daysElapsed).toFixed(2),
         daysElapsed,
         daysInMonth,
-        isProjectionApplied: shouldProject,
         estimatedPayment: calculation.totalToPay,
         bracketLevel: calculation.bracketLevel,
         bracketInfo: calculation.bracketInfo,
         bracketProgress,
-        nextLevelAlert: getProjectionAlert(bracketProgress.percent),
+        semaphore,
     };
 }
 

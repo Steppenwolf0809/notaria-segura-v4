@@ -147,6 +147,9 @@ export async function importCxcXlsFile(fileBuffer, fileName, userId) {
           paidAmount = rowData.totalAmount - rowData.balance; // mejor calculamos lo pagado
         }
 
+        // Calcular Base Imponible (sin IVA 15%)
+        const subtotalAmount = rowData.totalAmount > 0 ? Math.round((rowData.totalAmount / 1.15) * 100) / 100 : 0;
+
         // Preparar operación Upsert
         operations.push(prisma.invoice.upsert({
           where: { invoiceNumber: rowData.invoiceNumber },
@@ -154,6 +157,7 @@ export async function importCxcXlsFile(fileBuffer, fileName, userId) {
             clientTaxId: rowData.clientTaxId,
             clientName: rowData.clientName,
             totalAmount: rowData.totalAmount,
+            subtotalAmount,
             paidAmount: paidAmount,
             issueDate: rowData.issueDate,
             status: status,
@@ -168,6 +172,7 @@ export async function importCxcXlsFile(fileBuffer, fileName, userId) {
             clientTaxId: rowData.clientTaxId || '9999999999999',
             clientName: rowData.clientName || 'Consumidor Final',
             totalAmount: rowData.totalAmount,
+            subtotalAmount,
             paidAmount: paidAmount,
             issueDate: rowData.issueDate || new Date(),
             status: status,

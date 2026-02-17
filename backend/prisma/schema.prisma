@@ -599,7 +599,8 @@ model Invoice {
   clientName        String                 // nomcli
   
   // Montos
-  totalAmount       Decimal       @db.Decimal(12, 2)  // valcob de FC
+  totalAmount       Decimal       @db.Decimal(12, 2)  // valcob de FC (incluye IVA)
+  subtotalAmount    Decimal?      @db.Decimal(12, 2)  // Base Imponible (sin IVA) — para Participación al Estado
   paidAmount        Decimal?      @db.Decimal(12, 2) @default(0)  // Suma incremental de pagos
   
   // Fechas

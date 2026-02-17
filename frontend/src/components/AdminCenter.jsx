@@ -8,7 +8,6 @@ import {
   Alert,
   Chip,
   CircularProgress,
-  LinearProgress,
   Paper,
   FormControl,
   InputLabel,
@@ -83,9 +82,13 @@ import FinancialHealthCard from './admin/FinancialHealthCard';
 import ParticipacionEstado from './admin/ParticipacionEstado';
 import billingService from '../services/billing-service';
 import {
-  buildParticipationProjection,
   getAlertState,
-  getMonthRange
+  getMonthRange,
+  extractSubtotal,
+  calculateStateParticipation,
+  applyPenalty,
+  getSemaphoreState,
+  calculateBracketProgress,
 } from '../utils/stateParticipationCalculator';
 
 /**
@@ -152,21 +155,21 @@ const AdminCenter = () => {
 /**
  * Dashboard de SupervisiÃ³n
  */
-// â”€â”€ WIDGET PARTICIPACIÃ“N (DASHBOARD) â”€â”€
-const ParticipationWidget = ({ onViewChange, projection, loading }) => {
+// â"€â"€ WIDGET PARTICIPACIÃ"N (DASHBOARD) â"€â"€
+const ParticipationWidget = ({ onViewChange, subtotal, loading }) => {
   const alertState = getAlertState();
   const day = new Date().getDate();
-  const maxDays = 30;
-  const progress = (day / maxDays) * 100;
-  const bracketProgress = projection?.bracketProgress?.percent || 0;
-  const levelColor = projection?.nextLevelAlert?.color || '#0284c7';
 
   const formatMoney = (value) =>
     '$' + Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-  const bracketStatusLabel = projection?.bracketProgress?.isTopBracket
-    ? 'Tramo maximo alcanzado'
-    : `Faltan ${formatMoney(projection?.bracketProgress?.remaining)} para el siguiente tramo`;
+  const calc = calculateStateParticipation(subtotal || 0);
+  const progress = calculateBracketProgress(subtotal || 0, calc.bracketInfo);
+  const semaphore = getSemaphoreState(progress.remaining, progress.isTopBracket);
+
+  const totalToPay = alertState.isOverdue
+    ? applyPenalty(calc.totalToPay).totalWithPenalty
+    : calc.totalToPay;
 
   return (
     <Paper
@@ -213,98 +216,51 @@ const ParticipationWidget = ({ onViewChange, projection, loading }) => {
       </Box>
 
       <Box sx={{ mb: 1.5 }}>
-        {loading && !projection ? (
+        {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 0.5 }}>
             <CircularProgress size={18} />
           </Box>
         ) : (
           <>
-            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-              Proyeccion de pago en {projection?.paymentMonthLabel || 'mes siguiente'}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                {alertState.isOverdue ? 'Deuda al corte + recargo 3%' : 'Deuda al corte de hoy'}
+              </Typography>
+              {/* Semaphore dot */}
+              <Box sx={{
+                width: 10,
+                height: 10,
+                borderRadius: '50%',
+                bgcolor: semaphore.color,
+                boxShadow: `0 0 4px ${semaphore.color}60`,
+                flexShrink: 0,
+              }} />
+            </Box>
+            <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.15, color: alertState.isOverdue ? 'error.main' : 'text.primary' }}>
+              {formatMoney(totalToPay)}
             </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.15 }}>
-              {formatMoney(projection?.estimatedPayment)}
-            </Typography>
             <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-              Facturado al dia {projection?.daysElapsed || day}: {formatMoney(projection?.grossToDate)}
+              Base Imponible (sin IVA): {formatMoney(subtotal)}
             </Typography>
           </>
         )}
       </Box>
 
-      <Box sx={{ position: 'relative', mt: 1, mb: 1 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>Dia 1</Typography>
-          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem', fontWeight: 700 }}>Dia 10 (Limite)</Typography>
-          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>Fin Mes</Typography>
-        </Box>
-        <Box sx={{
-          height: 6,
-          borderRadius: 3,
-          bgcolor: 'rgba(0,0,0,0.06)',
-          position: 'relative',
-          overflow: 'hidden'
-        }}>
-          <Box sx={{
-            position: 'absolute',
-            left: `${(10 / 30) * 100}%`,
-            top: 0,
-            bottom: 0,
-            width: 2,
-            bgcolor: 'text.disabled',
-            zIndex: 1
-          }} />
-
-          <Box sx={{
-            height: '100%',
-            width: `${Math.min(progress, 100)}%`,
-            bgcolor: alertState.color,
-            borderRadius: 3,
-            transition: 'width 1s ease'
-          }} />
-        </Box>
-      </Box>
-
-      <Box sx={{ mt: 1.5 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-            Progreso al siguiente tramo
-          </Typography>
-          <Typography variant="caption" sx={{ color: levelColor, fontWeight: 700 }}>
-            {bracketProgress.toFixed(0)}%
-          </Typography>
-        </Box>
-        <LinearProgress
-          variant="determinate"
-          value={Math.max(0, Math.min(bracketProgress, 100))}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
+        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+          Esquema {calc.bracketLevel} • {semaphore.label}
+        </Typography>
+        <Chip
+          size="small"
+          label={semaphore.label}
           sx={{
-            height: 7,
-            borderRadius: 4,
-            bgcolor: 'rgba(148, 163, 184, 0.15)',
-            '& .MuiLinearProgress-bar': {
-              borderRadius: 4,
-              bgcolor: levelColor
-            }
+            height: 20,
+            fontSize: '0.6rem',
+            bgcolor: `${semaphore.color}18`,
+            color: semaphore.color,
+            fontWeight: 700
           }}
         />
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 0.75, gap: 1 }}>
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            {bracketStatusLabel}
-          </Typography>
-          {projection?.nextLevelAlert?.label && (
-            <Chip
-              size="small"
-              label={projection.nextLevelAlert.label}
-              sx={{
-                height: 20,
-                fontSize: '0.65rem',
-                bgcolor: `${levelColor}20`,
-                color: levelColor,
-                fontWeight: 700
-              }}
-            />
-          )}
-        </Box>
       </Box>
 
       {alertState.isOverdue && (
@@ -457,9 +413,13 @@ const AdminDashboard = ({ onViewChange }) => {
         dateFrom: fromISO,
         dateTo: toISO
       });
-      setCurrentMonthBilled(Number(summary?.totals?.invoiced || 0));
+      // Usar subtotal directo de la BD (Base Imponible sin IVA)
+      const subtotalFromDB = Number(summary?.totals?.subtotalInvoiced || 0);
+      const totalWithIVA = Number(summary?.totals?.invoiced || 0);
+      // Fallback: si no hay subtotal en BD, estimar dividiendo por 1.15
+      setCurrentMonthBilled(subtotalFromDB > 0 ? subtotalFromDB : Number(extractSubtotal(totalWithIVA)));
     } catch (e) {
-      console.error('Error cargando proyeccion de participacion', e);
+      console.error('Error cargando participacion', e);
       setCurrentMonthBilled(0);
     } finally {
       setParticipationLoading(false);
@@ -530,7 +490,7 @@ const AdminDashboard = ({ onViewChange }) => {
     }, 100);
   };
 
-  const participationProjection = buildParticipationProjection(currentMonthBilled, new Date(), { projectToMonthEnd: true });
+  // currentMonthBilled ya es subtotal (sin IVA) — se pasa directo al widget
 
   // Solo mostrar spinner completo si es la carga inicial y no tenemos datos
   if (loading && page === 1 && !stats) {
@@ -720,10 +680,10 @@ const AdminDashboard = ({ onViewChange }) => {
               />
             </Box>
             <Box sx={{ mt: 2 }}>
-              {/* WIDGET PARTICIPACIÃ“N */}
+              {/* WIDGET PARTICIPACIÃ"N */}
               <ParticipationWidget
                 onViewChange={onViewChange}
-                projection={participationProjection}
+                subtotal={currentMonthBilled}
                 loading={participationLoading}
               />
             </Box>

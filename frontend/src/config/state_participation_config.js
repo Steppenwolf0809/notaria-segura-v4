@@ -34,8 +34,16 @@ export const ALERT_STATES = {
     OVERDUE: { minDay: 11, maxDay: 31, status: 'overdue', color: '#991b1b', label: 'En mora' },
 };
 
+// ── Tasa de IVA vigente — para extraer Base Imponible ──
+// La BD almacena totalAmount (valcob del XML) que INCLUYE IVA.
+// Se usa esta tasa para derivar el subtotal (Base Imponible).
+export const IVA_RATE = 0.15; // 15% IVA Ecuador (vigente desde abril 2024)
+
 // ── Tasa de Multa por Mora ──
 export const PENALTY_RATE = 0.03; // 3%
+
+// ── Umbral de proximidad al siguiente tramo (semáforo) ──
+export const BRACKET_PROXIMITY_THRESHOLD = 1000; // USD
 
 // ── Tipos de documentos requeridos para el vault ──
 export const REQUIRED_DOCUMENTS = [

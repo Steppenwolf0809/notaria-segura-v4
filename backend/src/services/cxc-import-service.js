@@ -224,18 +224,21 @@ async function processInvoiceUpsert(factura, sourceFile) {
         }
     });
 
+    const subtotalAmount = totalAmount > 0 ? Math.round((totalAmount / 1.15) * 100) / 100 : 0;
+
     if (invoice) {
         // Escenario 1: Factura existe - actualizar datos del CXC
         // Calcular paidAmount basado en la diferencia entre totalAmount y balance
         const paidAmount = totalAmount - balance;
         const newStatus = balance <= 0 ? 'PAID' : (paidAmount > 0 ? 'PARTIAL' : 'PENDING');
-        
+
         await prisma.invoice.update({
             where: { id: invoice.id },
             data: {
                 clientTaxId,
                 clientName,
                 totalAmount,
+                subtotalAmount,
                 paidAmount: paidAmount > 0 ? paidAmount : 0,
                 dueDate,
                 status: newStatus,
@@ -257,6 +260,7 @@ async function processInvoiceUpsert(factura, sourceFile) {
                 clientTaxId,
                 clientName,
                 totalAmount,
+                subtotalAmount,
                 paidAmount: paidAmount > 0 ? paidAmount : 0,
                 issueDate,
                 dueDate,
