@@ -979,15 +979,19 @@ async function getDashboardStats(req, res) {
         where: {
           assignedToId: m.id,
           status: 'ENTREGADO',
-          ...(Object.keys(performanceDateFilter).length > 0 ? { updatedAt: performanceDateFilter } : {})
+          ...(Object.keys(performanceDateFilter).length > 0 ? { fechaListo: performanceDateFilter } : {})
         }
       });
+
+      // Construir filtro de fechaListo combinando "not null" + rango de fecha si existe
+      const fechaListoFilter = Object.keys(performanceDateFilter).length > 0
+        ? { not: null, ...performanceDateFilter }
+        : { not: null };
 
       const recentDeliveries = await prisma.document.findMany({
         where: {
           assignedToId: m.id,
-          fechaListo: { not: null }, // Usar fechaListo en vez de status ENTREGADO
-          ...(Object.keys(performanceDateFilter).length > 0 ? { fechaListo: performanceDateFilter } : {})
+          fechaListo: fechaListoFilter,
         },
         select: { createdAt: true, fechaListo: true },
         take: 20,

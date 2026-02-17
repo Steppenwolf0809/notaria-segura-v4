@@ -511,30 +511,33 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
           <Box sx={{
             display: 'flex',
             alignItems: 'center',
-            mb: 2,
-            p: 1.5,
-            borderRadius: 2,
+            mb: 1,
+            p: 1,
+            borderRadius: 1.5,
             backgroundColor: isDarkMode ? 'rgba(30, 41, 59, 0.5)' : 'rgba(241, 245, 249, 0.8)',
           }}>
             <Avatar
               sx={{
                 bgcolor: getUserRoleColor(),
-                width: 36,
-                height: 36,
-                mr: 1.5,
-                fontSize: '0.875rem',
+                width: 28,
+                height: 28,
+                mr: 1,
+                fontSize: '0.7rem',
                 fontWeight: 600
               }}
             >
               {getUserInitials()}
             </Avatar>
             <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography variant="body2" sx={{
+              <Typography variant="caption" sx={{
                 fontWeight: 600,
                 color: isDarkMode ? '#f1f5f9' : '#1e293b',
                 whiteSpace: 'nowrap',
                 overflow: 'hidden',
-                textOverflow: 'ellipsis'
+                textOverflow: 'ellipsis',
+                display: 'block',
+                lineHeight: 1.3,
+                fontSize: '0.7rem'
               }}>
                 {getFullName()}
               </Typography>
@@ -542,8 +545,9 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
                 color: isDarkMode ? '#64748b' : '#94a3b8',
                 textTransform: 'uppercase',
                 fontWeight: 600,
-                fontSize: '0.6875rem',
-                letterSpacing: '0.05em'
+                fontSize: '0.6rem',
+                letterSpacing: '0.05em',
+                lineHeight: 1.2
               }}>
                 {user?.role}
               </Typography>
