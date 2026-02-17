@@ -443,7 +443,7 @@ const AdminDashboard = () => {
                 <SummaryCard title={`Críticos`} value={kpis?.criticalCount || 0} icon={<WarningIcon />} color="error" subtext={`> ${thresholdDays}d`} />
               </Grid>
               <Grid item xs={6} sm={3}>
-                <SummaryCard title="Pendientes" value={kpis?.pendingCount || 0} icon={<DocumentIcon />} color="warning" subtext="Por iniciar" />
+                <SummaryCard title="En Proceso" value={kpis?.inProgressCount || 0} icon={<InProgressIcon />} color="info" subtext="En curso" />
               </Grid>
               <Grid item xs={6} sm={3}>
                 <SummaryCard title="Listos" value={kpis?.readyCount || 0} icon={<CheckCircleIcon />} color="success" subtext="Para entregar" />

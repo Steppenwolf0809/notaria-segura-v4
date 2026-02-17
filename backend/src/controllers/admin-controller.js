@@ -833,10 +833,10 @@ async function getDashboardStats(req, res) {
       ? Math.round((deliveredThisWeek / createdThisWeek) * 100)
       : 0;
 
-    // KPI: Pendientes y Listos
-    const pendingCount = await prisma.document.count({
+    // KPI: En Proceso y Listos
+    const inProgressCount = await prisma.document.count({
       where: {
-        status: 'PENDIENTE',
+        status: 'EN_PROCESO',
         ...dateFilter,
         ...matrixerFilter
       }
@@ -1035,7 +1035,7 @@ async function getDashboardStats(req, res) {
         kpis: {
           activeCount,
           criticalCount,
-          pendingCount,
+          inProgressCount,
           readyCount,
           totalBilled,
           totalInvoiceBilled,
