@@ -293,12 +293,16 @@ function parseInvoiceTransaction(group) {
     // Parsear fecha de emisión
     const issueDate = parseKoinorDate(group.fecemi);
 
+    // Capturar Base Imponible (sin IVA) directamente del XML
+    const totalSinImpuestos = parseFloat(group.totalSinImpuestos || 0);
+
     return {
         invoiceNumber: invoiceNumber || numtra,
         invoiceNumberRaw: numtra || invoiceNumber,
         clientTaxId: String(group.codcli || '').trim(),
         clientName: String(group.nomcli || '').trim(),
         totalAmount: Math.abs(valcob),
+        subtotalAmount: totalSinImpuestos > 0 ? totalSinImpuestos : null,
         issueDate,
         concept: String(group.concep || '').trim(),
         type: 'FC'

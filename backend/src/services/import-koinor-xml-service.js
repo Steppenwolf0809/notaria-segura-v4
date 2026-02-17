@@ -380,6 +380,8 @@ async function processSinglePayment(payment, detail, sourceFile, userId) {
         console.log(`[import-koinor-xml] Creating legacy invoice for: ${detail.invoiceNumberRaw}`);
         
         // Usar upsert para evitar errores de unique constraint
+        const legacyTotal = parseFloat(detail.amount || 0);
+        const legacySubtotal = legacyTotal > 0 ? Math.round((legacyTotal / 1.15) * 100) / 100 : 0;
         invoice = await prisma.invoice.upsert({
             where: { invoiceNumber: detail.invoiceNumberRaw },
             update: {
@@ -393,6 +395,7 @@ async function processSinglePayment(payment, detail, sourceFile, userId) {
                 clientTaxId: payment.clientTaxId || '9999999999999',
                 issueDate: payment.paymentDate,
                 totalAmount: detail.amount,
+                subtotalAmount: legacySubtotal,
                 paidAmount: 0,
                 status: 'PENDING',
                 isLegacy: true,
@@ -655,7 +658,11 @@ async function processInvoiceFC(invoiceData, sourceFile) {
         console.log(`[import-koinor-xml] 🔍 Found document ${document.protocolNumber} for invoice ${invoiceData.invoiceNumberRaw}`);
     }
     
-    // Crear nueva factura desde el XML
+    // Usar Base Imponible real del XML; fallback a estimación por división
+    const totalAmt = parseFloat(invoiceData.totalAmount || 0);
+    const subtotalAmount = invoiceData.subtotalAmount != null
+        ? invoiceData.subtotalAmount
+        : (totalAmt > 0 ? Math.round((totalAmt / 1.15) * 100) / 100 : 0);
     await prisma.invoice.create({
         data: {
             invoiceNumber: invoiceData.invoiceNumberRaw,
@@ -664,6 +671,7 @@ async function processInvoiceFC(invoiceData, sourceFile) {
             clientTaxId: invoiceData.clientTaxId || '',
             issueDate: invoiceData.issueDate,
             totalAmount: invoiceData.totalAmount,
+            subtotalAmount,
             paidAmount: 0,
             status: 'PENDING',
             isLegacy: false,  // Es del XML, no legacy
