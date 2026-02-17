@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
     Box,
     Card,
@@ -21,6 +21,9 @@ import {
     TableHead,
     TableRow,
     Collapse,
+    MenuItem,
+    Alert,
+    CircularProgress,
 } from '@mui/material';
 import {
     Warning as WarningIcon,
@@ -33,11 +36,15 @@ import {
     TrendingUp as TrendingIcon,
     Schedule as ClockIcon,
     Gavel as JudicaturaIcon,
+    Timeline as TimelineIcon,
 } from '@mui/icons-material';
+import billingService from '../../services/billing-service';
 import {
     calculateStateParticipation,
     getAlertState,
     applyPenalty,
+    buildParticipationProjection,
+    getMonthRange,
 } from '../../utils/stateParticipationCalculator';
 import {
     TAX_BRACKETS,
@@ -49,6 +56,25 @@ const fmt = (val) =>
     '$' + Number(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const fmtPct = (val) => `${(val * 100).toFixed(0)}%`;
+
+const PAYMENT_STORAGE_KEY = 'state_participation_payments_v1';
+const MONTHS_TO_SHOW = 6;
+
+const createMonthOptions = (monthsBack = MONTHS_TO_SHOW) => {
+    const today = new Date();
+
+    return Array.from({ length: monthsBack }, (_, index) => {
+        const date = new Date(today.getFullYear(), today.getMonth() - index, 1);
+        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        const rawLabel = date.toLocaleDateString('es-EC', { month: 'long', year: 'numeric' });
+
+        return {
+            key,
+            date,
+            label: rawLabel.charAt(0).toUpperCase() + rawLabel.slice(1),
+        };
+    });
+};
 
 // ── Alert Banner ──
 const AlertBanner = ({ alertState }) => {
@@ -192,14 +218,86 @@ const BracketReferenceTable = ({ currentBracket }) => {
 // ═══════════════════════════════════════════════════
 const ParticipacionEstado = () => {
     // ── State ──
+    const monthOptions = useMemo(() => createMonthOptions(), []);
+    const [selectedMonthKey, setSelectedMonthKey] = useState(monthOptions[0]?.key || '');
     const [grossIncome, setGrossIncome] = useState('');
+    const [monthSnapshots, setMonthSnapshots] = useState({});
+    const [loadingSnapshots, setLoadingSnapshots] = useState(true);
+    const [snapshotError, setSnapshotError] = useState('');
     // Simple checklist state
     const [checklist, setChecklist] = useState({
         formularioCerrado: false,
         pagado: false,
         comprobanteRegistrado: false,
     });
-    const [completedMonths, setCompletedMonths] = useState([]);
+    const [completedMonths, setCompletedMonths] = useState(() => {
+        try {
+            const saved = localStorage.getItem(PAYMENT_STORAGE_KEY);
+            const parsed = saved ? JSON.parse(saved) : [];
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    });
+
+    useEffect(() => {
+        localStorage.setItem(PAYMENT_STORAGE_KEY, JSON.stringify(completedMonths));
+    }, [completedMonths]);
+
+    const loadMonthSnapshots = useCallback(async () => {
+        try {
+            setLoadingSnapshots(true);
+            setSnapshotError('');
+
+            const results = await Promise.all(
+                monthOptions.map(async (option) => {
+                    const range = getMonthRange(option.date, { currentMonthUntilToday: true });
+                    const summary = await billingService.getSummary({
+                        dateFrom: range.fromISO,
+                        dateTo: range.toISO,
+                    });
+                    const gross = Number(summary?.totals?.invoiced || 0);
+                    const closedProjection = buildParticipationProjection(gross, range.isCurrentMonth ? new Date() : range.to, {
+                        projectToMonthEnd: false,
+                    });
+
+                    return {
+                        key: option.key,
+                        monthLabel: option.label,
+                        gross,
+                        isCurrentMonth: range.isCurrentMonth,
+                        paymentEstimate: Number(closedProjection.estimatedPayment || 0),
+                        bracketLevel: closedProjection.bracketLevel,
+                        bracketProgressPercent: closedProjection.bracketProgress.percent,
+                        remainingToNextBracket: closedProjection.bracketProgress.remaining,
+                    };
+                })
+            );
+
+            const mapped = results.reduce((acc, item) => {
+                acc[item.key] = item;
+                return acc;
+            }, {});
+
+            setMonthSnapshots(mapped);
+        } catch (error) {
+            console.error('Error cargando progresion mensual de participacion:', error);
+            setSnapshotError('No se pudo cargar la progresion historica de facturacion.');
+        } finally {
+            setLoadingSnapshots(false);
+        }
+    }, [monthOptions]);
+
+    useEffect(() => {
+        loadMonthSnapshots();
+    }, [loadMonthSnapshots]);
+
+    useEffect(() => {
+        if (!selectedMonthKey) return;
+        const selectedSnapshot = monthSnapshots[selectedMonthKey];
+        if (!selectedSnapshot) return;
+        setGrossIncome(selectedSnapshot.gross.toFixed(2));
+    }, [selectedMonthKey, monthSnapshots]);
 
     // ── Derived state ──
     const alertState = useMemo(() => getAlertState(), []);
@@ -215,6 +313,14 @@ const ParticipacionEstado = () => {
         }
         return null;
     }, [alertState.isOverdue, calculation.totalToPay]);
+
+    const selectedSnapshot = monthSnapshots[selectedMonthKey];
+    const isCurrentMonthSelection = selectedSnapshot?.isCurrentMonth ?? true;
+
+    const currentMonthProjection = useMemo(() => {
+        if (!isCurrentMonthSelection) return null;
+        return buildParticipationProjection(parseFloat(grossIncome) || 0, new Date(), { projectToMonthEnd: true });
+    }, [grossIncome, isCurrentMonthSelection]);
 
     // ── Progress towards next bracket ──
     const bracketProgress = useMemo(() => {
@@ -242,15 +348,21 @@ const ParticipacionEstado = () => {
     }, []);
 
     const handleMarkComplete = useCallback(() => {
-        const month = new Date().toLocaleString('es-EC', { month: 'long', year: 'numeric' });
+        const selectedOption = monthOptions.find((month) => month.key === selectedMonthKey);
+        if (!selectedOption) return;
+
         setCompletedMonths((prev) => [
-            { month, amount: penaltyInfo ? penaltyInfo.totalWithPenalty : calculation.totalToPay, date: new Date().toLocaleDateString('es-EC') },
-            ...prev,
+            {
+                key: selectedMonthKey,
+                month: selectedOption.label,
+                amount: Number(penaltyInfo ? penaltyInfo.totalWithPenalty : calculation.totalToPay),
+                date: new Date().toLocaleDateString('es-EC'),
+            },
+            ...prev.filter((item) => item.key !== selectedMonthKey),
         ]);
-        // Reset for next period
-        setGrossIncome('');
+
         setChecklist({ formularioCerrado: false, pagado: false, comprobanteRegistrado: false });
-    }, [calculation, penaltyInfo]);
+    }, [calculation.totalToPay, penaltyInfo, monthOptions, selectedMonthKey]);
 
     const allChecked = checklist.formularioCerrado && checklist.pagado && checklist.comprobanteRegistrado;
     const canComplete = allChecked && parseFloat(grossIncome) > 0;
@@ -259,6 +371,32 @@ const ParticipacionEstado = () => {
 
     // ── Bracket Progress Color ──
     const progressColor = bracketProgress.value > 85 ? '#dc2626' : bracketProgress.value > 60 ? '#d97706' : '#0284c7';
+
+    const paidByMonthKey = useMemo(() => {
+        return completedMonths.reduce((acc, item) => {
+            if (item.key) acc[item.key] = item;
+            return acc;
+        }, {});
+    }, [completedMonths]);
+
+    const historicalRows = useMemo(() => {
+        return monthOptions
+            .map((option) => {
+                const snapshot = monthSnapshots[option.key];
+                if (!snapshot) return null;
+
+                return {
+                    key: option.key,
+                    month: option.label,
+                    gross: snapshot.gross,
+                    paymentEstimate: snapshot.paymentEstimate,
+                    progress: snapshot.bracketProgressPercent,
+                    remaining: snapshot.remainingToNextBracket,
+                    paidRecord: paidByMonthKey[option.key],
+                };
+            })
+            .filter(Boolean);
+    }, [monthOptions, monthSnapshots, paidByMonthKey]);
 
     return (
         <Box sx={{ maxWidth: 900, mx: 'auto' }}>
@@ -287,7 +425,93 @@ const ParticipacionEstado = () => {
             {/* ── Alert Banner ── */}
             <AlertBanner alertState={alertState} />
 
-            {/* ── Revenue Input + Calculation Result ── */}
+            <Card
+                sx={{
+                    mb: 3,
+                    borderRadius: 3,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                }}
+            >
+                <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                        <TimelineIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
+                        <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.08em', fontSize: '0.6875rem' }}>
+                            CORTE DE FACTURACION
+                        </Typography>
+                    </Box>
+                    <TextField
+                        select
+                        fullWidth
+                        value={selectedMonthKey}
+                        label="Mes de facturacion"
+                        onChange={(e) => setSelectedMonthKey(e.target.value)}
+                        helperText="La prevision solo aplica al mes actual. Los meses anteriores muestran cierre real."
+                    >
+                        {monthOptions.map((option) => (
+                            <MenuItem key={option.key} value={option.key}>
+                                {option.label}
+                            </MenuItem>
+                        ))}
+                    </TextField>
+                    {snapshotError && (
+                        <Alert severity="warning" sx={{ mt: 2 }}>
+                            {snapshotError}
+                        </Alert>
+                    )}
+                </CardContent>
+            </Card>
+
+            {isCurrentMonthSelection && currentMonthProjection && (
+                <Card
+                    sx={{
+                        mb: 3,
+                        borderRadius: 3,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                    }}
+                >
+                    <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
+                        <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.08em', fontSize: '0.6875rem' }}>
+                            PREVISION DEL MES ACTUAL
+                        </Typography>
+                        <Box sx={{ mt: 1.5, display: 'grid', gap: 0.5 }}>
+                            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                                Facturado al dia {currentMonthProjection.daysElapsed}: <strong>{fmt(currentMonthProjection.grossToDate)}</strong>
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                                Proyeccion al cierre del mes: <strong>{fmt(currentMonthProjection.projectedGross)}</strong>
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                                Pago estimado para {currentMonthProjection.paymentMonthLabel}: <strong>{fmt(currentMonthProjection.estimatedPayment)}</strong>
+                            </Typography>
+                        </Box>
+                        <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                            <Chip
+                                size="small"
+                                label={currentMonthProjection.nextLevelAlert.label}
+                                sx={{
+                                    bgcolor: `${currentMonthProjection.nextLevelAlert.color}18`,
+                                    color: currentMonthProjection.nextLevelAlert.color,
+                                    fontWeight: 700,
+                                }}
+                            />
+                            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                {currentMonthProjection.bracketProgress.isTopBracket
+                                    ? 'Tramo maximo alcanzado.'
+                                    : `Margen al siguiente tramo: ${fmt(currentMonthProjection.bracketProgress.remaining)}`}
+                            </Typography>
+                        </Box>
+                    </CardContent>
+                </Card>
+            )}
+
+            {!isCurrentMonthSelection && selectedSnapshot && (
+                <Alert severity="info" sx={{ mb: 3 }}>
+                    Vista historica de {selectedSnapshot.monthLabel}. Sin prevision, solo valores cerrados.
+                </Alert>
+            )}
+
             <Box sx={{ display: 'flex', gap: 3, mb: 3, flexWrap: { xs: 'wrap', md: 'nowrap' } }}>
                 {/* Input Card */}
                 <Card
@@ -575,7 +799,7 @@ const ParticipacionEstado = () => {
                                     },
                                 }}
                             >
-                                Cerrar Mes — Registrar Pago de {fmt(finalAmount)}
+                                Registrar pago de {fmt(finalAmount)}
                             </Button>
                         </span>
                     </Tooltip>
@@ -583,41 +807,61 @@ const ParticipacionEstado = () => {
             </Card>
 
             {/* ── Monthly History ── */}
-            {completedMonths.length > 0 && (
-                <Card
-                    sx={{
-                        borderRadius: 3,
-                        border: '1px solid',
-                        borderColor: 'divider',
-                    }}
-                >
-                    <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
-                        <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.08em', fontSize: '0.6875rem', display: 'block', mb: 1.5 }}>
-                            HISTORIAL DE CIERRES
-                        </Typography>
+            <Card
+                sx={{
+                    borderRadius: 3,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                }}
+            >
+                <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
+                    <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.08em', fontSize: '0.6875rem', display: 'block', mb: 1.5 }}>
+                        PROGRESION HISTORICA DE FACTURACION
+                    </Typography>
+                    {loadingSnapshots ? (
+                        <Box sx={{ py: 3, display: 'flex', justifyContent: 'center' }}>
+                            <CircularProgress size={24} />
+                        </Box>
+                    ) : (
                         <TableContainer>
                             <Table size="small">
                                 <TableHead>
                                     <TableRow>
                                         <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem', color: 'text.secondary' }}>Mes</TableCell>
-                                        <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem', color: 'text.secondary' }}>Monto Pagado</TableCell>
-                                        <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem', color: 'text.secondary' }}>Fecha Cierre</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem', color: 'text.secondary' }}>Facturado</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem', color: 'text.secondary' }}>Pago Estado</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem', color: 'text.secondary' }}>Progreso Tramo</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem', color: 'text.secondary' }}>Margen Tramo</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem', color: 'text.secondary' }}>Pago Registrado</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {completedMonths.map((m, idx) => (
-                                        <TableRow key={idx}>
-                                            <TableCell sx={{ fontSize: '0.8125rem', textTransform: 'capitalize' }}>{m.month}</TableCell>
-                                            <TableCell align="right" sx={{ fontSize: '0.8125rem', fontWeight: 600 }}>{fmt(m.amount)}</TableCell>
-                                            <TableCell align="right" sx={{ fontSize: '0.8125rem', color: 'text.secondary' }}>{m.date}</TableCell>
+                                    {historicalRows.map((row) => (
+                                        <TableRow
+                                            key={row.key}
+                                            hover
+                                            selected={row.key === selectedMonthKey}
+                                            onClick={() => setSelectedMonthKey(row.key)}
+                                            sx={{ cursor: 'pointer' }}
+                                        >
+                                            <TableCell sx={{ fontSize: '0.8125rem', textTransform: 'capitalize' }}>{row.month}</TableCell>
+                                            <TableCell align="right" sx={{ fontSize: '0.8125rem', fontWeight: 600 }}>{fmt(row.gross)}</TableCell>
+                                            <TableCell align="right" sx={{ fontSize: '0.8125rem' }}>{fmt(row.paymentEstimate)}</TableCell>
+                                            <TableCell align="right" sx={{ fontSize: '0.8125rem' }}>{row.progress.toFixed(0)}%</TableCell>
+                                            <TableCell align="right" sx={{ fontSize: '0.8125rem' }}>
+                                                {row.remaining > 0 ? fmt(row.remaining) : 'Tramo maximo'}
+                                            </TableCell>
+                                            <TableCell align="right" sx={{ fontSize: '0.8125rem', color: 'text.secondary' }}>
+                                                {row.paidRecord ? `${fmt(row.paidRecord.amount)} (${row.paidRecord.date})` : '-'}
+                                            </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
                             </Table>
                         </TableContainer>
-                    </CardContent>
-                </Card>
-            )}
+                    )}
+                </CardContent>
+            </Card>
         </Box>
     );
 };

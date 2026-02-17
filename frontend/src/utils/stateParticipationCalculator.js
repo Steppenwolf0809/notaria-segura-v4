@@ -1,10 +1,3 @@
-/**
- * Motor de Cálculo — Participación al Estado
- * Resolución 005-2023 del Consejo de la Judicatura
- *
- * Usa Decimal.js para precisión financiera (evita errores de punto flotante).
- * NUNCA usar aritmética nativa de JS para montos legales.
- */
 import Decimal from 'decimal.js';
 import {
     SBU_CURRENT,
@@ -13,26 +6,15 @@ import {
     PENALTY_RATE,
 } from '../config/state_participation_config';
 
-// Configurar Decimal.js para máxima precisión financiera
 Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP });
 
 /**
- * Calcula la participación al Estado para un ingreso bruto mensual.
- *
- * @param {number|string} monthlyGrossIncome — Ingreso Bruto sin IVA del mes
- * @returns {{
- *   bracketLevel: number,
- *   fixedBaseAmount: string,
- *   variableBaseAmount: string,
- *   totalToPay: string,
- *   bracketInfo: { lowerLimit: number, upperLimit: number, nextBracketAt: number|null, variableRate: number }
- * }}
+ * Calcula la participacion al Estado para un ingreso bruto mensual.
  */
 export function calculateStateParticipation(monthlyGrossIncome) {
     const income = new Decimal(monthlyGrossIncome || 0);
 
-    // Determinar el tramo que aplica
-    let matchedBracket = TAX_BRACKETS[0]; // default: schema 0
+    let matchedBracket = TAX_BRACKETS[0];
     for (let i = TAX_BRACKETS.length - 1; i >= 0; i--) {
         if (income.gte(TAX_BRACKETS[i].lowerLimit)) {
             matchedBracket = TAX_BRACKETS[i];
@@ -42,21 +24,16 @@ export function calculateStateParticipation(monthlyGrossIncome) {
 
     const { schema, lowerLimit, upperLimit, fixedSBU, variableRate } = matchedBracket;
 
-    // Base Fija = fixedSBU × SBU_CURRENT
     const fixedBaseAmount = new Decimal(fixedSBU).times(SBU_CURRENT);
 
-    // Excedente Variable = (income - lowerLimit) × variableRate
-    // Para schema 0 el variableRate es 0%, así que excedente = 0
     let variableBaseAmount = new Decimal(0);
     if (schema > 0) {
         const excess = income.minus(new Decimal(lowerLimit));
         variableBaseAmount = excess.times(new Decimal(variableRate));
     }
 
-    // Total a Pagar
     const totalToPay = fixedBaseAmount.plus(variableBaseAmount);
 
-    // Info del siguiente tramo para la barra de progreso
     const nextBracketIndex = TAX_BRACKETS.findIndex((b) => b.schema === schema + 1);
     const nextBracketAt = nextBracketIndex >= 0 ? TAX_BRACKETS[nextBracketIndex].lowerLimit : null;
 
@@ -76,10 +53,7 @@ export function calculateStateParticipation(monthlyGrossIncome) {
 }
 
 /**
- * Determina el estado de alerta según el día del mes actual.
- *
- * @param {number} [dayOfMonth] — Día del mes (1-31). Si no se pasa, usa Date actual.
- * @returns {{ status: string, message: string, color: string, bgColor: string, isOverdue: boolean, isFlashing: boolean }}
+ * Estado de alerta por dia del mes actual (1-31).
  */
 export function getAlertState(dayOfMonth) {
     const day = dayOfMonth ?? new Date().getDate();
@@ -87,7 +61,7 @@ export function getAlertState(dayOfMonth) {
     if (day >= ALERT_STATES.OVERDUE.minDay) {
         return {
             status: 'overdue',
-            message: 'EN MORA — Se aplica recargo del 3%. Interés acumulado en curso.',
+            message: 'EN MORA - Se aplica recargo del 3%. Interes acumulado en curso.',
             color: ALERT_STATES.OVERDUE.color,
             bgColor: 'rgba(153, 27, 27, 0.08)',
             isOverdue: true,
@@ -98,7 +72,7 @@ export function getAlertState(dayOfMonth) {
     if (day >= ALERT_STATES.DEADLINE.minDay && day <= ALERT_STATES.DEADLINE.maxDay) {
         return {
             status: 'deadline',
-            message: 'ÚLTIMO DÍA: Cierre obligatorio en Sistema Notarial.',
+            message: 'ULTIMO DIA: Cierre obligatorio en Sistema Notarial.',
             color: ALERT_STATES.DEADLINE.color,
             bgColor: 'rgba(220, 38, 38, 0.08)',
             isOverdue: false,
@@ -117,10 +91,9 @@ export function getAlertState(dayOfMonth) {
         };
     }
 
-    // Normal (Day 1-7)
     return {
         status: 'normal',
-        message: 'Cálculo en proceso. Prepare cierre.',
+        message: 'Calculo en proceso. Prepare cierre.',
         color: ALERT_STATES.NORMAL.color,
         bgColor: 'rgba(2, 132, 199, 0.06)',
         isOverdue: false,
@@ -129,10 +102,7 @@ export function getAlertState(dayOfMonth) {
 }
 
 /**
- * Aplica la multa del 3% por mora.
- *
- * @param {number|string} totalToPay — Monto original a pagar
- * @returns {{ originalAmount: string, penaltyAmount: string, totalWithPenalty: string }}
+ * Aplica multa del 3% por mora.
  */
 export function applyPenalty(totalToPay) {
     const original = new Decimal(totalToPay || 0);
@@ -143,5 +113,156 @@ export function applyPenalty(totalToPay) {
         originalAmount: original.toFixed(2),
         penaltyAmount: penalty.toFixed(2),
         totalWithPenalty: total.toFixed(2),
+    };
+}
+
+/**
+ * Progreso hacia el siguiente tramo, dado un ingreso bruto mensual.
+ */
+export function calculateBracketProgress(monthlyGrossIncome, bracketInfo) {
+    const income = Number(monthlyGrossIncome) || 0;
+
+    if (!bracketInfo?.nextBracketAt) {
+        return {
+            percent: 100,
+            remaining: 0,
+            isTopBracket: true,
+        };
+    }
+
+    const rangeStart = Number(bracketInfo.lowerLimit) || 0;
+    const rangeEnd = Number(bracketInfo.nextBracketAt);
+
+    const rawProgress = ((income - rangeStart) / (rangeEnd - rangeStart)) * 100;
+    const percent = Math.max(0, Math.min(rawProgress, 100));
+    const remaining = Math.max(0, rangeEnd - income);
+
+    return {
+        percent,
+        remaining,
+        isTopBracket: false,
+    };
+}
+
+function getProjectionAlert(progressPercent) {
+    if (progressPercent >= 95) {
+        return {
+            level: 'critical',
+            label: 'Muy cerca del siguiente tramo',
+            color: '#be123c',
+        };
+    }
+
+    if (progressPercent >= 80) {
+        return {
+            level: 'warning',
+            label: 'Zona de atencion',
+            color: '#d97706',
+        };
+    }
+
+    return {
+        level: 'normal',
+        label: 'Margen saludable',
+        color: '#0284c7',
+    };
+}
+
+function formatMonthLabel(date) {
+    return date.toLocaleDateString('es-EC', {
+        month: 'long',
+        year: 'numeric',
+    });
+}
+
+/**
+ * Construye una proyeccion/lectura de participacion para un mes.
+ * `projectToMonthEnd` debe usarse SOLO para mes actual.
+ */
+export function buildParticipationProjection(
+    monthlyGrossIncome,
+    referenceDate = new Date(),
+    options = {}
+) {
+    const { projectToMonthEnd = false } = options;
+
+    const currentDate = new Date(referenceDate);
+    const today = new Date();
+    const isCurrentMonth =
+        currentDate.getFullYear() === today.getFullYear() &&
+        currentDate.getMonth() === today.getMonth();
+    const shouldProject = projectToMonthEnd && isCurrentMonth;
+
+    const daysInMonth = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth() + 1,
+        0
+    ).getDate();
+    const daysElapsed = Math.max(1, Math.min(currentDate.getDate(), daysInMonth));
+
+    const grossToDate = new Decimal(monthlyGrossIncome || 0);
+    const projectedGross = shouldProject
+        ? grossToDate.div(daysElapsed).times(daysInMonth)
+        : grossToDate;
+
+    const calculation = calculateStateParticipation(projectedGross.toNumber());
+    const bracketProgress = calculateBracketProgress(
+        projectedGross.toNumber(),
+        calculation.bracketInfo
+    );
+
+    const nextPaymentMonthDate = new Date(
+        currentDate.getFullYear(),
+        currentDate.getMonth() + 1,
+        1
+    );
+
+    return {
+        billingMonthLabel: formatMonthLabel(currentDate),
+        paymentMonthLabel: formatMonthLabel(nextPaymentMonthDate),
+        grossToDate: grossToDate.toFixed(2),
+        projectedGross: projectedGross.toFixed(2),
+        averageDailyGross: grossToDate.div(daysElapsed).toFixed(2),
+        daysElapsed,
+        daysInMonth,
+        isProjectionApplied: shouldProject,
+        estimatedPayment: calculation.totalToPay,
+        bracketLevel: calculation.bracketLevel,
+        bracketInfo: calculation.bracketInfo,
+        bracketProgress,
+        nextLevelAlert: getProjectionAlert(bracketProgress.percent),
+    };
+}
+
+export function toLocalISODate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+export function getMonthRange(targetDate = new Date(), options = {}) {
+    const { currentMonthUntilToday = false } = options;
+    const baseDate = new Date(targetDate);
+
+    const from = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
+    const monthEnd = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, 0);
+
+    const today = new Date();
+    const isCurrentMonth =
+        baseDate.getFullYear() === today.getFullYear() &&
+        baseDate.getMonth() === today.getMonth();
+
+    const to =
+        currentMonthUntilToday && isCurrentMonth
+            ? new Date(today.getFullYear(), today.getMonth(), today.getDate())
+            : monthEnd;
+
+    return {
+        from,
+        to,
+        fromISO: toLocalISODate(from),
+        toISO: toLocalISODate(to),
+        isCurrentMonth,
     };
 }

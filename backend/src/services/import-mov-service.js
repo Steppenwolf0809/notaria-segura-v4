@@ -131,7 +131,7 @@ export async function importMovFile(fileBuffer, fileName, userId) {
         // 2. Procesar cada factura
         for (const invoiceData of invoices) {
             try {
-                const result = await processMovInvoice(invoiceData, fileName);
+                const result = await processMovInvoice(invoiceData, fileName, userId);
                 
                 if (result.created) stats.facturasNuevas++;
                 if (result.updated) stats.facturasActualizadas++;
@@ -242,7 +242,7 @@ export async function importMovFile(fileBuffer, fileName, userId) {
  * @param {string} sourceFile - Nombre del archivo origen
  * @returns {Promise<Object>} - {created, updated, cashPaymentApplied, isCredit}
  */
-async function processMovInvoice(invoiceData, sourceFile) {
+async function processMovInvoice(invoiceData, sourceFile, userId) {
     const result = {
         created: false,
         updated: false,
@@ -453,6 +453,28 @@ async function processMovInvoice(invoiceData, sourceFile) {
 
             result.updated = true;
             console.log(`[import-mov] Cash payment applied to existing invoice: ${invoiceNumber}`);
+
+            // Registrar evento de pago en el timeline del documento
+            const payDocId = documentId || invoice.documentId;
+            if (payDocId && userId) {
+                await prisma.documentEvent.create({
+                    data: {
+                        documentId: payDocId,
+                        userId: userId,
+                        eventType: 'PAYMENT_REGISTERED',
+                        description: `Pago en efectivo de $${parseFloat(invoiceData.totalAmount).toFixed(2)} registrado desde Sistema Koinor`,
+                        details: JSON.stringify({
+                            amount: parseFloat(invoiceData.totalAmount),
+                            receiptNumber: `MOV-${invoiceNumberRaw}`,
+                            invoiceNumber,
+                            paymentType: 'CASH',
+                            concept: 'Pago en efectivo al momento de facturación',
+                            source: 'KOINOR_MOV',
+                            sourceFile
+                        })
+                    }
+                });
+            }
         } else if (!result.updated) {
             console.log(`[import-mov] Invoice already exists, no changes needed: ${invoiceNumber}`);
         }
@@ -514,6 +536,27 @@ async function processMovInvoice(invoiceData, sourceFile) {
                 }
             });
             console.log(`[import-mov] Cash payment created for: ${invoiceNumber}`);
+
+            // Registrar evento de pago en el timeline del documento
+            if (documentId && userId) {
+                await prisma.documentEvent.create({
+                    data: {
+                        documentId,
+                        userId: userId,
+                        eventType: 'PAYMENT_REGISTERED',
+                        description: `Pago en efectivo de $${parseFloat(invoiceData.totalAmount).toFixed(2)} registrado desde Sistema Koinor`,
+                        details: JSON.stringify({
+                            amount: parseFloat(invoiceData.totalAmount),
+                            receiptNumber: `MOV-${invoiceNumberRaw}`,
+                            invoiceNumber,
+                            paymentType: 'CASH',
+                            concept: 'Pago en efectivo al momento de facturación',
+                            source: 'KOINOR_MOV',
+                            sourceFile
+                        })
+                    }
+                });
+            }
         }
     }
 

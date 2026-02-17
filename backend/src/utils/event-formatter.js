@@ -106,6 +106,16 @@ function formatEventDescription(event) {
         return `Proceso de verificación iniciado por ${userName}`;
       }
 
+    case 'PAYMENT_REGISTERED': {
+      const amount = details.amount ? formatCurrencyUSD(details.amount) : '';
+      const receiptNum = details.receiptNumber || '';
+      const invoiceNum = details.invoiceNumber || '';
+      if (amount && invoiceNum) {
+        return `Pago de ${amount} registrado para factura ${invoiceNum} (Recibo: ${receiptNum || 'N/A'})`;
+      }
+      return `Pago registrado desde Sistema Koinor${amount ? ` por ${amount}` : ''}`;
+    }
+
     case 'WHATSAPP_SENT':
       const messageType = details.messageType;
       const phoneNumber = details.phoneNumber || 'cliente';
@@ -252,6 +262,13 @@ function getEventContextInfo(event) {
       });
       break;
 
+    case 'PAYMENT_REGISTERED':
+      if (details.amount) contextInfo.push(`Monto: ${formatCurrencyUSD(details.amount)}`);
+      if (details.receiptNumber) contextInfo.push(`Recibo: ${details.receiptNumber}`);
+      if (details.invoiceNumber) contextInfo.push(`Factura: ${details.invoiceNumber}`);
+      if (details.paymentType) contextInfo.push(`Tipo: ${details.paymentType === 'TRANSFER' ? 'Transferencia' : details.paymentType}`);
+      break;
+
     case 'WHATSAPP_SENT':
       if (details.channel) {
         contextInfo.push(`Canal: ${details.channel}`);
@@ -279,7 +296,7 @@ function translateRelationship(relationship) {
 }
 
 /**
- * Formatea valores monetarios
+ * Formatea valores monetarios (COP legacy)
  */
 function formatCurrency(amount) {
   if (!amount) return '';
@@ -287,6 +304,17 @@ function formatCurrency(amount) {
     style: 'currency',
     currency: 'COP',
     minimumFractionDigits: 0
+  }).format(amount);
+}
+
+/**
+ * Formatea valores monetarios en USD
+ */
+function formatCurrencyUSD(amount) {
+  if (!amount) return '';
+  return new Intl.NumberFormat('es-EC', {
+    style: 'currency',
+    currency: 'USD'
   }).format(amount);
 }
 
@@ -365,7 +393,8 @@ function getEventTitle(eventType, details = {}) {
     'GROUP_CREATED': 'Grupo Creado',
     'GROUP_DELIVERED': 'Grupo Entregado',
     'VERIFICATION_GENERATED': 'Código Generado',
-    'WHATSAPP_SENT': 'Notificación Enviada'
+    'WHATSAPP_SENT': 'Notificación Enviada',
+    'PAYMENT_REGISTERED': 'Pago Registrado'
   };
   return titleMap[eventType] || eventType;
 }
@@ -388,7 +417,8 @@ function getEventIcon(eventType, details = {}) {
     'GROUP_CREATED': 'group',
     'GROUP_DELIVERED': 'delivery',
     'VERIFICATION_GENERATED': 'check_circle',
-    'WHATSAPP_SENT': 'notification'
+    'WHATSAPP_SENT': 'notification',
+    'PAYMENT_REGISTERED': 'payment'
   };
   return iconMap[eventType] || 'default';
 }
@@ -418,6 +448,8 @@ function getEventColor(eventType, details = {}) {
       return 'success';
     case 'WHATSAPP_SENT':
       return details.whatsappSent || details.status === 'SENT' ? 'info' : 'error';
+    case 'PAYMENT_REGISTERED':
+      return 'success';
     default:
       return 'grey';
   }

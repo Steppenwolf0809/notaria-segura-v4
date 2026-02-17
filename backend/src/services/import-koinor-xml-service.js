@@ -161,7 +161,7 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId) {
             
             // Procesar batch en paralelo (con límite de concurrencia)
             const batchResults = await Promise.allSettled(
-                batch.map(payment => processPayment(payment, fileName, stats))
+                batch.map(payment => processPayment(payment, fileName, stats, userId))
             );
             
             // Agregar resultados
@@ -309,7 +309,7 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId) {
  * @param {Object} stats - Objeto de estadísticas
  * @returns {Promise<Object>} - {created, skipped, invoicesUpdated, documentsUpdated}
  */
-async function processPayment(payment, sourceFile, stats) {
+async function processPayment(payment, sourceFile, stats, userId) {
     const result = {
         created: 0,
         skipped: 0,
@@ -321,7 +321,7 @@ async function processPayment(payment, sourceFile, stats) {
     // Procesar cada factura en el pago (multi-factura)
     for (const detail of payment.details) {
         try {
-            const singleResult = await processSinglePayment(payment, detail, sourceFile);
+            const singleResult = await processSinglePayment(payment, detail, sourceFile, userId);
             
             if (singleResult.created) {
                 result.created++;
@@ -357,7 +357,7 @@ async function processPayment(payment, sourceFile, stats) {
  * @param {string} sourceFile - Nombre del archivo
  * @returns {Promise<Object>} - {created, skipped, documentUpdated}
  */
-async function processSinglePayment(payment, detail, sourceFile) {
+async function processSinglePayment(payment, detail, sourceFile, userId) {
     // 1. Buscar factura por invoiceNumberRaw O por invoiceNumber normalizado
     // Esto evita duplicados cuando el formato varía entre importaciones
     const normalizedNumber = detail.invoiceNumberRaw.replace(/^0+/, '');
@@ -517,6 +517,30 @@ async function processSinglePayment(payment, detail, sourceFile) {
                 });
                 console.log(`[import-koinor-xml] ✅ Updated existing document ${document.protocolNumber} with numeroFactura: ${detail.invoiceNumberRaw}`);
             }
+        }
+
+        // ⭐ Registrar evento de pago en el timeline del documento
+        const finalDocId = documentId || invoice.documentId;
+        if (finalDocId && userId) {
+            await tx.documentEvent.create({
+                data: {
+                    documentId: finalDocId,
+                    userId: userId,
+                    eventType: 'PAYMENT_REGISTERED',
+                    description: `Pago de $${parseFloat(detail.amount).toFixed(2)} registrado desde Sistema Koinor (Recibo: ${payment.receiptNumber || 'N/A'})`,
+                    details: JSON.stringify({
+                        amount: parseFloat(detail.amount),
+                        receiptNumber: payment.receiptNumber,
+                        invoiceNumber: detail.invoiceNumberRaw,
+                        paymentDate: payment.paymentDate,
+                        paymentType: 'TRANSFER',
+                        concept: payment.concept || '',
+                        source: 'KOINOR_XML',
+                        sourceFile
+                    })
+                }
+            });
+            console.log(`[import-koinor-xml] 📋 Created PAYMENT_REGISTERED event for document ${finalDocId}`);
         }
     });
 
