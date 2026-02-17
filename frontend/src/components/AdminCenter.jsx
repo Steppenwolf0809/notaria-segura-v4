@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Card,
@@ -186,6 +186,9 @@ const AdminDashboard = () => {
   const [billingAnchorEl, setBillingAnchorEl] = useState(null);
   const [performanceAnchorEl, setPerformanceAnchorEl] = useState(null);
 
+  // Ref para scroll al hacer clic en rendimiento de equipo
+  const docsCardRef = useRef(null);
+
   // Modal de mensaje
   const [mensajeModalOpen, setMensajeModalOpen] = useState(false);
   const [documentoParaMensaje, setDocumentoParaMensaje] = useState(null);
@@ -314,6 +317,16 @@ const AdminDashboard = () => {
   const handlePerformanceIntervalChange = (interval) => {
     setPerformanceTimeRange(interval);
     setPerformanceAnchorEl(null);
+  };
+
+  // Handler: clic en fila de rendimiento → filtrar documentos críticos de ese matrizador
+  const handleTeamRowClick = (member) => {
+    setSelectedMatrixer(member.id);
+    setStatusFilter('');  // '' = ALERTAS (Default) → muestra documentos críticos/retrasados
+    // Scroll suave a la tabla de documentos
+    setTimeout(() => {
+      docsCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
   };
 
   // Solo mostrar spinner completo si es la carga inicial y no tenemos datos
@@ -508,7 +521,7 @@ const AdminDashboard = () => {
       </Grid>
 
       {/* Tabla de Documentos / Alertas */}
-      <Card variant="outlined" sx={{ mb: 3 }}>
+      <Card variant="outlined" sx={{ mb: 3 }} ref={docsCardRef}>
         <CardContent>
           <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
             <DescriptionIcon color={statusFilter ? "primary" : "error"} sx={{ mr: 1 }} />
@@ -724,14 +737,16 @@ const AdminDashboard = () => {
                       arrow
                     >
                       <TableRow
+                        onClick={() => handleTeamRowClick(member)}
                         sx={{
+                          cursor: 'pointer',
                           ...(isSaturated && {
                             bgcolor: 'rgba(220, 38, 38, 0.04)',
                             borderLeft: '3px solid #dc2626',
                             '& td': { color: '#991b1b' },
                           }),
                           transition: 'background-color 0.2s ease',
-                          '&:hover': { bgcolor: isSaturated ? 'rgba(220, 38, 38, 0.08)' : 'rgba(0,0,0,0.02)' },
+                          '&:hover': { bgcolor: isSaturated ? 'rgba(220, 38, 38, 0.08)' : 'rgba(0,0,0,0.04)' },
                         }}
                       >
                         <TableCell sx={{ fontWeight: 'bold' }}>
