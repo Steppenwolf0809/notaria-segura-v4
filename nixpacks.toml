@@ -4,13 +4,12 @@ nixPkgs = ["nodejs_22", "npm-9_x", "openssl"]
 
 [phases.install]
 cmds = [
-    "npm install"
+    "npm install --include=dev"
 ]
 
 [phases.build]
 cmds = [
     "chmod +x node_modules/.bin/* || true",
-    "chmod +x frontend/node_modules/.bin/* || true",
     "npm run build:frontend",
     "cd backend && npx prisma generate"
 ]
