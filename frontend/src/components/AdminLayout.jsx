@@ -139,7 +139,7 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
       label: 'Sistema',
       items: [
         { view: 'users', label: 'Usuarios', icon: <PersonIcon /> },
-        { view: 'settings', label: 'Configuración', icon: <SettingsIcon /> },
+        { view: 'settings', label: 'ConfiguraciÃ³n', icon: <SettingsIcon /> },
         { view: 'whatsapp-templates', label: 'Templates', icon: <StyleIcon /> },
       ],
     },
