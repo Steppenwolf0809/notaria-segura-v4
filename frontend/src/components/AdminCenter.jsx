@@ -47,7 +47,8 @@ import {
   Chat as ChatIcon,
   Pending as PendingIcon,
   PlayArrow as InProgressIcon,
-  LocalShipping as DeliveredIcon
+  LocalShipping as DeliveredIcon,
+  PriorityHigh as PriorityIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import AdminLayout from './AdminLayout';
