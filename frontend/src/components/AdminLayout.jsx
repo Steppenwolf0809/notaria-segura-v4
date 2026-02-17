@@ -106,7 +106,6 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
       label: 'Principal',
       items: [
         { view: 'dashboard', label: 'Dashboard', icon: <DashboardIcon /> },
-        { view: 'users', label: 'Usuarios', icon: <PersonIcon /> },
         { view: 'documents', label: 'Documentos', icon: <DocumentIcon /> },
         { view: 'seguimiento-mensajes', label: 'Mensajes', icon: <MessageIcon /> },
       ],
@@ -139,7 +138,8 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
     {
       label: 'Sistema',
       items: [
-        { view: 'settings', label: 'ConfiguraciÃ³n', icon: <SettingsIcon /> },
+        { view: 'users', label: 'Usuarios', icon: <PersonIcon /> },
+        { view: 'settings', label: 'Configuración', icon: <SettingsIcon /> },
         { view: 'whatsapp-templates', label: 'Templates', icon: <StyleIcon /> },
       ],
     },

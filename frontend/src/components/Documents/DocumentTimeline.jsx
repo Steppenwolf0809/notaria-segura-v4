@@ -26,6 +26,7 @@ import {
   CheckCircle as CheckIcon,
   Notifications as NotificationIcon,
   LocalShipping as DeliveryIcon,
+  AttachMoney as PaymentIcon,
   Error as ErrorIcon,
   Warning as WarningIcon,
   Circle as DefaultIcon,
@@ -105,6 +106,7 @@ const DocumentTimeline = ({
       check_circle: CheckIcon,
       notification: NotificationIcon,
       delivery: DeliveryIcon,
+      payment: PaymentIcon,
       error: ErrorIcon,
       warning: WarningIcon,
       edit: EditIcon,
@@ -523,7 +525,8 @@ const DocumentTimeline = ({
                                   'RECEPCION': '#1976d2',
                                   'CAJA': '#388e3c',
                                   'ARCHIVO': '#f57c00',
-                                  'MATRIZADOR': '#7b1fa2'
+                                  'MATRIZADOR': '#7b1fa2',
+                                  'SISTEMA': '#00838f'
                                 };
                                 const role = event.user.match(/\(([^)]+)\)/)?.[1];
                                 const name = event.user.replace(/\s*\(.*?\)\s*/, '');

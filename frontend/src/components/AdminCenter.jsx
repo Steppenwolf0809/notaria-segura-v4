@@ -8,6 +8,7 @@ import {
   Alert,
   Chip,
   CircularProgress,
+  LinearProgress,
   Paper,
   FormControl,
   InputLabel,
@@ -80,10 +81,15 @@ import ListaPagos from './billing/ListaPagos';
 import Reportes from './billing/Reportes';
 import FinancialHealthCard from './admin/FinancialHealthCard';
 import ParticipacionEstado from './admin/ParticipacionEstado';
-import { getAlertState } from '../utils/stateParticipationCalculator';
+import billingService from '../services/billing-service';
+import {
+  buildParticipationProjection,
+  getAlertState,
+  getMonthRange
+} from '../utils/stateParticipationCalculator';
 
 /**
- * Centro de administración - Panel principal para ADMIN
+ * Centro de administraciÃ³n - Panel principal para ADMIN
  */
 const AdminCenter = () => {
   const [currentView, setCurrentView] = useState('dashboard');
@@ -144,19 +150,23 @@ const AdminCenter = () => {
 };
 
 /**
- * Dashboard de Supervisión
+ * Dashboard de SupervisiÃ³n
  */
-// ── WIDGET PARTICIPACIÓN (DASHBOARD) ──
-const ParticipationWidget = ({ onViewChange }) => {
+// â”€â”€ WIDGET PARTICIPACIÃ“N (DASHBOARD) â”€â”€
+const ParticipationWidget = ({ onViewChange, projection, loading }) => {
   const alertState = getAlertState();
   const day = new Date().getDate();
-  // Progress relative to "deadline" (approx day 10) or month end?
-  // Let's show a timeline: 1-----10(Deadline)-----30
-  // If day <= 10, value is relative to 10. If > 10, it's overdue.
-
-  const maxDays = 30; // Scale
-  const deadline = 10;
+  const maxDays = 30;
   const progress = (day / maxDays) * 100;
+  const bracketProgress = projection?.bracketProgress?.percent || 0;
+  const levelColor = projection?.nextLevelAlert?.color || '#0284c7';
+
+  const formatMoney = (value) =>
+    '$' + Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const bracketStatusLabel = projection?.bracketProgress?.isTopBracket
+    ? 'Tramo maximo alcanzado'
+    : `Faltan ${formatMoney(projection?.bracketProgress?.remaining)} para el siguiente tramo`;
 
   return (
     <Paper
@@ -186,10 +196,10 @@ const ParticipationWidget = ({ onViewChange }) => {
           </Box>
           <Box>
             <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-              Participación Estado
+              Participacion Estado
             </Typography>
             <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
-              Día {day} • {alertState.status === 'normal' ? 'A tiempo' : alertState.status === 'deadline' ? 'Vence hoy' : 'Con recargo'}
+              Dia {day} • {alertState.status === 'normal' ? 'A tiempo' : alertState.status === 'deadline' ? 'Vence hoy' : 'Con recargo'}
             </Typography>
           </Box>
         </Box>
@@ -202,11 +212,30 @@ const ParticipationWidget = ({ onViewChange }) => {
         </IconButton>
       </Box>
 
-      {/* Timeline Bar */}
+      <Box sx={{ mb: 1.5 }}>
+        {loading && !projection ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 0.5 }}>
+            <CircularProgress size={18} />
+          </Box>
+        ) : (
+          <>
+            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+              Proyeccion de pago en {projection?.paymentMonthLabel || 'mes siguiente'}
+            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.15 }}>
+              {formatMoney(projection?.estimatedPayment)}
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+              Facturado al dia {projection?.daysElapsed || day}: {formatMoney(projection?.grossToDate)}
+            </Typography>
+          </>
+        )}
+      </Box>
+
       <Box sx={{ position: 'relative', mt: 1, mb: 1 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>Día 1</Typography>
-          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem', fontWeight: 700 }}>Día 10 (Límite)</Typography>
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>Dia 1</Typography>
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem', fontWeight: 700 }}>Dia 10 (Limite)</Typography>
           <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>Fin Mes</Typography>
         </Box>
         <Box sx={{
@@ -216,17 +245,16 @@ const ParticipationWidget = ({ onViewChange }) => {
           position: 'relative',
           overflow: 'hidden'
         }}>
-          {/* Deadline Marker */}
           <Box sx={{
             position: 'absolute',
             left: `${(10 / 30) * 100}%`,
-            top: 0, bottom: 0,
+            top: 0,
+            bottom: 0,
             width: 2,
             bgcolor: 'text.disabled',
             zIndex: 1
           }} />
 
-          {/* Progress */}
           <Box sx={{
             height: '100%',
             width: `${Math.min(progress, 100)}%`,
@@ -234,6 +262,48 @@ const ParticipationWidget = ({ onViewChange }) => {
             borderRadius: 3,
             transition: 'width 1s ease'
           }} />
+        </Box>
+      </Box>
+
+      <Box sx={{ mt: 1.5 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+            Progreso al siguiente tramo
+          </Typography>
+          <Typography variant="caption" sx={{ color: levelColor, fontWeight: 700 }}>
+            {bracketProgress.toFixed(0)}%
+          </Typography>
+        </Box>
+        <LinearProgress
+          variant="determinate"
+          value={Math.max(0, Math.min(bracketProgress, 100))}
+          sx={{
+            height: 7,
+            borderRadius: 4,
+            bgcolor: 'rgba(148, 163, 184, 0.15)',
+            '& .MuiLinearProgress-bar': {
+              borderRadius: 4,
+              bgcolor: levelColor
+            }
+          }}
+        />
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 0.75, gap: 1 }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            {bracketStatusLabel}
+          </Typography>
+          {projection?.nextLevelAlert?.label && (
+            <Chip
+              size="small"
+              label={projection.nextLevelAlert.label}
+              sx={{
+                height: 20,
+                fontSize: '0.65rem',
+                bgcolor: `${levelColor}20`,
+                color: levelColor,
+                fontWeight: 700
+              }}
+            />
+          )}
         </Box>
       </Box>
 
@@ -246,7 +316,6 @@ const ParticipationWidget = ({ onViewChange }) => {
     </Paper>
   );
 };
-
 const AdminDashboard = ({ onViewChange }) => {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
@@ -257,21 +326,23 @@ const AdminDashboard = ({ onViewChange }) => {
   const [thresholdDays, setThresholdDays] = useState(15);
   const [selectedMatrixer, setSelectedMatrixer] = useState('');
   const [statusFilter, setStatusFilter] = useState('EN_PROCESO'); // Filtro de estado por defecto EN_PROCESO
-  const [billedTimeRange, setBilledTimeRange] = useState('current_month'); // Filtro Facturación
+  const [billedTimeRange, setBilledTimeRange] = useState('current_month'); // Filtro FacturaciÃ³n
   // const [startDate, setStartDate] = useState(''); // Filtro fecha inicio (Removido por solicitud)
   // const [endDate, setEndDate] = useState(''); // Filtro fecha fin
   const [performanceTimeRange, setPerformanceTimeRange] = useState('current_month');
 
   const [matrizadores, setMatrizadores] = useState([]);
+  const [currentMonthBilled, setCurrentMonthBilled] = useState(0);
+  const [participationLoading, setParticipationLoading] = useState(true);
 
   // Mapeo de tipos de acto a badges - Paleta refinada y elegante
   const actoBadges = {
     'PROTOCOLO': { label: 'P', color: '#1e3a5f', bgColor: 'rgba(30, 58, 95, 0.1)' },      // Azul marino
     'CERTIFICACION': { label: 'C', color: '#2f5233', bgColor: 'rgba(47, 82, 51, 0.1)' },  // Verde bosque
-    'ARRENDAMIENTO': { label: 'A', color: '#5b4a6c', bgColor: 'rgba(91, 74, 108, 0.1)' }, // Púrpura grisáceo
-    'DECLARACION': { label: 'D', color: '#8b5a2b', bgColor: 'rgba(139, 90, 43, 0.1)' },   // Marrón arcilla
+    'ARRENDAMIENTO': { label: 'A', color: '#5b4a6c', bgColor: 'rgba(91, 74, 108, 0.1)' }, // PÃºrpura grisÃ¡ceo
+    'DECLARACION': { label: 'D', color: '#8b5a2b', bgColor: 'rgba(139, 90, 43, 0.1)' },   // MarrÃ³n arcilla
     'RECONOCIMIENTO': { label: 'R', color: '#5a6572', bgColor: 'rgba(90, 101, 114, 0.1)' }, // Gris pizarra
-    'DILIGENCIA': { label: 'Di', color: '#2c5f6f', bgColor: 'rgba(44, 95, 111, 0.1)' },    // Azul petróleo
+    'DILIGENCIA': { label: 'Di', color: '#2c5f6f', bgColor: 'rgba(44, 95, 111, 0.1)' },    // Azul petrÃ³leo
     'OTROS': { label: 'O', color: '#6b7280', bgColor: 'rgba(107, 114, 128, 0.1)' }        // Gris neutro
   };
 
@@ -285,13 +356,13 @@ const AdminDashboard = ({ onViewChange }) => {
     }
   };
 
-  // Paginación
+  // PaginaciÃ³n
   const [page, setPage] = useState(1);
   const [docsList, setDocsList] = useState([]); // Lista acumulativa
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  // Menu para filtro de facturación
+  // Menu para filtro de facturaciÃ³n
   const [billingAnchorEl, setBillingAnchorEl] = useState(null);
   const [performanceAnchorEl, setPerformanceAnchorEl] = useState(null);
 
@@ -313,10 +384,10 @@ const AdminDashboard = ({ onViewChange }) => {
       // En getSupervisionStats el backend suele devolver matrixer como nombre string.
       // El modal espera assignedTo: { id, firstName, lastName }
       // Revisando el servicio, parece que row.matrixer es un string.
-      // OJO: Si row.matrixer es solo string, el modal fallará al intentar leer assignedTo.id
+      // OJO: Si row.matrixer es solo string, el modal fallarÃ¡ al intentar leer assignedTo.id
       // En DocumentOversight funciona porque recibe el objeto completo de /admin/documents/oversight
-      // Aquí estamos recibiendo DTOs de estadísticas simplificados.
-      // SOLUCIÓN: Usaremos assignedTo si existe en row, o reconstruiremos un objeto básico si tenemos ID.
+      // AquÃ­ estamos recibiendo DTOs de estadÃ­sticas simplificados.
+      // SOLUCIÃ“N: Usaremos assignedTo si existe en row, o reconstruiremos un objeto bÃ¡sico si tenemos ID.
       // Revisando getSupervisionStats en backend, devuelve: 
       // id, protocol, client, type, status, daysDelayed, matrixer (nombre), matrixerId (id)
       assignedTo: doc.matrixerId ? { id: doc.matrixerId, firstName: doc.matrixer, lastName: '' } : null
@@ -332,7 +403,7 @@ const AdminDashboard = ({ onViewChange }) => {
 
   // Handler para ver detalles
   const handleViewDetails = async (document) => {
-    // Abrir rápido con datos disponibles
+    // Abrir rÃ¡pido con datos disponibles
     setSelectedDocument(document);
     setDetailsModalOpen(true);
 
@@ -345,7 +416,7 @@ const AdminDashboard = ({ onViewChange }) => {
         }
       }
     } catch (e) {
-      // Silencioso: mantenemos datos básicos si falla
+      // Silencioso: mantenemos datos bÃ¡sicos si falla
       console.warn('No se pudo refrescar detalle del documento:', e?.message);
     }
   };
@@ -359,7 +430,11 @@ const AdminDashboard = ({ onViewChange }) => {
     loadMatrizadores();
   }, []);
 
-  // Recargar al cambiar filtros principales (resetea paginación)
+  useEffect(() => {
+    loadCurrentMonthParticipation();
+  }, []);
+
+  // Recargar al cambiar filtros principales (resetea paginaciÃ³n)
   useEffect(() => {
     setPage(1);
     loadStats(1, false);
@@ -371,6 +446,23 @@ const AdminDashboard = ({ onViewChange }) => {
       setMatrizadores(users);
     } catch (e) {
       console.error('Error cargando matrizadores', e);
+    }
+  };
+
+  const loadCurrentMonthParticipation = async () => {
+    try {
+      setParticipationLoading(true);
+      const { fromISO, toISO } = getMonthRange(new Date(), { currentMonthUntilToday: true });
+      const summary = await billingService.getSummary({
+        dateFrom: fromISO,
+        dateTo: toISO
+      });
+      setCurrentMonthBilled(Number(summary?.totals?.invoiced || 0));
+    } catch (e) {
+      console.error('Error cargando proyeccion de participacion', e);
+      setCurrentMonthBilled(0);
+    } finally {
+      setParticipationLoading(false);
     }
   };
 
@@ -393,7 +485,7 @@ const AdminDashboard = ({ onViewChange }) => {
 
       setStats(prev => isLoadMore ? { ...prev, ...data } : data); // Actualizar KPIs siempre
 
-      // Manejo de lista con paginación
+      // Manejo de lista con paginaciÃ³n
       const newDocs = data.criticalList || [];
       if (isLoadMore) {
         setDocsList(prev => [...prev, ...newDocs]);
@@ -404,7 +496,7 @@ const AdminDashboard = ({ onViewChange }) => {
       setHasMore(data.pagination?.hasMore || false);
       setError(null);
     } catch (err) {
-      setError('Error al cargar estadísticas de supervisión.');
+      setError('Error al cargar estadÃ­sticas de supervisiÃ³n.');
       console.error(err);
     } finally {
       setLoading(false);
@@ -428,15 +520,17 @@ const AdminDashboard = ({ onViewChange }) => {
     setPerformanceAnchorEl(null);
   };
 
-  // Handler: clic en fila de rendimiento → filtrar documentos críticos de ese matrizador
+  // Handler: clic en fila de rendimiento â†’ filtrar documentos crÃ­ticos de ese matrizador
   const handleTeamRowClick = (member) => {
     setSelectedMatrixer(member.id);
-    setStatusFilter('');  // '' = ALERTAS (Default) → muestra documentos críticos/retrasados
+    setStatusFilter('');  // '' = ALERTAS (Default) â†’ muestra documentos crÃ­ticos/retrasados
     // Scroll suave a la tabla de documentos
     setTimeout(() => {
       docsCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 100);
   };
+
+  const participationProjection = buildParticipationProjection(currentMonthBilled, new Date(), { projectToMonthEnd: true });
 
   // Solo mostrar spinner completo si es la carga inicial y no tenemos datos
   if (loading && page === 1 && !stats) {
@@ -458,8 +552,8 @@ const AdminDashboard = ({ onViewChange }) => {
     'current_week': 'Esta Semana',
     'current_month': 'Mes Actual',
     'last_month': 'Mes Anterior',
-    'year_to_date': 'Año Actual',
-    'all_time': 'Histórico'
+    'year_to_date': 'AÃ±o Actual',
+    'all_time': 'HistÃ³rico'
   };
 
   return (
@@ -468,7 +562,7 @@ const AdminDashboard = ({ onViewChange }) => {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <DashboardIcon sx={{ mr: 1, fontSize: 32, color: 'primary.main' }} />
-          <Typography variant="h5" fontWeight="bold">Supervisión</Typography>
+          <Typography variant="h5" fontWeight="bold">SupervisiÃ³n</Typography>
         </Box>
 
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
@@ -495,10 +589,10 @@ const AdminDashboard = ({ onViewChange }) => {
               label="Umbral Retraso"
               onChange={(e) => setThresholdDays(e.target.value)}
             >
-              <MenuItem value={5}>5 días</MenuItem>
-              <MenuItem value={10}>10 días</MenuItem>
-              <MenuItem value={15}>15 días</MenuItem>
-              <MenuItem value={30}>30 días</MenuItem>
+              <MenuItem value={5}>5 dÃ­as</MenuItem>
+              <MenuItem value={10}>10 dÃ­as</MenuItem>
+              <MenuItem value={15}>15 dÃ­as</MenuItem>
+              <MenuItem value={30}>30 dÃ­as</MenuItem>
             </Select>
           </FormControl>
 
@@ -541,9 +635,9 @@ const AdminDashboard = ({ onViewChange }) => {
         </Box>
       </Box>
 
-      {/* ═══ KPIs AGRUPADOS ═══ */}
+      {/* â•â•â• KPIs AGRUPADOS â•â•â• */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        {/* ── GRUPO GESTIÓN ── */}
+        {/* â”€â”€ GRUPO GESTIÃ“N â”€â”€ */}
         <Grid item xs={12} md={7}>
           <Box sx={{
             p: 2.5,
@@ -555,14 +649,14 @@ const AdminDashboard = ({ onViewChange }) => {
               variant="overline"
               sx={{ color: 'text.secondary', fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.08em', mb: 2, display: 'block' }}
             >
-              GESTIÓN OPERATIVA
+              GESTIÃ“N OPERATIVA
             </Typography>
             <Grid container spacing={2}>
               <Grid item xs={6} sm={3}>
                 <SummaryCard title="Activos" value={kpis?.activeCount || 0} icon={<DescriptionIcon />} color="primary" subtext="En curso" />
               </Grid>
               <Grid item xs={6} sm={3}>
-                <SummaryCard title={`Críticos`} value={kpis?.criticalCount || 0} icon={<WarningIcon />} color="error" subtext={`> ${thresholdDays}d`} />
+                <SummaryCard title={`CrÃ­ticos`} value={kpis?.criticalCount || 0} icon={<WarningIcon />} color="error" subtext={`> ${thresholdDays}d`} />
               </Grid>
               <Grid item xs={6} sm={3}>
                 <SummaryCard title="En Proceso" value={kpis?.inProgressCount || 0} icon={<InProgressIcon />} color="info" subtext="En curso" />
@@ -574,7 +668,7 @@ const AdminDashboard = ({ onViewChange }) => {
           </Box>
         </Grid>
 
-        {/* ── GRUPO FINANZAS ── */}
+        {/* â”€â”€ GRUPO FINANZAS â”€â”€ */}
         <Grid item xs={12} md={5}>
           <Box sx={{
             p: 2.5,
@@ -605,8 +699,8 @@ const AdminDashboard = ({ onViewChange }) => {
               >
                 <MenuItem onClick={() => handleBillingIntervalChange('current_month')}>Mes Actual</MenuItem>
                 <MenuItem onClick={() => handleBillingIntervalChange('last_month')}>Mes Anterior</MenuItem>
-                <MenuItem onClick={() => handleBillingIntervalChange('year_to_date')}>Año Actual</MenuItem>
-                <MenuItem onClick={() => handleBillingIntervalChange('all_time')}>Histórico</MenuItem>
+                <MenuItem onClick={() => handleBillingIntervalChange('year_to_date')}>AÃ±o Actual</MenuItem>
+                <MenuItem onClick={() => handleBillingIntervalChange('all_time')}>HistÃ³rico</MenuItem>
               </Menu>
             </Box>
             <Box sx={{ flex: 1 }}>
@@ -626,8 +720,12 @@ const AdminDashboard = ({ onViewChange }) => {
               />
             </Box>
             <Box sx={{ mt: 2 }}>
-              {/* WIDGET PARTICIPACIÓN */}
-              <ParticipationWidget onViewChange={onViewChange} />
+              {/* WIDGET PARTICIPACIÃ“N */}
+              <ParticipationWidget
+                onViewChange={onViewChange}
+                projection={participationProjection}
+                loading={participationLoading}
+              />
             </Box>
           </Box>
         </Grid>
@@ -650,8 +748,8 @@ const AdminDashboard = ({ onViewChange }) => {
                   <TableCell>Matrizador</TableCell>
                   <TableCell>Acto</TableCell>
                   <TableCell>Estado</TableCell>
-                  <TableCell>Antigüedad</TableCell>
-                  <TableCell>Acción</TableCell>
+                  <TableCell>AntigÃ¼edad</TableCell>
+                  <TableCell>AcciÃ³n</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -794,7 +892,7 @@ const AdminDashboard = ({ onViewChange }) => {
                 disabled={loadingMore}
                 startIcon={loadingMore ? <CircularProgress size={20} /> : null}
               >
-                {loadingMore ? 'Cargando...' : 'Cargar más documentos'}
+                {loadingMore ? 'Cargando...' : 'Cargar mÃ¡s documentos'}
               </Button>
             </Box>
           )}
@@ -823,8 +921,8 @@ const AdminDashboard = ({ onViewChange }) => {
               >
                 <MenuItem onClick={() => handlePerformanceIntervalChange('current_month')}>Mes Actual</MenuItem>
                 <MenuItem onClick={() => handlePerformanceIntervalChange('current_week')}>Esta Semana</MenuItem>
-                <MenuItem onClick={() => handlePerformanceIntervalChange('year_to_date')}>Año Actual</MenuItem>
-                <MenuItem onClick={() => handlePerformanceIntervalChange('all_time')}>Histórico</MenuItem>
+                <MenuItem onClick={() => handlePerformanceIntervalChange('year_to_date')}>AÃ±o Actual</MenuItem>
+                <MenuItem onClick={() => handlePerformanceIntervalChange('all_time')}>HistÃ³rico</MenuItem>
               </Menu>
             </Box>
           </Box>
@@ -834,7 +932,7 @@ const AdminDashboard = ({ onViewChange }) => {
                 <TableRow>
                   <TableCell>Matrizador</TableCell>
                   <TableCell align="center">Carga Activa</TableCell>
-                  <TableCell align="center">Críticos</TableCell>
+                  <TableCell align="center">CrÃ­ticos</TableCell>
                   <TableCell align="center">Entregas ({billingIntervals[performanceTimeRange]})</TableCell>
                   <TableCell align="center">Velocidad Prom.</TableCell>
                 </TableRow>
@@ -845,7 +943,7 @@ const AdminDashboard = ({ onViewChange }) => {
                   return (
                     <Tooltip
                       key={member.id}
-                      title={isSaturated ? '⚠ Riesgo de incumplimiento legal por saturación' : ''}
+                      title={isSaturated ? 'âš  Riesgo de incumplimiento legal por saturaciÃ³n' : ''}
                       placement="left"
                       arrow
                     >
@@ -925,7 +1023,7 @@ const AdminDashboard = ({ onViewChange }) => {
           {selectedDocument && (
             <Grid container spacing={2}>
               <Grid item xs={12} sm={6}>
-                <Typography variant="overline" color="textSecondary">Número de Protocolo</Typography>
+                <Typography variant="overline" color="textSecondary">NÃºmero de Protocolo</Typography>
                 <Typography variant="body1" fontWeight="bold" data-testid="detalle-numero">
                   {selectedDocument.protocol || 'S/N'}
                 </Typography>
@@ -952,7 +1050,7 @@ const AdminDashboard = ({ onViewChange }) => {
                 <Typography variant="body1">{selectedDocument.type || 'N/A'}</Typography>
               </Grid>
               <Grid item xs={12} sm={6}>
-                <Typography variant="overline" color="textSecondary">N° Factura</Typography>
+                <Typography variant="overline" color="textSecondary">NÂ° Factura</Typography>
                 <Typography variant="body1" color={selectedDocument.numeroFactura ? 'textPrimary' : 'textSecondary'}>
                   {selectedDocument.numeroFactura || 'Sin asignar'}
                 </Typography>
@@ -962,7 +1060,7 @@ const AdminDashboard = ({ onViewChange }) => {
                 <Typography variant="body1">
                   {selectedDocument.fechaFactura
                     ? new Date(selectedDocument.fechaFactura).toLocaleDateString('es-EC')
-                    : '—'}
+                    : 'â€”'}
                 </Typography>
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -975,9 +1073,9 @@ const AdminDashboard = ({ onViewChange }) => {
                 </Box>
               </Grid>
               <Grid item xs={12} sm={6}>
-                <Typography variant="overline" color="textSecondary">Antigüedad</Typography>
+                <Typography variant="overline" color="textSecondary">AntigÃ¼edad</Typography>
                 <Typography variant="body1" color={selectedDocument.daysDelayed > 15 ? 'error.main' : 'textPrimary'}>
-                  {selectedDocument.daysDelayed} días
+                  {selectedDocument.daysDelayed} dÃ­as
                 </Typography>
               </Grid>
               {selectedDocument.id && (
@@ -1022,7 +1120,7 @@ const AdminDashboard = ({ onViewChange }) => {
         onClose={() => setMensajeModalOpen(false)}
         documento={documentoParaMensaje}
         onSuccess={() => {
-          // Opcional: recargar estadísticas si queremos ver cambios inmediatos
+          // Opcional: recargar estadÃ­sticas si queremos ver cambios inmediatos
           loadStats(page, false);
         }}
       />

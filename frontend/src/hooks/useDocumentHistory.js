@@ -243,6 +243,7 @@ const useDocumentHistory = (documentId, options = {}) => {
       GROUP_CREATED: 'Grupo Creado',
       GROUP_DELIVERED: 'Grupo Entregado',
       VERIFICATION_GENERATED: 'Código Generado',
+      PAYMENT_REGISTERED: 'Pago Registrado',
       notification_sent: 'Notificación Enviada'
     };
     return titleMap[eventType] || eventType;
@@ -261,6 +262,7 @@ const useDocumentHistory = (documentId, options = {}) => {
       GROUP_CREATED: 'group',
       GROUP_DELIVERED: 'delivery',
       VERIFICATION_GENERATED: 'check_circle',
+      PAYMENT_REGISTERED: 'payment',
       notification_sent: 'notification'
     };
     return iconMap[eventType] || 'default';
@@ -279,6 +281,7 @@ const useDocumentHistory = (documentId, options = {}) => {
       GROUP_CREATED: 'success',
       GROUP_DELIVERED: 'success',
       VERIFICATION_GENERATED: 'success',
+      PAYMENT_REGISTERED: 'success',
       notification_sent: 'info'
     };
     return colorMap[eventType] || 'grey';
@@ -514,6 +517,7 @@ const useDocumentHistory = (documentId, options = {}) => {
           check_circle: 'CheckCircle',
           notification: 'Notifications',
           delivery: 'LocalShipping',
+          payment: 'AttachMoney',
           error: 'Error',
           warning: 'Warning',
           edit: 'Edit',

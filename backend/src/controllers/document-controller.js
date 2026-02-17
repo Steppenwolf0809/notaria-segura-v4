@@ -2835,6 +2835,7 @@ async function getDocumentHistory(req, res) {
         'EXTRACTION_APPLIED',
         'STATUS_UNDO',
         'NOTE_ADDED',
+        'PAYMENT_REGISTERED',
         'UNKNOWN'
       ];
 
@@ -3076,11 +3077,13 @@ async function getDocumentHistory(req, res) {
         title: getEventTitle(event.eventType, parsedDetails),
         description: formattedDescription,
         timestamp: event.createdAt,
-        user: {
-          id: event.user.id,
-          name: `${event.user.firstName} ${event.user.lastName}`,
-          role: event.user.role
-        },
+        user: event.eventType === 'PAYMENT_REGISTERED'
+          ? { id: 0, name: 'Sistema Koinor', role: 'SISTEMA' }
+          : {
+            id: event.user.id,
+            name: `${event.user.firstName} ${event.user.lastName}`,
+            role: event.user.role
+          },
         icon: getEventIcon(event.eventType, parsedDetails),
         color: getEventColor(event.eventType, parsedDetails),
         contextInfo: contextInfo, // Información adicional para mostrar
