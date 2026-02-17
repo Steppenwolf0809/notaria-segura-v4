@@ -6,11 +6,7 @@ import {
     Typography,
     TextField,
     LinearProgress,
-    Checkbox,
-    FormControlLabel,
-    Button,
     Chip,
-    Divider,
     Tooltip,
     InputAdornment,
     Paper,
@@ -26,9 +22,6 @@ import {
     CircularProgress,
 } from '@mui/material';
 import {
-    Warning as WarningIcon,
-    CheckCircle as CheckIcon,
-    ErrorOutline as ErrorIcon,
     ExpandMore as ExpandIcon,
     ExpandLess as CollapseIcon,
     Info as InfoIcon,
@@ -41,8 +34,6 @@ import {
 import billingService from '../../services/billing-service';
 import {
     calculateStateParticipation,
-    getAlertState,
-    applyPenalty,
     calculateBracketProgress,
     getSemaphoreState,
     extractSubtotal,
@@ -60,7 +51,6 @@ const fmt = (val) =>
 
 const fmtPct = (val) => `${(val * 100).toFixed(0)}%`;
 
-const PAYMENT_STORAGE_KEY = 'state_participation_payments_v1';
 const MONTHS_TO_SHOW = 6;
 
 const TOOLTIP_LEGAL = `Calculo basado en la Resolucion 005-2023 del Consejo de la Judicatura.\n\nBase Imponible = Subtotal facturado (sin IVA) del mes en curso.\nFormula: Base Fija (SBU x $${SBU_CURRENT}) + Tasa Variable x (Facturado - Limite Inferior del tramo).\n\nEste valor refleja unicamente lo facturado hasta la fecha de corte, sin proyecciones a futuro. El IVA (${(IVA_RATE * 100).toFixed(0)}%) se excluye automaticamente del monto total registrado en el sistema.`;
@@ -81,16 +71,14 @@ const createMonthOptions = (monthsBack = MONTHS_TO_SHOW) => {
     });
 };
 
-// ── Alert Banner ──
-const AlertBanner = ({ alertState }) => {
-    const { status, message, color, bgColor, isFlashing } = alertState;
-
-    const iconMap = {
-        normal: <ClockIcon sx={{ color }} />,
-        critical: <WarningIcon sx={{ color }} />,
-        deadline: <ErrorIcon sx={{ color }} />,
-        overdue: <ErrorIcon sx={{ color }} />,
-    };
+// ── Payment Info Banner ──
+const PaymentInfoBanner = ({ selectedMonthKey }) => {
+    // Parse the selected month to compute the payment month (next month)
+    const [year, month] = (selectedMonthKey || '').split('-').map(Number);
+    const billingDate = new Date(year, month - 1, 1);
+    const paymentDate = new Date(year, month, 1); // next month
+    const billingMonthName = billingDate.toLocaleDateString('es-EC', { month: 'long', year: 'numeric' });
+    const paymentMonthName = paymentDate.toLocaleDateString('es-EC', { month: 'long', year: 'numeric' });
 
     return (
         <Paper
@@ -99,40 +87,22 @@ const AlertBanner = ({ alertState }) => {
                 p: 2,
                 mb: 3,
                 borderRadius: 3,
-                border: `1.5px solid ${color}30`,
-                bgcolor: bgColor,
+                border: '1.5px solid #6366f130',
+                bgcolor: 'rgba(99, 102, 241, 0.04)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 2,
-                animation: isFlashing ? 'pulse-alert 2s ease-in-out infinite' : 'none',
-                '@keyframes pulse-alert': {
-                    '0%, 100%': { opacity: 1 },
-                    '50%': { opacity: 0.7 },
-                },
             }}
         >
-            {iconMap[status]}
+            <ClockIcon sx={{ color: '#6366f1' }} />
             <Box sx={{ flex: 1 }}>
-                <Typography variant="subtitle2" sx={{ color, fontWeight: 700, fontSize: '0.8125rem' }}>
-                    {status === 'normal' && 'Estado: Normal'}
-                    {status === 'critical' && 'Estado: CRITICO'}
-                    {status === 'deadline' && 'Estado: ULTIMO DIA'}
-                    {status === 'overdue' && 'Estado: EN MORA'}
+                <Typography variant="subtitle2" sx={{ color: '#6366f1', fontWeight: 700, fontSize: '0.8125rem' }}>
+                    Fecha limite de pago: 10 de {paymentMonthName}
                 </Typography>
                 <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.25 }}>
-                    {message}
+                    Lo facturado en {billingMonthName} se paga hasta el 10 del mes siguiente.
                 </Typography>
             </Box>
-            <Chip
-                label={`Dia ${new Date().getDate()} del mes`}
-                size="small"
-                sx={{
-                    bgcolor: `${color}18`,
-                    color,
-                    fontWeight: 600,
-                    fontSize: '0.75rem',
-                }}
-            />
         </Paper>
     );
 };
@@ -229,25 +199,6 @@ const ParticipacionEstado = () => {
     const [monthSnapshots, setMonthSnapshots] = useState({});
     const [loadingSnapshots, setLoadingSnapshots] = useState(true);
     const [snapshotError, setSnapshotError] = useState('');
-    // Simple checklist state
-    const [checklist, setChecklist] = useState({
-        formularioCerrado: false,
-        pagado: false,
-        comprobanteRegistrado: false,
-    });
-    const [completedMonths, setCompletedMonths] = useState(() => {
-        try {
-            const saved = localStorage.getItem(PAYMENT_STORAGE_KEY);
-            const parsed = saved ? JSON.parse(saved) : [];
-            return Array.isArray(parsed) ? parsed : [];
-        } catch {
-            return [];
-        }
-    });
-
-    useEffect(() => {
-        localStorage.setItem(PAYMENT_STORAGE_KEY, JSON.stringify(completedMonths));
-    }, [completedMonths]);
 
     const loadMonthSnapshots = useCallback(async () => {
         try {
@@ -309,19 +260,10 @@ const ParticipacionEstado = () => {
     }, [selectedMonthKey, monthSnapshots]);
 
     // ── Derived state ──
-    const alertState = useMemo(() => getAlertState(), []);
-
     const calculation = useMemo(() => {
         const val = parseFloat(grossIncome) || 0;
         return calculateStateParticipation(val);
     }, [grossIncome]);
-
-    const penaltyInfo = useMemo(() => {
-        if (alertState.isOverdue) {
-            return applyPenalty(calculation.totalToPay);
-        }
-        return null;
-    }, [alertState.isOverdue, calculation.totalToPay]);
 
     const selectedSnapshot = monthSnapshots[selectedMonthKey];
 
@@ -351,41 +293,8 @@ const ParticipacionEstado = () => {
         setGrossIncome(raw);
     }, []);
 
-    const handleChecklistChange = useCallback((key) => {
-        setChecklist(prev => ({ ...prev, [key]: !prev[key] }));
-    }, []);
-
-    const handleMarkComplete = useCallback(() => {
-        const selectedOption = monthOptions.find((month) => month.key === selectedMonthKey);
-        if (!selectedOption) return;
-
-        setCompletedMonths((prev) => [
-            {
-                key: selectedMonthKey,
-                month: selectedOption.label,
-                amount: Number(penaltyInfo ? penaltyInfo.totalWithPenalty : calculation.totalToPay),
-                date: new Date().toLocaleDateString('es-EC'),
-            },
-            ...prev.filter((item) => item.key !== selectedMonthKey),
-        ]);
-
-        setChecklist({ formularioCerrado: false, pagado: false, comprobanteRegistrado: false });
-    }, [calculation.totalToPay, penaltyInfo, monthOptions, selectedMonthKey]);
-
-    const allChecked = checklist.formularioCerrado && checklist.pagado && checklist.comprobanteRegistrado;
-    const canComplete = allChecked && parseFloat(grossIncome) > 0;
-
-    const finalAmount = penaltyInfo ? penaltyInfo.totalWithPenalty : calculation.totalToPay;
-
     // ── Bracket Progress Color ──
     const progressColor = semaphore.color;
-
-    const paidByMonthKey = useMemo(() => {
-        return completedMonths.reduce((acc, item) => {
-            if (item.key) acc[item.key] = item;
-            return acc;
-        }, {});
-    }, [completedMonths]);
 
     const historicalRows = useMemo(() => {
         return monthOptions
@@ -400,11 +309,10 @@ const ParticipacionEstado = () => {
                     paymentEstimate: snapshot.paymentEstimate,
                     progress: snapshot.bracketProgressPercent,
                     remaining: snapshot.remainingToNextBracket,
-                    paidRecord: paidByMonthKey[option.key],
                 };
             })
             .filter(Boolean);
-    }, [monthOptions, monthSnapshots, paidByMonthKey]);
+    }, [monthOptions, monthSnapshots]);
 
     return (
         <Box sx={{ maxWidth: 900, mx: 'auto' }}>
@@ -430,8 +338,8 @@ const ParticipacionEstado = () => {
                 </Box>
             </Box>
 
-            {/* ── Alert Banner ── */}
-            <AlertBanner alertState={alertState} />
+            {/* ── Payment Info Banner ── */}
+            <PaymentInfoBanner selectedMonthKey={selectedMonthKey} />
 
             <Card
                 sx={{
@@ -542,7 +450,7 @@ const ParticipacionEstado = () => {
                         minWidth: 280,
                         borderRadius: 3,
                         border: '2px solid',
-                        borderColor: alertState.isOverdue ? 'error.main' : semaphore.color,
+                        borderColor: semaphore.color,
                     }}
                 >
                     <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
@@ -550,7 +458,7 @@ const ParticipacionEstado = () => {
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <TrendingIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
                                 <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.08em', fontSize: '0.6875rem' }}>
-                                    {alertState.isOverdue ? 'DEUDA AL CORTE + RECARGO (3%)' : 'DEUDA AL CORTE DE HOY'}
+                                    A PAGAR POR LO FACTURADO
                                 </Typography>
                             </Box>
                             {/* Semaphore dot */}
@@ -567,20 +475,20 @@ const ParticipacionEstado = () => {
                         </Box>
 
                         <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block', mb: 0.5 }}>
-                            A pagar por lo facturado hasta hoy
+                            Calculado sobre la Base Imponible al corte
                         </Typography>
 
                         <Typography
                             variant="h3"
                             sx={{
                                 fontWeight: 800,
-                                color: alertState.isOverdue ? 'error.main' : 'text.primary',
+                                color: 'text.primary',
                                 letterSpacing: '-0.03em',
                                 fontSize: '2.5rem',
                                 mb: 1.5,
                             }}
                         >
-                            {fmt(finalAmount)}
+                            {fmt(calculation.totalToPay)}
                         </Typography>
 
                         {/* Breakdown */}
@@ -602,19 +510,6 @@ const ParticipacionEstado = () => {
                                     {fmt(calculation.variableBaseAmount)}
                                 </Typography>
                             </Box>
-                            {penaltyInfo && (
-                                <>
-                                    <Typography variant="h6" sx={{ color: 'error.main', alignSelf: 'flex-end', pb: 0.25 }}>+</Typography>
-                                    <Box>
-                                        <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 600, display: 'block' }}>
-                                            Multa 3%
-                                        </Typography>
-                                        <Typography variant="body2" sx={{ fontWeight: 700, color: 'error.main' }}>
-                                            {fmt(penaltyInfo.penaltyAmount)}
-                                        </Typography>
-                                    </Box>
-                                </>
-                            )}
                         </Box>
                     </CardContent>
                 </Card>
@@ -679,129 +574,6 @@ const ParticipacionEstado = () => {
                 </CardContent>
             </Card>
 
-            {/* ── Simple Checklist ── */}
-            <Card
-                sx={{
-                    mb: 3,
-                    borderRadius: 3,
-                    border: '1px solid',
-                    borderColor: 'divider',
-                }}
-            >
-                <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
-                    <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.08em', fontSize: '0.6875rem', display: 'block', mb: 2 }}>
-                        CIERRE MENSUAL — CHECKLIST
-                    </Typography>
-
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
-                        <FormControlLabel
-                            control={
-                                <Checkbox
-                                    checked={checklist.formularioCerrado}
-                                    onChange={() => handleChecklistChange('formularioCerrado')}
-                                    sx={{
-                                        color: 'text.disabled',
-                                        '&.Mui-checked': { color: '#047857' },
-                                    }}
-                                />
-                            }
-                            label={
-                                <Typography variant="body2" sx={{ fontWeight: 500, color: checklist.formularioCerrado ? 'success.main' : 'text.primary' }}>
-                                    Formulario cerrado en el sistema del Consejo de la Judicatura
-                                </Typography>
-                            }
-                            sx={{ mx: 0 }}
-                        />
-                        <FormControlLabel
-                            control={
-                                <Checkbox
-                                    checked={checklist.pagado}
-                                    onChange={() => handleChecklistChange('pagado')}
-                                    sx={{
-                                        color: 'text.disabled',
-                                        '&.Mui-checked': { color: '#047857' },
-                                    }}
-                                />
-                            }
-                            label={
-                                <Typography variant="body2" sx={{ fontWeight: 500, color: checklist.pagado ? 'success.main' : 'text.primary' }}>
-                                    Pago realizado
-                                </Typography>
-                            }
-                            sx={{ mx: 0 }}
-                        />
-                        <FormControlLabel
-                            control={
-                                <Checkbox
-                                    checked={checklist.comprobanteRegistrado}
-                                    onChange={() => handleChecklistChange('comprobanteRegistrado')}
-                                    sx={{
-                                        color: 'text.disabled',
-                                        '&.Mui-checked': { color: '#047857' },
-                                    }}
-                                />
-                            }
-                            label={
-                                <Typography variant="body2" sx={{ fontWeight: 500, color: checklist.comprobanteRegistrado ? 'success.main' : 'text.primary' }}>
-                                    Comprobante de transferencia registrado
-                                </Typography>
-                            }
-                            sx={{ mx: 0 }}
-                        />
-                    </Box>
-
-                    <Divider sx={{ my: 2 }} />
-
-                    {/* Status indicators */}
-                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
-                        <Chip
-                            icon={allChecked ? <CheckIcon /> : <ErrorIcon />}
-                            label={allChecked ? 'Todos los pasos completados' : `${Object.values(checklist).filter(Boolean).length} de 3 completados`}
-                            size="small"
-                            sx={{
-                                fontSize: '0.75rem',
-                                bgcolor: allChecked ? 'rgba(4, 120, 87, 0.08)' : 'rgba(190, 18, 60, 0.08)',
-                                color: allChecked ? '#047857' : '#be123c',
-                                '& .MuiChip-icon': {
-                                    color: allChecked ? '#047857' : '#be123c',
-                                    fontSize: 16,
-                                },
-                            }}
-                        />
-                    </Box>
-
-                    {/* Complete Button */}
-                    <Tooltip
-                        title={!canComplete ? 'Complete todos los pasos del checklist e ingrese un monto' : ''}
-                    >
-                        <span>
-                            <Button
-                                variant="contained"
-                                disabled={!canComplete}
-                                onClick={handleMarkComplete}
-                                startIcon={<CheckIcon />}
-                                fullWidth
-                                sx={{
-                                    py: 1.5,
-                                    borderRadius: 2,
-                                    fontWeight: 700,
-                                    fontSize: '0.875rem',
-                                    textTransform: 'none',
-                                    bgcolor: '#047857',
-                                    '&:hover': { bgcolor: '#065f46' },
-                                    '&.Mui-disabled': {
-                                        bgcolor: 'action.disabledBackground',
-                                        color: 'text.disabled',
-                                    },
-                                }}
-                            >
-                                Registrar pago de {fmt(finalAmount)}
-                            </Button>
-                        </span>
-                    </Tooltip>
-                </CardContent>
-            </Card>
-
             {/* ── Monthly History ── */}
             <Card
                 sx={{
@@ -828,7 +600,6 @@ const ParticipacionEstado = () => {
                                         <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem', color: 'text.secondary' }}>Pago Estado</TableCell>
                                         <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem', color: 'text.secondary' }}>Progreso Tramo</TableCell>
                                         <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem', color: 'text.secondary' }}>Margen Tramo</TableCell>
-                                        <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.75rem', color: 'text.secondary' }}>Pago Registrado</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -846,9 +617,6 @@ const ParticipacionEstado = () => {
                                             <TableCell align="right" sx={{ fontSize: '0.8125rem' }}>{row.progress.toFixed(0)}%</TableCell>
                                             <TableCell align="right" sx={{ fontSize: '0.8125rem' }}>
                                                 {row.remaining > 0 ? fmt(row.remaining) : 'Tramo maximo'}
-                                            </TableCell>
-                                            <TableCell align="right" sx={{ fontSize: '0.8125rem', color: 'text.secondary' }}>
-                                                {row.paidRecord ? `${fmt(row.paidRecord.amount)} (${row.paidRecord.date})` : '-'}
                                             </TableCell>
                                         </TableRow>
                                     ))}
