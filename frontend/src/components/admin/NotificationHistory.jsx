@@ -20,7 +20,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Button
+  Button,
+  TablePagination
 } from '@mui/material';
 import {
   History as HistoryIcon,
@@ -46,13 +47,25 @@ const NotificationHistory = () => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewNotification, setPreviewNotification] = useState(null);
 
-  const loadNotifications = async () => {
+  // Estados de paginación
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [totalNotifications, setTotalNotifications] = useState(0);
+
+  const loadNotifications = async (currentPage = page, currentRowsPerPage = rowsPerPage) => {
     try {
       setLoading(true);
       setError(null);
 
+      // Usar parámetros de paginación
+      // Backend espera page index 1-based, MUI usa 0-based
+      const queryParams = new URLSearchParams({
+        page: currentPage + 1,
+        limit: currentRowsPerPage
+      }).toString();
+
       const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:3001/api';
-      const response = await fetch(`${API_BASE_URL}/admin/notificaciones`, {
+      const response = await fetch(`${API_BASE_URL}/admin/notificaciones?${queryParams}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -63,6 +76,10 @@ const NotificationHistory = () => {
         const data = await response.json();
         if (data.success) {
           setNotifications(data.data.notifications);
+          // Actualizar total para la paginación
+          if (data.data.pagination && data.data.pagination.total) {
+            setTotalNotifications(data.data.pagination.total);
+          }
         } else {
           throw new Error('Error en respuesta');
         }
@@ -79,8 +96,22 @@ const NotificationHistory = () => {
   };
 
   useEffect(() => {
-    loadNotifications();
-  }, [token]);
+    loadNotifications(page, rowsPerPage);
+  }, [token, page, rowsPerPage]);
+
+  const handleChangePage = (event, newPage) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event) => {
+    const newRowsPerPage = parseInt(event.target.value, 10);
+    setRowsPerPage(newRowsPerPage);
+    setPage(0); // Reset a primera página al cambiar límite
+  };
+
+  const reloadData = () => {
+    loadNotifications(page, rowsPerPage);
+  };
 
   const getStatusIcon = (status) => {
     switch (status) {
@@ -158,7 +189,7 @@ const NotificationHistory = () => {
           </Typography>
         </Box>
         <Tooltip title="Recargar">
-          <IconButton onClick={loadNotifications} disabled={loading}>
+          <IconButton onClick={reloadData} disabled={loading}>
             <RefreshIcon />
           </IconButton>
         </Tooltip>
@@ -248,6 +279,21 @@ const NotificationHistory = () => {
               </TableBody>
             </Table>
           </TableContainer>
+
+          {/* Controles de Paginación */}
+          <TablePagination
+            rowsPerPageOptions={[10, 25, 50, 100]}
+            component="div"
+            count={totalNotifications}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+            labelRowsPerPage="Filas por página"
+            labelDisplayedRows={({ from, to, count }) =>
+              `${from}-${to} de ${count !== -1 ? count : `más de ${to}`}`
+            }
+          />
         </CardContent>
       </Card>
 
@@ -282,9 +328,9 @@ const NotificationHistory = () => {
                   <Typography variant="body2" color="text.secondary">
                     Estado:
                   </Typography>
-                  <Chip 
-                    label={previewNotification.estado} 
-                    size="small" 
+                  <Chip
+                    label={previewNotification.estado}
+                    size="small"
                     color={getStatusColor(previewNotification.estado)}
                   />
                 </Box>
@@ -294,8 +340,8 @@ const NotificationHistory = () => {
               </Box>
 
               {/* Simulación de chat WhatsApp */}
-              <Box 
-                sx={{ 
+              <Box
+                sx={{
                   bgcolor: '#e5ddd5',
                   backgroundImage: 'url("data:image/svg+xml,%3csvg width=\'100\' height=\'100\' xmlns=\'http://www.w3.org/2000/svg\'%3e%3cdefs%3e%3cpattern id=\'a\' patternUnits=\'userSpaceOnUse\' width=\'40\' height=\'40\' patternTransform=\'scale(0.5) rotate(0)\'%3e%3crect x=\'0\' y=\'0\' width=\'100%25\' height=\'100%25\' fill=\'%23ffffff00\'/%3e%3cpath d=\'M0 20h40v20H0V20zm20 20h20v20H20V40z\' stroke-width=\'0\' stroke=\'%23ffffff\' fill=\'%2300000008\'/%3e%3c/pattern%3e%3c/defs%3e%3crect width=\'100%25\' height=\'100%25\' fill=\'url(%23a)\'/%3e%3c/svg%3e")',
                   p: 2,
@@ -326,9 +372,9 @@ const NotificationHistory = () => {
                       }
                     }}
                   >
-                    <Typography 
-                      variant="body2" 
-                      sx={{ 
+                    <Typography
+                      variant="body2"
+                      sx={{
                         whiteSpace: 'pre-wrap',
                         wordBreak: 'break-word',
                         lineHeight: 1.4
@@ -336,11 +382,11 @@ const NotificationHistory = () => {
                     >
                       {previewNotification.mensaje}
                     </Typography>
-                    
+
                     {/* Timestamp y estado */}
-                    <Box sx={{ 
-                      display: 'flex', 
-                      justifyContent: 'flex-end', 
+                    <Box sx={{
+                      display: 'flex',
+                      justifyContent: 'flex-end',
                       alignItems: 'center',
                       gap: 0.5,
                       mt: 1
