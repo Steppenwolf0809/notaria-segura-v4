@@ -76,6 +76,7 @@ import DetalleFactura from './billing/DetalleFactura';
 import ListaPagos from './billing/ListaPagos';
 import Reportes from './billing/Reportes';
 import FinancialHealthCard from './admin/FinancialHealthCard';
+import ParticipacionEstado from './admin/ParticipacionEstado';
 
 /**
  * Centro de administración - Panel principal para ADMIN
@@ -99,6 +100,8 @@ const AdminCenter = () => {
         return <FormulariosUAFE adminMode={true} />;
       case 'analisis-uafe':
         return <AnalisisUAFE />;
+      case 'participacion-estado':
+        return <ParticipacionEstado />;
       case 'notifications':
         return <NotificationCenter />;
       case 'notification-templates':
