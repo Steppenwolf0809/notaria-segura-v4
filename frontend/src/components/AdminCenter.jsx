@@ -91,7 +91,7 @@ import {
 } from '../utils/stateParticipationCalculator';
 
 /**
- * Centro de administraciÃ³n - Panel principal para ADMIN
+ * Centro de administración - Panel principal para ADMIN
  */
 const AdminCenter = () => {
   const [currentView, setCurrentView] = useState('dashboard');
@@ -152,9 +152,9 @@ const AdminCenter = () => {
 };
 
 /**
- * Dashboard de SupervisiÃ³n
+ * Dashboard de Supervisión
  */
-// â"€â"€ WIDGET PARTICIPACIÃ"N (DASHBOARD) â"€â"€
+// ── WIDGET PARTICIPACIÓN (DASHBOARD) ──
 const ParticipationWidget = ({ onViewChange, subtotal, loading }) => {
   const now = new Date();
   const paymentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -200,7 +200,7 @@ const ParticipationWidget = ({ onViewChange, subtotal, loading }) => {
           </Box>
           <Box>
             <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-              Participacion Estado
+              Participación Estado
             </Typography>
             <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
               Facturado en {billingMonthName}
@@ -324,7 +324,7 @@ const AdminDashboard = ({ onViewChange }) => {
   const [thresholdDays, setThresholdDays] = useState(15);
   const [selectedMatrixer, setSelectedMatrixer] = useState('');
   const [statusFilter, setStatusFilter] = useState('EN_PROCESO'); // Filtro de estado por defecto EN_PROCESO
-  const [billedTimeRange, setBilledTimeRange] = useState('current_month'); // Filtro FacturaciÃ³n
+  const [billedTimeRange, setBilledTimeRange] = useState('current_month'); // Filtro Facturación
   // const [startDate, setStartDate] = useState(''); // Filtro fecha inicio (Removido por solicitud)
   // const [endDate, setEndDate] = useState(''); // Filtro fecha fin
   const [performanceTimeRange, setPerformanceTimeRange] = useState('current_month');
@@ -337,10 +337,10 @@ const AdminDashboard = ({ onViewChange }) => {
   const actoBadges = {
     'PROTOCOLO': { label: 'P', color: '#1e3a5f', bgColor: 'rgba(30, 58, 95, 0.1)' },      // Azul marino
     'CERTIFICACION': { label: 'C', color: '#2f5233', bgColor: 'rgba(47, 82, 51, 0.1)' },  // Verde bosque
-    'ARRENDAMIENTO': { label: 'A', color: '#5b4a6c', bgColor: 'rgba(91, 74, 108, 0.1)' }, // PÃºrpura grisÃ¡ceo
-    'DECLARACION': { label: 'D', color: '#8b5a2b', bgColor: 'rgba(139, 90, 43, 0.1)' },   // MarrÃ³n arcilla
+    'ARRENDAMIENTO': { label: 'A', color: '#5b4a6c', bgColor: 'rgba(91, 74, 108, 0.1)' }, // Púrpura grisáceo
+    'DECLARACION': { label: 'D', color: '#8b5a2b', bgColor: 'rgba(139, 90, 43, 0.1)' },   // Marrón arcilla
     'RECONOCIMIENTO': { label: 'R', color: '#5a6572', bgColor: 'rgba(90, 101, 114, 0.1)' }, // Gris pizarra
-    'DILIGENCIA': { label: 'Di', color: '#2c5f6f', bgColor: 'rgba(44, 95, 111, 0.1)' },    // Azul petrÃ³leo
+    'DILIGENCIA': { label: 'Di', color: '#2c5f6f', bgColor: 'rgba(44, 95, 111, 0.1)' },    // Azul petróleo
     'OTROS': { label: 'O', color: '#6b7280', bgColor: 'rgba(107, 114, 128, 0.1)' }        // Gris neutro
   };
 
@@ -354,13 +354,13 @@ const AdminDashboard = ({ onViewChange }) => {
     }
   };
 
-  // PaginaciÃ³n
+  // Paginación
   const [page, setPage] = useState(1);
   const [docsList, setDocsList] = useState([]); // Lista acumulativa
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  // Menu para filtro de facturaciÃ³n
+  // Menu para filtro de facturación
   const [billingAnchorEl, setBillingAnchorEl] = useState(null);
   const [performanceAnchorEl, setPerformanceAnchorEl] = useState(null);
 
@@ -414,7 +414,7 @@ const AdminDashboard = ({ onViewChange }) => {
         }
       }
     } catch (e) {
-      // Silencioso: mantenemos datos bÃ¡sicos si falla
+      // Silencioso: mantenemos datos básicos si falla
       console.warn('No se pudo refrescar detalle del documento:', e?.message);
     }
   };
@@ -432,7 +432,7 @@ const AdminDashboard = ({ onViewChange }) => {
     loadCurrentMonthParticipation();
   }, []);
 
-  // Recargar al cambiar filtros principales (resetea paginaciÃ³n)
+  // Recargar al cambiar filtros principales (resetea paginación)
   useEffect(() => {
     setPage(1);
     loadStats(1, false);
@@ -498,7 +498,7 @@ const AdminDashboard = ({ onViewChange }) => {
       setHasMore(data.pagination?.hasMore || false);
       setError(null);
     } catch (err) {
-      setError('Error al cargar estadÃ­sticas de supervisiÃ³n.');
+      setError('Error al cargar estadísticas de supervisión.');
       console.error(err);
     } finally {
       setLoading(false);
@@ -554,8 +554,8 @@ const AdminDashboard = ({ onViewChange }) => {
     'current_week': 'Esta Semana',
     'current_month': 'Mes Actual',
     'last_month': 'Mes Anterior',
-    'year_to_date': 'AÃ±o Actual',
-    'all_time': 'HistÃ³rico'
+    'year_to_date': 'Año Actual',
+    'all_time': 'Histórico'
   };
 
   return (
@@ -564,7 +564,7 @@ const AdminDashboard = ({ onViewChange }) => {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <DashboardIcon sx={{ mr: 1, fontSize: 32, color: 'primary.main' }} />
-          <Typography variant="h5" fontWeight="bold">SupervisiÃ³n</Typography>
+          <Typography variant="h5" fontWeight="bold">Supervisión</Typography>
         </Box>
 
         <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
@@ -591,10 +591,10 @@ const AdminDashboard = ({ onViewChange }) => {
               label="Umbral Retraso"
               onChange={(e) => setThresholdDays(e.target.value)}
             >
-              <MenuItem value={5}>5 dÃ­as</MenuItem>
-              <MenuItem value={10}>10 dÃ­as</MenuItem>
-              <MenuItem value={15}>15 dÃ­as</MenuItem>
-              <MenuItem value={30}>30 dÃ­as</MenuItem>
+              <MenuItem value={5}>5 días</MenuItem>
+              <MenuItem value={10}>10 días</MenuItem>
+              <MenuItem value={15}>15 días</MenuItem>
+              <MenuItem value={30}>30 días</MenuItem>
             </Select>
           </FormControl>
 
@@ -639,7 +639,7 @@ const AdminDashboard = ({ onViewChange }) => {
 
       {/* â•â•â• KPIs AGRUPADOS â•â•â• */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
-        {/* â”€â”€ GRUPO GESTIÃ“N â”€â”€ */}
+        {/* ── GRUPO GESTIÓN ── */}
         <Grid item xs={12} md={7}>
           <Box sx={{
             p: 2.5,
@@ -651,7 +651,7 @@ const AdminDashboard = ({ onViewChange }) => {
               variant="overline"
               sx={{ color: 'text.secondary', fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.08em', mb: 2, display: 'block' }}
             >
-              GESTIÃ“N OPERATIVA
+              GESTIÓN OPERATIVA
             </Typography>
             <Grid container spacing={2}>
               <Grid item xs={6} sm={3}>
@@ -750,8 +750,8 @@ const AdminDashboard = ({ onViewChange }) => {
                   <TableCell>Matrizador</TableCell>
                   <TableCell>Acto</TableCell>
                   <TableCell>Estado</TableCell>
-                  <TableCell>AntigÃ¼edad</TableCell>
-                  <TableCell>AcciÃ³n</TableCell>
+                  <TableCell>Antigüedad</TableCell>
+                  <TableCell>Acción</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -894,7 +894,7 @@ const AdminDashboard = ({ onViewChange }) => {
                 disabled={loadingMore}
                 startIcon={loadingMore ? <CircularProgress size={20} /> : null}
               >
-                {loadingMore ? 'Cargando...' : 'Cargar mÃ¡s documentos'}
+                {loadingMore ? 'Cargando...' : 'Cargar más documentos'}
               </Button>
             </Box>
           )}
@@ -923,8 +923,8 @@ const AdminDashboard = ({ onViewChange }) => {
               >
                 <MenuItem onClick={() => handlePerformanceIntervalChange('current_month')}>Mes Actual</MenuItem>
                 <MenuItem onClick={() => handlePerformanceIntervalChange('current_week')}>Esta Semana</MenuItem>
-                <MenuItem onClick={() => handlePerformanceIntervalChange('year_to_date')}>AÃ±o Actual</MenuItem>
-                <MenuItem onClick={() => handlePerformanceIntervalChange('all_time')}>HistÃ³rico</MenuItem>
+                <MenuItem onClick={() => handlePerformanceIntervalChange('year_to_date')}>Año Actual</MenuItem>
+                <MenuItem onClick={() => handlePerformanceIntervalChange('all_time')}>Histórico</MenuItem>
               </Menu>
             </Box>
           </Box>
@@ -934,7 +934,7 @@ const AdminDashboard = ({ onViewChange }) => {
                 <TableRow>
                   <TableCell>Matrizador</TableCell>
                   <TableCell align="center">Carga Activa</TableCell>
-                  <TableCell align="center">CrÃ­ticos</TableCell>
+                  <TableCell align="center">Críticos</TableCell>
                   <TableCell align="center">Entregas ({billingIntervals[performanceTimeRange]})</TableCell>
                   <TableCell align="center">Velocidad Prom.</TableCell>
                 </TableRow>
@@ -945,7 +945,7 @@ const AdminDashboard = ({ onViewChange }) => {
                   return (
                     <Tooltip
                       key={member.id}
-                      title={isSaturated ? 'âš  Riesgo de incumplimiento legal por saturaciÃ³n' : ''}
+                      title={isSaturated ? '⚠️ Riesgo de incumplimiento legal por saturación' : ''}
                       placement="left"
                       arrow
                     >
@@ -1025,7 +1025,7 @@ const AdminDashboard = ({ onViewChange }) => {
           {selectedDocument && (
             <Grid container spacing={2}>
               <Grid item xs={12} sm={6}>
-                <Typography variant="overline" color="textSecondary">NÃºmero de Protocolo</Typography>
+                <Typography variant="overline" color="textSecondary">Número de Protocolo</Typography>
                 <Typography variant="body1" fontWeight="bold" data-testid="detalle-numero">
                   {selectedDocument.protocol || 'S/N'}
                 </Typography>
@@ -1062,7 +1062,7 @@ const AdminDashboard = ({ onViewChange }) => {
                 <Typography variant="body1">
                   {selectedDocument.fechaFactura
                     ? new Date(selectedDocument.fechaFactura).toLocaleDateString('es-EC')
-                    : 'â€”'}
+                    : '—'}
                 </Typography>
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -1075,9 +1075,9 @@ const AdminDashboard = ({ onViewChange }) => {
                 </Box>
               </Grid>
               <Grid item xs={12} sm={6}>
-                <Typography variant="overline" color="textSecondary">AntigÃ¼edad</Typography>
+                <Typography variant="overline" color="textSecondary">Antigüedad</Typography>
                 <Typography variant="body1" color={selectedDocument.daysDelayed > 15 ? 'error.main' : 'textPrimary'}>
-                  {selectedDocument.daysDelayed} dÃ­as
+                  {selectedDocument.daysDelayed} días
                 </Typography>
               </Grid>
               {selectedDocument.id && (
@@ -1122,7 +1122,7 @@ const AdminDashboard = ({ onViewChange }) => {
         onClose={() => setMensajeModalOpen(false)}
         documento={documentoParaMensaje}
         onSuccess={() => {
-          // Opcional: recargar estadÃ­sticas si queremos ver cambios inmediatos
+          // Opcional: recargar estadísticas si queremos ver cambios inmediatos
           loadStats(page, false);
         }}
       />
