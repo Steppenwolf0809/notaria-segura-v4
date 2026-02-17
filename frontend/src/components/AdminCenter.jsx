@@ -51,7 +51,8 @@ import {
   PriorityHigh as PriorityIcon,
   Style as StyleIcon,
   Gavel as GavelIcon,
-  ArrowForward as ArrowForwardIcon
+  ArrowForward as ArrowForwardIcon,
+  Schedule as ScheduleIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import AdminLayout from './AdminLayout';
@@ -82,11 +83,9 @@ import FinancialHealthCard from './admin/FinancialHealthCard';
 import ParticipacionEstado from './admin/ParticipacionEstado';
 import billingService from '../services/billing-service';
 import {
-  getAlertState,
   getMonthRange,
   extractSubtotal,
   calculateStateParticipation,
-  applyPenalty,
   getSemaphoreState,
   calculateBracketProgress,
 } from '../utils/stateParticipationCalculator';
@@ -157,8 +156,10 @@ const AdminCenter = () => {
  */
 // â"€â"€ WIDGET PARTICIPACIÃ"N (DASHBOARD) â"€â"€
 const ParticipationWidget = ({ onViewChange, subtotal, loading }) => {
-  const alertState = getAlertState();
-  const day = new Date().getDate();
+  const now = new Date();
+  const paymentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const paymentMonthName = paymentMonth.toLocaleDateString('es-EC', { month: 'long', year: 'numeric' });
+  const billingMonthName = now.toLocaleDateString('es-EC', { month: 'long' });
 
   const formatMoney = (value) =>
     '$' + Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -167,10 +168,6 @@ const ParticipationWidget = ({ onViewChange, subtotal, loading }) => {
   const progress = calculateBracketProgress(subtotal || 0, calc.bracketInfo);
   const semaphore = getSemaphoreState(progress.remaining, progress.isTopBracket);
 
-  const totalToPay = alertState.isOverdue
-    ? applyPenalty(calc.totalToPay).totalWithPenalty
-    : calc.totalToPay;
-
   return (
     <Paper
       elevation={0}
@@ -178,10 +175,8 @@ const ParticipationWidget = ({ onViewChange, subtotal, loading }) => {
         p: 2.5,
         borderRadius: 3,
         border: '1px solid',
-        borderColor: alertState.isOverdue ? 'error.main' : 'rgba(148, 163, 184, 0.12)',
-        background: alertState.isOverdue
-          ? 'linear-gradient(135deg, rgba(220,38,38,0.05) 0%, rgba(255,255,255,0) 100%)'
-          : 'rgba(255, 255, 255, 0.5)',
+        borderColor: 'rgba(148, 163, 184, 0.12)',
+        background: 'rgba(255, 255, 255, 0.5)',
         position: 'relative',
         overflow: 'hidden'
       }}
@@ -191,8 +186,8 @@ const ParticipationWidget = ({ onViewChange, subtotal, loading }) => {
           <Box sx={{
             p: 1,
             borderRadius: 2,
-            bgcolor: alertState.color + '20',
-            color: alertState.color,
+            bgcolor: '#6366f120',
+            color: '#6366f1',
             display: 'flex'
           }}>
             <GavelIcon fontSize="small" />
@@ -202,7 +197,7 @@ const ParticipationWidget = ({ onViewChange, subtotal, loading }) => {
               Participacion Estado
             </Typography>
             <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
-              Dia {day} • {alertState.status === 'normal' ? 'A tiempo' : alertState.status === 'deadline' ? 'Vence hoy' : 'Con recargo'}
+              Facturado en {billingMonthName}
             </Typography>
           </Box>
         </Box>
@@ -224,9 +219,8 @@ const ParticipationWidget = ({ onViewChange, subtotal, loading }) => {
           <>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
               <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                {alertState.isOverdue ? 'Deuda al corte + recargo 3%' : 'Deuda al corte de hoy'}
+                A pagar por lo facturado hasta hoy
               </Typography>
-              {/* Semaphore dot */}
               <Box sx={{
                 width: 10,
                 height: 10,
@@ -236,8 +230,8 @@ const ParticipationWidget = ({ onViewChange, subtotal, loading }) => {
                 flexShrink: 0,
               }} />
             </Box>
-            <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.15, color: alertState.isOverdue ? 'error.main' : 'text.primary' }}>
-              {formatMoney(totalToPay)}
+            <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.15 }}>
+              {formatMoney(calc.totalToPay)}
             </Typography>
             <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
               Base Imponible (sin IVA): {formatMoney(subtotal)}
@@ -263,12 +257,10 @@ const ParticipationWidget = ({ onViewChange, subtotal, loading }) => {
         />
       </Box>
 
-      {alertState.isOverdue && (
-        <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
-          <WarningIcon sx={{ fontSize: 14 }} />
-          Multa del 3% aplica actualmente
-        </Typography>
-      )}
+      <Typography variant="caption" sx={{ color: '#6366f1', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
+        <ScheduleIcon sx={{ fontSize: 14 }} />
+        Pagar hasta el 10 de {paymentMonthName}
+      </Typography>
     </Paper>
   );
 };
