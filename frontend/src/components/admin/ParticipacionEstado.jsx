@@ -6,8 +6,6 @@ import {
     Typography,
     TextField,
     LinearProgress,
-    Alert,
-    AlertTitle,
     Checkbox,
     FormControlLabel,
     Button,
@@ -22,16 +20,12 @@ import {
     TableContainer,
     TableHead,
     TableRow,
-    IconButton,
     Collapse,
 } from '@mui/material';
 import {
-    AccountBalance as GavelIcon,
     Warning as WarningIcon,
     CheckCircle as CheckIcon,
     ErrorOutline as ErrorIcon,
-    CloudUpload as UploadIcon,
-    Delete as DeleteIcon,
     ExpandMore as ExpandIcon,
     ExpandLess as CollapseIcon,
     Info as InfoIcon,
@@ -39,11 +33,7 @@ import {
     TrendingUp as TrendingIcon,
     Schedule as ClockIcon,
     Gavel as JudicaturaIcon,
-    PictureAsPdf as PdfIcon,
-    Image as ImageIcon,
-    InsertDriveFile as FileIcon,
 } from '@mui/icons-material';
-import { useDropzone } from 'react-dropzone';
 import {
     calculateStateParticipation,
     getAlertState,
@@ -52,7 +42,6 @@ import {
 import {
     TAX_BRACKETS,
     SBU_CURRENT,
-    REQUIRED_DOCUMENTS,
 } from '../../config/state_participation_config';
 
 // ── Helpers ──
@@ -63,7 +52,7 @@ const fmtPct = (val) => `${(val * 100).toFixed(0)}%`;
 
 // ── Alert Banner ──
 const AlertBanner = ({ alertState }) => {
-    const { status, message, color, bgColor, isFlashing, isOverdue } = alertState;
+    const { status, message, color, bgColor, isFlashing } = alertState;
 
     const iconMap = {
         normal: <ClockIcon sx={{ color }} />,
@@ -117,81 +106,6 @@ const AlertBanner = ({ alertState }) => {
     );
 };
 
-// ── Document Dropzone ──
-const DocumentDropzone = ({ docConfig, file, onDrop, onRemove }) => {
-    const { getRootProps, getInputProps, isDragActive } = useDropzone({
-        onDrop: (accepted) => onDrop(docConfig.id, accepted[0]),
-        accept: docConfig.accept,
-        maxFiles: 1,
-        multiple: false,
-    });
-
-    const getFileIcon = (name) => {
-        if (!name) return <FileIcon />;
-        if (name.toLowerCase().endsWith('.pdf')) return <PdfIcon sx={{ color: '#dc2626' }} />;
-        return <ImageIcon sx={{ color: '#0284c7' }} />;
-    };
-
-    return (
-        <Box sx={{ flex: 1 }}>
-            <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary', mb: 1, display: 'block' }}>
-                {docConfig.label}
-            </Typography>
-            {file ? (
-                <Paper
-                    elevation={0}
-                    sx={{
-                        p: 1.5,
-                        borderRadius: 2,
-                        border: '1px solid rgba(4, 120, 87, 0.3)',
-                        bgcolor: 'rgba(4, 120, 87, 0.04)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 1.5,
-                    }}
-                >
-                    {getFileIcon(file.name)}
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
-                            {file.name}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                            {(file.size / 1024).toFixed(1)} KB
-                        </Typography>
-                    </Box>
-                    <IconButton size="small" onClick={() => onRemove(docConfig.id)} sx={{ color: '#be123c' }}>
-                        <DeleteIcon fontSize="small" />
-                    </IconButton>
-                </Paper>
-            ) : (
-                <Box
-                    {...getRootProps()}
-                    sx={{
-                        p: 3,
-                        borderRadius: 2,
-                        border: '2px dashed',
-                        borderColor: isDragActive ? '#0284c7' : 'rgba(148, 163, 184, 0.3)',
-                        bgcolor: isDragActive ? 'rgba(2, 132, 199, 0.04)' : 'rgba(248, 250, 252, 0.5)',
-                        textAlign: 'center',
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                        '&:hover': {
-                            borderColor: '#0284c7',
-                            bgcolor: 'rgba(2, 132, 199, 0.04)',
-                        },
-                    }}
-                >
-                    <input {...getInputProps()} />
-                    <UploadIcon sx={{ fontSize: 28, color: 'text.disabled', mb: 0.5 }} />
-                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-                        {isDragActive ? 'Soltar archivo aquí' : 'Arrastrar o hacer clic'}
-                    </Typography>
-                </Box>
-            )}
-        </Box>
-    );
-};
-
 // ── Bracket Table ──
 const BracketReferenceTable = ({ currentBracket }) => {
     const [open, setOpen] = useState(false);
@@ -216,10 +130,10 @@ const BracketReferenceTable = ({ currentBracket }) => {
                 {open ? <CollapseIcon sx={{ fontSize: 16, color: 'text.secondary' }} /> : <ExpandIcon sx={{ fontSize: 16, color: 'text.secondary' }} />}
             </Box>
             <Collapse in={open}>
-                <TableContainer component={Paper} elevation={0} sx={{ mt: 1, borderRadius: 2, border: '1px solid rgba(148,163,184,0.12)' }}>
+                <TableContainer component={Paper} elevation={0} sx={{ mt: 1, borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
                     <Table size="small">
                         <TableHead>
-                            <TableRow sx={{ bgcolor: 'rgba(248,250,252,0.8)' }}>
+                            <TableRow>
                                 <TableCell sx={{ fontWeight: 700, fontSize: '0.6875rem', color: 'text.secondary' }}>Esquema</TableCell>
                                 <TableCell sx={{ fontWeight: 700, fontSize: '0.6875rem', color: 'text.secondary' }}>Rango (USD)</TableCell>
                                 <TableCell align="right" sx={{ fontWeight: 700, fontSize: '0.6875rem', color: 'text.secondary' }}>Base Fija (SBU)</TableCell>
@@ -232,8 +146,8 @@ const BracketReferenceTable = ({ currentBracket }) => {
                                 <TableRow
                                     key={b.schema}
                                     sx={{
-                                        bgcolor: b.schema === currentBracket ? 'rgba(2, 132, 199, 0.06)' : 'transparent',
-                                        '& td': { borderColor: 'rgba(148,163,184,0.08)' },
+                                        bgcolor: b.schema === currentBracket ? 'action.selected' : 'transparent',
+                                        '& td': { borderColor: 'divider' },
                                     }}
                                 >
                                     <TableCell>
@@ -244,7 +158,7 @@ const BracketReferenceTable = ({ currentBracket }) => {
                                                 height: 22,
                                                 fontSize: '0.6875rem',
                                                 fontWeight: 700,
-                                                bgcolor: b.schema === currentBracket ? '#0284c7' : 'rgba(100,116,139,0.08)',
+                                                bgcolor: b.schema === currentBracket ? '#0284c7' : 'action.hover',
                                                 color: b.schema === currentBracket ? '#fff' : 'text.primary',
                                             }}
                                         />
@@ -279,8 +193,12 @@ const BracketReferenceTable = ({ currentBracket }) => {
 const ParticipacionEstado = () => {
     // ── State ──
     const [grossIncome, setGrossIncome] = useState('');
-    const [certChecked, setCertChecked] = useState(false);
-    const [documents, setDocuments] = useState({});
+    // Simple checklist state
+    const [checklist, setChecklist] = useState({
+        formularioCerrado: false,
+        pagado: false,
+        comprobanteRegistrado: false,
+    });
     const [completedMonths, setCompletedMonths] = useState([]);
 
     // ── Derived state ──
@@ -319,16 +237,8 @@ const ParticipacionEstado = () => {
         setGrossIncome(raw);
     }, []);
 
-    const handleDocumentDrop = useCallback((docId, file) => {
-        setDocuments((prev) => ({ ...prev, [docId]: file }));
-    }, []);
-
-    const handleDocumentRemove = useCallback((docId) => {
-        setDocuments((prev) => {
-            const copy = { ...prev };
-            delete copy[docId];
-            return copy;
-        });
+    const handleChecklistChange = useCallback((key) => {
+        setChecklist(prev => ({ ...prev, [key]: !prev[key] }));
     }, []);
 
     const handleMarkComplete = useCallback(() => {
@@ -339,14 +249,11 @@ const ParticipacionEstado = () => {
         ]);
         // Reset for next period
         setGrossIncome('');
-        setCertChecked(false);
-        setDocuments({});
+        setChecklist({ formularioCerrado: false, pagado: false, comprobanteRegistrado: false });
     }, [calculation, penaltyInfo]);
 
-    const canComplete =
-        certChecked &&
-        REQUIRED_DOCUMENTS.every((d) => documents[d.id]) &&
-        parseFloat(grossIncome) > 0;
+    const allChecked = checklist.formularioCerrado && checklist.pagado && checklist.comprobanteRegistrado;
+    const canComplete = allChecked && parseFloat(grossIncome) > 0;
 
     const finalAmount = penaltyInfo ? penaltyInfo.totalWithPenalty : calculation.totalToPay;
 
@@ -368,7 +275,7 @@ const ParticipacionEstado = () => {
                     <JudicaturaIcon sx={{ color: '#fff', fontSize: 28 }} />
                 </Box>
                 <Box>
-                    <Typography variant="h5" sx={{ fontWeight: 800, color: '#0f172a', letterSpacing: '-0.02em' }}>
+                    <Typography variant="h5" sx={{ fontWeight: 800, color: 'text.primary', letterSpacing: '-0.02em' }}>
                         Participación al Estado
                     </Typography>
                     <Typography variant="caption" sx={{ color: 'text.secondary' }}>
@@ -388,13 +295,13 @@ const ParticipacionEstado = () => {
                         flex: 1,
                         minWidth: 280,
                         borderRadius: 3,
-                        border: '1px solid rgba(148, 163, 184, 0.12)',
-                        background: 'linear-gradient(135deg, rgba(255,255,255,0.97) 0%, rgba(248,250,252,0.97) 100%)',
+                        border: '1px solid',
+                        borderColor: 'divider',
                     }}
                 >
                     <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                            <MoneyIcon sx={{ fontSize: 18, color: '#64748b' }} />
+                            <MoneyIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
                             <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.08em', fontSize: '0.6875rem' }}>
                                 INGRESO BRUTO MENSUAL (SIN IVA)
                             </Typography>
@@ -411,7 +318,7 @@ const ParticipacionEstado = () => {
                                     fontSize: '1.5rem',
                                     fontWeight: 700,
                                     letterSpacing: '-0.01em',
-                                    '& fieldset': { borderColor: 'rgba(148,163,184,0.2)', borderRadius: 2 },
+                                    '& fieldset': { borderColor: 'divider', borderRadius: 2 },
                                     '&:hover fieldset': { borderColor: '#0284c7 !important' },
                                     '&.Mui-focused fieldset': { borderColor: '#0284c7 !important' },
                                 },
@@ -444,17 +351,15 @@ const ParticipacionEstado = () => {
                         flex: 1,
                         minWidth: 280,
                         borderRadius: 3,
-                        border: '1px solid rgba(148, 163, 184, 0.12)',
-                        background: alertState.isOverdue
-                            ? 'linear-gradient(135deg, rgba(153,27,27,0.03) 0%, rgba(220,38,38,0.03) 100%)'
-                            : 'linear-gradient(135deg, rgba(255,255,255,0.97) 0%, rgba(248,250,252,0.97) 100%)',
+                        border: '1px solid',
+                        borderColor: alertState.isOverdue ? 'error.main' : 'divider',
                     }}
                 >
                     <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                            <TrendingIcon sx={{ fontSize: 18, color: '#64748b' }} />
+                            <TrendingIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
                             <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.08em', fontSize: '0.6875rem' }}>
-                                {alertState.isOverdue ? 'TOTAL CON RECARGO (3%)' : 'SI EL MES TERMINARA HOY, PAGARÍA'}
+                                {alertState.isOverdue ? 'TOTAL CON RECARGO (3%)' : 'TOTAL A PAGAR'}
                             </Typography>
                         </Box>
 
@@ -462,7 +367,7 @@ const ParticipacionEstado = () => {
                             variant="h3"
                             sx={{
                                 fontWeight: 800,
-                                color: alertState.isOverdue ? '#dc2626' : '#0f172a',
+                                color: alertState.isOverdue ? 'error.main' : 'text.primary',
                                 letterSpacing: '-0.03em',
                                 fontSize: '2.25rem',
                                 mb: 1.5,
@@ -477,7 +382,7 @@ const ParticipacionEstado = () => {
                                 <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500, display: 'block' }}>
                                     Base Fija
                                 </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 700, color: '#0f172a' }}>
+                                <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
                                     {fmt(calculation.fixedBaseAmount)}
                                 </Typography>
                             </Box>
@@ -486,18 +391,18 @@ const ParticipacionEstado = () => {
                                 <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500, display: 'block' }}>
                                     Excedente Variable
                                 </Typography>
-                                <Typography variant="body2" sx={{ fontWeight: 700, color: '#0f172a' }}>
+                                <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
                                     {fmt(calculation.variableBaseAmount)}
                                 </Typography>
                             </Box>
                             {penaltyInfo && (
                                 <>
-                                    <Typography variant="h6" sx={{ color: '#dc2626', alignSelf: 'flex-end', pb: 0.25 }}>+</Typography>
+                                    <Typography variant="h6" sx={{ color: 'error.main', alignSelf: 'flex-end', pb: 0.25 }}>+</Typography>
                                     <Box>
-                                        <Typography variant="caption" sx={{ color: '#dc2626', fontWeight: 600, display: 'block' }}>
+                                        <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 600, display: 'block' }}>
                                             Multa 3%
                                         </Typography>
-                                        <Typography variant="body2" sx={{ fontWeight: 700, color: '#dc2626' }}>
+                                        <Typography variant="body2" sx={{ fontWeight: 700, color: 'error.main' }}>
                                             {fmt(penaltyInfo.penaltyAmount)}
                                         </Typography>
                                     </Box>
@@ -513,8 +418,8 @@ const ParticipacionEstado = () => {
                 sx={{
                     mb: 3,
                     borderRadius: 3,
-                    border: '1px solid rgba(148, 163, 184, 0.12)',
-                    background: 'linear-gradient(135deg, rgba(255,255,255,0.97) 0%, rgba(248,250,252,0.97) 100%)',
+                    border: '1px solid',
+                    borderColor: 'divider',
                 }}
             >
                 <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
@@ -532,7 +437,7 @@ const ParticipacionEstado = () => {
                         sx={{
                             height: 10,
                             borderRadius: 5,
-                            bgcolor: 'rgba(148, 163, 184, 0.1)',
+                            bgcolor: 'action.hover',
                             '& .MuiLinearProgress-bar': {
                                 borderRadius: 5,
                                 bgcolor: progressColor,
@@ -554,84 +459,91 @@ const ParticipacionEstado = () => {
                 </CardContent>
             </Card>
 
-            {/* ── Compliance & Document Vault ── */}
+            {/* ── Simple Checklist ── */}
             <Card
                 sx={{
                     mb: 3,
                     borderRadius: 3,
-                    border: '1px solid rgba(148, 163, 184, 0.12)',
-                    background: 'linear-gradient(135deg, rgba(255,255,255,0.97) 0%, rgba(248,250,252,0.97) 100%)',
+                    border: '1px solid',
+                    borderColor: 'divider',
                 }}
             >
                 <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
                     <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.08em', fontSize: '0.6875rem', display: 'block', mb: 2 }}>
-                        CIERRE MENSUAL — COMPLIANCE
+                        CIERRE MENSUAL — CHECKLIST
                     </Typography>
 
-                    {/* Document Vault */}
-                    <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: { xs: 'wrap', sm: 'nowrap' } }}>
-                        {REQUIRED_DOCUMENTS.map((doc) => (
-                            <DocumentDropzone
-                                key={doc.id}
-                                docConfig={doc}
-                                file={documents[doc.id]}
-                                onDrop={handleDocumentDrop}
-                                onRemove={handleDocumentRemove}
-                            />
-                        ))}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 2 }}>
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={checklist.formularioCerrado}
+                                    onChange={() => handleChecklistChange('formularioCerrado')}
+                                    sx={{
+                                        color: 'text.disabled',
+                                        '&.Mui-checked': { color: '#047857' },
+                                    }}
+                                />
+                            }
+                            label={
+                                <Typography variant="body2" sx={{ fontWeight: 500, color: checklist.formularioCerrado ? 'success.main' : 'text.primary' }}>
+                                    Formulario cerrado en el sistema del Consejo de la Judicatura
+                                </Typography>
+                            }
+                            sx={{ mx: 0 }}
+                        />
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={checklist.pagado}
+                                    onChange={() => handleChecklistChange('pagado')}
+                                    sx={{
+                                        color: 'text.disabled',
+                                        '&.Mui-checked': { color: '#047857' },
+                                    }}
+                                />
+                            }
+                            label={
+                                <Typography variant="body2" sx={{ fontWeight: 500, color: checklist.pagado ? 'success.main' : 'text.primary' }}>
+                                    Pago realizado
+                                </Typography>
+                            }
+                            sx={{ mx: 0 }}
+                        />
+                        <FormControlLabel
+                            control={
+                                <Checkbox
+                                    checked={checklist.comprobanteRegistrado}
+                                    onChange={() => handleChecklistChange('comprobanteRegistrado')}
+                                    sx={{
+                                        color: 'text.disabled',
+                                        '&.Mui-checked': { color: '#047857' },
+                                    }}
+                                />
+                            }
+                            label={
+                                <Typography variant="body2" sx={{ fontWeight: 500, color: checklist.comprobanteRegistrado ? 'success.main' : 'text.primary' }}>
+                                    Comprobante de transferencia registrado
+                                </Typography>
+                            }
+                            sx={{ mx: 0 }}
+                        />
                     </Box>
 
                     <Divider sx={{ my: 2 }} />
 
-                    {/* Compliance Checkbox */}
-                    <FormControlLabel
-                        control={
-                            <Checkbox
-                                checked={certChecked}
-                                onChange={(e) => setCertChecked(e.target.checked)}
-                                sx={{
-                                    color: '#64748b',
-                                    '&.Mui-checked': { color: '#047857' },
-                                }}
-                            />
-                        }
-                        label={
-                            <Typography variant="body2" sx={{ fontWeight: 500, color: certChecked ? '#047857' : 'text.primary' }}>
-                                Certifico que he cerrado el formulario en el sistema del Consejo de la Judicatura
-                            </Typography>
-                        }
-                        sx={{ mb: 2, alignItems: 'flex-start', mx: 0 }}
-                    />
-
                     {/* Status indicators */}
                     <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', mb: 2 }}>
-                        {REQUIRED_DOCUMENTS.map((doc) => (
-                            <Chip
-                                key={doc.id}
-                                icon={documents[doc.id] ? <CheckIcon /> : <ErrorIcon />}
-                                label={doc.label}
-                                size="small"
-                                sx={{
-                                    fontSize: '0.75rem',
-                                    bgcolor: documents[doc.id] ? 'rgba(4, 120, 87, 0.08)' : 'rgba(190, 18, 60, 0.08)',
-                                    color: documents[doc.id] ? '#047857' : '#be123c',
-                                    '& .MuiChip-icon': {
-                                        color: documents[doc.id] ? '#047857' : '#be123c',
-                                        fontSize: 16,
-                                    },
-                                }}
-                            />
-                        ))}
                         <Chip
-                            icon={certChecked ? <CheckIcon /> : <ErrorIcon />}
-                            label="Certificación Judicatura"
+                            icon={allChecked ? <CheckIcon /> : <ErrorIcon />}
+                            label={allChecked ? 'Todos los pasos completados' : `${Object.values(checklist).filter(Boolean).length} de 3 completados`}
                             size="small"
                             sx={{
                                 fontSize: '0.75rem',
-                                bgcolor: certChecked ? 'rgba(4, 120, 87, 0.08)' : 'rgba(190, 18, 60, 0.08)',
-                                color: certChecked ? '#047857' : '#be123c',
+                                bgcolor: allChecked ? 'rgba(4, 120, 87, 0.08)' : 'rgba(190, 18, 60, 0.08)',
+                                color: allChecked ? '#047857' : '#be123c',
                                 '& .MuiChip-icon': {
-                                    color: certChecked ? '#047857' : '#be123c',
+                                    color: allChecked ? '#047857' : '#be123c',
                                     fontSize: 16,
                                 },
                             }}
@@ -640,7 +552,7 @@ const ParticipacionEstado = () => {
 
                     {/* Complete Button */}
                     <Tooltip
-                        title={!canComplete ? 'Complete todos los requisitos: documentos + certificación + ingreso' : ''}
+                        title={!canComplete ? 'Complete todos los pasos del checklist e ingrese un monto' : ''}
                     >
                         <span>
                             <Button
@@ -658,8 +570,8 @@ const ParticipacionEstado = () => {
                                     bgcolor: '#047857',
                                     '&:hover': { bgcolor: '#065f46' },
                                     '&.Mui-disabled': {
-                                        bgcolor: 'rgba(148, 163, 184, 0.12)',
-                                        color: 'rgba(148, 163, 184, 0.5)',
+                                        bgcolor: 'action.disabledBackground',
+                                        color: 'text.disabled',
                                     },
                                 }}
                             >
@@ -675,8 +587,8 @@ const ParticipacionEstado = () => {
                 <Card
                     sx={{
                         borderRadius: 3,
-                        border: '1px solid rgba(148, 163, 184, 0.12)',
-                        background: 'linear-gradient(135deg, rgba(255,255,255,0.97) 0%, rgba(248,250,252,0.97) 100%)',
+                        border: '1px solid',
+                        borderColor: 'divider',
                     }}
                 >
                     <CardContent sx={{ p: 3, '&:last-child': { pb: 3 } }}>
