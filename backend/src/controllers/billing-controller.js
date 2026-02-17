@@ -1178,6 +1178,7 @@ export async function getSummary(req, res) {
         });
 
         let totalInvoiced = 0;
+        let totalSubtotalInvoiced = 0;
         let totalPaid = 0;
         let pendingCount = 0;
         let paidCount = 0;
@@ -1188,6 +1189,7 @@ export async function getSummary(req, res) {
             const balance = Number(invoice.totalAmount) - paid;
 
             totalInvoiced += Number(invoice.totalAmount);
+            totalSubtotalInvoiced += Number(invoice.subtotalAmount || 0);
             totalPaid += paid;
 
             if (balance <= 0) paidCount++;
@@ -1223,6 +1225,7 @@ export async function getSummary(req, res) {
             // Invoice-based totals (filtered by issue date)
             totals: {
                 invoiced: totalInvoiced,
+                subtotalInvoiced: totalSubtotalInvoiced,
                 paid: totalPaid,
                 pending: totalInvoiced - totalPaid
             },

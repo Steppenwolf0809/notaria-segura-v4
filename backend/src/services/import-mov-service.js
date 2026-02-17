@@ -481,12 +481,15 @@ async function processMovInvoice(invoiceData, sourceFile, userId) {
         
     } else {
         // Crear nueva factura
+        const movTotal = parseFloat(invoiceData.totalAmount || 0);
+        const movSubtotal = movTotal > 0 ? Math.round((movTotal / 1.15) * 100) / 100 : 0;
         const invoiceCreateData = {
             invoiceNumber,
             invoiceNumberRaw,
             clientTaxId: '', // No disponible en XML MOV
             clientName: invoiceData.clientName || 'Sin nombre',
             totalAmount: invoiceData.totalAmount,
+            subtotalAmount: movSubtotal,
             paidAmount: paidAmount,
             issueDate: invoiceData.issueDate || new Date(),
             status,
