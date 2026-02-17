@@ -48,7 +48,10 @@ import {
   Pending as PendingIcon,
   PlayArrow as InProgressIcon,
   LocalShipping as DeliveredIcon,
-  PriorityHigh as PriorityIcon
+  PriorityHigh as PriorityIcon,
+  Style as StyleIcon,
+  Gavel as GavelIcon,
+  ArrowForward as ArrowForwardIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import AdminLayout from './AdminLayout';
@@ -77,6 +80,7 @@ import ListaPagos from './billing/ListaPagos';
 import Reportes from './billing/Reportes';
 import FinancialHealthCard from './admin/FinancialHealthCard';
 import ParticipacionEstado from './admin/ParticipacionEstado';
+import { getAlertState } from '../utils/stateParticipationCalculator';
 
 /**
  * Centro de administración - Panel principal para ADMIN
@@ -91,7 +95,7 @@ const AdminCenter = () => {
   const renderContent = () => {
     switch (currentView) {
       case 'dashboard':
-        return <AdminDashboard />;
+        return <AdminDashboard onViewChange={handleViewChange} />;
       case 'users':
         return <UserManagement />;
       case 'documents':
@@ -128,7 +132,7 @@ const AdminCenter = () => {
       case 'reportes':
         return <Reportes />;
       default:
-        return <AdminDashboard />;
+        return <AdminDashboard onViewChange={handleViewChange} />;
     }
   };
 
@@ -142,7 +146,108 @@ const AdminCenter = () => {
 /**
  * Dashboard de Supervisión
  */
-const AdminDashboard = () => {
+// ── WIDGET PARTICIPACIÓN (DASHBOARD) ──
+const ParticipationWidget = ({ onViewChange }) => {
+  const alertState = getAlertState();
+  const day = new Date().getDate();
+  // Progress relative to "deadline" (approx day 10) or month end?
+  // Let's show a timeline: 1-----10(Deadline)-----30
+  // If day <= 10, value is relative to 10. If > 10, it's overdue.
+
+  const maxDays = 30; // Scale
+  const deadline = 10;
+  const progress = (day / maxDays) * 100;
+
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        p: 2.5,
+        borderRadius: 3,
+        border: '1px solid',
+        borderColor: alertState.isOverdue ? 'error.main' : 'rgba(148, 163, 184, 0.12)',
+        background: alertState.isOverdue
+          ? 'linear-gradient(135deg, rgba(220,38,38,0.05) 0%, rgba(255,255,255,0) 100%)'
+          : 'rgba(255, 255, 255, 0.5)',
+        position: 'relative',
+        overflow: 'hidden'
+      }}
+    >
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{
+            p: 1,
+            borderRadius: 2,
+            bgcolor: alertState.color + '20',
+            color: alertState.color,
+            display: 'flex'
+          }}>
+            <GavelIcon fontSize="small" />
+          </Box>
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+              Participación Estado
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+              Día {day} • {alertState.status === 'normal' ? 'A tiempo' : alertState.status === 'deadline' ? 'Vence hoy' : 'Con recargo'}
+            </Typography>
+          </Box>
+        </Box>
+        <IconButton
+          size="small"
+          onClick={() => onViewChange('participacion-estado')}
+          sx={{ color: 'primary.main', bgcolor: 'primary.light', '&:hover': { bgcolor: 'primary.main', color: 'white' } }}
+        >
+          <ArrowForwardIcon fontSize="small" />
+        </IconButton>
+      </Box>
+
+      {/* Timeline Bar */}
+      <Box sx={{ position: 'relative', mt: 1, mb: 1 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>Día 1</Typography>
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem', fontWeight: 700 }}>Día 10 (Límite)</Typography>
+          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.65rem' }}>Fin Mes</Typography>
+        </Box>
+        <Box sx={{
+          height: 6,
+          borderRadius: 3,
+          bgcolor: 'rgba(0,0,0,0.06)',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          {/* Deadline Marker */}
+          <Box sx={{
+            position: 'absolute',
+            left: `${(10 / 30) * 100}%`,
+            top: 0, bottom: 0,
+            width: 2,
+            bgcolor: 'text.disabled',
+            zIndex: 1
+          }} />
+
+          {/* Progress */}
+          <Box sx={{
+            height: '100%',
+            width: `${Math.min(progress, 100)}%`,
+            bgcolor: alertState.color,
+            borderRadius: 3,
+            transition: 'width 1s ease'
+          }} />
+        </Box>
+      </Box>
+
+      {alertState.isOverdue && (
+        <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
+          <WarningIcon sx={{ fontSize: 14 }} />
+          Multa del 3% aplica actualmente
+        </Typography>
+      )}
+    </Paper>
+  );
+};
+
+const AdminDashboard = ({ onViewChange }) => {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -519,6 +624,10 @@ const AdminDashboard = () => {
                 color={kpis?.weeklyEfficiency > 80 ? "success" : "warning"}
                 subtext="Entregados / Ingresados"
               />
+            </Box>
+            <Box sx={{ mt: 2 }}>
+              {/* WIDGET PARTICIPACIÓN */}
+              <ParticipationWidget onViewChange={onViewChange} />
             </Box>
           </Box>
         </Grid>
@@ -917,7 +1026,7 @@ const AdminDashboard = () => {
           loadStats(page, false);
         }}
       />
-    </Box>
+    </Box >
   );
 };
 
