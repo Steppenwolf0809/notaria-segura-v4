@@ -48,12 +48,10 @@ import {
     Clear as ClearIcon,
     KeyboardArrowDown as ExpandIcon,
     KeyboardArrowUp as CollapseIcon,
-    Send as SendIcon,
     Edit as EditIcon
 } from '@mui/icons-material';
 import billingService from '../../services/billing-service';
 import * as XLSX from 'xlsx';
-import MensajeCobroModal from './MensajeCobroModal';
 import useAuthStore from '../../store/auth-store';
 
 /**
@@ -80,8 +78,6 @@ const Reportes = () => {
     // Estado para filas expandidas en Cartera por Cobrar
     const [expandedRows, setExpandedRows] = useState(new Set());
 
-    // Estado para modal de mensaje de cobro
-    const [mensajeModal, setMensajeModal] = useState({ open: false, clientData: null });
     const [commentModal, setCommentModal] = useState({ open: false, row: null, text: '' });
     const [savingComment, setSavingComment] = useState(false);
     const { user } = useAuthStore();
@@ -311,7 +307,7 @@ const Reportes = () => {
     };
 
     const handleSaveComment = async () => {
-        const receivableId = commentModal.row?.receivableId;
+        const receivableId = commentModal.row?.receivableId || commentModal.row?.id;
 
         if (!receivableId) {
             setError('No se pudo identificar la factura para guardar el comentario');
@@ -802,7 +798,7 @@ const Reportes = () => {
                                                                         <TableCell sx={{ fontWeight: 'bold' }} align="right">Saldo</TableCell>
                                                                         <TableCell sx={{ fontWeight: 'bold' }}>Matrizador</TableCell>
                                                                         <TableCell sx={{ fontWeight: 'bold' }}>Estado</TableCell>
-                                                                        <TableCell sx={{ fontWeight: 'bold' }} align="center">Mensaje</TableCell>
+                                                                        <TableCell sx={{ fontWeight: 'bold' }} align="center">Comentario Caja</TableCell>
                                                                     </TableRow>
                                                                 </TableHead>
                                                                 <TableBody>
@@ -830,32 +826,34 @@ const Reportes = () => {
                                                                                     color={inv.status === 'PENDING' ? 'warning' : inv.status === 'PARTIAL' ? 'info' : 'error'}
                                                                                 />
                                                                             </TableCell>
-                                                                            <TableCell align="center">
-                                                                                <Tooltip title="Enviar mensaje de cobro para esta factura">
-                                                                                    <IconButton
+                                                                            <TableCell sx={{ minWidth: 260 }}>
+                                                                                <Typography variant="body2" color={inv.comentarioCaja ? 'text.primary' : 'text.secondary'}>
+                                                                                    {inv.comentarioCaja || 'Sin comentario'}
+                                                                                </Typography>
+                                                                                {(inv.comentarioCajaUpdatedAt || inv.comentarioCajaUpdatedBy) && (
+                                                                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                                                                        {inv.comentarioCajaUpdatedBy || 'Caja'} • {formatDate(inv.comentarioCajaUpdatedAt)}
+                                                                                    </Typography>
+                                                                                )}
+                                                                                {canEditCashierComment && (
+                                                                                    <Button
                                                                                         size="small"
-                                                                                        color="success"
+                                                                                        startIcon={<EditIcon fontSize="small" />}
+                                                                                        sx={{ mt: 1 }}
                                                                                         onClick={(e) => {
                                                                                             e.stopPropagation();
-                                                                                            setMensajeModal({
-                                                                                                open: true,
-                                                                                                clientData: {
-                                                                                                    clientName: row.clientName,
-                                                                                                    clientTaxId: row.clientTaxId,
-                                                                                                    balance: inv.balance,
-                                                                                                    invoiceCount: 1,
-                                                                                                    invoiceNumber: inv.invoiceNumber,
-                                                                                                    totalAmount: inv.totalAmount,
-                                                                                                    paidAmount: inv.paidAmount,
-                                                                                                    matrizador: inv.matrizador,
-                                                                                                    documentoId: inv.documentId || null
-                                                                                                }
+                                                                                            handleOpenCommentModal({
+                                                                                                id: inv.id,
+                                                                                                receivableId: inv.id,
+                                                                                                factura: inv.invoiceNumber,
+                                                                                                cliente: row.clientName,
+                                                                                                comentarioCaja: inv.comentarioCaja || ''
                                                                                             });
                                                                                         }}
                                                                                     >
-                                                                                        <SendIcon fontSize="small" />
-                                                                                    </IconButton>
-                                                                                </Tooltip>
+                                                                                        {inv.comentarioCaja ? 'Editar' : 'Agregar'}
+                                                                                    </Button>
+                                                                                )}
                                                                             </TableCell>
                                                                         </TableRow>
                                                                     ))}
@@ -1106,7 +1104,7 @@ const Reportes = () => {
                 </>
             )}
 
-            {/* Modal de comentario de caja en cartera vencida */}
+            {/* Modal de comentario de caja */}
             <Dialog open={commentModal.open} onClose={handleCloseCommentModal} maxWidth="sm" fullWidth>
                 <DialogTitle>Comentario de Caja</DialogTitle>
                 <DialogContent dividers>
@@ -1138,14 +1136,6 @@ const Reportes = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
-
-            {/* Modal de mensaje de cobro */}
-            <MensajeCobroModal
-                open={mensajeModal.open}
-                onClose={() => setMensajeModal({ open: false, clientData: null })}
-                clientData={mensajeModal.clientData}
-                onSuccess={() => setMensajeModal({ open: false, clientData: null })}
-            />
         </Box>
     );
 };
