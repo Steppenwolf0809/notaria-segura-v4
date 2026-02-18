@@ -562,6 +562,20 @@ const CarteraCobros = () => {
                                                         />
                                                     )}
                                                 </TableCell>
+                                                <TableCell sx={{ minWidth: 220 }}>
+                                                    <Typography
+                                                        variant="caption"
+                                                        color={invoice.comentarioCaja ? 'text.primary' : 'text.secondary'}
+                                                        sx={{ display: 'block' }}
+                                                    >
+                                                        {invoice.comentarioCaja || 'Sin comentario de caja'}
+                                                    </Typography>
+                                                    {(invoice.comentarioCajaUpdatedBy || invoice.comentarioCajaUpdatedAt) && (
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            {invoice.comentarioCajaUpdatedBy || 'Caja'} • {formatDate(invoice.comentarioCajaUpdatedAt)}
+                                                        </Typography>
+                                                    )}
+                                                </TableCell>
                                                 <TableCell>
                                                     <Box display="flex" alignItems="center" gap={1}>
                                                         <ScheduleIcon fontSize="small" color="action" />

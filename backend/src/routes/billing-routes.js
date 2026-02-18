@@ -176,6 +176,12 @@ router.get('/cartera-pendiente/resumen',
     billingController.getCarteraPendienteResumen
 );
 
+router.put('/cartera-pendiente/:id/comentario',
+    requireRoles(['ADMIN', 'CAJA']),
+    csrfProtection,
+    billingController.updatePendingReceivableComment
+);
+
 router.get('/cartera-pendiente/sync-status',
     requireRoles(['ADMIN']),
     billingController.getCxcSyncStatus

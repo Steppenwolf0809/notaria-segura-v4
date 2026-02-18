@@ -43,7 +43,6 @@ const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
       limit: rowsPerPage,
       search: debouncedSearchTerm,
       status: statusFilter,
-      status: statusFilter,
       tipo: typeFilter,
       paymentStatus: paymentFilter, // Pasar filtro de pago
       orderBy: orderBy,
@@ -145,7 +144,6 @@ const GestionDocumentos = ({ documentoEspecifico, onDocumentoFound }) => {
       page: page + 1, // API usa 1-based index
       limit: rowsPerPage,
       search: debouncedSearchTerm,
-      status: statusFilter,
       status: statusFilter,
       tipo: typeFilter,
       paymentStatus: paymentFilter,
