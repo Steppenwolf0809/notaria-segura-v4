@@ -382,10 +382,10 @@ const AdminDashboard = ({ onViewChange }) => {
       // En getSupervisionStats el backend suele devolver matrixer como nombre string.
       // El modal espera assignedTo: { id, firstName, lastName }
       // Revisando el servicio, parece que row.matrixer es un string.
-      // OJO: Si row.matrixer es solo string, el modal fallarÃ¡ al intentar leer assignedTo.id
+      // OJO: Si row.matrixer es solo string, el modal fallará al intentar leer assignedTo.id
       // En DocumentOversight funciona porque recibe el objeto completo de /admin/documents/oversight
-      // AquÃ­ estamos recibiendo DTOs de estadÃ­sticas simplificados.
-      // SOLUCIÃ“N: Usaremos assignedTo si existe en row, o reconstruiremos un objeto bÃ¡sico si tenemos ID.
+      // Aquí estamos recibiendo DTOs de estadísticas simplificados.
+      // SOLUCIÓN: Usaremos assignedTo si existe en row, o reconstruiremos un objeto básico si tenemos ID.
       // Revisando getSupervisionStats en backend, devuelve: 
       // id, protocol, client, type, status, daysDelayed, matrixer (nombre), matrixerId (id)
       assignedTo: doc.matrixerId ? { id: doc.matrixerId, firstName: doc.matrixer, lastName: '' } : null
@@ -401,7 +401,7 @@ const AdminDashboard = ({ onViewChange }) => {
 
   // Handler para ver detalles
   const handleViewDetails = async (document) => {
-    // Abrir rÃ¡pido con datos disponibles
+    // Abrir rápido con datos disponibles
     setSelectedDocument(document);
     setDetailsModalOpen(true);
 
@@ -487,7 +487,7 @@ const AdminDashboard = ({ onViewChange }) => {
 
       setStats(prev => isLoadMore ? { ...prev, ...data } : data); // Actualizar KPIs siempre
 
-      // Manejo de lista con paginaciÃ³n
+      // Manejo de lista con paginación
       const newDocs = data.criticalList || [];
       if (isLoadMore) {
         setDocsList(prev => [...prev, ...newDocs]);
@@ -522,10 +522,10 @@ const AdminDashboard = ({ onViewChange }) => {
     setPerformanceAnchorEl(null);
   };
 
-  // Handler: clic en fila de rendimiento â†’ filtrar documentos crÃ­ticos de ese matrizador
+  // Handler: clic en fila de rendimiento -> filtrar documentos críticos de ese matrizador
   const handleTeamRowClick = (member) => {
     setSelectedMatrixer(member.id);
-    setStatusFilter('');  // '' = ALERTAS (Default) â†’ muestra documentos crÃ­ticos/retrasados
+    setStatusFilter('');  // '' = ALERTAS (Default) -> muestra documentos críticos/retrasados
     // Scroll suave a la tabla de documentos
     setTimeout(() => {
       docsCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -637,7 +637,7 @@ const AdminDashboard = ({ onViewChange }) => {
         </Box>
       </Box>
 
-      {/* â•â•â• KPIs AGRUPADOS â•â•â• */}
+      {/* === KPIs AGRUPADOS === */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         {/* ── GRUPO GESTIÓN ── */}
         <Grid item xs={12} md={7}>
@@ -658,7 +658,7 @@ const AdminDashboard = ({ onViewChange }) => {
                 <SummaryCard title="Activos" value={kpis?.activeCount || 0} icon={<DescriptionIcon />} color="primary" subtext="En curso" />
               </Grid>
               <Grid item xs={6} sm={3}>
-                <SummaryCard title={`CrÃ­ticos`} value={kpis?.criticalCount || 0} icon={<WarningIcon />} color="error" subtext={`> ${thresholdDays}d`} />
+                <SummaryCard title={`Críticos`} value={kpis?.criticalCount || 0} icon={<WarningIcon />} color="error" subtext={`> ${thresholdDays}d`} />
               </Grid>
               <Grid item xs={6} sm={3}>
                 <SummaryCard title="En Proceso" value={kpis?.inProgressCount || 0} icon={<InProgressIcon />} color="info" subtext="En curso" />
@@ -670,7 +670,7 @@ const AdminDashboard = ({ onViewChange }) => {
           </Box>
         </Grid>
 
-        {/* â”€â”€ GRUPO FINANZAS â”€â”€ */}
+        {/* --- GRUPO FINANZAS --- */}
         <Grid item xs={12} md={5}>
           <Box sx={{
             p: 2.5,
@@ -701,8 +701,8 @@ const AdminDashboard = ({ onViewChange }) => {
               >
                 <MenuItem onClick={() => handleBillingIntervalChange('current_month')}>Mes Actual</MenuItem>
                 <MenuItem onClick={() => handleBillingIntervalChange('last_month')}>Mes Anterior</MenuItem>
-                <MenuItem onClick={() => handleBillingIntervalChange('year_to_date')}>AÃ±o Actual</MenuItem>
-                <MenuItem onClick={() => handleBillingIntervalChange('all_time')}>HistÃ³rico</MenuItem>
+                <MenuItem onClick={() => handleBillingIntervalChange('year_to_date')}>Año Actual</MenuItem>
+                <MenuItem onClick={() => handleBillingIntervalChange('all_time')}>Histórico</MenuItem>
               </Menu>
             </Box>
             <Box sx={{ flex: 1 }}>
@@ -722,7 +722,7 @@ const AdminDashboard = ({ onViewChange }) => {
               />
             </Box>
             <Box sx={{ mt: 2 }}>
-              {/* WIDGET PARTICIPACIÃ"N */}
+              {/* WIDGET PARTICIPACIÓN */}
               <ParticipationWidget
                 onViewChange={onViewChange}
                 subtotal={currentMonthBilled}
@@ -1052,7 +1052,7 @@ const AdminDashboard = ({ onViewChange }) => {
                 <Typography variant="body1">{selectedDocument.type || 'N/A'}</Typography>
               </Grid>
               <Grid item xs={12} sm={6}>
-                <Typography variant="overline" color="textSecondary">NÂ° Factura</Typography>
+                <Typography variant="overline" color="textSecondary">N° Factura</Typography>
                 <Typography variant="body1" color={selectedDocument.numeroFactura ? 'textPrimary' : 'textSecondary'}>
                   {selectedDocument.numeroFactura || 'Sin asignar'}
                 </Typography>

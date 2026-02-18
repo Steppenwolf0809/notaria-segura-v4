@@ -65,6 +65,12 @@ const AdminFormulariosUAFE = () => {
   const [protocoloAEliminar, setProtocoloAEliminar] = useState(null);
   const [expandedProtocol, setExpandedProtocol] = useState(null);
 
+  const tableHeaderCellSx = {
+    backgroundColor: 'primary.main',
+    color: 'primary.contrastText',
+    fontWeight: 'bold'
+  };
+
   // Cargar protocolos al montar
   useEffect(() => {
     cargarProtocolos();
@@ -262,14 +268,14 @@ const AdminFormulariosUAFE = () => {
         <Table>
           <TableHead>
             <TableRow sx={{ backgroundColor: 'primary.main' }}>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold', width: 50 }}></TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>No. Protocolo</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Fecha</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Acto/Contrato</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Matrizador</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Personas</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Progreso</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="center">Acciones</TableCell>
+              <TableCell sx={{ ...tableHeaderCellSx, width: 50 }}></TableCell>
+              <TableCell sx={tableHeaderCellSx}>No. Protocolo</TableCell>
+              <TableCell sx={tableHeaderCellSx}>Fecha</TableCell>
+              <TableCell sx={tableHeaderCellSx}>Acto/Contrato</TableCell>
+              <TableCell sx={tableHeaderCellSx}>Matrizador</TableCell>
+              <TableCell sx={tableHeaderCellSx}>Personas</TableCell>
+              <TableCell sx={tableHeaderCellSx}>Progreso</TableCell>
+              <TableCell sx={tableHeaderCellSx} align="center">Acciones</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>

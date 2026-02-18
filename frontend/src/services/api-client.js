@@ -173,7 +173,7 @@ apiClient.interceptors.response.use(
           const newToken = response?.data?.data?.token || response?.data?.token;
 
           if (newToken) {
-            // esl�-disable-next-line no-console
+            // eslint-disable-next-line no-console
             console.log('[AUTH] ✅ Token refrescado exitosamente');
 
             // ✅ Actualizar token en TODOS los storages

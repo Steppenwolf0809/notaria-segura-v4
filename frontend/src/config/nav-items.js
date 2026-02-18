@@ -46,7 +46,6 @@ export const navItemsByRole = {
       label: 'Facturación',
       icon: 'AccountBalance',
       submenu: [
-        { id: 'importar-datos', label: 'Importar Datos', view: 'importar-datos', icon: 'CloudUpload' },
         { id: 'facturas', label: 'Facturas', view: 'facturas', icon: 'Receipt' },
         { id: 'pagos', label: 'Pagos', view: 'pagos', icon: 'Payments' },
         { id: 'reportes', label: 'Reportes', view: 'reportes', icon: 'Assessment' }

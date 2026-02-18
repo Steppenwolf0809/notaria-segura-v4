@@ -46,7 +46,7 @@ Este script analiza las secuencias de documentos registrados en la base de datos
    DATABASE_URL=postgresql://postgres:ymGXjRwwZshJaTEwyIpyztWqAZogkzSG@gondola.proxy.rlwy.net:41960/railway
    ```
    
-   > � **Seguridad**: Este script usa STAGING (copia de producción), nunca producción directa
+   > ⚠️ **Seguridad**: Este script usa STAGING (copia de producción), nunca producción directa
 
 ## ▶️ Ejecución
 
