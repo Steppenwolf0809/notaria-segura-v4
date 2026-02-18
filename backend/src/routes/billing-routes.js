@@ -24,33 +24,7 @@ import {
 
 const router = express.Router();
 
-// Configure multer for XLS file uploads (memory storage) - LEGACY
-const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: {
-        fileSize: 10 * 1024 * 1024 // 10MB limit
-    },
-    fileFilter: (req, file, cb) => {
-        const allowedMimes = [
-            'application/vnd.ms-excel',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'text/csv',
-            'application/octet-stream' // Some browsers send .xls as this
-        ];
-
-        // Also check file extension
-        const ext = file.originalname.toLowerCase().substring(file.originalname.lastIndexOf('.'));
-        const allowedExts = ['.xls', '.xlsx', '.csv'];
-
-        if (allowedMimes.includes(file.mimetype) || allowedExts.includes(ext)) {
-            cb(null, true);
-        } else {
-            cb(new Error('Tipo de archivo no permitido. Solo .xls, .xlsx, .csv'), false);
-        }
-    }
-});
-
-// Configure multer for XML file uploads (memory storage) - NUEVO SISTEMA
+// Configure multer for XML file uploads (memory storage)
 const xmlUpload = multer({
     storage: multer.memoryStorage(),
     limits: {
@@ -107,15 +81,8 @@ router.post('/import-xml', csrfProtection, xmlUpload.single('file'), billingCont
 // Get XML import statistics - 🔒 SECURITY: CSRF protection
 router.get('/import-xml-stats', csrfProtection, billingController.getXMLImportStats);
 
-// Import CXC endpoint (Cartera por Cobrar) - 🔒 SECURITY: CSRF protection
-router.post('/import-cxc', csrfProtection, xmlUpload.single('file'), billingController.importCxcFile);
-
 // Import MOV endpoint (Movimientos de Caja - Facturas + Pagos Efectivo) - 🔒 SECURITY: CSRF protection
 router.post('/import-mov', csrfProtection, xmlUpload.single('file'), billingController.importMovFile);
-
-// Import XLS endpoint (LEGACY - Deprecado, mantener 1 mes)
-// TODO: Comentar después del 28 de febrero de 2026
-router.post('/import', csrfProtection, upload.single('file'), billingController.importFile);
 
 // ============================================================================
 // SPRINT 6: Cartera de Matrizadores
@@ -157,15 +124,8 @@ router.get('/matrizadores', billingController.getMatrizadoresForAssignment);
 router.patch('/invoices/:invoiceId/assign', csrfProtection, billingController.assignInvoiceMatrizador);
 
 // ============================================================================
-// MÓDULO CXC - CARTERA POR COBRAR (Sync Agent + Legacy XLS)
+// MÓDULO CXC - CARTERA POR COBRAR (Sync Agent)
 // ============================================================================
-
-// --- Legacy XLS import (se deprecará) ---
-router.post('/import-cxc-xls', csrfProtection, upload.single('file'), billingController.importCxcXls);
-router.get('/cartera-pendiente/fechas', billingController.getAvailableReportDates);
-router.delete('/cartera-pendiente/limpiar', csrfProtection, billingController.limpiarCarteraAntigua);
-
-// --- Cartera Pendiente (nueva versión - Sync Agent) ---
 router.get('/cartera-pendiente',
     requireRoles(['ADMIN', 'CAJA', 'RECEPCION']),
     billingController.getCarteraPendiente

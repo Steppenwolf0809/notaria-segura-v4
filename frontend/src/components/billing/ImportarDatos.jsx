@@ -30,7 +30,6 @@ import {
     Error as ErrorIcon,
     Warning as WarningIcon,
     Receipt as ReceiptIcon,
-    Assessment as AssessmentIcon,
     PointOfSale as PointOfSaleIcon
 } from '@mui/icons-material';
 import { useDropzone } from 'react-dropzone';
@@ -38,10 +37,9 @@ import billingService from '../../services/billing-service';
 
 /**
  * ImportarDatos Component
- * Permite importar archivos Excel/CSV/XML de Koinor al sistema de facturación
+ * Permite importar archivos XML de Koinor al sistema de facturación
  * - Pestaña MOV: XML de Movimientos de Caja (facturas + pagos efectivo)
  * - Pestaña PAGOS: XML de Estado de Cuenta (pagos posteriores)
- * - Pestaña CXC: XLS/CSV de Cartera por Cobrar (saldos pendientes)
  */
 const ImportarDatos = () => {
     // Pestaña activa
@@ -89,27 +87,12 @@ const ImportarDatos = () => {
         }
     }, []);
 
-    // Configurar formatos aceptados según la pestaña activa
-    const getAcceptedFormats = () => {
-        if (activeTab === 0 || activeTab === 1) {
-            // Pestaña MOV y PAGOS: solo XML
-            return {
-                'text/xml': ['.xml'],
-                'application/xml': ['.xml']
-            };
-        } else {
-            // Pestaña CXC: XLS, XLSX, CSV
-            return {
-                'application/vnd.ms-excel': ['.xls'],
-                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-                'text/csv': ['.csv']
-            };
-        }
-    };
-
     const { getRootProps, getInputProps, isDragActive } = useDropzone({
         onDrop,
-        accept: getAcceptedFormats(),
+        accept: {
+            'text/xml': ['.xml'],
+            'application/xml': ['.xml']
+        },
         maxFiles: 1,
         multiple: false
     });
@@ -126,7 +109,7 @@ const ImportarDatos = () => {
 
         try {
             let response;
-            
+
             if (activeTab === 0) {
                 // Pestaña MOV: importar XML de movimientos (facturas + pagos efectivo)
                 setProcessingStatus('Procesando XML de Movimientos de Caja...');
@@ -139,7 +122,7 @@ const ImportarDatos = () => {
                         }
                     }
                 );
-            } else if (activeTab === 1) {
+            } else {
                 // Pestaña PAGOS: importar XML de pagos posteriores
                 setProcessingStatus('Procesando XML de Estado de Cuenta...');
                 response = await billingService.importXmlFile(
@@ -148,18 +131,6 @@ const ImportarDatos = () => {
                         setUploadProgress(progress);
                         if (progress >= 100) {
                             setProcessingStatus('Aplicando pagos a facturas...');
-                        }
-                    }
-                );
-            } else {
-                // Pestaña CXC: importar XLS/CSV de cartera por cobrar
-                setProcessingStatus('Procesando archivo de Cartera por Cobrar...');
-                response = await billingService.importCxcXls(
-                    selectedFile,
-                    (progress) => {
-                        setUploadProgress(progress);
-                        if (progress >= 100) {
-                            setProcessingStatus('Actualizando saldos pendientes...');
                         }
                     }
                 );
@@ -221,8 +192,8 @@ const ImportarDatos = () => {
 
             {/* Pestañas */}
             <Paper sx={{ mb: 3 }}>
-                <Tabs 
-                    value={activeTab} 
+                <Tabs
+                    value={activeTab}
                     onChange={(e, newValue) => {
                         setActiveTab(newValue);
                         setSelectedFile(null);
@@ -231,19 +202,14 @@ const ImportarDatos = () => {
                     }}
                     variant="fullWidth"
                 >
-                    <Tab 
-                        icon={<PointOfSaleIcon />} 
-                        label="MOV - FACTURAS (XML)" 
+                    <Tab
+                        icon={<PointOfSaleIcon />}
+                        label="MOV - FACTURAS (XML)"
                         iconPosition="start"
                     />
-                    <Tab 
-                        icon={<ReceiptIcon />} 
-                        label="PAGOS POSTERIORES (XML)" 
-                        iconPosition="start"
-                    />
-                    <Tab 
-                        icon={<AssessmentIcon />} 
-                        label="CXC - CARTERA (XLS/CSV)" 
+                    <Tab
+                        icon={<ReceiptIcon />}
+                        label="PAGOS POSTERIORES (XML)"
                         iconPosition="start"
                     />
                 </Tabs>
@@ -253,21 +219,15 @@ const ImportarDatos = () => {
             <Alert severity="info" sx={{ mb: 3 }}>
                 {activeTab === 0 ? (
                     <>
-                        <strong>💰 MOVIMIENTOS DE CAJA:</strong> Importa el archivo XML de "Diario de Caja" desde Koinor.
+                        <strong>MOVIMIENTOS DE CAJA:</strong> Importa el archivo XML de "Diario de Caja" desde Koinor.
                         Este archivo contiene las facturas del día y marca automáticamente como PAGADAS las que
                         fueron pagadas en efectivo (conpag=E).
                     </>
-                ) : activeTab === 1 ? (
-                    <>
-                        <strong>📄 PAGOS POSTERIORES:</strong> Importa el archivo XML de "Estado de Cuenta" desde Koinor.
-                        Este archivo contiene los pagos por transferencia/cheque y actualiza automáticamente
-                        el estado de las facturas existentes.
-                    </>
                 ) : (
                     <>
-                        <strong>📊 CARTERA POR COBRAR:</strong> Importa el reporte XLS/CSV de saldos pendientes.
-                        Este archivo es una "fotografía" de la cartera en un momento dado y se guarda en una tabla
-                        separada para análisis y reportes.
+                        <strong>PAGOS POSTERIORES:</strong> Importa el archivo XML de "Estado de Cuenta" desde Koinor.
+                        Este archivo contiene los pagos por transferencia/cheque y actualiza automáticamente
+                        el estado de las facturas existentes.
                     </>
                 )}
             </Alert>
@@ -314,10 +274,7 @@ const ImportarDatos = () => {
                                     o haz clic para seleccionar
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                                    {activeTab === 0 || activeTab === 1
-                                        ? 'Formato aceptado: .xml' 
-                                        : 'Formatos aceptados: .xls, .xlsx, .csv'
-                                    }
+                                    Formato aceptado: .xml
                                 </Typography>
                             </Box>
                         )}
@@ -326,9 +283,9 @@ const ImportarDatos = () => {
                     {/* Barra de progreso y estado */}
                     {uploading && (
                         <Box sx={{ mt: 2 }}>
-                            <LinearProgress 
-                                variant={uploadProgress >= 100 ? "indeterminate" : "determinate"} 
-                                value={uploadProgress} 
+                            <LinearProgress
+                                variant={uploadProgress >= 100 ? "indeterminate" : "determinate"}
+                                value={uploadProgress}
                             />
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
                                 <Typography variant="body2" color="primary.main" fontWeight="medium">
@@ -382,7 +339,7 @@ const ImportarDatos = () => {
                                             • Facturas a crédito: {result.stats?.facturasCredito || 0}
                                         </Typography>
                                     </>
-                                ) : activeTab === 1 ? (
+                                ) : (
                                     // Resultado de importación de PAGOS
                                     <>
                                         <Typography variant="body2">
@@ -397,27 +354,6 @@ const ImportarDatos = () => {
                                         {result.stats?.invoicesCreatedLegacy > 0 && (
                                             <Typography variant="body2" color="info.main">
                                                 • Facturas legacy creadas: {result.stats.invoicesCreatedLegacy}
-                                            </Typography>
-                                        )}
-                                    </>
-                                ) : (
-                                    // Resultado de importación de CXC
-                                    <>
-                                        <Typography variant="body2">
-                                            • Registros procesados: {result.stats?.totalRecords || 0}
-                                        </Typography>
-                                        <Typography variant="body2">
-                                            • Nuevos: {result.stats?.created || 0} | Actualizados: {result.stats?.updated || 0}
-                                        </Typography>
-                                        <Typography variant="body2">
-                                            • Saldo total: ${result.stats?.totalBalance?.toFixed(2) || '0.00'}
-                                        </Typography>
-                                        <Typography variant="body2">
-                                            • Clientes: {result.stats?.clientsCount || 0}
-                                        </Typography>
-                                        {result.stats?.totalOverdue > 0 && (
-                                            <Typography variant="body2" color="warning.main">
-                                                • Saldo vencido: ${result.stats.totalOverdue.toFixed(2)}
                                             </Typography>
                                         )}
                                     </>
@@ -436,50 +372,34 @@ const ImportarDatos = () => {
                 <Grid size={{ xs: 12, md: 4 }}>
                     <Card>
                         <CardContent>
-                            {(activeTab === 0 || activeTab === 1) && (
-                                <>
-                                    <Typography variant="subtitle1" gutterBottom>
-                                        Filtro de Fechas (Opcional)
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
-                                        Filtra los registros a importar por rango de fechas
-                                    </Typography>
+                            <Typography variant="subtitle1" gutterBottom>
+                                Filtro de Fechas (Opcional)
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary" sx={{ mb: 2, display: 'block' }}>
+                                Filtra los registros a importar por rango de fechas
+                            </Typography>
 
-                                    <TextField
-                                        label="Desde"
-                                        type="date"
-                                        value={dateFrom}
-                                        onChange={(e) => setDateFrom(e.target.value)}
-                                        fullWidth
-                                        size="small"
-                                        sx={{ mb: 2 }}
-                                        InputLabelProps={{ shrink: true }}
-                                    />
+                            <TextField
+                                label="Desde"
+                                type="date"
+                                value={dateFrom}
+                                onChange={(e) => setDateFrom(e.target.value)}
+                                fullWidth
+                                size="small"
+                                sx={{ mb: 2 }}
+                                InputLabelProps={{ shrink: true }}
+                            />
 
-                                    <TextField
-                                        label="Hasta"
-                                        type="date"
-                                        value={dateTo}
-                                        onChange={(e) => setDateTo(e.target.value)}
-                                        fullWidth
-                                        size="small"
-                                        sx={{ mb: 3 }}
-                                        InputLabelProps={{ shrink: true }}
-                                    />
-                                </>
-                            )}
-
-                            {activeTab === 2 && (
-                                <>
-                                    <Typography variant="subtitle1" gutterBottom>
-                                        Información
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary" sx={{ mb: 3, display: 'block' }}>
-                                        El archivo debe contener las columnas: CODCLI, NOMCLI, NUMTRA, SALDO.
-                                        La fecha del reporte se detecta automáticamente del nombre del archivo.
-                                    </Typography>
-                                </>
-                            )}
+                            <TextField
+                                label="Hasta"
+                                type="date"
+                                value={dateTo}
+                                onChange={(e) => setDateTo(e.target.value)}
+                                fullWidth
+                                size="small"
+                                sx={{ mb: 3 }}
+                                InputLabelProps={{ shrink: true }}
+                            />
 
                             <Button
                                 variant="contained"
@@ -500,7 +420,7 @@ const ImportarDatos = () => {
             <Box sx={{ mt: 4 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
                     <Typography variant="h6">
-                        📜 Historial de Importaciones
+                        Historial de Importaciones
                     </Typography>
                     <Tooltip title="Actualizar">
                         <span>
