@@ -81,7 +81,7 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
 
   // Keep billing submenu open when on a billing view
   useEffect(() => {
-    const billingViews = ['importar-datos', 'facturas', 'pagos', 'reportes'];
+    const billingViews = ['facturas', 'pagos', 'reportes'];
     if (billingViews.includes(currentView)) setBillingMenuOpen(true);
   }, [currentView]);
 
@@ -127,7 +127,6 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
         {
           view: '_billing', label: 'Facturación', icon: <AccountBalanceIcon />,
           submenu: [
-            { view: 'importar-datos', label: 'Importar Datos', icon: <CloudUploadIcon /> },
             { view: 'facturas', label: 'Facturas', icon: <ReceiptIcon /> },
             { view: 'pagos', label: 'Pagos', icon: <PaymentsIcon /> },
             { view: 'reportes', label: 'Reportes', icon: <AssessmentIcon /> },
