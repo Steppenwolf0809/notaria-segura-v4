@@ -72,15 +72,24 @@ const ListaFacturas = () => {
     const [invoiceDetail, setInvoiceDetail] = useState(null);
     const [detailLoading, setDetailLoading] = useState(false);
 
-    // Cargar estadísticas
+    // Cargar estadísticas filtradas por periodo
     const loadStats = useCallback(async () => {
         try {
-            const response = await billingService.getStats();
-            setStats(response.data);
+            const params = {};
+            if (dateFrom) params.dateFrom = dateFrom;
+            if (dateTo) params.dateTo = dateTo;
+            const response = await billingService.getSummary(params);
+            // Mapear respuesta de getSummary a la estructura que usan los KPIs
+            setStats({
+                totalInvoices: response?.counts?.total || 0,
+                pendingInvoices: response?.counts?.pending || 0,
+                paidInvoices: response?.counts?.paid || 0,
+                totalPendingAmount: response?.totals?.pending || 0
+            });
         } catch (err) {
             console.error('Error cargando estadísticas:', err);
         }
-    }, []);
+    }, [dateFrom, dateTo]);
 
     // Cargar facturas
     const loadInvoices = useCallback(async () => {
