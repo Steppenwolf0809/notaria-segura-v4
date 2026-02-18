@@ -69,7 +69,10 @@
       "Bash(git -C \"C:\\\\notaria-segura\" diff frontend/src/components/recepcion/BulkDeliveryDialog.jsx)",
       "Bash(git -C \"C:\\\\notaria-segura\" add frontend/src/components/recepcion/BulkDeliveryDialog.jsx)",
       "Bash(git -C \"C:\\\\notaria-segura\" commit -m \"$\\(cat <<''EOF''\nfix: corregir nombres de campos en payload de entrega grupal\n\nEl frontend enviaba deliveredTo/receptorId/relationType/observations\npero el backend esperaba entregadoA/cedulaReceptor/relacionTitular/observaciones.\nEste mismatch causaba que entregadoA fuera undefined y la validación\nsiempre rechazara con \"nombre de quien retira es obligatorio\".\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(npx -y acorn:*)"
+      "Bash(npx -y acorn:*)",
+      "Bash(dir:*)",
+      "Bash(git -C \"d:/notaria-segura-clone\" status)",
+      "Bash(git -C \"d:\\\\notaria-segura-clone\" status)"
     ],
     "deny": []
   }

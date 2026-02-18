@@ -611,65 +611,7 @@ export async function getDocumentPaymentStatus(req, res) {
 }
 
 /**
- * Import Koinor Excel file
- * Requires multipart/form-data with 'file' field
- */
-export async function importFile(req, res) {
-    try {
-        // Check if file was uploaded
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                error: 'No se proporcionó archivo',
-                message: 'Debe subir un archivo Excel (.xls, .xlsx) o CSV (.csv)'
-            });
-        }
-
-        const { file } = req;
-        const userId = req.user?.id;
-
-        // Validate file type
-        const allowedExtensions = ['.xls', '.xlsx', '.csv'];
-        const ext = file.originalname.toLowerCase().substring(file.originalname.lastIndexOf('.'));
-
-        if (!allowedExtensions.includes(ext)) {
-            return res.status(400).json({
-                success: false,
-                error: 'Tipo de archivo no válido',
-                message: `Solo se permiten archivos: ${allowedExtensions.join(', ')}`
-            });
-        }
-
-        console.log(`[billing-controller] Starting import of ${file.originalname} (${file.size} bytes)`);
-
-        // Import the service dynamically to avoid circular dependencies
-        const { importKoinorFile } = await import('../services/import-koinor-service.js');
-
-        // Process the file
-        const result = await importKoinorFile(
-            file.buffer,
-            file.originalname,
-            userId
-        );
-
-        res.json({
-            success: true,
-            message: 'Importación completada',
-            ...result
-        });
-
-    } catch (error) {
-        console.error('[billing-controller] Import error:', error);
-        // 🔒 SECURITY: Never expose internal error details
-        res.status(500).json({
-            success: false,
-            message: 'Error durante la importación del archivo'
-        });
-    }
-}
-
-/**
- * Import Koinor XML file (NUEVO - Reemplaza sistema XLS)
+ * Import Koinor XML file
  * Requires multipart/form-data with 'file' field
  *
  * Características:
@@ -729,14 +671,11 @@ export async function importXmlFile(req, res) {
             xmlPreview = file.buffer.toString('utf8').substring(0, 1000);
         }
 
-        // Detectar si es XML de CXC (tag raíz: cxc_YYYYMMDD)
-        const isCxcXml = /<cxc_\d{8}>/.test(xmlPreview);
-
         // Detectar si es XML de MOV (Movimientos de Caja)
         const isMovXml = xmlPreview.includes('d_vc_i_diario_caja_detallado') ||
             xmlPreview.includes('<MOV_');
 
-        // 🔍 VALIDACIÓN: No permitir archivos MOV en pestaña PAGOS
+        // No permitir archivos MOV en pestaña PAGOS
         if (isMovXml) {
             return res.status(400).json({
                 success: false,
@@ -746,26 +685,13 @@ export async function importXmlFile(req, res) {
             });
         }
 
-        let result;
-        if (isCxcXml) {
-            // Usar servicio de CXC para archivos de cartera por cobrar
-            console.log('[billing-controller] Detected CXC XML format, using CXC import service');
-            const { importCxcFile } = await import('../services/cxc-import-service.js');
-            result = await importCxcFile(
-                file.buffer,
-                file.originalname,
-                userId
-            );
-        } else {
-            // Usar servicio de pagos para archivos de estado de cuenta
-            console.log('[billing-controller] Detected payment XML format, using payment import service');
-            const { importKoinorXMLFile } = await import('../services/import-koinor-xml-service.js');
-            result = await importKoinorXMLFile(
-                file.buffer,
-                file.originalname,
-                userId
-            );
-        }
+        console.log('[billing-controller] Processing payment XML, using payment import service');
+        const { importKoinorXMLFile } = await import('../services/import-koinor-xml-service.js');
+        const result = await importKoinorXMLFile(
+            file.buffer,
+            file.originalname,
+            userId
+        );
 
         res.json({
             success: true,
@@ -802,16 +728,22 @@ export async function importXmlFile(req, res) {
  */
 export async function getStats(req, res) {
     try {
-        const { getImportStats } = await import('../services/import-koinor-service.legacy.js');
-        const stats = await getImportStats();
+        const [invoiceCount, paymentCount, pendingCount] = await Promise.all([
+            prisma.invoice.count(),
+            prisma.payment.count(),
+            prisma.invoice.count({ where: { status: 'PENDING' } })
+        ]);
 
         res.json({
             success: true,
-            stats
+            stats: {
+                totalInvoices: invoiceCount,
+                totalPayments: paymentCount,
+                pendingInvoices: pendingCount
+            }
         });
     } catch (error) {
         console.error('[billing-controller] Get stats error:', error);
-        // 🔒 SECURITY: Never expose internal error details
         res.status(500).json({
             success: false,
             message: 'Error al obtener estadísticas'
@@ -2312,107 +2244,6 @@ export async function getEntregasConSaldo(req, res) {
 }
 
 /**
- * Import CXC (Cartera por Cobrar) from XML file
- * Requires multipart/form-data with 'file' field
- */
-export async function importCxcFile(req, res) {
-    try {
-        // Check if file was uploaded
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                error: 'No se proporcionó archivo',
-                message: 'Debe subir un archivo XML de CXC'
-            });
-        }
-
-        const { file } = req;
-        const userId = req.user?.id;
-
-        // Validate file type
-        const ext = file.originalname.toLowerCase().substring(
-            file.originalname.lastIndexOf('.')
-        );
-
-        if (ext !== '.xml') {
-            return res.status(400).json({
-                success: false,
-                error: 'Tipo de archivo no válido',
-                message: 'Solo se permiten archivos XML (.xml)'
-            });
-        }
-
-        // Validate file size (máximo 50MB)
-        const maxSize = 50 * 1024 * 1024;
-        if (file.size > maxSize) {
-            return res.status(400).json({
-                success: false,
-                error: 'Archivo demasiado grande',
-                message: 'El archivo no debe superar 50MB'
-            });
-        }
-
-        console.log(`[billing-controller] Starting CXC import of ${file.originalname} (${file.size} bytes)`);
-
-        // Import the service dynamically
-        const { importCxcFile: importCxc } = await import('../services/cxc-import-service.js');
-
-        // Process the file
-        const result = await importCxc(
-            file.buffer,
-            file.originalname,
-            userId
-        );
-
-        res.json({
-            success: true,
-            message: 'Importación de CXC completada',
-            ...result
-        });
-
-    } catch (error) {
-        console.error('[billing-controller] CXC import error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error durante la importación del archivo CXC',
-            details: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
-    }
-}
-
-/**
- * Detecta el tipo de archivo XML basado en su contenido
- * @param {Buffer} fileBuffer - Buffer del archivo
- * @returns {Object} - { type: 'MOV'|'PAGOS'|'CXC'|'UNKNOWN', preview: string }
- */
-function detectXmlFileType(fileBuffer) {
-    let xmlPreview;
-    try {
-        // Intentar leer como UTF-16LE primero
-        xmlPreview = fileBuffer.toString('utf16le').substring(0, 1000);
-        if (!xmlPreview.includes('<?xml')) {
-            xmlPreview = fileBuffer.toString('utf8').substring(0, 1000);
-        }
-    } catch (e) {
-        xmlPreview = fileBuffer.toString('utf8').substring(0, 1000);
-    }
-
-    // Detectar tipo por tags
-    const hasMovTags = xmlPreview.includes('d_vc_i_diario_caja_detallado') ||
-        xmlPreview.includes('<MOV_');
-    const hasPagosTags = xmlPreview.includes('<d_vc_i_estado_cuenta') ||
-        xmlPreview.includes('<E>') ||
-        xmlPreview.includes('<E_group1>');
-    const hasCxcTags = xmlPreview.includes('<cxc_');
-
-    if (hasMovTags) return { type: 'MOV', preview: xmlPreview.substring(0, 200) };
-    if (hasPagosTags) return { type: 'PAGOS', preview: xmlPreview.substring(0, 200) };
-    if (hasCxcTags) return { type: 'CXC', preview: xmlPreview.substring(0, 200) };
-
-    return { type: 'UNKNOWN', preview: xmlPreview.substring(0, 200) };
-}
-
-/**
  * Import MOV (Movimientos de Caja) from XML file
  * Importa facturas y marca como PAGADAS las que fueron pagadas en efectivo
  * Requires multipart/form-data with 'file' field
@@ -2630,77 +2461,7 @@ export async function getMatrizadoresForAssignment(req, res) {
 }
 
 /**
- * ============================================================================
- * NUEVO MÓDULO CXC - CARTERA POR COBRAR (XLS/CSV)
- * ============================================================================
- */
-
-/**
- * Importar archivo XLS/CSV de Cartera por Cobrar
- * Requires multipart/form-data with 'file' field
- * Acepta: .xls, .xlsx, .csv
- */
-export async function importCxcXls(req, res) {
-    try {
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                error: 'No se proporcionó archivo',
-                message: 'Debe subir un archivo Excel (.xls, .xlsx) o CSV (.csv)'
-            });
-        }
-
-        const { file } = req;
-        const userId = req.user?.id;
-
-        const allowedExtensions = ['.xls', '.xlsx', '.csv'];
-        const ext = file.originalname.toLowerCase().substring(file.originalname.lastIndexOf('.'));
-
-        if (!allowedExtensions.includes(ext)) {
-            return res.status(400).json({
-                success: false,
-                error: 'Tipo de archivo no válido',
-                message: `Solo se permiten archivos: ${allowedExtensions.join(', ')}`
-            });
-        }
-
-        const maxSize = 50 * 1024 * 1024;
-        if (file.size > maxSize) {
-            return res.status(400).json({
-                success: false,
-                error: 'Archivo demasiado grande',
-                message: 'El archivo no debe superar 50MB'
-            });
-        }
-
-        console.log(`[billing-controller] Starting CXC XLS import of ${file.originalname} (${file.size} bytes)`);
-
-        const { importCxcXlsFile } = await import('../services/cxc-xls-import-service.js');
-
-        const result = await importCxcXlsFile(
-            file.buffer,
-            file.originalname,
-            userId
-        );
-
-        res.json({
-            success: true,
-            message: 'Importación de Cartera por Cobrar completada',
-            ...result
-        });
-
-    } catch (error) {
-        console.error('[billing-controller] CXC XLS import error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error en la importación',
-            error: error.message || 'Error al procesar el archivo. Verifique el formato.'
-        });
-    }
-}
-
-/**
- * Obtener cartera pendiente (detalle) - NUEVA VERSIÓN (Sync Agent)
+ * Obtener cartera pendiente (detalle) - Sync Agent
  * GET /api/billing/cartera-pendiente
  *
  * Query params:
@@ -3031,51 +2792,3 @@ export async function getCxcSyncStatus(req, res) {
     }
 }
 
-/**
- * Limpiar reportes antiguos de cartera
- * DELETE /api/billing/cartera-pendiente/limpiar
- */
-export async function limpiarCarteraAntigua(req, res) {
-    try {
-        const daysToKeep = req.query.days ? parseInt(req.query.days) : 60;
-
-        const { limpiarCarteraAntigua: limpiar } = await import('../services/cxc-xls-import-service.js');
-        const result = await limpiar(daysToKeep);
-
-        res.json({
-            success: true,
-            message: `Se eliminaron ${result.deletedCount} registros antiguos`,
-            ...result
-        });
-
-    } catch (error) {
-        console.error('[billing-controller] limpiarCarteraAntigua error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error al limpiar reportes antiguos'
-        });
-    }
-}
-
-/**
- * Obtener fechas de reportes disponibles
- * GET /api/billing/cartera-pendiente/fechas
- */
-export async function getAvailableReportDates(req, res) {
-    try {
-        const { getAvailableReportDates: getDates } = await import('../services/cxc-xls-import-service.js');
-        const dates = await getDates();
-
-        res.json({
-            success: true,
-            data: dates
-        });
-
-    } catch (error) {
-        console.error('[billing-controller] getAvailableReportDates error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error al obtener fechas de reportes'
-        });
-    }
-}

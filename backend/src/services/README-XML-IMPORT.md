@@ -11,7 +11,7 @@
 ### Servicios Principales
 - ✅ [`xml-koinor-parser.js`](./xml-koinor-parser.js) - Parser XML por streaming
 - ✅ [`import-koinor-xml-service.js`](./import-koinor-xml-service.js) - Orquestador de importación
-- ✅ [`import-koinor-service.legacy.js`](./import-koinor-service.legacy.js) - Sistema XLS deprecado
+- (Eliminado) `import-koinor-service.legacy.js` - Sistema XLS eliminado, reemplazado por Sync Agent
 
 ### Controladores y Rutas
 - ✅ [`../controllers/billing-controller.js`](../controllers/billing-controller.js) - Endpoint `importXmlFile()` agregado

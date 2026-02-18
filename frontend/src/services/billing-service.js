@@ -137,40 +137,7 @@ async function getClientBalance(taxId) {
  */
 
 /**
- * Importar archivo Excel/CSV de Koinor (LEGACY - usar importXmlFile para nuevas importaciones)
- * @param {File} file - Archivo a importar
- * @param {string} dateFrom - Fecha desde (opcional, YYYY-MM-DD)
- * @param {string} dateTo - Fecha hasta (opcional, YYYY-MM-DD)
- * @param {Function} onProgress - Callback de progreso (opcional)
- * @returns {Promise<Object>} Resultado de la importación
- */
-async function importFile(file, dateFrom = null, dateTo = null, onProgress = null) {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    if (dateFrom) formData.append('dateFrom', dateFrom);
-    if (dateTo) formData.append('dateTo', dateTo);
-
-    const config = {
-        headers: {
-            'Content-Type': 'multipart/form-data'
-        }
-    };
-
-    // Agregar callback de progreso si se proporciona
-    if (onProgress) {
-        config.onUploadProgress = (progressEvent) => {
-            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            onProgress(percentCompleted);
-        };
-    }
-
-    const response = await apiClient.post('/billing/import', formData, config);
-    return response.data;
-}
-
-/**
- * Importar archivo XML de Koinor (RECOMENDADO)
+ * Importar archivo XML de Koinor
  * @param {File} file - Archivo XML a importar
  * @param {Function} onProgress - Callback de progreso (opcional)
  * @returns {Promise<Object>} Resultado de la importación
@@ -235,34 +202,6 @@ async function importMovFile(file, onProgress = null) {
     }
 
     const response = await apiClient.post('/billing/import-mov', formData, config);
-    return response.data;
-}
-
-/**
- * Importar archivo XLS/CSV de Cartera por Cobrar (CXC)
- * @param {File} file - Archivo XLS/CSV a importar
- * @param {Function} onProgress - Callback de progreso (opcional)
- * @returns {Promise<Object>} Resultado de la importación
- */
-async function importCxcXls(file, onProgress = null) {
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const config = {
-        headers: {
-            'Content-Type': 'multipart/form-data'
-        },
-        timeout: 300000 // 5 minutos
-    };
-
-    if (onProgress) {
-        config.onUploadProgress = (progressEvent) => {
-            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            onProgress(percentCompleted);
-        };
-    }
-
-    const response = await apiClient.post('/billing/import-cxc-xls', formData, config);
     return response.data;
 }
 
@@ -526,10 +465,8 @@ const billingService = {
     getClientBalance,
 
     // Importación
-    importFile,
     importXmlFile,
     importMovFile,
-    importCxcXls,
     getImportLogs,
     getXMLImportStats,
 
