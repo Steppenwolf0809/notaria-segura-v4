@@ -11,7 +11,7 @@
 
 import { db as prisma } from '../db.js';
 import { parseCxcXML } from './xml-cxc-parser.js';
-import { normalizeInvoiceNumber, cleanTaxId } from '../utils/billing-utils.js';
+import { normalizeInvoiceNumber, cleanTaxId, buildInvoiceWhereByNumber } from '../utils/billing-utils.js';
 
 // Normalización de nombres de matrizadores para evitar duplicados visuales
 const MATRIZADOR_NAME_NORMALIZATION = {
@@ -216,12 +216,7 @@ async function processInvoiceUpsert(factura, sourceFile) {
 
     // Buscar factura existente
     let invoice = await prisma.invoice.findFirst({
-        where: {
-            OR: [
-                { invoiceNumber },
-                { invoiceNumberRaw }
-            ]
-        }
+        where: buildInvoiceWhereByNumber(invoiceNumberRaw || invoiceNumber)
     });
 
     const subtotalAmount = totalAmount > 0 ? Math.round((totalAmount / 1.15) * 100) / 100 : 0;

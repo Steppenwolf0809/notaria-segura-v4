@@ -246,7 +246,7 @@ const CajaStatsDashboard = () => {
         dateFrom: fromISO,
         dateTo: toISO,
         excludeCancelled: true,
-        excludeLegacy: true,
+        deduplicateInvoices: true,
         subtotalMode: 'hybrid'
       });
       const subtotalFromDB = Number(summary?.totals?.subtotalInvoiced || 0);

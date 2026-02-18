@@ -1,5 +1,6 @@
 import { db as prisma } from '../db.js';
 import XLSX from 'xlsx';
+import { buildInvoiceWhereByNumber } from '../utils/billing-utils.js';
 
 // Mapeo de códigos de vendedores a nombres ESTÁNDAR
 const MATRIZADOR_MAPPING = {
@@ -151,37 +152,47 @@ export async function importCxcXlsFile(fileBuffer, fileName, userId) {
         const subtotalAmount = rowData.totalAmount > 0 ? Math.round((rowData.totalAmount / 1.15) * 100) / 100 : 0;
 
         // Preparar operación Upsert
-        operations.push(prisma.invoice.upsert({
-          where: { invoiceNumber: rowData.invoiceNumber },
-          update: {
-            clientTaxId: rowData.clientTaxId,
-            clientName: rowData.clientName,
-            totalAmount: rowData.totalAmount,
-            subtotalAmount,
-            paidAmount: paidAmount,
-            issueDate: rowData.issueDate,
-            status: status,
-            matrizador: rowData.matrizador,
-            lastSyncAt: new Date(),
-            sourceFile: fileName,
-            invoiceNumberRaw: rowData.invoiceNumberRaw
-          },
-          create: {
-            invoiceNumber: rowData.invoiceNumber,
-            invoiceNumberRaw: rowData.invoiceNumberRaw,
-            clientTaxId: rowData.clientTaxId || '9999999999999',
-            clientName: rowData.clientName || 'Consumidor Final',
-            totalAmount: rowData.totalAmount,
-            subtotalAmount,
-            paidAmount: paidAmount,
-            issueDate: rowData.issueDate || new Date(),
-            status: status,
-            matrizador: rowData.matrizador,
-            sourceFile: fileName,
-            importedAt: new Date(),
-            lastSyncAt: new Date()
-          }
-        }));
+        const existingInvoice = await prisma.invoice.findFirst({
+          where: buildInvoiceWhereByNumber(rowData.invoiceNumberRaw || rowData.invoiceNumber),
+          select: { id: true }
+        });
+
+        if (existingInvoice) {
+          operations.push(prisma.invoice.update({
+            where: { id: existingInvoice.id },
+            data: {
+              clientTaxId: rowData.clientTaxId,
+              clientName: rowData.clientName,
+              totalAmount: rowData.totalAmount,
+              subtotalAmount,
+              paidAmount: paidAmount,
+              issueDate: rowData.issueDate,
+              status: status,
+              matrizador: rowData.matrizador,
+              lastSyncAt: new Date(),
+              sourceFile: fileName,
+              invoiceNumberRaw: rowData.invoiceNumberRaw
+            }
+          }));
+        } else {
+          operations.push(prisma.invoice.create({
+            data: {
+              invoiceNumber: rowData.invoiceNumber,
+              invoiceNumberRaw: rowData.invoiceNumberRaw,
+              clientTaxId: rowData.clientTaxId || '9999999999999',
+              clientName: rowData.clientName || 'Consumidor Final',
+              totalAmount: rowData.totalAmount,
+              subtotalAmount,
+              paidAmount: paidAmount,
+              issueDate: rowData.issueDate || new Date(),
+              status: status,
+              matrizador: rowData.matrizador,
+              sourceFile: fileName,
+              importedAt: new Date(),
+              lastSyncAt: new Date()
+            }
+          }));
+        }
 
       } catch (rowError) {
         console.warn(`[cxc-xls-import] Error reading row ${index}: ${rowError.message}`);

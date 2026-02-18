@@ -456,7 +456,7 @@ const AdminDashboard = ({ onViewChange }) => {
         dateFrom: fromISO,
         dateTo: toISO,
         excludeCancelled: true,
-        excludeLegacy: true,
+        deduplicateInvoices: true,
         subtotalMode: 'hybrid'
       });
       // Usar subtotal directo de la BD (Base Imponible sin IVA)

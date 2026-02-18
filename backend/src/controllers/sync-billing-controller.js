@@ -9,7 +9,7 @@
  */
 
 import { db as prisma } from '../db.js';
-import { normalizeInvoiceNumber } from '../utils/billing-utils.js';
+import { normalizeInvoiceNumber, buildInvoiceWhereByNumber } from '../utils/billing-utils.js';
 
 // Constants
 const BATCH_SIZE = 50; // Process invoices in batches for better transaction handling
@@ -218,12 +218,7 @@ async function processInvoice(tx, invoiceData) {
 
     // Check if invoice exists
     const existingInvoice = await tx.invoice.findFirst({
-        where: {
-            OR: [
-                { invoiceNumberRaw: invoiceNumberRaw },
-                { invoiceNumber: invoiceNumber }
-            ]
-        }
+        where: buildInvoiceWhereByNumber(invoiceNumberRaw)
     });
 
     let action = 'unchanged';
@@ -668,13 +663,9 @@ export async function syncCxc(req, res) {
                 try {
                     // Try to find and update the corresponding Invoice
                     const invoice = await prisma.invoice.findFirst({
-                        where: {
-                            OR: [
-                                { invoiceNumberRaw: paidInvoice.invoiceNumberRaw },
-                                { invoiceNumberRaw: paidInvoice.invoiceNumberRaw?.replace(/-/g, '') },
-                                { invoiceNumber: paidInvoice.invoiceNumber }
-                            ]
-                        }
+                        where: buildInvoiceWhereByNumber(
+                            paidInvoice.invoiceNumberRaw || paidInvoice.invoiceNumber
+                        )
                     });
                     
                     if (invoice && invoice.status !== 'PAID') {
