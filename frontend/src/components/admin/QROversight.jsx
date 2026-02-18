@@ -308,19 +308,23 @@ const QROversight = () => {
                                 </FormControl>
                             </Box>
 
-                            <TableContainer component={Box}>
-                                <Table size="small">
+                            <TableContainer component={Box} sx={{ overflowX: 'auto' }}>
+                                <Table size="small" sx={{ tableLayout: 'fixed', minWidth: 850 }}>
                                     <TableHead>
                                         <TableRow>
-                                            <TableCell>Token</TableCell>
-                                            <TableCell>N° Escritura</TableCell>
-                                            <TableCell>Tipo de Acto</TableCell>
-                                            <TableCell>Fecha</TableCell>
-                                            <TableCell>Matrizador</TableCell>
-                                            <TableCell>Estado</TableCell>
-                                            <TableCell align="right">Verificaciones</TableCell>
-                                            <TableCell align="right">Vistas PDF</TableCell>
-                                            <TableCell align="center">Acciones</TableCell>
+                                            <TableCell sx={{ width: 90 }}>Token</TableCell>
+                                            <TableCell sx={{ width: 150 }}>N° Escritura</TableCell>
+                                            <TableCell sx={{ width: 160 }}>Tipo de Acto</TableCell>
+                                            <TableCell sx={{ width: 90 }}>Fecha</TableCell>
+                                            <TableCell sx={{ width: 120 }}>Matrizador</TableCell>
+                                            <TableCell sx={{ width: 80 }}>Estado</TableCell>
+                                            <TableCell align="center" sx={{ width: 45 }}>
+                                                <Tooltip title="Verificaciones"><VisibilityIcon fontSize="small" color="action" /></Tooltip>
+                                            </TableCell>
+                                            <TableCell align="center" sx={{ width: 45 }}>
+                                                <Tooltip title="Vistas PDF"><Box component="span" sx={{ fontSize: 13, fontWeight: 600, color: 'text.secondary' }}>PDF</Box></Tooltip>
+                                            </TableCell>
+                                            <TableCell align="center" sx={{ width: 70 }}>Acciones</TableCell>
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
@@ -333,19 +337,20 @@ const QROversight = () => {
                                         ) : escrituras.length > 0 ? (
                                             escrituras.map((qr) => (
                                                 <TableRow key={qr.id} hover>
-                                                    <TableCell sx={{ fontFamily: 'monospace', fontWeight: 'bold' }}>
+                                                    <TableCell sx={{ fontFamily: 'monospace', fontWeight: 'bold', fontSize: 12, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                                         {qr.token}
                                                     </TableCell>
-                                                    <TableCell>{qr.numeroEscritura || 'N/A'}</TableCell>
+                                                    <TableCell sx={{ fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{qr.numeroEscritura || 'N/A'}</TableCell>
                                                     <TableCell>
                                                         <Chip
                                                             label={getTipoActo(qr)}
                                                             size="small"
                                                             variant="outlined"
+                                                            sx={{ maxWidth: '100%', '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 12 } }}
                                                         />
                                                     </TableCell>
-                                                    <TableCell>{new Date(qr.createdAt).toLocaleDateString()}</TableCell>
-                                                    <TableCell>
+                                                    <TableCell sx={{ fontSize: 13, whiteSpace: 'nowrap' }}>{new Date(qr.createdAt).toLocaleDateString()}</TableCell>
+                                                    <TableCell sx={{ fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                                         {qr.creador ? `${qr.creador.firstName} ${qr.creador.lastName}` : 'N/A'}
                                                     </TableCell>
                                                     <TableCell>
@@ -355,11 +360,12 @@ const QROversight = () => {
                                                             color={qr.estado === 'activo' ? 'success' : qr.estado === 'revision_requerida' ? 'warning' : 'default'}
                                                             variant="outlined"
                                                             data-testid="qr-estado"
+                                                            sx={{ '& .MuiChip-label': { fontSize: 11, px: 1 } }}
                                                         />
                                                     </TableCell>
-                                                    <TableCell align="right">{qr.verifyViewCount || 0}</TableCell>
-                                                    <TableCell align="right">{qr.pdfViewCount || 0}</TableCell>
-                                                    <TableCell align="center">
+                                                    <TableCell align="center" sx={{ fontSize: 13 }}>{qr.verifyViewCount || 0}</TableCell>
+                                                    <TableCell align="center" sx={{ fontSize: 13 }}>{qr.pdfViewCount || 0}</TableCell>
+                                                    <TableCell align="center" sx={{ whiteSpace: 'nowrap' }}>
                                                         <Tooltip title="Ver Detalles">
                                                             <IconButton
                                                                 size="small"
