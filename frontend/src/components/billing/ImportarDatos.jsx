@@ -253,7 +253,7 @@ const ImportarDatos = () => {
             <Alert severity="info" sx={{ mb: 3 }}>
                 {activeTab === 0 ? (
                     <>
-                        <strong>� MOVIMIENTOS DE CAJA:</strong> Importa el archivo XML de "Diario de Caja" desde Koinor.
+                        <strong>💰 MOVIMIENTOS DE CAJA:</strong> Importa el archivo XML de "Diario de Caja" desde Koinor.
                         Este archivo contiene las facturas del día y marca automáticamente como PAGADAS las que
                         fueron pagadas en efectivo (conpag=E).
                     </>

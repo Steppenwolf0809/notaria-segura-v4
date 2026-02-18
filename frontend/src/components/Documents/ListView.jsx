@@ -540,7 +540,7 @@ const ListView = ({
                           color={statusInfo.color}
                           variant="filled"
                         />
-                        {/* � Indicador de estado de pago */}
+                        {/* Indicador de estado de pago */}
                         <PaymentIndicator 
                           paymentStatus={document.paymentStatus} 
                           paymentInfo={document.paymentInfo}

@@ -43,10 +43,12 @@ import {
     ArrowDownward as DescIcon,
     Clear as ClearIcon,
     KeyboardArrowDown as ExpandIcon,
-    KeyboardArrowUp as CollapseIcon
+    KeyboardArrowUp as CollapseIcon,
+    Send as SendIcon
 } from '@mui/icons-material';
 import billingService from '../../services/billing-service';
 import * as XLSX from 'xlsx';
+import MensajeCobroModal from './MensajeCobroModal';
 
 /**
  * Reportes Component - Enhanced with Admin Filters
@@ -71,6 +73,9 @@ const Reportes = () => {
     
     // Estado para filas expandidas en Cartera por Cobrar
     const [expandedRows, setExpandedRows] = useState(new Set());
+
+    // Estado para modal de mensaje de cobro
+    const [mensajeModal, setMensajeModal] = useState({ open: false, clientData: null });
 
     // Enhanced filters
     const [searchTerm, setSearchTerm] = useState('');
@@ -198,6 +203,14 @@ const Reportes = () => {
                     aVal = new Date(a.fecha || a.issueDate || 0).getTime();
                     bVal = new Date(b.fecha || b.issueDate || 0).getTime();
                     break;
+                case 'oldestInvoice':
+                    aVal = a.invoices?.length
+                        ? Math.min(...a.invoices.map(inv => new Date(inv.issueDate || 0).getTime()))
+                        : Date.now();
+                    bVal = b.invoices?.length
+                        ? Math.min(...b.invoices.map(inv => new Date(inv.issueDate || 0).getTime()))
+                        : Date.now();
+                    break;
                 default:
                     aVal = a.balance || a.saldo || 0;
                     bVal = b.balance || b.saldo || 0;
@@ -271,6 +284,13 @@ const Reportes = () => {
     };
 
     const hasActiveFilters = searchTerm || selectedMatrizador || minBalance;
+
+    const getHeaderCellSx = (paletteColor, extraSx = {}) => ({
+        backgroundColor: `${paletteColor}.main`,
+        color: `${paletteColor}.contrastText`,
+        fontWeight: 'bold',
+        ...extraSx
+    });
 
     const exportToExcel = () => {
         if (filteredData.length === 0) return;
@@ -444,6 +464,7 @@ const Reportes = () => {
                             >
                                 {activeTab === 0 && <MenuItem value="balance">Saldo</MenuItem>}
                                 {activeTab === 0 && <MenuItem value="monto">Total Facturado</MenuItem>}
+                                {activeTab === 0 && <MenuItem value="oldestInvoice">Mas Antiguo</MenuItem>}
                                 {activeTab === 1 && <MenuItem value="monto">Monto</MenuItem>}
                                 {activeTab === 1 && <MenuItem value="fecha">Fecha</MenuItem>}
                                 {activeTab === 2 && <MenuItem value="saldo">Saldo</MenuItem>}
@@ -669,14 +690,15 @@ const Reportes = () => {
                         <Table size="small">
                             <TableHead>
                                 <TableRow sx={{ bgcolor: 'primary.main' }}>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold', width: 50 }}></TableCell>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Cédula/RUC</TableCell>
-                                    <SortableHeader field="cliente" sx={{ color: 'white', fontWeight: 'bold' }}>Cliente</SortableHeader>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="center">Facturas</TableCell>
-                                    <SortableHeader field="monto" sx={{ color: 'white', fontWeight: 'bold' }} align="right">Facturado</SortableHeader>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="right">Pagado</TableCell>
-                                    <SortableHeader field="balance" sx={{ color: 'white', fontWeight: 'bold' }} align="right">Saldo</SortableHeader>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Matrizador</TableCell>
+                                    <TableCell sx={getHeaderCellSx('primary', { width: 50 })}></TableCell>
+                                    <TableCell sx={getHeaderCellSx('primary')}>Cédula/RUC</TableCell>
+                                    <SortableHeader field="cliente" sx={getHeaderCellSx('primary')}>Cliente</SortableHeader>
+                                    <TableCell sx={getHeaderCellSx('primary')} align="center">Facturas</TableCell>
+                                    <SortableHeader field="monto" sx={getHeaderCellSx('primary')} align="right">Facturado</SortableHeader>
+                                    <TableCell sx={getHeaderCellSx('primary')} align="right">Pagado</TableCell>
+                                    <SortableHeader field="balance" sx={getHeaderCellSx('primary')} align="right">Saldo</SortableHeader>
+                                    <TableCell sx={getHeaderCellSx('primary')}>Matrizador</TableCell>
+                                    <TableCell sx={getHeaderCellSx('primary')} align="center">Acciones</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -703,11 +725,25 @@ const Reportes = () => {
                                             <TableCell>
                                                 <Chip size="small" label={row.matrizador} variant="outlined" />
                                             </TableCell>
+                                            <TableCell align="center">
+                                                <Tooltip title="Enviar mensaje de cobro al matrizador">
+                                                    <IconButton
+                                                        size="small"
+                                                        color="success"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setMensajeModal({ open: true, clientData: row });
+                                                        }}
+                                                    >
+                                                        <SendIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            </TableCell>
                                         </TableRow>
                                         {/* Fila expandible con detalle de facturas */}
                                         {expandedRows.has(row.clientTaxId) && row.invoices && (
                                             <TableRow>
-                                                <TableCell colSpan={8} sx={{ py: 0, bgcolor: 'grey.50' }}>
+                                                <TableCell colSpan={9} sx={{ py: 0, bgcolor: 'grey.50' }}>
                                                     <Collapse in={expandedRows.has(row.clientTaxId)} timeout="auto" unmountOnExit>
                                                         <Box sx={{ py: 2, px: 4 }}>
                                                             <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 'bold' }}>
@@ -764,13 +800,13 @@ const Reportes = () => {
                         <Table size="small">
                             <TableHead>
                                 <TableRow sx={{ bgcolor: 'success.main' }}>
-                                    <SortableHeader field="fecha" sx={{ color: 'white', fontWeight: 'bold' }}>Fecha</SortableHeader>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Recibo</TableCell>
-                                    <SortableHeader field="cliente" sx={{ color: 'white', fontWeight: 'bold' }}>Cliente</SortableHeader>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Cédula/RUC</TableCell>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Factura</TableCell>
-                                    <SortableHeader field="monto" sx={{ color: 'white', fontWeight: 'bold' }} align="right">Monto</SortableHeader>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Concepto</TableCell>
+                                    <SortableHeader field="fecha" sx={getHeaderCellSx('success')}>Fecha</SortableHeader>
+                                    <TableCell sx={getHeaderCellSx('success')}>Recibo</TableCell>
+                                    <SortableHeader field="cliente" sx={getHeaderCellSx('success')}>Cliente</SortableHeader>
+                                    <TableCell sx={getHeaderCellSx('success')}>Cédula/RUC</TableCell>
+                                    <TableCell sx={getHeaderCellSx('success')}>Factura</TableCell>
+                                    <SortableHeader field="monto" sx={getHeaderCellSx('success')} align="right">Monto</SortableHeader>
+                                    <TableCell sx={getHeaderCellSx('success')}>Concepto</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -797,13 +833,13 @@ const Reportes = () => {
                         <Table size="small">
                             <TableHead>
                                 <TableRow sx={{ bgcolor: 'error.main' }}>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Factura</TableCell>
-                                    <SortableHeader field="cliente" sx={{ color: 'white', fontWeight: 'bold' }}>Cliente</SortableHeader>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Vencimiento</TableCell>
-                                    <SortableHeader field="diasVencido" sx={{ color: 'white', fontWeight: 'bold' }} align="center">Días</SortableHeader>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="right">Total</TableCell>
-                                    <SortableHeader field="saldo" sx={{ color: 'white', fontWeight: 'bold' }} align="right">Saldo</SortableHeader>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Matrizador</TableCell>
+                                    <TableCell sx={getHeaderCellSx('error')}>Factura</TableCell>
+                                    <SortableHeader field="cliente" sx={getHeaderCellSx('error')}>Cliente</SortableHeader>
+                                    <TableCell sx={getHeaderCellSx('error')}>Vencimiento</TableCell>
+                                    <SortableHeader field="diasVencido" sx={getHeaderCellSx('error')} align="center">Días</SortableHeader>
+                                    <TableCell sx={getHeaderCellSx('error')} align="right">Total</TableCell>
+                                    <SortableHeader field="saldo" sx={getHeaderCellSx('error')} align="right">Saldo</SortableHeader>
+                                    <TableCell sx={getHeaderCellSx('error')}>Matrizador</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -841,14 +877,14 @@ const Reportes = () => {
                         <Table size="small">
                             <TableHead>
                                 <TableRow sx={{ bgcolor: 'warning.main' }}>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Protocolo</TableCell>
-                                    <SortableHeader field="cliente" sx={{ color: 'white', fontWeight: 'bold' }}>Cliente</SortableHeader>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Entrega</TableCell>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="center">Días</TableCell>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="center">Facturas</TableCell>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }} align="right">Facturado</TableCell>
-                                    <SortableHeader field="saldo" sx={{ color: 'white', fontWeight: 'bold' }} align="right">Saldo</SortableHeader>
-                                    <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Matrizador</TableCell>
+                                    <TableCell sx={getHeaderCellSx('warning')}>Protocolo</TableCell>
+                                    <SortableHeader field="cliente" sx={getHeaderCellSx('warning')}>Cliente</SortableHeader>
+                                    <TableCell sx={getHeaderCellSx('warning')}>Entrega</TableCell>
+                                    <TableCell sx={getHeaderCellSx('warning')} align="center">Días</TableCell>
+                                    <TableCell sx={getHeaderCellSx('warning')} align="center">Facturas</TableCell>
+                                    <TableCell sx={getHeaderCellSx('warning')} align="right">Facturado</TableCell>
+                                    <SortableHeader field="saldo" sx={getHeaderCellSx('warning')} align="right">Saldo</SortableHeader>
+                                    <TableCell sx={getHeaderCellSx('warning')}>Matrizador</TableCell>
                                 </TableRow>
                             </TableHead>
                             <TableBody>
@@ -970,6 +1006,14 @@ const Reportes = () => {
                     {renderTable()}
                 </>
             )}
+
+            {/* Modal de mensaje de cobro */}
+            <MensajeCobroModal
+                open={mensajeModal.open}
+                onClose={() => setMensajeModal({ open: false, clientData: null })}
+                clientData={mensajeModal.clientData}
+                onSuccess={() => setMensajeModal({ open: false, clientData: null })}
+            />
         </Box>
     );
 };

@@ -1157,7 +1157,7 @@ function DocumentosUnificados({ onEstadisticasChange, documentoEspecifico, onDoc
                     <TableCell>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                         <StatusIndicator status={documento.status} />
-                        {/* � Indicador de estado de pago */}
+                        {/* Indicador de estado de pago */}
                         <PaymentIndicator 
                           paymentStatus={documento.paymentStatus} 
                           paymentInfo={documento.paymentInfo}

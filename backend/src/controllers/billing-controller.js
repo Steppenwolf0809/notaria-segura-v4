@@ -1727,7 +1727,12 @@ export async function getCarteraPorCobrar(req, res) {
 
 
 /**
- * Report: Pagos del Período (Payments in Date Range)
+ * Report: Pagos del Periodo (Payments in Date Range)
+ *
+ * Combina dos fuentes de datos:
+ * 1. Tabla Payment - pagos individuales importados via XML
+ * 2. Tabla Invoice - facturas con fechaUltimoPago y pagos directos (sync Koinor)
+ *    Solo incluye facturas que tienen pago registrado pero NO tienen registros en Payment
  */
 export async function getPagosDelPeriodo(req, res) {
     try {
@@ -1745,6 +1750,9 @@ export async function getPagosDelPeriodo(req, res) {
         // Set to end of day
         to.setHours(23, 59, 59, 999);
 
+        const data = [];
+
+        // Fuente 1: Registros individuales de Payment
         const payments = await prisma.payment.findMany({
             where: {
                 paymentDate: {
@@ -1764,15 +1772,75 @@ export async function getPagosDelPeriodo(req, res) {
             orderBy: { paymentDate: 'desc' }
         });
 
-        const data = payments.map(p => ({
-            fecha: p.paymentDate,
-            recibo: p.receiptNumber,
-            cliente: p.invoice.clientName,
-            cedula: p.invoice.clientTaxId,
-            factura: p.invoice.invoiceNumber,
-            monto: Number(p.amount),
-            concepto: p.concept || 'Abono a factura'
-        }));
+        // Set de invoiceIds que ya tienen Payment registrado (para evitar duplicados)
+        const invoiceIdsWithPayment = new Set(payments.map(p => p.invoiceId));
+
+        for (const p of payments) {
+            data.push({
+                fecha: p.paymentDate,
+                recibo: p.receiptNumber,
+                cliente: p.invoice?.clientName || 'Sin nombre',
+                cedula: p.invoice?.clientTaxId || '',
+                factura: p.invoice?.invoiceNumber || '',
+                monto: Number(p.amount),
+                concepto: p.concept || 'Abono a factura'
+            });
+        }
+
+        // Fuente 2: Facturas con fechaUltimoPago en el periodo (sync Koinor)
+        // Solo incluye las que NO tienen registros en Payment (evitar duplicados)
+        const invoicesWithPayment = await prisma.invoice.findMany({
+            where: {
+                fechaUltimoPago: {
+                    gte: from,
+                    lte: to
+                },
+                paidAmount: { gt: 0 }
+            },
+            select: {
+                id: true,
+                invoiceNumber: true,
+                clientName: true,
+                clientTaxId: true,
+                fechaUltimoPago: true,
+                paidAmount: true,
+                pagoDirecto: true,
+                montoPagadoCxc: true,
+                condicionPago: true,
+                concept: true,
+                _count: { select: { payments: true } }
+            },
+            orderBy: { fechaUltimoPago: 'desc' }
+        });
+
+        for (const inv of invoicesWithPayment) {
+            // Skip if this invoice already has Payment records (already included above)
+            if (invoiceIdsWithPayment.has(inv.id)) continue;
+            // Skip if it has Payment records not in the date range
+            if (inv._count.payments > 0) continue;
+
+            const monto = Number(inv.paidAmount) || 0;
+            if (monto <= 0) continue;
+
+            const concepto = inv.condicionPago === 'E'
+                ? 'Pago al contado'
+                : Number(inv.montoPagadoCxc) > 0
+                    ? 'Pago via CxC'
+                    : inv.concept || 'Pago registrado';
+
+            data.push({
+                fecha: inv.fechaUltimoPago,
+                recibo: '-',
+                cliente: inv.clientName || 'Sin nombre',
+                cedula: inv.clientTaxId || '',
+                factura: inv.invoiceNumber || '',
+                monto,
+                concepto
+            });
+        }
+
+        // Ordenar por fecha descendente
+        data.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
 
         // Calculate totals
         const totalMonto = data.reduce((sum, p) => sum + p.monto, 0);
@@ -1780,7 +1848,7 @@ export async function getPagosDelPeriodo(req, res) {
         res.json({
             success: true,
             reportType: 'pagos-periodo',
-            reportName: 'Pagos del Período',
+            reportName: 'Pagos del Periodo',
             generatedAt: new Date().toISOString(),
             period: {
                 from: from.toISOString(),
@@ -1794,79 +1862,94 @@ export async function getPagosDelPeriodo(req, res) {
         });
     } catch (error) {
         console.error('[billing-controller] getPagosDelPeriodo error:', error);
-        // 🔒 SECURITY: Never expose internal error details
+        // SECURITY: Never expose internal error details
         res.status(500).json({
             success: false,
-            message: 'Error al generar reporte de pagos del período'
+            message: 'Error al generar reporte de pagos del periodo'
         });
     }
 }
 
 /**
  * Report: Facturas Vencidas (Overdue Invoices)
+ * FUENTE UNICA DE VERDAD: PendingReceivable (sincronizado desde Koinor)
+ * Usa la misma fuente que Cartera por Cobrar para consistencia,
+ * filtrada por daysOverdue > 0 (facturas con fecha de vencimiento pasada).
  */
 export async function getFacturasVencidas(req, res) {
     try {
         console.log('[billing-controller] getFacturasVencidas');
 
-        const now = new Date();
-
-        // Get invoices with due date in the past
-        const invoices = await prisma.invoice.findMany({
+        // Fuente: PendingReceivable con daysOverdue > 0 y saldo pendiente
+        const receivables = await prisma.pendingReceivable.findMany({
             where: {
-                dueDate: {
-                    lt: now
-                },
-                status: {
-                    not: 'PAID'
-                }
+                status: { in: ['PENDING', 'PARTIAL', 'OVERDUE'] },
+                balance: { gt: 0 },
+                daysOverdue: { gt: 0 }
             },
-            include: {
-                payments: true,
-                document: {
-                    select: {
-                        id: true,
-                        protocolNumber: true,
-                        clientPhone: true,
-                        assignedTo: {
-                            select: {
-                                firstName: true,
-                                lastName: true
+            orderBy: { daysOverdue: 'desc' }
+        });
+
+        // Buscar telefono y matrizador asignado desde Invoice+Document
+        const invoiceNumbers = receivables
+            .map(r => r.invoiceNumber)
+            .filter(Boolean);
+
+        const invoicesWithDocs = invoiceNumbers.length > 0
+            ? await prisma.invoice.findMany({
+                where: { invoiceNumber: { in: invoiceNumbers } },
+                select: {
+                    invoiceNumber: true,
+                    document: {
+                        select: {
+                            clientPhone: true,
+                            assignedTo: {
+                                select: { firstName: true, lastName: true }
                             }
                         }
                     }
                 }
-            },
-            orderBy: { dueDate: 'asc' }
-        });
+            })
+            : [];
 
-        const data = invoices
-            .map(inv => {
-                const paid = inv.payments.reduce((sum, p) => sum + Number(p.amount), 0);
-                const balance = Number(inv.totalAmount) - paid;
-
-                if (balance <= 0) return null; // Skip fully paid
-
-                const diasVencido = Math.floor((now.getTime() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24));
-
-                return {
-                    factura: inv.invoiceNumber,
-                    cliente: inv.clientName,
-                    cedula: inv.clientTaxId,
+        // Mapa de invoiceNumber -> info del documento
+        const docInfoMap = new Map();
+        for (const inv of invoicesWithDocs) {
+            if (inv.invoiceNumber) {
+                docInfoMap.set(inv.invoiceNumber, {
                     telefono: inv.document?.clientPhone || '',
-                    emision: inv.issueDate,
-                    vencimiento: inv.dueDate,
-                    diasVencido,
-                    totalFactura: Number(inv.totalAmount),
-                    pagado: paid,
-                    saldo: balance,
                     matrizador: inv.document?.assignedTo
                         ? `${inv.document.assignedTo.firstName} ${inv.document.assignedTo.lastName}`
-                        : 'Sin asignar'
+                        : null
+                });
+            }
+        }
+
+        const data = receivables
+            .map(r => {
+                const balance = Number(r.balance) || 0;
+                const totalAmount = Number(r.totalAmount) || 0;
+                const totalPaid = Number(r.totalPaid) || 0;
+
+                if (balance <= 0) return null;
+
+                const docInfo = docInfoMap.get(r.invoiceNumber) || {};
+
+                return {
+                    factura: r.invoiceNumber || r.invoiceNumberRaw,
+                    cliente: r.clientName,
+                    cedula: r.clientTaxId,
+                    telefono: docInfo.telefono || '',
+                    emision: r.issueDate,
+                    vencimiento: r.dueDate,
+                    diasVencido: r.daysOverdue,
+                    totalFactura: totalAmount,
+                    pagado: totalPaid,
+                    saldo: balance,
+                    matrizador: docInfo.matrizador || r.matrizador || 'Sin asignar'
                 };
             })
-            .filter(Boolean)
-            .sort((a, b) => b.diasVencido - a.diasVencido);
+            .filter(Boolean);
 
         // Calculate totals
         const totals = data.reduce((acc, inv) => ({
@@ -1886,7 +1969,7 @@ export async function getFacturasVencidas(req, res) {
         });
     } catch (error) {
         console.error('[billing-controller] getFacturasVencidas error:', error);
-        // 🔒 SECURITY: Never expose internal error details
+        // SECURITY: Never expose internal error details
         res.status(500).json({
             success: false,
             message: 'Error al generar reporte de facturas vencidas'

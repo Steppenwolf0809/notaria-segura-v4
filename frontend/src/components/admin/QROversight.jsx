@@ -373,7 +373,7 @@ const QROversight = () => {
                                                             <IconButton
                                                                 size="small"
                                                                 component="a"
-                                                                href={`/verify/${qr.token}`}
+                                                                href={`https://www.notaria18quito.com.ec/verificar.html?token=${qr.token}`}
                                                                 target="_blank"
                                                                 rel="noopener noreferrer"
                                                                 data-testid="btn-ver-verificacion"
@@ -535,7 +535,7 @@ const QROversight = () => {
                 <DialogActions sx={{ px: 3, py: 2, justifyContent: 'space-between' }}>
                     <Button
                         component="a"
-                        href={selectedQR ? `/verify/${selectedQR.token}` : '#'}
+                        href={selectedQR ? `https://www.notaria18quito.com.ec/verificar.html?token=${selectedQR.token}` : '#'}
                         target="_blank"
                         rel="noopener noreferrer"
                         variant="contained"
