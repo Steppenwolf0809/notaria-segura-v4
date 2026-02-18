@@ -454,7 +454,10 @@ const AdminDashboard = ({ onViewChange }) => {
       const { fromISO, toISO } = getMonthRange(new Date(), { currentMonthUntilToday: true });
       const summary = await billingService.getSummary({
         dateFrom: fromISO,
-        dateTo: toISO
+        dateTo: toISO,
+        excludeCancelled: true,
+        excludeLegacy: true,
+        subtotalMode: 'hybrid'
       });
       // Usar subtotal directo de la BD (Base Imponible sin IVA)
       const subtotalFromDB = Number(summary?.totals?.subtotalInvoiced || 0);

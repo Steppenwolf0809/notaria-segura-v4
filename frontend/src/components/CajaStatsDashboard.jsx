@@ -244,7 +244,10 @@ const CajaStatsDashboard = () => {
       const { fromISO, toISO } = getMonthRange(new Date(), { currentMonthUntilToday: true });
       const summary = await billingService.getSummary({
         dateFrom: fromISO,
-        dateTo: toISO
+        dateTo: toISO,
+        excludeCancelled: true,
+        excludeLegacy: true,
+        subtotalMode: 'hybrid'
       });
       const subtotalFromDB = Number(summary?.totals?.subtotalInvoiced || 0);
       const totalWithIVA = Number(summary?.totals?.invoiced || 0);

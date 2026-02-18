@@ -212,6 +212,9 @@ const ParticipacionEstado = () => {
                     const summary = await billingService.getSummary({
                         dateFrom: range.fromISO,
                         dateTo: range.toISO,
+                        excludeCancelled: true,
+                        excludeLegacy: true,
+                        subtotalMode: 'hybrid',
                     });
                     const totalWithIVA = Number(summary?.totals?.invoiced || 0);
                     // Usar subtotal directo de la BD; fallback a estimación
