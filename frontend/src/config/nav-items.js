@@ -6,6 +6,7 @@ export const navItemsByRole = {
     { id: 'dashboard', label: 'Dashboard', view: 'dashboard', icon: 'Dashboard' },
     { id: 'documentos', label: 'Documentos', view: 'documentos', icon: 'Assignment' },
     { id: 'subir-xml', label: 'Subir XML', view: 'uploads', icon: 'CloudUpload' },
+    { id: 'participacion-estado', label: 'Participación al Estado', view: 'participacion-estado', icon: 'Gavel' },
     {
       id: 'facturacion',
       label: 'Facturación',
