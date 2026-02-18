@@ -1190,7 +1190,12 @@ export async function getSummary(req, res) {
 
         const invoices = await prisma.invoice.findMany({
             where: invoiceWhere,
-            include: { payments: true }
+            select: {
+                totalAmount: true,
+                subtotalAmount: true,
+                paidAmount: true,
+                status: true
+            }
         });
 
         let totalInvoiced = 0;
@@ -1201,15 +1206,12 @@ export async function getSummary(req, res) {
         let partialCount = 0;
 
         for (const invoice of invoices) {
-            const paid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
-            const balance = Number(invoice.totalAmount) - paid;
-
             totalInvoiced += Number(invoice.totalAmount);
             totalSubtotalInvoiced += Number(invoice.subtotalAmount || 0);
-            totalPaid += paid;
+            totalPaid += Number(invoice.paidAmount || 0);
 
-            if (balance <= 0) paidCount++;
-            else if (paid > 0) partialCount++;
+            if (invoice.status === 'PAID') paidCount++;
+            else if (invoice.status === 'PARTIAL') partialCount++;
             else pendingCount++;
         }
 
