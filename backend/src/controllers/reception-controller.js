@@ -2,6 +2,7 @@ import { getPrismaClient } from '../db.js';
 import { Prisma } from '@prisma/client';
 import { getReversionCleanupData, isValidStatus, isReversion as isReversionFn, STATUS_ORDER_LIST } from '../utils/status-transitions.js';
 import logger from '../utils/logger.js';
+import { buildInvoiceNumberVariants } from '../utils/billing-utils.js';
 
 const prisma = getPrismaClient();
 
@@ -21,6 +22,179 @@ async function supportsUnaccentFn() {
     UNACCENT_SUPPORTED = false;
   }
   return UNACCENT_SUPPORTED;
+}
+
+function extractInvoiceSequential(value) {
+  if (!value) return '';
+  const parts = String(value).split('-');
+  const lastPart = parts[parts.length - 1] || '';
+  return lastPart.replace(/^0+/, '') || '0';
+}
+
+function normalizeTaxId(value) {
+  return String(value || '').replace(/\D/g, '').trim();
+}
+
+function pickInvoiceCandidateForDocument(candidates, doc) {
+  if (!Array.isArray(candidates) || candidates.length === 0) return null;
+
+  const docProtocol = String(doc.protocolNumber || '').trim();
+  const docVariants = new Set(buildInvoiceNumberVariants(String(doc.numeroFactura || '')));
+  const docSequential = extractInvoiceSequential(doc.numeroFactura);
+  const docTaxId = normalizeTaxId(doc.clientId);
+
+  const byProtocol = docProtocol
+    ? candidates.filter((inv) => String(inv.numeroProtocolo || '').trim() === docProtocol)
+    : [];
+  if (byProtocol.length === 1) return byProtocol[0];
+
+  const byExactNumber = docVariants.size > 0
+    ? candidates.filter((inv) => docVariants.has(inv.invoiceNumber) || docVariants.has(inv.invoiceNumberRaw))
+    : [];
+  if (byExactNumber.length === 1) return byExactNumber[0];
+
+  const bySequential = (docSequential && docSequential.length >= 5)
+    ? candidates.filter((inv) => extractInvoiceSequential(inv.invoiceNumberRaw || inv.invoiceNumber) === docSequential)
+    : [];
+  if (bySequential.length === 1) return bySequential[0];
+
+  if (docTaxId) {
+    const exactByTaxId = byExactNumber.filter((inv) => normalizeTaxId(inv.clientTaxId) === docTaxId);
+    if (exactByTaxId.length === 1) return exactByTaxId[0];
+
+    const sequentialByTaxId = bySequential.filter((inv) => normalizeTaxId(inv.clientTaxId) === docTaxId);
+    if (sequentialByTaxId.length === 1) return sequentialByTaxId[0];
+  }
+
+  return null;
+}
+
+function summarizeDocumentPayment(doc, docInvoices) {
+  let paymentStatus = 'SIN_FACTURA';
+  let paymentInfo = null;
+  let computedFechaFactura = doc.fechaFactura || null;
+  let computedNumeroFactura = doc.numeroFactura || null;
+
+  if (docInvoices.length > 0) {
+    const totalFacturado = docInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
+    const totalPagado = docInvoices.reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
+    const saldoPendiente = totalFacturado - totalPagado;
+
+    if (saldoPendiente <= 0) {
+      paymentStatus = 'PAGADO';
+    } else if (totalPagado > 0) {
+      paymentStatus = 'PARCIAL';
+    } else {
+      paymentStatus = 'PENDIENTE';
+    }
+
+    paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: docInvoices.length };
+
+    if (!computedFechaFactura) {
+      const byDateAsc = [...docInvoices]
+        .filter(inv => inv.issueDate)
+        .sort((a, b) => new Date(a.issueDate) - new Date(b.issueDate));
+      computedFechaFactura = byDateAsc[0]?.issueDate || null;
+    }
+    if (!computedNumeroFactura) {
+      computedNumeroFactura = docInvoices[0]?.invoiceNumberRaw || docInvoices[0]?.invoiceNumber || null;
+    }
+  }
+
+  return {
+    paymentStatus,
+    paymentInfo,
+    computedFechaFactura,
+    computedNumeroFactura
+  };
+}
+
+async function autoHealInvoiceLinks(documents, invoicesMap) {
+  if (!Array.isArray(documents) || documents.length === 0) return;
+
+  const reservedInvoiceIds = new Set();
+  const docsToHeal = documents.filter((doc) => {
+    const hasInvoices = (invoicesMap.get(doc.id) || []).length > 0;
+    return !hasInvoices && (doc.numeroFactura || doc.protocolNumber);
+  });
+
+  for (const doc of docsToHeal) {
+    const variants = buildInvoiceNumberVariants(String(doc.numeroFactura || ''));
+    const sequential = extractInvoiceSequential(doc.numeroFactura);
+    const orClauses = [];
+
+    if (variants.length > 0) {
+      orClauses.push({ invoiceNumber: { in: variants } });
+      orClauses.push({ invoiceNumberRaw: { in: variants } });
+    }
+
+    if (sequential && sequential.length >= 5) {
+      orClauses.push({ invoiceNumber: { endsWith: sequential } });
+      orClauses.push({ invoiceNumberRaw: { endsWith: sequential } });
+    }
+
+    if (doc.protocolNumber) {
+      orClauses.push({ numeroProtocolo: doc.protocolNumber });
+    }
+
+    if (orClauses.length === 0) continue;
+
+    const candidates = await prisma.invoice.findMany({
+      where: {
+        AND: [
+          { OR: orClauses },
+          { OR: [{ documentId: null }, { documentId: doc.id }] }
+        ]
+      },
+      select: {
+        id: true,
+        documentId: true,
+        invoiceNumber: true,
+        invoiceNumberRaw: true,
+        totalAmount: true,
+        paidAmount: true,
+        status: true,
+        issueDate: true,
+        clientTaxId: true,
+        numeroProtocolo: true
+      },
+      orderBy: { issueDate: 'desc' },
+      take: 10
+    });
+
+    if (candidates.length === 0) continue;
+
+    const candidate = pickInvoiceCandidateForDocument(candidates, doc);
+    if (!candidate || reservedInvoiceIds.has(candidate.id)) continue;
+    reservedInvoiceIds.add(candidate.id);
+
+    if (!candidate.documentId) {
+      await prisma.invoice.update({
+        where: { id: candidate.id },
+        data: { documentId: doc.id }
+      });
+
+      const patch = {};
+      if (!doc.numeroFactura) patch.numeroFactura = candidate.invoiceNumberRaw || candidate.invoiceNumber;
+      if (!doc.fechaFactura && candidate.issueDate) patch.fechaFactura = candidate.issueDate;
+      if (Object.keys(patch).length > 0) {
+        await prisma.document.update({ where: { id: doc.id }, data: patch });
+      }
+
+      logger.warn(`[reception] Auto-healing invoice link: doc=${doc.id}, invoice=${candidate.invoiceNumberRaw || candidate.invoiceNumber}`);
+    }
+
+    if (!invoicesMap.has(doc.id)) invoicesMap.set(doc.id, []);
+    invoicesMap.get(doc.id).push({
+      documentId: doc.id,
+      totalAmount: candidate.totalAmount,
+      paidAmount: candidate.paidAmount,
+      status: candidate.status,
+      issueDate: candidate.issueDate,
+      invoiceNumber: candidate.invoiceNumber,
+      invoiceNumberRaw: candidate.invoiceNumberRaw
+    });
+  }
 }
 
 async function getDashboardStats(req, res) {
@@ -359,7 +533,7 @@ async function listarTodosDocumentos(req, res) {
         if (docIds.length > 0) {
         const invoices = await prisma.invoice.findMany({
           where: { documentId: { in: docIds } },
-          select: { documentId: true, totalAmount: true, paidAmount: true, status: true, issueDate: true, invoiceNumber: true }
+          select: { documentId: true, totalAmount: true, paidAmount: true, status: true, issueDate: true, invoiceNumber: true, invoiceNumberRaw: true }
         });
           invoices.forEach(inv => {
             if (!invoicesMap.has(inv.documentId)) {
@@ -369,39 +543,17 @@ async function listarTodosDocumentos(req, res) {
           });
         }
 
+        await autoHealInvoiceLinks(documents, invoicesMap);
+
         const formattedDocuments = documents.map(doc => {
           // 💰 Calcular estado de pago
           const docInvoices = invoicesMap.get(doc.id) || [];
-          let paymentStatus = 'SIN_FACTURA';
-          let paymentInfo = null;
-          let computedFechaFactura = doc.fechaFactura || null;
-          let computedNumeroFactura = doc.numeroFactura || null;
-          
-          if (docInvoices.length > 0) {
-            const totalFacturado = docInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
-            const totalPagado = docInvoices.reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
-            const saldoPendiente = totalFacturado - totalPagado;
-            
-            if (saldoPendiente <= 0) {
-              paymentStatus = 'PAGADO';
-            } else if (totalPagado > 0) {
-              paymentStatus = 'PARCIAL';
-            } else {
-              paymentStatus = 'PENDIENTE';
-            }
-            
-            paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: docInvoices.length };
-
-            if (!computedFechaFactura) {
-              const byDateAsc = [...docInvoices]
-                .filter(inv => inv.issueDate)
-                .sort((a, b) => new Date(a.issueDate) - new Date(b.issueDate));
-              computedFechaFactura = byDateAsc[0]?.issueDate || null;
-            }
-            if (!computedNumeroFactura) {
-              computedNumeroFactura = docInvoices[0]?.invoiceNumber || null;
-            }
-          }
+          const {
+            paymentStatus,
+            paymentInfo,
+            computedFechaFactura,
+            computedNumeroFactura
+          } = summarizeDocumentPayment(doc, docInvoices);
           
           return {
             id: doc.id,
@@ -520,6 +672,7 @@ async function listarTodosDocumentos(req, res) {
             select: {
               id: true,
               invoiceNumber: true,
+              invoiceNumberRaw: true,
               totalAmount: true,
               paidAmount: true,
               status: true,
@@ -534,40 +687,21 @@ async function listarTodosDocumentos(req, res) {
       prisma.document.count({ where })
     ]);
 
+    const invoicesMap = new Map();
+    documents.forEach((doc) => {
+      invoicesMap.set(doc.id, Array.isArray(doc.invoices) ? doc.invoices : []);
+    });
+    await autoHealInvoiceLinks(documents, invoicesMap);
+
     const formattedDocuments = documents.map(doc => {
       // 💰 Calcular estado de pago
-      let paymentStatus = 'SIN_FACTURA';
-      let paymentInfo = null;
-      let computedFechaFactura = doc.fechaFactura || null;
-      
-      if (doc.invoices && doc.invoices.length > 0) {
-        const totalFacturado = doc.invoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
-        const totalPagado = doc.invoices.reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
-        const saldoPendiente = totalFacturado - totalPagado;
-        
-        if (saldoPendiente <= 0) {
-          paymentStatus = 'PAGADO';
-        } else if (totalPagado > 0) {
-          paymentStatus = 'PARCIAL';
-        } else {
-          paymentStatus = 'PENDIENTE';
-        }
-        
-        paymentInfo = {
-          totalFacturado,
-          totalPagado,
-          saldoPendiente,
-          facturas: doc.invoices.length
-        };
-        
-        // Calcular fechaFactura desde las facturas si no existe
-        if (!computedFechaFactura) {
-          const byDateAsc = [...doc.invoices]
-            .filter(inv => inv.issueDate)
-            .sort((a, b) => new Date(a.issueDate) - new Date(b.issueDate));
-          computedFechaFactura = byDateAsc[0]?.issueDate || null;
-        }
-      }
+      const docInvoices = invoicesMap.get(doc.id) || [];
+      const {
+        paymentStatus,
+        paymentInfo,
+        computedFechaFactura,
+        computedNumeroFactura
+      } = summarizeDocumentPayment(doc, docInvoices);
       
       return {
         id: doc.id,
@@ -588,6 +722,7 @@ async function listarTodosDocumentos(req, res) {
         actoPrincipalDescripcion: doc.actoPrincipalDescripcion,
         actoPrincipalValor: doc.totalFactura,
         totalFactura: doc.totalFactura,
+        numeroFactura: computedNumeroFactura || doc.numeroFactura || null,
         matrizadorName: doc.matrizadorName,
         detalle_documento: doc.detalle_documento,
         comentarios_recepcion: doc.comentarios_recepcion,
