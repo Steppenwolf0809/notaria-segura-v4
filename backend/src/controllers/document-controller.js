@@ -13,6 +13,7 @@ import {
 } from '../utils/event-formatter.js';
 import AdvancedExtractionService from '../services/advanced-extraction-service.js';
 import ActosExtractorService from '../services/actos-extractor-service.js';
+import { buildInvoiceNumberVariants, buildInvoiceWhereByNumber } from '../utils/billing-utils.js';
 
 /**
  * Procesar XML y crear documento automáticamente
@@ -193,9 +194,8 @@ async function uploadXmlDocument(req, res) {
 
         // Buscar factura por número (formato normalizado)
         const existingInvoice = await prisma.invoice.findFirst({
-          where: {
-            invoiceNumber: parsedData.numeroFactura
-          }
+          where: buildInvoiceWhereByNumber(parsedData.numeroFactura),
+          orderBy: { issueDate: 'desc' }
         });
 
         if (existingInvoice) {
@@ -874,6 +874,139 @@ async function supportsUnaccentFn() {
   }
 }
 
+function extractInvoiceSequential(value) {
+  if (!value) return '';
+  const parts = String(value).split('-');
+  const lastPart = parts[parts.length - 1] || '';
+  return lastPart.replace(/^0+/, '') || '0';
+}
+
+function normalizeTaxId(value) {
+  return String(value || '').replace(/\D/g, '').trim();
+}
+
+function pickInvoiceCandidateForDocument(candidates, doc) {
+  if (!Array.isArray(candidates) || candidates.length === 0) return null;
+
+  const docProtocol = String(doc.protocolNumber || '').trim();
+  const docVariants = new Set(buildInvoiceNumberVariants(String(doc.numeroFactura || '')));
+  const docSequential = extractInvoiceSequential(doc.numeroFactura);
+  const docTaxId = normalizeTaxId(doc.clientId);
+
+  const byProtocol = docProtocol
+    ? candidates.filter((inv) => String(inv.numeroProtocolo || '').trim() === docProtocol)
+    : [];
+  if (byProtocol.length === 1) return byProtocol[0];
+
+  const byExactNumber = docVariants.size > 0
+    ? candidates.filter((inv) => docVariants.has(inv.invoiceNumber) || docVariants.has(inv.invoiceNumberRaw))
+    : [];
+  if (byExactNumber.length === 1) return byExactNumber[0];
+
+  const bySequential = (docSequential && docSequential.length >= 5)
+    ? candidates.filter((inv) => extractInvoiceSequential(inv.invoiceNumberRaw || inv.invoiceNumber) === docSequential)
+    : [];
+  if (bySequential.length === 1) return bySequential[0];
+
+  if (docTaxId) {
+    const exactByTaxId = byExactNumber.filter((inv) => normalizeTaxId(inv.clientTaxId) === docTaxId);
+    if (exactByTaxId.length === 1) return exactByTaxId[0];
+
+    const sequentialByTaxId = bySequential.filter((inv) => normalizeTaxId(inv.clientTaxId) === docTaxId);
+    if (sequentialByTaxId.length === 1) return sequentialByTaxId[0];
+  }
+
+  return null;
+}
+
+async function autoHealInvoiceLinks(documents, invoicesMap) {
+  if (!Array.isArray(documents) || documents.length === 0) return;
+
+  const reservedInvoiceIds = new Set();
+  const docsToHeal = documents.filter((doc) => {
+    const hasInvoices = (invoicesMap.get(doc.id) || []).length > 0;
+    return !hasInvoices && (doc.numeroFactura || doc.protocolNumber);
+  });
+
+  for (const doc of docsToHeal) {
+    const variants = buildInvoiceNumberVariants(String(doc.numeroFactura || ''));
+    const sequential = extractInvoiceSequential(doc.numeroFactura);
+    const orClauses = [];
+
+    if (variants.length > 0) {
+      orClauses.push({ invoiceNumber: { in: variants } });
+      orClauses.push({ invoiceNumberRaw: { in: variants } });
+    }
+
+    if (sequential && sequential.length >= 5) {
+      orClauses.push({ invoiceNumber: { endsWith: sequential } });
+      orClauses.push({ invoiceNumberRaw: { endsWith: sequential } });
+    }
+
+    if (doc.protocolNumber) {
+      orClauses.push({ numeroProtocolo: doc.protocolNumber });
+    }
+
+    if (orClauses.length === 0) continue;
+
+    const candidates = await prisma.invoice.findMany({
+      where: {
+        AND: [
+          { OR: orClauses },
+          { OR: [{ documentId: null }, { documentId: doc.id }] }
+        ]
+      },
+      select: {
+        id: true,
+        documentId: true,
+        invoiceNumber: true,
+        invoiceNumberRaw: true,
+        totalAmount: true,
+        paidAmount: true,
+        status: true,
+        issueDate: true,
+        clientTaxId: true,
+        numeroProtocolo: true
+      },
+      orderBy: { issueDate: 'desc' },
+      take: 10
+    });
+
+    if (candidates.length === 0) continue;
+
+    const candidate = pickInvoiceCandidateForDocument(candidates, doc);
+    if (!candidate || reservedInvoiceIds.has(candidate.id)) continue;
+    reservedInvoiceIds.add(candidate.id);
+
+    if (!candidate.documentId) {
+      await prisma.invoice.update({
+        where: { id: candidate.id },
+        data: { documentId: doc.id }
+      });
+
+      const patch = {};
+      if (!doc.numeroFactura) patch.numeroFactura = candidate.invoiceNumberRaw || candidate.invoiceNumber;
+      if (!doc.fechaFactura && candidate.issueDate) patch.fechaFactura = candidate.issueDate;
+      if (Object.keys(patch).length > 0) {
+        await prisma.document.update({ where: { id: doc.id }, data: patch });
+      }
+      console.warn(`[documents] Auto-healing invoice link: doc=${doc.id}, invoice=${candidate.invoiceNumberRaw || candidate.invoiceNumber}`);
+    }
+
+    if (!invoicesMap.has(doc.id)) invoicesMap.set(doc.id, []);
+    invoicesMap.get(doc.id).push({
+      id: candidate.id,
+      documentId: doc.id,
+      totalAmount: candidate.totalAmount,
+      paidAmount: candidate.paidAmount,
+      status: candidate.status,
+      issueDate: candidate.issueDate,
+      invoiceNumber: candidate.invoiceNumber,
+      invoiceNumberRaw: candidate.invoiceNumberRaw
+    });
+  }
+}
+
 /**
  * Obtener documentos del matrizador autenticado
  * Función para MATRIZADOR: Ver solo documentos asignados a él con paginación
@@ -1023,7 +1156,10 @@ async function getMyDocuments(req, res) {
               documentId: true,
               totalAmount: true,
               paidAmount: true,
-              status: true
+              status: true,
+              issueDate: true,
+              invoiceNumber: true,
+              invoiceNumberRaw: true
             }
           });
 
@@ -1031,26 +1167,32 @@ async function getMyDocuments(req, res) {
             if (!invoicesMap.has(inv.documentId)) invoicesMap.set(inv.documentId, []);
             invoicesMap.get(inv.documentId).push(inv);
           });
+        }
 
-          // Obtener pagos de la tabla payments
-          const invoiceIds = invoices.map(inv => inv.id);
-          if (invoiceIds.length > 0) {
-            const payments = await prisma.payment.findMany({
-              where: { invoiceId: { in: invoiceIds } },
-              select: { invoiceId: true, amount: true }
-            });
+        await autoHealInvoiceLinks(documents, invoicesMap);
 
-            payments.forEach(payment => {
-              if (!paymentsMap.has(payment.invoiceId)) paymentsMap.set(payment.invoiceId, 0);
-              paymentsMap.set(payment.invoiceId, paymentsMap.get(payment.invoiceId) + Number(payment.amount));
-            });
-          }
+        // Obtener pagos de la tabla payments (incluyendo facturas curadas en autohealing)
+        const allInvoiceIds = Array.from(new Set(
+          [...invoicesMap.values()].flat().map(inv => inv.id).filter(Boolean)
+        ));
+        if (allInvoiceIds.length > 0) {
+          const payments = await prisma.payment.findMany({
+            where: { invoiceId: { in: allInvoiceIds } },
+            select: { invoiceId: true, amount: true }
+          });
+
+          payments.forEach(payment => {
+            if (!paymentsMap.has(payment.invoiceId)) paymentsMap.set(payment.invoiceId, 0);
+            paymentsMap.set(payment.invoiceId, paymentsMap.get(payment.invoiceId) + Number(payment.amount));
+          });
         }
 
         const hydratedDocs = documents.map(d => {
           const docInvoices = invoicesMap.get(d.id) || [];
           let paymentStatus = 'SIN_FACTURA';
           let paymentInfo = null;
+          let computedNumeroFactura = d.numeroFactura || null;
+          let computedFechaFactura = d.fechaFactura || null;
 
           if (docInvoices.length > 0) {
             const totalFacturado = docInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
@@ -1070,13 +1212,25 @@ async function getMyDocuments(req, res) {
             else paymentStatus = 'PENDIENTE';
 
             paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: docInvoices.length };
+
+            if (!computedNumeroFactura) {
+              computedNumeroFactura = docInvoices[0]?.invoiceNumberRaw || docInvoices[0]?.invoiceNumber || null;
+            }
+            if (!computedFechaFactura) {
+              const byDateAsc = [...docInvoices]
+                .filter(inv => inv.issueDate)
+                .sort((a, b) => new Date(a.issueDate) - new Date(b.issueDate));
+              computedFechaFactura = byDateAsc[0]?.issueDate || null;
+            }
           }
 
           return {
             ...d,
             createdBy: d.createdById ? authorMap.get(d.createdById) : null,
             paymentStatus,
-            paymentInfo
+            paymentInfo,
+            numeroFactura: computedNumeroFactura,
+            fechaFactura: computedFechaFactura || d.createdAt
           };
         });
 
@@ -1159,6 +1313,8 @@ async function getMyDocuments(req, res) {
               paidAmount: true,
               status: true,
               invoiceNumber: true,
+              invoiceNumberRaw: true,
+              issueDate: true,
               payments: {
                 select: { amount: true }
               }
@@ -1195,19 +1351,46 @@ async function getMyDocuments(req, res) {
     }
 
     // 💰 Calcular estado de pago para cada documento
+    const invoicesMapForHeal = new Map();
+    documents.forEach((doc) => {
+      invoicesMapForHeal.set(doc.id, Array.isArray(doc.invoices) ? doc.invoices : []);
+    });
+    await autoHealInvoiceLinks(documents, invoicesMapForHeal);
+
+    const paymentsMapForHeal = new Map();
+    const allInvoiceIds = Array.from(new Set(
+      [...invoicesMapForHeal.values()].flat().map(inv => inv.id).filter(Boolean)
+    ));
+    if (allInvoiceIds.length > 0) {
+      const payments = await prisma.payment.findMany({
+        where: { invoiceId: { in: allInvoiceIds } },
+        select: { invoiceId: true, amount: true }
+      });
+      payments.forEach((payment) => {
+        if (!paymentsMapForHeal.has(payment.invoiceId)) paymentsMapForHeal.set(payment.invoiceId, 0);
+        paymentsMapForHeal.set(payment.invoiceId, paymentsMapForHeal.get(payment.invoiceId) + Number(payment.amount));
+      });
+    }
+
     const documentsWithPayment = documents.map(doc => {
       let paymentStatus = 'SIN_FACTURA';
       let paymentInfo = null;
+      let computedNumeroFactura = doc.numeroFactura || null;
+      let computedFechaFactura = doc.fechaFactura || null;
 
-      if (doc.invoices && doc.invoices.length > 0) {
-        const totalFacturado = doc.invoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
+      const docInvoices = invoicesMapForHeal.get(doc.id) || doc.invoices || [];
+      if (docInvoices.length > 0) {
+        const totalFacturado = docInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
 
         // Calcular total pagado usando ambas fuentes:
         // 1. paidAmount del invoice (sync de Koinor)
         // 2. payments de la tabla payments (importaciones manuales)
-        const totalPagado = doc.invoices.reduce((sum, inv) => {
+        const totalPagado = docInvoices.reduce((sum, inv) => {
           const syncedPaid = Number(inv.paidAmount || 0);
-          const paymentsTotal = inv.payments?.reduce((pSum, p) => pSum + Number(p.amount || 0), 0) || 0;
+          const paymentsTotal = Math.max(
+            inv.payments?.reduce((pSum, p) => pSum + Number(p.amount || 0), 0) || 0,
+            paymentsMapForHeal.get(inv.id) || 0
+          );
           return sum + Math.max(syncedPaid, paymentsTotal);
         }, 0);
 
@@ -1217,11 +1400,27 @@ async function getMyDocuments(req, res) {
         else if (totalPagado > 0) paymentStatus = 'PARCIAL';
         else paymentStatus = 'PENDIENTE';
 
-        paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: doc.invoices.length };
+        paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: docInvoices.length };
+
+        if (!computedNumeroFactura) {
+          computedNumeroFactura = docInvoices[0]?.invoiceNumberRaw || docInvoices[0]?.invoiceNumber || null;
+        }
+        if (!computedFechaFactura) {
+          const byDateAsc = [...docInvoices]
+            .filter(inv => inv.issueDate)
+            .sort((a, b) => new Date(a.issueDate) - new Date(b.issueDate));
+          computedFechaFactura = byDateAsc[0]?.issueDate || null;
+        }
       }
 
       const { invoices, ...docWithoutInvoices } = doc;
-      return { ...docWithoutInvoices, paymentStatus, paymentInfo };
+      return {
+        ...docWithoutInvoices,
+        paymentStatus,
+        paymentInfo,
+        numeroFactura: computedNumeroFactura,
+        fechaFactura: computedFechaFactura || doc.createdAt
+      };
     });
 
     res.json({
