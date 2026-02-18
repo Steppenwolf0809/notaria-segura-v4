@@ -1098,9 +1098,26 @@ export async function getInvoicePayments(req, res) {
  */
 export async function getSummary(req, res) {
     try {
-        const { dateFrom, dateTo } = req.query;
+        const {
+            dateFrom,
+            dateTo,
+            excludeCancelled = 'false',
+            excludeLegacy = 'false',
+            subtotalMode = 'stored'
+        } = req.query;
+        const parseBooleanQuery = (value) => ['true', '1', 'yes', 'si'].includes(String(value || '').toLowerCase());
+        const shouldExcludeCancelled = parseBooleanQuery(excludeCancelled);
+        const shouldExcludeLegacy = parseBooleanQuery(excludeLegacy);
+        const useHybridSubtotal = String(subtotalMode || '').toLowerCase() === 'hybrid';
+        const IVA_DIVISOR = 1.15;
 
-        console.log('[billing-controller] getSummary called with:', { dateFrom, dateTo });
+        console.log('[billing-controller] getSummary called with:', {
+            dateFrom,
+            dateTo,
+            shouldExcludeCancelled,
+            shouldExcludeLegacy,
+            subtotalMode
+        });
 
         // Build where clause for payments based on date range
         const paymentWhere = {};
@@ -1187,6 +1204,12 @@ export async function getSummary(req, res) {
                 invoiceWhere.issueDate.lte = toDate;
             }
         }
+        if (shouldExcludeCancelled) {
+            invoiceWhere.status = { not: 'CANCELLED' };
+        }
+        if (shouldExcludeLegacy) {
+            invoiceWhere.isLegacy = false;
+        }
 
         const invoices = await prisma.invoice.findMany({
             where: invoiceWhere,
@@ -1206,8 +1229,15 @@ export async function getSummary(req, res) {
         let partialCount = 0;
 
         for (const invoice of invoices) {
-            totalInvoiced += Number(invoice.totalAmount);
-            totalSubtotalInvoiced += Number(invoice.subtotalAmount || 0);
+            const invoiceTotal = Number(invoice.totalAmount || 0);
+            const storedSubtotal = invoice.subtotalAmount != null ? Number(invoice.subtotalAmount) : null;
+            const computedSubtotal = invoiceTotal > 0 ? invoiceTotal / IVA_DIVISOR : 0;
+            const effectiveSubtotal = useHybridSubtotal
+                ? (storedSubtotal != null ? storedSubtotal : computedSubtotal)
+                : (storedSubtotal ?? 0);
+
+            totalInvoiced += invoiceTotal;
+            totalSubtotalInvoiced += effectiveSubtotal;
             totalPaid += Number(invoice.paidAmount || 0);
 
             if (invoice.status === 'PAID') paidCount++;
