@@ -44,6 +44,7 @@ import {
     SBU_CURRENT,
     IVA_RATE,
 } from '../../config/state_participation_config';
+import InfoTooltip from '../UI/InfoTooltip';
 
 // ── Helpers ──
 const fmt = (val) =>
@@ -496,6 +497,7 @@ const ParticipacionEstado = () => {
                             <Box>
                                 <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500, display: 'block' }}>
                                     Base Fija
+                                    <InfoTooltip text="Monto fijo establecido por ley segun el tramo en que se ubica. Se calcula como: SBU x cantidad de SBU del esquema." />
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
                                     {fmt(calculation.fixedBaseAmount)}
@@ -505,6 +507,7 @@ const ParticipacionEstado = () => {
                             <Box>
                                 <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500, display: 'block' }}>
                                     Excedente Variable
+                                    <InfoTooltip text="Porcentaje aplicado sobre el monto que excede el limite inferior del tramo actual." />
                                 </Typography>
                                 <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
                                     {fmt(calculation.variableBaseAmount)}
@@ -528,6 +531,7 @@ const ParticipacionEstado = () => {
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
                         <Typography variant="overline" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.08em', fontSize: '0.6875rem' }}>
                             PROXIMIDAD AL SIGUIENTE TRAMO
+                            <InfoTooltip text={'Verde: margen amplio, no requiere accion.\nAmarillo: cercano al siguiente tramo, monitoree la facturacion.\nRojo: muy cerca o supero el tramo, el porcentaje de participacion aumentara.'} />
                         </Typography>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             <Chip
