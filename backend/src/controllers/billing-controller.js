@@ -1398,7 +1398,10 @@ export async function getMyPortfolio(req, res) {
                 isOverdue,
                 daysOverdue,
                 source: 'CXC',
-                matrizador: 'Sin asignar'  // TODO: use receivable.matrizador after migration
+                matrizador: 'Sin asignar',  // TODO: use receivable.matrizador after migration
+                comentarioCaja: receivable.cashierComment || null,
+                comentarioCajaUpdatedAt: receivable.cashierCommentUpdatedAt || null,
+                comentarioCajaUpdatedBy: receivable.cashierCommentUpdatedByName || null
             });
         }
 
@@ -1691,7 +1694,10 @@ export async function getCarteraPorCobrar(req, res) {
                 balance,
                 status: receivable.status,
                 hasDocument: false,
-                canAssign: false
+                canAssign: false,
+                comentarioCaja: receivable.cashierComment || null,
+                comentarioCajaUpdatedAt: receivable.cashierCommentUpdatedAt || null,
+                comentarioCajaUpdatedBy: receivable.cashierCommentUpdatedByName || null
             });
         }
 
@@ -1936,6 +1942,7 @@ export async function getFacturasVencidas(req, res) {
                 const docInfo = docInfoMap.get(r.invoiceNumber) || {};
 
                 return {
+                    receivableId: r.id,
                     factura: r.invoiceNumber || r.invoiceNumberRaw,
                     cliente: r.clientName,
                     cedula: r.clientTaxId,
@@ -1946,7 +1953,10 @@ export async function getFacturasVencidas(req, res) {
                     totalFactura: totalAmount,
                     pagado: totalPaid,
                     saldo: balance,
-                    matrizador: docInfo.matrizador || r.matrizador || 'Sin asignar'
+                    matrizador: docInfo.matrizador || r.matrizador || 'Sin asignar',
+                    comentarioCaja: r.cashierComment || null,
+                    comentarioCajaUpdatedAt: r.cashierCommentUpdatedAt || null,
+                    comentarioCajaUpdatedBy: r.cashierCommentUpdatedByName || null
                 };
             })
             .filter(Boolean);
@@ -2675,6 +2685,82 @@ export async function getCarteraPendienteResumen(req, res) {
         res.status(500).json({
             success: false,
             message: 'Error al obtener resumen de cartera pendiente'
+        });
+    }
+}
+
+/**
+ * Actualizar comentario operativo de Caja para un registro CXC
+ * PUT /api/billing/cartera-pendiente/:id/comentario
+ */
+export async function updatePendingReceivableComment(req, res) {
+    try {
+        const { id } = req.params;
+        const rawComment = req.body?.comentario;
+
+        if (!id || typeof id !== 'string') {
+            return res.status(400).json({
+                success: false,
+                message: 'ID de cartera pendiente inválido'
+            });
+        }
+
+        if (typeof rawComment !== 'string') {
+            return res.status(400).json({
+                success: false,
+                message: 'El campo comentario es obligatorio'
+            });
+        }
+
+        const comentario = rawComment.trim();
+        const MAX_COMMENT_LENGTH = 500;
+
+        if (comentario.length > MAX_COMMENT_LENGTH) {
+            return res.status(400).json({
+                success: false,
+                message: `El comentario no puede superar ${MAX_COMMENT_LENGTH} caracteres`
+            });
+        }
+
+        const updatedByName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || 'Usuario caja';
+
+        const updated = await prisma.pendingReceivable.update({
+            where: { id },
+            data: {
+                cashierComment: comentario || null,
+                cashierCommentUpdatedAt: new Date(),
+                cashierCommentUpdatedById: req.user.id,
+                cashierCommentUpdatedByName: updatedByName
+            },
+            select: {
+                id: true,
+                invoiceNumber: true,
+                invoiceNumberRaw: true,
+                cashierComment: true,
+                cashierCommentUpdatedAt: true,
+                cashierCommentUpdatedById: true,
+                cashierCommentUpdatedByName: true
+            }
+        });
+
+        res.json({
+            success: true,
+            message: comentario ? 'Comentario guardado exitosamente' : 'Comentario eliminado exitosamente',
+            data: updated
+        });
+    } catch (error) {
+        console.error('[billing-controller] updatePendingReceivableComment error:', error);
+
+        if (error?.code === 'P2025') {
+            return res.status(404).json({
+                success: false,
+                message: 'Registro de cartera no encontrado'
+            });
+        }
+
+        res.status(500).json({
+            success: false,
+            message: 'Error al guardar comentario de cartera'
         });
     }
 }

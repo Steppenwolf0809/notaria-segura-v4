@@ -288,6 +288,20 @@ async function getCarteraPendienteResumen(reportDate = null) {
 }
 
 /**
+ * Actualizar comentario operativo de Caja sobre una factura de cartera pendiente
+ * @param {string} receivableId - ID del registro PendingReceivable
+ * @param {string} comentario - Comentario de caja (vacío para limpiar)
+ * @returns {Promise<Object>} Resultado de la actualización
+ */
+async function updateCarteraComentario(receivableId, comentario) {
+    const response = await apiClient.put(
+        `/billing/cartera-pendiente/${encodeURIComponent(receivableId)}/comentario`,
+        { comentario }
+    );
+    return response.data;
+}
+
+/**
  * Obtener historial de importaciones
  * @param {Object} params - Parámetros de búsqueda
  * @param {number} params.page - Página
@@ -521,6 +535,7 @@ const billingService = {
     // CXC - Cartera por Cobrar
     getCarteraPendiente,
     getCarteraPendienteResumen,
+    updateCarteraComentario,
 
     // Documentos
     getDocumentPaymentStatus,

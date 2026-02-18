@@ -804,6 +804,12 @@ model PendingReceivable {
   // === ASIGNACIÓN ===
   matrizador        String?                       // Nombre del matrizador (codven mapeado desde Koinor)
 
+  // === COMENTARIOS DE GESTIÓN (CAJA) ===
+  cashierComment              String?             // Comentario operativo visible en Caja/Admin/Matrizador
+  cashierCommentUpdatedAt     DateTime?           // Última actualización del comentario
+  cashierCommentUpdatedById   Int?                // Usuario que actualizó el comentario
+  cashierCommentUpdatedByName String?             // Nombre visible del usuario que actualizó
+
   // === METADATA DE SINCRONIZACIÓN ===
   lastSyncAt        DateTime @default(now())      // Última vez que se actualizó desde Koinor
   syncSource        String   @default("SYNC_AGENT") // SYNC_AGENT o MANUAL_XLS
@@ -819,6 +825,7 @@ model PendingReceivable {
   @@index([dueDate])
   @@index([lastSyncAt])
   @@index([matrizador])
+  @@index([cashierCommentUpdatedAt])
   @@map("pending_receivables")
 }
 

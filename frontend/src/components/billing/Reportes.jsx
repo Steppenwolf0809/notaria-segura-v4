@@ -26,7 +26,11 @@ import {
     Select,
     MenuItem,
     InputAdornment,
-    Collapse
+    Collapse,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions
 } from '@mui/material';
 import {
     Assessment as ReportIcon,
@@ -44,11 +48,13 @@ import {
     Clear as ClearIcon,
     KeyboardArrowDown as ExpandIcon,
     KeyboardArrowUp as CollapseIcon,
-    Send as SendIcon
+    Send as SendIcon,
+    Edit as EditIcon
 } from '@mui/icons-material';
 import billingService from '../../services/billing-service';
 import * as XLSX from 'xlsx';
 import MensajeCobroModal from './MensajeCobroModal';
+import useAuthStore from '../../store/auth-store';
 
 /**
  * Reportes Component - Enhanced with Admin Filters
@@ -76,6 +82,10 @@ const Reportes = () => {
 
     // Estado para modal de mensaje de cobro
     const [mensajeModal, setMensajeModal] = useState({ open: false, clientData: null });
+    const [commentModal, setCommentModal] = useState({ open: false, row: null, text: '' });
+    const [savingComment, setSavingComment] = useState(false);
+    const { user } = useAuthStore();
+    const canEditCashierComment = user?.role === 'CAJA' || user?.role === 'ADMIN';
 
     // Enhanced filters
     const [searchTerm, setSearchTerm] = useState('');
@@ -283,6 +293,39 @@ const Reportes = () => {
         setSortDirection('desc');
     };
 
+    const handleOpenCommentModal = (row) => {
+        setCommentModal({
+            open: true,
+            row,
+            text: row?.comentarioCaja || ''
+        });
+    };
+
+    const handleCloseCommentModal = () => {
+        setCommentModal({ open: false, row: null, text: '' });
+    };
+
+    const handleSaveComment = async () => {
+        const receivableId = commentModal.row?.receivableId;
+
+        if (!receivableId) {
+            setError('No se pudo identificar la factura para guardar el comentario');
+            return;
+        }
+
+        try {
+            setSavingComment(true);
+            await billingService.updateCarteraComentario(receivableId, commentModal.text || '');
+            handleCloseCommentModal();
+            await loadReport();
+        } catch (err) {
+            console.error('Error updating cashier comment:', err);
+            setError('Error al guardar comentario de caja');
+        } finally {
+            setSavingComment(false);
+        }
+    };
+
     const hasActiveFilters = searchTerm || selectedMatrizador || minBalance;
 
     const getHeaderCellSx = (paletteColor, extraSx = {}) => ({
@@ -335,7 +378,8 @@ const Reportes = () => {
                     'Total Factura': row.totalFactura,
                     'Pagado': row.pagado,
                     'Saldo': row.saldo,
-                    'Matrizador': row.matrizador
+                    'Matrizador': row.matrizador,
+                    'Comentario Caja': row.comentarioCaja || ''
                 }));
                 fileName = `Facturas_Vencidas_${new Date().toISOString().split('T')[0]}.xlsx`;
                 break;
@@ -839,6 +883,7 @@ const Reportes = () => {
                                     <SortableHeader field="diasVencido" sx={getHeaderCellSx('error')} align="center">Días</SortableHeader>
                                     <TableCell sx={getHeaderCellSx('error')} align="right">Total</TableCell>
                                     <SortableHeader field="saldo" sx={getHeaderCellSx('error')} align="right">Saldo</SortableHeader>
+                                    <TableCell sx={getHeaderCellSx('error')}>Comentario Caja</TableCell>
                                     <TableCell sx={getHeaderCellSx('error')}>Matrizador</TableCell>
                                 </TableRow>
                             </TableHead>
@@ -861,6 +906,26 @@ const Reportes = () => {
                                         <TableCell align="right">{formatCurrency(row.totalFactura)}</TableCell>
                                         <TableCell align="right" sx={{ color: 'error.main', fontWeight: 'bold' }}>
                                             {formatCurrency(row.saldo)}
+                                        </TableCell>
+                                        <TableCell sx={{ minWidth: 260 }}>
+                                            <Typography variant="body2" color={row.comentarioCaja ? 'text.primary' : 'text.secondary'}>
+                                                {row.comentarioCaja || 'Sin comentario'}
+                                            </Typography>
+                                            {(row.comentarioCajaUpdatedAt || row.comentarioCajaUpdatedBy) && (
+                                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                                    {row.comentarioCajaUpdatedBy || 'Caja'} • {formatDate(row.comentarioCajaUpdatedAt)}
+                                                </Typography>
+                                            )}
+                                            {canEditCashierComment && (
+                                                <Button
+                                                    size="small"
+                                                    startIcon={<EditIcon fontSize="small" />}
+                                                    sx={{ mt: 1 }}
+                                                    onClick={() => handleOpenCommentModal(row)}
+                                                >
+                                                    {row.comentarioCaja ? 'Editar' : 'Agregar'}
+                                                </Button>
+                                            )}
                                         </TableCell>
                                         <TableCell>
                                             <Chip size="small" label={row.matrizador} variant="outlined" />
@@ -1006,6 +1071,39 @@ const Reportes = () => {
                     {renderTable()}
                 </>
             )}
+
+            {/* Modal de comentario de caja en cartera vencida */}
+            <Dialog open={commentModal.open} onClose={handleCloseCommentModal} maxWidth="sm" fullWidth>
+                <DialogTitle>Comentario de Caja</DialogTitle>
+                <DialogContent dividers>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Factura: <strong>{commentModal.row?.factura || '-'}</strong> • Cliente: <strong>{commentModal.row?.cliente || '-'}</strong>
+                    </Typography>
+                    <TextField
+                        fullWidth
+                        multiline
+                        rows={4}
+                        value={commentModal.text}
+                        onChange={(e) => setCommentModal(prev => ({ ...prev, text: e.target.value }))}
+                        placeholder="Ej: Esta factura la paga el matrizador / cliente ofreció pagar el viernes / en validación..."
+                        helperText={`${(commentModal.text || '').length}/500`}
+                        inputProps={{ maxLength: 500 }}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCloseCommentModal} disabled={savingComment}>
+                        Cancelar
+                    </Button>
+                    <Button
+                        variant="contained"
+                        onClick={handleSaveComment}
+                        disabled={savingComment}
+                        startIcon={savingComment ? <CircularProgress size={16} color="inherit" /> : <EditIcon />}
+                    >
+                        {savingComment ? 'Guardando...' : 'Guardar'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             {/* Modal de mensaje de cobro */}
             <MensajeCobroModal
