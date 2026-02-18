@@ -1650,6 +1650,82 @@ export async function getCarteraPorCobrar(req, res) {
 
         console.log(`[billing-controller] Found ${receivables.length} pending receivables for report`);
 
+        // Resolver matrizador real por factura (documento asignado -> asignacion directa -> matrizador de factura/CXC)
+        const invoiceNumbers = [...new Set(receivables.map(r => r.invoiceNumber).filter(Boolean))];
+        const invoiceNumbersRaw = [...new Set(receivables.map(r => r.invoiceNumberRaw).filter(Boolean))];
+
+        const invoicesWithAssignment = (invoiceNumbers.length > 0 || invoiceNumbersRaw.length > 0)
+            ? await prisma.invoice.findMany({
+                where: {
+                    OR: [
+                        ...(invoiceNumbers.length > 0 ? [{ invoiceNumber: { in: invoiceNumbers } }] : []),
+                        ...(invoiceNumbersRaw.length > 0 ? [{ invoiceNumberRaw: { in: invoiceNumbersRaw } }] : [])
+                    ]
+                },
+                select: {
+                    id: true,
+                    invoiceNumber: true,
+                    invoiceNumberRaw: true,
+                    documentId: true,
+                    matrizador: true,
+                    assignedTo: {
+                        select: { firstName: true, lastName: true }
+                    },
+                    document: {
+                        select: {
+                            assignedTo: {
+                                select: { firstName: true, lastName: true }
+                            }
+                        }
+                    }
+                }
+            })
+            : [];
+
+        const invoiceMatrizadorMap = new Map();
+
+        for (const inv of invoicesWithAssignment) {
+            const fromDocument = inv.document?.assignedTo
+                ? `${inv.document.assignedTo.firstName} ${inv.document.assignedTo.lastName}`.trim()
+                : null;
+            const fromDirectAssignment = inv.assignedTo
+                ? `${inv.assignedTo.firstName} ${inv.assignedTo.lastName}`.trim()
+                : null;
+
+            const resolved = normalizeMatrizadorName(
+                fromDocument ||
+                fromDirectAssignment ||
+                inv.matrizador ||
+                'Sin asignar'
+            );
+
+            if (inv.invoiceNumber) {
+                invoiceMatrizadorMap.set(`N:${inv.invoiceNumber}`, {
+                    matrizador: resolved,
+                    documentId: inv.documentId || null
+                });
+            }
+            if (inv.invoiceNumberRaw) {
+                invoiceMatrizadorMap.set(`R:${inv.invoiceNumberRaw}`, {
+                    matrizador: resolved,
+                    documentId: inv.documentId || null
+                });
+            }
+        }
+
+        const resolveMatrizadorForReceivable = (receivable) => {
+            const mappedEntry =
+                (receivable.invoiceNumber && invoiceMatrizadorMap.get(`N:${receivable.invoiceNumber}`)) ||
+                (receivable.invoiceNumberRaw && invoiceMatrizadorMap.get(`R:${receivable.invoiceNumberRaw}`));
+
+            if (mappedEntry) return mappedEntry;
+
+            return {
+                matrizador: normalizeMatrizadorName(receivable.matrizador || 'Sin asignar'),
+                documentId: null
+            };
+        };
+
         // Group by client
         const clientMap = new Map();
 
@@ -1671,7 +1747,8 @@ export async function getCarteraPorCobrar(req, res) {
                     totalInvoiced: 0,
                     totalPaid: 0,
                     balance: 0,
-                    matrizador: 'Sin asignar',  // PendingReceivable doesn't have matrizador yet
+                    matrizador: 'Sin asignar',
+                    matrizadores: [],
                     canAssign: false,
                     invoices: []
                 });
@@ -1683,6 +1760,9 @@ export async function getCarteraPorCobrar(req, res) {
             client.totalPaid += totalPaid;
             client.balance += balance;
 
+            const resolvedInvoiceContext = resolveMatrizadorForReceivable(receivable);
+            const invoiceMatrizador = resolvedInvoiceContext.matrizador;
+
             // Add invoice detail
             client.invoices.push({
                 id: receivable.id,
@@ -1693,12 +1773,35 @@ export async function getCarteraPorCobrar(req, res) {
                 paidAmount: totalPaid,
                 balance,
                 status: receivable.status,
-                hasDocument: false,
+                hasDocument: !!resolvedInvoiceContext.documentId,
+                documentId: resolvedInvoiceContext.documentId,
                 canAssign: false,
+                matrizador: invoiceMatrizador,
                 comentarioCaja: receivable.cashierComment || null,
                 comentarioCajaUpdatedAt: receivable.cashierCommentUpdatedAt || null,
                 comentarioCajaUpdatedBy: receivable.cashierCommentUpdatedByName || null
             });
+        }
+
+        // Definir matrizador de cabecera por cliente (uno o multiples)
+        for (const client of clientMap.values()) {
+            const uniqueMatrizadores = Array.from(
+                new Set(
+                    client.invoices
+                        .map(inv => inv.matrizador)
+                        .filter(m => m && m !== 'Sin asignar')
+                )
+            );
+
+            client.matrizadores = uniqueMatrizadores;
+
+            if (uniqueMatrizadores.length === 0) {
+                client.matrizador = 'Sin asignar';
+            } else if (uniqueMatrizadores.length === 1) {
+                client.matrizador = uniqueMatrizadores[0];
+            } else {
+                client.matrizador = `Multiples (${uniqueMatrizadores.length})`;
+            }
         }
 
         // Convert to array and sort by balance descending
