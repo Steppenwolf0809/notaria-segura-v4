@@ -134,11 +134,11 @@ router.get('/',
 /**
  * @route POST /api/mensajes-internos
  * @desc Enviar mensaje individual a un usuario
- * @access Private (ADMIN only)
+ * @access Private (ADMIN y CAJA)
  */
 router.post('/',
     authenticateToken,
-    requireRoles(['ADMIN']),
+    requireRoles(['ADMIN', 'CAJA']),
     enviarMensaje
 );
 

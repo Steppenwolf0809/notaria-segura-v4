@@ -106,10 +106,13 @@ const Reportes = () => {
         if (!reportData?.data) return [];
         const matrizadores = new Set();
         reportData.data.forEach(row => {
-            const mat = row.matrizador || row.matrizador_name;
-            if (mat && mat !== 'Sin asignar') {
-                matrizadores.add(mat);
-            }
+            const mats = Array.isArray(row.matrizadores) && row.matrizadores.length > 0
+                ? row.matrizadores
+                : [row.matrizador || row.matrizador_name];
+
+            mats
+                .filter(mat => mat && mat !== 'Sin asignar')
+                .forEach(mat => matrizadores.add(mat));
         });
         return Array.from(matrizadores).sort();
     }, [reportData]);
@@ -174,8 +177,10 @@ const Reportes = () => {
         // Matrizador filter
         if (selectedMatrizador) {
             filtered = filtered.filter(row => {
-                const mat = row.matrizador || row.matrizador_name;
-                return mat === selectedMatrizador;
+                const mats = Array.isArray(row.matrizadores) && row.matrizadores.length > 0
+                    ? row.matrizadores
+                    : [row.matrizador || row.matrizador_name];
+                return mats.includes(selectedMatrizador);
             });
         }
 
@@ -350,7 +355,9 @@ const Reportes = () => {
                     'Total Facturado': row.totalInvoiced,
                     'Total Pagado': row.totalPaid,
                     'Saldo': row.balance,
-                    'Matrizador': row.matrizador
+                    'Matrizador': (Array.isArray(row.matrizadores) && row.matrizadores.length > 0)
+                        ? row.matrizadores.join(', ')
+                        : row.matrizador
                 }));
                 fileName = `Cartera_Por_Cobrar_${new Date().toISOString().split('T')[0]}.xlsx`;
                 break;
@@ -770,18 +777,9 @@ const Reportes = () => {
                                                 <Chip size="small" label={row.matrizador} variant="outlined" />
                                             </TableCell>
                                             <TableCell align="center">
-                                                <Tooltip title="Enviar mensaje de cobro al matrizador">
-                                                    <IconButton
-                                                        size="small"
-                                                        color="success"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setMensajeModal({ open: true, clientData: row });
-                                                        }}
-                                                    >
-                                                        <SendIcon fontSize="small" />
-                                                    </IconButton>
-                                                </Tooltip>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    Por factura
+                                                </Typography>
                                             </TableCell>
                                         </TableRow>
                                         {/* Fila expandible con detalle de facturas */}
@@ -802,7 +800,9 @@ const Reportes = () => {
                                                                         <TableCell sx={{ fontWeight: 'bold' }} align="right">Total</TableCell>
                                                                         <TableCell sx={{ fontWeight: 'bold' }} align="right">Pagado</TableCell>
                                                                         <TableCell sx={{ fontWeight: 'bold' }} align="right">Saldo</TableCell>
+                                                                        <TableCell sx={{ fontWeight: 'bold' }}>Matrizador</TableCell>
                                                                         <TableCell sx={{ fontWeight: 'bold' }}>Estado</TableCell>
+                                                                        <TableCell sx={{ fontWeight: 'bold' }} align="center">Mensaje</TableCell>
                                                                     </TableRow>
                                                                 </TableHead>
                                                                 <TableBody>
@@ -817,11 +817,45 @@ const Reportes = () => {
                                                                                 {formatCurrency(inv.balance)}
                                                                             </TableCell>
                                                                             <TableCell>
+                                                                                <Chip
+                                                                                    size="small"
+                                                                                    label={inv.matrizador || 'Sin asignar'}
+                                                                                    variant="outlined"
+                                                                                />
+                                                                            </TableCell>
+                                                                            <TableCell>
                                                                                 <Chip 
                                                                                     size="small" 
                                                                                     label={inv.status}
                                                                                     color={inv.status === 'PENDING' ? 'warning' : inv.status === 'PARTIAL' ? 'info' : 'error'}
                                                                                 />
+                                                                            </TableCell>
+                                                                            <TableCell align="center">
+                                                                                <Tooltip title="Enviar mensaje de cobro para esta factura">
+                                                                                    <IconButton
+                                                                                        size="small"
+                                                                                        color="success"
+                                                                                        onClick={(e) => {
+                                                                                            e.stopPropagation();
+                                                                                            setMensajeModal({
+                                                                                                open: true,
+                                                                                                clientData: {
+                                                                                                    clientName: row.clientName,
+                                                                                                    clientTaxId: row.clientTaxId,
+                                                                                                    balance: inv.balance,
+                                                                                                    invoiceCount: 1,
+                                                                                                    invoiceNumber: inv.invoiceNumber,
+                                                                                                    totalAmount: inv.totalAmount,
+                                                                                                    paidAmount: inv.paidAmount,
+                                                                                                    matrizador: inv.matrizador,
+                                                                                                    documentoId: inv.documentId || null
+                                                                                                }
+                                                                                            });
+                                                                                        }}
+                                                                                    >
+                                                                                        <SendIcon fontSize="small" />
+                                                                                    </IconButton>
+                                                                                </Tooltip>
                                                                             </TableCell>
                                                                         </TableRow>
                                                                     ))}
