@@ -9,6 +9,7 @@ import ListaFacturas from './billing/ListaFacturas';
 import DetalleFactura from './billing/DetalleFactura';
 import ListaPagos from './billing/ListaPagos';
 import Reportes from './billing/Reportes';
+import ParticipacionEstado from './admin/ParticipacionEstado';
 
 /**
  * Centro de Control de CAJA
@@ -22,6 +23,7 @@ import Reportes from './billing/Reportes';
  * - #/facturas: Lista de facturas
  * - #/factura-detalle/:id: Detalle de factura
  * - #/pagos: Lista de pagos
+ * - #/participacion-estado: Participación al Estado
  */
 const CajaCenter = () => {
   const [currentView, setCurrentView] = useState('dashboard');
@@ -83,6 +85,9 @@ const CajaCenter = () => {
 
       case 'reportes':
         return <Reportes />;
+
+      case 'participacion-estado':
+        return <ParticipacionEstado />;
 
       default:
         // Si el hash no coincide con ninguna vista, mostrar dashboard

@@ -16,7 +16,9 @@ import {
   LinearProgress,
   Alert,
   Button,
-  Divider
+  Divider,
+  IconButton,
+  CircularProgress
 } from '@mui/material';
 import {
   TrendingUp as TrendingUpIcon,
@@ -24,10 +26,181 @@ import {
   Description as DocumentIcon,
   Refresh as RefreshIcon,
   Assessment as AssessmentIcon,
-  CloudUpload as CloudUploadIcon
+  CloudUpload as CloudUploadIcon,
+  Gavel as GavelIcon,
+  ArrowForward as ArrowForwardIcon,
+  Schedule as ScheduleIcon
 } from '@mui/icons-material';
 import documentService from '../services/document-service';
 import useDocumentStore from '../store/document-store';
+import billingService from '../services/billing-service';
+import {
+  getMonthRange,
+  extractSubtotal,
+  calculateStateParticipation,
+  getSemaphoreState,
+  calculateBracketProgress,
+} from '../utils/stateParticipationCalculator';
+
+// ── WIDGET PARTICIPACIÓN (DASHBOARD) ──
+const ParticipationWidget = ({ subtotal, loading }) => {
+  const now = new Date();
+  const paymentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const paymentMonthName = paymentMonth.toLocaleDateString('es-EC', { month: 'long', year: 'numeric' });
+  const billingMonthName = now.toLocaleDateString('es-EC', { month: 'long' });
+
+  const formatMoney = (value) =>
+    '$' + Number(value || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  const formatMoneyShort = (value) => {
+    const n = Number(value || 0);
+    if (n >= 1000) return '$' + (n / 1000).toFixed(1) + 'k';
+    return '$' + n.toFixed(0);
+  };
+
+  const calc = calculateStateParticipation(subtotal || 0);
+  const progress = calculateBracketProgress(subtotal || 0, calc.bracketInfo);
+  const semaphore = getSemaphoreState(progress.remaining, progress.isTopBracket);
+
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        p: 2.5,
+        borderRadius: 3,
+        border: '1px solid',
+        borderColor: 'rgba(148, 163, 184, 0.12)',
+        background: 'rgba(255, 255, 255, 0.5)',
+        position: 'relative',
+        overflow: 'hidden'
+      }}
+    >
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{
+            p: 1,
+            borderRadius: 2,
+            bgcolor: '#6366f120',
+            color: '#6366f1',
+            display: 'flex'
+          }}>
+            <GavelIcon fontSize="small" />
+          </Box>
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+              Participación Estado
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+              Facturado en {billingMonthName}
+            </Typography>
+          </Box>
+        </Box>
+        <IconButton
+          size="small"
+          onClick={() => window.location.hash = '#/participacion-estado'}
+          sx={{ color: 'primary.main', bgcolor: 'primary.light', '&:hover': { bgcolor: 'primary.main', color: 'white' } }}
+        >
+          <ArrowForwardIcon fontSize="small" />
+        </IconButton>
+      </Box>
+
+      <Box sx={{ mb: 1.5 }}>
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 0.5 }}>
+            <CircularProgress size={18} />
+          </Box>
+        ) : (
+          <>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                A pagar por lo facturado hasta hoy
+              </Typography>
+              <Box sx={{
+                width: 10,
+                height: 10,
+                borderRadius: '50%',
+                bgcolor: semaphore.color,
+                boxShadow: `0 0 4px ${semaphore.color}60`,
+                flexShrink: 0,
+              }} />
+            </Box>
+            <Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1.15 }}>
+              {formatMoney(calc.totalToPay)}
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+              Base Imponible (sin IVA): {formatMoney(subtotal)}
+            </Typography>
+          </>
+        )}
+      </Box>
+
+      {/* ── Bracket Progress Bar ── */}
+      {!loading && (
+        <Box sx={{ mt: 1.5, mb: 1 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+              Esquema {calc.bracketLevel}
+            </Typography>
+            {progress.isTopBracket ? (
+              <Chip
+                size="small"
+                label="Tramo máximo"
+                sx={{
+                  height: 18,
+                  fontSize: '0.6rem',
+                  bgcolor: 'rgba(100, 116, 139, 0.12)',
+                  color: '#64748b',
+                  fontWeight: 700,
+                }}
+              />
+            ) : (
+              <Typography variant="caption" sx={{ color: semaphore.color, fontWeight: 700 }}>
+                {formatMoney(progress.remaining)} para Esquema {calc.bracketLevel + 1}
+              </Typography>
+            )}
+          </Box>
+
+          {/* Progress bar */}
+          <Box sx={{
+            height: 8,
+            borderRadius: 4,
+            bgcolor: 'rgba(148, 163, 184, 0.12)',
+            overflow: 'hidden',
+          }}>
+            <Box sx={{
+              height: '100%',
+              borderRadius: 4,
+              width: `${Math.min(progress.percent, 100)}%`,
+              bgcolor: semaphore.color,
+              transition: 'width 0.6s ease-in-out',
+              boxShadow: `0 0 6px ${semaphore.color}40`,
+            }} />
+          </Box>
+
+          {/* Range labels */}
+          {!progress.isTopBracket && (
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.3 }}>
+              <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.6rem' }}>
+                {formatMoneyShort(calc.bracketInfo.lowerLimit)}
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.6rem', fontWeight: 600 }}>
+                {Math.round(progress.percent)}%
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'text.disabled', fontSize: '0.6rem' }}>
+                {formatMoneyShort(calc.bracketInfo.nextBracketAt)}
+              </Typography>
+            </Box>
+          )}
+        </Box>
+      )}
+
+      <Typography variant="caption" sx={{ color: '#6366f1', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
+        <ScheduleIcon sx={{ fontSize: 14 }} />
+        Pagar hasta el 10 de {paymentMonthName}
+      </Typography>
+    </Paper>
+  );
+};
 
 /**
  * Dashboard de estadísticas de negocio para CAJA
@@ -37,6 +210,8 @@ const CajaStatsDashboard = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [currentMonthBilled, setCurrentMonthBilled] = useState(0);
+  const [participationLoading, setParticipationLoading] = useState(true);
 
   // Obtener documentos recientes del store
   const { documents, fetchAllDocuments } = useDocumentStore();
@@ -63,11 +238,31 @@ const CajaStatsDashboard = () => {
     }
   };
 
+  const loadCurrentMonthParticipation = async () => {
+    try {
+      setParticipationLoading(true);
+      const { fromISO, toISO } = getMonthRange(new Date(), { currentMonthUntilToday: true });
+      const summary = await billingService.getSummary({
+        dateFrom: fromISO,
+        dateTo: toISO
+      });
+      const subtotalFromDB = Number(summary?.totals?.subtotalInvoiced || 0);
+      const totalWithIVA = Number(summary?.totals?.invoiced || 0);
+      setCurrentMonthBilled(subtotalFromDB > 0 ? subtotalFromDB : Number(extractSubtotal(totalWithIVA)));
+    } catch (e) {
+      console.error('Error cargando participacion', e);
+      setCurrentMonthBilled(0);
+    } finally {
+      setParticipationLoading(false);
+    }
+  };
+
   /**
    * Cargar datos al montar
    */
   useEffect(() => {
     loadStats();
+    loadCurrentMonthParticipation();
     fetchAllDocuments(1, 10); // Cargar últimos 10 documentos
   }, []);
 
@@ -274,6 +469,14 @@ const CajaStatsDashboard = () => {
           </Card>
         </Grid>
       </Grid>
+
+      {/* Widget Participación Estado */}
+      <Box sx={{ mb: 4 }}>
+        <ParticipationWidget
+          subtotal={currentMonthBilled}
+          loading={participationLoading}
+        />
+      </Box>
 
       {/* Tendencias */}
       <Card sx={{ mb: 4 }}>
