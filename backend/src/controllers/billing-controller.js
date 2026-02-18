@@ -1103,19 +1103,53 @@ export async function getSummary(req, res) {
             dateTo,
             excludeCancelled = 'false',
             excludeLegacy = 'false',
-            subtotalMode = 'stored'
+            subtotalMode = 'stored',
+            deduplicateInvoices = 'false'
         } = req.query;
         const parseBooleanQuery = (value) => ['true', '1', 'yes', 'si'].includes(String(value || '').toLowerCase());
         const shouldExcludeCancelled = parseBooleanQuery(excludeCancelled);
         const shouldExcludeLegacy = parseBooleanQuery(excludeLegacy);
+        const shouldDeduplicateInvoices = parseBooleanQuery(deduplicateInvoices);
         const useHybridSubtotal = String(subtotalMode || '').toLowerCase() === 'hybrid';
         const IVA_DIVISOR = 1.15;
+        const parseLocalBoundary = (input, endOfDay = false) => {
+            if (!input) return null;
+            const value = String(input).trim();
+
+            // Evita el bug de UTC al parsear YYYY-MM-DD con new Date()
+            const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+            if (dateOnlyMatch) {
+                const year = Number(dateOnlyMatch[1]);
+                const month = Number(dateOnlyMatch[2]) - 1;
+                const day = Number(dateOnlyMatch[3]);
+                return endOfDay
+                    ? new Date(year, month, day, 23, 59, 59, 999)
+                    : new Date(year, month, day, 0, 0, 0, 0);
+            }
+
+            const parsed = new Date(value);
+            if (Number.isNaN(parsed.getTime())) return null;
+            if (endOfDay) {
+                parsed.setHours(23, 59, 59, 999);
+            } else {
+                parsed.setHours(0, 0, 0, 0);
+            }
+            return parsed;
+        };
+        const normalizeInvoiceDedupKey = (invoice) => {
+            const raw = String(invoice?.invoiceNumberRaw || invoice?.invoiceNumber || '').replace(/\D/g, '');
+            if (raw.length >= 14) {
+                return `${raw.slice(0, 6)}${raw.slice(-8)}`;
+            }
+            return raw || String(invoice?.id || '');
+        };
 
         console.log('[billing-controller] getSummary called with:', {
             dateFrom,
             dateTo,
             shouldExcludeCancelled,
             shouldExcludeLegacy,
+            shouldDeduplicateInvoices,
             subtotalMode
         });
 
@@ -1124,18 +1158,18 @@ export async function getSummary(req, res) {
         if (dateFrom || dateTo) {
             paymentWhere.paymentDate = {};
             if (dateFrom) {
-                // Parse date in local timezone (YYYY-MM-DD format from HTML date input)
-                const fromDate = new Date(dateFrom);
-                fromDate.setHours(0, 0, 0, 0);
-                paymentWhere.paymentDate.gte = fromDate;
-                console.log('[billing-controller] From date:', fromDate.toISOString());
+                const fromDate = parseLocalBoundary(dateFrom, false);
+                if (fromDate) {
+                    paymentWhere.paymentDate.gte = fromDate;
+                    console.log('[billing-controller] From date:', fromDate.toISOString());
+                }
             }
             if (dateTo) {
-                // Parse date in local timezone
-                const toDate = new Date(dateTo);
-                toDate.setHours(23, 59, 59, 999);
-                paymentWhere.paymentDate.lte = toDate;
-                console.log('[billing-controller] To date:', toDate.toISOString());
+                const toDate = parseLocalBoundary(dateTo, true);
+                if (toDate) {
+                    paymentWhere.paymentDate.lte = toDate;
+                    console.log('[billing-controller] To date:', toDate.toISOString());
+                }
             }
         }
 
@@ -1194,14 +1228,16 @@ export async function getSummary(req, res) {
         if (dateFrom || dateTo) {
             invoiceWhere.issueDate = {};
             if (dateFrom) {
-                const fromDate = new Date(dateFrom);
-                fromDate.setHours(0, 0, 0, 0);
-                invoiceWhere.issueDate.gte = fromDate;
+                const fromDate = parseLocalBoundary(dateFrom, false);
+                if (fromDate) {
+                    invoiceWhere.issueDate.gte = fromDate;
+                }
             }
             if (dateTo) {
-                const toDate = new Date(dateTo);
-                toDate.setHours(23, 59, 59, 999);
-                invoiceWhere.issueDate.lte = toDate;
+                const toDate = parseLocalBoundary(dateTo, true);
+                if (toDate) {
+                    invoiceWhere.issueDate.lte = toDate;
+                }
             }
         }
         if (shouldExcludeCancelled) {
@@ -1211,15 +1247,50 @@ export async function getSummary(req, res) {
             invoiceWhere.isLegacy = false;
         }
 
-        const invoices = await prisma.invoice.findMany({
+        const rawInvoices = await prisma.invoice.findMany({
             where: invoiceWhere,
             select: {
+                id: true,
+                invoiceNumber: true,
+                invoiceNumberRaw: true,
+                isLegacy: true,
+                issueDate: true,
                 totalAmount: true,
                 subtotalAmount: true,
                 paidAmount: true,
                 status: true
             }
         });
+        const invoices = shouldDeduplicateInvoices
+            ? (() => {
+                const byInvoiceKey = new Map();
+                for (const invoice of rawInvoices) {
+                    const key = normalizeInvoiceDedupKey(invoice);
+                    const existing = byInvoiceKey.get(key);
+                    if (!existing) {
+                        byInvoiceKey.set(key, invoice);
+                        continue;
+                    }
+
+                    const existingTime = existing.issueDate ? new Date(existing.issueDate).getTime() : 0;
+                    const candidateTime = invoice.issueDate ? new Date(invoice.issueDate).getTime() : 0;
+
+                    if (candidateTime > existingTime) {
+                        byInvoiceKey.set(key, invoice);
+                        continue;
+                    }
+                    if (candidateTime < existingTime) {
+                        continue;
+                    }
+
+                    // En empate de fecha, priorizar no-legacy para estabilidad.
+                    if (Boolean(existing.isLegacy) && !Boolean(invoice.isLegacy)) {
+                        byInvoiceKey.set(key, invoice);
+                    }
+                }
+                return Array.from(byInvoiceKey.values());
+            })()
+            : rawInvoices;
 
         let totalInvoiced = 0;
         let totalSubtotalInvoiced = 0;

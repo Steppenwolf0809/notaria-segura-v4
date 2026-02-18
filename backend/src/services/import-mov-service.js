@@ -14,7 +14,7 @@
 
 import { db as prisma } from '../db.js';
 import { parseMovXML } from './xml-mov-parser.js';
-import { normalizeInvoiceNumber } from '../utils/billing-utils.js';
+import { normalizeInvoiceNumber, buildInvoiceWhereByNumber } from '../utils/billing-utils.js';
 
 /**
  * Extrae el secuencial de un número de factura (los últimos dígitos después del último guión o los últimos 6-9 dígitos)
@@ -261,12 +261,7 @@ async function processMovInvoice(invoiceData, sourceFile, userId) {
 
     // Buscar factura existente
     let invoice = await prisma.invoice.findFirst({
-        where: {
-            OR: [
-                { invoiceNumber },
-                { invoiceNumberRaw }
-            ]
-        },
+        where: buildInvoiceWhereByNumber(invoiceNumberRaw),
         include: {
             payments: true,
             document: true

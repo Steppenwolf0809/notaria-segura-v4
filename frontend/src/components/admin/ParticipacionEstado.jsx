@@ -213,7 +213,7 @@ const ParticipacionEstado = () => {
                         dateFrom: range.fromISO,
                         dateTo: range.toISO,
                         excludeCancelled: true,
-                        excludeLegacy: true,
+                        deduplicateInvoices: true,
                         subtotalMode: 'hybrid',
                     });
                     const totalWithIVA = Number(summary?.totals?.invoiced || 0);

@@ -15,6 +15,7 @@
 
 import { db as prisma } from '../db.js';
 import { parseKoinorXML, validateKoinorXMLStructure } from './xml-koinor-parser.js';
+import { normalizeInvoiceNumber, buildInvoiceWhereByNumber } from '../utils/billing-utils.js';
 
 /**
  * Extrae el secuencial de un número de factura
@@ -360,16 +361,8 @@ async function processPayment(payment, sourceFile, stats, userId) {
 async function processSinglePayment(payment, detail, sourceFile, userId) {
     // 1. Buscar factura por invoiceNumberRaw O por invoiceNumber normalizado
     // Esto evita duplicados cuando el formato varía entre importaciones
-    const normalizedNumber = detail.invoiceNumberRaw.replace(/^0+/, '');
-    
     let invoice = await prisma.invoice.findFirst({
-        where: {
-            OR: [
-                { invoiceNumberRaw: detail.invoiceNumberRaw },
-                { invoiceNumber: detail.invoiceNumberRaw },
-                { invoiceNumber: normalizedNumber }
-            ]
-        },
+        where: buildInvoiceWhereByNumber(detail.invoiceNumberRaw),
         include: { document: true }
     });
 
@@ -382,14 +375,15 @@ async function processSinglePayment(payment, detail, sourceFile, userId) {
         // Usar upsert para evitar errores de unique constraint
         const legacyTotal = parseFloat(detail.amount || 0);
         const legacySubtotal = legacyTotal > 0 ? Math.round((legacyTotal / 1.15) * 100) / 100 : 0;
+        const canonicalInvoiceNumber = normalizeInvoiceNumber(detail.invoiceNumberRaw) || detail.invoiceNumberRaw;
         invoice = await prisma.invoice.upsert({
-            where: { invoiceNumber: detail.invoiceNumberRaw },
+            where: { invoiceNumber: canonicalInvoiceNumber },
             update: {
                 // Si ya existe, solo actualizar invoiceNumberRaw si está vacío
                 invoiceNumberRaw: detail.invoiceNumberRaw
             },
             create: {
-                invoiceNumber: detail.invoiceNumberRaw, // Usar el RAW como número principal
+                invoiceNumber: canonicalInvoiceNumber,
                 invoiceNumberRaw: detail.invoiceNumberRaw,
                 clientName: payment.clientName || 'Cliente Legacy',
                 clientTaxId: payment.clientTaxId || '9999999999999',
@@ -622,16 +616,13 @@ async function processNotaCredito(nc, sourceFile) {
  */
 async function processInvoiceFC(invoiceData, sourceFile) {
     const result = { created: false, skipped: false };
+    const canonicalInvoiceNumber = normalizeInvoiceNumber(invoiceData.invoiceNumberRaw || invoiceData.invoiceNumber)
+        || invoiceData.invoiceNumberRaw
+        || invoiceData.invoiceNumber;
     
     // Buscar si la factura ya existe
     const existingInvoice = await prisma.invoice.findFirst({
-        where: {
-            OR: [
-                { invoiceNumberRaw: invoiceData.invoiceNumberRaw },
-                { invoiceNumber: invoiceData.invoiceNumber },
-                { invoiceNumber: invoiceData.invoiceNumberRaw }
-            ]
-        }
+        where: buildInvoiceWhereByNumber(invoiceData.invoiceNumberRaw || invoiceData.invoiceNumber)
     });
     
     if (existingInvoice) {
@@ -665,7 +656,7 @@ async function processInvoiceFC(invoiceData, sourceFile) {
         : (totalAmt > 0 ? Math.round((totalAmt / 1.15) * 100) / 100 : 0);
     await prisma.invoice.create({
         data: {
-            invoiceNumber: invoiceData.invoiceNumberRaw,
+            invoiceNumber: canonicalInvoiceNumber,
             invoiceNumberRaw: invoiceData.invoiceNumberRaw,
             clientName: invoiceData.clientName || 'Cliente del XML',
             clientTaxId: invoiceData.clientTaxId || '',
