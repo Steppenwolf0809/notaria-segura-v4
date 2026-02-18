@@ -382,7 +382,8 @@ function formatDate(date) {
     return new Date(date).toLocaleDateString('es-EC', {
         year: 'numeric',
         month: '2-digit',
-        day: '2-digit'
+        day: '2-digit',
+        timeZone: 'UTC'
     });
 }
 
