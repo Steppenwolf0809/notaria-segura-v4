@@ -256,8 +256,16 @@ export async function getInvoices(req, res) {
 
         if (dateFrom || dateTo) {
             where.issueDate = {};
-            if (dateFrom) where.issueDate.gte = new Date(dateFrom);
-            if (dateTo) where.issueDate.lte = new Date(dateTo);
+            if (dateFrom) {
+                const fromDate = new Date(dateFrom);
+                fromDate.setHours(0, 0, 0, 0);
+                where.issueDate.gte = fromDate;
+            }
+            if (dateTo) {
+                const toDate = new Date(dateTo);
+                toDate.setHours(23, 59, 59, 999);
+                where.issueDate.lte = toDate;
+            }
         }
 
         const [invoices, total] = await Promise.all([
@@ -1164,12 +1172,20 @@ export async function getSummary(req, res) {
         const paymentsCountToday = paymentsToday.length;
         const collectedToday = paymentsToday.reduce((sum, p) => sum + Number(p.amount), 0);
 
-        // Get invoice stats (for overall context, not date-filtered)
+        // Get invoice stats (filtered by issue date)
         const invoiceWhere = {};
         if (dateFrom || dateTo) {
             invoiceWhere.issueDate = {};
-            if (dateFrom) invoiceWhere.issueDate.gte = new Date(dateFrom);
-            if (dateTo) invoiceWhere.issueDate.lte = new Date(dateTo);
+            if (dateFrom) {
+                const fromDate = new Date(dateFrom);
+                fromDate.setHours(0, 0, 0, 0);
+                invoiceWhere.issueDate.gte = fromDate;
+            }
+            if (dateTo) {
+                const toDate = new Date(dateTo);
+                toDate.setHours(23, 59, 59, 999);
+                invoiceWhere.issueDate.lte = toDate;
+            }
         }
 
         const invoices = await prisma.invoice.findMany({
