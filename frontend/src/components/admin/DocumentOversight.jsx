@@ -71,6 +71,7 @@ import BulkOperationsDialog from './BulkOperationsDialog';
 import EnviarMensajeModal from './EnviarMensajeModal';
 import EnviarMensajeMasivoModal from './EnviarMensajeMasivoModal';
 import PaymentIndicator from '../shared/PaymentIndicator';
+import InfoTooltip from '../UI/InfoTooltip';
 
 /**
  * Componente de supervisión integral de documentos para administradores
@@ -510,7 +511,7 @@ const DocumentOversight = () => {
       { value: stats.total, label: 'Total Documentos', color: kpiColors.primary, icon: <DescriptionIcon /> },
       { value: stats.pending, label: 'Pendientes', color: kpiColors.warning, icon: <PendingIcon /> },
       { value: stats.inProgress, label: 'En Proceso', color: kpiColors.info, icon: <InProgressIcon /> },
-      { value: stats.overdue, label: 'Vencidos', color: kpiColors.error, icon: <WarningIcon /> },
+      { value: stats.overdue, label: 'Vencidos', color: kpiColors.error, icon: <WarningIcon />, infoTooltip: `Documentos que excedieron el tiempo maximo en su estado: Pendiente > ${OVERDUE_THRESHOLDS.PENDIENTE}d, En Proceso > ${OVERDUE_THRESHOLDS.EN_PROCESO}d, Listo > ${OVERDUE_THRESHOLDS.LISTO}d.` },
     ];
 
     return (
@@ -534,11 +535,12 @@ const DocumentOversight = () => {
                       }}
                     >
                       {kpi.label}
+                      {kpi.infoTooltip && <InfoTooltip text={kpi.infoTooltip} />}
                     </Typography>
-                    <Typography 
-                      variant="h5" 
-                      sx={{ 
-                        fontWeight: 700, 
+                    <Typography
+                      variant="h5"
+                      sx={{
+                        fontWeight: 700,
                         color: kpi.color.main,
                         mt: 0.5,
                         fontSize: '1.625rem'
@@ -780,15 +782,17 @@ const DocumentOversight = () => {
             sx={{ mb: 2 }}
             action={
               <Box sx={{ display: 'flex', gap: 1 }}>
-                <Button
-                  size="small"
-                  variant="contained"
-                  color="primary"
-                  startIcon={<SendIcon />}
-                  onClick={openMensajeMasivoModal}
-                >
-                  Mensaje Masivo
-                </Button>
+                <Tooltip title="Envia una alerta interna a los miembros del equipo asignados. No envia WhatsApp a los clientes." arrow>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    color="primary"
+                    startIcon={<SendIcon />}
+                    onClick={openMensajeMasivoModal}
+                  >
+                    Mensaje Masivo
+                  </Button>
+                </Tooltip>
                 <Button
                   size="small"
                   onClick={() => setShowBulkOperations(true)}
@@ -838,7 +842,7 @@ const DocumentOversight = () => {
                 <TableCell>Tipo</TableCell>
                 <TableCell>Estado</TableCell>
                 <TableCell>Matrizador</TableCell>
-                <TableCell>Tiempo en Estado</TableCell>
+                <TableCell>Tiempo en Estado <InfoTooltip text="Dias desde el ultimo cambio de estado. Rojo = supera el umbral permitido para ese estado." /></TableCell>
                 <TableCell>Fecha Factura</TableCell>
                 <TableCell align="center">Acciones</TableCell>
               </TableRow>

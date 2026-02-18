@@ -54,6 +54,7 @@ import {
   ArrowForward as ArrowForwardIcon,
   Schedule as ScheduleIcon
 } from '@mui/icons-material';
+import InfoTooltip from './UI/InfoTooltip';
 import useAuth from '../hooks/use-auth';
 import AdminLayout from './AdminLayout';
 import UserManagement from './admin/UserManagement';
@@ -655,16 +656,16 @@ const AdminDashboard = ({ onViewChange }) => {
             </Typography>
             <Grid container spacing={2}>
               <Grid item xs={6} sm={3}>
-                <SummaryCard title="Activos" value={kpis?.activeCount || 0} icon={<DescriptionIcon />} color="primary" subtext="En curso" />
+                <SummaryCard title="Activos" value={kpis?.activeCount || 0} icon={<DescriptionIcon />} color="primary" subtext="En curso" infoTooltip="Documentos que aun no han llegado a estado final (escritura entregada o cancelado)." />
               </Grid>
               <Grid item xs={6} sm={3}>
-                <SummaryCard title={`Críticos`} value={kpis?.criticalCount || 0} icon={<WarningIcon />} color="error" subtext={`> ${thresholdDays}d`} />
+                <SummaryCard title={`Críticos`} value={kpis?.criticalCount || 0} icon={<WarningIcon />} color="error" subtext={`> ${thresholdDays}d`} infoTooltip={`Documentos que superan ${thresholdDays} dias en su estado actual. Ajuste el umbral en el filtro "Umbral Retraso".`} />
               </Grid>
               <Grid item xs={6} sm={3}>
-                <SummaryCard title="En Proceso" value={kpis?.inProgressCount || 0} icon={<InProgressIcon />} color="info" subtext="En curso" />
+                <SummaryCard title="En Proceso" value={kpis?.inProgressCount || 0} icon={<InProgressIcon />} color="info" subtext="En curso" infoTooltip="Documentos asignados a un matrizador que estan siendo trabajados activamente." />
               </Grid>
               <Grid item xs={6} sm={3}>
-                <SummaryCard title="Listos" value={kpis?.readyCount || 0} icon={<CheckCircleIcon />} color="success" subtext="Para entregar" />
+                <SummaryCard title="Listos" value={kpis?.readyCount || 0} icon={<CheckCircleIcon />} color="success" subtext="Para entregar" infoTooltip="Documentos completados por el matrizador, pendientes de entrega al cliente." />
               </Grid>
             </Grid>
           </Box>
@@ -719,6 +720,7 @@ const AdminDashboard = ({ onViewChange }) => {
                 icon={<TrendingUpIcon />}
                 color={kpis?.weeklyEfficiency > 80 ? "success" : "warning"}
                 subtext="Entregados / Ingresados"
+                infoTooltip="Ritmo de salida: mide si el equipo esta cerrando mas tramites de los que abre en los ultimos 7 dias."
               />
             </Box>
             <Box sx={{ mt: 2 }}>
@@ -933,10 +935,10 @@ const AdminDashboard = ({ onViewChange }) => {
               <TableHead>
                 <TableRow>
                   <TableCell>Matrizador</TableCell>
-                  <TableCell align="center">Carga Activa</TableCell>
-                  <TableCell align="center">Críticos</TableCell>
+                  <TableCell align="center">Carga Activa <InfoTooltip text="Documentos activos asignados actualmente a este matrizador." /></TableCell>
+                  <TableCell align="center">Críticos <InfoTooltip text="Documentos que superan el umbral de dias permitido en su estado actual." /></TableCell>
                   <TableCell align="center">Entregas ({billingIntervals[performanceTimeRange]})</TableCell>
-                  <TableCell align="center">Velocidad Prom.</TableCell>
+                  <TableCell align="center">Velocidad Prom. <InfoTooltip text="Dias promedio que tarda este matrizador en completar un documento, desde asignacion hasta estado Listo." /></TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -1140,7 +1142,7 @@ const kpiColors = {
   neutral: { main: '#64748b', light: 'rgba(100, 116, 139, 0.08)', contrast: '#fff' }
 };
 
-const SummaryCard = ({ title, value, icon, color = 'primary', subtext }) => {
+const SummaryCard = ({ title, value, icon, color = 'primary', subtext, infoTooltip }) => {
   const themeColor = kpiColors[color] || kpiColors.primary;
 
   return (
@@ -1169,6 +1171,7 @@ const SummaryCard = ({ title, value, icon, color = 'primary', subtext }) => {
               }}
             >
               {title}
+              {infoTooltip && <InfoTooltip text={infoTooltip} />}
             </Typography>
             <Typography
               variant="h4"
