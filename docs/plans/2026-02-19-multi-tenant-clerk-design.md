@@ -162,3 +162,55 @@ Reglas:
 3. No depender de filtros manuales dispersos en controllers para seguridad.
 4. Mantener trazabilidad con auditoria en operaciones cross-tenant y UAFE.
 5. Ejecutar por fases y validar con pruebas de aislamiento en cada fase.
+
+## 11) Estimacion de Capacidad (2026-02-19)
+
+Objetivo seguro con infraestructura actual (1 backend + 1 PostgreSQL en Railway):
+
+1. Capacidad recomendada hoy: `20 notarias activas` (rango operativo `18 a 22`).
+
+Metodo de calculo usado:
+
+1. Limite por request sync: `2000` registros (`backend/src/controllers/sync-billing-controller.js`, `MAX_RECORDS_PER_REQUEST`).
+2. Frecuencia esperada sync agent: cada `15` minutos (`docs/SYNC_AGENT_PLAN.md`).
+3. Carga base por notaria: `2000 / 900s = 2.22 registros/seg`.
+4. Benchmark interno XML: `7000 registros < 2 min` (`backend/src/services/README-XML-IMPORT.md`), equivalente aproximado `58 registros/seg`.
+5. Margen operativo del 75% para UI, UAFE y picos: `58 * 0.75 = 43.5 registros/seg`.
+6. Capacidad estimada: `43.5 / 2.22 = 19.6`, redondeado a `20` notarias.
+
+Ajustes de capacidad:
+
+1. Si sync pasa a cada 30 min: objetivo aproximado `30 a 35` notarias.
+2. Si hay alta concurrencia de PDF/UAFE: bajar objetivo a `15 a 18`.
+3. Si se separan workers de sync/PDF del API principal: se puede subir por encima de `35` sin redisenar arquitectura.
+
+Nota:
+
+1. Esta estimacion es de planificacion. Debe validarse con prueba de carga por etapas.
+
+## 12) Criterio de Upgrade Railway (Hobby -> Pro)
+
+Estado de referencia (verificado 2026-02-19 en docs de Railway):
+
+1. Hobby: uso incluido mensual `5 USD` y gasto minimo mensual `5 USD`.
+2. Pro: uso incluido mensual `20 USD` y gasto minimo mensual `20 USD`.
+3. El cobro sigue siendo por uso; cambia el minimo incluido y limites del plan.
+
+Regla practica para este proyecto:
+
+1. Mantener Hobby durante piloto N18 si el uso y limites siguen holgados.
+2. Pasar a Pro justo antes del primer cliente externo en produccion o cuando aparezca un limite operativo.
+
+Triggers claros para migrar a Pro:
+
+1. Necesidad de mas de `2` dominios por servicio.
+2. Necesidad de mas de `6` replicas por servicio.
+3. Volumen PostgreSQL acercandose al limite de `5 GB` en Hobby (recomendado migrar al llegar a `4 GB`).
+4. Operacion multi-cliente con exigencia de mayor gobernanza de equipo.
+
+Fuentes:
+
+1. Planes: https://docs.railway.com/reference/pricing/plans
+2. Pricing general: https://railway.com/pricing
+3. Volumes: https://docs.railway.com/reference/volumes
+4. Dominios: https://docs.railway.com/guides/public-networking
