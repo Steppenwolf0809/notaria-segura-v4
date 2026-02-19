@@ -23,6 +23,8 @@ Implementado en codigo (Fase 1 + avance Fase 2):
 11. RLS activado en staging para tablas core (`documents`, `document_events`, `whatsapp_notifications`) con `ENABLE + FORCE ROW LEVEL SECURITY` y politicas fail-closed.
 12. Rol runtime `app_runtime_rls` creado (sin `BYPASSRLS`) y usado por backend via `SET LOCAL ROLE` + contexto de sesion por transaccion.
 13. Verificacion staging post-RLS: `notary_id` sin nulos en tablas core (`documents: 2270/2270`, `document_events: 9341/9341`, `whatsapp_notifications: 1308/1308`) y prueba fail-closed validada (`0` filas sin contexto tenant).
+14. Prueba de aislamiento A/B ejecutada en staging con script dedicado (`backend/scripts/verify-tenant-isolation-ab.js`): tenant A y tenant B aislados en `documents`, `document_events` y `whatsapp_notifications`; sin contexto tenant = `0` filas; modo super admin = acceso a ambos tenants.
+15. La validacion A/B se ejecuto en transaccion con `ROLLBACK` (sin persistir datos de prueba en staging).
 
 Migraciones nuevas creadas:
 1. `backend/prisma/migrations/20260219113000_phase1_multi_tenant_foundation/migration.sql`
@@ -30,7 +32,7 @@ Migraciones nuevas creadas:
 
 Pendiente para continuar (siguiente conversacion):
 1. Terminar migracion de controladores/servicios fuera de auth/admin para usar contexto tenant transaccional explicito (fase de endurecimiento).
-2. Ejecutar pruebas de aislamiento A/B con al menos dos notarias activas y validar escenarios `SUPER_ADMIN` cross-tenant auditados extremo a extremo.
+2. Validar escenarios `SUPER_ADMIN` cross-tenant auditados extremo a extremo sobre endpoints reales (no solo SQL de verificacion).
 3. Extender RLS a tablas adicionales (incluyendo modulo UAFE) segun Fase 3.
 
 ## 1) Objetivo

@@ -81,3 +81,21 @@ NO (todavia):
 ## 7) Siguiente paso recomendado
 
 Crear una segunda notaria de prueba (Tenant B) y ejecutar test A/B de aislamiento para confirmar que A no puede leer datos de B.
+
+## 8) Actualizacion (ya ejecutado)
+
+Se ejecuto prueba A/B real en staging con script:
+
+1. `backend/scripts/verify-tenant-isolation-ab.js`
+
+Resultado:
+
+1. Sin contexto tenant: `0` filas visibles.
+2. Contexto Tenant A: solo datos de A.
+3. Contexto Tenant B: solo datos de B.
+4. Contexto super admin: ve A y B.
+
+Importante:
+
+1. La prueba se hizo en una transaccion con `ROLLBACK`.
+2. No se dejaron datos de prueba persistidos en staging.
