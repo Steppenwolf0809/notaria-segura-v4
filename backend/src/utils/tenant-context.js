@@ -1,3 +1,5 @@
+import { applyTenantRlsContext } from './apply-tenant-rls-context.js';
+
 /**
  * Ejecuta una operacion dentro de una transaccion con contexto tenant local.
  * Esto prepara el camino para RLS (SET LOCAL app.current_notary_id / app.is_super_admin).
@@ -8,12 +10,8 @@
  * @returns {Promise<any>}
  */
 export async function withTenantContext(prismaClient, tenantContext, operation) {
-  const notaryId = tenantContext?.notaryId || '';
-  const isSuperAdmin = tenantContext?.isSuperAdmin ? 'true' : 'false';
-
   return prismaClient.$transaction(async (tx) => {
-    await tx.$executeRaw`SELECT set_config('app.current_notary_id', ${notaryId}, true)`;
-    await tx.$executeRaw`SELECT set_config('app.is_super_admin', ${isSuperAdmin}, true)`;
+    await applyTenantRlsContext(tx, tenantContext);
 
     return operation(tx);
   });
@@ -79,9 +77,12 @@ export async function withLoginEmailContext(prismaClient, email, operation) {
   const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
 
   return prismaClient.$transaction(async (tx) => {
+    await applyTenantRlsContext(tx, {
+      notaryId: null,
+      isSuperAdmin: false
+    });
+
     await tx.$executeRaw`SELECT set_config('app.auth_login_email', ${normalizedEmail}, true)`;
-    await tx.$executeRaw`SELECT set_config('app.current_notary_id', '', true)`;
-    await tx.$executeRaw`SELECT set_config('app.is_super_admin', 'false', true)`;
 
     return operation(tx);
   });

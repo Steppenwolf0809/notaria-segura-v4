@@ -19,15 +19,19 @@ Implementado en codigo (Fase 1 + avance Fase 2):
 7. Migraciones aplicadas en staging (`20260219113000` y `20260219133000`) con hardening de compatibilidad legacy.
 8. Flujos de `auth` y CRUD de usuarios admin ejecutan operaciones tenant-scoped con transaccion + `SET LOCAL`.
 9. Auditoria persistente para `SUPER_ADMIN` en cambios de contexto tenant y CRUD cross-tenant de usuarios.
+10. Tablas core `documents`, `document_events`, `whatsapp_notifications` ahora tienen `notary_id` en staging con backfill inicial y triggers de autocompletado tenant.
+11. RLS activado en staging para tablas core (`documents`, `document_events`, `whatsapp_notifications`) con `ENABLE + FORCE ROW LEVEL SECURITY` y politicas fail-closed.
+12. Rol runtime `app_runtime_rls` creado (sin `BYPASSRLS`) y usado por backend via `SET LOCAL ROLE` + contexto de sesion por transaccion.
+13. Verificacion staging post-RLS: `notary_id` sin nulos en tablas core (`documents: 2270/2270`, `document_events: 9341/9341`, `whatsapp_notifications: 1308/1308`) y prueba fail-closed validada (`0` filas sin contexto tenant).
 
 Migraciones nuevas creadas:
 1. `backend/prisma/migrations/20260219113000_phase1_multi_tenant_foundation/migration.sql`
 2. `backend/prisma/migrations/20260219133000_add_immutable_audit_logs/migration.sql`
 
 Pendiente para continuar (siguiente conversacion):
-1. Ejecutar Fase 2 completa: activar RLS por tabla core/UAFE con politicas fail-closed.
-2. Terminar migracion de todos los controladores/servicios tenant-scoped a transaccion + `SET LOCAL`.
-3. Pruebas de aislamiento A/B + casos `SUPER_ADMIN` cross-tenant auditados extremo a extremo.
+1. Terminar migracion de controladores/servicios fuera de auth/admin para usar contexto tenant transaccional explicito (fase de endurecimiento).
+2. Ejecutar pruebas de aislamiento A/B con al menos dos notarias activas y validar escenarios `SUPER_ADMIN` cross-tenant auditados extremo a extremo.
+3. Extender RLS a tablas adicionales (incluyendo modulo UAFE) segun Fase 3.
 
 ## 1) Objetivo
 

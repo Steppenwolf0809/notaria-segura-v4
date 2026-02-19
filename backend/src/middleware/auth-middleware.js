@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import prisma from '../db.js';
 import { persistAuditLog } from '../utils/audit-log-store.js';
+import { runWithTenantRequestContext } from '../utils/request-tenant-context.js';
 
 const SUPER_ADMIN_ROLE = 'SUPER_ADMIN';
 
@@ -192,7 +193,14 @@ async function authenticateToken(req, res, next) {
       res.setHeader('x-tenant-notary-id', tenantContext.notaryId);
     }
 
-    next();
+    return runWithTenantRequestContext(
+      {
+        notaryId: tenantContext.notaryId,
+        isSuperAdmin: tenantContext.isSuperAdmin,
+        source: 'auth-middleware'
+      },
+      () => next()
+    );
 
   } catch (error) {
     console.error('Error en autenticacion:', error);

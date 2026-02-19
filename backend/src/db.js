@@ -1,36 +1,78 @@
 import { PrismaClient } from '@prisma/client';
 import cache from './services/cache-service.js';
+import { getTenantRequestContext, runWithTenantRequestContext } from './utils/request-tenant-context.js';
+import { applyTenantRlsContext } from './utils/apply-tenant-rls-context.js';
 
 /**
- * Singleton PrismaClient instance
- * Previene múltiples conexiones a la base de datos
+ * Singleton PrismaClient instance.
+ * Previene multiples conexiones a la base de datos.
  */
-
 let prisma = null;
+
+const TENANT_SCOPED_PRISMA_MODELS = new Set([
+  'Document',
+  'DocumentEvent',
+  'WhatsAppNotification'
+]);
+
+const TENANT_SCOPED_PRISMA_ACTIONS = new Set([
+  'findUnique',
+  'findUniqueOrThrow',
+  'findFirst',
+  'findFirstOrThrow',
+  'findMany',
+  'count',
+  'aggregate',
+  'groupBy',
+  'create',
+  'createMany',
+  'update',
+  'updateMany',
+  'upsert',
+  'delete',
+  'deleteMany'
+]);
+
+function toPrismaDelegateKey(modelName) {
+  if (!modelName || typeof modelName !== 'string') {
+    return null;
+  }
+  return `${modelName.charAt(0).toLowerCase()}${modelName.slice(1)}`;
+}
+
+function hasTenantScopedAction(params) {
+  return TENANT_SCOPED_PRISMA_MODELS.has(params?.model)
+    && TENANT_SCOPED_PRISMA_ACTIONS.has(params?.action);
+}
+
+function resolveActiveTenantContext() {
+  return getTenantRequestContext() || {
+    notaryId: null,
+    isSuperAdmin: false,
+    source: 'implicit-default'
+  };
+}
 
 async function ensureExtensions(client) {
   try {
-    // Intentar habilitar extensión unaccent para búsquedas acento-insensibles
-    // No falla si ya existe o si no hay permisos
+    // Intentar habilitar extension unaccent para busquedas acento-insensibles.
     await client.$executeRaw`CREATE EXTENSION IF NOT EXISTS unaccent`;
   } catch (e) {
-    // Silencioso: en algunos entornos no se permite CREATE EXTENSION
     if (process.env.NODE_ENV === 'development') {
-      console.warn('Aviso: no se pudo habilitar extensión unaccent:', e.message);
+      console.warn('Aviso: no se pudo habilitar extension unaccent:', e.message);
     }
   }
 }
 
 /**
- * Forzar codificación UTF-8 para evitar problemas con emojis y caracteres especiales
- * Este es un fix crítico para Railway donde la conexión puede no usar UTF-8 por defecto
+ * Forzar codificacion UTF-8 para evitar problemas con caracteres especiales.
  */
 async function ensureUTF8Encoding(client) {
   try {
     await client.$executeRaw`SET client_encoding = 'UTF8'`;
-    console.log('✅ Client encoding establecido a UTF8');
+    console.log('Client encoding establecido a UTF8');
   } catch (e) {
-    console.warn('⚠️ No se pudo establecer client_encoding:', e.message);
+    console.warn('No se pudo establecer client_encoding:', e.message);
   }
 }
 
@@ -44,7 +86,46 @@ function createPrismaClient() {
 export function getPrismaClient() {
   if (!prisma) {
     prisma = createPrismaClient();
-    // Invalidador de caché: cualquier mutación de Document y tablas relacionadas.
+
+    const originalTransaction = prisma.$transaction.bind(prisma);
+    prisma.$transaction = async (transactionArg, ...transactionOptions) => {
+      if (typeof transactionArg !== 'function') {
+        return originalTransaction(transactionArg, ...transactionOptions);
+      }
+
+      const tenantContext = resolveActiveTenantContext();
+      return originalTransaction(async (tx) => {
+        await applyTenantRlsContext(tx, tenantContext);
+        return runWithTenantRequestContext(tenantContext, () => transactionArg(tx));
+      }, ...transactionOptions);
+    };
+
+    // Aplica contexto tenant por query para modelos protegidos por RLS.
+    prisma.$use(async (params, next) => {
+      if (params?.runInTransaction || !hasTenantScopedAction(params)) {
+        return next(params);
+      }
+
+      const tenantContext = resolveActiveTenantContext();
+
+      const delegateKey = toPrismaDelegateKey(params.model);
+      if (!delegateKey) {
+        return next(params);
+      }
+
+      const args = params?.args || {};
+
+      return prisma.$transaction(async (tx) => {
+        const delegate = tx[delegateKey];
+        if (!delegate || typeof delegate[params.action] !== 'function') {
+          throw new Error(`Delegate Prisma no disponible para ${params.model}.${params.action}`);
+        }
+
+        return runWithTenantRequestContext(tenantContext, () => delegate[params.action](args));
+      });
+    });
+
+    // Invalidador de cache: mutaciones de Document y relacionadas.
     prisma.$use(async (params, next) => {
       const result = await next(params);
       try {
@@ -57,17 +138,15 @@ export function getPrismaClient() {
           'WhatsAppNotification', 'whatsAppNotification'
         ]);
         if (isMutation && modelsToWatch.has(model)) {
-          // Invalidar todas las búsquedas de documentos
           cache.invalidateByTag('documents').catch(() => { });
         }
       } catch (e) {
-        // No romper la request si falla la invalidación
+        // No romper el request si falla la invalidacion.
       }
       return result;
     });
-    // Intentar asegurar extensiones útiles en segundo plano (no bloquear)
+
     ensureExtensions(prisma).catch(() => { });
-    // Forzar UTF-8 para emojis y caracteres especiales
     ensureUTF8Encoding(prisma).catch(() => { });
   }
   return prisma;
@@ -75,10 +154,10 @@ export function getPrismaClient() {
 
 export async function closePrismaClient() {
   if (prisma) {
-    console.log('🔌 Cerrando conexión de base de datos...');
+    console.log('Cerrando conexion de base de datos...');
     await prisma.$disconnect();
     prisma = null;
-    console.log('📊 Prisma client desconectado correctamente');
+    console.log('Prisma client desconectado correctamente');
   }
 }
 

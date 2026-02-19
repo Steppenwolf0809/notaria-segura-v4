@@ -9,23 +9,26 @@ datasource db {
 }
 
 model Notary {
-  id         String    @id @default(uuid()) @db.Uuid
-  code       String    @unique
-  slug       String    @unique
-  name       String
-  ruc        String?
-  email      String?
-  phone      String?
-  address    String?
-  city       String?
-  province   String?
-  clerkOrgId String?   @unique @map("clerk_org_id")
-  isActive   Boolean   @default(true) @map("is_active")
-  deletedAt  DateTime? @map("deleted_at")
-  config     Json?
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
-  users      User[]
+  id                    String                 @id @default(uuid()) @db.Uuid
+  code                  String                 @unique
+  slug                  String                 @unique
+  name                  String
+  ruc                   String?
+  email                 String?
+  phone                 String?
+  address               String?
+  city                  String?
+  province              String?
+  clerkOrgId            String?                @unique @map("clerk_org_id")
+  isActive              Boolean                @default(true) @map("is_active")
+  deletedAt             DateTime?              @map("deleted_at")
+  config                Json?
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @updatedAt @map("updated_at")
+  users                 User[]
+  documents             Document[]
+  documentEvents        DocumentEvent[]
+  whatsAppNotifications WhatsAppNotification[]
 
   @@index([isActive])
   @@index([deletedAt])
@@ -67,6 +70,7 @@ model User {
 
 model Document {
   id                       String                 @id @default(uuid())
+  notaryId                 String?                @db.Uuid @map("notary_id")
   protocolNumber           String                 @unique
   clientName               String
   clientPhone              String?
@@ -112,6 +116,7 @@ model Document {
   mensajeInterno           String?
   
   events                   DocumentEvent[]
+  notary                   Notary?                @relation(fields: [notaryId], references: [id])
   assignedTo               User?                  @relation("AssignedDocuments", fields: [assignedToId], references: [id])
   createdBy                User                   @relation("CreatedDocuments", fields: [createdById], references: [id])
   usuarioEntrega           User?                  @relation("DeliveredDocuments", fields: [usuarioEntregaId], references: [id])
@@ -125,12 +130,15 @@ model Document {
   @@index([clientPhone])
   @@index([clientName])
   @@index([clientId])
+  @@index([notaryId])
   @@index([assignedToId, status])
+  @@index([notaryId, status])
   @@map("documents")
 }
 
 model DocumentEvent {
   id                  String    @id @default(uuid())
+  notaryId            String?   @db.Uuid @map("notary_id")
   documentId          String?
   userId              Int
   eventType           String    @default("UNKNOWN")
@@ -144,8 +152,10 @@ model DocumentEvent {
   userAgent           String?
   createdAt           DateTime  @default(now())
   document            Document? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  notary              Notary?   @relation(fields: [notaryId], references: [id])
   user                User      @relation(fields: [userId], references: [id])
 
+  @@index([notaryId])
   @@index([documentId, createdAt])
   @@index([userId])
   @@index([eventType])
@@ -154,6 +164,7 @@ model DocumentEvent {
 
 model WhatsAppNotification {
   id           String         @id @default(uuid())
+  notaryId     String?        @db.Uuid @map("notary_id")
   documentId   String?
   clientName   String
   clientPhone  String
@@ -165,10 +176,13 @@ model WhatsAppNotification {
   sentAt       DateTime?
   createdAt    DateTime       @default(now())
   document     Document?      @relation(fields: [documentId], references: [id])
+  notary       Notary?        @relation(fields: [notaryId], references: [id])
 
   @@index([status])
+  @@index([notaryId])
   @@index([documentId])
   @@index([createdAt])
+  @@index([notaryId, status])
   @@map("whatsapp_notifications")
 }
 

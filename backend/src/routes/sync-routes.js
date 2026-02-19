@@ -13,12 +13,14 @@
 
 import express from 'express';
 import { requireSyncApiKey } from '../middleware/sync-api-key-middleware.js';
+import { applySyncTenantContext } from '../middleware/sync-tenant-context-middleware.js';
 import * as syncBillingController from '../controllers/sync-billing-controller.js';
 
 const router = express.Router();
 
 // All sync routes require API key authentication
 router.use(requireSyncApiKey);
+router.use(applySyncTenantContext);
 
 // ============================================================================
 // BILLING SYNC ENDPOINTS
