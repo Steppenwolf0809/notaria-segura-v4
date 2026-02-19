@@ -388,7 +388,7 @@ const SatisfactionWidget = ({ onViewChange, stats, loading, onRefresh }) => {
           </Box>
           <Box>
             <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-              SatisfacciÃ³n Cliente
+              {'Satisfacci\u00F3n Cliente'}
             </Typography>
             <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
               Encuestas registradas
@@ -448,7 +448,7 @@ const SatisfactionWidget = ({ onViewChange, stats, loading, onRefresh }) => {
           <Box sx={{ mt: 2.2 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
               <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                Ãndice de satisfacciÃ³n
+                {'\u00CDndice de satisfacci\u00F3n'}
               </Typography>
               <Typography variant="caption" sx={{ color: promedioColor, fontWeight: 700 }}>
                 {promedio.toFixed(2)} / 5
