@@ -23,7 +23,9 @@ export function sendSuccess(res, {
     ...headers
   };
 
-  res.set(securityHeaders);
+  if (typeof res.set === 'function') {
+    res.set(securityHeaders);
+  }
 
   const response = {
     success: true,
@@ -59,7 +61,9 @@ export function sendError(res, {
     ...headers
   };
 
-  res.set(securityHeaders);
+  if (typeof res.set === 'function') {
+    res.set(securityHeaders);
+  }
 
   const response = {
     success: false,

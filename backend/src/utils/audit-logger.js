@@ -164,10 +164,10 @@ function logSecurityViolation({ userId, userEmail, ipAddress, userAgent, violati
  */
 function extractRequestInfo(req) {
   return {
-    ipAddress: req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown',
-    userAgent: req.headers['user-agent'] || 'unknown',
-    method: req.method,
-    url: req.originalUrl || req.url,
+    ipAddress: req?.ip || req?.connection?.remoteAddress || req?.headers?.['x-forwarded-for'] || 'unknown',
+    userAgent: req?.headers?.['user-agent'] || 'unknown',
+    method: req?.method || 'UNKNOWN',
+    url: req?.originalUrl || req?.url || 'unknown',
     timestamp: new Date().toISOString()
   };
 }

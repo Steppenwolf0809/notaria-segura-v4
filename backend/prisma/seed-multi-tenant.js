@@ -1,89 +1,138 @@
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
+
 const prisma = new PrismaClient();
 
 async function main() {
-    console.log('🌱 Iniciando semilla multi-tenant...');
+  console.log('[seed] Iniciando semilla multi-tenant...');
 
-    // 1. Crear Notaría 18 si no existe
-    const notaryData = {
-        name: 'Notaría 18 del Cantón Quito',
-        code: 'N18',
-        slug: 'n18',
-        ruc: '1768038930001',
-        address: 'Av. Amazonas y Naciones Unidas',
-        city: 'Quito',
-        province: 'Pichincha',
-        phone: '0999999999',
-        email: 'info@notaria18.com.ec',
-        isActive: true,
-        config: {
-            s3Prefix: 'n18',
-            whatsapp: { enabled: true },
-            auth0: { orgId: 'org_n18abc' }
+  const clerkOrgId = process.env.CLERK_N18_ORG_ID || null;
+
+  const notary = await prisma.notary.upsert({
+    where: { code: 'N18' },
+    update: {
+      slug: 'n18',
+      name: 'Notaria 18 del Canton Quito',
+      ruc: '1768038930001',
+      address: 'Av. Amazonas y Naciones Unidas',
+      city: 'Quito',
+      province: 'Pichincha',
+      phone: '0999999999',
+      email: 'info@notaria18.com.ec',
+      clerkOrgId,
+      isActive: true,
+      deletedAt: null,
+      config: {
+        tenantCode: 'N18',
+        auth: {
+          provider: 'clerk',
+          pilot: true
         }
-    };
-
-    const notary = await prisma.notary.upsert({
-        where: { code: 'N18' },
-        update: {},
-        create: notaryData,
-    });
-
-    console.log(`✅ Notaría creada/verificada: ${notary.name} (${notary.id})`);
-
-    // 2. Asignar todos los usuarios existentes a esta notaría (si no tienen)
-    const usersUpdate = await prisma.user.updateMany({
-        where: { notaryId: null },
-        data: { notaryId: notary.id }
-    });
-
-    console.log(`👥 Usuarios asignados a N18: ${usersUpdate.count}`);
-
-    // 3. Crear usuarios base si no existen
-    const bcrypt = (await import('bcryptjs')).default;
-    const hashedPassword = await bcrypt.hash('Admin123!', 10);
-
-    // Super Admin
-    const superAdmin = await prisma.user.upsert({
-        where: { email: 'superadmin@notariasegura.com' },
-        update: {},
-        create: {
-            email: 'superadmin@notariasegura.com',
-            password: hashedPassword,
-            firstName: 'Super',
-            lastName: 'Admin',
-            role: 'SUPER_ADMIN',
-            isActive: true,
-            // Super Admin no pertenece a ninguna notaría específica (o null)
-            notaryId: null
+      }
+    },
+    create: {
+      code: 'N18',
+      slug: 'n18',
+      name: 'Notaria 18 del Canton Quito',
+      ruc: '1768038930001',
+      address: 'Av. Amazonas y Naciones Unidas',
+      city: 'Quito',
+      province: 'Pichincha',
+      phone: '0999999999',
+      email: 'info@notaria18.com.ec',
+      clerkOrgId,
+      isActive: true,
+      config: {
+        tenantCode: 'N18',
+        auth: {
+          provider: 'clerk',
+          pilot: true
         }
-    });
+      }
+    },
+    select: {
+      id: true,
+      code: true,
+      name: true
+    }
+  });
 
-    console.log(`🦸 Super Admin creado: ${superAdmin.email}`);
+  console.log(`[seed] Notaria lista: ${notary.name} (${notary.code})`);
 
-    // Admin Notaría 18
-    const notaryAdmin = await prisma.user.upsert({
-        where: { email: 'admin@notaria18.com.ec' },
-        update: { notaryId: notary.id },
-        create: {
-            email: 'admin@notaria18.com.ec',
-            password: hashedPassword,
-            firstName: 'Admin',
-            lastName: 'Notaría 18',
-            role: 'ADMIN',
-            isActive: true,
-            notaryId: notary.id
-        }
-    });
+  const usersUpdate = await prisma.user.updateMany({
+    where: {
+      notaryId: null,
+      role: {
+        not: 'SUPER_ADMIN'
+      }
+    },
+    data: { notaryId: notary.id }
+  });
 
-    console.log(`👤 Admin Notaría 18 creado: ${notaryAdmin.email}`);
+  console.log(`[seed] Usuarios asignados a N18: ${usersUpdate.count}`);
+
+  const adminPassword = process.env.SEED_SUPERADMIN_PASSWORD || 'Admin123!';
+  const hashedPassword = await bcrypt.hash(adminPassword, 10);
+
+  const superAdmin = await prisma.user.upsert({
+    where: { email: 'superadmin@notariasegura.com' },
+    update: {
+      role: 'SUPER_ADMIN',
+      notaryId: null,
+      isActive: true,
+      deletedAt: null
+    },
+    create: {
+      email: 'superadmin@notariasegura.com',
+      password: hashedPassword,
+      firstName: 'Super',
+      lastName: 'Admin',
+      role: 'SUPER_ADMIN',
+      isActive: true,
+      notaryId: null
+    },
+    select: {
+      id: true,
+      email: true
+    }
+  });
+
+  console.log(`[seed] Super admin listo: ${superAdmin.email}`);
+
+  const notaryAdminPassword = process.env.SEED_NOTARY_ADMIN_PASSWORD || 'Admin123!';
+  const notaryAdminHash = await bcrypt.hash(notaryAdminPassword, 10);
+
+  const notaryAdmin = await prisma.user.upsert({
+    where: { email: 'admin@notaria18.com.ec' },
+    update: {
+      role: 'ADMIN',
+      notaryId: notary.id,
+      isActive: true,
+      deletedAt: null
+    },
+    create: {
+      email: 'admin@notaria18.com.ec',
+      password: notaryAdminHash,
+      firstName: 'Admin',
+      lastName: 'Notaria 18',
+      role: 'ADMIN',
+      isActive: true,
+      notaryId: notary.id
+    },
+    select: {
+      id: true,
+      email: true
+    }
+  });
+
+  console.log(`[seed] Admin N18 listo: ${notaryAdmin.email}`);
 }
 
 main()
-    .catch((e) => {
-        console.error(e);
-        process.exit(1);
-    })
-    .finally(async () => {
-        await prisma.$disconnect();
-    });
+  .catch((error) => {
+    console.error('[seed] Error:', error);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

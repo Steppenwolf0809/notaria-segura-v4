@@ -81,7 +81,7 @@ router.use(adminRateLimit);
 
 // 🔒 OWASP Security: Define validation schemas for admin routes
 const adminUsersQuerySchema = paginationSchema.merge(searchSchema).merge(z.object({
-  role: z.enum(['ADMIN', 'CAJA', 'MATRIZADOR', 'RECEPCION', 'ARCHIVO']).optional(),
+  role: z.enum(['SUPER_ADMIN', 'ADMIN', 'CAJA', 'MATRIZADOR', 'RECEPCION', 'ARCHIVO']).optional(),
   status: z.enum(['true', 'false']).optional()
 }));
 

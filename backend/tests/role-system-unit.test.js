@@ -12,6 +12,9 @@ const mockPrisma = {
     groupBy: jest.fn(),
     deleteMany: jest.fn()
   },
+  notary: {
+    findFirst: jest.fn()
+  },
   document: {
     findMany: jest.fn(),
     updateMany: jest.fn(),
@@ -20,8 +23,17 @@ const mockPrisma = {
   notification: {
     create: jest.fn(),
     findMany: jest.fn()
-  }
+  },
+  $transaction: jest.fn()
 };
+
+const mockTransactionClient = {
+  user: mockPrisma.user,
+  notary: mockPrisma.notary,
+  $executeRaw: jest.fn().mockResolvedValue(1)
+};
+
+mockPrisma.$transaction.mockImplementation(async (callback) => callback(mockTransactionClient));
 
 // Mock the entire db.js module
 jest.unstable_mockModule('../src/db.js', () => ({
@@ -30,6 +42,10 @@ jest.unstable_mockModule('../src/db.js', () => ({
 
 // Mock bcryptjs
 jest.unstable_mockModule('bcryptjs', () => ({
+  default: {
+    hash: jest.fn().mockResolvedValue('$2b$12$hashedpassword'),
+    compare: jest.fn().mockResolvedValue(true)
+  },
   hash: jest.fn().mockResolvedValue('$2b$12$hashedpassword'),
   compare: jest.fn().mockResolvedValue(true)
 }));
@@ -60,7 +76,7 @@ describe('Role System Unit Tests', () => {
           page: '1',
           limit: '10'
         },
-        user: { id: 1, email: 'admin@example.com' }
+        user: { id: 1, email: 'admin@example.com', notaryId: 'notary-test-1', activeNotaryId: 'notary-test-1' }
       };
 
       const mockRes = {
@@ -106,11 +122,13 @@ describe('Role System Unit Tests', () => {
         expect.objectContaining({
           success: true,
           data: expect.any(Array),
-          pagination: expect.objectContaining({
-            page: 1,
-            limit: 10,
-            total: 1,
-            totalPages: 1
+          meta: expect.objectContaining({
+            pagination: expect.objectContaining({
+              page: 1,
+              limit: 10,
+              total: 1,
+              totalPages: 1
+            })
           })
         })
       );
@@ -123,7 +141,7 @@ describe('Role System Unit Tests', () => {
           page: '1',
           limit: '5'
         },
-        user: { id: 1, email: 'admin@example.com' }
+        user: { id: 1, email: 'admin@example.com', notaryId: 'notary-test-1', activeNotaryId: 'notary-test-1' }
       };
 
       const mockRes = {
@@ -165,7 +183,7 @@ describe('Role System Unit Tests', () => {
           page: '2',
           limit: '5'
         },
-        user: { id: 1, email: 'admin@example.com' }
+        user: { id: 1, email: 'admin@example.com', notaryId: 'notary-test-1', activeNotaryId: 'notary-test-1' }
       };
 
       const mockRes = {
@@ -188,13 +206,15 @@ describe('Role System Unit Tests', () => {
 
       expect(mockRes.json).toHaveBeenCalledWith(
         expect.objectContaining({
-          pagination: expect.objectContaining({
-            page: 2,
-            limit: 5,
-            total: 15,
-            totalPages: 3,
-            hasNextPage: true,
-            hasPrevPage: true
+          meta: expect.objectContaining({
+            pagination: expect.objectContaining({
+              page: 2,
+              limit: 5,
+              total: 15,
+              totalPages: 3,
+              hasNextPage: true,
+              hasPrevPage: true
+            })
           })
         })
       );
@@ -208,7 +228,7 @@ describe('Role System Unit Tests', () => {
           email: 'test@example.com'
           // Missing required fields: password, firstName, lastName, role
         },
-        user: { id: 1, email: 'admin@example.com' }
+        user: { id: 1, email: 'admin@example.com', notaryId: 'notary-test-1', activeNotaryId: 'notary-test-1' }
       };
 
       const mockRes = {
@@ -237,7 +257,7 @@ describe('Role System Unit Tests', () => {
           lastName: 'User',
           role: 'CAJA'
         },
-        user: { id: 1, email: 'admin@example.com' }
+        user: { id: 1, email: 'admin@example.com', notaryId: 'notary-test-1', activeNotaryId: 'notary-test-1' }
       };
 
       const mockRes = {
@@ -265,7 +285,7 @@ describe('Role System Unit Tests', () => {
           lastName: 'User',
           role: 'INVALID_ROLE'
         },
-        user: { id: 1, email: 'admin@example.com' }
+        user: { id: 1, email: 'admin@example.com', notaryId: 'notary-test-1', activeNotaryId: 'notary-test-1' }
       };
 
       const mockRes = {
@@ -280,7 +300,7 @@ describe('Role System Unit Tests', () => {
         expect.objectContaining({
           success: false,
           message: 'Rol no válido',
-          validRoles: expect.arrayContaining(['ADMIN', 'CAJA', 'MATRIZADOR', 'RECEPCION', 'ARCHIVO'])
+          validRoles: expect.arrayContaining(['SUPER_ADMIN', 'ADMIN', 'CAJA', 'MATRIZADOR', 'RECEPCION', 'ARCHIVO'])
         })
       );
     });
@@ -294,7 +314,7 @@ describe('Role System Unit Tests', () => {
           lastName: 'User',
           role: 'CAJA'
         },
-        user: { id: 1, email: 'admin@example.com' }
+        user: { id: 1, email: 'admin@example.com', notaryId: 'notary-test-1', activeNotaryId: 'notary-test-1' }
       };
 
       const mockRes = {
@@ -329,7 +349,7 @@ describe('Role System Unit Tests', () => {
           role: 'MATRIZADOR'
           // email and lastName not provided - should not be updated
         },
-        user: { id: 1, email: 'admin@example.com' }
+        user: { id: 1, email: 'admin@example.com', notaryId: 'notary-test-1', activeNotaryId: 'notary-test-1' }
       };
 
       const mockRes = {
@@ -343,7 +363,9 @@ describe('Role System Unit Tests', () => {
         email: 'user@example.com',
         firstName: 'OldName',
         lastName: 'Unchanged',
-        role: 'CAJA'
+        role: 'CAJA',
+        notaryId: 'notary-test-1',
+        deletedAt: null
       });
 
       // Mock updated user
@@ -388,7 +410,7 @@ describe('Role System Unit Tests', () => {
       const mockReq = {
         params: { id: '2' },
         body: {}, // No fields provided for update
-        user: { id: 1, email: 'admin@example.com' }
+        user: { id: 1, email: 'admin@example.com', notaryId: 'notary-test-1', activeNotaryId: 'notary-test-1' }
       };
 
       const mockRes = {
@@ -402,7 +424,9 @@ describe('Role System Unit Tests', () => {
         email: 'user@example.com',
         firstName: 'Name',
         lastName: 'Last',
-        role: 'CAJA'
+        role: 'CAJA',
+        notaryId: 'notary-test-1',
+        deletedAt: null
       });
 
       await updateUser(mockReq, mockRes);
@@ -427,7 +451,7 @@ describe('Role System Unit Tests', () => {
           lastName: '  Doe  ',
           role: 'CAJA'
         },
-        user: { id: 1, email: 'admin@example.com' }
+        user: { id: 1, email: 'admin@example.com', notaryId: 'notary-test-1', activeNotaryId: 'notary-test-1' }
       };
 
       const mockRes = {
@@ -467,7 +491,7 @@ describe('Role System Unit Tests', () => {
           lastName: 'User',
           role: 'CAJA'
         },
-        user: { id: 1, email: 'admin@example.com' }
+        user: { id: 1, email: 'admin@example.com', notaryId: 'notary-test-1', activeNotaryId: 'notary-test-1' }
       };
 
       const mockRes = {
@@ -504,3 +528,4 @@ describe('Role System Unit Tests', () => {
 });
 
 console.log('✅ Role System Unit Tests - Test structure is valid and ready to run with actual database');
+

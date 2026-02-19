@@ -8,11 +8,51 @@ import {
   extractRequestInfo,
   AuditEventTypes
 } from '../utils/audit-logger.js';
+import { withRequestTenantContext } from '../utils/tenant-context.js';
+import { persistAuditLog } from '../utils/audit-log-store.js';
 
 /**
  * Roles válidos del sistema
  */
-const validRoles = ['ADMIN', 'CAJA', 'MATRIZADOR', 'RECEPCION', 'ARCHIVO'];
+const validRoles = ['SUPER_ADMIN', 'ADMIN', 'CAJA', 'MATRIZADOR', 'RECEPCION', 'ARCHIVO'];
+
+function isSuperAdminCrossTenantRequest(req) {
+  return Boolean(
+    req?.user?.isSuperAdmin &&
+    req?.tenantContext?.resolutionSource === 'request' &&
+    req?.tenantContext?.notaryId
+  );
+}
+
+async function persistCrossTenantAdminAudit(req, action, resourceType, resourceId, metadata = {}) {
+  if (!isSuperAdminCrossTenantRequest(req)) {
+    return;
+  }
+
+  const requestInfo = extractRequestInfo(req);
+
+  try {
+    await persistAuditLog({
+      prismaClient: prisma,
+      tenantContext: req.tenantContext,
+      notaryId: req.tenantContext?.notaryId || null,
+      actorUserId: req.user?.id,
+      actorRole: req.user?.role || null,
+      action,
+      resourceType,
+      resourceId: resourceId !== undefined && resourceId !== null ? String(resourceId) : null,
+      metadata: {
+        ...metadata,
+        resolutionSource: req.tenantContext?.resolutionSource || null,
+        requestedNotaryId: req.tenantContext?.requestedNotaryId || null
+      },
+      ipAddress: requestInfo.ipAddress,
+      userAgent: requestInfo.userAgent
+    });
+  } catch (error) {
+    console.error('Error persistiendo auditoria cross-tenant de SUPER_ADMIN:', error);
+  }
+}
 
 /**
  * Obtiene todos los usuarios (solo admin)
@@ -34,7 +74,18 @@ async function getAllUsers(req, res) {
     });
 
     // Construir filtros
-    const where = {};
+    const where = { deletedAt: null };
+
+    if (!req.user?.isSuperAdmin) {
+      const scopedNotaryId = req.user?.activeNotaryId || req.user?.notaryId;
+      if (!scopedNotaryId) {
+        return res.status(403).json({
+          success: false,
+          message: 'No existe contexto de notaria para esta sesion'
+        });
+      }
+      where.notaryId = scopedNotaryId;
+    }
 
     if (search) {
       where.OR = [
@@ -45,6 +96,12 @@ async function getAllUsers(req, res) {
     }
 
     if (role && validRoles.includes(role)) {
+      if (role === 'SUPER_ADMIN' && !req.user?.isSuperAdmin) {
+        return res.status(403).json({
+          success: false,
+          message: 'No tienes permisos para consultar usuarios SUPER_ADMIN'
+        });
+      }
       where.role = role;
     }
 
@@ -57,26 +114,29 @@ async function getAllUsers(req, res) {
     const take = parseInt(limit);
 
     // Obtener usuarios con paginación
-    const [users, totalCount] = await Promise.all([
-      prisma.user.findMany({
-        where,
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          role: true,
-          isActive: true,
-          createdAt: true,
-          updatedAt: true,
-          lastLogin: true
-        },
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take
-      }),
-      prisma.user.count({ where })
-    ]);
+    const [users, totalCount] = await withRequestTenantContext(prisma, req, async (tx) => {
+      return Promise.all([
+        tx.user.findMany({
+          where,
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            notaryId: true,
+            isActive: true,
+            createdAt: true,
+            updatedAt: true,
+            lastLogin: true
+          },
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take
+        }),
+        tx.user.count({ where })
+      ]);
+    });
 
     const totalPages = Math.ceil(totalCount / take);
 
@@ -93,6 +153,12 @@ async function getAllUsers(req, res) {
     );
 
   } catch (error) {
+    if (error?.status) {
+      return res.status(error.status).json({
+        success: false,
+        message: error.message
+      });
+    }
     console.error('Error obteniendo usuarios:', error);
     return sendError(res);
   }
@@ -108,26 +174,41 @@ async function getUserById(req, res) {
     const { id } = req.params;
     const requestInfo = extractRequestInfo(req);
 
-    const user = await prisma.user.findUnique({
-      where: { id: parseInt(id) },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        isActive: true,
-        createdAt: true,
-        updatedAt: true,
-        lastLogin: true
-      }
+    const user = await withRequestTenantContext(prisma, req, async (tx) => {
+      return tx.user.findUnique({
+        where: { id: parseInt(id) },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          notaryId: true,
+          isActive: true,
+          deletedAt: true,
+          createdAt: true,
+          updatedAt: true,
+          lastLogin: true
+        }
+      });
     });
 
-    if (!user) {
+    if (!user || user.deletedAt) {
       return res.status(404).json({
         success: false,
         message: 'Usuario no encontrado'
       });
+    }
+
+    if (!req.user?.isSuperAdmin) {
+      const scopedNotaryId = req.user?.activeNotaryId || req.user?.notaryId;
+      const isSameTenant = scopedNotaryId && user.notaryId === scopedNotaryId;
+      if (!isSameTenant || user.role === 'SUPER_ADMIN') {
+        return res.status(403).json({
+          success: false,
+          message: 'No tienes permisos para ver este usuario'
+        });
+      }
     }
 
     // Log acceso al usuario específico
@@ -141,12 +222,26 @@ async function getUserById(req, res) {
       userAgent: requestInfo.userAgent
     });
 
+    await persistCrossTenantAdminAudit(
+      req,
+      'SUPER_ADMIN_USER_VIEW',
+      'user',
+      user.id,
+      { targetUserEmail: user.email, targetUserRole: user.role }
+    );
+
     res.json({
       success: true,
       data: { user }
     });
 
   } catch (error) {
+    if (error?.status) {
+      return res.status(error.status).json({
+        success: false,
+        message: error.message
+      });
+    }
     console.error('Error obteniendo usuario:', error);
     res.status(500).json({
       success: false,
@@ -162,7 +257,7 @@ async function getUserById(req, res) {
  */
 async function createUser(req, res) {
   try {
-    const { email, password, firstName, lastName, role } = req.body;
+    const { email, password, firstName, lastName, role, notaryId } = req.body;
     const requestInfo = extractRequestInfo(req);
 
     // Validar campos obligatorios
@@ -183,6 +278,13 @@ async function createUser(req, res) {
       });
     }
 
+    if (role === 'SUPER_ADMIN' && !req.user?.isSuperAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo un SUPER_ADMIN puede crear otro SUPER_ADMIN'
+      });
+    }
+
     // Validar email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
@@ -193,11 +295,13 @@ async function createUser(req, res) {
     }
 
     // Verificar si el email ya existe
-    const existingUser = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() }
+    const existingUser = await withRequestTenantContext(prisma, req, async (tx) => {
+      return tx.user.findUnique({
+        where: { email: email.toLowerCase() }
+      });
     });
 
-    if (existingUser) {
+    if (existingUser && !existingUser.deletedAt) {
       logAdminAction({
         adminUserId: req.user.id,
         adminEmail: req.user.email,
@@ -228,25 +332,65 @@ async function createUser(req, res) {
 
     // hashear contraseña
     const hashedPassword = await bcrypt.hash(sanitizedPassword, 12);
+    let targetNotaryId = null;
+
+    if (role !== 'SUPER_ADMIN') {
+      const requestedNotaryId = typeof notaryId === 'string' ? notaryId.trim() : null;
+
+      if (req.user?.isSuperAdmin && requestedNotaryId) {
+        const targetNotary = await withRequestTenantContext(prisma, req, async (tx) => {
+          return tx.notary.findFirst({
+            where: {
+              id: requestedNotaryId,
+              isActive: true,
+              deletedAt: null
+            },
+            select: { id: true }
+          });
+        });
+
+        if (!targetNotary) {
+          return res.status(400).json({
+            success: false,
+            message: 'La notaria especificada no existe o esta inactiva'
+          });
+        }
+
+        targetNotaryId = targetNotary.id;
+      } else {
+        targetNotaryId = req.user?.activeNotaryId || req.user?.notaryId || null;
+      }
+
+      if (!targetNotaryId) {
+        return res.status(400).json({
+          success: false,
+          message: 'No se pudo resolver la notaria para el usuario'
+        });
+      }
+    }
 
     // Crear usuario
-    const newUser = await prisma.user.create({
-      data: {
-        email: email.toLowerCase(),
-        password: hashedPassword,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        role
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        isActive: true,
-        createdAt: true
-      }
+    const newUser = await withRequestTenantContext(prisma, req, async (tx) => {
+      return tx.user.create({
+        data: {
+          email: email.toLowerCase(),
+          password: hashedPassword,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          role,
+          notaryId: role === 'SUPER_ADMIN' ? null : targetNotaryId
+        },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          notaryId: true,
+          isActive: true,
+          createdAt: true
+        }
+      });
     });
 
     // Log creación exitosa
@@ -256,10 +400,18 @@ async function createUser(req, res) {
       targetUserId: newUser.id,
       targetEmail: newUser.email,
       action: AuditEventTypes.USER_CREATED,
-      details: { role: newUser.role },
+      details: { role: newUser.role, notaryId: newUser.notaryId },
       ipAddress: requestInfo.ipAddress,
       userAgent: requestInfo.userAgent
     });
+
+    await persistCrossTenantAdminAudit(
+      req,
+      'SUPER_ADMIN_USER_CREATED',
+      'user',
+      newUser.id,
+      { targetUserEmail: newUser.email, targetUserRole: newUser.role, targetNotaryId: newUser.notaryId }
+    );
 
     res.status(201).json({
       success: true,
@@ -268,6 +420,12 @@ async function createUser(req, res) {
     });
 
   } catch (error) {
+    if (error?.status) {
+      return res.status(error.status).json({
+        success: false,
+        message: error.message
+      });
+    }
     console.error('Error creando usuario:', error);
 
     const requestInfo = extractRequestInfo(req);
@@ -302,15 +460,28 @@ async function updateUser(req, res) {
     const requestInfo = extractRequestInfo(req);
 
     // Verificar que el usuario existe
-    const existingUser = await prisma.user.findUnique({
-      where: { id: parseInt(id) }
+    const existingUser = await withRequestTenantContext(prisma, req, async (tx) => {
+      return tx.user.findUnique({
+        where: { id: parseInt(id) }
+      });
     });
 
-    if (!existingUser) {
+    if (!existingUser || existingUser.deletedAt) {
       return res.status(404).json({
         success: false,
         message: 'Usuario no encontrado'
       });
+    }
+
+    if (!req.user?.isSuperAdmin) {
+      const scopedNotaryId = req.user?.activeNotaryId || req.user?.notaryId;
+      const isSameTenant = scopedNotaryId && existingUser.notaryId === scopedNotaryId;
+      if (!isSameTenant || existingUser.role === 'SUPER_ADMIN') {
+        return res.status(403).json({
+          success: false,
+          message: 'No tienes permisos para actualizar este usuario'
+        });
+      }
     }
 
     // Preparar datos de actualización
@@ -327,8 +498,10 @@ async function updateUser(req, res) {
       }
 
       // Verificar que el nuevo email no esté en uso
-      const emailExists = await prisma.user.findUnique({
-        where: { email: email.toLowerCase() }
+      const emailExists = await withRequestTenantContext(prisma, req, async (tx) => {
+        return tx.user.findUnique({
+          where: { email: email.toLowerCase() }
+        });
       });
 
       if (emailExists) {
@@ -355,6 +528,12 @@ async function updateUser(req, res) {
           success: false,
           message: 'Rol no válido',
           validRoles
+        });
+      }
+      if (role === 'SUPER_ADMIN' && !req.user?.isSuperAdmin) {
+        return res.status(403).json({
+          success: false,
+          message: 'Solo un SUPER_ADMIN puede asignar el rol SUPER_ADMIN'
         });
       }
       updateData.role = role;
@@ -385,18 +564,21 @@ async function updateUser(req, res) {
     }
 
     // Actualizar usuario
-    const updatedUser = await prisma.user.update({
-      where: { id: parseInt(id) },
-      data: updateData,
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        isActive: true,
-        updatedAt: true
-      }
+    const updatedUser = await withRequestTenantContext(prisma, req, async (tx) => {
+      return tx.user.update({
+        where: { id: parseInt(id) },
+        data: updateData,
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          notaryId: true,
+          isActive: true,
+          updatedAt: true
+        }
+      });
     });
 
     // Log actualización
@@ -411,6 +593,14 @@ async function updateUser(req, res) {
       userAgent: requestInfo.userAgent
     });
 
+    await persistCrossTenantAdminAudit(
+      req,
+      'SUPER_ADMIN_USER_UPDATED',
+      'user',
+      updatedUser.id,
+      { targetUserEmail: updatedUser.email, targetUserRole: updatedUser.role, changes: updateData }
+    );
+
     res.json({
       success: true,
       message: 'Usuario actualizado exitosamente',
@@ -418,6 +608,12 @@ async function updateUser(req, res) {
     });
 
   } catch (error) {
+    if (error?.status) {
+      return res.status(error.status).json({
+        success: false,
+        message: error.message
+      });
+    }
     console.error('Error actualizando usuario:', error);
     res.status(500).json({
       success: false,
@@ -446,15 +642,28 @@ async function toggleUserStatus(req, res) {
     }
 
     // Verificar que el usuario existe
-    const user = await prisma.user.findUnique({
-      where: { id: parseInt(id) }
+    const user = await withRequestTenantContext(prisma, req, async (tx) => {
+      return tx.user.findUnique({
+        where: { id: parseInt(id) }
+      });
     });
 
-    if (!user) {
+    if (!user || user.deletedAt) {
       return res.status(404).json({
         success: false,
         message: 'Usuario no encontrado'
       });
+    }
+
+    if (!req.user?.isSuperAdmin) {
+      const scopedNotaryId = req.user?.activeNotaryId || req.user?.notaryId;
+      const isSameTenant = scopedNotaryId && user.notaryId === scopedNotaryId;
+      if (!isSameTenant || user.role === 'SUPER_ADMIN') {
+        return res.status(403).json({
+          success: false,
+          message: 'No tienes permisos para modificar este usuario'
+        });
+      }
     }
 
     // Prevenir que admin se desactive a sí mismo
@@ -478,18 +687,25 @@ async function toggleUserStatus(req, res) {
     }
 
     // Actualizar estado
-    const updatedUser = await prisma.user.update({
-      where: { id: parseInt(id) },
-      data: { isActive },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        isActive: true,
-        updatedAt: true
-      }
+    const updatedUser = await withRequestTenantContext(prisma, req, async (tx) => {
+      return tx.user.update({
+        where: { id: parseInt(id) },
+        data: {
+          isActive,
+          deletedAt: isActive ? null : new Date()
+        },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          notaryId: true,
+          isActive: true,
+          deletedAt: true,
+          updatedAt: true
+        }
+      });
     });
 
     // Log acción
@@ -504,6 +720,19 @@ async function toggleUserStatus(req, res) {
       userAgent: requestInfo.userAgent
     });
 
+    await persistCrossTenantAdminAudit(
+      req,
+      isActive ? 'SUPER_ADMIN_USER_ACTIVATED' : 'SUPER_ADMIN_USER_DEACTIVATED',
+      'user',
+      updatedUser.id,
+      {
+        targetUserEmail: updatedUser.email,
+        targetUserRole: updatedUser.role,
+        previousStatus: user.isActive,
+        newStatus: isActive
+      }
+    );
+
     res.json({
       success: true,
       message: `Usuario ${isActive ? 'activado' : 'desactivado'} exitosamente`,
@@ -511,6 +740,12 @@ async function toggleUserStatus(req, res) {
     });
 
   } catch (error) {
+    if (error?.status) {
+      return res.status(error.status).json({
+        success: false,
+        message: error.message
+      });
+    }
     console.error('Error cambiando estado del usuario:', error);
     res.status(500).json({
       success: false,
@@ -530,15 +765,28 @@ async function deleteUser(req, res) {
     const requestInfo = extractRequestInfo(req);
 
     // Verificar que el usuario existe
-    const user = await prisma.user.findUnique({
-      where: { id: parseInt(id) }
+    const user = await withRequestTenantContext(prisma, req, async (tx) => {
+      return tx.user.findUnique({
+        where: { id: parseInt(id) }
+      });
     });
 
-    if (!user) {
+    if (!user || user.deletedAt) {
       return res.status(404).json({
         success: false,
         message: 'Usuario no encontrado'
       });
+    }
+
+    if (!req.user?.isSuperAdmin) {
+      const scopedNotaryId = req.user?.activeNotaryId || req.user?.notaryId;
+      const isSameTenant = scopedNotaryId && user.notaryId === scopedNotaryId;
+      if (!isSameTenant || user.role === 'SUPER_ADMIN') {
+        return res.status(403).json({
+          success: false,
+          message: 'No tienes permisos para eliminar este usuario'
+        });
+      }
     }
 
     // Prevenir que admin se elimine a sí mismo
@@ -561,9 +809,15 @@ async function deleteUser(req, res) {
       });
     }
 
-    // Eliminar usuario
-    await prisma.user.delete({
-      where: { id: parseInt(id) }
+    // Soft delete obligatorio por trazabilidad
+    await withRequestTenantContext(prisma, req, async (tx) => {
+      await tx.user.update({
+        where: { id: parseInt(id) },
+        data: {
+          isActive: false,
+          deletedAt: new Date()
+        }
+      });
     });
 
     // Log eliminación
@@ -578,13 +832,27 @@ async function deleteUser(req, res) {
       userAgent: requestInfo.userAgent
     });
 
+    await persistCrossTenantAdminAudit(
+      req,
+      'SUPER_ADMIN_USER_DELETED',
+      'user',
+      user.id,
+      { targetUserEmail: user.email, targetUserRole: user.role }
+    );
+
     res.json({
       success: true,
-      message: 'Usuario eliminado exitosamente',
+      message: 'Usuario dado de baja exitosamente',
       data: { deletedUserId: user.id, deletedUserEmail: user.email }
     });
 
   } catch (error) {
+    if (error?.status) {
+      return res.status(error.status).json({
+        success: false,
+        message: error.message
+      });
+    }
     console.error('Error eliminando usuario:', error);
     res.status(500).json({
       success: false,
@@ -600,31 +868,47 @@ async function deleteUser(req, res) {
  */
 async function getUserStats(req, res) {
   try {
+    const scopedWhere = { deletedAt: null };
+    if (!req.user?.isSuperAdmin) {
+      const scopedNotaryId = req.user?.activeNotaryId || req.user?.notaryId;
+      if (!scopedNotaryId) {
+        return res.status(403).json({
+          success: false,
+          message: 'No existe contexto de notaria para esta sesion'
+        });
+      }
+      scopedWhere.notaryId = scopedNotaryId;
+    }
+
     const [
       totalUsers,
       activeUsers,
       usersByRole,
       recentUsers
-    ] = await Promise.all([
-      prisma.user.count(),
-      prisma.user.count({ where: { isActive: true } }),
-      prisma.user.groupBy({
-        by: ['role'],
-        _count: { role: true }
-      }),
-      prisma.user.findMany({
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          role: true,
-          createdAt: true
-        },
-        orderBy: { createdAt: 'desc' },
-        take: 5
-      })
-    ]);
+    ] = await withRequestTenantContext(prisma, req, async (tx) => {
+      return Promise.all([
+        tx.user.count({ where: scopedWhere }),
+        tx.user.count({ where: { ...scopedWhere, isActive: true } }),
+        tx.user.groupBy({
+          by: ['role'],
+          where: scopedWhere,
+          _count: { role: true }
+        }),
+        tx.user.findMany({
+          where: scopedWhere,
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            createdAt: true
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 5
+        })
+      ]);
+    });
 
     // Formatear estadísticas por rol
     const roleStats = {};
@@ -645,6 +929,12 @@ async function getUserStats(req, res) {
     });
 
   } catch (error) {
+    if (error?.status) {
+      return res.status(error.status).json({
+        success: false,
+        message: error.message
+      });
+    }
     console.error('Error obteniendo estadísticas:', error);
     res.status(500).json({
       success: false,

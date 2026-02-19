@@ -8,17 +8,45 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Notary {
+  id         String    @id @default(uuid()) @db.Uuid
+  code       String    @unique
+  slug       String    @unique
+  name       String
+  ruc        String?
+  email      String?
+  phone      String?
+  address    String?
+  city       String?
+  province   String?
+  clerkOrgId String?   @unique @map("clerk_org_id")
+  isActive   Boolean   @default(true) @map("is_active")
+  deletedAt  DateTime? @map("deleted_at")
+  config     Json?
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  users      User[]
+
+  @@index([isActive])
+  @@index([deletedAt])
+  @@map("notaries")
+}
+
 model User {
   id                         Int                        @id @default(autoincrement())
   email                      String                     @unique
+  clerkUserId                String?                    @unique @map("clerk_user_id")
   password                   String
   firstName                  String
   lastName                   String
   role                       UserRole
+  notaryId                   String?                    @db.Uuid @map("notary_id")
   isActive                   Boolean                    @default(true)
+  deletedAt                  DateTime?                  @map("deleted_at")
   createdAt                  DateTime                   @default(now())
   updatedAt                  DateTime                   @updatedAt
   lastLogin                  DateTime?
+  notary                     Notary?                    @relation(fields: [notaryId], references: [id])
   auditoriaPersonas          AuditoriaPersona[]
   documentEvents             DocumentEvent[]
   documents                  Document[]                 @relation("AssignedDocuments")
@@ -32,6 +60,8 @@ model User {
   mensajesRecibidos          MensajeInterno[]           @relation("MensajesRecibidos")
   assignedInvoices           Invoice[]                  @relation("AssignedInvoices")
 
+  @@index([notaryId])
+  @@index([deletedAt])
   @@map("users")
 }
 
@@ -576,6 +606,7 @@ model MensajeInterno {
 }
 
 enum UserRole {
+  SUPER_ADMIN
   ADMIN
   CAJA
   MATRIZADOR

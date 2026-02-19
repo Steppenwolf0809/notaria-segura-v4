@@ -4,6 +4,31 @@ Fecha: 2026-02-19
 Rama: `feature/architecture-v2.1-restart`  
 Estado: Validado con usuario
 
+## 0) Estado de Implementacion (Actualizado 2026-02-19)
+
+Implementado en codigo (Fase 1 + avance Fase 2):
+1. Fundacion multi-tenant en Prisma:
+   - `notaries`
+   - `users` con `notary_id`, `clerk_user_id`, `deleted_at`
+   - rol `SUPER_ADMIN`
+2. Middleware de resolucion tenant/superadmin en auth.
+3. Login legacy ajustado con contexto transaccional.
+4. Seed N18 actualizado para piloto Clerk.
+5. Reglas fail-closed agregadas en este plan (deny-by-default + `FORCE ROW LEVEL SECURITY`).
+6. Auditoria inmutable agregada por migracion (`audit_logs` append-only).
+7. Migraciones aplicadas en staging (`20260219113000` y `20260219133000`) con hardening de compatibilidad legacy.
+8. Flujos de `auth` y CRUD de usuarios admin ejecutan operaciones tenant-scoped con transaccion + `SET LOCAL`.
+9. Auditoria persistente para `SUPER_ADMIN` en cambios de contexto tenant y CRUD cross-tenant de usuarios.
+
+Migraciones nuevas creadas:
+1. `backend/prisma/migrations/20260219113000_phase1_multi_tenant_foundation/migration.sql`
+2. `backend/prisma/migrations/20260219133000_add_immutable_audit_logs/migration.sql`
+
+Pendiente para continuar (siguiente conversacion):
+1. Ejecutar Fase 2 completa: activar RLS por tabla core/UAFE con politicas fail-closed.
+2. Terminar migracion de todos los controladores/servicios tenant-scoped a transaccion + `SET LOCAL`.
+3. Pruebas de aislamiento A/B + casos `SUPER_ADMIN` cross-tenant auditados extremo a extremo.
+
 ## 1) Objetivo
 
 Escalar Notaria Segura para operar con multiples notarias sin rehacer arquitectura por cliente.
@@ -85,6 +110,12 @@ Todas con:
 
 No usar `BYPASSRLS` en el rol DB principal de la app.
 
+Estado por defecto obligatorio (fail-closed):
+1. El rol de conexion de la app debe quedar sin bypass (`rolbypassrls = false`).
+2. Toda tabla tenant-protected debe tener `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY`.
+3. Si falta contexto valido (`app.current_notary_id`) la consulta debe devolver `0` filas, no datos de otro tenant.
+4. No se acepta seguridad basada solo en filtros manuales en controllers.
+
 ## 5.2 Contexto por request
 
 Cada operacion tenant-scoped debe ejecutarse en transaccion y setear:
@@ -100,6 +131,9 @@ Patron:
 2. Super admin: habilitado por `current_setting('app.is_super_admin', true) = 'true'`.
 3. Sin contexto valido: no hay acceso.
 
+Regla adicional:
+1. Implementar helper SQL seguro para parsear tenant (`app.current_notary_uuid()`), de modo que valores vacios/invalidos resulten en `NULL` y la policy falle en cerrado.
+
 ## 6) Soft Delete y Unicidad
 
 Regla de dominio notarial: no borrado fisico operativo.
@@ -107,6 +141,7 @@ Regla de dominio notarial: no borrado fisico operativo.
 1. Baja de notaria/usuario/registro sensible: `is_active = false` + `deleted_at = now()`.
 2. Unicidad con soft delete: indices parciales SQL (`WHERE deleted_at IS NULL`) donde aplique.
 3. Auditoria de cambios sensibles en `audit_logs`.
+4. `audit_logs` debe ser append-only: prohibido `UPDATE`, `DELETE` y `TRUNCATE` via trigger DB.
 
 ## 7) Clerk (Piloto N18 Legacy)
 
@@ -151,6 +186,8 @@ Regla de dominio notarial: no borrado fisico operativo.
 3. Super admin puede operar cross-tenant con trazabilidad.
 4. Usuarios N18 legacy inician sesion con su clave anterior.
 5. Sistema opera con habilitacion por modulos sin cobro in-app.
+6. Si no existe contexto tenant en sesion DB, consultas tenant-protected devuelven `0` filas.
+7. `audit_logs` no permite `UPDATE/DELETE/TRUNCATE`.
 
 ## 10) Instruccion de Ejecucion para Agente IDE
 
@@ -162,6 +199,10 @@ Reglas:
 3. No depender de filtros manuales dispersos en controllers para seguridad.
 4. Mantener trazabilidad con auditoria en operaciones cross-tenant y UAFE.
 5. Ejecutar por fases y validar con pruebas de aislamiento en cada fase.
+6. Toda operacion tenant-scoped debe ejecutarse dentro de transaccion con `SET LOCAL` de tenant/superadmin.
+7. Antes de activar RLS en una tabla, confirmar que su flujo de lectura/escritura ya usa contexto transaccional; si no, bloquear release.
+8. Validar caso de falla de middleware: sin `app.current_notary_id`, resultado esperado = `0` filas.
+9. Prohibir mutaciones de `audit_logs` en DB (trigger inmutable) y registrar accesos cross-tenant de SUPER_ADMIN.
 
 ## 11) Estimacion de Capacidad (2026-02-19)
 

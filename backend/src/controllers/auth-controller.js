@@ -1,58 +1,115 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../db.js';
-import { sendSuccess, sendError, sendUnauthorized, sendValidationError, sanitizeResponse } from '../utils/http.js';
+import { sendSuccess, sendError, sendUnauthorized, sanitizeResponse } from '../utils/http.js';
 import { validatePassword, sanitizePassword } from '../utils/password-validator.js';
 import { logPasswordChange, logLoginAttempt, extractRequestInfo } from '../utils/audit-logger.js';
+import { withTenantContext, withLoginEmailContext } from '../utils/tenant-context.js';
 
-/**
- * Roles válidos del sistema (completo con ARCHIVO)
- */
-const validRoles = ['ADMIN', 'CAJA', 'MATRIZADOR', 'RECEPCION', 'ARCHIVO'];
+const validRoles = ['SUPER_ADMIN', 'ADMIN', 'CAJA', 'MATRIZADOR', 'RECEPCION', 'ARCHIVO'];
+const PILOT_NOTARY_CODE = 'N18';
 
-/**
- * Obtiene el color asociado a cada rol
- * @param {string} role - Rol del usuario
- * @returns {string} Color del rol
- */
 function getRoleColor(role) {
   const roleColors = {
-    ADMIN: '#ef4444',      // Rojo - Control total
-    CAJA: '#22c55e',       // Verde - Gestión financiera  
-    MATRIZADOR: '#3b82f6', // Azul - Creación documentos
-    RECEPCION: '#06b6d4',  // Cyan - Entrega documentos
-    ARCHIVO: '#f59e0b'     // Naranja/Warning - Archivo histórico
+    SUPER_ADMIN: '#8b5cf6',
+    ADMIN: '#ef4444',
+    CAJA: '#22c55e',
+    MATRIZADOR: '#3b82f6',
+    RECEPCION: '#06b6d4',
+    ARCHIVO: '#f59e0b'
   };
+
   return roleColors[role] || '#6b7280';
 }
 
-/**
- * Genera token JWT para el usuario
- * @param {Object} user - Datos del usuario
- * @returns {string} Token JWT
- */
 function generateToken(user) {
   return jwt.sign(
-    { 
-      id: user.id, 
-      email: user.email, 
-      role: user.role 
+    {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      notaryId: user.notaryId || null,
+      isSuperAdmin: user.role === 'SUPER_ADMIN'
     },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
   );
 }
 
-/**
- * Registro de nuevo usuario (solo ADMIN puede crear usuarios)
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- */
+function getAuthenticatedTenantContext(req) {
+  return {
+    notaryId: req?.user?.activeNotaryId || req?.user?.notaryId || null,
+    isSuperAdmin: Boolean(req?.user?.isSuperAdmin || req?.user?.role === 'SUPER_ADMIN')
+  };
+}
+
+async function ensurePilotNotary() {
+  return prisma.notary.upsert({
+    where: { code: PILOT_NOTARY_CODE },
+    update: {
+      slug: 'n18',
+      name: 'Notaria 18 del Canton Quito',
+      isActive: true,
+      deletedAt: null
+    },
+    create: {
+      code: PILOT_NOTARY_CODE,
+      slug: 'n18',
+      name: 'Notaria 18 del Canton Quito',
+      ruc: '1768038930001',
+      address: 'Av. Amazonas y Naciones Unidas',
+      city: 'Quito',
+      province: 'Pichincha',
+      phone: '0999999999',
+      email: 'info@notaria18.com.ec',
+      isActive: true
+    },
+    select: { id: true }
+  });
+}
+
+async function resolveNotaryForNewUser({ requester, role, requestedNotaryId }) {
+  if (role === 'SUPER_ADMIN') {
+    return null;
+  }
+
+  const trimmedRequestedNotaryId = typeof requestedNotaryId === 'string'
+    ? requestedNotaryId.trim()
+    : null;
+
+  if (requester?.isSuperAdmin && trimmedRequestedNotaryId) {
+    const targetNotary = await prisma.notary.findFirst({
+      where: {
+        id: trimmedRequestedNotaryId,
+        isActive: true,
+        deletedAt: null
+      },
+      select: { id: true }
+    });
+
+    if (targetNotary) {
+      return targetNotary.id;
+    }
+
+    return null;
+  }
+
+  if (requester?.activeNotaryId) {
+    return requester.activeNotaryId;
+  }
+
+  if (requester?.notaryId) {
+    return requester.notaryId;
+  }
+
+  const pilotNotary = await ensurePilotNotary();
+  return pilotNotary.id;
+}
+
 async function register(req, res) {
   try {
-    const { email, password, firstName, lastName, role } = req.body;
+    const { email, password, firstName, lastName, role, notaryId } = req.body;
 
-    // Validar que todos los campos están presentes
     if (!email || !password || !firstName || !lastName || !role) {
       return res.status(400).json({
         success: false,
@@ -60,41 +117,69 @@ async function register(req, res) {
       });
     }
 
-    // Validar rol válido
     if (!validRoles.includes(role)) {
       return res.status(400).json({
         success: false,
-        message: 'Rol no válido'
+        message: 'Rol no valido'
       });
     }
 
-    // Verificar si el email ya existe
-    const existingUser = await prisma.user.findUnique({
-      where: { email }
+    if (role === 'SUPER_ADMIN' && !req.user?.isSuperAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo un SUPER_ADMIN puede crear otro SUPER_ADMIN'
+      });
+    }
+
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const existingUser = await withLoginEmailContext(prisma, normalizedEmail, async (tx) => {
+      return tx.user.findUnique({
+        where: { email: normalizedEmail }
+      });
     });
 
-    if (existingUser) {
+    if (existingUser && !existingUser.deletedAt) {
       return res.status(400).json({
         success: false,
-        message: 'El email ya está registrado'
+        message: 'El email ya esta registrado'
       });
     }
 
-    // Encriptar contraseña
     const hashedPassword = await bcrypt.hash(password, 12);
-
-    // Crear usuario
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        firstName,
-        lastName,
-        role
-      }
+    const targetNotaryId = await resolveNotaryForNewUser({
+      requester: req.user,
+      role,
+      requestedNotaryId: notaryId
     });
 
-    // Generar token
+    if (role !== 'SUPER_ADMIN' && !targetNotaryId) {
+      return res.status(400).json({
+        success: false,
+        message: 'No se pudo resolver la notaria para el usuario'
+      });
+    }
+
+    const user = await withTenantContext(
+      prisma,
+      {
+        notaryId: targetNotaryId || req.user?.activeNotaryId || req.user?.notaryId || null,
+        isSuperAdmin: Boolean(req.user?.isSuperAdmin || role === 'SUPER_ADMIN')
+      },
+      async (tx) => {
+        return tx.user.create({
+          data: {
+            email: normalizedEmail,
+            password: hashedPassword,
+            firstName: firstName.trim(),
+            lastName: lastName.trim(),
+            role,
+            notaryId: role === 'SUPER_ADMIN' ? null : targetNotaryId
+          }
+        });
+      }
+    );
+
     const token = generateToken(user);
 
     res.status(201).json({
@@ -107,6 +192,8 @@ async function register(req, res) {
           firstName: user.firstName,
           lastName: user.lastName,
           role: user.role,
+          notaryId: user.notaryId,
+          isSuperAdmin: user.role === 'SUPER_ADMIN',
           roleColor: getRoleColor(user.role)
         },
         token
@@ -122,74 +209,89 @@ async function register(req, res) {
   }
 }
 
-/**
- * Inicio de sesión de usuario
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- */
 async function login(req, res) {
   try {
     const { email, password } = req.body;
 
-    // Validar campos obligatorios
     if (!email || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Email y contraseña son obligatorios'
+        message: 'Email y contrasena son obligatorios'
       });
     }
 
-    // Buscar usuario por email
-    const user = await prisma.user.findUnique({
-      where: { email }
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const user = await withLoginEmailContext(prisma, normalizedEmail, async (tx) => {
+      return tx.user.findUnique({
+        where: { email: normalizedEmail },
+        select: {
+          id: true,
+          email: true,
+          password: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          notaryId: true,
+          isActive: true,
+          deletedAt: true
+        }
+      });
     });
 
     if (!user) {
-      return sendUnauthorized(res, 'Credenciales inválidas');
+      return sendUnauthorized(res, 'Credenciales invalidas');
     }
 
-    // Verificar si el usuario está activo
-    if (!user.isActive) {
+    if (!user.isActive || user.deletedAt) {
       return sendUnauthorized(res, 'Usuario desactivado');
     }
 
-    // Verificar contraseña
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      // Log intento fallido
       const requestInfo = extractRequestInfo(req);
       logLoginAttempt({
-        userEmail: email,
+        userEmail: normalizedEmail,
         ipAddress: requestInfo.ipAddress,
         userAgent: requestInfo.userAgent,
         success: false,
-        reason: 'Contraseña incorrecta'
+        reason: 'Contrasena incorrecta'
       });
 
-      return sendUnauthorized(res, 'Credenciales inválidas');
+      return sendUnauthorized(res, 'Credenciales invalidas');
     }
 
-    // Actualizar último login
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLogin: new Date() }
-    });
+    if (user.role !== 'SUPER_ADMIN' && !user.notaryId) {
+      return sendUnauthorized(res, 'Usuario sin notaria asignada');
+    }
 
-    // Log login exitoso
+    await withTenantContext(
+      prisma,
+      {
+        notaryId: user.notaryId,
+        isSuperAdmin: user.role === 'SUPER_ADMIN'
+      },
+      async (tx) => {
+        await tx.user.update({
+          where: { id: user.id },
+          data: { lastLogin: new Date() }
+        });
+      }
+    );
+
     const requestInfo = extractRequestInfo(req);
     logLoginAttempt({
       userId: user.id,
-      userEmail: email,
+      userEmail: normalizedEmail,
       ipAddress: requestInfo.ipAddress,
       userAgent: requestInfo.userAgent,
       success: true
     });
 
-    // Generar token
     const token = generateToken(user);
 
     return sendSuccess(res, {
-      message: 'Inicio de sesión exitoso',
+      message: 'Inicio de sesion exitoso',
       data: {
         user: sanitizeResponse({
           id: user.id,
@@ -197,6 +299,8 @@ async function login(req, res) {
           firstName: user.firstName,
           lastName: user.lastName,
           role: user.role,
+          notaryId: user.notaryId,
+          isSuperAdmin: user.role === 'SUPER_ADMIN',
           roleColor: getRoleColor(user.role)
         }),
         token
@@ -209,28 +313,31 @@ async function login(req, res) {
   }
 }
 
-/**
- * Obtiene el perfil del usuario autenticado
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- */
 async function getUserProfile(req, res) {
   try {
     const userId = req.user.id;
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        isActive: true,
-        createdAt: true,
-        lastLogin: true
+    const user = await withTenantContext(
+      prisma,
+      getAuthenticatedTenantContext(req),
+      async (tx) => {
+        return tx.user.findUnique({
+          where: { id: userId },
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            notaryId: true,
+            isActive: true,
+            deletedAt: true,
+            createdAt: true,
+            lastLogin: true
+          }
+        });
       }
-    });
+    );
 
     if (!user) {
       return res.status(404).json({
@@ -239,11 +346,19 @@ async function getUserProfile(req, res) {
       });
     }
 
+    if (!user.isActive || user.deletedAt) {
+      return res.status(401).json({
+        success: false,
+        message: 'Usuario desactivado'
+      });
+    }
+
     res.json({
       success: true,
       data: {
         user: {
           ...user,
+          isSuperAdmin: user.role === 'SUPER_ADMIN',
           roleColor: getRoleColor(user.role)
         }
       }
@@ -258,23 +373,32 @@ async function getUserProfile(req, res) {
   }
 }
 
-/**
- * Refresca el token JWT del usuario
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- */
 async function refreshToken(req, res) {
   try {
     const userId = req.user.id;
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId }
-    });
+    const user = await withTenantContext(
+      prisma,
+      getAuthenticatedTenantContext(req),
+      async (tx) => {
+        return tx.user.findUnique({
+          where: { id: userId },
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            notaryId: true,
+            isActive: true,
+            deletedAt: true
+          }
+        });
+      }
+    );
 
-    if (!user || !user.isActive) {
+    if (!user || !user.isActive || user.deletedAt) {
       return res.status(401).json({
         success: false,
-        message: 'Usuario no válido'
+        message: 'Usuario no valido'
       });
     }
 
@@ -297,17 +421,10 @@ async function refreshToken(req, res) {
   }
 }
 
-/**
- * ENDPOINT TEMPORAL: Crea usuarios iniciales
- * ⚠️ Solo funciona si no hay usuarios en la base de datos
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- */
 async function initUsers(req, res) {
   try {
-    // Verificar si ya existen usuarios
     const userCount = await prisma.user.count();
-    
+
     if (userCount > 0) {
       return res.status(400).json({
         success: false,
@@ -315,9 +432,10 @@ async function initUsers(req, res) {
         data: { userCount }
       });
     }
-    
-    // Usuarios iniciales
-    const INITIAL_USERS = [
+
+    const pilotNotary = await ensurePilotNotary();
+
+    const initialUsers = [
       {
         email: 'admin@notaria.com',
         password: 'admin123',
@@ -336,46 +454,45 @@ async function initUsers(req, res) {
         email: 'matrizador@notaria.com',
         password: 'matrizador123',
         firstName: 'Juan',
-        lastName: 'Pérez',
+        lastName: 'Perez',
         role: 'MATRIZADOR'
       },
       {
         email: 'recepcion@notaria.com',
         password: 'recepcion123',
-        firstName: 'María',
-        lastName: 'García',
+        firstName: 'Maria',
+        lastName: 'Garcia',
         role: 'RECEPCION'
       }
     ];
-    
+
     const createdUsers = [];
-    
-    for (const userData of INITIAL_USERS) {
-      // Hashear contraseña
+
+    for (const userData of initialUsers) {
       const hashedPassword = await bcrypt.hash(userData.password, 12);
-      
-      // Crear usuario
+
       const user = await prisma.user.create({
         data: {
           email: userData.email,
           password: hashedPassword,
           firstName: userData.firstName,
           lastName: userData.lastName,
-          role: userData.role
+          role: userData.role,
+          notaryId: pilotNotary.id
         }
       });
-      
+
       createdUsers.push({
         id: user.id,
         email: user.email,
         firstName: user.firstName,
         lastName: user.lastName,
         role: user.role,
-        // ⚠️ Solo para desarrollo: contraseña sin hashear
+        notaryId: user.notaryId,
         plainPassword: userData.password
       });
     }
-    
+
     res.status(201).json({
       success: true,
       message: 'Usuarios iniciales creados exitosamente',
@@ -390,7 +507,7 @@ async function initUsers(req, res) {
         ]
       }
     });
-    
+
   } catch (error) {
     console.error('Error creando usuarios iniciales:', error);
     res.status(500).json({
@@ -401,18 +518,12 @@ async function initUsers(req, res) {
   }
 }
 
-/**
- * Cambiar contraseña del usuario autenticado
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- */
 async function changePassword(req, res) {
   try {
     const userId = req.user.id;
     const { currentPassword, newPassword, confirmPassword } = req.body;
     const requestInfo = extractRequestInfo(req);
 
-    // Validar que todos los campos están presentes
     if (!currentPassword || !newPassword || !confirmPassword) {
       return res.status(400).json({
         success: false,
@@ -423,7 +534,6 @@ async function changePassword(req, res) {
       });
     }
 
-    // Verificar que las nuevas contraseñas coincidan
     if (newPassword !== confirmPassword) {
       logPasswordChange({
         userId,
@@ -431,16 +541,15 @@ async function changePassword(req, res) {
         ipAddress: requestInfo.ipAddress,
         userAgent: requestInfo.userAgent,
         success: false,
-        reason: 'Confirmación de contraseña no coincide'
+        reason: 'Confirmacion de contrasena no coincide'
       });
 
       return res.status(400).json({
         success: false,
-        message: 'La nueva contraseña y su confirmación no coinciden'
+        message: 'La nueva contrasena y su confirmacion no coinciden'
       });
     }
 
-    // Sanitizar y validar nueva contraseña
     const sanitizedNewPassword = sanitizePassword(newPassword);
     const passwordValidation = validatePassword(sanitizedNewPassword);
 
@@ -451,12 +560,12 @@ async function changePassword(req, res) {
         ipAddress: requestInfo.ipAddress,
         userAgent: requestInfo.userAgent,
         success: false,
-        reason: 'Nueva contraseña no cumple criterios de seguridad'
+        reason: 'Nueva contrasena no cumple criterios de seguridad'
       });
 
       return res.status(400).json({
         success: false,
-        message: 'La nueva contraseña no cumple los criterios de seguridad',
+        message: 'La nueva contrasena no cumple los criterios de seguridad',
         details: {
           errors: passwordValidation.errors,
           requirements: passwordValidation.requirements,
@@ -465,12 +574,17 @@ async function changePassword(req, res) {
       });
     }
 
-    // Buscar usuario actual
-    const user = await prisma.user.findUnique({
-      where: { id: userId }
-    });
+    const user = await withTenantContext(
+      prisma,
+      getAuthenticatedTenantContext(req),
+      async (tx) => {
+        return tx.user.findUnique({
+          where: { id: userId }
+        });
+      }
+    );
 
-    if (!user || !user.isActive) {
+    if (!user || !user.isActive || user.deletedAt) {
       logPasswordChange({
         userId,
         userEmail: req.user.email,
@@ -486,7 +600,6 @@ async function changePassword(req, res) {
       });
     }
 
-    // Verificar contraseña actual
     const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
     if (!isCurrentPasswordValid) {
       logPasswordChange({
@@ -495,16 +608,15 @@ async function changePassword(req, res) {
         ipAddress: requestInfo.ipAddress,
         userAgent: requestInfo.userAgent,
         success: false,
-        reason: 'Contraseña actual incorrecta'
+        reason: 'Contrasena actual incorrecta'
       });
 
       return res.status(401).json({
         success: false,
-        message: 'La contraseña actual es incorrecta'
+        message: 'La contrasena actual es incorrecta'
       });
     }
 
-    // Verificar que la nueva contraseña sea diferente a la actual
     const isSamePassword = await bcrypt.compare(sanitizedNewPassword, user.password);
     if (isSamePassword) {
       logPasswordChange({
@@ -513,28 +625,31 @@ async function changePassword(req, res) {
         ipAddress: requestInfo.ipAddress,
         userAgent: requestInfo.userAgent,
         success: false,
-        reason: 'Nueva contraseña igual a la actual'
+        reason: 'Nueva contrasena igual a la actual'
       });
 
       return res.status(400).json({
         success: false,
-        message: 'La nueva contraseña debe ser diferente a la actual'
+        message: 'La nueva contrasena debe ser diferente a la actual'
       });
     }
 
-    // Encriptar nueva contraseña
     const hashedNewPassword = await bcrypt.hash(sanitizedNewPassword, 12);
 
-    // Actualizar contraseña en la base de datos
-    await prisma.user.update({
-      where: { id: userId },
-      data: { 
-        password: hashedNewPassword,
-        updatedAt: new Date()
+    await withTenantContext(
+      prisma,
+      getAuthenticatedTenantContext(req),
+      async (tx) => {
+        await tx.user.update({
+          where: { id: userId },
+          data: {
+            password: hashedNewPassword,
+            updatedAt: new Date()
+          }
+        });
       }
-    });
+    );
 
-    // Log cambio exitoso
     logPasswordChange({
       userId,
       userEmail: user.email,
@@ -545,7 +660,7 @@ async function changePassword(req, res) {
 
     res.json({
       success: true,
-      message: 'Contraseña cambiada exitosamente',
+      message: 'Contrasena cambiada exitosamente',
       data: {
         user: {
           id: user.id,
@@ -560,9 +675,8 @@ async function changePassword(req, res) {
     });
 
   } catch (error) {
-    console.error('Error cambiando contraseña:', error);
-    
-    // Log error
+    console.error('Error cambiando contrasena:', error);
+
     const requestInfo = extractRequestInfo(req);
     logPasswordChange({
       userId: req.user?.id || 'unknown',
@@ -587,4 +701,4 @@ export {
   refreshToken,
   initUsers,
   changePassword
-}; 
+};
