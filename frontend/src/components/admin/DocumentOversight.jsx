@@ -77,7 +77,7 @@ import InfoTooltip from '../UI/InfoTooltip';
  * Componente de supervisión integral de documentos para administradores
  * Permite ver TODOS los documentos del sistema con filtros avanzados
  */
-const DocumentOversight = () => {
+const DocumentOversight = ({ quickSearch = null, onQuickSearchApplied = null }) => {
   const { token, user: currentUser } = useAuthStore();
 
   // Estado de datos
@@ -207,6 +207,26 @@ const DocumentOversight = () => {
   useEffect(() => {
     loadDocuments();
   }, [loadDocuments]);
+
+  useEffect(() => {
+    const term = String(quickSearch?.term || '').trim();
+    if (!term) return;
+
+    setSearch(term);
+    setStatusFilter('');
+    setTypeFilter('');
+    setMatrizadorFilter('');
+    setOverdueOnly(false);
+    setStartDate('');
+    setEndDate('');
+    setSortBy('createdAt');
+    setSortOrder('desc');
+    setPage(0);
+
+    if (typeof onQuickSearchApplied === 'function') {
+      onQuickSearchApplied();
+    }
+  }, [quickSearch, onQuickSearchApplied]);
 
   useEffect(() => {
     loadMatrizadores();

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Box,
   Card,
@@ -28,7 +28,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Divider
+  Divider,
+  LinearProgress
 } from '@mui/material';
 import {
   Person as PersonIcon,
@@ -52,7 +53,8 @@ import {
   Style as StyleIcon,
   Gavel as GavelIcon,
   ArrowForward as ArrowForwardIcon,
-  Schedule as ScheduleIcon
+  Schedule as ScheduleIcon,
+  Poll as PollIcon
 } from '@mui/icons-material';
 import InfoTooltip from './UI/InfoTooltip';
 import useAuth from '../hooks/use-auth';
@@ -83,6 +85,7 @@ import Reportes from './billing/Reportes';
 import FinancialHealthCard from './admin/FinancialHealthCard';
 import ParticipacionEstado from './admin/ParticipacionEstado';
 import billingService from '../services/billing-service';
+import api from '../services/api-client';
 import {
   getMonthRange,
   extractSubtotal,
@@ -96,9 +99,26 @@ import {
  */
 const AdminCenter = () => {
   const [currentView, setCurrentView] = useState('dashboard');
+  const [documentsQuickSearch, setDocumentsQuickSearch] = useState(null);
 
   const handleViewChange = (view) => {
     setCurrentView(view);
+  };
+
+  const handleOpenDocumentByTramite = (tramiteId) => {
+    const term = String(tramiteId || '').trim();
+    if (!term) return;
+
+    setDocumentsQuickSearch({
+      term,
+      source: 'encuestas',
+      requestedAt: Date.now(),
+    });
+    setCurrentView('documents');
+  };
+
+  const handleQuickSearchApplied = () => {
+    setDocumentsQuickSearch(null);
   };
 
   const renderContent = () => {
@@ -108,7 +128,12 @@ const AdminCenter = () => {
       case 'users':
         return <UserManagement />;
       case 'documents':
-        return <DocumentOversight />;
+        return (
+          <DocumentOversight
+            quickSearch={documentsQuickSearch}
+            onQuickSearchApplied={handleQuickSearchApplied}
+          />
+        );
       case 'formularios-uafe':
         return <FormulariosUAFE adminMode={true} />;
       case 'analisis-uafe':
@@ -124,7 +149,7 @@ const AdminCenter = () => {
       case 'qr-management':
         return <QROversight />;
       case 'encuestas-satisfaccion':
-        return <EncuestasSatisfaccion />;
+        return <EncuestasSatisfaccion onOpenDocumentByTramite={handleOpenDocumentByTramite} />;
       case 'settings':
         return <AdminSettings />;
       case 'seguimiento-mensajes':
@@ -315,6 +340,140 @@ const ParticipationWidget = ({ onViewChange, subtotal, loading }) => {
   );
 };
 
+const SatisfactionWidget = ({ onViewChange, stats, loading, onRefresh }) => {
+  const total = Number(stats?.total || 0);
+  const promedio = Number(stats?.promedioCalificacion || 0);
+  const porcentajeInfoClara = Number(stats?.porcentajeInfoClara || 0);
+  const porcentajeTratoCordial = Number(stats?.porcentajeTratoCordial || 0);
+
+  const promedioColor = promedio >= 4.5
+    ? '#047857'
+    : promedio >= 4
+      ? '#0284c7'
+      : promedio >= 3
+        ? '#d97706'
+        : '#be123c';
+
+  const nivelSatisfaccion = Math.min(100, Math.max(0, (promedio / 5) * 100));
+
+  const metrics = [
+    { label: 'Encuestas', value: total.toLocaleString('en-US') },
+    { label: 'Promedio', value: `${promedio.toFixed(2)} / 5` },
+    { label: 'Info clara', value: `${porcentajeInfoClara.toFixed(1)}%` },
+    { label: 'Trato cordial', value: `${porcentajeTratoCordial.toFixed(1)}%` },
+  ];
+
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        p: 2.5,
+        borderRadius: 3,
+        border: '1px solid',
+        borderColor: 'rgba(148, 163, 184, 0.12)',
+        background: 'rgba(255, 255, 255, 0.5)',
+        height: '100%',
+      }}
+    >
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{
+            p: 1,
+            borderRadius: 2,
+            bgcolor: '#0891b220',
+            color: '#0891b2',
+            display: 'flex'
+          }}>
+            <PollIcon fontSize="small" />
+          </Box>
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+              SatisfacciÃ³n Cliente
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+              Encuestas registradas
+            </Typography>
+          </Box>
+        </Box>
+        <Box sx={{ display: 'flex', gap: 0.5 }}>
+          <Tooltip title="Actualizar">
+            <IconButton
+              size="small"
+              onClick={onRefresh}
+              sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
+            >
+              <RefreshIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Ver encuestas">
+            <IconButton
+              size="small"
+              onClick={() => onViewChange('encuestas-satisfaccion')}
+              sx={{ color: 'primary.main', bgcolor: 'primary.light', '&:hover': { bgcolor: 'primary.main', color: 'white' } }}
+            >
+              <ArrowForwardIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        </Box>
+      </Box>
+
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 5 }}>
+          <CircularProgress size={24} />
+        </Box>
+      ) : (
+        <>
+          <Grid container spacing={1.25}>
+            {metrics.map((metric) => (
+              <Grid item xs={6} key={metric.label}>
+                <Box
+                  sx={{
+                    p: 1.25,
+                    borderRadius: 2,
+                    border: '1px solid rgba(148, 163, 184, 0.14)',
+                    bgcolor: 'rgba(248, 250, 252, 0.65)',
+                  }}
+                >
+                  <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, fontSize: '0.68rem' }}>
+                    {metric.label}
+                  </Typography>
+                  <Typography sx={{ fontWeight: 700, color: '#1e293b', lineHeight: 1.2, mt: 0.25 }}>
+                    {metric.value}
+                  </Typography>
+                </Box>
+              </Grid>
+            ))}
+          </Grid>
+
+          <Box sx={{ mt: 2.2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.75 }}>
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                Ãndice de satisfacciÃ³n
+              </Typography>
+              <Typography variant="caption" sx={{ color: promedioColor, fontWeight: 700 }}>
+                {promedio.toFixed(2)} / 5
+              </Typography>
+            </Box>
+            <LinearProgress
+              variant="determinate"
+              value={nivelSatisfaccion}
+              sx={{
+                height: 8,
+                borderRadius: 999,
+                bgcolor: 'rgba(148, 163, 184, 0.2)',
+                '& .MuiLinearProgress-bar': {
+                  borderRadius: 999,
+                  bgcolor: promedioColor,
+                },
+              }}
+            />
+          </Box>
+        </>
+      )}
+    </Paper>
+  );
+};
+
 const AdminDashboard = ({ onViewChange }) => {
   const { user } = useAuth();
   const [stats, setStats] = useState(null);
@@ -333,6 +492,8 @@ const AdminDashboard = ({ onViewChange }) => {
   const [matrizadores, setMatrizadores] = useState([]);
   const [currentMonthBilled, setCurrentMonthBilled] = useState(0);
   const [participationLoading, setParticipationLoading] = useState(true);
+  const [surveyStats, setSurveyStats] = useState(null);
+  const [surveyLoading, setSurveyLoading] = useState(true);
 
   // Mapeo de tipos de acto a badges - Paleta refinada y elegante
   const actoBadges = {
@@ -425,6 +586,23 @@ const AdminDashboard = ({ onViewChange }) => {
     setSelectedDocument(null);
   };
 
+  const loadSurveyOverview = useCallback(async () => {
+    try {
+      setSurveyLoading(true);
+      const response = await api.get('/encuesta/admin/estadisticas');
+      if (response?.data?.success) {
+        setSurveyStats(response.data.data);
+      } else {
+        setSurveyStats(null);
+      }
+    } catch (e) {
+      console.error('Error cargando resumen de encuestas', e);
+      setSurveyStats(null);
+    } finally {
+      setSurveyLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadMatrizadores();
   }, []);
@@ -432,6 +610,10 @@ const AdminDashboard = ({ onViewChange }) => {
   useEffect(() => {
     loadCurrentMonthParticipation();
   }, []);
+
+  useEffect(() => {
+    loadSurveyOverview();
+  }, [loadSurveyOverview]);
 
   // Recargar al cambiar filtros principales (resetea paginación)
   useEffect(() => {
@@ -644,7 +826,7 @@ const AdminDashboard = ({ onViewChange }) => {
       {/* === KPIs AGRUPADOS === */}
       <Grid container spacing={3} sx={{ mb: 4 }}>
         {/* ── GRUPO GESTIÓN ── */}
-        <Grid item xs={12} md={7}>
+        <Grid item xs={12}>
           <Box sx={{
             p: 2.5,
             borderRadius: 3,
@@ -675,7 +857,7 @@ const AdminDashboard = ({ onViewChange }) => {
         </Grid>
 
         {/* --- GRUPO FINANZAS --- */}
-        <Grid item xs={12} md={5}>
+        <Grid item xs={12} md={6}>
           <Box sx={{
             p: 2.5,
             borderRadius: 3,
@@ -735,6 +917,14 @@ const AdminDashboard = ({ onViewChange }) => {
               />
             </Box>
           </Box>
+        </Grid>
+        <Grid item xs={12} md={6}>
+          <SatisfactionWidget
+            onViewChange={onViewChange}
+            stats={surveyStats}
+            loading={surveyLoading}
+            onRefresh={loadSurveyOverview}
+          />
         </Grid>
       </Grid>
 

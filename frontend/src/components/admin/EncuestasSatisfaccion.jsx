@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import useAuthStore from '../../store/auth-store';
 import api from '../../services/api-client';
 
-const EncuestasSatisfaccion = () => {
+const EncuestasSatisfaccion = ({ onOpenDocumentByTramite = null }) => {
     const [encuestas, setEncuestas] = useState([]);
     const [estadisticas, setEstadisticas] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -104,6 +104,11 @@ const EncuestasSatisfaccion = () => {
             );
         }
         return <div style={{ display: 'flex', alignItems: 'center' }}>{stars}</div>;
+    };
+
+    const handleOpenDocument = (tramiteId) => {
+        if (!tramiteId || typeof onOpenDocumentByTramite !== 'function') return;
+        onOpenDocumentByTramite(tramiteId);
     };
 
     return (
@@ -421,7 +426,28 @@ const EncuestasSatisfaccion = () => {
                                             </span>
                                         </td>
                                         <td style={{ padding: '20px 24px', fontSize: '0.875rem', color: '#1E293B', fontWeight: 700 }}>
-                                            {enc.tramiteId || '-'}
+                                            {enc.tramiteId ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleOpenDocument(enc.tramiteId)}
+                                                    disabled={typeof onOpenDocumentByTramite !== 'function'}
+                                                    style={{
+                                                        padding: 0,
+                                                        border: 'none',
+                                                        background: 'transparent',
+                                                        fontSize: '0.875rem',
+                                                        fontWeight: 700,
+                                                        fontFamily: 'inherit',
+                                                        color: typeof onOpenDocumentByTramite === 'function' ? '#1D4ED8' : '#1E293B',
+                                                        textDecoration: typeof onOpenDocumentByTramite === 'function' ? 'underline' : 'none',
+                                                        textUnderlineOffset: '3px',
+                                                        cursor: typeof onOpenDocumentByTramite === 'function' ? 'pointer' : 'default'
+                                                    }}
+                                                    title={typeof onOpenDocumentByTramite === 'function' ? 'Abrir documento relacionado' : ''}
+                                                >
+                                                    {enc.tramiteId}
+                                                </button>
+                                            ) : '-'}
                                         </td>
                                         <td style={{ padding: '20px 24px', maxWidth: '350px' }}>
                                             {enc.sugerencia ? (
