@@ -171,9 +171,10 @@ const documentService = {
    * CAJA: Ver todos los documentos para gestión
    * @returns {Promise<Object>} Lista de todos los documentos
    */
-  async getAllDocuments({ page = 1, limit = 50 } = {}) {
+  async getAllDocuments({ page = 1, limit = 50, search = '' } = {}) {
     try {
       const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+      if (search) params.append('search', search);
       const response = await api.get(`/documents/all?${params.toString()}`);
 
       return {
