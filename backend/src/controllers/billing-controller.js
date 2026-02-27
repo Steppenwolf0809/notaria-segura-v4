@@ -125,7 +125,7 @@ export async function getPaymentStatusForDocument(documentId) {
             const syncedPaidAmount = Number(invoice.paidAmount || 0);
             // Use the higher value (sync might have more recent data)
             const paid = Math.max(paymentsTotal, syncedPaidAmount);
-            
+
             const balance = Number(invoice.totalAmount) - paid;
 
             totalAmount += Number(invoice.totalAmount);
@@ -571,7 +571,7 @@ export async function getDocumentPaymentStatus(req, res) {
             const syncedPaidAmount = Number(invoice.paidAmount || 0);
             // Use the higher value (sync might have more recent data)
             const paid = Math.max(paymentsTotal, syncedPaidAmount);
-            
+
             const balance = Number(invoice.totalAmount) - paid;
 
             totalAmount += Number(invoice.totalAmount);
@@ -1230,6 +1230,7 @@ export async function getSummary(req, res) {
         let pendingCount = 0;
         let paidCount = 0;
         let partialCount = 0;
+        let fallbackCount = 0;
 
         for (const invoice of invoices) {
             const invoiceTotal = Number(invoice.totalAmount || 0);
@@ -1239,6 +1240,10 @@ export async function getSummary(req, res) {
                 ? (storedSubtotal != null ? storedSubtotal : computedSubtotal)
                 : (storedSubtotal ?? 0);
 
+            if (useHybridSubtotal && storedSubtotal == null && invoiceTotal > 0) {
+                fallbackCount++;
+            }
+
             totalInvoiced += invoiceTotal;
             totalSubtotalInvoiced += effectiveSubtotal;
             totalPaid += Number(invoice.paidAmount || 0);
@@ -1246,6 +1251,10 @@ export async function getSummary(req, res) {
             if (invoice.status === 'PAID') paidCount++;
             else if (invoice.status === 'PARTIAL') partialCount++;
             else pendingCount++;
+        }
+
+        if (fallbackCount > 0) {
+            console.warn(`[billing-controller] ⚠️ ${fallbackCount} invoices used ÷1.15 fallback (no subtotalAmount stored)`);
         }
 
         // Get recent imports
