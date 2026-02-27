@@ -7,6 +7,7 @@ import express from 'express';
 import multer from 'multer';
 import * as billingController from '../controllers/billing-controller.js';
 import { authenticateToken, requireRoles } from '../middleware/auth-middleware.js';
+import { requireModule } from '../middleware/require-module.js';
 import { csrfProtection } from '../middleware/csrf-protection.js';
 import {
     validateQuery,
@@ -74,6 +75,7 @@ router.get('/health', billingController.healthCheck);
 
 // All other routes require authentication
 router.use(authenticateToken);
+router.use(requireModule('FACTURACION'));
 
 // Dashboard & Summary
 router.get('/stats', billingController.getStats);

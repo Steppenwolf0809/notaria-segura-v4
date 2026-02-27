@@ -6,6 +6,7 @@
 import express from 'express';
 import multer from 'multer';
 import { authenticateToken, requireMatrizador } from '../middleware/auth-middleware.js';
+import { requireModule } from '../middleware/require-module.js';
 import {
   uploadEscritura,
   createEscrituraManual,
@@ -68,14 +69,16 @@ router.get('/verify/:token/pdf/metadata', getPDFMetadata);
 // GET /api/verify/:token/pdf - Obtener PDF público de escritura
 router.get('/verify/:token/pdf', getPDFPublic);
 
+router.use(authenticateToken);
+router.use(requireModule('ESCRITURAS_QR'));
+
 /**
  * RUTAS PROTEGIDAS (requieren autenticación)
  */
 
 // POST /api/escrituras/upload - Subir PDF y generar QR (solo matrizadores)
 // Acepta 'pdfFile' (obligatorio) y 'foto' (opcional)
-router.post('/upload', 
-  authenticateToken, 
+router.post('/upload',  
   requireMatrizador, 
   upload.fields([
     { name: 'pdfFile', maxCount: 1 },
@@ -87,7 +90,6 @@ router.post('/upload',
 // POST /api/escrituras/manual - Crear escritura manualmente (solo matrizadores)
 // Acepta 'data' (JSON con los datos) y 'foto' (opcional)
 router.post('/manual',
-  authenticateToken,
   requireMatrizador,
   upload.fields([
     { name: 'foto', maxCount: 1 }
@@ -96,20 +98,17 @@ router.post('/manual',
 );
 
 // GET /api/escrituras - Listar escrituras del usuario
-router.get('/', 
-  authenticateToken, 
+router.get('/',  
   getEscrituras
 );
 
 // GET /api/escrituras/:id - Obtener escritura específica
-router.get('/:id', 
-  authenticateToken, 
+router.get('/:id',  
   getEscritura
 );
 
 // PUT /api/escrituras/:id - Actualizar datos de escritura (soporta foto opcional)
 router.put('/:id', 
-  authenticateToken,
   upload.fields([
     { name: 'foto', maxCount: 1 }
   ]),
@@ -117,40 +116,34 @@ router.put('/:id',
 );
 
 // GET /api/escrituras/:id/qr - Generar QR para escritura
-router.get('/:id/qr', 
-  authenticateToken, 
+router.get('/:id/qr',  
   getEscrituraQR
 );
 
 // DELETE /api/escrituras/:id - Desactivar escritura (soft delete)
-router.delete('/:id', 
-  authenticateToken, 
+router.delete('/:id',  
   deleteEscritura
 );
 
 // DELETE /api/escrituras/:id/hard-delete - Eliminar permanentemente escritura
 router.delete('/:id/hard-delete',
-  authenticateToken,
   requireMatrizador,
   hardDeleteEscritura
 );
 
 // POST /api/escrituras/:id/pdf - Subir PDF completo de escritura (protegido)
 router.post('/:id/pdf',
-  authenticateToken,
   upload.single('pdfFile'),
   uploadPDFToEscritura
 );
 
 // GET /api/escrituras/:id/pdf - Obtener PDF de escritura por ID (protegido)
 router.get('/:id/pdf',
-  authenticateToken,
   getPDFPrivate
 );
 
 // PUT /api/escrituras/:id/pdf-hidden-pages - Actualizar páginas ocultas (protegido)
 router.put('/:id/pdf-hidden-pages',
-  authenticateToken,
   updatePDFHiddenPages
 );
 
@@ -196,3 +189,4 @@ router.use((error, req, res, next) => {
 });
 
 export default router;
+
