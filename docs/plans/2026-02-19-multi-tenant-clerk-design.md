@@ -52,6 +52,8 @@ por modulos y operacion segura en una sola infraestructura.
 7. UAFE: schema separado `uafe` dentro de la misma base PostgreSQL.
 8. Monetizacion v1: habilitacion tecnica por modulos (sin cobro in-app).
 9. Borrado: soft delete obligatorio en entidades criticas (`deleted_at`).
+10. Billing: cada notaria puede usar integracion externa distinta (Koinor u otra), pero los datos internos de facturacion se almacenan tenant-scoped.
+11. WhatsApp templates: configuracion per-tenant (cada notaria personaliza sus templates).
 
 ## 3) Alcance v1
 
@@ -61,6 +63,7 @@ Incluido:
 3. Politicas RLS por tenant y bypass por contexto de sesion (`app.is_super_admin`).
 4. UAFE inicial en schema `uafe` con aislamiento por tenant.
 5. Modelo de planes/modulos normalizado para setup comercial manual.
+6. Facturacion tenant-scoped para `invoices`, `payments`, `import_logs` y `pending_receivables`.
 
 No incluido:
 1. Cobro dentro de la plataforma.
@@ -109,6 +112,14 @@ Todas con:
 2. `deleted_at` para soft delete.
 3. indices compuestos por tenant.
 4. uniques por tenant (ej. `UNIQUE(notary_id, codigo_externo)`).
+
+### 4.4 Billing tenant-scoped (sin cobro in-app)
+
+Regla:
+1. Integracion externa de facturacion por notaria (venta/setup directo).
+2. Persistencia interna siempre tenant-scoped con `notary_id`.
+3. Tablas objetivo: `invoices`, `payments`, `import_logs`, `pending_receivables`.
+4. Politicas RLS equivalentes a tablas core antes de release multi-cliente.
 
 ## 5) Seguridad: RLS + Prisma + Pool
 
@@ -268,7 +279,7 @@ Ultima actualizacion: 2026-02-27
 
 Resumen por fase:
 1. Fase 1 (Fundacion tenant + Clerk mapping): En progreso avanzado.
-2. Fase 2 (RLS robusto): En progreso.
+2. Fase 2 (RLS robusto): En progreso - OLA A completada en codigo, pendiente validacion final.
 3. Fase 3 (UAFE schema): Pendiente.
 4. Fase 4 (Modulos/planes): Pendiente.
 
@@ -287,6 +298,31 @@ Resumen por fase:
 - [ ] Aplicar politicas RLS finales en todas las tablas core tenant-protected.
 - [ ] Validar pruebas A/B de aislamiento por endpoint (no solo SQL).
 - [ ] Auditar flujos `SUPER_ADMIN` cross-tenant en endpoints reales.
+
+#### OLA A - Endurecimiento de controladores (sesion 2026-02-26)
+
+Controladores endurecidos (queries a tablas con RLS wrapeadas en `withRequestTenantContext`):
+- [x] `archivo-controller.js` - Todas las queries a `document`/`documentEvent` wrapeadas.
+- [x] `reception-controller.js` - Todas las queries wrapeadas.
+- [x] `reception-bulk-controller.js` - Sin queries directas; delega en `bulk-status-service` (deuda tecnica documentada para OLA B).
+- [x] `document-controller.js` - Queries principales + `autoHealInvoiceLinks` corregido para recibir `tx`.
+- [x] `admin-controller.js` - CRUD users ya wrapeado + dashboard/stats (13 queries) ahora wrapeadas.
+- [x] `admin-document-controller.js` - Ya wrapeado previamente.
+- [x] `admin-notification-controller.js` - 8 funciones wrapeadas (16 queries `whatsAppNotification`).
+- [x] `billing-controller.js` - 4 queries a `document`/`documentEvent` wrapeadas en 3 funciones.
+- [x] `mensajes-internos-controller.js` - 2 queries a `document` wrapeadas.
+- [x] `auth-controller.js` - Wrapeado previamente.
+
+Pendientes documentados:
+- [x] `sync-billing-controller.js` - 2 queries directas a `document.update`/`documentEvent.create` endurecidas con `withTenantContext` (2026-02-27).
+- [ ] `billing-controller.js:59` - `getPaymentStatusForDocument()` es helper standalone sin `req`. Llamado desde `document-controller` que ya gestiona su propio contexto tenant. Aceptable por ahora.
+
+Servicios con queries directas (deuda tecnica para OLA B):
+- `alertas-service.js` (~20 queries)
+- `bulk-status-service.js` (~4 queries)
+- `matrizador-assignment-service.js` (3 queries)
+- `import-mov-service.js` (~10 queries)
+- `import-koinor-xml-service.js` (2 queries)
 
 ### Fase 3 - UAFE schema
 
@@ -310,3 +346,9 @@ Resumen por fase:
 - [ ] Runbook de escalado (20 -> 30 -> 50) documentado para operacion.
 - [ ] Decidir momento de upgrade Railway Hobby -> Pro con metricas reales.
 - [ ] Cerrar riesgos abiertos y actualizar este checklist al final de cada sesion.
+
+## 14) Control Go/No-Go por Olas
+
+Referencia operativa actual:
+
+1. `docs/plans/2026-02-27-multi-tenant-go-no-go-checklist.md`

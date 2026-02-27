@@ -10,6 +10,7 @@
 
 import { db as prisma } from '../db.js';
 import { normalizeInvoiceNumber, buildInvoiceWhereByNumber } from '../utils/billing-utils.js';
+import { withTenantContext } from '../utils/tenant-context.js';
 
 // Constants
 const BATCH_SIZE = 50; // Process invoices in batches for better transaction handling
@@ -481,6 +482,10 @@ export async function syncCxc(req, res) {
 
     try {
         const { type, fullSync, timestamp, data } = req.body;
+        const tenantContext = req.tenantContext || {
+            notaryId: req.syncTenantContext?.notaryId || null,
+            isSuperAdmin: false
+        };
 
         // Validate request structure
         if (type !== 'cxc') {
@@ -501,6 +506,13 @@ export async function syncCxc(req, res) {
             return res.status(400).json({
                 success: false,
                 message: `Máximo ${MAX_RECORDS_PER_REQUEST} registros por request`
+            });
+        }
+
+        if (!tenantContext.notaryId) {
+            return res.status(500).json({
+                success: false,
+                message: 'No se pudo resolver contexto tenant para sync CXC'
             });
         }
 
@@ -682,35 +694,37 @@ export async function syncCxc(req, res) {
                         
                         // Also update Document if linked
                         if (invoice.documentId) {
-                            await prisma.document.update({
-                                where: { id: invoice.documentId },
-                                data: { pagoConfirmado: true }
-                            });
-                            
-                            // 📝 Create event in document history
-                            try {
-                                await prisma.documentEvent.create({
-                                    data: {
-                                        documentId: invoice.documentId,
-                                        userId: 1, // System user
-                                        eventType: 'PAGO_REGISTRADO',
-                                        description: `Factura ${invoice.invoiceNumber} marcada como pagada por sincronización CXC`,
-                                        details: JSON.stringify({
-                                            invoiceNumber: invoice.invoiceNumber,
-                                            invoiceId: invoice.id,
-                                            amount: paidInvoice.totalAmount || invoice.totalAmount,
-                                            paymentDate: new Date().toISOString(),
-                                            syncSource: 'KOINOR_SYNC_CXC',
-                                            syncedAt: syncedAt.toISOString()
-                                        })
-                                    }
+                            await withTenantContext(prisma, tenantContext, async (tx) => {
+                                await tx.document.update({
+                                    where: { id: invoice.documentId },
+                                    data: { pagoConfirmado: true }
                                 });
-                                console.log(`[sync-cxc] Created payment event for document ${invoice.documentId}`);
-                            } catch (eventError) {
-                                console.error(`[sync-cxc] Error creating payment event:`, eventError.message);
-                            }
+
+                                // Create event in document history (best-effort)
+                                try {
+                                    await tx.documentEvent.create({
+                                        data: {
+                                            documentId: invoice.documentId,
+                                            userId: 1, // System user
+                                            eventType: 'PAGO_REGISTRADO',
+                                            description: `Factura ${invoice.invoiceNumber} marcada como pagada por sincronización CXC`,
+                                            details: JSON.stringify({
+                                                invoiceNumber: invoice.invoiceNumber,
+                                                invoiceId: invoice.id,
+                                                amount: paidInvoice.totalAmount || invoice.totalAmount,
+                                                paymentDate: new Date().toISOString(),
+                                                syncSource: 'KOINOR_SYNC_CXC',
+                                                syncedAt: syncedAt.toISOString()
+                                            })
+                                        }
+                                    });
+                                    console.log(`[sync-cxc] Created payment event for document ${invoice.documentId}`);
+                                } catch (eventError) {
+                                    console.error(`[sync-cxc] Error creating payment event:`, eventError.message);
+                                }
+                            });
                         }
-                        
+
                         invoiceSyncCount++;
                     }
                 } catch (invoiceSyncError) {
