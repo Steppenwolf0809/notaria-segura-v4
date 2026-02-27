@@ -190,9 +190,9 @@ const MatrizadorDashboardNew = () => {
                 secondaryTypographyProps={{ variant: 'caption' }}
               />
               <Chip
-                label={doc.status === 'LISTO' ? 'Completado' : 'En Proceso'}
+                label={doc.status === 'ANULADO_NOTA_CREDITO' ? 'Nota de Crédito' : doc.status === 'LISTO' ? 'Completado' : 'En Proceso'}
                 size="small"
-                color={doc.status === 'LISTO' ? 'success' : 'info'}
+                color={doc.status === 'ANULADO_NOTA_CREDITO' ? 'error' : doc.status === 'LISTO' ? 'success' : 'info'}
                 variant="outlined"
               />
             </ListItem>

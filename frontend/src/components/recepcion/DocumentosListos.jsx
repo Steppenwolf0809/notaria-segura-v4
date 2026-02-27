@@ -284,6 +284,8 @@ function DocumentosListos({ onEstadisticasChange }) {
         return 'success';
       case 'ENTREGADO':
         return 'default';
+      case 'ANULADO_NOTA_CREDITO':
+        return 'error';
       default:
         return 'default';
     }

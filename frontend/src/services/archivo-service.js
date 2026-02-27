@@ -234,7 +234,8 @@ const formatearEstado = (estado) => {
     'PENDIENTE': { texto: 'Pendiente', color: 'warning' },
     'EN_PROCESO': { texto: 'En Proceso', color: 'info' },
     'LISTO': { texto: 'Listo', color: 'success' },
-    'ENTREGADO': { texto: 'Entregado', color: 'default' }
+    'ENTREGADO': { texto: 'Entregado', color: 'default' },
+    'ANULADO_NOTA_CREDITO': { texto: 'Nota de Crédito', color: 'error' }
   };
   return estados[estado] || { texto: estado, color: 'default' };
 };
