@@ -9,7 +9,8 @@
  */
 
 import { db as prisma } from '../db.js';
-import { normalizeInvoiceNumber } from '../utils/billing-utils.js';
+import { normalizeInvoiceNumber, buildInvoiceWhereByNumber } from '../utils/billing-utils.js';
+import { withTenantContext } from '../utils/tenant-context.js';
 
 // Constants
 const BATCH_SIZE = 50; // Process invoices in batches for better transaction handling
@@ -218,12 +219,7 @@ async function processInvoice(tx, invoiceData) {
 
     // Check if invoice exists
     const existingInvoice = await tx.invoice.findFirst({
-        where: {
-            OR: [
-                { invoiceNumberRaw: invoiceNumberRaw },
-                { invoiceNumber: invoiceNumber }
-            ]
-        }
+        where: buildInvoiceWhereByNumber(invoiceNumberRaw)
     });
 
     let action = 'unchanged';
@@ -486,6 +482,10 @@ export async function syncCxc(req, res) {
 
     try {
         const { type, fullSync, timestamp, data } = req.body;
+        const tenantContext = req.tenantContext || {
+            notaryId: req.syncTenantContext?.notaryId || null,
+            isSuperAdmin: false
+        };
 
         // Validate request structure
         if (type !== 'cxc') {
@@ -506,6 +506,13 @@ export async function syncCxc(req, res) {
             return res.status(400).json({
                 success: false,
                 message: `Máximo ${MAX_RECORDS_PER_REQUEST} registros por request`
+            });
+        }
+
+        if (!tenantContext.notaryId) {
+            return res.status(500).json({
+                success: false,
+                message: 'No se pudo resolver contexto tenant para sync CXC'
             });
         }
 
@@ -666,19 +673,19 @@ export async function syncCxc(req, res) {
             
             for (const paidInvoice of markedAsPaidInvoiceNumbers) {
                 try {
-                    // Try to find and update the corresponding Invoice
-                    const invoice = await prisma.invoice.findFirst({
-                        where: {
-                            OR: [
-                                { invoiceNumberRaw: paidInvoice.invoiceNumberRaw },
-                                { invoiceNumberRaw: paidInvoice.invoiceNumberRaw?.replace(/-/g, '') },
-                                { invoiceNumber: paidInvoice.invoiceNumber }
-                            ]
+                    const syncedInvoice = await withTenantContext(prisma, tenantContext, async (tx) => {
+                        // Try to find and update the corresponding Invoice
+                        const invoice = await tx.invoice.findFirst({
+                            where: buildInvoiceWhereByNumber(
+                                paidInvoice.invoiceNumberRaw || paidInvoice.invoiceNumber
+                            )
+                        });
+
+                        if (!invoice || invoice.status === 'PAID') {
+                            return null;
                         }
-                    });
-                    
-                    if (invoice && invoice.status !== 'PAID') {
-                        await prisma.invoice.update({
+
+                        await tx.invoice.update({
                             where: { id: invoice.id },
                             data: {
                                 status: 'PAID',
@@ -688,15 +695,42 @@ export async function syncCxc(req, res) {
                                 syncSource: 'KOINOR_SYNC_CXC'
                             }
                         });
-                        
+
                         // Also update Document if linked
                         if (invoice.documentId) {
-                            await prisma.document.update({
-                                where: { id: invoice.documentId },
-                                data: { pagoConfirmado: true }
-                            });
+                                await tx.document.update({
+                                    where: { id: invoice.documentId },
+                                    data: { pagoConfirmado: true }
+                                });
+
+                                // Create event in document history (best-effort)
+                                try {
+                                    await tx.documentEvent.create({
+                                        data: {
+                                            documentId: invoice.documentId,
+                                            userId: 1, // System user
+                                            eventType: 'PAGO_REGISTRADO',
+                                            description: `Factura ${invoice.invoiceNumber} marcada como pagada por sincronización CXC`,
+                                            details: JSON.stringify({
+                                                invoiceNumber: invoice.invoiceNumber,
+                                                invoiceId: invoice.id,
+                                                amount: paidInvoice.totalAmount || invoice.totalAmount,
+                                                paymentDate: new Date().toISOString(),
+                                                syncSource: 'KOINOR_SYNC_CXC',
+                                                syncedAt: syncedAt.toISOString()
+                                            })
+                                        }
+                                    });
+                                    console.log(`[sync-cxc] Created payment event for document ${invoice.documentId}`);
+                                } catch (eventError) {
+                                    console.error(`[sync-cxc] Error creating payment event:`, eventError.message);
+                                }
                         }
-                        
+
+                        return invoice;
+                    });
+
+                    if (syncedInvoice) {
                         invoiceSyncCount++;
                     }
                 } catch (invoiceSyncError) {

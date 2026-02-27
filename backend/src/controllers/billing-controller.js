@@ -3,6 +3,7 @@
  * Handles billing module endpoints for invoices, payments, and imports
  */
 import { db as prisma } from '../db.js';
+import { withRequestTenantContext } from '../utils/tenant-context.js';
 
 // Normalización de nombres de matrizadores para evitar duplicados visuales
 const MATRIZADOR_NAME_NORMALIZATION = {
@@ -256,8 +257,16 @@ export async function getInvoices(req, res) {
 
         if (dateFrom || dateTo) {
             where.issueDate = {};
-            if (dateFrom) where.issueDate.gte = new Date(dateFrom);
-            if (dateTo) where.issueDate.lte = new Date(dateTo);
+            if (dateFrom) {
+                const fromDate = new Date(dateFrom);
+                fromDate.setHours(0, 0, 0, 0);
+                where.issueDate.gte = fromDate;
+            }
+            if (dateTo) {
+                const toDate = new Date(dateTo);
+                toDate.setHours(23, 59, 59, 999);
+                where.issueDate.lte = toDate;
+            }
         }
 
         const [invoices, total] = await Promise.all([
@@ -553,10 +562,17 @@ export async function getDocumentPaymentStatus(req, res) {
         const invoiceDetails = [];
 
         for (const invoice of invoices) {
-            const paid = invoice.payments.reduce(
+            // Calculate paid amount from both sources:
+            // 1. Payments table (manual imports/XML)
+            const paymentsTotal = invoice.payments.reduce(
                 (sum, p) => sum + Number(p.amount),
                 0
             );
+            // 2. paidAmount from Koinor sync (sync-billing)
+            const syncedPaidAmount = Number(invoice.paidAmount || 0);
+            // Use the higher value (sync might have more recent data)
+            const paid = Math.max(paymentsTotal, syncedPaidAmount);
+            
             const balance = Number(invoice.totalAmount) - paid;
 
             totalAmount += Number(invoice.totalAmount);
@@ -596,65 +612,7 @@ export async function getDocumentPaymentStatus(req, res) {
 }
 
 /**
- * Import Koinor Excel file
- * Requires multipart/form-data with 'file' field
- */
-export async function importFile(req, res) {
-    try {
-        // Check if file was uploaded
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                error: 'No se proporcionó archivo',
-                message: 'Debe subir un archivo Excel (.xls, .xlsx) o CSV (.csv)'
-            });
-        }
-
-        const { file } = req;
-        const userId = req.user?.id;
-
-        // Validate file type
-        const allowedExtensions = ['.xls', '.xlsx', '.csv'];
-        const ext = file.originalname.toLowerCase().substring(file.originalname.lastIndexOf('.'));
-
-        if (!allowedExtensions.includes(ext)) {
-            return res.status(400).json({
-                success: false,
-                error: 'Tipo de archivo no válido',
-                message: `Solo se permiten archivos: ${allowedExtensions.join(', ')}`
-            });
-        }
-
-        console.log(`[billing-controller] Starting import of ${file.originalname} (${file.size} bytes)`);
-
-        // Import the service dynamically to avoid circular dependencies
-        const { importKoinorFile } = await import('../services/import-koinor-service.js');
-
-        // Process the file
-        const result = await importKoinorFile(
-            file.buffer,
-            file.originalname,
-            userId
-        );
-
-        res.json({
-            success: true,
-            message: 'Importación completada',
-            ...result
-        });
-
-    } catch (error) {
-        console.error('[billing-controller] Import error:', error);
-        // 🔒 SECURITY: Never expose internal error details
-        res.status(500).json({
-            success: false,
-            message: 'Error durante la importación del archivo'
-        });
-    }
-}
-
-/**
- * Import Koinor XML file (NUEVO - Reemplaza sistema XLS)
+ * Import Koinor XML file
  * Requires multipart/form-data with 'file' field
  *
  * Características:
@@ -714,14 +672,11 @@ export async function importXmlFile(req, res) {
             xmlPreview = file.buffer.toString('utf8').substring(0, 1000);
         }
 
-        // Detectar si es XML de CXC (tag raíz: cxc_YYYYMMDD)
-        const isCxcXml = /<cxc_\d{8}>/.test(xmlPreview);
-
         // Detectar si es XML de MOV (Movimientos de Caja)
         const isMovXml = xmlPreview.includes('d_vc_i_diario_caja_detallado') ||
             xmlPreview.includes('<MOV_');
 
-        // 🔍 VALIDACIÓN: No permitir archivos MOV en pestaña PAGOS
+        // No permitir archivos MOV en pestaña PAGOS
         if (isMovXml) {
             return res.status(400).json({
                 success: false,
@@ -731,26 +686,21 @@ export async function importXmlFile(req, res) {
             });
         }
 
-        let result;
-        if (isCxcXml) {
-            // Usar servicio de CXC para archivos de cartera por cobrar
-            console.log('[billing-controller] Detected CXC XML format, using CXC import service');
-            const { importCxcFile } = await import('../services/cxc-import-service.js');
-            result = await importCxcFile(
+        console.log('[billing-controller] Processing payment XML, using payment import service');
+        const { importKoinorXMLFile } = await import('../services/import-koinor-xml-service.js');
+        const result = await withRequestTenantContext(prisma, req, async (tx) => {
+            return importKoinorXMLFile(
                 file.buffer,
                 file.originalname,
-                userId
+                userId,
+                tx
             );
-        } else {
-            // Usar servicio de pagos para archivos de estado de cuenta
-            console.log('[billing-controller] Detected payment XML format, using payment import service');
-            const { importKoinorXMLFile } = await import('../services/import-koinor-xml-service.js');
-            result = await importKoinorXMLFile(
-                file.buffer,
-                file.originalname,
-                userId
-            );
-        }
+        }, {
+            transactionOptions: {
+                maxWait: 30000,
+                timeout: 600000
+            }
+        });
 
         res.json({
             success: true,
@@ -787,16 +737,22 @@ export async function importXmlFile(req, res) {
  */
 export async function getStats(req, res) {
     try {
-        const { getImportStats } = await import('../services/import-koinor-service.legacy.js');
-        const stats = await getImportStats();
+        const [invoiceCount, paymentCount, pendingCount] = await Promise.all([
+            prisma.invoice.count(),
+            prisma.payment.count(),
+            prisma.invoice.count({ where: { status: 'PENDING' } })
+        ]);
 
         res.json({
             success: true,
-            stats
+            stats: {
+                totalInvoices: invoiceCount,
+                totalPayments: paymentCount,
+                pendingInvoices: pendingCount
+            }
         });
     } catch (error) {
         console.error('[billing-controller] Get stats error:', error);
-        // 🔒 SECURITY: Never expose internal error details
         res.status(500).json({
             success: false,
             message: 'Error al obtener estadísticas'
@@ -811,7 +767,9 @@ export async function getStats(req, res) {
 export async function getXMLImportStats(req, res) {
     try {
         const { getXMLImportStats: getStats } = await import('../services/import-koinor-xml-service.js');
-        const data = await getStats();
+        const data = await withRequestTenantContext(prisma, req, async (tx) => {
+            return getStats(tx);
+        });
 
         res.json({
             success: true,
@@ -1083,27 +1041,78 @@ export async function getInvoicePayments(req, res) {
  */
 export async function getSummary(req, res) {
     try {
-        const { dateFrom, dateTo } = req.query;
+        const {
+            dateFrom,
+            dateTo,
+            excludeCancelled = 'false',
+            excludeLegacy = 'false',
+            subtotalMode = 'stored',
+            deduplicateInvoices = 'false'
+        } = req.query;
+        const parseBooleanQuery = (value) => ['true', '1', 'yes', 'si'].includes(String(value || '').toLowerCase());
+        const shouldExcludeCancelled = parseBooleanQuery(excludeCancelled);
+        const shouldExcludeLegacy = parseBooleanQuery(excludeLegacy);
+        const shouldDeduplicateInvoices = parseBooleanQuery(deduplicateInvoices);
+        const useHybridSubtotal = String(subtotalMode || '').toLowerCase() === 'hybrid';
+        const IVA_DIVISOR = 1.15;
+        const parseLocalBoundary = (input, endOfDay = false) => {
+            if (!input) return null;
+            const value = String(input).trim();
 
-        console.log('[billing-controller] getSummary called with:', { dateFrom, dateTo });
+            // Evita el bug de UTC al parsear YYYY-MM-DD con new Date()
+            const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+            if (dateOnlyMatch) {
+                const year = Number(dateOnlyMatch[1]);
+                const month = Number(dateOnlyMatch[2]) - 1;
+                const day = Number(dateOnlyMatch[3]);
+                return endOfDay
+                    ? new Date(year, month, day, 23, 59, 59, 999)
+                    : new Date(year, month, day, 0, 0, 0, 0);
+            }
+
+            const parsed = new Date(value);
+            if (Number.isNaN(parsed.getTime())) return null;
+            if (endOfDay) {
+                parsed.setHours(23, 59, 59, 999);
+            } else {
+                parsed.setHours(0, 0, 0, 0);
+            }
+            return parsed;
+        };
+        const normalizeInvoiceDedupKey = (invoice) => {
+            const raw = String(invoice?.invoiceNumberRaw || invoice?.invoiceNumber || '').replace(/\D/g, '');
+            if (raw.length >= 14) {
+                return `${raw.slice(0, 6)}${raw.slice(-8)}`;
+            }
+            return raw || String(invoice?.id || '');
+        };
+
+        console.log('[billing-controller] getSummary called with:', {
+            dateFrom,
+            dateTo,
+            shouldExcludeCancelled,
+            shouldExcludeLegacy,
+            shouldDeduplicateInvoices,
+            subtotalMode
+        });
 
         // Build where clause for payments based on date range
         const paymentWhere = {};
         if (dateFrom || dateTo) {
             paymentWhere.paymentDate = {};
             if (dateFrom) {
-                // Parse date in local timezone (YYYY-MM-DD format from HTML date input)
-                const fromDate = new Date(dateFrom);
-                fromDate.setHours(0, 0, 0, 0);
-                paymentWhere.paymentDate.gte = fromDate;
-                console.log('[billing-controller] From date:', fromDate.toISOString());
+                const fromDate = parseLocalBoundary(dateFrom, false);
+                if (fromDate) {
+                    paymentWhere.paymentDate.gte = fromDate;
+                    console.log('[billing-controller] From date:', fromDate.toISOString());
+                }
             }
             if (dateTo) {
-                // Parse date in local timezone
-                const toDate = new Date(dateTo);
-                toDate.setHours(23, 59, 59, 999);
-                paymentWhere.paymentDate.lte = toDate;
-                console.log('[billing-controller] To date:', toDate.toISOString());
+                const toDate = parseLocalBoundary(dateTo, true);
+                if (toDate) {
+                    paymentWhere.paymentDate.lte = toDate;
+                    console.log('[billing-controller] To date:', toDate.toISOString());
+                }
             }
         }
 
@@ -1157,34 +1166,96 @@ export async function getSummary(req, res) {
         const paymentsCountToday = paymentsToday.length;
         const collectedToday = paymentsToday.reduce((sum, p) => sum + Number(p.amount), 0);
 
-        // Get invoice stats (for overall context, not date-filtered)
+        // Get invoice stats (filtered by issue date)
         const invoiceWhere = {};
         if (dateFrom || dateTo) {
             invoiceWhere.issueDate = {};
-            if (dateFrom) invoiceWhere.issueDate.gte = new Date(dateFrom);
-            if (dateTo) invoiceWhere.issueDate.lte = new Date(dateTo);
+            if (dateFrom) {
+                const fromDate = parseLocalBoundary(dateFrom, false);
+                if (fromDate) {
+                    invoiceWhere.issueDate.gte = fromDate;
+                }
+            }
+            if (dateTo) {
+                const toDate = parseLocalBoundary(dateTo, true);
+                if (toDate) {
+                    invoiceWhere.issueDate.lte = toDate;
+                }
+            }
+        }
+        if (shouldExcludeCancelled) {
+            invoiceWhere.status = { not: 'CANCELLED' };
+        }
+        if (shouldExcludeLegacy) {
+            invoiceWhere.isLegacy = false;
         }
 
-        const invoices = await prisma.invoice.findMany({
+        const rawInvoices = await prisma.invoice.findMany({
             where: invoiceWhere,
-            include: { payments: true }
+            select: {
+                id: true,
+                invoiceNumber: true,
+                invoiceNumberRaw: true,
+                isLegacy: true,
+                issueDate: true,
+                totalAmount: true,
+                subtotalAmount: true,
+                paidAmount: true,
+                status: true
+            }
         });
+        const invoices = shouldDeduplicateInvoices
+            ? (() => {
+                const byInvoiceKey = new Map();
+                for (const invoice of rawInvoices) {
+                    const key = normalizeInvoiceDedupKey(invoice);
+                    const existing = byInvoiceKey.get(key);
+                    if (!existing) {
+                        byInvoiceKey.set(key, invoice);
+                        continue;
+                    }
+
+                    const existingTime = existing.issueDate ? new Date(existing.issueDate).getTime() : 0;
+                    const candidateTime = invoice.issueDate ? new Date(invoice.issueDate).getTime() : 0;
+
+                    if (candidateTime > existingTime) {
+                        byInvoiceKey.set(key, invoice);
+                        continue;
+                    }
+                    if (candidateTime < existingTime) {
+                        continue;
+                    }
+
+                    // En empate de fecha, priorizar no-legacy para estabilidad.
+                    if (Boolean(existing.isLegacy) && !Boolean(invoice.isLegacy)) {
+                        byInvoiceKey.set(key, invoice);
+                    }
+                }
+                return Array.from(byInvoiceKey.values());
+            })()
+            : rawInvoices;
 
         let totalInvoiced = 0;
+        let totalSubtotalInvoiced = 0;
         let totalPaid = 0;
         let pendingCount = 0;
         let paidCount = 0;
         let partialCount = 0;
 
         for (const invoice of invoices) {
-            const paid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
-            const balance = Number(invoice.totalAmount) - paid;
+            const invoiceTotal = Number(invoice.totalAmount || 0);
+            const storedSubtotal = invoice.subtotalAmount != null ? Number(invoice.subtotalAmount) : null;
+            const computedSubtotal = invoiceTotal > 0 ? invoiceTotal / IVA_DIVISOR : 0;
+            const effectiveSubtotal = useHybridSubtotal
+                ? (storedSubtotal != null ? storedSubtotal : computedSubtotal)
+                : (storedSubtotal ?? 0);
 
-            totalInvoiced += Number(invoice.totalAmount);
-            totalPaid += paid;
+            totalInvoiced += invoiceTotal;
+            totalSubtotalInvoiced += effectiveSubtotal;
+            totalPaid += Number(invoice.paidAmount || 0);
 
-            if (balance <= 0) paidCount++;
-            else if (paid > 0) partialCount++;
+            if (invoice.status === 'PAID') paidCount++;
+            else if (invoice.status === 'PARTIAL') partialCount++;
             else pendingCount++;
         }
 
@@ -1216,6 +1287,7 @@ export async function getSummary(req, res) {
             // Invoice-based totals (filtered by issue date)
             totals: {
                 invoiced: totalInvoiced,
+                subtotalInvoiced: totalSubtotalInvoiced,
                 paid: totalPaid,
                 pending: totalInvoiced - totalPaid
             },
@@ -1388,7 +1460,10 @@ export async function getMyPortfolio(req, res) {
                 isOverdue,
                 daysOverdue,
                 source: 'CXC',
-                matrizador: 'Sin asignar'  // TODO: use receivable.matrizador after migration
+                matrizador: 'Sin asignar',  // TODO: use receivable.matrizador after migration
+                comentarioCaja: receivable.cashierComment || null,
+                comentarioCajaUpdatedAt: receivable.cashierCommentUpdatedAt || null,
+                comentarioCajaUpdatedBy: receivable.cashierCommentUpdatedByName || null
             });
         }
 
@@ -1445,13 +1520,15 @@ export async function updateClientPhone(req, res) {
         }
 
         // Actualizar clientPhone en todos los documentos con ese clientTaxId
-        const result = await prisma.document.updateMany({
-            where: {
-                clientId: clientTaxId
-            },
-            data: {
-                clientPhone: phone.trim()
-            }
+        const result = await withRequestTenantContext(prisma, req, async (tx) => {
+            return tx.document.updateMany({
+                where: {
+                    clientId: clientTaxId
+                },
+                data: {
+                    clientPhone: phone.trim()
+                }
+            });
         });
 
         console.log(`[billing-controller] Updated ${result.count} documents`);
@@ -1480,60 +1557,91 @@ export async function generateCollectionReminder(req, res) {
         const userId = req.user.id;
 
         // Get invoices for this client from documents assigned to the user
-        const documents = await prisma.document.findMany({
-            where: {
-                assignedToId: userId,
-                invoices: {
-                    some: {
-                        clientTaxId
+        const result = await withRequestTenantContext(prisma, req, async (tx) => {
+            const documents = await tx.document.findMany({
+                where: {
+                    assignedToId: userId,
+                    invoices: {
+                        some: {
+                            clientTaxId
+                        }
+                    }
+                },
+                include: {
+                    invoices: {
+                        where: { clientTaxId },
+                        include: { payments: true }
                     }
                 }
-            },
-            include: {
-                invoices: {
-                    where: { clientTaxId },
-                    include: { payments: true }
+            });
+
+            if (documents.length === 0) {
+                return { empty: true };
+            }
+
+            // Calculate totals
+            let totalDebt = 0;
+            const invoiceDetails = [];
+            let clientName = '';
+            let clientPhone = '';
+
+            for (const doc of documents) {
+                if (!clientPhone && doc.clientPhone) clientPhone = doc.clientPhone;
+
+                for (const invoice of doc.invoices) {
+                    clientName = invoice.clientName;
+                    const paid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+                    const balance = Number(invoice.totalAmount) - paid;
+
+                    if (balance > 0) {
+                        totalDebt += balance;
+                        invoiceDetails.push({
+                            invoiceNumber: invoice.invoiceNumber,
+                            total: Number(invoice.totalAmount),
+                            paid,
+                            balance,
+                            dueDate: invoice.dueDate
+                        });
+                    }
                 }
             }
+
+            if (invoiceDetails.length === 0) {
+                return { noBalance: true };
+            }
+
+            // Log the reminder
+            await tx.documentEvent.create({
+                data: {
+                    documentId: documents[0].id,
+                    userId,
+                    eventType: 'COLLECTION_REMINDER',
+                    description: `Recordatorio de cobro generado para ${clientName}`,
+                    details: JSON.stringify({
+                        clientTaxId,
+                        clientName,
+                        totalDebt,
+                        invoiceCount: invoiceDetails.length,
+                        timestamp: new Date().toISOString()
+                    })
+                }
+            });
+
+            return { documents, totalDebt, invoiceDetails, clientName, clientPhone };
         });
 
-        if (documents.length === 0) {
+        if (result.empty) {
             return res.status(404).json({ error: 'No se encontraron facturas para este cliente' });
         }
 
-        // Calculate totals
-        let totalDebt = 0;
-        const invoiceDetails = [];
-        let clientName = '';
-        let clientPhone = '';
-
-        for (const doc of documents) {
-            if (!clientPhone && doc.clientPhone) clientPhone = doc.clientPhone;
-
-            for (const invoice of doc.invoices) {
-                clientName = invoice.clientName;
-                const paid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
-                const balance = Number(invoice.totalAmount) - paid;
-
-                if (balance > 0) {
-                    totalDebt += balance;
-                    invoiceDetails.push({
-                        invoiceNumber: invoice.invoiceNumber,
-                        total: Number(invoice.totalAmount),
-                        paid,
-                        balance,
-                        dueDate: invoice.dueDate
-                    });
-                }
-            }
-        }
-
-        if (invoiceDetails.length === 0) {
+        if (result.noBalance) {
             return res.json({
                 success: false,
                 message: 'El cliente no tiene saldo pendiente'
             });
         }
+
+        const { totalDebt, invoiceDetails, clientName, clientPhone } = result;
 
         // Build message
         let message = `📋 *NOTARÍA 18 - RECORDATORIO DE PAGO*\n\nEstimado cliente,\n\nLe recordamos que tiene los siguientes valores pendientes:\n\n`;
@@ -1570,23 +1678,6 @@ export async function generateCollectionReminder(req, res) {
         const waUrl = formattedPhone
             ? `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`
             : null;
-
-        // Log the reminder
-        await prisma.documentEvent.create({
-            data: {
-                documentId: documents[0].id,
-                userId,
-                eventType: 'COLLECTION_REMINDER',
-                description: `Recordatorio de cobro generado para ${clientName}`,
-                details: JSON.stringify({
-                    clientTaxId,
-                    clientName,
-                    totalDebt,
-                    invoiceCount: invoiceDetails.length,
-                    timestamp: new Date().toISOString()
-                })
-            }
-        });
 
         res.json({
             success: true,
@@ -1637,6 +1728,82 @@ export async function getCarteraPorCobrar(req, res) {
 
         console.log(`[billing-controller] Found ${receivables.length} pending receivables for report`);
 
+        // Resolver matrizador real por factura (documento asignado -> asignacion directa -> matrizador de factura/CXC)
+        const invoiceNumbers = [...new Set(receivables.map(r => r.invoiceNumber).filter(Boolean))];
+        const invoiceNumbersRaw = [...new Set(receivables.map(r => r.invoiceNumberRaw).filter(Boolean))];
+
+        const invoicesWithAssignment = (invoiceNumbers.length > 0 || invoiceNumbersRaw.length > 0)
+            ? await prisma.invoice.findMany({
+                where: {
+                    OR: [
+                        ...(invoiceNumbers.length > 0 ? [{ invoiceNumber: { in: invoiceNumbers } }] : []),
+                        ...(invoiceNumbersRaw.length > 0 ? [{ invoiceNumberRaw: { in: invoiceNumbersRaw } }] : [])
+                    ]
+                },
+                select: {
+                    id: true,
+                    invoiceNumber: true,
+                    invoiceNumberRaw: true,
+                    documentId: true,
+                    matrizador: true,
+                    assignedTo: {
+                        select: { firstName: true, lastName: true }
+                    },
+                    document: {
+                        select: {
+                            assignedTo: {
+                                select: { firstName: true, lastName: true }
+                            }
+                        }
+                    }
+                }
+            })
+            : [];
+
+        const invoiceMatrizadorMap = new Map();
+
+        for (const inv of invoicesWithAssignment) {
+            const fromDocument = inv.document?.assignedTo
+                ? `${inv.document.assignedTo.firstName} ${inv.document.assignedTo.lastName}`.trim()
+                : null;
+            const fromDirectAssignment = inv.assignedTo
+                ? `${inv.assignedTo.firstName} ${inv.assignedTo.lastName}`.trim()
+                : null;
+
+            const resolved = normalizeMatrizadorName(
+                fromDocument ||
+                fromDirectAssignment ||
+                inv.matrizador ||
+                'Sin asignar'
+            );
+
+            if (inv.invoiceNumber) {
+                invoiceMatrizadorMap.set(`N:${inv.invoiceNumber}`, {
+                    matrizador: resolved,
+                    documentId: inv.documentId || null
+                });
+            }
+            if (inv.invoiceNumberRaw) {
+                invoiceMatrizadorMap.set(`R:${inv.invoiceNumberRaw}`, {
+                    matrizador: resolved,
+                    documentId: inv.documentId || null
+                });
+            }
+        }
+
+        const resolveMatrizadorForReceivable = (receivable) => {
+            const mappedEntry =
+                (receivable.invoiceNumber && invoiceMatrizadorMap.get(`N:${receivable.invoiceNumber}`)) ||
+                (receivable.invoiceNumberRaw && invoiceMatrizadorMap.get(`R:${receivable.invoiceNumberRaw}`));
+
+            if (mappedEntry) return mappedEntry;
+
+            return {
+                matrizador: normalizeMatrizadorName(receivable.matrizador || 'Sin asignar'),
+                documentId: null
+            };
+        };
+
         // Group by client
         const clientMap = new Map();
 
@@ -1658,7 +1825,8 @@ export async function getCarteraPorCobrar(req, res) {
                     totalInvoiced: 0,
                     totalPaid: 0,
                     balance: 0,
-                    matrizador: 'Sin asignar',  // PendingReceivable doesn't have matrizador yet
+                    matrizador: 'Sin asignar',
+                    matrizadores: [],
                     canAssign: false,
                     invoices: []
                 });
@@ -1670,6 +1838,9 @@ export async function getCarteraPorCobrar(req, res) {
             client.totalPaid += totalPaid;
             client.balance += balance;
 
+            const resolvedInvoiceContext = resolveMatrizadorForReceivable(receivable);
+            const invoiceMatrizador = resolvedInvoiceContext.matrizador;
+
             // Add invoice detail
             client.invoices.push({
                 id: receivable.id,
@@ -1680,9 +1851,35 @@ export async function getCarteraPorCobrar(req, res) {
                 paidAmount: totalPaid,
                 balance,
                 status: receivable.status,
-                hasDocument: false,
-                canAssign: false
+                hasDocument: !!resolvedInvoiceContext.documentId,
+                documentId: resolvedInvoiceContext.documentId,
+                canAssign: false,
+                matrizador: invoiceMatrizador,
+                comentarioCaja: receivable.cashierComment || null,
+                comentarioCajaUpdatedAt: receivable.cashierCommentUpdatedAt || null,
+                comentarioCajaUpdatedBy: receivable.cashierCommentUpdatedByName || null
             });
+        }
+
+        // Definir matrizador de cabecera por cliente (uno o multiples)
+        for (const client of clientMap.values()) {
+            const uniqueMatrizadores = Array.from(
+                new Set(
+                    client.invoices
+                        .map(inv => inv.matrizador)
+                        .filter(m => m && m !== 'Sin asignar')
+                )
+            );
+
+            client.matrizadores = uniqueMatrizadores;
+
+            if (uniqueMatrizadores.length === 0) {
+                client.matrizador = 'Sin asignar';
+            } else if (uniqueMatrizadores.length === 1) {
+                client.matrizador = uniqueMatrizadores[0];
+            } else {
+                client.matrizador = `Multiples (${uniqueMatrizadores.length})`;
+            }
         }
 
         // Convert to array and sort by balance descending
@@ -1717,7 +1914,12 @@ export async function getCarteraPorCobrar(req, res) {
 
 
 /**
- * Report: Pagos del Período (Payments in Date Range)
+ * Report: Pagos del Periodo (Payments in Date Range)
+ *
+ * Combina dos fuentes de datos:
+ * 1. Tabla Payment - pagos individuales importados via XML
+ * 2. Tabla Invoice - facturas con fechaUltimoPago y pagos directos (sync Koinor)
+ *    Solo incluye facturas que tienen pago registrado pero NO tienen registros en Payment
  */
 export async function getPagosDelPeriodo(req, res) {
     try {
@@ -1735,6 +1937,9 @@ export async function getPagosDelPeriodo(req, res) {
         // Set to end of day
         to.setHours(23, 59, 59, 999);
 
+        const data = [];
+
+        // Fuente 1: Registros individuales de Payment
         const payments = await prisma.payment.findMany({
             where: {
                 paymentDate: {
@@ -1754,15 +1959,75 @@ export async function getPagosDelPeriodo(req, res) {
             orderBy: { paymentDate: 'desc' }
         });
 
-        const data = payments.map(p => ({
-            fecha: p.paymentDate,
-            recibo: p.receiptNumber,
-            cliente: p.invoice.clientName,
-            cedula: p.invoice.clientTaxId,
-            factura: p.invoice.invoiceNumber,
-            monto: Number(p.amount),
-            concepto: p.concept || 'Abono a factura'
-        }));
+        // Set de invoiceIds que ya tienen Payment registrado (para evitar duplicados)
+        const invoiceIdsWithPayment = new Set(payments.map(p => p.invoiceId));
+
+        for (const p of payments) {
+            data.push({
+                fecha: p.paymentDate,
+                recibo: p.receiptNumber,
+                cliente: p.invoice?.clientName || 'Sin nombre',
+                cedula: p.invoice?.clientTaxId || '',
+                factura: p.invoice?.invoiceNumber || '',
+                monto: Number(p.amount),
+                concepto: p.concept || 'Abono a factura'
+            });
+        }
+
+        // Fuente 2: Facturas con fechaUltimoPago en el periodo (sync Koinor)
+        // Solo incluye las que NO tienen registros en Payment (evitar duplicados)
+        const invoicesWithPayment = await prisma.invoice.findMany({
+            where: {
+                fechaUltimoPago: {
+                    gte: from,
+                    lte: to
+                },
+                paidAmount: { gt: 0 }
+            },
+            select: {
+                id: true,
+                invoiceNumber: true,
+                clientName: true,
+                clientTaxId: true,
+                fechaUltimoPago: true,
+                paidAmount: true,
+                pagoDirecto: true,
+                montoPagadoCxc: true,
+                condicionPago: true,
+                concept: true,
+                _count: { select: { payments: true } }
+            },
+            orderBy: { fechaUltimoPago: 'desc' }
+        });
+
+        for (const inv of invoicesWithPayment) {
+            // Skip if this invoice already has Payment records (already included above)
+            if (invoiceIdsWithPayment.has(inv.id)) continue;
+            // Skip if it has Payment records not in the date range
+            if (inv._count.payments > 0) continue;
+
+            const monto = Number(inv.paidAmount) || 0;
+            if (monto <= 0) continue;
+
+            const concepto = inv.condicionPago === 'E'
+                ? 'Pago al contado'
+                : Number(inv.montoPagadoCxc) > 0
+                    ? 'Pago via CxC'
+                    : inv.concept || 'Pago registrado';
+
+            data.push({
+                fecha: inv.fechaUltimoPago,
+                recibo: '-',
+                cliente: inv.clientName || 'Sin nombre',
+                cedula: inv.clientTaxId || '',
+                factura: inv.invoiceNumber || '',
+                monto,
+                concepto
+            });
+        }
+
+        // Ordenar por fecha descendente
+        data.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
 
         // Calculate totals
         const totalMonto = data.reduce((sum, p) => sum + p.monto, 0);
@@ -1770,7 +2035,7 @@ export async function getPagosDelPeriodo(req, res) {
         res.json({
             success: true,
             reportType: 'pagos-periodo',
-            reportName: 'Pagos del Período',
+            reportName: 'Pagos del Periodo',
             generatedAt: new Date().toISOString(),
             period: {
                 from: from.toISOString(),
@@ -1784,79 +2049,98 @@ export async function getPagosDelPeriodo(req, res) {
         });
     } catch (error) {
         console.error('[billing-controller] getPagosDelPeriodo error:', error);
-        // 🔒 SECURITY: Never expose internal error details
+        // SECURITY: Never expose internal error details
         res.status(500).json({
             success: false,
-            message: 'Error al generar reporte de pagos del período'
+            message: 'Error al generar reporte de pagos del periodo'
         });
     }
 }
 
 /**
  * Report: Facturas Vencidas (Overdue Invoices)
+ * FUENTE UNICA DE VERDAD: PendingReceivable (sincronizado desde Koinor)
+ * Usa la misma fuente que Cartera por Cobrar para consistencia,
+ * filtrada por daysOverdue > 0 (facturas con fecha de vencimiento pasada).
  */
 export async function getFacturasVencidas(req, res) {
     try {
         console.log('[billing-controller] getFacturasVencidas');
 
-        const now = new Date();
-
-        // Get invoices with due date in the past
-        const invoices = await prisma.invoice.findMany({
+        // Fuente: PendingReceivable con daysOverdue > 0 y saldo pendiente
+        const receivables = await prisma.pendingReceivable.findMany({
             where: {
-                dueDate: {
-                    lt: now
-                },
-                status: {
-                    not: 'PAID'
-                }
+                status: { in: ['PENDING', 'PARTIAL', 'OVERDUE'] },
+                balance: { gt: 0 },
+                daysOverdue: { gt: 0 }
             },
-            include: {
-                payments: true,
-                document: {
-                    select: {
-                        id: true,
-                        protocolNumber: true,
-                        clientPhone: true,
-                        assignedTo: {
-                            select: {
-                                firstName: true,
-                                lastName: true
+            orderBy: { daysOverdue: 'desc' }
+        });
+
+        // Buscar telefono y matrizador asignado desde Invoice+Document
+        const invoiceNumbers = receivables
+            .map(r => r.invoiceNumber)
+            .filter(Boolean);
+
+        const invoicesWithDocs = invoiceNumbers.length > 0
+            ? await prisma.invoice.findMany({
+                where: { invoiceNumber: { in: invoiceNumbers } },
+                select: {
+                    invoiceNumber: true,
+                    document: {
+                        select: {
+                            clientPhone: true,
+                            assignedTo: {
+                                select: { firstName: true, lastName: true }
                             }
                         }
                     }
                 }
-            },
-            orderBy: { dueDate: 'asc' }
-        });
+            })
+            : [];
 
-        const data = invoices
-            .map(inv => {
-                const paid = inv.payments.reduce((sum, p) => sum + Number(p.amount), 0);
-                const balance = Number(inv.totalAmount) - paid;
-
-                if (balance <= 0) return null; // Skip fully paid
-
-                const diasVencido = Math.floor((now.getTime() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24));
-
-                return {
-                    factura: inv.invoiceNumber,
-                    cliente: inv.clientName,
-                    cedula: inv.clientTaxId,
+        // Mapa de invoiceNumber -> info del documento
+        const docInfoMap = new Map();
+        for (const inv of invoicesWithDocs) {
+            if (inv.invoiceNumber) {
+                docInfoMap.set(inv.invoiceNumber, {
                     telefono: inv.document?.clientPhone || '',
-                    emision: inv.issueDate,
-                    vencimiento: inv.dueDate,
-                    diasVencido,
-                    totalFactura: Number(inv.totalAmount),
-                    pagado: paid,
-                    saldo: balance,
                     matrizador: inv.document?.assignedTo
                         ? `${inv.document.assignedTo.firstName} ${inv.document.assignedTo.lastName}`
-                        : 'Sin asignar'
+                        : null
+                });
+            }
+        }
+
+        const data = receivables
+            .map(r => {
+                const balance = Number(r.balance) || 0;
+                const totalAmount = Number(r.totalAmount) || 0;
+                const totalPaid = Number(r.totalPaid) || 0;
+
+                if (balance <= 0) return null;
+
+                const docInfo = docInfoMap.get(r.invoiceNumber) || {};
+
+                return {
+                    receivableId: r.id,
+                    factura: r.invoiceNumber || r.invoiceNumberRaw,
+                    cliente: r.clientName,
+                    cedula: r.clientTaxId,
+                    telefono: docInfo.telefono || '',
+                    emision: r.issueDate,
+                    vencimiento: r.dueDate,
+                    diasVencido: r.daysOverdue,
+                    totalFactura: totalAmount,
+                    pagado: totalPaid,
+                    saldo: balance,
+                    matrizador: docInfo.matrizador || r.matrizador || 'Sin asignar',
+                    comentarioCaja: r.cashierComment || null,
+                    comentarioCajaUpdatedAt: r.cashierCommentUpdatedAt || null,
+                    comentarioCajaUpdatedBy: r.cashierCommentUpdatedByName || null
                 };
             })
-            .filter(Boolean)
-            .sort((a, b) => b.diasVencido - a.diasVencido);
+            .filter(Boolean);
 
         // Calculate totals
         const totals = data.reduce((acc, inv) => ({
@@ -1876,7 +2160,7 @@ export async function getFacturasVencidas(req, res) {
         });
     } catch (error) {
         console.error('[billing-controller] getFacturasVencidas error:', error);
-        // 🔒 SECURITY: Never expose internal error details
+        // SECURITY: Never expose internal error details
         res.status(500).json({
             success: false,
             message: 'Error al generar reporte de facturas vencidas'
@@ -1893,31 +2177,33 @@ export async function getEntregasConSaldo(req, res) {
         console.log('[billing-controller] getEntregasConSaldo');
 
         // Get delivered documents that have invoices with pending balance
-        const documents = await prisma.document.findMany({
-            where: {
-                status: 'ENTREGADO',
-                invoices: {
-                    some: {
-                        status: {
-                            not: 'PAID'
+        const documents = await withRequestTenantContext(prisma, req, async (tx) => {
+            return tx.document.findMany({
+                where: {
+                    status: 'ENTREGADO',
+                    invoices: {
+                        some: {
+                            status: {
+                                not: 'PAID'
+                            }
                         }
                     }
-                }
-            },
-            include: {
-                invoices: {
-                    include: {
-                        payments: true
+                },
+                include: {
+                    invoices: {
+                        include: {
+                            payments: true
+                        }
+                    },
+                    assignedTo: {
+                        select: {
+                            firstName: true,
+                            lastName: true
+                        }
                     }
                 },
-                assignedTo: {
-                    select: {
-                        firstName: true,
-                        lastName: true
-                    }
-                }
-            },
-            orderBy: { updatedAt: 'desc' }
+                orderBy: { updatedAt: 'desc' }
+            });
         });
 
         const data = documents
@@ -1984,107 +2270,6 @@ export async function getEntregasConSaldo(req, res) {
             message: 'Error al generar reporte de entregas con saldo pendiente'
         });
     }
-}
-
-/**
- * Import CXC (Cartera por Cobrar) from XML file
- * Requires multipart/form-data with 'file' field
- */
-export async function importCxcFile(req, res) {
-    try {
-        // Check if file was uploaded
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                error: 'No se proporcionó archivo',
-                message: 'Debe subir un archivo XML de CXC'
-            });
-        }
-
-        const { file } = req;
-        const userId = req.user?.id;
-
-        // Validate file type
-        const ext = file.originalname.toLowerCase().substring(
-            file.originalname.lastIndexOf('.')
-        );
-
-        if (ext !== '.xml') {
-            return res.status(400).json({
-                success: false,
-                error: 'Tipo de archivo no válido',
-                message: 'Solo se permiten archivos XML (.xml)'
-            });
-        }
-
-        // Validate file size (máximo 50MB)
-        const maxSize = 50 * 1024 * 1024;
-        if (file.size > maxSize) {
-            return res.status(400).json({
-                success: false,
-                error: 'Archivo demasiado grande',
-                message: 'El archivo no debe superar 50MB'
-            });
-        }
-
-        console.log(`[billing-controller] Starting CXC import of ${file.originalname} (${file.size} bytes)`);
-
-        // Import the service dynamically
-        const { importCxcFile: importCxc } = await import('../services/cxc-import-service.js');
-
-        // Process the file
-        const result = await importCxc(
-            file.buffer,
-            file.originalname,
-            userId
-        );
-
-        res.json({
-            success: true,
-            message: 'Importación de CXC completada',
-            ...result
-        });
-
-    } catch (error) {
-        console.error('[billing-controller] CXC import error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error durante la importación del archivo CXC',
-            details: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
-    }
-}
-
-/**
- * Detecta el tipo de archivo XML basado en su contenido
- * @param {Buffer} fileBuffer - Buffer del archivo
- * @returns {Object} - { type: 'MOV'|'PAGOS'|'CXC'|'UNKNOWN', preview: string }
- */
-function detectXmlFileType(fileBuffer) {
-    let xmlPreview;
-    try {
-        // Intentar leer como UTF-16LE primero
-        xmlPreview = fileBuffer.toString('utf16le').substring(0, 1000);
-        if (!xmlPreview.includes('<?xml')) {
-            xmlPreview = fileBuffer.toString('utf8').substring(0, 1000);
-        }
-    } catch (e) {
-        xmlPreview = fileBuffer.toString('utf8').substring(0, 1000);
-    }
-
-    // Detectar tipo por tags
-    const hasMovTags = xmlPreview.includes('d_vc_i_diario_caja_detallado') ||
-        xmlPreview.includes('<MOV_');
-    const hasPagosTags = xmlPreview.includes('<d_vc_i_estado_cuenta') ||
-        xmlPreview.includes('<E>') ||
-        xmlPreview.includes('<E_group1>');
-    const hasCxcTags = xmlPreview.includes('<cxc_');
-
-    if (hasMovTags) return { type: 'MOV', preview: xmlPreview.substring(0, 200) };
-    if (hasPagosTags) return { type: 'PAGOS', preview: xmlPreview.substring(0, 200) };
-    if (hasCxcTags) return { type: 'CXC', preview: xmlPreview.substring(0, 200) };
-
-    return { type: 'UNKNOWN', preview: xmlPreview.substring(0, 200) };
 }
 
 /**
@@ -2158,11 +2343,19 @@ export async function importMovFile(req, res) {
         const { importMovFile: importMov } = await import('../services/import-mov-service.js');
 
         // Process the file
-        const result = await importMov(
-            file.buffer,
-            file.originalname,
-            userId
-        );
+        const result = await withRequestTenantContext(prisma, req, async (tx) => {
+            return importMov(
+                file.buffer,
+                file.originalname,
+                userId,
+                tx
+            );
+        }, {
+            transactionOptions: {
+                maxWait: 30000,
+                timeout: 600000
+            }
+        });
 
         res.json({
             success: true,
@@ -2305,77 +2498,7 @@ export async function getMatrizadoresForAssignment(req, res) {
 }
 
 /**
- * ============================================================================
- * NUEVO MÓDULO CXC - CARTERA POR COBRAR (XLS/CSV)
- * ============================================================================
- */
-
-/**
- * Importar archivo XLS/CSV de Cartera por Cobrar
- * Requires multipart/form-data with 'file' field
- * Acepta: .xls, .xlsx, .csv
- */
-export async function importCxcXls(req, res) {
-    try {
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                error: 'No se proporcionó archivo',
-                message: 'Debe subir un archivo Excel (.xls, .xlsx) o CSV (.csv)'
-            });
-        }
-
-        const { file } = req;
-        const userId = req.user?.id;
-
-        const allowedExtensions = ['.xls', '.xlsx', '.csv'];
-        const ext = file.originalname.toLowerCase().substring(file.originalname.lastIndexOf('.'));
-
-        if (!allowedExtensions.includes(ext)) {
-            return res.status(400).json({
-                success: false,
-                error: 'Tipo de archivo no válido',
-                message: `Solo se permiten archivos: ${allowedExtensions.join(', ')}`
-            });
-        }
-
-        const maxSize = 50 * 1024 * 1024;
-        if (file.size > maxSize) {
-            return res.status(400).json({
-                success: false,
-                error: 'Archivo demasiado grande',
-                message: 'El archivo no debe superar 50MB'
-            });
-        }
-
-        console.log(`[billing-controller] Starting CXC XLS import of ${file.originalname} (${file.size} bytes)`);
-
-        const { importCxcXlsFile } = await import('../services/cxc-xls-import-service.js');
-
-        const result = await importCxcXlsFile(
-            file.buffer,
-            file.originalname,
-            userId
-        );
-
-        res.json({
-            success: true,
-            message: 'Importación de Cartera por Cobrar completada',
-            ...result
-        });
-
-    } catch (error) {
-        console.error('[billing-controller] CXC XLS import error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error en la importación',
-            error: error.message || 'Error al procesar el archivo. Verifique el formato.'
-        });
-    }
-}
-
-/**
- * Obtener cartera pendiente (detalle) - NUEVA VERSIÓN (Sync Agent)
+ * Obtener cartera pendiente (detalle) - Sync Agent
  * GET /api/billing/cartera-pendiente
  *
  * Query params:
@@ -2587,6 +2710,82 @@ export async function getCarteraPendienteResumen(req, res) {
 }
 
 /**
+ * Actualizar comentario operativo de Caja para un registro CXC
+ * PUT /api/billing/cartera-pendiente/:id/comentario
+ */
+export async function updatePendingReceivableComment(req, res) {
+    try {
+        const { id } = req.params;
+        const rawComment = req.body?.comentario;
+
+        if (!id || typeof id !== 'string') {
+            return res.status(400).json({
+                success: false,
+                message: 'ID de cartera pendiente inválido'
+            });
+        }
+
+        if (typeof rawComment !== 'string') {
+            return res.status(400).json({
+                success: false,
+                message: 'El campo comentario es obligatorio'
+            });
+        }
+
+        const comentario = rawComment.trim();
+        const MAX_COMMENT_LENGTH = 500;
+
+        if (comentario.length > MAX_COMMENT_LENGTH) {
+            return res.status(400).json({
+                success: false,
+                message: `El comentario no puede superar ${MAX_COMMENT_LENGTH} caracteres`
+            });
+        }
+
+        const updatedByName = `${req.user.firstName || ''} ${req.user.lastName || ''}`.trim() || 'Usuario caja';
+
+        const updated = await prisma.pendingReceivable.update({
+            where: { id },
+            data: {
+                cashierComment: comentario || null,
+                cashierCommentUpdatedAt: new Date(),
+                cashierCommentUpdatedById: req.user.id,
+                cashierCommentUpdatedByName: updatedByName
+            },
+            select: {
+                id: true,
+                invoiceNumber: true,
+                invoiceNumberRaw: true,
+                cashierComment: true,
+                cashierCommentUpdatedAt: true,
+                cashierCommentUpdatedById: true,
+                cashierCommentUpdatedByName: true
+            }
+        });
+
+        res.json({
+            success: true,
+            message: comentario ? 'Comentario guardado exitosamente' : 'Comentario eliminado exitosamente',
+            data: updated
+        });
+    } catch (error) {
+        console.error('[billing-controller] updatePendingReceivableComment error:', error);
+
+        if (error?.code === 'P2025') {
+            return res.status(404).json({
+                success: false,
+                message: 'Registro de cartera no encontrado'
+            });
+        }
+
+        res.status(500).json({
+            success: false,
+            message: 'Error al guardar comentario de cartera'
+        });
+    }
+}
+
+/**
  * Estado de sync CXC
  * GET /api/billing/cartera-pendiente/sync-status
  */
@@ -2630,51 +2829,3 @@ export async function getCxcSyncStatus(req, res) {
     }
 }
 
-/**
- * Limpiar reportes antiguos de cartera
- * DELETE /api/billing/cartera-pendiente/limpiar
- */
-export async function limpiarCarteraAntigua(req, res) {
-    try {
-        const daysToKeep = req.query.days ? parseInt(req.query.days) : 60;
-
-        const { limpiarCarteraAntigua: limpiar } = await import('../services/cxc-xls-import-service.js');
-        const result = await limpiar(daysToKeep);
-
-        res.json({
-            success: true,
-            message: `Se eliminaron ${result.deletedCount} registros antiguos`,
-            ...result
-        });
-
-    } catch (error) {
-        console.error('[billing-controller] limpiarCarteraAntigua error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error al limpiar reportes antiguos'
-        });
-    }
-}
-
-/**
- * Obtener fechas de reportes disponibles
- * GET /api/billing/cartera-pendiente/fechas
- */
-export async function getAvailableReportDates(req, res) {
-    try {
-        const { getAvailableReportDates: getDates } = await import('../services/cxc-xls-import-service.js');
-        const dates = await getDates();
-
-        res.json({
-            success: true,
-            data: dates
-        });
-
-    } catch (error) {
-        console.error('[billing-controller] getAvailableReportDates error:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error al obtener fechas de reportes'
-        });
-    }
-}

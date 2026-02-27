@@ -10,7 +10,7 @@ class AlertasService {
    * RECEPCIÓN: Documentos estado "LISTO" sin entregar
    * Criterios: 3-7 días amarilla, 8-15 días naranja, +15 días roja
    */
-  static async getAlertasRecepcion() {
+  static async getAlertasRecepcion(dbClient = prisma) {
     const now = new Date();
 
     // Calcular fechas límite
@@ -22,7 +22,7 @@ class AlertasService {
       // Documentos LISTO sin entregar con diferentes niveles de urgencia
       const [alertasRojas, alertasNaranjas, alertasAmarillas] = await Promise.all([
         // CRÍTICAS (> 15 días)
-        prisma.document.findMany({
+        dbClient.document.findMany({
           where: {
             status: 'LISTO',
             updatedAt: {
@@ -44,7 +44,7 @@ class AlertasService {
         }),
 
         // URGENTES (8-15 días)  
-        prisma.document.findMany({
+        dbClient.document.findMany({
           where: {
             status: 'LISTO',
             updatedAt: {
@@ -67,7 +67,7 @@ class AlertasService {
         }),
 
         // ATENCIÓN (3-7 días)
-        prisma.document.findMany({
+        dbClient.document.findMany({
           where: {
             status: 'LISTO',
             updatedAt: {
@@ -118,7 +118,7 @@ class AlertasService {
         criticas: alertasRojas.length,
         urgentes: alertasNaranjas.length,
         atencion: alertasAmarillas.length,
-        documentosListo: await prisma.document.count({ where: { status: 'LISTO' } })
+        documentosListo: await dbClient.document.count({ where: { status: 'LISTO' } })
       };
 
       return {
@@ -147,7 +147,7 @@ class AlertasService {
    * MATRIZADOR: Documentos asignados sin procesar  
    * Criterios: 5-7 días amarilla, 8-10 días naranja, +10 días roja
    */
-  static async getAlertasMatrizador(matrizadorId) {
+  static async getAlertasMatrizador(matrizadorId, dbClient = prisma) {
     const now = new Date();
 
     const fechaAmarilla = new Date(now.getTime() - (5 * 24 * 60 * 60 * 1000)); // 5 días
@@ -157,7 +157,7 @@ class AlertasService {
     try {
       const [alertasRojas, alertasNaranjas, alertasAmarillas] = await Promise.all([
         // Documentos asignados hace más de 10 días sin procesar
-        prisma.document.findMany({
+        dbClient.document.findMany({
           where: {
             assignedToId: matrizadorId,
             status: 'EN_PROCESO',
@@ -183,7 +183,7 @@ class AlertasService {
           }
         }),
 
-        prisma.document.findMany({
+        dbClient.document.findMany({
           where: {
             assignedToId: matrizadorId,
             status: 'EN_PROCESO',
@@ -210,7 +210,7 @@ class AlertasService {
           }
         }),
 
-        prisma.document.findMany({
+        dbClient.document.findMany({
           where: {
             assignedToId: matrizadorId,
             status: 'EN_PROCESO',
@@ -263,7 +263,7 @@ class AlertasService {
         criticas: alertasRojas.length,
         urgentes: alertasNaranjas.length,
         atencion: alertasAmarillas.length,
-        documentosEnProceso: await prisma.document.count({
+        documentosEnProceso: await dbClient.document.count({
           where: {
             assignedToId: matrizadorId,
             status: 'EN_PROCESO'
@@ -297,7 +297,7 @@ class AlertasService {
    * ARCHIVO: Documentos asignados por tiempo
    * Criterios: 7-14 días amarilla, 15-21 días naranja, +21 días roja
    */
-  static async getAlertasArchivo(archivoId) {
+  static async getAlertasArchivo(archivoId, dbClient = prisma) {
     const now = new Date();
 
     const fechaAmarilla = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));  // 7 días
@@ -306,7 +306,7 @@ class AlertasService {
 
     try {
       const [alertasRojas, alertasNaranjas, alertasAmarillas] = await Promise.all([
-        prisma.document.findMany({
+        dbClient.document.findMany({
           where: {
             assignedToId: archivoId,
             status: {
@@ -329,7 +329,7 @@ class AlertasService {
           }
         }),
 
-        prisma.document.findMany({
+        dbClient.document.findMany({
           where: {
             assignedToId: archivoId,
             status: {
@@ -353,7 +353,7 @@ class AlertasService {
           }
         }),
 
-        prisma.document.findMany({
+        dbClient.document.findMany({
           where: {
             assignedToId: archivoId,
             status: {
@@ -431,7 +431,7 @@ class AlertasService {
    * ADMIN: Vista global consolidada
    * Criterios: 7 días amarilla, 15 días naranja, 30+ días roja crítica
    */
-  static async getAlertasAdmin() {
+  static async getAlertasAdmin(dbClient = prisma) {
     const now = new Date();
 
     const fechaAmarilla = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));  // 7 días
@@ -442,15 +442,15 @@ class AlertasService {
       const [estadisticasGlobales, documentosCriticos, documentosUrgentes, documentosAtencion] = await Promise.all([
         // Estadísticas globales
         Promise.all([
-          prisma.document.count(),
-          prisma.document.count({ where: { status: 'PENDIENTE' } }),
-          prisma.document.count({ where: { status: 'EN_PROCESO' } }),
-          prisma.document.count({ where: { status: 'LISTO' } }),
-          prisma.document.count({ where: { status: 'ENTREGADO' } })
+          dbClient.document.count(),
+          dbClient.document.count({ where: { status: 'PENDIENTE' } }),
+          dbClient.document.count({ where: { status: 'EN_PROCESO' } }),
+          dbClient.document.count({ where: { status: 'LISTO' } }),
+          dbClient.document.count({ where: { status: 'ENTREGADO' } })
         ]),
 
         // Documentos críticos (>30 días)
-        prisma.document.findMany({
+        dbClient.document.findMany({
           where: {
             status: {
               in: ['PENDIENTE', 'EN_PROCESO', 'LISTO']
@@ -481,7 +481,7 @@ class AlertasService {
         }),
 
         // Documentos urgentes (15-30 días)
-        prisma.document.findMany({
+        dbClient.document.findMany({
           where: {
             status: {
               in: ['PENDIENTE', 'EN_PROCESO', 'LISTO']
@@ -513,7 +513,7 @@ class AlertasService {
         }),
 
         // Documentos de atención (7-15 días)
-        prisma.document.count({
+        dbClient.document.count({
           where: {
             status: {
               in: ['PENDIENTE', 'EN_PROCESO', 'LISTO']

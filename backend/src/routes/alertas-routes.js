@@ -1,6 +1,8 @@
 import express from 'express';
+import prisma from '../db.js';
 import { authenticateToken, requireRoles } from '../middleware/auth-middleware.js';
 import AlertasService from '../services/alertas-service.js';
+import { withRequestTenantContext } from '../utils/tenant-context.js';
 
 const router = express.Router();
 
@@ -19,7 +21,9 @@ router.get('/recepcion',
   requireRoles(['RECEPCION', 'ADMIN']),
   async (req, res) => {
     try {
-      const alertas = await AlertasService.getAlertasRecepcion();
+      const alertas = await withRequestTenantContext(prisma, req, async (tx) => {
+        return AlertasService.getAlertasRecepcion(tx);
+      });
       res.json(alertas);
     } catch (error) {
       console.error('Error en endpoint alertas recepción:', error);
@@ -58,7 +62,9 @@ router.get('/matrizador',
         });
       }
 
-      const alertas = await AlertasService.getAlertasMatrizador(parseInt(matrizadorId));
+      const alertas = await withRequestTenantContext(prisma, req, async (tx) => {
+        return AlertasService.getAlertasMatrizador(parseInt(matrizadorId), tx);
+      });
       res.json(alertas);
     } catch (error) {
       console.error('Error en endpoint alertas matrizador:', error);
@@ -97,7 +103,9 @@ router.get('/archivo',
         });
       }
 
-      const alertas = await AlertasService.getAlertasArchivo(parseInt(archivoId));
+      const alertas = await withRequestTenantContext(prisma, req, async (tx) => {
+        return AlertasService.getAlertasArchivo(parseInt(archivoId), tx);
+      });
       res.json(alertas);
     } catch (error) {
       console.error('Error en endpoint alertas archivo:', error);
@@ -123,7 +131,9 @@ router.get('/admin',
   requireRoles(['ADMIN']),
   async (req, res) => {
     try {
-      const alertas = await AlertasService.getAlertasAdmin();
+      const alertas = await withRequestTenantContext(prisma, req, async (tx) => {
+        return AlertasService.getAlertasAdmin(tx);
+      });
       res.json(alertas);
     } catch (error) {
       console.error('Error en endpoint alertas admin:', error);
@@ -154,30 +164,37 @@ router.get('/resumen',
   authenticateToken,
   async (req, res) => {
     try {
-      let alertas = null;
-      
-      switch (req.user.role) {
-        case 'RECEPCION':
-          alertas = await AlertasService.getAlertasRecepcion();
-          break;
-        case 'MATRIZADOR':
-          alertas = await AlertasService.getAlertasMatrizador(req.user.id);
-          break;
-        case 'ARCHIVO':
-          alertas = await AlertasService.getAlertasArchivo(req.user.id);
-          break;
-        case 'ADMIN':
-          alertas = await AlertasService.getAlertasAdmin();
-          break;
-        default:
-          return res.json({
-            success: true,
-            data: {
-              stats: { total: 0, criticas: 0, urgentes: 0, atencion: 0 },
-              ultimaActualizacion: new Date()
-            }
-          });
+      const supportedRoles = new Set(['RECEPCION', 'MATRIZADOR', 'ARCHIVO', 'ADMIN']);
+      if (!supportedRoles.has(req.user.role)) {
+        return res.json({
+          success: true,
+          data: {
+            stats: { total: 0, criticas: 0, urgentes: 0, atencion: 0 },
+            ultimaActualizacion: new Date()
+          }
+        });
       }
+
+      const alertas = await withRequestTenantContext(prisma, req, async (tx) => {
+        switch (req.user.role) {
+          case 'RECEPCION':
+            return AlertasService.getAlertasRecepcion(tx);
+          case 'MATRIZADOR':
+            return AlertasService.getAlertasMatrizador(req.user.id, tx);
+          case 'ARCHIVO':
+            return AlertasService.getAlertasArchivo(req.user.id, tx);
+          case 'ADMIN':
+            return AlertasService.getAlertasAdmin(tx);
+          default:
+            return {
+              success: true,
+              data: {
+                stats: { total: 0, criticas: 0, urgentes: 0, atencion: 0 },
+                ultimaActualizacion: new Date()
+              }
+            };
+        }
+      });
 
       // Devolver solo stats para rendimiento
       res.json({

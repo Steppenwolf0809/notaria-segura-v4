@@ -1,4 +1,8 @@
+import { getPrismaClient } from '../db.js';
 import { bulkMarkReady, bulkDeliverDocuments } from '../services/bulk-status-service.js';
+import { withRequestTenantContext } from '../utils/tenant-context.js';
+
+const prisma = getPrismaClient();
 
 /**
  * Controlador: Cambio masivo de estado a LISTO
@@ -8,25 +12,27 @@ export async function bulkStatusChange(req, res) {
   try {
     const { documentIds, sendNotifications = true, toStatus, ...options } = req.body || {};
 
-    let result;
+    const result = await withRequestTenantContext(prisma, req, async (tx) => {
+      if (toStatus === 'ENTREGADO') {
+        // Flujo de Entrega
+        return bulkDeliverDocuments({
+          documentIds,
+          actor: req.user,
+          deliveryData: options, // deliveredTo, receptorId, etc.
+          sendNotifications,
+          dbClient: tx
+        });
+      }
 
-    if (toStatus === 'ENTREGADO') {
-      // Flujo de Entrega
-      result = await bulkDeliverDocuments({
-        documentIds,
-        actor: req.user,
-        deliveryData: options, // deliveredTo, receptorId, etc.
-        sendNotifications
-      });
-    } else {
       // Flujo por defecto (Marcar Listo)
-      // Nota: Si se agregan más estados, usar switch
-      result = await bulkMarkReady({
+      // Nota: Si se agregan mas estados, usar switch
+      return bulkMarkReady({
         documentIds,
         actor: req.user,
-        sendNotifications
+        sendNotifications,
+        dbClient: tx
       });
-    }
+    });
 
     return res.status(result.status).json({
       success: result.success,
@@ -40,5 +46,3 @@ export async function bulkStatusChange(req, res) {
 }
 
 export default { bulkStatusChange };
-
-

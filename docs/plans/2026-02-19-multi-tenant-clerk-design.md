@@ -1,0 +1,381 @@
+# Multi-Tenant + Clerk + UAFE Design (v1 Piloto N18)
+
+Fecha: 2026-02-19  
+Rama: `feature/architecture-v2.1-restart`  
+Estado: Validado con usuario
+
+## 0) Estado de Implementacion (Actualizado 2026-02-19)
+
+Implementado en codigo (Fase 1 + avance Fase 2):
+1. Fundacion multi-tenant en Prisma:
+   - `notaries`
+   - `users` con `notary_id`, `clerk_user_id`, `deleted_at`
+   - rol `SUPER_ADMIN`
+2. Middleware de resolucion tenant/superadmin en auth.
+3. Login legacy ajustado con contexto transaccional.
+4. Seed N18 actualizado para piloto Clerk.
+5. Reglas fail-closed agregadas en este plan (deny-by-default + `FORCE ROW LEVEL SECURITY`).
+6. Auditoria inmutable agregada por migracion (`audit_logs` append-only).
+7. Migraciones aplicadas en staging (`20260219113000` y `20260219133000`) con hardening de compatibilidad legacy.
+8. Flujos de `auth` y CRUD de usuarios admin ejecutan operaciones tenant-scoped con transaccion + `SET LOCAL`.
+9. Auditoria persistente para `SUPER_ADMIN` en cambios de contexto tenant y CRUD cross-tenant de usuarios.
+10. Tablas core `documents`, `document_events`, `whatsapp_notifications` ahora tienen `notary_id` en staging con backfill inicial y triggers de autocompletado tenant.
+11. RLS activado en staging para tablas core (`documents`, `document_events`, `whatsapp_notifications`) con `ENABLE + FORCE ROW LEVEL SECURITY` y politicas fail-closed.
+12. Rol runtime `app_runtime_rls` creado (sin `BYPASSRLS`) y usado por backend via `SET LOCAL ROLE` + contexto de sesion por transaccion.
+13. Verificacion staging post-RLS: `notary_id` sin nulos en tablas core (`documents: 2270/2270`, `document_events: 9341/9341`, `whatsapp_notifications: 1308/1308`) y prueba fail-closed validada (`0` filas sin contexto tenant).
+14. Prueba de aislamiento A/B ejecutada en staging con script dedicado (`backend/scripts/verify-tenant-isolation-ab.js`): tenant A y tenant B aislados en `documents`, `document_events` y `whatsapp_notifications`; sin contexto tenant = `0` filas; modo super admin = acceso a ambos tenants.
+15. La validacion A/B se ejecuto en transaccion con `ROLLBACK` (sin persistir datos de prueba en staging).
+
+Migraciones nuevas creadas:
+1. `backend/prisma/migrations/20260219113000_phase1_multi_tenant_foundation/migration.sql`
+2. `backend/prisma/migrations/20260219133000_add_immutable_audit_logs/migration.sql`
+
+Pendiente para continuar (siguiente conversacion):
+1. Terminar migracion de controladores/servicios fuera de auth/admin para usar contexto tenant transaccional explicito (fase de endurecimiento).
+2. Validar escenarios `SUPER_ADMIN` cross-tenant auditados extremo a extremo sobre endpoints reales (no solo SQL de verificacion).
+3. Extender RLS a tablas adicionales (incluyendo modulo UAFE) segun Fase 3.
+
+## 1) Objetivo
+
+Escalar Notaria Segura para operar con multiples notarias sin rehacer arquitectura por cliente.
+El diseno debe garantizar aislamiento fuerte de datos (especialmente UAFE), soporte a venta directa
+por modulos y operacion segura en una sola infraestructura.
+
+## 2) Decisiones Cerradas
+
+1. Modelo tenant: base de datos compartida + `notary_id` + RLS.
+2. Auth staff: Clerk (no Auth0).
+3. Login v1: solo correo + clave.
+4. Piloto v1: solo notaria `N18` con usuarios legacy.
+5. Migracion legacy: mantener clave antigua (bcrypt digest), sin forzar cambio de clave por ahora.
+6. Super admin: acceso cross-tenant auditado, sin `BYPASSRLS` en el rol principal de la app.
+7. UAFE: schema separado `uafe` dentro de la misma base PostgreSQL.
+8. Monetizacion v1: habilitacion tecnica por modulos (sin cobro in-app).
+9. Borrado: soft delete obligatorio en entidades criticas (`deleted_at`).
+10. Billing: cada notaria puede usar integracion externa distinta (Koinor u otra), pero los datos internos de facturacion se almacenan tenant-scoped.
+11. WhatsApp templates: configuracion per-tenant (cada notaria personaliza sus templates).
+
+## 3) Alcance v1
+
+Incluido:
+1. Fundacion multi-tenant en `public`.
+2. Integracion Clerk para staff + mapeo `org -> notary`.
+3. Politicas RLS por tenant y bypass por contexto de sesion (`app.is_super_admin`).
+4. UAFE inicial en schema `uafe` con aislamiento por tenant.
+5. Modelo de planes/modulos normalizado para setup comercial manual.
+6. Facturacion tenant-scoped para `invoices`, `payments`, `import_logs` y `pending_receivables`.
+
+No incluido:
+1. Cobro dentro de la plataforma.
+2. Wizard completo de onboarding multi-notaria.
+3. Separacion fisica de UAFE en otra base (se evalua en fase futura).
+
+## 4) Modelo de Datos (Base)
+
+### 4.1 Entidades tenant en `public`
+
+1. `notaries`
+   - `id` (uuid pk)
+   - `code` (unique)
+   - `slug` (unique)
+   - `clerk_org_id` (unique)
+   - `is_active` (bool)
+   - `deleted_at` (timestamp null)
+   - metadatos operativos (nombre, ruc, contacto, etc.)
+
+2. `users`
+   - `id` (int pk)
+   - `email` (unique activo)
+   - `clerk_user_id` (unique)
+   - `role`
+   - `notary_id` (nullable solo para `SUPER_ADMIN`)
+   - `is_active`
+   - `deleted_at` (timestamp null)
+
+### 4.2 Entitlements por modulos (sin billing in-app)
+
+1. `plans`
+2. `modules`
+3. `plan_modules`
+4. `notary_subscriptions`
+5. `notary_module_overrides`
+
+Regla efectiva:
+`plan_modules + overrides = modulos habilitados para la notaria`.
+
+### 4.3 UAFE en schema separado
+
+Schema: `uafe`  
+Tablas iniciales criticas: `uafe.protocolos`, `uafe.personas_protocolo` (y relacionadas).  
+Todas con:
+1. `notary_id` obligatorio.
+2. `deleted_at` para soft delete.
+3. indices compuestos por tenant.
+4. uniques por tenant (ej. `UNIQUE(notary_id, codigo_externo)`).
+
+### 4.4 Billing tenant-scoped (sin cobro in-app)
+
+Regla:
+1. Integracion externa de facturacion por notaria (venta/setup directo).
+2. Persistencia interna siempre tenant-scoped con `notary_id`.
+3. Tablas objetivo: `invoices`, `payments`, `import_logs`, `pending_receivables`.
+4. Politicas RLS equivalentes a tablas core antes de release multi-cliente.
+
+## 5) Seguridad: RLS + Prisma + Pool
+
+## 5.1 Politica principal
+
+No usar `BYPASSRLS` en el rol DB principal de la app.
+
+Estado por defecto obligatorio (fail-closed):
+1. El rol de conexion de la app debe quedar sin bypass (`rolbypassrls = false`).
+2. Toda tabla tenant-protected debe tener `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY`.
+3. Si falta contexto valido (`app.current_notary_id`) la consulta debe devolver `0` filas, no datos de otro tenant.
+4. No se acepta seguridad basada solo en filtros manuales en controllers.
+
+## 5.2 Contexto por request
+
+Cada operacion tenant-scoped debe ejecutarse en transaccion y setear:
+1. `SET LOCAL app.current_notary_id = ...`
+2. `SET LOCAL app.is_super_admin = ...`
+
+Esto evita contaminacion de conexiones recicladas por pool.
+
+## 5.3 Politicas RLS
+
+Patron:
+1. Usuario normal: `notary_id = current_setting('app.current_notary_id', true)`.
+2. Super admin: habilitado por `current_setting('app.is_super_admin', true) = 'true'`.
+3. Sin contexto valido: no hay acceso.
+
+Regla adicional:
+1. Implementar helper SQL seguro para parsear tenant (`app.current_notary_uuid()`), de modo que valores vacios/invalidos resulten en `NULL` y la policy falle en cerrado.
+
+## 6) Soft Delete y Unicidad
+
+Regla de dominio notarial: no borrado fisico operativo.
+
+1. Baja de notaria/usuario/registro sensible: `is_active = false` + `deleted_at = now()`.
+2. Unicidad con soft delete: indices parciales SQL (`WHERE deleted_at IS NULL`) donde aplique.
+3. Auditoria de cambios sensibles en `audit_logs`.
+4. `audit_logs` debe ser append-only: prohibido `UPDATE`, `DELETE` y `TRUNCATE` via trigger DB.
+
+## 7) Clerk (Piloto N18 Legacy)
+
+1. Crear org Clerk para N18 y persistir `clerk_org_id` en `notaries`.
+2. Migrar usuarios legacy con hash existente:
+   - `passwordHasher = bcrypt`
+   - `passwordDigest = hash legacy`
+3. Login v1: correo + clave.
+4. No forzar cambio de clave en esta fase.
+5. `SUPER_ADMIN` con controles y auditoria de acceso cross-tenant.
+
+## 8) Fases de Implementacion
+
+### Fase 1: Fundacion tenant + Clerk mapping
+
+1. Ajustes de schema `public` (`notaries`, `users`, claves Clerk).
+2. Migraciones SQL y datos piloto N18.
+3. Middleware de resolucion tenant y rol.
+
+### Fase 2: RLS robusto
+
+1. Politicas RLS para tablas core.
+2. Contexto por transaccion con `SET LOCAL`.
+3. Pruebas de aislamiento A/B y super admin.
+
+### Fase 3: UAFE schema
+
+1. Crear schema `uafe` por SQL.
+2. Tablas con `notary_id`, soft delete, indices por tenant.
+3. Politicas RLS equivalentes a core.
+
+### Fase 4: Modulos/planes
+
+1. Tablas normalizadas de plan y modulos.
+2. Middleware `requireModule`.
+3. Activacion manual por setup comercial.
+
+## 9) Criterios de Aceptacion v1
+
+1. Tenant A no puede leer/escribir datos de Tenant B.
+2. UAFE no mezcla datos entre notarías.
+3. Super admin puede operar cross-tenant con trazabilidad.
+4. Usuarios N18 legacy inician sesion con su clave anterior.
+5. Sistema opera con habilitacion por modulos sin cobro in-app.
+6. Si no existe contexto tenant en sesion DB, consultas tenant-protected devuelven `0` filas.
+7. `audit_logs` no permite `UPDATE/DELETE/TRUNCATE`.
+
+## 10) Instruccion de Ejecucion para Agente IDE
+
+Usar este markdown como especificacion base de implementacion.
+
+Reglas:
+1. Priorizar infraestructura (tenant + RLS + Clerk + UAFE base) antes de nuevas features.
+2. No introducir `BYPASSRLS` en el rol principal de Prisma.
+3. No depender de filtros manuales dispersos en controllers para seguridad.
+4. Mantener trazabilidad con auditoria en operaciones cross-tenant y UAFE.
+5. Ejecutar por fases y validar con pruebas de aislamiento en cada fase.
+6. Toda operacion tenant-scoped debe ejecutarse dentro de transaccion con `SET LOCAL` de tenant/superadmin.
+7. Antes de activar RLS en una tabla, confirmar que su flujo de lectura/escritura ya usa contexto transaccional; si no, bloquear release.
+8. Validar caso de falla de middleware: sin `app.current_notary_id`, resultado esperado = `0` filas.
+9. Prohibir mutaciones de `audit_logs` en DB (trigger inmutable) y registrar accesos cross-tenant de SUPER_ADMIN.
+
+## 11) Estimacion de Capacidad (2026-02-19)
+
+Objetivo seguro con infraestructura actual (1 backend + 1 PostgreSQL en Railway):
+
+1. Capacidad recomendada hoy: `20 notarias activas` (rango operativo `18 a 22`).
+
+Metodo de calculo usado:
+
+1. Limite por request sync: `2000` registros (`backend/src/controllers/sync-billing-controller.js`, `MAX_RECORDS_PER_REQUEST`).
+2. Frecuencia esperada sync agent: cada `15` minutos (`docs/SYNC_AGENT_PLAN.md`).
+3. Carga base por notaria: `2000 / 900s = 2.22 registros/seg`.
+4. Benchmark interno XML: `7000 registros < 2 min` (`backend/src/services/README-XML-IMPORT.md`), equivalente aproximado `58 registros/seg`.
+5. Margen operativo del 75% para UI, UAFE y picos: `58 * 0.75 = 43.5 registros/seg`.
+6. Capacidad estimada: `43.5 / 2.22 = 19.6`, redondeado a `20` notarias.
+
+Ajustes de capacidad:
+
+1. Si sync pasa a cada 30 min: objetivo aproximado `30 a 35` notarias.
+2. Si hay alta concurrencia de PDF/UAFE: bajar objetivo a `15 a 18`.
+3. Si se separan workers de sync/PDF del API principal: se puede subir por encima de `35` sin redisenar arquitectura.
+
+Nota:
+
+1. Esta estimacion es de planificacion. Debe validarse con prueba de carga por etapas.
+
+## 12) Criterio de Upgrade Railway (Hobby -> Pro)
+
+Estado de referencia (verificado 2026-02-19 en docs de Railway):
+
+1. Hobby: uso incluido mensual `5 USD` y gasto minimo mensual `5 USD`.
+2. Pro: uso incluido mensual `20 USD` y gasto minimo mensual `20 USD`.
+3. El cobro sigue siendo por uso; cambia el minimo incluido y limites del plan.
+
+Regla practica para este proyecto:
+
+1. Mantener Hobby durante piloto N18 si el uso y limites siguen holgados.
+2. Pasar a Pro justo antes del primer cliente externo en produccion o cuando aparezca un limite operativo.
+
+Triggers claros para migrar a Pro:
+
+1. Necesidad de mas de `2` dominios por servicio.
+2. Necesidad de mas de `6` replicas por servicio.
+3. Volumen PostgreSQL acercandose al limite de `5 GB` en Hobby (recomendado migrar al llegar a `4 GB`).
+4. Operacion multi-cliente con exigencia de mayor gobernanza de equipo.
+
+Fuentes:
+
+1. Planes: https://docs.railway.com/reference/pricing/plans
+2. Pricing general: https://railway.com/pricing
+3. Volumes: https://docs.railway.com/reference/volumes
+4. Dominios: https://docs.railway.com/guides/public-networking
+
+## 13) Estado de Avance (Checklist Vivo)
+
+Ultima actualizacion: 2026-02-27
+
+Resumen por fase:
+1. Fase 1 (Fundacion tenant + Clerk mapping): En progreso avanzado.
+2. Fase 2 (RLS robusto): En progreso - OLA A cerrada en verde y lista para iniciar OLA B.
+3. Fase 3 (UAFE schema): Pendiente.
+4. Fase 4 (Modulos/planes): Pendiente.
+
+### Fase 1 - Fundacion tenant + Clerk mapping
+
+- [x] Definir arquitectura objetivo multi-tenant + Clerk + UAFE schema separado.
+- [x] Crear rama dedicada de arquitectura (`feature/architecture-v2.1-restart`).
+- [x] Documentar decisiones cerradas de seguridad (sin `BYPASSRLS` en rol runtime).
+- [ ] Consolidar modelo final de `notaries/users` en `schema.prisma` para v1.
+- [ ] Validar migracion legacy N18 -> Clerk en entorno de prueba end-to-end.
+
+### Fase 2 - RLS robusto
+
+- [x] Definir patron obligatorio transaccional con `SET LOCAL` por request.
+- [x] Definir criterio fail-closed (sin contexto tenant = `0` filas).
+- [ ] Aplicar politicas RLS finales en todas las tablas core tenant-protected.
+- [x] Validar pruebas A/B de aislamiento por endpoint (no solo SQL).
+  - Evidencia 2026-02-27: `backend/tests/e2e/super-admin-isolation.test.js` en staging (`PASS`, 3/3 casos).
+- [x] Auditar flujos `SUPER_ADMIN` cross-tenant en endpoints reales.
+  - Evidencia 2026-02-27: `backend/tests/e2e/super-admin-isolation.test.js` valida lectura, mutacion y aislamiento de pool.
+
+#### OLA A - Endurecimiento de controladores (sesion 2026-02-26)
+
+Controladores endurecidos (queries a tablas con RLS wrapeadas en `withRequestTenantContext`):
+- [x] `archivo-controller.js` - Todas las queries a `document`/`documentEvent` wrapeadas.
+- [x] `reception-controller.js` - Todas las queries wrapeadas.
+- [x] `reception-bulk-controller.js` - Sin queries directas; delega en `bulk-status-service` (deuda tecnica documentada para OLA B).
+- [x] `document-controller.js` - Queries principales + `autoHealInvoiceLinks` corregido para recibir `tx`.
+- [x] `admin-controller.js` - CRUD users ya wrapeado + dashboard/stats (13 queries) ahora wrapeadas.
+- [x] `admin-document-controller.js` - Ya wrapeado previamente.
+- [x] `admin-notification-controller.js` - 8 funciones wrapeadas (16 queries `whatsAppNotification`).
+- [x] `billing-controller.js` - 4 queries a `document`/`documentEvent` wrapeadas en 3 funciones.
+- [x] `mensajes-internos-controller.js` - 2 queries a `document` wrapeadas.
+- [x] `auth-controller.js` - Wrapeado previamente.
+
+Pendientes documentados:
+- [x] `sync-billing-controller.js` - 2 queries directas a `document.update`/`documentEvent.create` endurecidas con `withTenantContext` (2026-02-27).
+- [ ] `billing-controller.js:59` - `getPaymentStatusForDocument()` es helper standalone sin `req`. Llamado desde `document-controller` que ya gestiona su propio contexto tenant. Aceptable por ahora.
+
+Servicios con queries directas (deuda tecnica para OLA B):
+- `alertas-service.js` (~20 queries)
+- `bulk-status-service.js` (~4 queries)
+- `matrizador-assignment-service.js` (3 queries)
+- `import-mov-service.js` (~10 queries)
+- `import-koinor-xml-service.js` (2 queries)
+
+Estado de cierre OLA A (2026-02-27):
+- [x] E2E `SUPER_ADMIN` en staging (`backend/tests/e2e/super-admin-isolation.test.js`) -> PASS.
+- [x] Script A/B de aislamiento en staging (`backend/scripts/verify-tenant-isolation-ab.js`) -> PASS.
+- [x] Smoke manual por rol completado.
+- [x] GO formal aprobado para iniciar OLA B.
+
+#### OLA B - notary_id + backfill (sesion 2026-02-27)
+
+Avance ejecutado:
+- [x] Migracion `20260227060000_ola_b_add_notary_id_business_uafe_tables` creada.
+- [x] `notary_id` agregado en 13 tablas objetivo (billing + UAFE + operativas).
+- [x] Backfill aplicado en staging con estrategia deterministica (preferencia `N18`, fallback seguro).
+- [x] Validacion post-backfill: `0` nulos en `notary_id` para todas las tablas objetivo.
+
+Pendiente de OLA B:
+- [x] Activar RLS (`ENABLE + FORCE`) y politicas tenant en tablas de OLA B.
+  - Evidencia 2026-02-27: migracion `20260227113000_enable_rls_ola_b_business_uafe_tables` aplicada en staging.
+- [x] Enforzar `NOT NULL` de `notary_id` en 13 tablas OLA B.
+  - Evidencia 2026-02-27: validacion SQL `nullNotaryId = 0` + `ALTER COLUMN ... SET NOT NULL`.
+- [x] Endurecer servicios restantes (`alertas`, `bulk-status`, `import-mov`, `import-koinor-xml`, `matrizador-assignment`) antes de RLS final.
+  - Evidencia 2026-02-27: servicios migrados a `dbClient` + controladores/rutas actualizados para pasar `tx` request-scoped.
+- [ ] Ejecutar validaciones A/B por endpoint sobre tablas OLA B ya con RLS activo.
+  - Estado 2026-02-27: validacion SQL A/B y fail-closed completada; falta evidencia E2E/endpoint.
+
+### Fase 3 - UAFE schema
+
+- [x] Decidir `uafe` como schema separado en la misma DB.
+- [ ] Crear migraciones SQL base para schema `uafe`.
+- [x] Agregar `notary_id` en tablas UAFE core (`protocolos_uafe`, `personas_protocolo`, `formulario_uafe_asignaciones`, `formulario_uafe_respuestas`, `sesiones_formulario_uafe`, `auditoria_personas`).
+- [ ] Agregar `deleted_at`, indices y uniques por tenant en tablas UAFE.
+- [ ] Activar RLS equivalente en tablas UAFE.
+- [ ] Ejecutar pruebas de no mezcla de datos UAFE entre notarías.
+
+### Fase 4 - Modulos/planes
+
+- [x] Definir modelo normalizado (`plans`, `modules`, `plan_modules`, `notary_subscriptions`, `notary_module_overrides`).
+- [ ] Implementar tablas y migraciones.
+- [ ] Implementar resolucion de entitlements (plan + overrides).
+- [ ] Integrar middleware `requireModule`.
+- [ ] Probar activacion tecnica por modulo (sin cobro in-app).
+
+### Checklist transversal (release gate)
+
+- [ ] Prueba de carga inicial y validacion de capacidad real (objetivo base: 20 notarias activas).
+- [ ] Runbook de escalado (20 -> 30 -> 50) documentado para operacion.
+- [ ] Decidir momento de upgrade Railway Hobby -> Pro con metricas reales.
+- [ ] Cerrar riesgos abiertos y actualizar este checklist al final de cada sesion.
+
+## 14) Control Go/No-Go por Olas
+
+Referencia operativa actual:
+
+1. `docs/plans/2026-02-27-multi-tenant-go-no-go-checklist.md`

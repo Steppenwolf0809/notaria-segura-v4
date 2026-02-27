@@ -21,7 +21,7 @@ class MatrizadorAssignmentService {
    * @param {string} matrizadorNameFromXml - Nombre del matrizador extraído del XML
    * @returns {Object|null} Usuario matrizador encontrado o null
    */
-  async findMatrizadorByName(matrizadorNameFromXml) {
+  async findMatrizadorByName(matrizadorNameFromXml, dbClient = prisma) {
     if (!matrizadorNameFromXml || matrizadorNameFromXml === 'Sin asignar') {
       return null;
     }
@@ -31,7 +31,7 @@ class MatrizadorAssignmentService {
     
     try {
       // Buscar todos los matrizadores activos (incluye ADMIN, ARCHIVO y CAJA que también pueden ser matrizadores)
-      const matrizadores = await prisma.user.findMany({
+      const matrizadores = await dbClient.user.findMany({
         where: {
           role: {
             in: ['MATRIZADOR', 'ADMIN', 'ARCHIVO', 'CAJA']
@@ -179,10 +179,10 @@ class MatrizadorAssignmentService {
    * @param {string} matrizadorNameFromXml - Nombre del matrizador del XML
    * @returns {Object} Resultado de la asignación
    */
-  async autoAssignDocument(documentId, matrizadorNameFromXml) {
+  async autoAssignDocument(documentId, matrizadorNameFromXml, dbClient = prisma) {
     try {
       // Buscar matrizador correspondiente
-      const matrizador = await this.findMatrizadorByName(matrizadorNameFromXml);
+      const matrizador = await this.findMatrizadorByName(matrizadorNameFromXml, dbClient);
       
       if (!matrizador) {
         return {
@@ -194,13 +194,13 @@ class MatrizadorAssignmentService {
       }
 
       // Obtener documento original para registro de evento
-      const originalDocument = await prisma.document.findUnique({
+      const originalDocument = await dbClient.document.findUnique({
         where: { id: documentId },
         select: { status: true, assignedToId: true, createdById: true }
       });
 
       // Asignar documento al matrizador
-      const documentoAsignado = await prisma.document.update({
+      const documentoAsignado = await dbClient.document.update({
         where: { id: documentId },
         data: {
           assignedToId: matrizador.id,
@@ -221,7 +221,7 @@ class MatrizadorAssignmentService {
 
       // 📈 Registrar evento de asignación automática
       try {
-        await prisma.documentEvent.create({
+        await dbClient.documentEvent.create({
           data: {
             documentId: documentId,
             userId: originalDocument.createdById, // Usuario que creó el documento
@@ -272,9 +272,9 @@ class MatrizadorAssignmentService {
    * Obtiene estadísticas de asignación automática
    * @returns {Object} Estadísticas del sistema
    */
-  async getAssignmentStats() {
+  async getAssignmentStats(dbClient = prisma) {
     try {
-      const stats = await prisma.$queryRaw`
+      const stats = await dbClient.$queryRaw`
         SELECT 
           COUNT(*) as total_documentos,
           COUNT(CASE WHEN "assignedToId" IS NOT NULL THEN 1 END) as documentos_asignados,
@@ -283,7 +283,7 @@ class MatrizadorAssignmentService {
         FROM documents
       `;
 
-      const matrizadoresActivos = await prisma.user.count({
+      const matrizadoresActivos = await dbClient.user.count({
         where: {
           role: {
             in: ['MATRIZADOR', 'ADMIN']

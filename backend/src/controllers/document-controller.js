@@ -1,5 +1,6 @@
 import prisma from '../db.js';
 import { Prisma } from '@prisma/client';
+import { withRequestTenantContext } from '../utils/tenant-context.js';
 import { EMOJIS } from '../utils/emojis.js';
 import { getReversionCleanupData, isValidStatus, isReversion as isReversionFn } from '../utils/status-transitions.js';
 import { parseXmlDocument, generateVerificationCode } from '../services/xml-parser-service.js';
@@ -13,6 +14,7 @@ import {
 } from '../utils/event-formatter.js';
 import AdvancedExtractionService from '../services/advanced-extraction-service.js';
 import ActosExtractorService from '../services/actos-extractor-service.js';
+import { buildInvoiceNumberVariants, buildInvoiceWhereByNumber } from '../utils/billing-utils.js';
 
 /**
  * Procesar XML y crear documento automáticamente
@@ -52,8 +54,10 @@ async function uploadXmlDocument(req, res) {
     // Procesar XML con el parser service
     const parsedData = await parseXmlDocument(xmlContent);
 
+    // Wrap all tenant-protected operations in tenant context
+    const { document, finalDocument, invoiceLinked, assignmentResult } = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
     // Verificar que no existe un documento con el mismo protocolNumber
-    const existingDocument = await prisma.document.findUnique({
+    const existingDocument = await tx.document.findUnique({
       where: { protocolNumber: parsedData.protocolNumber }
     });
 
@@ -74,7 +78,7 @@ async function uploadXmlDocument(req, res) {
     console.log('🔍 DEBUG createDocument - typeof numeroFactura:', typeof parsedData.numeroFactura);
 
     // Crear documento en la base de datos
-    const document = await prisma.document.create({
+    const document = await tx.document.create({
       data: {
         protocolNumber: parsedData.protocolNumber,
         clientName: parsedData.clientName,
@@ -112,7 +116,7 @@ async function uploadXmlDocument(req, res) {
 
     // 📈 Registrar evento de creación de documento
     try {
-      await prisma.documentEvent.create({
+      await tx.documentEvent.create({
         data: {
           documentId: document.id,
           userId: req.user.id,
@@ -141,7 +145,8 @@ async function uploadXmlDocument(req, res) {
     console.log(`🔍 Intentando asignación automática para matrizador: "${parsedData.matrizadorName}"`);
     const assignmentResult = await MatrizadorAssignmentService.autoAssignDocument(
       document.id,
-      parsedData.matrizadorName
+      parsedData.matrizadorName,
+      tx
     );
 
     // Actualizar el documento con la información de asignación
@@ -162,7 +167,7 @@ async function uploadXmlDocument(req, res) {
         const actos = ActosExtractorService.extract(candidateText);
         const parties = actos.acts.flatMap(a => a.parties || []);
 
-        await prisma.documentEvent.create({
+        await tx.documentEvent.create({
           data: {
             documentId: document.id,
             userId: req.user.id,
@@ -190,17 +195,16 @@ async function uploadXmlDocument(req, res) {
     if (parsedData.numeroFactura) {
       try {
         console.log(`🔍 Buscando factura existente: ${parsedData.numeroFactura}`);
-        
+
         // Buscar factura por número (formato normalizado)
-        const existingInvoice = await prisma.invoice.findFirst({
-          where: {
-            invoiceNumber: parsedData.numeroFactura
-          }
+        const existingInvoice = await tx.invoice.findFirst({
+          where: buildInvoiceWhereByNumber(parsedData.numeroFactura),
+          orderBy: { issueDate: 'desc' }
         });
 
         if (existingInvoice) {
           // Vincular factura con documento
-          await prisma.invoice.update({
+          await tx.invoice.update({
             where: { id: existingInvoice.id },
             data: {
               documentId: document.id,
@@ -212,7 +216,7 @@ async function uploadXmlDocument(req, res) {
           invoiceLinked = true;
 
           // Registrar evento de vinculación
-          await prisma.documentEvent.create({
+          await tx.documentEvent.create({
             data: {
               documentId: document.id,
               userId: req.user.id,
@@ -236,6 +240,9 @@ async function uploadXmlDocument(req, res) {
         // No fallar la creación del documento si hay error vinculando factura
       }
     }
+
+    return { document, finalDocument, invoiceLinked, assignmentResult };
+    }); // end withRequestTenantContext
 
     // ⭐ FIX: Invalidar caché de documentos para que se muestren los nuevos
     try {
@@ -313,7 +320,8 @@ async function extractDocumentActs(req, res) {
     const { id } = req.params;
     const { text, saveSnapshot = false } = req.body || {};
 
-    const doc = await prisma.document.findUnique({ where: { id } });
+    return await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
+    const doc = await tx.document.findUnique({ where: { id } });
     if (!doc) {
       return res.status(404).json({ success: false, message: 'Documento no encontrado' });
     }
@@ -332,7 +340,7 @@ async function extractDocumentActs(req, res) {
     // Persistir snapshot en historial si se solicita
     if (saveSnapshot) {
       try {
-        await prisma.documentEvent.create({
+        await tx.documentEvent.create({
           data: {
             documentId: id,
             userId: req.user.id,
@@ -367,6 +375,7 @@ async function extractDocumentActs(req, res) {
         saved: !!saveSnapshot
       }
     });
+    }); // end withRequestTenantContext
   } catch (error) {
     console.error('Error en extractDocumentActs:', error);
     res.status(500).json({ success: false, message: 'Error interno extrayendo actos', error: error.message });
@@ -382,10 +391,11 @@ async function applyExtractionSuggestions(req, res) {
     const { id } = req.params;
     const minConfidence = parseFloat(process.env.DEFAULT_EXTRACTION_CONFIDENCE || '0.8');
 
-    const doc = await prisma.document.findUnique({ where: { id } });
+    return await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
+    const doc = await tx.document.findUnique({ where: { id } });
     if (!doc) return res.status(404).json({ success: false, message: 'Documento no encontrado' });
 
-    const snapshot = await prisma.documentEvent.findFirst({
+    const snapshot = await tx.documentEvent.findFirst({
       where: { documentId: id, eventType: 'EXTRACTION_SNAPSHOT' },
       orderBy: { createdAt: 'desc' }
     });
@@ -418,11 +428,11 @@ async function applyExtractionSuggestions(req, res) {
       return res.status(200).json({ success: true, message: 'No hay cambios aplicables (campos ya tienen valor o no hay actos detectados)' });
     }
 
-    const updated = await prisma.document.update({ where: { id }, data: updates });
+    const updated = await tx.document.update({ where: { id }, data: updates });
 
     // Auditar
     try {
-      await prisma.documentEvent.create({
+      await tx.documentEvent.create({
         data: {
           documentId: id,
           userId: req.user.id,
@@ -441,6 +451,7 @@ async function applyExtractionSuggestions(req, res) {
     } catch { }
 
     return res.json({ success: true, message: 'Sugerencias aplicadas', data: { document: updated, applied } });
+    }); // end withRequestTenantContext
   } catch (error) {
     console.error('Error en applyExtractionSuggestions:', error);
     return res.status(500).json({ success: false, message: 'Error aplicando sugerencias', error: error.message });
@@ -464,13 +475,15 @@ async function findProtocolSequenceGaps(req, res) {
     const exactPrefix = typeof prefix === 'string' && prefix.trim().length > 0 ? prefix.trim() : null;
 
     // Solo analizar documentos cuyo número de protocolo pertenezca al año 2026
-    const docs = await prisma.document.findMany({
-      where: {
-        protocolNumber: {
-          startsWith: '2026'
-        }
-      },
-      select: { id: true, protocolNumber: true, createdAt: true },
+    const docs = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
+      return await tx.document.findMany({
+        where: {
+          protocolNumber: {
+            startsWith: '2026'
+          }
+        },
+        select: { id: true, protocolNumber: true, createdAt: true },
+      });
     });
 
     const invalidCodes = [];
@@ -633,7 +646,8 @@ async function getAllDocuments(req, res) {
 
         const pattern = `%${searchTerm}%`;
 
-        const documents = await prisma.$queryRaw`
+        const { documents, total } = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
+        const documents = await tx.$queryRaw`
           SELECT d.*
           FROM "documents" d
           WHERE 1=1
@@ -649,7 +663,7 @@ async function getAllDocuments(req, res) {
           OFFSET ${skip} LIMIT ${limit}
         `;
 
-        const countRows = await prisma.$queryRaw`
+        const countRows = await tx.$queryRaw`
           SELECT COUNT(*)::int AS count
           FROM "documents" d
           WHERE 1=1
@@ -663,6 +677,8 @@ async function getAllDocuments(req, res) {
           )
         `;
         const total = Array.isArray(countRows) ? (countRows[0]?.count || 0) : (countRows?.count || 0);
+        return { documents, total };
+        }); // end withRequestTenantContext
 
         // Hydrate authors and assignedTo
         const createdByIds = [...new Set(documents.map(d => d.createdById).filter(Boolean))];
@@ -701,8 +717,8 @@ async function getAllDocuments(req, res) {
       return res.json({ success: true, data: cached });
     }
 
-    const [documents, total] = await Promise.all([
-      prisma.document.findMany({
+    const [documents, total] = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
+      const docs = await tx.document.findMany({
         where,
         include: {
           createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
@@ -711,9 +727,10 @@ async function getAllDocuments(req, res) {
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit
-      }),
-      prisma.document.count({ where })
-    ]);
+      });
+      const count = await tx.document.count({ where });
+      return [docs, count];
+    });
 
     const payload = {
       documents,
@@ -763,18 +780,6 @@ async function assignDocument(req, res) {
       });
     }
 
-    // Verificar que el documento existe
-    const document = await prisma.document.findUnique({
-      where: { id }
-    });
-
-    if (!document) {
-      return res.status(404).json({
-        success: false,
-        message: 'Documento no encontrado'
-      });
-    }
-
     // Verificar que el matrizador existe y tiene el rol correcto
     const matrizador = await prisma.user.findUnique({
       where: { id: parseInt(matrizadorId) }
@@ -787,8 +792,21 @@ async function assignDocument(req, res) {
       });
     }
 
+    const updatedDocument = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
+    // Verificar que el documento existe
+    const document = await tx.document.findUnique({
+      where: { id }
+    });
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Documento no encontrado'
+      });
+    }
+
     // Asignar documento y cambiar estado a EN_PROCESO
-    const updatedDocument = await prisma.document.update({
+    const updatedDocument = await tx.document.update({
       where: { id },
       data: {
         assignedToId: parseInt(matrizadorId),
@@ -816,7 +834,7 @@ async function assignDocument(req, res) {
 
     // 📈 Registrar evento de asignación de documento
     try {
-      await prisma.documentEvent.create({
+      await tx.documentEvent.create({
         data: {
           documentId: id,
           userId: req.user.id,
@@ -840,6 +858,12 @@ async function assignDocument(req, res) {
       console.error('Error registrando evento de asignación de documento:', auditError);
       // No fallar la asignación del documento si hay error en auditoría
     }
+
+    return updatedDocument;
+    }); // end withRequestTenantContext
+
+    // If response was already sent (e.g., 404), don't send again
+    if (res.headersSent) return;
 
     res.json({
       success: true,
@@ -871,6 +895,139 @@ async function supportsUnaccentFn() {
     return true;
   } catch (error) {
     return false;
+  }
+}
+
+function extractInvoiceSequential(value) {
+  if (!value) return '';
+  const parts = String(value).split('-');
+  const lastPart = parts[parts.length - 1] || '';
+  return lastPart.replace(/^0+/, '') || '0';
+}
+
+function normalizeTaxId(value) {
+  return String(value || '').replace(/\D/g, '').trim();
+}
+
+function pickInvoiceCandidateForDocument(candidates, doc) {
+  if (!Array.isArray(candidates) || candidates.length === 0) return null;
+
+  const docProtocol = String(doc.protocolNumber || '').trim();
+  const docVariants = new Set(buildInvoiceNumberVariants(String(doc.numeroFactura || '')));
+  const docSequential = extractInvoiceSequential(doc.numeroFactura);
+  const docTaxId = normalizeTaxId(doc.clientId);
+
+  const byProtocol = docProtocol
+    ? candidates.filter((inv) => String(inv.numeroProtocolo || '').trim() === docProtocol)
+    : [];
+  if (byProtocol.length === 1) return byProtocol[0];
+
+  const byExactNumber = docVariants.size > 0
+    ? candidates.filter((inv) => docVariants.has(inv.invoiceNumber) || docVariants.has(inv.invoiceNumberRaw))
+    : [];
+  if (byExactNumber.length === 1) return byExactNumber[0];
+
+  const bySequential = (docSequential && docSequential.length >= 5)
+    ? candidates.filter((inv) => extractInvoiceSequential(inv.invoiceNumberRaw || inv.invoiceNumber) === docSequential)
+    : [];
+  if (bySequential.length === 1) return bySequential[0];
+
+  if (docTaxId) {
+    const exactByTaxId = byExactNumber.filter((inv) => normalizeTaxId(inv.clientTaxId) === docTaxId);
+    if (exactByTaxId.length === 1) return exactByTaxId[0];
+
+    const sequentialByTaxId = bySequential.filter((inv) => normalizeTaxId(inv.clientTaxId) === docTaxId);
+    if (sequentialByTaxId.length === 1) return sequentialByTaxId[0];
+  }
+
+  return null;
+}
+
+async function autoHealInvoiceLinks(documents, invoicesMap, dbClient = prisma) {
+  if (!Array.isArray(documents) || documents.length === 0) return;
+
+  const reservedInvoiceIds = new Set();
+  const docsToHeal = documents.filter((doc) => {
+    const hasInvoices = (invoicesMap.get(doc.id) || []).length > 0;
+    return !hasInvoices && (doc.numeroFactura || doc.protocolNumber);
+  });
+
+  for (const doc of docsToHeal) {
+    const variants = buildInvoiceNumberVariants(String(doc.numeroFactura || ''));
+    const sequential = extractInvoiceSequential(doc.numeroFactura);
+    const orClauses = [];
+
+    if (variants.length > 0) {
+      orClauses.push({ invoiceNumber: { in: variants } });
+      orClauses.push({ invoiceNumberRaw: { in: variants } });
+    }
+
+    if (sequential && sequential.length >= 5) {
+      orClauses.push({ invoiceNumber: { endsWith: sequential } });
+      orClauses.push({ invoiceNumberRaw: { endsWith: sequential } });
+    }
+
+    if (doc.protocolNumber) {
+      orClauses.push({ numeroProtocolo: doc.protocolNumber });
+    }
+
+    if (orClauses.length === 0) continue;
+
+    const candidates = await dbClient.invoice.findMany({
+      where: {
+        AND: [
+          { OR: orClauses },
+          { OR: [{ documentId: null }, { documentId: doc.id }] }
+        ]
+      },
+      select: {
+        id: true,
+        documentId: true,
+        invoiceNumber: true,
+        invoiceNumberRaw: true,
+        totalAmount: true,
+        paidAmount: true,
+        status: true,
+        issueDate: true,
+        clientTaxId: true,
+        numeroProtocolo: true
+      },
+      orderBy: { issueDate: 'desc' },
+      take: 10
+    });
+
+    if (candidates.length === 0) continue;
+
+    const candidate = pickInvoiceCandidateForDocument(candidates, doc);
+    if (!candidate || reservedInvoiceIds.has(candidate.id)) continue;
+    reservedInvoiceIds.add(candidate.id);
+
+    if (!candidate.documentId) {
+      await dbClient.invoice.update({
+        where: { id: candidate.id },
+        data: { documentId: doc.id }
+      });
+
+      const patch = {};
+      if (!doc.numeroFactura) patch.numeroFactura = candidate.invoiceNumberRaw || candidate.invoiceNumber;
+      if (!doc.fechaFactura && candidate.issueDate) patch.fechaFactura = candidate.issueDate;
+      if (Object.keys(patch).length > 0) {
+        await dbClient.document.update({ where: { id: doc.id }, data: patch });
+      }
+      console.warn(`[documents] Auto-healing invoice link: doc=${doc.id}, invoice=${candidate.invoiceNumberRaw || candidate.invoiceNumber}`);
+    }
+
+    if (!invoicesMap.has(doc.id)) invoicesMap.set(doc.id, []);
+    invoicesMap.get(doc.id).push({
+      id: candidate.id,
+      documentId: doc.id,
+      totalAmount: candidate.totalAmount,
+      paidAmount: candidate.paidAmount,
+      status: candidate.status,
+      issueDate: candidate.issueDate,
+      invoiceNumber: candidate.invoiceNumber,
+      invoiceNumberRaw: candidate.invoiceNumberRaw
+    });
   }
 }
 
@@ -951,21 +1108,22 @@ async function getMyDocuments(req, res) {
           dateFilter = Prisma.sql`AND d."fechaFactura" < ${endDate}`;
         }
 
-        // Construcción dinámica de ORDER BY SQL
-        let orderSql = Prisma.sql`d."updatedAt" DESC`;
+        // Construcción dinámica de ORDER BY SQL - usar Prisma.raw para strings seguros
+        let orderSql = Prisma.raw('d."updatedAt" DESC');
         if (orderBy !== 'prioridad') {
           const allowedCols = ['createdAt', 'updatedAt', 'clientName', 'protocolNumber', 'totalFactura', 'status', 'fechaFactura'];
           const safeCol = allowedCols.includes(orderBy) ? orderBy : 'updatedAt';
-          const safeDir = orderDirection.toLowerCase() === 'asc' ? Prisma.sql`ASC` : Prisma.sql`DESC`;
-          orderSql = Prisma.sql([`d."${safeCol}" ${safeDir === Prisma.sql`ASC` ? 'ASC' : 'DESC'}`]);
+          const safeDirStr = orderDirection.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+          orderSql = Prisma.raw(`d."${safeCol}" ${safeDirStr}`);
         }
 
         const pattern = `%${searchTerm}%`;
 
-        const documents = await prisma.$queryRaw`
+        const { documents, total } = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
+        const documents = await tx.$queryRaw`
           SELECT d.*
           FROM "documents" d
-          WHERE d."assignedToId" = ${req.user.id} 
+          WHERE d."assignedToId" = ${req.user.id}
           ${statusFilter}
           ${typeFilter}
           ${dateFilter}
@@ -979,10 +1137,10 @@ async function getMyDocuments(req, res) {
           OFFSET ${(parseInt(page) - 1) * parseInt(limit)} LIMIT ${parseInt(limit)}
         `;
 
-        const countRows = await prisma.$queryRaw`
+        const countRows = await tx.$queryRaw`
           SELECT COUNT(*)::int AS count
           FROM "documents" d
-          WHERE d."assignedToId" = ${req.user.id} 
+          WHERE d."assignedToId" = ${req.user.id}
           ${statusFilter}
           ${typeFilter}
           ${dateFilter}
@@ -994,6 +1152,8 @@ async function getMyDocuments(req, res) {
           )
         `;
         const total = Array.isArray(countRows) ? (countRows[0]?.count || 0) : (countRows?.count || 0);
+        return { documents, total };
+        }); // end withRequestTenantContext
 
         // Enriquecer documentos con relaciones mínimas si es necesario (el frontend las espera)
         // Nota: QueryRaw no trae relaciones. Si se necesitan, habría que hacer un fetch adicional o JOINs manuales.
@@ -1013,48 +1173,57 @@ async function getMyDocuments(req, res) {
         const docIds = documents.map(d => d.id);
         const invoicesMap = new Map();
         const paymentsMap = new Map();
-        
+
         if (docIds.length > 0) {
           // Obtener facturas
           const invoices = await prisma.invoice.findMany({
             where: { documentId: { in: docIds } },
-            select: { 
+            select: {
               id: true,
-              documentId: true, 
-              totalAmount: true, 
-              paidAmount: true, 
-              status: true 
+              documentId: true,
+              totalAmount: true,
+              paidAmount: true,
+              status: true,
+              issueDate: true,
+              invoiceNumber: true,
+              invoiceNumberRaw: true
             }
           });
-          
+
           invoices.forEach(inv => {
             if (!invoicesMap.has(inv.documentId)) invoicesMap.set(inv.documentId, []);
             invoicesMap.get(inv.documentId).push(inv);
           });
-          
-          // Obtener pagos de la tabla payments
-          const invoiceIds = invoices.map(inv => inv.id);
-          if (invoiceIds.length > 0) {
-            const payments = await prisma.payment.findMany({
-              where: { invoiceId: { in: invoiceIds } },
-              select: { invoiceId: true, amount: true }
-            });
-            
-            payments.forEach(payment => {
-              if (!paymentsMap.has(payment.invoiceId)) paymentsMap.set(payment.invoiceId, 0);
-              paymentsMap.set(payment.invoiceId, paymentsMap.get(payment.invoiceId) + Number(payment.amount));
-            });
-          }
+        }
+
+        await autoHealInvoiceLinks(documents, invoicesMap, tx);
+
+        // Obtener pagos de la tabla payments (incluyendo facturas curadas en autohealing)
+        const allInvoiceIds = Array.from(new Set(
+          [...invoicesMap.values()].flat().map(inv => inv.id).filter(Boolean)
+        ));
+        if (allInvoiceIds.length > 0) {
+          const payments = await prisma.payment.findMany({
+            where: { invoiceId: { in: allInvoiceIds } },
+            select: { invoiceId: true, amount: true }
+          });
+
+          payments.forEach(payment => {
+            if (!paymentsMap.has(payment.invoiceId)) paymentsMap.set(payment.invoiceId, 0);
+            paymentsMap.set(payment.invoiceId, paymentsMap.get(payment.invoiceId) + Number(payment.amount));
+          });
         }
 
         const hydratedDocs = documents.map(d => {
           const docInvoices = invoicesMap.get(d.id) || [];
           let paymentStatus = 'SIN_FACTURA';
           let paymentInfo = null;
-          
+          let computedNumeroFactura = d.numeroFactura || null;
+          let computedFechaFactura = d.fechaFactura || null;
+
           if (docInvoices.length > 0) {
             const totalFacturado = docInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
-            
+
             // Calcular total pagado usando ambas fuentes:
             // 1. paidAmount del invoice (sync de Koinor)
             // 2. payments de la tabla payments (importaciones manuales)
@@ -1063,20 +1232,32 @@ async function getMyDocuments(req, res) {
               const paymentsTotal = paymentsMap.get(inv.id) || 0;
               return sum + Math.max(syncedPaid, paymentsTotal);
             }, 0);
-            
+
             const saldoPendiente = totalFacturado - totalPagado;
             if (saldoPendiente <= 0) paymentStatus = 'PAGADO';
             else if (totalPagado > 0) paymentStatus = 'PARCIAL';
             else paymentStatus = 'PENDIENTE';
-            
+
             paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: docInvoices.length };
+
+            if (!computedNumeroFactura) {
+              computedNumeroFactura = docInvoices[0]?.invoiceNumberRaw || docInvoices[0]?.invoiceNumber || null;
+            }
+            if (!computedFechaFactura) {
+              const byDateAsc = [...docInvoices]
+                .filter(inv => inv.issueDate)
+                .sort((a, b) => new Date(a.issueDate) - new Date(b.issueDate));
+              computedFechaFactura = byDateAsc[0]?.issueDate || null;
+            }
           }
-          
+
           return {
             ...d,
             createdBy: d.createdById ? authorMap.get(d.createdById) : null,
             paymentStatus,
-            paymentInfo
+            paymentInfo,
+            numeroFactura: computedNumeroFactura,
+            fechaFactura: computedFechaFactura || d.createdAt
           };
         });
 
@@ -1144,8 +1325,9 @@ async function getMyDocuments(req, res) {
     // DEBUG: Log filtros aplicados
     console.log(`[getMyDocuments] userId=${userId}, page=${page}, limit=${limit}, where.status=`, where.status);
 
+    const { documents, total, byStatus } = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
     const [documents, total] = await Promise.all([
-      prisma.document.findMany({
+      tx.document.findMany({
         where,
         include: {
           createdBy: {
@@ -1153,12 +1335,14 @@ async function getMyDocuments(req, res) {
           },
           // 💰 Incluir facturas y pagos para estado de pago
           invoices: {
-            select: { 
+            select: {
               id: true,
-              totalAmount: true, 
-              paidAmount: true, 
-              status: true, 
+              totalAmount: true,
+              paidAmount: true,
+              status: true,
               invoiceNumber: true,
+              invoiceNumberRaw: true,
+              issueDate: true,
               payments: {
                 select: { amount: true }
               }
@@ -1169,7 +1353,7 @@ async function getMyDocuments(req, res) {
         skip,
         take: parseInt(limit)
       }),
-      prisma.document.count({ where })
+      tx.document.count({ where })
     ]);
 
     // DEBUG: Log resultado
@@ -1184,7 +1368,7 @@ async function getMyDocuments(req, res) {
     let byStatus = {};
     // Solo calcular conteos globales si es la primera página para ahorrar recursos
     if (parseInt(page) === 1 && !search) {
-      const counts = await prisma.document.groupBy({
+      const counts = await tx.document.groupBy({
         by: ['status'],
         where: { assignedToId: userId },
         _count: { status: true }
@@ -1194,34 +1378,80 @@ async function getMyDocuments(req, res) {
       });
     }
 
+    return { documents, total, byStatus };
+    }); // end withRequestTenantContext
+
     // 💰 Calcular estado de pago para cada documento
+    const invoicesMapForHeal = new Map();
+    documents.forEach((doc) => {
+      invoicesMapForHeal.set(doc.id, Array.isArray(doc.invoices) ? doc.invoices : []);
+    });
+    await autoHealInvoiceLinks(documents, invoicesMapForHeal);
+
+    const paymentsMapForHeal = new Map();
+    const allInvoiceIds = Array.from(new Set(
+      [...invoicesMapForHeal.values()].flat().map(inv => inv.id).filter(Boolean)
+    ));
+    if (allInvoiceIds.length > 0) {
+      const payments = await prisma.payment.findMany({
+        where: { invoiceId: { in: allInvoiceIds } },
+        select: { invoiceId: true, amount: true }
+      });
+      payments.forEach((payment) => {
+        if (!paymentsMapForHeal.has(payment.invoiceId)) paymentsMapForHeal.set(payment.invoiceId, 0);
+        paymentsMapForHeal.set(payment.invoiceId, paymentsMapForHeal.get(payment.invoiceId) + Number(payment.amount));
+      });
+    }
+
     const documentsWithPayment = documents.map(doc => {
       let paymentStatus = 'SIN_FACTURA';
       let paymentInfo = null;
-      
-      if (doc.invoices && doc.invoices.length > 0) {
-        const totalFacturado = doc.invoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
-        
+      let computedNumeroFactura = doc.numeroFactura || null;
+      let computedFechaFactura = doc.fechaFactura || null;
+
+      const docInvoices = invoicesMapForHeal.get(doc.id) || doc.invoices || [];
+      if (docInvoices.length > 0) {
+        const totalFacturado = docInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
+
         // Calcular total pagado usando ambas fuentes:
         // 1. paidAmount del invoice (sync de Koinor)
         // 2. payments de la tabla payments (importaciones manuales)
-        const totalPagado = doc.invoices.reduce((sum, inv) => {
+        const totalPagado = docInvoices.reduce((sum, inv) => {
           const syncedPaid = Number(inv.paidAmount || 0);
-          const paymentsTotal = inv.payments?.reduce((pSum, p) => pSum + Number(p.amount || 0), 0) || 0;
+          const paymentsTotal = Math.max(
+            inv.payments?.reduce((pSum, p) => pSum + Number(p.amount || 0), 0) || 0,
+            paymentsMapForHeal.get(inv.id) || 0
+          );
           return sum + Math.max(syncedPaid, paymentsTotal);
         }, 0);
-        
+
         const saldoPendiente = totalFacturado - totalPagado;
-        
+
         if (saldoPendiente <= 0) paymentStatus = 'PAGADO';
         else if (totalPagado > 0) paymentStatus = 'PARCIAL';
         else paymentStatus = 'PENDIENTE';
-        
-        paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: doc.invoices.length };
+
+        paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: docInvoices.length };
+
+        if (!computedNumeroFactura) {
+          computedNumeroFactura = docInvoices[0]?.invoiceNumberRaw || docInvoices[0]?.invoiceNumber || null;
+        }
+        if (!computedFechaFactura) {
+          const byDateAsc = [...docInvoices]
+            .filter(inv => inv.issueDate)
+            .sort((a, b) => new Date(a.issueDate) - new Date(b.issueDate));
+          computedFechaFactura = byDateAsc[0]?.issueDate || null;
+        }
       }
-      
+
       const { invoices, ...docWithoutInvoices } = doc;
-      return { ...docWithoutInvoices, paymentStatus, paymentInfo };
+      return {
+        ...docWithoutInvoices,
+        paymentStatus,
+        paymentInfo,
+        numeroFactura: computedNumeroFactura,
+        fechaFactura: computedFechaFactura || doc.createdAt
+      };
     });
 
     res.json({
@@ -1280,8 +1510,9 @@ async function updateDocumentStatus(req, res) {
       });
     }
 
+    const { document, updatedDocument, updatedDocuments, groupAffected, whatsappSent, whatsappError, whatsappResults, notificacionCreada, updateData, isReversion } = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
     // Buscar documento y verificar propiedad
-    const document = await prisma.document.findUnique({
+    const document = await tx.document.findUnique({
       where: { id }
     });
 
@@ -1403,10 +1634,11 @@ async function updateDocumentStatus(req, res) {
     // Generar código de verificación si se marca como LISTO Y no tiene código
     if (status === 'LISTO' && !document.verificationCode) {
       updateData.verificationCode = generateVerificationCode();
+      updateData.fechaListo = new Date(); // ⏱️ Registrar timestamp de "listo"
 
       // 📈 Registrar evento de generación de código de verificación
       try {
-        await prisma.documentEvent.create({
+        await tx.documentEvent.create({
           data: {
             documentId: id,
             userId: req.user.id,
@@ -1425,6 +1657,9 @@ async function updateDocumentStatus(req, res) {
       } catch (auditError) {
         console.error('Error registrando evento de generación de código:', auditError);
       }
+    } else if (status === 'LISTO' && !document.fechaListo) {
+      // Si ya tenía código pero no tenía fechaListo (caso edge), setear igualmente
+      updateData.fechaListo = new Date();
     }
 
     // NUEVA FUNCIONALIDAD: Manejar propagación de estado en documentos agrupados
@@ -1434,7 +1669,7 @@ async function updateDocumentStatus(req, res) {
     // Verificar si el documento pertenece a un grupo y si el cambio debe propagarse
     // Ahora: si el usuario es MATRIZADOR y el documento está agrupado, propagamos SIEMPRE
     // Actualización individual (comportamiento original)
-    const updatedDocument = await prisma.document.update({
+    const updatedDocument = await tx.document.update({
       where: { id },
       data: updateData,
       include: {
@@ -1469,7 +1704,7 @@ async function updateDocumentStatus(req, res) {
     if (status === 'LISTO') {
       try {
         // Buscar si ya existe una notificación PENDING para este documento
-        const notificacionExistente = await prisma.whatsAppNotification.findFirst({
+        const notificacionExistente = await tx.whatsAppNotification.findFirst({
           where: {
             documentId: id,
             status: { in: ['PENDING', 'PREPARED'] },
@@ -1479,7 +1714,7 @@ async function updateDocumentStatus(req, res) {
 
         if (!notificacionExistente) {
           // Crear nueva notificación PENDING
-          notificacionCreada = await prisma.whatsAppNotification.create({
+          notificacionCreada = await tx.whatsAppNotification.create({
             data: {
               documentId: id,
               clientName: updatedDocument.clientName || document.clientName,
@@ -1507,7 +1742,7 @@ async function updateDocumentStatus(req, res) {
 
     // Registrar evento de auditoría
     try {
-      await prisma.documentEvent.create({
+      await tx.documentEvent.create({
         data: {
           documentId: id,
           userId: req.user.id,
@@ -1536,6 +1771,12 @@ async function updateDocumentStatus(req, res) {
     } catch (auditError) {
       console.error('Error registrando evento de auditoría:', auditError);
     }
+
+    return { document, updatedDocument, updatedDocuments, groupAffected, whatsappSent, whatsappError, whatsappResults, notificacionCreada, updateData, isReversion };
+    }); // end withRequestTenantContext
+
+    // If response was already sent (e.g., 404, 403, 400), don't send again
+    if (res.headersSent) return;
 
     // Preparar mensaje de respuesta
     let message = groupAffected
@@ -1601,32 +1842,34 @@ async function getDocumentById(req, res) {
   try {
     const { id } = req.params;
 
-    const document = await prisma.document.findUnique({
-      where: { id },
-      include: {
-        createdBy: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true
-          }
-        },
-        assignedTo: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true
-          }
-        },
-        // Include invoices for payment status
-        invoices: {
-          include: {
-            payments: true
+    const document = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
+      return await tx.document.findUnique({
+        where: { id },
+        include: {
+          createdBy: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true
+            }
+          },
+          assignedTo: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true
+            }
+          },
+          // Include invoices for payment status
+          invoices: {
+            include: {
+              payments: true
+            }
           }
         }
-      }
+      });
     });
 
     if (!document) {
@@ -1662,7 +1905,7 @@ async function getDocumentById(req, res) {
 
       for (const invoice of document.invoices) {
         totalAmount += Number(invoice.totalAmount);
-        
+
         // Calculate paid amount from both sources:
         // 1. Payments table (manual imports/XML)
         const paymentsTotal = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
@@ -1670,7 +1913,7 @@ async function getDocumentById(req, res) {
         const syncedPaidAmount = Number(invoice.paidAmount || 0);
         // Use the higher value (sync might have more recent data)
         const paid = Math.max(paymentsTotal, syncedPaidAmount);
-        
+
         totalPaid += paid;
       }
 
@@ -1863,8 +2106,9 @@ async function uploadXmlDocumentsBatch(req, res) {
         const xmlContent = archivo.buffer.toString('utf-8');
         const parsedData = await parseXmlDocument(xmlContent);
 
-        // Verificar si ya existe un documento con este número de protocolo
-        const existingDocument = await prisma.document.findUnique({
+        // Verificar and create document in tenant context
+        const document = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
+        const existingDocument = await tx.document.findUnique({
           where: { protocolNumber: parsedData.protocolNumber }
         });
 
@@ -1875,11 +2119,11 @@ async function uploadXmlDocumentsBatch(req, res) {
             error: `Ya existe un documento con número de protocolo: ${parsedData.protocolNumber}`,
             indice: i + 1
           });
-          continue;
+          return null;
         }
 
         // Crear documento en la base de datos
-        const document = await prisma.document.create({
+        const document = await tx.document.create({
           data: {
             protocolNumber: parsedData.protocolNumber,
             clientName: parsedData.clientName,
@@ -1908,11 +2152,19 @@ async function uploadXmlDocumentsBatch(req, res) {
           }
         });
 
+        return document;
+        }); // end withRequestTenantContext
+
+        if (!document) continue;
+
         // 🤖 ASIGNACIÓN AUTOMÁTICA DE MATRIZADOR
-        const assignmentResult = await MatrizadorAssignmentService.autoAssignDocument(
-          document.id,
-          parsedData.matrizadorName
-        );
+        const assignmentResult = await withRequestTenantContext(prisma, req, async (tx) => {
+          return MatrizadorAssignmentService.autoAssignDocument(
+            document.id,
+            parsedData.matrizadorName,
+            tx
+          );
+        });
 
         // CAJA SOLO PROCESA XMLs - Sin detección de agrupación
         // La agrupación es responsabilidad exclusiva del MATRIZADOR
@@ -2027,8 +2279,10 @@ async function getEditableDocumentInfo(req, res) {
     });
 
     // Buscar documento
-    const document = await prisma.document.findUnique({
-      where: { id }
+    const document = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
+      return await tx.document.findUnique({
+        where: { id }
+      });
     });
 
     if (!document) {
@@ -2106,8 +2360,9 @@ async function updateDocumentInfo(req, res) {
       updateData: req.body
     });
 
+    const updatedDocument = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
     // Buscar documento
-    const document = await prisma.document.findUnique({
+    const document = await tx.document.findUnique({
       where: { id }
     });
 
@@ -2145,7 +2400,7 @@ async function updateDocumentInfo(req, res) {
     }
 
     // Actualizar documento
-    const updatedDocument = await prisma.document.update({
+    const updatedDocument = await tx.document.update({
       where: { id },
       data: {
         detalle_documento: detalle_documento?.trim() || null,
@@ -2161,7 +2416,7 @@ async function updateDocumentInfo(req, res) {
 
     // Registrar evento de edición
     try {
-      await prisma.documentEvent.create({
+      await tx.documentEvent.create({
         data: {
           documentId: id,
           userId: req.user.id,
@@ -2195,6 +2450,12 @@ async function updateDocumentInfo(req, res) {
     } catch (auditError) {
       console.error('Error registrando evento de edición:', auditError);
     }
+
+    return updatedDocument;
+    }); // end withRequestTenantContext
+
+    // If response was already sent (e.g., 404, 403, 400), don't send again
+    if (res.headersSent) return;
 
     res.json({
       success: true,
@@ -2256,13 +2517,15 @@ async function deliverDocument(req, res) {
     }
 
     // Buscar documento con información de grupo (ajustado al esquema actual)
-    const document = await prisma.document.findUnique({
-      where: { id },
-      include: {
-        assignedTo: {
-          select: { firstName: true, lastName: true }
+    const document = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
+      return await tx.document.findUnique({
+        where: { id },
+        include: {
+          assignedTo: {
+            select: { firstName: true, lastName: true }
+          }
         }
-      }
+      });
     });
 
     if (!document) {
@@ -2349,7 +2612,7 @@ async function deliverDocument(req, res) {
     // let groupDocuments = []; // REMOVED: Group delivery logic
 
     // CONSERVADORA: Usar transacción para garantizar atomicidad entre update y log
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
       // 1. Actualizar documento principal con información de entrega
       const updatedDocument = await tx.document.update({
         where: { id },
@@ -2495,8 +2758,9 @@ async function undoDocumentStatusChange(req, res) {
       });
     }
 
+    const { document, lastChangeEvent } = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
     // Buscar el documento actual
-    const document = await prisma.document.findUnique({
+    const document = await tx.document.findUnique({
       where: { id: documentId },
       include: {
         assignedTo: {
@@ -2505,19 +2769,12 @@ async function undoDocumentStatusChange(req, res) {
       }
     });
 
-    if (!document) {
-      return res.status(404).json({
-        success: false,
-        message: 'Documento no encontrado'
-      });
-    }
-
     // Verificar permisos - solo el usuario que hizo el cambio o ADMIN puede deshacer
     let lastChangeEvent = null;
 
     if (changeId) {
       // Buscar evento específico por ID
-      lastChangeEvent = await prisma.documentEvent.findUnique({
+      lastChangeEvent = await tx.documentEvent.findUnique({
         where: { id: changeId },
         include: {
           user: {
@@ -2527,7 +2784,7 @@ async function undoDocumentStatusChange(req, res) {
       });
     } else {
       // Buscar último cambio de estado del documento
-      lastChangeEvent = await prisma.documentEvent.findFirst({
+      lastChangeEvent = await tx.documentEvent.findFirst({
         where: {
           documentId: documentId,
           eventType: 'STATUS_CHANGED'
@@ -2540,6 +2797,16 @@ async function undoDocumentStatusChange(req, res) {
             select: { firstName: true, lastName: true, role: true }
           }
         }
+      });
+    }
+
+    return { document, lastChangeEvent };
+    }); // end withRequestTenantContext
+
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: 'Documento no encontrado'
       });
     }
 
@@ -2594,7 +2861,7 @@ async function undoDocumentStatusChange(req, res) {
     }
 
     // CONSERVADOR: Usar transacción para garantizar consistencia
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
       // Revertir estado del documento
       const updatedDocument = await tx.document.update({
         where: { id: documentId },
@@ -2679,23 +2946,25 @@ async function getUndoableChanges(req, res) {
     const { documentId } = req.params;
 
     // Buscar cambios recientes (últimos 10 minutos) que pueden ser deshechos
-    const recentChanges = await prisma.documentEvent.findMany({
-      where: {
-        documentId: documentId,
-        eventType: 'STATUS_CHANGED',
-        createdAt: {
-          gte: new Date(Date.now() - 10 * 60 * 1000) // Últimos 10 minutos
-        }
-      },
-      include: {
-        user: {
-          select: { firstName: true, lastName: true, role: true }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      },
-      take: 5 // Máximo 5 cambios recientes
+    const recentChanges = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
+      return await tx.documentEvent.findMany({
+        where: {
+          documentId: documentId,
+          eventType: 'STATUS_CHANGED',
+          createdAt: {
+            gte: new Date(Date.now() - 10 * 60 * 1000) // Últimos 10 minutos
+          }
+        },
+        include: {
+          user: {
+            select: { firstName: true, lastName: true, role: true }
+          }
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        take: 5 // Máximo 5 cambios recientes
+      });
     });
 
     // Filtrar cambios que el usuario puede deshacer
@@ -2747,34 +3016,36 @@ async function getDocumentHistory(req, res) {
     console.log(`📜 getDocumentHistory params: id=${id}, limit=${limit}, offset=${offset}, eventType=${eventType || 'ALL'}`);
 
     // Buscar documento y verificar permisos
-    const document = await prisma.document.findUnique({
-      where: { id },
-      include: {
-        usuarioEntrega: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            role: true
-          }
-        },
-        createdBy: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            role: true
-          }
-        },
-        assignedTo: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            role: true
+    const document = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
+      return await tx.document.findUnique({
+        where: { id },
+        include: {
+          usuarioEntrega: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              role: true
+            }
+          },
+          createdBy: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              role: true
+            }
+          },
+          assignedTo: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              role: true
+            }
           }
         }
-      }
+      });
     });
 
     if (!document) {
@@ -2831,6 +3102,7 @@ async function getDocumentHistory(req, res) {
         'EXTRACTION_APPLIED',
         'STATUS_UNDO',
         'NOTE_ADDED',
+        'PAYMENT_REGISTERED',
         'UNKNOWN'
       ];
 
@@ -2843,23 +3115,25 @@ async function getDocumentHistory(req, res) {
 
     // Obtener eventos del historial
     console.log(`🔍 Querying events for document ${id}...`);
-    const events = await prisma.documentEvent.findMany({
-      where: whereClause,
-      include: {
-        user: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            role: true
+    const events = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
+      return await tx.documentEvent.findMany({
+        where: whereClause,
+        include: {
+          user: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              role: true
+            }
           }
-        }
-      },
-      orderBy: {
-        createdAt: 'desc'
-      },
-      skip: parseInt(offset),
-      take: parseInt(limit)
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        skip: parseInt(offset),
+        take: parseInt(limit)
+      });
     });
 
     // 🩹 FIX: Detectar y reparar eventos de entrega perdidos (Self-Healing)
@@ -3037,8 +3311,10 @@ async function getDocumentHistory(req, res) {
 
 
     // Obtener total de eventos para paginación
-    const totalEvents = await prisma.documentEvent.count({
-      where: whereClause
+    const totalEvents = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
+      return await tx.documentEvent.count({
+        where: whereClause
+      });
     });
 
     // Formatear eventos para respuesta con descripciones mejoradas
@@ -3072,11 +3348,13 @@ async function getDocumentHistory(req, res) {
         title: getEventTitle(event.eventType, parsedDetails),
         description: formattedDescription,
         timestamp: event.createdAt,
-        user: {
-          id: event.user.id,
-          name: `${event.user.firstName} ${event.user.lastName}`,
-          role: event.user.role
-        },
+        user: event.eventType === 'PAYMENT_REGISTERED'
+          ? { id: 0, name: 'Sistema Koinor', role: 'SISTEMA' }
+          : {
+            id: event.user.id,
+            name: `${event.user.firstName} ${event.user.lastName}`,
+            role: event.user.role
+          },
         icon: getEventIcon(event.eventType, parsedDetails),
         color: getEventColor(event.eventType, parsedDetails),
         contextInfo: contextInfo, // Información adicional para mostrar
@@ -3161,8 +3439,9 @@ async function revertDocumentStatus(req, res) {
       userRole: req.user.role
     });
 
+    const { document, updatedDocuments, groupAffected } = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
     // Obtener el documento con información de grupo
-    const document = await prisma.document.findUnique({
+    const document = await tx.document.findUnique({
       where: { id },
       include: {
         assignedTo: {
@@ -3209,7 +3488,7 @@ async function revertDocumentStatus(req, res) {
     // Si el documento está agrupado y el rol permite operaciones grupales,
     // propagar la reversión a todo el grupo. Ahora incluye RECEPCION.
     // Reversión individual (documento no agrupado o usuario MATRIZADOR/RECEPCION)
-    updatedDocuments = [await prisma.document.update({
+    updatedDocuments = [await tx.document.update({
       where: { id },
       data: {
         status: newStatus,
@@ -3230,7 +3509,7 @@ async function revertDocumentStatus(req, res) {
     })];
 
     // Registrar evento de auditoría
-    await prisma.documentEvent.create({
+    await tx.documentEvent.create({
       data: {
         documentId: id,
         userId: req.user.id,
@@ -3247,6 +3526,12 @@ async function revertDocumentStatus(req, res) {
         userAgent: req.get('User-Agent') || 'unknown'
       }
     });
+
+    return { document, updatedDocuments, groupAffected };
+    }); // end withRequestTenantContext
+
+    // If response was already sent (e.g., 404, 403, 400), don't send again
+    if (res.headersSent) return;
 
     // Preparar mensaje de respuesta
     const message = groupAffected
@@ -3345,8 +3630,8 @@ async function getDocumentsUnified(req, res) {
     });
 
     // Ejecutar consulta con optimización de índices
-    const [documents, total] = await Promise.all([
-      prisma.document.findMany({
+    const [documents, total] = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
+      const docs = await tx.document.findMany({
         where: whereClause,
         include: {
           createdBy: {
@@ -3359,9 +3644,10 @@ async function getDocumentsUnified(req, res) {
         orderBy: { createdAt: 'desc' },
         skip: offset,
         take: limit
-      }),
-      prisma.document.count({ where: whereClause })
-    ]);
+      });
+      const count = await tx.document.count({ where: whereClause });
+      return [docs, count];
+    });
 
     // Formatear respuesta optimizada para frontend
     const formattedDocuments = documents.map(doc => ({
@@ -3432,8 +3718,9 @@ async function markAsNotaCredito(req, res) {
       });
     }
 
+    const { document, updatedDocument } = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
     // Buscar documento
-    const document = await prisma.document.findUnique({
+    const document = await tx.document.findUnique({
       where: { id },
       include: {
         assignedTo: true,
@@ -3465,7 +3752,7 @@ async function markAsNotaCredito(req, res) {
     }
 
     // Actualizar documento a ANULADO_NOTA_CREDITO
-    const updatedDocument = await prisma.document.update({
+    const updatedDocument = await tx.document.update({
       where: { id },
       data: {
         status: 'ANULADO_NOTA_CREDITO',
@@ -3480,7 +3767,7 @@ async function markAsNotaCredito(req, res) {
     });
 
     // Registrar evento en auditoría
-    await prisma.documentEvent.create({
+    await tx.documentEvent.create({
       data: {
         documentId: id,
         userId: req.user.id,
@@ -3494,6 +3781,12 @@ async function markAsNotaCredito(req, res) {
         })
       }
     });
+
+    return { document, updatedDocument };
+    }); // end withRequestTenantContext
+
+    // If response was already sent (e.g., 404, 400), don't send again
+    if (res.headersSent) return;
 
     console.log('✅ Documento marcado como Nota de Crédito exitosamente:', {
       documentId: id,
@@ -3552,22 +3845,21 @@ async function getDocumentsCounts(req, res) {
     }
 
     // Ejecutar conteos en paralelo para mejor performance
-    const [activosCount, entregadosCount] = await Promise.all([
-      // Conteo para ACTIVOS (EN_PROCESO + LISTO)
-      prisma.document.count({
+    const [activosCount, entregadosCount] = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
+      const activos = await tx.document.count({
         where: {
           ...baseWhere,
           status: { in: ['EN_PROCESO', 'LISTO'] }
         }
-      }),
-      // Conteo para ENTREGADOS
-      prisma.document.count({
+      });
+      const entregados = await tx.document.count({
         where: {
           ...baseWhere,
           status: 'ENTREGADO'
         }
-      })
-    ]);
+      });
+      return [activos, entregados];
+    });
 
     console.log('📊 getDocumentsCounts completado:', {
       query: query || '(sin búsqueda)',
@@ -3626,9 +3918,10 @@ async function getCajaStats(req, res) {
       tramitesUltimos30Dias,
       montoUltimos7Dias,
       montoUltimos30Dias
-    ] = await Promise.all([
+    ] = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
+      return await Promise.all([
       // Total de documentos (excluyendo notas de crédito)
-      prisma.document.count({
+      tx.document.count({
         where: {
           status: {
             not: 'ANULADO_NOTA_CREDITO'
@@ -3637,7 +3930,7 @@ async function getCajaStats(req, res) {
       }),
 
       // Total facturado (excluyendo notas de crédito)
-      prisma.document.aggregate({
+      tx.document.aggregate({
         where: {
           status: {
             not: 'ANULADO_NOTA_CREDITO'
@@ -3649,7 +3942,7 @@ async function getCajaStats(req, res) {
       }),
 
       // Trámites por tipo de documento
-      prisma.document.groupBy({
+      tx.document.groupBy({
         by: ['documentType'],
         where: {
           status: {
@@ -3665,7 +3958,7 @@ async function getCajaStats(req, res) {
       }),
 
       // Trámites por estado
-      prisma.document.groupBy({
+      tx.document.groupBy({
         by: ['status'],
         where: {
           status: {
@@ -3678,7 +3971,7 @@ async function getCajaStats(req, res) {
       }),
 
       // Trámites últimos 7 días
-      prisma.document.count({
+      tx.document.count({
         where: {
           status: {
             not: 'ANULADO_NOTA_CREDITO'
@@ -3690,7 +3983,7 @@ async function getCajaStats(req, res) {
       }),
 
       // Trámites últimos 30 días
-      prisma.document.count({
+      tx.document.count({
         where: {
           status: {
             not: 'ANULADO_NOTA_CREDITO'
@@ -3702,7 +3995,7 @@ async function getCajaStats(req, res) {
       }),
 
       // Monto últimos 7 días
-      prisma.document.aggregate({
+      tx.document.aggregate({
         where: {
           status: {
             not: 'ANULADO_NOTA_CREDITO'
@@ -3717,7 +4010,7 @@ async function getCajaStats(req, res) {
       }),
 
       // Monto últimos 30 días
-      prisma.document.aggregate({
+      tx.document.aggregate({
         where: {
           status: {
             not: 'ANULADO_NOTA_CREDITO'
@@ -3730,7 +4023,8 @@ async function getCajaStats(req, res) {
           totalFactura: true
         }
       })
-    ]);
+      ]);
+    });
 
     // Formatear datos de trámites por tipo
     const tramitesPorTipoFormateado = tramitesPorTipo.reduce((acc, item) => {
@@ -3818,16 +4112,18 @@ async function bulkNotify(req, res) {
     }
 
     // Obtener documentos seleccionados
-    const selectedDocuments = await prisma.document.findMany({
-      where: {
-        id: { in: documentIds },
-        status: { in: ['LISTO', 'EN_PROCESO'] }
-      },
-      include: {
-        assignedTo: {
-          select: { firstName: true, lastName: true }
+    const selectedDocuments = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
+      return await tx.document.findMany({
+        where: {
+          id: { in: documentIds },
+          status: { in: ['LISTO', 'EN_PROCESO'] }
+        },
+        include: {
+          assignedTo: {
+            select: { firstName: true, lastName: true }
+          }
         }
-      }
+      });
     });
 
     if (selectedDocuments.length === 0) {
@@ -3868,24 +4164,26 @@ async function bulkNotify(req, res) {
         whereClause.assignedToId = req.user.id;
       }
 
-      allClientDocuments = await prisma.document.findMany({
-        where: whereClause,
-        include: {
-          assignedTo: {
-            select: { firstName: true, lastName: true }
+      allClientDocuments = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
+        return await tx.document.findMany({
+          where: whereClause,
+          include: {
+            assignedTo: {
+              select: { firstName: true, lastName: true }
+            }
           }
-        }
+        });
       });
     }
 
     // Combinar documentos seleccionados con todos los del cliente (evitar duplicados)
     const documentMap = new Map();
-    
+
     // Primero agregar los documentos del cliente (LISTO)
     for (const doc of allClientDocuments) {
       documentMap.set(doc.id, doc);
     }
-    
+
     // Luego agregar los seleccionados (pueden ser EN_PROCESO)
     for (const doc of selectedDocuments) {
       if (!documentMap.has(doc.id)) {
@@ -3940,7 +4238,8 @@ async function bulkNotify(req, res) {
         // Actualizar todos los documentos del grupo con el código y timestamp
         const documentIdsToUpdate = clientGroup.documents.map(d => d.id);
 
-        await prisma.document.updateMany({
+        await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
+        await tx.document.updateMany({
           where: { id: { in: documentIdsToUpdate } },
           data: {
             codigoRetiro: codigoRetiro,
@@ -3951,7 +4250,7 @@ async function bulkNotify(req, res) {
 
         // 🔄 NUEVO: Marcar como PREPARED todas las notificaciones PENDING de estos documentos
         // Esto evita duplicados y asegura que todos queden marcados como enviados
-        await prisma.whatsAppNotification.updateMany({
+        await tx.whatsAppNotification.updateMany({
           where: {
             documentId: { in: documentIdsToUpdate },
             status: 'PENDING',
@@ -3966,7 +4265,7 @@ async function bulkNotify(req, res) {
 
         // Registrar evento de auditoría para cada documento
         for (const doc of clientGroup.documents) {
-          await prisma.documentEvent.create({
+          await tx.documentEvent.create({
             data: {
               documentId: doc.id,
               userId: req.user.id,
@@ -3983,7 +4282,7 @@ async function bulkNotify(req, res) {
           });
 
           // Verificar si ya existe notificación PREPARED para este documento
-          const existingPrepared = await prisma.whatsAppNotification.findFirst({
+          const existingPrepared = await tx.whatsAppNotification.findFirst({
             where: {
               documentId: doc.id,
               status: { in: ['PREPARED', 'SENT'] },
@@ -3993,7 +4292,7 @@ async function bulkNotify(req, res) {
 
           // Solo crear nueva notificación si no existe una PREPARED/SENT reciente
           if (!existingPrepared) {
-            await prisma.whatsAppNotification.create({
+            await tx.whatsAppNotification.create({
               data: {
                 documentId: doc.id,
                 clientName: clientGroup.clientName,
@@ -4006,6 +4305,7 @@ async function bulkNotify(req, res) {
             });
           }
         }
+        }); // end withRequestTenantContext
 
         // Generar URL wa.me si se solicita envío
         let waUrl = null;
@@ -4125,7 +4425,8 @@ async function bulkNotify(req, res) {
       try {
         const codigoRetiro = await CodigoRetiroService.generarUnico();
 
-        await prisma.document.update({
+        await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
+        await tx.document.update({
           where: { id: doc.id },
           data: {
             codigoRetiro,
@@ -4134,7 +4435,7 @@ async function bulkNotify(req, res) {
           }
         });
 
-        await prisma.documentEvent.create({
+        await tx.documentEvent.create({
           data: {
             documentId: doc.id,
             userId: req.user.id,
@@ -4147,6 +4448,7 @@ async function bulkNotify(req, res) {
             })
           }
         });
+        }); // end withRequestTenantContext
 
         results.sinTelefono.push({
           id: doc.id,
@@ -4179,14 +4481,14 @@ async function bulkNotify(req, res) {
     res.json({
       success: true,
       message: `Notificación procesada: ${results.notificados.length} clientes notificados, ${results.sinTelefono.length} sin teléfono` +
-               (consolidatedCount > 0 ? ` (${consolidatedCount} documentos adicionales consolidados)` : ''),
+        (consolidatedCount > 0 ? ` (${consolidatedCount} documentos adicionales consolidados)` : ''),
       data: {
         ...results,
         consolidacion: {
           documentosSeleccionados: totalSelected,
           documentosTotales: totalConsolidated,
           documentosAdicionales: consolidatedCount,
-          mensaje: consolidatedCount > 0 
+          mensaje: consolidatedCount > 0
             ? `Se incluyeron ${consolidatedCount} documentos adicionales del mismo cliente que ya estaban listos`
             : null
         }
@@ -4240,3 +4542,4 @@ export {
   // 🔎 Herramientas de control para CAJA
   findProtocolSequenceGaps
 };
+

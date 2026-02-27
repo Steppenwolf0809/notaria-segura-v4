@@ -1,4 +1,8 @@
+import { getPrismaClient } from '../db.js';
 import { bulkMarkReady } from '../services/bulk-status-service.js';
+import { withRequestTenantContext } from '../utils/tenant-context.js';
+
+const prisma = getPrismaClient();
 
 /**
  * Controlador: Archivo - cambio masivo a LISTO con notificación por cliente
@@ -6,10 +10,13 @@ import { bulkMarkReady } from '../services/bulk-status-service.js';
 export async function marcarVariosListosArchivo(req, res) {
   try {
     const { documentIds, sendNotifications = true } = req.body || {};
-    const result = await bulkMarkReady({
-      documentIds,
-      actor: req.user,
-      sendNotifications
+    const result = await withRequestTenantContext(prisma, req, async (tx) => {
+      return bulkMarkReady({
+        documentIds,
+        actor: req.user,
+        sendNotifications,
+        dbClient: tx
+      });
     });
 
     return res.status(result.status).json({

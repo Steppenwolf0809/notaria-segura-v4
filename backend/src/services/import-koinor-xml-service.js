@@ -15,6 +15,7 @@
 
 import { db as prisma } from '../db.js';
 import { parseKoinorXML, validateKoinorXMLStructure } from './xml-koinor-parser.js';
+import { normalizeInvoiceNumber, buildInvoiceWhereByNumber } from '../utils/billing-utils.js';
 
 /**
  * Extrae el secuencial de un número de factura
@@ -37,18 +38,46 @@ function invoiceNumbersMatch(num1, num2) {
     return seq1 === seq2 && seq1.length >= 5;
 }
 
+function isRootPrismaClient(dbClient) {
+    return typeof dbClient?.$connect === 'function';
+}
+
+async function runInTransaction(dbClient, operation) {
+    if (isRootPrismaClient(dbClient)) {
+        return dbClient.$transaction(operation);
+    }
+    return operation(dbClient);
+}
+
+async function processBatch(items, handler, parallel = true) {
+    if (parallel) {
+        return Promise.allSettled(items.map(handler));
+    }
+
+    const results = [];
+    for (const item of items) {
+        try {
+            const value = await handler(item);
+            results.push({ status: 'fulfilled', value });
+        } catch (reason) {
+            results.push({ status: 'rejected', reason });
+        }
+    }
+    return results;
+}
+
 /**
  * Busca un documento por número de factura
  * @param {string} invoiceNumber - Número de factura
  * @returns {Promise<Object|null>} - Documento encontrado o null
  */
-async function findDocumentByInvoiceNumber(invoiceNumber) {
+async function findDocumentByInvoiceNumber(invoiceNumber, dbClient = prisma) {
     if (!invoiceNumber) return null;
     
     const secuencial = extractSecuencial(invoiceNumber);
     
     // Buscar por numeroFactura exacto o por secuencial
-    let document = await prisma.document.findFirst({
+    let document = await dbClient.document.findFirst({
         where: {
             OR: [
                 { numeroFactura: invoiceNumber },
@@ -76,12 +105,13 @@ async function findDocumentByInvoiceNumber(invoiceNumber) {
  * @param {number} userId - ID del usuario ejecutando la importación
  * @returns {Promise<Object>} - Resultado de la importación
  */
-export async function importKoinorXMLFile(fileBuffer, fileName, userId) {
+export async function importKoinorXMLFile(fileBuffer, fileName, userId, dbClient = prisma) {
     const startTime = Date.now();
     console.log(`[import-koinor-xml] Starting import of ${fileName} by user ${userId}`);
+    const canParallelize = isRootPrismaClient(dbClient);
 
     // Crear log de importación
-    const importLog = await prisma.importLog.create({
+    const importLog = await dbClient.importLog.create({
         data: {
             fileName,
             fileType: 'XML_KOINOR',
@@ -125,8 +155,10 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId) {
                 
                 console.log(`[import-koinor-xml] Processing invoice batch ${batchNum}/${totalBatches} (${batch.length} invoices)...`);
                 
-                const batchResults = await Promise.allSettled(
-                    batch.map(invoice => processInvoiceFC(invoice, fileName))
+                const batchResults = await processBatch(
+                    batch,
+                    (invoice) => processInvoiceFC(invoice, fileName, dbClient),
+                    canParallelize
                 );
                 
                 for (const result of batchResults) {
@@ -160,8 +192,10 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId) {
             console.log(`[import-koinor-xml] Processing batch ${batchNum}/${totalBatches} (${batch.length} payments)...`);
             
             // Procesar batch en paralelo (con límite de concurrencia)
-            const batchResults = await Promise.allSettled(
-                batch.map(payment => processPayment(payment, fileName, stats))
+            const batchResults = await processBatch(
+                batch,
+                (payment) => processPayment(payment, fileName, stats, userId, dbClient),
+                canParallelize
             );
             
             // Agregar resultados
@@ -196,8 +230,10 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId) {
             for (let i = 0; i < parsed.notasCredito.length; i += BATCH_SIZE) {
                 const batch = parsed.notasCredito.slice(i, i + BATCH_SIZE);
                 
-                const batchResults = await Promise.allSettled(
-                    batch.map(nc => processNotaCredito(nc, fileName))
+                const batchResults = await processBatch(
+                    batch,
+                    (nc) => processNotaCredito(nc, fileName, dbClient),
+                    canParallelize
                 );
                 
                 for (const result of batchResults) {
@@ -215,7 +251,7 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId) {
         }
 
         // 5. Actualizar log con éxito
-        await prisma.importLog.update({
+        await dbClient.importLog.update({
             where: { id: importLog.id },
             data: {
                 totalRows: stats.totalTransactions,
@@ -281,7 +317,7 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId) {
         // Actualizar log con fallo (solo si el log fue creado)
         if (importLog && importLog.id) {
             try {
-                await prisma.importLog.update({
+                await dbClient.importLog.update({
                     where: { id: importLog.id },
                     data: {
                         status: 'FAILED',
@@ -309,7 +345,7 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId) {
  * @param {Object} stats - Objeto de estadísticas
  * @returns {Promise<Object>} - {created, skipped, invoicesUpdated, documentsUpdated}
  */
-async function processPayment(payment, sourceFile, stats) {
+async function processPayment(payment, sourceFile, stats, userId, dbClient = prisma) {
     const result = {
         created: 0,
         skipped: 0,
@@ -321,7 +357,7 @@ async function processPayment(payment, sourceFile, stats) {
     // Procesar cada factura en el pago (multi-factura)
     for (const detail of payment.details) {
         try {
-            const singleResult = await processSinglePayment(payment, detail, sourceFile);
+            const singleResult = await processSinglePayment(payment, detail, sourceFile, userId, dbClient);
             
             if (singleResult.created) {
                 result.created++;
@@ -357,19 +393,11 @@ async function processPayment(payment, sourceFile, stats) {
  * @param {string} sourceFile - Nombre del archivo
  * @returns {Promise<Object>} - {created, skipped, documentUpdated}
  */
-async function processSinglePayment(payment, detail, sourceFile) {
+async function processSinglePayment(payment, detail, sourceFile, userId, dbClient = prisma) {
     // 1. Buscar factura por invoiceNumberRaw O por invoiceNumber normalizado
     // Esto evita duplicados cuando el formato varía entre importaciones
-    const normalizedNumber = detail.invoiceNumberRaw.replace(/^0+/, '');
-    
-    let invoice = await prisma.invoice.findFirst({
-        where: {
-            OR: [
-                { invoiceNumberRaw: detail.invoiceNumberRaw },
-                { invoiceNumber: detail.invoiceNumberRaw },
-                { invoiceNumber: normalizedNumber }
-            ]
-        },
+    let invoice = await dbClient.invoice.findFirst({
+        where: buildInvoiceWhereByNumber(detail.invoiceNumberRaw),
         include: { document: true }
     });
 
@@ -380,19 +408,23 @@ async function processSinglePayment(payment, detail, sourceFile) {
         console.log(`[import-koinor-xml] Creating legacy invoice for: ${detail.invoiceNumberRaw}`);
         
         // Usar upsert para evitar errores de unique constraint
-        invoice = await prisma.invoice.upsert({
-            where: { invoiceNumber: detail.invoiceNumberRaw },
+        const legacyTotal = parseFloat(detail.amount || 0);
+        const legacySubtotal = legacyTotal > 0 ? Math.round((legacyTotal / 1.15) * 100) / 100 : 0;
+        const canonicalInvoiceNumber = normalizeInvoiceNumber(detail.invoiceNumberRaw) || detail.invoiceNumberRaw;
+        invoice = await dbClient.invoice.upsert({
+            where: { invoiceNumber: canonicalInvoiceNumber },
             update: {
                 // Si ya existe, solo actualizar invoiceNumberRaw si está vacío
                 invoiceNumberRaw: detail.invoiceNumberRaw
             },
             create: {
-                invoiceNumber: detail.invoiceNumberRaw, // Usar el RAW como número principal
+                invoiceNumber: canonicalInvoiceNumber,
                 invoiceNumberRaw: detail.invoiceNumberRaw,
                 clientName: payment.clientName || 'Cliente Legacy',
                 clientTaxId: payment.clientTaxId || '9999999999999',
                 issueDate: payment.paymentDate,
                 totalAmount: detail.amount,
+                subtotalAmount: legacySubtotal,
                 paidAmount: 0,
                 status: 'PENDING',
                 isLegacy: true,
@@ -405,7 +437,7 @@ async function processSinglePayment(payment, detail, sourceFile) {
 
     // 2. Verificar idempotencia - solo receiptNumber + invoiceId
     // No verificamos amount ni paymentDate porque pueden variar entre importaciones XLS/XML
-    const existingPayment = await prisma.payment.findFirst({
+    const existingPayment = await dbClient.payment.findFirst({
         where: {
             receiptNumber: payment.receiptNumber,
             invoiceId: invoice.id
@@ -423,7 +455,7 @@ async function processSinglePayment(payment, detail, sourceFile) {
     let linkedToDocument = false;
     
     if (!documentId) {
-        const document = await findDocumentByInvoiceNumber(detail.invoiceNumberRaw);
+        const document = await findDocumentByInvoiceNumber(detail.invoiceNumberRaw, dbClient);
         if (document) {
             documentId = document.id;
             linkedToDocument = true;
@@ -435,7 +467,7 @@ async function processSinglePayment(payment, detail, sourceFile) {
     let documentUpdated = false;
 
     try {
-        await prisma.$transaction(async (tx) => {
+        await runInTransaction(dbClient, async (tx) => {
             // ⭐ NUEVO: Vincular factura al documento si se encontró
             if (linkedToDocument && documentId) {
                 await tx.invoice.update({
@@ -518,6 +550,30 @@ async function processSinglePayment(payment, detail, sourceFile) {
                 console.log(`[import-koinor-xml] ✅ Updated existing document ${document.protocolNumber} with numeroFactura: ${detail.invoiceNumberRaw}`);
             }
         }
+
+        // ⭐ Registrar evento de pago en el timeline del documento
+        const finalDocId = documentId || invoice.documentId;
+        if (finalDocId && userId) {
+            await tx.documentEvent.create({
+                data: {
+                    documentId: finalDocId,
+                    userId: userId,
+                    eventType: 'PAYMENT_REGISTERED',
+                    description: `Pago de $${parseFloat(detail.amount).toFixed(2)} registrado desde Sistema Koinor (Recibo: ${payment.receiptNumber || 'N/A'})`,
+                    details: JSON.stringify({
+                        amount: parseFloat(detail.amount),
+                        receiptNumber: payment.receiptNumber,
+                        invoiceNumber: detail.invoiceNumberRaw,
+                        paymentDate: payment.paymentDate,
+                        paymentType: 'TRANSFER',
+                        concept: payment.concept || '',
+                        source: 'KOINOR_XML',
+                        sourceFile
+                    })
+                }
+            });
+            console.log(`[import-koinor-xml] 📋 Created PAYMENT_REGISTERED event for document ${finalDocId}`);
+        }
     });
 
         console.log(`[import-koinor-xml] Payment processed: ${payment.receiptNumber} -> ${detail.invoiceNumberRaw} ($${detail.amount})${createdLegacy ? ' [LEGACY INVOICE CREATED]' : ''}`);
@@ -546,9 +602,9 @@ async function processSinglePayment(payment, detail, sourceFile) {
  * @param {Object} nc - Nota de crédito parseada del XML
  * @param {string} sourceFile - Nombre del archivo
  */
-async function processNotaCredito(nc, sourceFile) {
+async function processNotaCredito(nc, sourceFile, dbClient = prisma) {
     // Buscar factura afectada por invoiceNumberRaw
-    const invoice = await prisma.invoice.findFirst({
+    const invoice = await dbClient.invoice.findFirst({
         where: { 
             invoiceNumberRaw: nc.invoiceNumberRaw 
         },
@@ -560,7 +616,7 @@ async function processNotaCredito(nc, sourceFile) {
         return;
     }
 
-    await prisma.$transaction(async (tx) => {
+    await runInTransaction(dbClient, async (tx) => {
         // Actualizar Invoice a CANCELLED
         await tx.invoice.update({
             where: { id: invoice.id },
@@ -593,24 +649,21 @@ async function processNotaCredito(nc, sourceFile) {
  * @param {string} sourceFile - Nombre del archivo origen
  * @returns {Promise<Object>} - {created, skipped}
  */
-async function processInvoiceFC(invoiceData, sourceFile) {
+async function processInvoiceFC(invoiceData, sourceFile, dbClient = prisma) {
     const result = { created: false, skipped: false };
+    const canonicalInvoiceNumber = normalizeInvoiceNumber(invoiceData.invoiceNumberRaw || invoiceData.invoiceNumber)
+        || invoiceData.invoiceNumberRaw
+        || invoiceData.invoiceNumber;
     
     // Buscar si la factura ya existe
-    const existingInvoice = await prisma.invoice.findFirst({
-        where: {
-            OR: [
-                { invoiceNumberRaw: invoiceData.invoiceNumberRaw },
-                { invoiceNumber: invoiceData.invoiceNumber },
-                { invoiceNumber: invoiceData.invoiceNumberRaw }
-            ]
-        }
+    const existingInvoice = await dbClient.invoice.findFirst({
+        where: buildInvoiceWhereByNumber(invoiceData.invoiceNumberRaw || invoiceData.invoiceNumber)
     });
     
     if (existingInvoice) {
         // Factura ya existe - solo actualizar invoiceNumberRaw si está vacío
         if (!existingInvoice.invoiceNumberRaw && invoiceData.invoiceNumberRaw) {
-            await prisma.invoice.update({
+            await dbClient.invoice.update({
                 where: { id: existingInvoice.id },
                 data: { 
                     invoiceNumberRaw: invoiceData.invoiceNumberRaw,
@@ -625,21 +678,26 @@ async function processInvoiceFC(invoiceData, sourceFile) {
     
     // ⭐ Buscar documento para vincular
     let documentId = null;
-    const document = await findDocumentByInvoiceNumber(invoiceData.invoiceNumberRaw);
+    const document = await findDocumentByInvoiceNumber(invoiceData.invoiceNumberRaw, dbClient);
     if (document) {
         documentId = document.id;
         console.log(`[import-koinor-xml] 🔍 Found document ${document.protocolNumber} for invoice ${invoiceData.invoiceNumberRaw}`);
     }
     
-    // Crear nueva factura desde el XML
-    await prisma.invoice.create({
+    // Usar Base Imponible real del XML; fallback a estimación por división
+    const totalAmt = parseFloat(invoiceData.totalAmount || 0);
+    const subtotalAmount = invoiceData.subtotalAmount != null
+        ? invoiceData.subtotalAmount
+        : (totalAmt > 0 ? Math.round((totalAmt / 1.15) * 100) / 100 : 0);
+    await dbClient.invoice.create({
         data: {
-            invoiceNumber: invoiceData.invoiceNumberRaw,
+            invoiceNumber: canonicalInvoiceNumber,
             invoiceNumberRaw: invoiceData.invoiceNumberRaw,
             clientName: invoiceData.clientName || 'Cliente del XML',
             clientTaxId: invoiceData.clientTaxId || '',
             issueDate: invoiceData.issueDate,
             totalAmount: invoiceData.totalAmount,
+            subtotalAmount,
             paidAmount: 0,
             status: 'PENDING',
             isLegacy: false,  // Es del XML, no legacy
@@ -654,7 +712,7 @@ async function processInvoiceFC(invoiceData, sourceFile) {
     
     // Si se vinculó a un documento sin numeroFactura, actualizarlo
     if (documentId && document) {
-        await prisma.document.update({
+        await dbClient.document.update({
             where: { id: documentId },
             data: { 
                 numeroFactura: invoiceData.invoiceNumberRaw,
@@ -674,8 +732,8 @@ async function processInvoiceFC(invoiceData, sourceFile) {
  * Obtiene estadísticas de importaciones XML
  * @returns {Promise<Object>} - Estadísticas agregadas
  */
-export async function getXMLImportStats() {
-    const logs = await prisma.importLog.findMany({
+export async function getXMLImportStats(dbClient = prisma) {
+    const logs = await dbClient.importLog.findMany({
         where: {
             fileType: 'XML_KOINOR'
         },

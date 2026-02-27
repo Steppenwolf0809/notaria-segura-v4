@@ -2,6 +2,8 @@ import { getPrismaClient } from '../db.js';
 import { Prisma } from '@prisma/client';
 import { getReversionCleanupData, isValidStatus, isReversion as isReversionFn, STATUS_ORDER_LIST } from '../utils/status-transitions.js';
 import logger from '../utils/logger.js';
+import { buildInvoiceNumberVariants } from '../utils/billing-utils.js';
+import { withRequestTenantContext } from '../utils/tenant-context.js';
 
 const prisma = getPrismaClient();
 
@@ -23,171 +25,362 @@ async function supportsUnaccentFn() {
   return UNACCENT_SUPPORTED;
 }
 
+function extractInvoiceSequential(value) {
+  if (!value) return '';
+  const parts = String(value).split('-');
+  const lastPart = parts[parts.length - 1] || '';
+  return lastPart.replace(/^0+/, '') || '0';
+}
+
+function normalizeTaxId(value) {
+  return String(value || '').replace(/\D/g, '').trim();
+}
+
+function pickInvoiceCandidateForDocument(candidates, doc) {
+  if (!Array.isArray(candidates) || candidates.length === 0) return null;
+
+  const docProtocol = String(doc.protocolNumber || '').trim();
+  const docVariants = new Set(buildInvoiceNumberVariants(String(doc.numeroFactura || '')));
+  const docSequential = extractInvoiceSequential(doc.numeroFactura);
+  const docTaxId = normalizeTaxId(doc.clientId);
+
+  const byProtocol = docProtocol
+    ? candidates.filter((inv) => String(inv.numeroProtocolo || '').trim() === docProtocol)
+    : [];
+  if (byProtocol.length === 1) return byProtocol[0];
+
+  const byExactNumber = docVariants.size > 0
+    ? candidates.filter((inv) => docVariants.has(inv.invoiceNumber) || docVariants.has(inv.invoiceNumberRaw))
+    : [];
+  if (byExactNumber.length === 1) return byExactNumber[0];
+
+  const bySequential = (docSequential && docSequential.length >= 5)
+    ? candidates.filter((inv) => extractInvoiceSequential(inv.invoiceNumberRaw || inv.invoiceNumber) === docSequential)
+    : [];
+  if (bySequential.length === 1) return bySequential[0];
+
+  if (docTaxId) {
+    const exactByTaxId = byExactNumber.filter((inv) => normalizeTaxId(inv.clientTaxId) === docTaxId);
+    if (exactByTaxId.length === 1) return exactByTaxId[0];
+
+    const sequentialByTaxId = bySequential.filter((inv) => normalizeTaxId(inv.clientTaxId) === docTaxId);
+    if (sequentialByTaxId.length === 1) return sequentialByTaxId[0];
+  }
+
+  return null;
+}
+
+function summarizeDocumentPayment(doc, docInvoices) {
+  let paymentStatus = 'SIN_FACTURA';
+  let paymentInfo = null;
+  let computedFechaFactura = doc.fechaFactura || null;
+  let computedNumeroFactura = doc.numeroFactura || null;
+
+  if (docInvoices.length > 0) {
+    const totalFacturado = docInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
+    const totalPagado = docInvoices.reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
+    const saldoPendiente = totalFacturado - totalPagado;
+
+    if (saldoPendiente <= 0) {
+      paymentStatus = 'PAGADO';
+    } else if (totalPagado > 0) {
+      paymentStatus = 'PARCIAL';
+    } else {
+      paymentStatus = 'PENDIENTE';
+    }
+
+    paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: docInvoices.length };
+
+    if (!computedFechaFactura) {
+      const byDateAsc = [...docInvoices]
+        .filter(inv => inv.issueDate)
+        .sort((a, b) => new Date(a.issueDate) - new Date(b.issueDate));
+      computedFechaFactura = byDateAsc[0]?.issueDate || null;
+    }
+    if (!computedNumeroFactura) {
+      computedNumeroFactura = docInvoices[0]?.invoiceNumberRaw || docInvoices[0]?.invoiceNumber || null;
+    }
+  }
+
+  return {
+    paymentStatus,
+    paymentInfo,
+    computedFechaFactura,
+    computedNumeroFactura
+  };
+}
+
+async function autoHealInvoiceLinks(documents, invoicesMap, dbClient = prisma) {
+  if (!Array.isArray(documents) || documents.length === 0) return;
+
+  const reservedInvoiceIds = new Set();
+  const docsToHeal = documents.filter((doc) => {
+    const hasInvoices = (invoicesMap.get(doc.id) || []).length > 0;
+    return !hasInvoices && (doc.numeroFactura || doc.protocolNumber);
+  });
+
+  for (const doc of docsToHeal) {
+    const variants = buildInvoiceNumberVariants(String(doc.numeroFactura || ''));
+    const sequential = extractInvoiceSequential(doc.numeroFactura);
+    const orClauses = [];
+
+    if (variants.length > 0) {
+      orClauses.push({ invoiceNumber: { in: variants } });
+      orClauses.push({ invoiceNumberRaw: { in: variants } });
+    }
+
+    if (sequential && sequential.length >= 5) {
+      orClauses.push({ invoiceNumber: { endsWith: sequential } });
+      orClauses.push({ invoiceNumberRaw: { endsWith: sequential } });
+    }
+
+    if (doc.protocolNumber) {
+      orClauses.push({ numeroProtocolo: doc.protocolNumber });
+    }
+
+    if (orClauses.length === 0) continue;
+
+    const candidates = await dbClient.invoice.findMany({
+      where: {
+        AND: [
+          { OR: orClauses },
+          { OR: [{ documentId: null }, { documentId: doc.id }] }
+        ]
+      },
+      select: {
+        id: true,
+        documentId: true,
+        invoiceNumber: true,
+        invoiceNumberRaw: true,
+        totalAmount: true,
+        paidAmount: true,
+        status: true,
+        issueDate: true,
+        clientTaxId: true,
+        numeroProtocolo: true
+      },
+      orderBy: { issueDate: 'desc' },
+      take: 10
+    });
+
+    if (candidates.length === 0) continue;
+
+    const candidate = pickInvoiceCandidateForDocument(candidates, doc);
+    if (!candidate || reservedInvoiceIds.has(candidate.id)) continue;
+    reservedInvoiceIds.add(candidate.id);
+
+    if (!candidate.documentId) {
+      await dbClient.invoice.update({
+        where: { id: candidate.id },
+        data: { documentId: doc.id }
+      });
+
+      const patch = {};
+      if (!doc.numeroFactura) patch.numeroFactura = candidate.invoiceNumberRaw || candidate.invoiceNumber;
+      if (!doc.fechaFactura && candidate.issueDate) patch.fechaFactura = candidate.issueDate;
+      if (Object.keys(patch).length > 0) {
+        await dbClient.document.update({ where: { id: doc.id }, data: patch });
+      }
+
+      logger.warn(`[reception] Auto-healing invoice link: doc=${doc.id}, invoice=${candidate.invoiceNumberRaw || candidate.invoiceNumber}`);
+    }
+
+    if (!invoicesMap.has(doc.id)) invoicesMap.set(doc.id, []);
+    invoicesMap.get(doc.id).push({
+      documentId: doc.id,
+      totalAmount: candidate.totalAmount,
+      paidAmount: candidate.paidAmount,
+      status: candidate.status,
+      issueDate: candidate.issueDate,
+      invoiceNumber: candidate.invoiceNumber,
+      invoiceNumberRaw: candidate.invoiceNumberRaw
+    });
+  }
+}
+
 async function getDashboardStats(req, res) {
   try {
-    // 🔄 CONSERVADOR: Estadísticas básicas para dashboard de recepción
-    // 🔥 EXCLUYE Notas de Crédito de todas las estadísticas
-    const baseFilter = { status: { not: 'ANULADO_NOTA_CREDITO' } };
+    const result = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
+      // 🔄 CONSERVADOR: Estadísticas básicas para dashboard de recepción
+      // 🔥 EXCLUYE Notas de Crédito de todas las estadísticas
+      const baseFilter = { status: { not: 'ANULADO_NOTA_CREDITO' } };
 
-    // Fechas de referencia
-    const now = new Date();
-    const hoy = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-    const hace7Dias = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const hace15Dias = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000);
-    const hace3Dias = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
-    const inicioSemana = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      // Fechas de referencia
+      const now = new Date();
+      const hoy = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      const hace7Dias = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const hace15Dias = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000);
+      const hace3Dias = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+      const inicioSemana = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    const stats = await Promise.all([
-      // Total de documentos (sin NC)
-      prisma.document.count({ where: { status: { not: 'ANULADO_NOTA_CREDITO' } } }),
-      // Documentos en proceso
-      prisma.document.count({ where: { status: 'EN_PROCESO' } }),
-      // Documentos listos para entrega
-      prisma.document.count({ where: { status: 'LISTO' } }),
-      // Documentos entregados
-      prisma.document.count({ where: { status: 'ENTREGADO' } }),
-      // Documentos creados hoy (sin NC)
-      prisma.document.count({
-        where: {
-          status: { not: 'ANULADO_NOTA_CREDITO' },
-          createdAt: {
-            gte: hoy
+      const stats = await Promise.all([
+        // Total de documentos (sin NC)
+        tx.document.count({ where: { status: { not: 'ANULADO_NOTA_CREDITO' } } }),
+        // Documentos en proceso
+        tx.document.count({ where: { status: 'EN_PROCESO' } }),
+        // Documentos listos para entrega
+        tx.document.count({ where: { status: 'LISTO' } }),
+        // Documentos entregados
+        tx.document.count({ where: { status: 'ENTREGADO' } }),
+        // Documentos creados hoy (sin NC)
+        tx.document.count({
+          where: {
+            status: { not: 'ANULADO_NOTA_CREDITO' },
+            createdAt: {
+              gte: hoy
+            }
           }
-        }
-      }),
-      // Documentos entregados hoy
-      prisma.document.count({
-        where: {
-          status: 'ENTREGADO',
-          fechaEntrega: {
-            gte: hoy
+        }),
+        // Documentos entregados hoy
+        tx.document.count({
+          where: {
+            status: 'ENTREGADO',
+            fechaEntrega: {
+              gte: hoy
+            }
           }
-        }
-      }),
-      // 📊 MÉTRICAS AVANZADAS
-      // Documentos no retirados hace más de 7 días
-      prisma.document.count({
-        where: {
-          status: 'LISTO',
-          updatedAt: {
-            lt: hace7Dias
+        }),
+        // 📊 MÉTRICAS AVANZADAS
+        // Documentos no retirados hace más de 7 días
+        tx.document.count({
+          where: {
+            status: 'LISTO',
+            updatedAt: {
+              lt: hace7Dias
+            }
           }
-        }
-      }),
-      // Documentos no retirados hace más de 15 días
-      prisma.document.count({
-        where: {
-          status: 'LISTO',
-          updatedAt: {
-            lt: hace15Dias
+        }),
+        // Documentos no retirados hace más de 15 días
+        tx.document.count({
+          where: {
+            status: 'LISTO',
+            updatedAt: {
+              lt: hace15Dias
+            }
           }
-        }
-      }),
-      // Documentos atrasados en proceso (más de 3 días)
-      prisma.document.count({
-        where: {
-          status: 'EN_PROCESO',
-          createdAt: {
-            lt: hace3Dias
+        }),
+        // Documentos atrasados en proceso (más de 3 días)
+        tx.document.count({
+          where: {
+            status: 'EN_PROCESO',
+            createdAt: {
+              lt: hace3Dias
+            }
           }
-        }
-      }),
-      // Documentos entregados esta semana
-      prisma.document.count({
+        }),
+        // Documentos entregados esta semana
+        tx.document.count({
+          where: {
+            status: 'ENTREGADO',
+            fechaEntrega: {
+              gte: inicioSemana
+            }
+          }
+        }),
+        // Grupos de documentos listos (contar códigos únicos en documentos LISTO)
+        tx.document.groupBy({
+          by: ['codigoRetiro'],
+          where: {
+            status: 'LISTO',
+            codigoRetiro: { not: null }
+          },
+          _count: true
+        })
+      ]);
+
+      const [
+        total,
+        enProceso,
+        listos,
+        entregados,
+        creadosHoy,
+        entregadosHoy,
+        noRetirados7Dias,
+        noRetirados15Dias,
+        atrasados3Dias,
+        entregadosSemana,
+        gruposListosData
+      ] = stats;
+
+      // Contar grupos únicos
+      const gruposListos = gruposListosData.length;
+
+      // Calcular tiempo promedio de entrega (documentos entregados en la última semana)
+      // Nota: El filtro gte ya excluye valores null, no es necesario agregar isNot: null
+      const documentosEntregadosRecientes = await tx.document.findMany({
         where: {
           status: 'ENTREGADO',
           fechaEntrega: {
             gte: inicioSemana
           }
-        }
-      }),
-      // Grupos de documentos listos (contar códigos únicos en documentos LISTO)
-      prisma.document.groupBy({
-        by: ['codigoRetiro'],
-        where: {
-          status: 'LISTO',
-          codigoRetiro: { not: null }
         },
-        _count: true
-      })
-    ]);
-
-    const [
-      total,
-      enProceso,
-      listos,
-      entregados,
-      creadosHoy,
-      entregadosHoy,
-      noRetirados7Dias,
-      noRetirados15Dias,
-      atrasados3Dias,
-      entregadosSemana,
-      gruposListosData
-    ] = stats;
-
-    // Contar grupos únicos
-    const gruposListos = gruposListosData.length;
-
-    // Calcular tiempo promedio de entrega (documentos entregados en la última semana)
-    // Nota: El filtro gte ya excluye valores null, no es necesario agregar isNot: null
-    const documentosEntregadosRecientes = await prisma.document.findMany({
-      where: {
-        status: 'ENTREGADO',
-        fechaEntrega: {
-          gte: inicioSemana
+        select: {
+          createdAt: true,
+          fechaEntrega: true
         }
-      },
-      select: {
-        createdAt: true,
-        fechaEntrega: true
+      });
+
+      let tiempoPromedioEntregaDias = 0;
+      if (documentosEntregadosRecientes.length > 0) {
+        const tiemposTotales = documentosEntregadosRecientes.reduce((sum, doc) => {
+          const diff = new Date(doc.fechaEntrega).getTime() - new Date(doc.createdAt).getTime();
+          const dias = diff / (1000 * 60 * 60 * 24);
+          return sum + dias;
+        }, 0);
+        tiempoPromedioEntregaDias = parseFloat((tiemposTotales / documentosEntregadosRecientes.length).toFixed(1));
       }
+
+      // Calcular tasa de retiro (documentos entregados vs listos en la semana)
+      const totalActivosSemana = listos + entregadosSemana;
+      const tasaRetiroPorcentaje = totalActivosSemana > 0
+        ? Math.round((entregadosSemana / totalActivosSemana) * 100)
+        : 100;
+
+      return {
+        total,
+        enProceso,
+        listos,
+        entregados,
+        creadosHoy,
+        entregadosHoy,
+        entregadosSemana,
+        gruposListos,
+        noRetirados7Dias,
+        noRetirados15Dias,
+        atrasados3Dias,
+        tiempoPromedioEntregaDias,
+        tasaRetiroPorcentaje
+      };
     });
-
-    let tiempoPromedioEntregaDias = 0;
-    if (documentosEntregadosRecientes.length > 0) {
-      const tiemposTotales = documentosEntregadosRecientes.reduce((sum, doc) => {
-        const diff = new Date(doc.fechaEntrega).getTime() - new Date(doc.createdAt).getTime();
-        const dias = diff / (1000 * 60 * 60 * 24);
-        return sum + dias;
-      }, 0);
-      tiempoPromedioEntregaDias = parseFloat((tiemposTotales / documentosEntregadosRecientes.length).toFixed(1));
-    }
-
-    // Calcular tasa de retiro (documentos entregados vs listos en la semana)
-    const totalActivosSemana = listos + entregadosSemana;
-    const tasaRetiroPorcentaje = totalActivosSemana > 0
-      ? Math.round((entregadosSemana / totalActivosSemana) * 100)
-      : 100;
 
     res.json({
       success: true,
       data: {
         stats: {
           // Métricas básicas
-          total,
-          documentosEnProceso: enProceso,
-          documentosListos: listos,
-          documentosEntregados: entregados,
-          creadosHoy,
-          documentosEntregadosHoy: entregadosHoy,
-          documentosEntregadosSemana: entregadosSemana,
-          gruposListos,
+          total: result.total,
+          documentosEnProceso: result.enProceso,
+          documentosListos: result.listos,
+          documentosEntregados: result.entregados,
+          creadosHoy: result.creadosHoy,
+          documentosEntregadosHoy: result.entregadosHoy,
+          documentosEntregadosSemana: result.entregadosSemana,
+          gruposListos: result.gruposListos,
 
           // 📊 Métricas avanzadas
-          documentosNoRetirados7Dias: noRetirados7Dias,
-          documentosNoRetirados15Dias: noRetirados15Dias,
-          documentosAtrasados3Dias: atrasados3Dias,
-          tiempoPromedioEntregaDias,
-          tasaRetiroPorcentaje,
+          documentosNoRetirados7Dias: result.noRetirados7Dias,
+          documentosNoRetirados15Dias: result.noRetirados15Dias,
+          documentosAtrasados3Dias: result.atrasados3Dias,
+          tiempoPromedioEntregaDias: result.tiempoPromedioEntregaDias,
+          tasaRetiroPorcentaje: result.tasaRetiroPorcentaje,
 
           // Compatibilidad con versión anterior
-          enProceso,
-          listos,
-          entregados,
-          entregadosHoy,
-          pendientesEntrega: listos,
-          eficienciaHoy: creadosHoy > 0 ? Math.round((entregadosHoy / creadosHoy) * 100) : 0
+          enProceso: result.enProceso,
+          listos: result.listos,
+          entregados: result.entregados,
+          entregadosHoy: result.entregadosHoy,
+          pendientesEntrega: result.listos,
+          eficienciaHoy: result.creadosHoy > 0 ? Math.round((result.entregadosHoy / result.creadosHoy) * 100) : 0
         }
       }
     });
@@ -219,6 +412,7 @@ async function getMatrizadores(req, res) {
 
 async function listarTodosDocumentos(req, res) {
   try {
+    await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
     const { search, matrizador, estado, fechaDesde, fechaHasta, page = 1, limit = 10, sortBy = 'createdAt', sortOrder = 'desc' } = req.query;
     // Normalizar y mapear campo de ordenamiento permitido
     const mapSortField = (field) => {
@@ -326,40 +520,40 @@ async function listarTodosDocumentos(req, res) {
           whereSql = Prisma.sql`${whereSql} AND ${clause}`;
         }
 
-        // Preparar ORDER BY seguro (solo campos permitidos)
-        const fieldSql = (() => {
+        // Preparar ORDER BY seguro (solo campos permitidos) - usar Prisma.raw para strings
+        const fieldName = (() => {
           switch (mappedSortField) {
-            case 'createdAt': return Prisma.sql`d."createdAt"`;
-            case 'updatedAt': return Prisma.sql`d."updatedAt"`;
-            case 'clientName': return Prisma.sql`d."clientName"`;
-            case 'protocolNumber': return Prisma.sql`d."protocolNumber"`;
-            case 'documentType': return Prisma.sql`d."documentType"`;
-            case 'status': return Prisma.sql`d."status"`;
-            case 'fechaEntrega': return Prisma.sql`d."fechaEntrega"`;
-            default: return Prisma.sql`d."createdAt"`;
+            case 'createdAt': return 'd."createdAt"';
+            case 'updatedAt': return 'd."updatedAt"';
+            case 'clientName': return 'd."clientName"';
+            case 'protocolNumber': return 'd."protocolNumber"';
+            case 'documentType': return 'd."documentType"';
+            case 'status': return 'd."status"';
+            case 'fechaEntrega': return 'd."fechaEntrega"';
+            default: return 'd."createdAt"';
           }
         })();
         // Use string for direction since ASC/DESC are safe SQL keywords
         const direction = mappedSortOrder === 'asc' ? 'ASC' : 'DESC';
 
-        const documents = await prisma.$queryRaw`
+        const documents = await tx.$queryRaw`
           SELECT d.*, u.id as "_assignedToId", u."firstName" as "_assignedToFirstName", u."lastName" as "_assignedToLastName"
           FROM "documents" d
           LEFT JOIN "users" u ON u.id = d."assignedToId"
           WHERE ${whereSql}
-          ORDER BY ${fieldSql} ${Prisma.raw(direction)}
+          ORDER BY ${Prisma.raw(fieldName)} ${Prisma.raw(direction)}
           OFFSET ${skip} LIMIT ${take}
         `;
-        const countRows = await prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${whereSql}`;
+        const countRows = await tx.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${whereSql}`;
         const total = Array.isArray(countRows) ? (countRows[0]?.count || 0) : (countRows?.count || 0);
 
         // 💰 Obtener facturas para los documentos encontrados
         const docIds = documents.map(d => d.id);
         const invoicesMap = new Map();
         if (docIds.length > 0) {
-        const invoices = await prisma.invoice.findMany({
+        const invoices = await tx.invoice.findMany({
           where: { documentId: { in: docIds } },
-          select: { documentId: true, totalAmount: true, paidAmount: true, status: true, issueDate: true, invoiceNumber: true }
+          select: { documentId: true, totalAmount: true, paidAmount: true, status: true, issueDate: true, invoiceNumber: true, invoiceNumberRaw: true }
         });
           invoices.forEach(inv => {
             if (!invoicesMap.has(inv.documentId)) {
@@ -369,40 +563,18 @@ async function listarTodosDocumentos(req, res) {
           });
         }
 
+        await autoHealInvoiceLinks(documents, invoicesMap, tx);
+
         const formattedDocuments = documents.map(doc => {
           // 💰 Calcular estado de pago
           const docInvoices = invoicesMap.get(doc.id) || [];
-          let paymentStatus = 'SIN_FACTURA';
-          let paymentInfo = null;
-          let computedFechaFactura = doc.fechaFactura || null;
-          let computedNumeroFactura = doc.numeroFactura || null;
-          
-          if (docInvoices.length > 0) {
-            const totalFacturado = docInvoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
-            const totalPagado = docInvoices.reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
-            const saldoPendiente = totalFacturado - totalPagado;
-            
-            if (saldoPendiente <= 0) {
-              paymentStatus = 'PAGADO';
-            } else if (totalPagado > 0) {
-              paymentStatus = 'PARCIAL';
-            } else {
-              paymentStatus = 'PENDIENTE';
-            }
-            
-            paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: docInvoices.length };
+          const {
+            paymentStatus,
+            paymentInfo,
+            computedFechaFactura,
+            computedNumeroFactura
+          } = summarizeDocumentPayment(doc, docInvoices);
 
-            if (!computedFechaFactura) {
-              const byDateAsc = [...docInvoices]
-                .filter(inv => inv.issueDate)
-                .sort((a, b) => new Date(a.issueDate) - new Date(b.issueDate));
-              computedFechaFactura = byDateAsc[0]?.issueDate || null;
-            }
-            if (!computedNumeroFactura) {
-              computedNumeroFactura = docInvoices[0]?.invoiceNumber || null;
-            }
-          }
-          
           return {
             id: doc.id,
             protocolNumber: doc.protocolNumber,
@@ -463,10 +635,10 @@ async function listarTodosDocumentos(req, res) {
         };
 
         const [enProceso, listos, entregados, entregadosHoy] = await Promise.all([
-          prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${statsWhere('EN_PROCESO')}`,
-          prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${statsWhere('LISTO')}`,
-          prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${statsWhere('ENTREGADO')}`,
-          prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${statsWhere('ENTREGADO', true)}`
+          tx.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${statsWhere('EN_PROCESO')}`,
+          tx.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${statsWhere('LISTO')}`,
+          tx.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${statsWhere('ENTREGADO')}`,
+          tx.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${statsWhere('ENTREGADO', true)}`
         ]);
 
         const stats = {
@@ -505,7 +677,7 @@ async function listarTodosDocumentos(req, res) {
     }
 
     const [documents, total] = await Promise.all([
-      prisma.document.findMany({
+      tx.document.findMany({
         where,
         include: {
           assignedTo: {
@@ -520,6 +692,7 @@ async function listarTodosDocumentos(req, res) {
             select: {
               id: true,
               invoiceNumber: true,
+              invoiceNumberRaw: true,
               totalAmount: true,
               paidAmount: true,
               status: true,
@@ -531,43 +704,24 @@ async function listarTodosDocumentos(req, res) {
         skip,
         take
       }),
-      prisma.document.count({ where })
+      tx.document.count({ where })
     ]);
+
+    const invoicesMap = new Map();
+    documents.forEach((doc) => {
+      invoicesMap.set(doc.id, Array.isArray(doc.invoices) ? doc.invoices : []);
+    });
+    await autoHealInvoiceLinks(documents, invoicesMap, tx);
 
     const formattedDocuments = documents.map(doc => {
       // 💰 Calcular estado de pago
-      let paymentStatus = 'SIN_FACTURA';
-      let paymentInfo = null;
-      let computedFechaFactura = doc.fechaFactura || null;
-      
-      if (doc.invoices && doc.invoices.length > 0) {
-        const totalFacturado = doc.invoices.reduce((sum, inv) => sum + Number(inv.totalAmount || 0), 0);
-        const totalPagado = doc.invoices.reduce((sum, inv) => sum + Number(inv.paidAmount || 0), 0);
-        const saldoPendiente = totalFacturado - totalPagado;
-        
-        if (saldoPendiente <= 0) {
-          paymentStatus = 'PAGADO';
-        } else if (totalPagado > 0) {
-          paymentStatus = 'PARCIAL';
-        } else {
-          paymentStatus = 'PENDIENTE';
-        }
-        
-        paymentInfo = {
-          totalFacturado,
-          totalPagado,
-          saldoPendiente,
-          facturas: doc.invoices.length
-        };
-        
-        // Calcular fechaFactura desde las facturas si no existe
-        if (!computedFechaFactura) {
-          const byDateAsc = [...doc.invoices]
-            .filter(inv => inv.issueDate)
-            .sort((a, b) => new Date(a.issueDate) - new Date(b.issueDate));
-          computedFechaFactura = byDateAsc[0]?.issueDate || null;
-        }
-      }
+      const docInvoices = invoicesMap.get(doc.id) || [];
+      const {
+        paymentStatus,
+        paymentInfo,
+        computedFechaFactura,
+        computedNumeroFactura
+      } = summarizeDocumentPayment(doc, docInvoices);
       
       return {
         id: doc.id,
@@ -588,6 +742,7 @@ async function listarTodosDocumentos(req, res) {
         actoPrincipalDescripcion: doc.actoPrincipalDescripcion,
         actoPrincipalValor: doc.totalFactura,
         totalFactura: doc.totalFactura,
+        numeroFactura: computedNumeroFactura || doc.numeroFactura || null,
         matrizadorName: doc.matrizadorName,
         detalle_documento: doc.detalle_documento,
         comentarios_recepcion: doc.comentarios_recepcion,
@@ -605,11 +760,11 @@ async function listarTodosDocumentos(req, res) {
 
     const statsPromises = [
       // Contar por estado (respetando los filtros where)
-      prisma.document.count({ where: { ...where, status: 'EN_PROCESO' } }),
-      prisma.document.count({ where: { ...where, status: 'LISTO' } }),
-      prisma.document.count({ where: { ...where, status: 'ENTREGADO' } }),
+      tx.document.count({ where: { ...where, status: 'EN_PROCESO' } }),
+      tx.document.count({ where: { ...where, status: 'LISTO' } }),
+      tx.document.count({ where: { ...where, status: 'ENTREGADO' } }),
       // Entregados hoy (respetando los filtros where)
-      prisma.document.count({
+      tx.document.count({
         where: {
           ...where,
           status: 'ENTREGADO',
@@ -641,6 +796,7 @@ async function listarTodosDocumentos(req, res) {
     await cache.set(cacheKey, payload, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'search:reception:todos'] });
     res.json({ success: true, data: payload });
 
+    }); // end withRequestTenantContext
   } catch (error) {
     logger.error('Error listando todos los documentos:', error);
     res.status(500).json({ success: false, error: 'Error interno del servidor' });
@@ -649,6 +805,7 @@ async function listarTodosDocumentos(req, res) {
 
 async function getDocumentosEnProceso(req, res) {
   try {
+    await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
     const { search, matrizador, page = 1, limit = 10 } = req.query;
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
@@ -689,7 +846,7 @@ async function getDocumentosEnProceso(req, res) {
             COALESCE(d."clientPhone", '')::text ILIKE ${pattern}
           )`;
 
-        const documents = await prisma.$queryRaw`
+        const documents = await tx.$queryRaw`
           SELECT d.*, u.id as "_assignedToId", u."firstName" as "_assignedToFirstName", u."lastName" as "_assignedToLastName"
           FROM "documents" d
           LEFT JOIN "users" u ON u.id = d."assignedToId"
@@ -697,7 +854,7 @@ async function getDocumentosEnProceso(req, res) {
           ORDER BY d."updatedAt" DESC
           OFFSET ${skip} LIMIT ${take}
         `;
-        const countRows = await prisma.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${whereSql}`;
+        const countRows = await tx.$queryRaw`SELECT COUNT(*)::int AS count FROM "documents" d WHERE ${whereSql}`;
         const total = Array.isArray(countRows) ? (countRows[0]?.count || 0) : (countRows?.count || 0);
 
         const formattedDocuments = documents.map(doc => ({
@@ -745,7 +902,7 @@ async function getDocumentosEnProceso(req, res) {
     }
 
     const [documents, total] = await Promise.all([
-      prisma.document.findMany({
+      tx.document.findMany({
         where,
         include: {
           assignedTo: {
@@ -760,7 +917,7 @@ async function getDocumentosEnProceso(req, res) {
         skip,
         take
       }),
-      prisma.document.count({ where })
+      tx.document.count({ where })
     ]);
 
     const formattedDocuments = documents.map(doc => ({
@@ -791,6 +948,7 @@ async function getDocumentosEnProceso(req, res) {
     await cache.set(cacheKey, payload, { ttlMs: parseInt(process.env.CACHE_TTL_MS || '60000', 10), tags: ['documents', 'search:reception:en_proceso'] });
     res.json({ success: true, data: payload });
 
+    }); // end withRequestTenantContext
   } catch (error) {
     logger.error('Error obteniendo documentos en proceso:', error);
     res.status(500).json({ success: false, error: 'Error interno del servidor' });
@@ -803,7 +961,9 @@ async function marcarComoListo(req, res) {
 
     logger.debug('marcarComoListo iniciado para documento:', id);
 
-    const document = await prisma.document.findUnique({
+    const transactionResult = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
+
+    const document = await tx.document.findUnique({
       where: { id },
       include: {
         assignedTo: {
@@ -814,14 +974,14 @@ async function marcarComoListo(req, res) {
 
     if (!document) {
       logger.warn('Documento no encontrado:', id);
-      return res.status(404).json({ success: false, message: 'Documento no encontrado' });
+      return { earlyResponse: { status: 404, body: { success: false, message: 'Documento no encontrado' } } };
     }
 
     logger.debug('Documento encontrado con estado:', document.status);
 
     if (document.status !== 'EN_PROCESO') {
       logger.warn('Estado incorrecto para marcar como listo:', document.status);
-      return res.status(400).json({ success: false, message: `El documento no está en proceso. Estado actual: ${document.status}` });
+      return { earlyResponse: { status: 400, body: { success: false, message: `El documento no está en proceso. Estado actual: ${document.status}` } } };
     }
 
     // 🔄 NUEVA LÓGICA: Verificar si el cliente tiene notificación pendiente para agrupar
@@ -834,7 +994,7 @@ async function marcarComoListo(req, res) {
 
       // Buscar notificación pendiente del mismo cliente (no enviada aún)
       // Una notificación está "pendiente de envío" si tiene status PENDING o PREPARED pero no ha sido enviada por WhatsApp
-      notificacionExistente = await prisma.whatsAppNotification.findFirst({
+      notificacionExistente = await tx.whatsAppNotification.findFirst({
         where: {
           clientPhone: phoneNormalized,
           messageType: 'DOCUMENTO_LISTO',
@@ -856,7 +1016,7 @@ async function marcarComoListo(req, res) {
         logger.info(`📦 Agrupando documento ${document.protocolNumber} con notificación existente. Código: ${codigoRetiro}`);
 
         // Buscar todos los documentos del mismo cliente con el mismo código
-        documentosAgrupados = await prisma.document.findMany({
+        documentosAgrupados = await tx.document.findMany({
           where: {
             codigoRetiro: codigoRetiro,
             status: 'LISTO'
@@ -872,116 +1032,114 @@ async function marcarComoListo(req, res) {
       codigoRetiro = await CodigoRetiroService.generarUnico();
     }
 
-    let updatedDocuments = [];
-    let updatedDocument;
-    let notificacionCreada = null;
+    const currentDoc = await tx.document.findUnique({ where: { id } });
 
-    // Usar transacción para evitar condiciones de carrera
-    const transactionResult = await prisma.$transaction(async (tx) => {
-      const currentDoc = await tx.document.findUnique({ where: { id } });
+    if (!currentDoc || currentDoc.status !== 'EN_PROCESO') {
+      throw new Error(`El documento ya no está en proceso. Estado actual: ${currentDoc?.status || 'NO_ENCONTRADO'}`);
+    }
 
-      if (!currentDoc || currentDoc.status !== 'EN_PROCESO') {
-        throw new Error(`El documento ya no está en proceso. Estado actual: ${currentDoc?.status || 'NO_ENCONTRADO'}`);
-      }
+    const now = new Date();
 
-      const now = new Date();
-
-      // Registro de evento de cambio de estado
-      await tx.documentEvent.create({
-        data: {
-          documentId: id,
-          userId: req.user.id,
-          eventType: 'STATUS_CHANGED',
-          description: `Estado cambiado de EN_PROCESO a LISTO - ${req.user.firstName} ${req.user.lastName}`,
-          details: JSON.stringify({
-            previousStatus: 'EN_PROCESO',
-            newStatus: 'LISTO',
-            codigoRetiro: codigoRetiro,
-            agrupadoConExistente: !!notificacionExistente,
-            timestamp: now.toISOString()
-          })
-        }
-      });
-
-      // Actualizar documento con código de retiro y estado LISTO
-      const docActualizado = await tx.document.update({
-        where: { id },
-        data: {
-          status: 'LISTO',
+    // Registro de evento de cambio de estado
+    await tx.documentEvent.create({
+      data: {
+        documentId: id,
+        userId: req.user.id,
+        eventType: 'STATUS_CHANGED',
+        description: `Estado cambiado de EN_PROCESO a LISTO - ${req.user.firstName} ${req.user.lastName}`,
+        details: JSON.stringify({
+          previousStatus: 'EN_PROCESO',
+          newStatus: 'LISTO',
           codigoRetiro: codigoRetiro,
-          fechaListo: now,
-          updatedAt: now
-        },
-        include: {
-          assignedTo: {
-            select: { id: true, firstName: true, lastName: true, email: true }
-          }
-        }
-      });
-
-      // 📱 CREAR NOTIFICACIÓN AUTOMÁTICAMENTE
-      // Siempre crear WhatsAppNotification para que aparezca en el Centro de Notificaciones
-      // (matrizador/archivo pueden agregar el teléfono después si falta)
-      let notificacion = null;
-      const cantidadDocumentos = documentosAgrupados.length + 1;
-      const clientPhone = (document.clientPhone || '').trim();
-
-      notificacion = await tx.whatsAppNotification.create({
-        data: {
-          documentId: id,
-          clientName: document.clientName,
-          clientPhone: clientPhone,
-          messageType: 'DOCUMENTO_LISTO',
-          messageBody: `Código de retiro: ${codigoRetiro}. Documentos en lote: ${cantidadDocumentos}`,
-          status: 'PENDING',
-          sentAt: null
-        }
-      });
-
-      // Registrar evento de notificación preparada
-      await tx.documentEvent.create({
-        data: {
-          documentId: id,
-          userId: req.user.id,
-          eventType: clientPhone ? 'WHATSAPP_NOTIFICATION' : 'CODIGO_GENERADO',
-          description: clientPhone
-            ? (notificacionExistente
-              ? `Documento agregado a notificación existente. Código: ${codigoRetiro}`
-              : `Notificación WhatsApp preparada automáticamente. Código: ${codigoRetiro}`)
-            : `Notificación preparada (cliente sin teléfono). Código: ${codigoRetiro}`,
-          details: JSON.stringify({
-            codigoRetiro,
-            clientPhone: clientPhone || null,
-            documentosEnLote: cantidadDocumentos,
-            agrupadoConExistente: !!notificacionExistente,
-            notificacionId: notificacion.id,
-            sinTelefono: !clientPhone,
-            timestamp: now.toISOString()
-          })
-        }
-      });
-
-      logger.info(`📱 Notificación creada para documento ${docActualizado.protocolNumber}. Código: ${codigoRetiro}${notificacionExistente ? ' (agrupado)' : ''}${!clientPhone ? ' (sin teléfono)' : ''}`);
-
-      return { docActualizado, notificacion };
+          agrupadoConExistente: !!notificacionExistente,
+          timestamp: now.toISOString()
+        })
+      }
     });
 
-    updatedDocument = transactionResult.docActualizado;
-    notificacionCreada = transactionResult.notificacion;
-    updatedDocuments = [updatedDocument];
+    // Actualizar documento con código de retiro y estado LISTO
+    const docActualizado = await tx.document.update({
+      where: { id },
+      data: {
+        status: 'LISTO',
+        codigoRetiro: codigoRetiro,
+        fechaListo: now,
+        updatedAt: now
+      },
+      include: {
+        assignedTo: {
+          select: { id: true, firstName: true, lastName: true, email: true }
+        }
+      }
+    });
+
+    // 📱 CREAR NOTIFICACIÓN AUTOMÁTICAMENTE
+    // Siempre crear WhatsAppNotification para que aparezca en el Centro de Notificaciones
+    // (matrizador/archivo pueden agregar el teléfono después si falta)
+    let notificacion = null;
+    const cantidadDocumentos = documentosAgrupados.length + 1;
+    const clientPhone = (document.clientPhone || '').trim();
+
+    notificacion = await tx.whatsAppNotification.create({
+      data: {
+        documentId: id,
+        clientName: document.clientName,
+        clientPhone: clientPhone,
+        messageType: 'DOCUMENTO_LISTO',
+        messageBody: `Código de retiro: ${codigoRetiro}. Documentos en lote: ${cantidadDocumentos}`,
+        status: 'PENDING',
+        sentAt: null
+      }
+    });
+
+    // Registrar evento de notificación preparada
+    await tx.documentEvent.create({
+      data: {
+        documentId: id,
+        userId: req.user.id,
+        eventType: clientPhone ? 'WHATSAPP_NOTIFICATION' : 'CODIGO_GENERADO',
+        description: clientPhone
+          ? (notificacionExistente
+            ? `Documento agregado a notificación existente. Código: ${codigoRetiro}`
+            : `Notificación WhatsApp preparada automáticamente. Código: ${codigoRetiro}`)
+          : `Notificación preparada (cliente sin teléfono). Código: ${codigoRetiro}`,
+        details: JSON.stringify({
+          codigoRetiro,
+          clientPhone: clientPhone || null,
+          documentosEnLote: cantidadDocumentos,
+          agrupadoConExistente: !!notificacionExistente,
+          notificacionId: notificacion.id,
+          sinTelefono: !clientPhone,
+          timestamp: now.toISOString()
+        })
+      }
+    });
+
+    logger.info(`📱 Notificación creada para documento ${docActualizado.protocolNumber}. Código: ${codigoRetiro}${notificacionExistente ? ' (agrupado)' : ''}${!clientPhone ? ' (sin teléfono)' : ''}`);
+
+    return { docActualizado, notificacion, notificacionExistente, documentosAgrupados, codigoRetiro };
+    }); // end withRequestTenantContext
+
+    if (transactionResult.earlyResponse) {
+      return res.status(transactionResult.earlyResponse.status).json(transactionResult.earlyResponse.body);
+    }
+
+    const updatedDocument = transactionResult.docActualizado;
+    const notificacionCreada = transactionResult.notificacion;
+    const updatedDocuments = [updatedDocument];
     logger.debug('Documento actualizado exitosamente');
 
     // Variables para la respuesta
     const mainDocument = updatedDocument;
-    const groupAffected = !!notificacionExistente;
-    const cantidadEnLote = documentosAgrupados.length + 1;
+    const groupAffected = !!transactionResult.notificacionExistente;
+    const cantidadEnLote = transactionResult.documentosAgrupados.length + 1;
 
     let responseMessage = `Documento ${mainDocument.protocolNumber} marcado como listo exitosamente`;
-    if (notificacionExistente) {
-      responseMessage += `. Agrupado con ${documentosAgrupados.length} documento(s) del mismo cliente`;
+    if (transactionResult.notificacionExistente) {
+      responseMessage += `. Agrupado con ${transactionResult.documentosAgrupados.length} documento(s) del mismo cliente`;
     }
     if (notificacionCreada) {
-      responseMessage += `. Notificación preparada - Código: ${codigoRetiro}`;
+      responseMessage += `. Notificación preparada - Código: ${transactionResult.codigoRetiro}`;
     }
 
     logger.debug('Proceso completado exitosamente');
@@ -1004,9 +1162,9 @@ async function marcarComoListo(req, res) {
         documentsUpdated: updatedDocuments.length,
         // Nuevos campos para el frontend
         notificacionCreada: !!notificacionCreada,
-        agrupadoConExistente: !!notificacionExistente,
+        agrupadoConExistente: !!transactionResult.notificacionExistente,
         cantidadEnLote: cantidadEnLote,
-        documentosAgrupados: documentosAgrupados.map(d => ({
+        documentosAgrupados: transactionResult.documentosAgrupados.map(d => ({
           id: d.id,
           protocolNumber: d.protocolNumber,
           documentType: d.documentType
@@ -1021,7 +1179,9 @@ async function marcarComoListo(req, res) {
 
 async function getAlertasRecepcion(req, res) {
   try {
-    const alertas = await AlertasService.getAlertasRecepcion();
+    const alertas = await withRequestTenantContext(prisma, req, async (tx) => {
+      return AlertasService.getAlertasRecepcion(tx);
+    });
     res.json(alertas);
   } catch (error) {
     logger.error('Error obteniendo alertas de recepción:', error);
@@ -1060,6 +1220,7 @@ async function revertirEstadoDocumento(req, res) {
  */
 async function getNotificationHistoryReception(req, res) {
   try {
+    await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
     const {
       page = 1,
       limit = 10,
@@ -1103,7 +1264,7 @@ async function getNotificationHistoryReception(req, res) {
       }
     }
 
-    const notifications = await prisma.whatsAppNotification.findMany({
+    const notifications = await tx.whatsAppNotification.findMany({
       where,
       take,
       skip,
@@ -1122,7 +1283,7 @@ async function getNotificationHistoryReception(req, res) {
       }
     });
 
-    const totalCount = await prisma.whatsAppNotification.count({ where });
+    const totalCount = await tx.whatsAppNotification.count({ where });
 
     logger.debug('Historial de notificaciones obtenido:', totalCount);
 
@@ -1139,6 +1300,7 @@ async function getNotificationHistoryReception(req, res) {
       }
     });
 
+    }); // end withRequestTenantContext
   } catch (error) {
     logger.error('Error obteniendo historial de notificaciones:', error);
     res.status(500).json({
@@ -1156,6 +1318,7 @@ async function getNotificationHistoryReception(req, res) {
  */
 async function getReceptionsUnified(req, res) {
   try {
+    await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
     const { tab, query, clientId, matrizadorId, page = 1, pageSize = 25 } = req.query;
 
     // Logs de diagnóstico
@@ -1197,7 +1360,7 @@ async function getReceptionsUnified(req, res) {
     }
 
     // Obtener documentos (sin paginar) para agrupar por "acto principal" por cliente
-    const docs = await prisma.document.findMany({
+    const docs = await tx.document.findMany({
       where: whereClause,
       select: {
         id: true,
@@ -1326,6 +1489,8 @@ async function getReceptionsUnified(req, res) {
         items
       }
     });
+
+    }); // end withRequestTenantContext
   } catch (error) {
     logger.error('Error en getReceptionsUnified:', error);
     return res.status(500).json({
@@ -1344,6 +1509,7 @@ async function getReceptionsUnified(req, res) {
  */
 async function getReceptionsCounts(req, res) {
   try {
+    await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
     const { query, clientId } = req.query;
 
     // Filtro base
@@ -1365,7 +1531,7 @@ async function getReceptionsCounts(req, res) {
     }
 
     // Traer documentos filtrados (sin paginar) para contar por grupos
-    const docs = await prisma.document.findMany({
+    const docs = await tx.document.findMany({
       where: baseWhere,
       select: {
         id: true,
@@ -1409,6 +1575,8 @@ async function getReceptionsCounts(req, res) {
       success: true,
       data: { ACTIVOS: activos, ENTREGADOS: entregados }
     });
+
+    }); // end withRequestTenantContext
   } catch (error) {
     logger.error('Error en getReceptionsCounts:', error);
     return res.status(500).json({
@@ -1432,11 +1600,12 @@ async function getReceptionSuggestions(req, res) {
       return res.json({ success: true, data: { clients: [], codes: [] } });
     }
 
+    await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
     const supportsUnaccent = await supportsUnaccentFn();
     let rows;
     if (supportsUnaccent) {
       const pattern = `%${term}%`;
-      rows = await prisma.$queryRaw`
+      rows = await tx.$queryRaw`
         SELECT d.id, d."protocolNumber", d."clientId", d."clientName", d."clientPhone", d."createdAt"
         FROM "documents" d
         WHERE (
@@ -1448,7 +1617,7 @@ async function getReceptionSuggestions(req, res) {
         LIMIT 50
       `;
     } else {
-      rows = await prisma.document.findMany({
+      rows = await tx.document.findMany({
         where: {
           OR: [
             { clientName: { contains: term, mode: 'insensitive' } },
@@ -1501,6 +1670,8 @@ async function getReceptionSuggestions(req, res) {
       success: true,
       data: { clients, codes: topCodes }
     });
+
+    }); // end withRequestTenantContext
   } catch (error) {
     logger.error('Error en getReceptionSuggestions:', error);
     return res.status(500).json({
@@ -1551,8 +1722,9 @@ async function bulkDelivery(req, res) {
       });
     }
 
+    const result = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
     // Buscar todos los documentos
-    const documents = await prisma.document.findMany({
+    const documents = await tx.document.findMany({
       where: {
         id: { in: documentIds },
         status: 'LISTO' // Solo documentos listos
@@ -1560,68 +1732,61 @@ async function bulkDelivery(req, res) {
     });
 
     if (documents.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: 'No se encontraron documentos listos para entrega'
-      });
+      return { earlyResponse: { status: 404, body: { success: false, message: 'No se encontraron documentos listos para entrega' } } };
     }
 
     if (documents.length !== documentIds.length) {
-      return res.status(400).json({
-        success: false,
-        message: `Solo ${documents.length} de ${documentIds.length} documentos están listos para entrega`
-      });
+      return { earlyResponse: { status: 400, body: { success: false, message: `Solo ${documents.length} de ${documentIds.length} documentos están listos para entrega` } } };
     }
 
     // Verificar que todos sean del mismo cliente
     const uniqueClients = new Set(documents.map(d => d.clientId));
     if (uniqueClients.size > 1) {
-      return res.status(400).json({
-        success: false,
-        message: 'Todos los documentos deben ser del mismo cliente'
-      });
+      return { earlyResponse: { status: 400, body: { success: false, message: 'Todos los documentos deben ser del mismo cliente' } } };
     }
 
-    // Actualizar todos los documentos en una transacción
-    const result = await prisma.$transaction(async (tx) => {
-      // Actualizar estado de todos
-      const updated = await tx.document.updateMany({
-        where: { id: { in: documentIds } },
-        data: {
-          status: 'ENTREGADO',
-          fechaEntrega: new Date(),
-          entregadoA: personaRetira,
-          cedulaReceptor: cedulaRetira,
-          usuarioEntregaId: req.user.id,
-          verificacionManual: verificationType === 'manual' || !verificationCode
-        }
-      });
-
-      // Crear eventos de auditoría para cada documento
-      const events = documents.map(doc => ({
-        documentId: doc.id,
-        userId: req.user.id,
-        eventType: 'ENTREGA_BLOQUE',
-        description: `Entregado en bloque (${documents.length} docs) a ${personaRetira}`,
-        details: JSON.stringify({
-          personaRetira,
-          cedulaRetira,
-          verificationType,
-          totalDocuments: documents.length,
-          documentIds: documentIds,
-          deliveredBy: req.user.id,
-          timestamp: new Date().toISOString()
-        }),
-        ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
-        userAgent: req.get('User-Agent') || 'unknown'
-      }));
-
-      await tx.documentEvent.createMany({
-        data: events
-      });
-
-      return { updated: updated.count };
+    // Actualizar estado de todos (already inside withRequestTenantContext transaction)
+    const updated = await tx.document.updateMany({
+      where: { id: { in: documentIds } },
+      data: {
+        status: 'ENTREGADO',
+        fechaEntrega: new Date(),
+        entregadoA: personaRetira,
+        cedulaReceptor: cedulaRetira,
+        usuarioEntregaId: req.user.id,
+        verificacionManual: verificationType === 'manual' || !verificationCode
+      }
     });
+
+    // Crear eventos de auditoría para cada documento
+    const events = documents.map(doc => ({
+      documentId: doc.id,
+      userId: req.user.id,
+      eventType: 'ENTREGA_BLOQUE',
+      description: `Entregado en bloque (${documents.length} docs) a ${personaRetira}`,
+      details: JSON.stringify({
+        personaRetira,
+        cedulaRetira,
+        verificationType,
+        totalDocuments: documents.length,
+        documentIds: documentIds,
+        deliveredBy: req.user.id,
+        timestamp: new Date().toISOString()
+      }),
+      ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+      userAgent: req.get('User-Agent') || 'unknown'
+    }));
+
+    await tx.documentEvent.createMany({
+      data: events
+    });
+
+    return { updated: updated.count };
+    }); // end withRequestTenantContext
+
+    if (result.earlyResponse) {
+      return res.status(result.earlyResponse.status).json(result.earlyResponse.body);
+    }
 
     return res.json({
       success: true,
@@ -1669,28 +1834,26 @@ async function entregaGrupal(req, res) {
       return res.status(400).json({ success: false, message: 'Nombre de quien retira es obligatorio' });
     }
 
+    const result = await withRequestTenantContext(prisma, req, async (tx, tenantContext) => {
     // Buscar documentos
-    const documents = await prisma.document.findMany({
+    const documents = await tx.document.findMany({
       where: { id: { in: documentIds } }
     });
 
     if (documents.length === 0) {
-      return res.status(404).json({ success: false, message: 'Documentos no encontrados' });
+      return { earlyResponse: { status: 404, body: { success: false, message: 'Documentos no encontrados' } } };
     }
 
     // Validar estados (LISTO o EN_PROCESO)
     const invalidDocs = documents.filter(d => !['LISTO', 'EN_PROCESO', 'PAGADO'].includes(d.status));
     if (invalidDocs.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: `Algunos documentos no están listos para entrega (Estado inválido: ${invalidDocs[0].status})`
-      });
+      return { earlyResponse: { status: 400, body: { success: false, message: `Algunos documentos no están listos para entrega (Estado inválido: ${invalidDocs[0].status})` } } };
     }
 
     // Validar cliente único
     const uniqueClients = new Set(documents.map(d => d.clientId));
     if (uniqueClients.size > 1) {
-      return res.status(400).json({ success: false, message: 'Todos los documentos deben ser del mismo cliente' });
+      return { earlyResponse: { status: 400, body: { success: false, message: 'Todos los documentos deben ser del mismo cliente' } } };
     }
 
     // Validar código si no es manual y alguno está LISTO
@@ -1699,58 +1862,63 @@ async function entregaGrupal(req, res) {
       // Intentar obtener código del grupo o individual
       const groupCode = documents[0].codigoRetiro || documents[0].verificationCode;
       if (!groupCode) {
-        return res.status(400).json({ success: false, message: 'Se requiere código de verificación para documentos listos' });
+        return { earlyResponse: { status: 400, body: { success: false, message: 'Se requiere código de verificación para documentos listos' } } };
       }
     }
 
-    // Actualizar documentos
-    await prisma.$transaction(async (tx) => {
-      const now = new Date();
+    // Actualizar documentos (already inside withRequestTenantContext transaction)
+    const now = new Date();
 
-      // Actualizar a ENTREGADO
-      await tx.document.updateMany({
-        where: { id: { in: documentIds } },
-        data: {
-          status: 'ENTREGADO',
-          fechaEntrega: now,
-          entregadoA: entregadoA,
-          cedulaReceptor: cedulaReceptor || null,
-          relacionTitular: relacionTitular || null,
-          observacionesEntrega: observaciones || null,
-          usuarioEntregaId: req.user.id,
-          verificacionManual: !!verificacionManual,
-          facturaPresenta: !!facturaPresenta
-        }
-      });
-
-      // Eventos
-      const events = documentIds.map(id => ({
-        documentId: id,
-        userId: req.user.id,
-        eventType: 'ENTREGA_GRUPAL',
-        description: `Entrega grupal a ${entregadoA} (${relacionTitular || 'N/A'})`,
-        details: JSON.stringify({
-          entregadoA,
-          cedulaReceptor,
-          relacionTitular,
-          observaciones,
-          verificacionManual,
-          facturaPresenta,
-          docsCount: documentIds.length
-        }),
-        ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
-        userAgent: req.get('User-Agent') || 'unknown'
-      }));
-
-      await tx.documentEvent.createMany({ data: events });
+    // Actualizar a ENTREGADO
+    await tx.document.updateMany({
+      where: { id: { in: documentIds } },
+      data: {
+        status: 'ENTREGADO',
+        fechaEntrega: now,
+        entregadoA: entregadoA,
+        cedulaReceptor: cedulaReceptor || null,
+        relacionTitular: relacionTitular || null,
+        observacionesEntrega: observaciones || null,
+        usuarioEntregaId: req.user.id,
+        verificacionManual: !!verificacionManual,
+        facturaPresenta: !!facturaPresenta
+      }
     });
+
+    // Eventos
+    const events = documentIds.map(id => ({
+      documentId: id,
+      userId: req.user.id,
+      eventType: 'ENTREGA_GRUPAL',
+      description: `Entrega grupal a ${entregadoA} (${relacionTitular || 'N/A'})`,
+      details: JSON.stringify({
+        entregadoA,
+        cedulaReceptor,
+        relacionTitular,
+        observaciones,
+        verificacionManual,
+        facturaPresenta,
+        docsCount: documentIds.length
+      }),
+      ipAddress: req.ip || req.connection?.remoteAddress || 'unknown',
+      userAgent: req.get('User-Agent') || 'unknown'
+    }));
+
+    await tx.documentEvent.createMany({ data: events });
+
+    return { documentsCount: documents.length };
+    }); // end withRequestTenantContext
+
+    if (result.earlyResponse) {
+      return res.status(result.earlyResponse.status).json(result.earlyResponse.body);
+    }
 
     logger.info(`Entrega grupal exitosa: ${documentIds.length} documentos por usuario ${req.user.id}`);
 
     return res.json({
       success: true,
-      message: `${documents.length} documentos entregados exitosamente`,
-      data: { deliveredCount: documents.length }
+      message: `${result.documentsCount} documentos entregados exitosamente`,
+      data: { deliveredCount: result.documentsCount }
     });
 
   } catch (error) {
