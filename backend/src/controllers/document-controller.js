@@ -1261,9 +1261,8 @@ async function getMyDocuments(req, res) {
     if (status && status !== 'TODOS') {
       where.status = status;
     } else {
-      // 🆕 OCULTAR ENTREGADOS por defecto cuando NO hay búsqueda activa
-      // Solo se muestran si el usuario filtra específicamente por ENTREGADO
-      where.status = { not: 'ENTREGADO' };
+      // Ocultar ENTREGADOS y ANULADOS por defecto cuando NO hay búsqueda activa
+      where.status = { notIn: ['ENTREGADO', 'ANULADO_NOTA_CREDITO'] };
     }
 
     if (tipo && tipo !== 'TODOS') {
