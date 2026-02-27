@@ -73,9 +73,9 @@ async function processBatch(items, handler, parallel = true) {
  */
 async function findDocumentByInvoiceNumber(invoiceNumber, dbClient = prisma) {
     if (!invoiceNumber) return null;
-    
+
     const secuencial = extractSecuencial(invoiceNumber);
-    
+
     // Buscar por numeroFactura exacto o por secuencial
     let document = await dbClient.document.findFirst({
         where: {
@@ -86,7 +86,7 @@ async function findDocumentByInvoiceNumber(invoiceNumber, dbClient = prisma) {
         },
         select: { id: true, protocolNumber: true, numeroFactura: true }
     });
-    
+
     // Validar que el secuencial coincida exactamente
     if (document && document.numeroFactura) {
         const docSecuencial = extractSecuencial(document.numeroFactura);
@@ -94,7 +94,7 @@ async function findDocumentByInvoiceNumber(invoiceNumber, dbClient = prisma) {
             document = null;
         }
     }
-    
+
     return document;
 }
 
@@ -140,27 +140,26 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId, dbClient
         // 1. Parsear XML por streaming (incluye decodificación y validación)
         console.log('[import-koinor-xml] Parsing XML...');
         const parsed = await parseKoinorXML(fileBuffer, fileName);
-        
+
         stats.totalTransactions = parsed.summary.totalTransactions;
 
         // 2. ⭐ NUEVO: Procesar facturas FC primero (para que existan cuando se procesen los pagos)
         if (parsed.invoices && parsed.invoices.length > 0) {
             console.log(`[import-koinor-xml] Processing ${parsed.invoices.length} invoices (FC) in batches...`);
-            
+
             const BATCH_SIZE = 50;
             for (let i = 0; i < parsed.invoices.length; i += BATCH_SIZE) {
                 const batch = parsed.invoices.slice(i, i + BATCH_SIZE);
                 const batchNum = Math.floor(i / BATCH_SIZE) + 1;
                 const totalBatches = Math.ceil(parsed.invoices.length / BATCH_SIZE);
-                
+
                 console.log(`[import-koinor-xml] Processing invoice batch ${batchNum}/${totalBatches} (${batch.length} invoices)...`);
-                
                 const batchResults = await processBatch(
                     batch,
                     (invoice) => processInvoiceFC(invoice, fileName, dbClient),
                     canParallelize
                 );
-                
+
                 for (const result of batchResults) {
                     if (result.status === 'fulfilled') {
                         const r = result.value;
@@ -180,24 +179,24 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId, dbClient
 
         // 3. Procesar pagos (AB) - OPTIMIZADO EN BATCHES
         console.log(`[import-koinor-xml] Processing ${parsed.payments.length} payments in batches...`);
-        
+
         const BATCH_SIZE = 50; // Procesar 50 pagos a la vez
         const payments = parsed.payments;
-        
+
         for (let i = 0; i < payments.length; i += BATCH_SIZE) {
             const batch = payments.slice(i, i + BATCH_SIZE);
             const batchNum = Math.floor(i / BATCH_SIZE) + 1;
             const totalBatches = Math.ceil(payments.length / BATCH_SIZE);
-            
+
             console.log(`[import-koinor-xml] Processing batch ${batchNum}/${totalBatches} (${batch.length} payments)...`);
-            
+
             // Procesar batch en paralelo (con límite de concurrencia)
             const batchResults = await processBatch(
                 batch,
                 (payment) => processPayment(payment, fileName, stats, userId, dbClient),
                 canParallelize
             );
-            
+
             // Agregar resultados
             for (const result of batchResults) {
                 if (result.status === 'fulfilled') {
@@ -226,16 +225,15 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId, dbClient
         // 4. Procesar notas de crédito (NC) - OPTIMIZADO EN BATCHES
         if (parsed.notasCredito.length > 0) {
             console.log(`[import-koinor-xml] Processing ${parsed.notasCredito.length} credit notes in batches...`);
-            
+
             for (let i = 0; i < parsed.notasCredito.length; i += BATCH_SIZE) {
                 const batch = parsed.notasCredito.slice(i, i + BATCH_SIZE);
-                
                 const batchResults = await processBatch(
                     batch,
                     (nc) => processNotaCredito(nc, fileName, dbClient),
                     canParallelize
                 );
-                
+
                 for (const result of batchResults) {
                     if (result.status === 'fulfilled') {
                         stats.notasCreditoProcessed++;
@@ -321,10 +319,10 @@ export async function importKoinorXMLFile(fileBuffer, fileName, userId, dbClient
                     where: { id: importLog.id },
                     data: {
                         status: 'FAILED',
-                        errorDetails: { 
-                            message: error.message, 
+                        errorDetails: {
+                            message: error.message,
                             code: error.code,
-                            stack: error.stack 
+                            stack: error.stack
                         },
                         completedAt: new Date()
                     }
@@ -358,7 +356,6 @@ async function processPayment(payment, sourceFile, stats, userId, dbClient = pri
     for (const detail of payment.details) {
         try {
             const singleResult = await processSinglePayment(payment, detail, sourceFile, userId, dbClient);
-            
             if (singleResult.created) {
                 result.created++;
                 result.invoicesUpdated++;
@@ -406,7 +403,7 @@ async function processSinglePayment(payment, detail, sourceFile, userId, dbClien
     if (!invoice) {
         // Factura no encontrada - crear factura legacy automáticamente
         console.log(`[import-koinor-xml] Creating legacy invoice for: ${detail.invoiceNumberRaw}`);
-        
+
         // Usar upsert para evitar errores de unique constraint
         const legacyTotal = parseFloat(detail.amount || 0);
         const legacySubtotal = legacyTotal > 0 ? Math.round((legacyTotal / 1.15) * 100) / 100 : 0;
@@ -431,7 +428,7 @@ async function processSinglePayment(payment, detail, sourceFile, userId, dbClien
                 sourceFile
             }
         });
-        
+
         createdLegacy = true;
     }
 
@@ -453,7 +450,7 @@ async function processSinglePayment(payment, detail, sourceFile, userId, dbClien
     // ⭐ NUEVO: Buscar documento para vincular si la factura no tiene uno
     let documentId = invoice.documentId;
     let linkedToDocument = false;
-    
+
     if (!documentId) {
         const document = await findDocumentByInvoiceNumber(detail.invoiceNumberRaw, dbClient);
         if (document) {
@@ -475,7 +472,7 @@ async function processSinglePayment(payment, detail, sourceFile, userId, dbClien
                     data: { documentId }
                 });
                 console.log(`[import-koinor-xml] ✅ Linked invoice ${detail.invoiceNumberRaw} to document (documentId: ${documentId})`);
-                
+
                 // Actualizar numeroFactura en el documento si está vacío
                 const document = await tx.document.findUnique({
                     where: { id: documentId },
@@ -489,7 +486,7 @@ async function processSinglePayment(payment, detail, sourceFile, userId, dbClien
                     console.log(`[import-koinor-xml] ✅ Updated document ${document.protocolNumber} with numeroFactura: ${detail.invoiceNumberRaw}`);
                 }
             }
-            
+
             // Crear Payment
             await tx.payment.create({
                 data: {
@@ -503,78 +500,78 @@ async function processSinglePayment(payment, detail, sourceFile, userId, dbClien
                 }
             });
 
-        // Actualizar paidAmount de Invoice
-        const currentPaid = parseFloat(invoice.paidAmount || 0);
-        const newPaid = currentPaid + parseFloat(detail.amount);
-        const totalAmount = parseFloat(invoice.totalAmount);
+            // Actualizar paidAmount de Invoice
+            const currentPaid = parseFloat(invoice.paidAmount || 0);
+            const newPaid = currentPaid + parseFloat(detail.amount);
+            const totalAmount = parseFloat(invoice.totalAmount);
 
-        // Calcular nuevo status
-        let newStatus = invoice.status;
-        if (newPaid >= totalAmount) {
-            newStatus = 'PAID';
-        } else if (newPaid > 0) {
-            newStatus = 'PARTIAL';
-        }
-
-        // Actualizar Invoice
-        await tx.invoice.update({
-            where: { id: invoice.id },
-            data: {
-                paidAmount: newPaid,
-                status: newStatus,
-                lastSyncAt: new Date()
+            // Calcular nuevo status
+            let newStatus = invoice.status;
+            if (newPaid >= totalAmount) {
+                newStatus = 'PAID';
+            } else if (newPaid > 0) {
+                newStatus = 'PARTIAL';
             }
-        });
 
-        // Si está completamente pagada y tiene documento, actualizar pagoConfirmado
-        const finalDocumentId = documentId || invoice.documentId;
-        if (newStatus === 'PAID' && finalDocumentId) {
-            await tx.document.update({
-                where: { id: finalDocumentId },
-                data: { pagoConfirmado: true }
-            });
-            documentUpdated = true;
-        }
-        
-        // ⭐ NUEVO: Si la factura ya tenía documento pero sin numeroFactura, actualizarlo
-        if (invoice.documentId && !linkedToDocument) {
-            const document = await tx.document.findUnique({
-                where: { id: invoice.documentId },
-                select: { numeroFactura: true, protocolNumber: true }
-            });
-            if (document && !document.numeroFactura) {
-                await tx.document.update({
-                    where: { id: invoice.documentId },
-                    data: { numeroFactura: detail.invoiceNumberRaw }
-                });
-                console.log(`[import-koinor-xml] ✅ Updated existing document ${document.protocolNumber} with numeroFactura: ${detail.invoiceNumberRaw}`);
-            }
-        }
-
-        // ⭐ Registrar evento de pago en el timeline del documento
-        const finalDocId = documentId || invoice.documentId;
-        if (finalDocId && userId) {
-            await tx.documentEvent.create({
+            // Actualizar Invoice
+            await tx.invoice.update({
+                where: { id: invoice.id },
                 data: {
-                    documentId: finalDocId,
-                    userId: userId,
-                    eventType: 'PAYMENT_REGISTERED',
-                    description: `Pago de $${parseFloat(detail.amount).toFixed(2)} registrado desde Sistema Koinor (Recibo: ${payment.receiptNumber || 'N/A'})`,
-                    details: JSON.stringify({
-                        amount: parseFloat(detail.amount),
-                        receiptNumber: payment.receiptNumber,
-                        invoiceNumber: detail.invoiceNumberRaw,
-                        paymentDate: payment.paymentDate,
-                        paymentType: 'TRANSFER',
-                        concept: payment.concept || '',
-                        source: 'KOINOR_XML',
-                        sourceFile
-                    })
+                    paidAmount: newPaid,
+                    status: newStatus,
+                    lastSyncAt: new Date()
                 }
             });
-            console.log(`[import-koinor-xml] 📋 Created PAYMENT_REGISTERED event for document ${finalDocId}`);
-        }
-    });
+
+            // Si está completamente pagada y tiene documento, actualizar pagoConfirmado
+            const finalDocumentId = documentId || invoice.documentId;
+            if (newStatus === 'PAID' && finalDocumentId) {
+                await tx.document.update({
+                    where: { id: finalDocumentId },
+                    data: { pagoConfirmado: true }
+                });
+                documentUpdated = true;
+            }
+
+            // ⭐ NUEVO: Si la factura ya tenía documento pero sin numeroFactura, actualizarlo
+            if (invoice.documentId && !linkedToDocument) {
+                const document = await tx.document.findUnique({
+                    where: { id: invoice.documentId },
+                    select: { numeroFactura: true, protocolNumber: true }
+                });
+                if (document && !document.numeroFactura) {
+                    await tx.document.update({
+                        where: { id: invoice.documentId },
+                        data: { numeroFactura: detail.invoiceNumberRaw }
+                    });
+                    console.log(`[import-koinor-xml] ✅ Updated existing document ${document.protocolNumber} with numeroFactura: ${detail.invoiceNumberRaw}`);
+                }
+            }
+
+            // ⭐ Registrar evento de pago en el timeline del documento
+            const finalDocId = documentId || invoice.documentId;
+            if (finalDocId && userId) {
+                await tx.documentEvent.create({
+                    data: {
+                        documentId: finalDocId,
+                        userId: userId,
+                        eventType: 'PAYMENT_REGISTERED',
+                        description: `Pago de $${parseFloat(detail.amount).toFixed(2)} registrado desde Sistema Koinor (Recibo: ${payment.receiptNumber || 'N/A'})`,
+                        details: JSON.stringify({
+                            amount: parseFloat(detail.amount),
+                            receiptNumber: payment.receiptNumber,
+                            invoiceNumber: detail.invoiceNumberRaw,
+                            paymentDate: payment.paymentDate,
+                            paymentType: 'TRANSFER',
+                            concept: payment.concept || '',
+                            source: 'KOINOR_XML',
+                            sourceFile
+                        })
+                    }
+                });
+                console.log(`[import-koinor-xml] 📋 Created PAYMENT_REGISTERED event for document ${finalDocId}`);
+            }
+        });
 
         console.log(`[import-koinor-xml] Payment processed: ${payment.receiptNumber} -> ${detail.invoiceNumberRaw} ($${detail.amount})${createdLegacy ? ' [LEGACY INVOICE CREATED]' : ''}`);
 
@@ -603,17 +600,36 @@ async function processSinglePayment(payment, detail, sourceFile, userId, dbClien
  * @param {string} sourceFile - Nombre del archivo
  */
 async function processNotaCredito(nc, sourceFile, dbClient = prisma) {
-    // Buscar factura afectada por invoiceNumberRaw
-    const invoice = await dbClient.invoice.findFirst({
-        where: { 
-            invoiceNumberRaw: nc.invoiceNumberRaw 
+    // Strategy 1: Buscar factura por variantes del numero de factura (normalizado/raw)
+    const whereByNumber = buildInvoiceWhereByNumber(nc.invoiceNumberRaw);
+    let invoice = await dbClient.invoice.findFirst({
+        where: {
+            ...whereByNumber,
+            status: { not: 'CANCELLED' }
         },
         include: { document: true }
     });
 
+    // Strategy 2: Fallback por clientTaxId + monto exacto (si numtra no coincidio)
+    if (!invoice && nc.clientTaxId && nc.amount > 0) {
+        invoice = await dbClient.invoice.findFirst({
+            where: {
+                clientTaxId: { contains: nc.clientTaxId.replace(/\s+/g, '') },
+                totalAmount: nc.amount,
+                status: { not: 'CANCELLED' }
+            },
+            include: { document: true },
+            orderBy: { issueDate: 'desc' } // la mas reciente primero
+        });
+
+        if (invoice) {
+            console.log(`[import-koinor-xml] NC ${nc.receiptNumber}: matched by client+amount fallback -> ${invoice.invoiceNumberRaw}`);
+        }
+    }
+
     if (!invoice) {
-        console.warn(`[import-koinor-xml] Invoice not found for NC: ${nc.invoiceNumberRaw}`);
-        return;
+        console.warn(`[import-koinor-xml] NC ${nc.receiptNumber}: Invoice NOT FOUND for numtra=${nc.invoiceNumberRaw}, client=${nc.clientTaxId}, amount=${nc.amount}. NC was NOT applied.`);
+        throw new Error(`Invoice not found for NC ${nc.receiptNumber} (numtra=${nc.invoiceNumberRaw})`);
     }
 
     await runInTransaction(dbClient, async (tx) => {
@@ -626,7 +642,7 @@ async function processNotaCredito(nc, sourceFile, dbClient = prisma) {
             }
         });
 
-        // Si tiene documento, actualizar campos de nota de crédito
+        // Si tiene documento, actualizar campos de nota de credito
         if (invoice.documentId) {
             await tx.document.update({
                 where: { id: invoice.documentId },
@@ -639,7 +655,7 @@ async function processNotaCredito(nc, sourceFile, dbClient = prisma) {
         }
     });
 
-    console.log(`[import-koinor-xml] Credit note processed: ${nc.receiptNumber} -> ${nc.invoiceNumberRaw}`);
+    console.log(`[import-koinor-xml] Credit note processed: ${nc.receiptNumber} -> ${invoice.invoiceNumberRaw} (CANCELLED)`);
 }
 
 /**
@@ -654,18 +670,18 @@ async function processInvoiceFC(invoiceData, sourceFile, dbClient = prisma) {
     const canonicalInvoiceNumber = normalizeInvoiceNumber(invoiceData.invoiceNumberRaw || invoiceData.invoiceNumber)
         || invoiceData.invoiceNumberRaw
         || invoiceData.invoiceNumber;
-    
+
     // Buscar si la factura ya existe
     const existingInvoice = await dbClient.invoice.findFirst({
         where: buildInvoiceWhereByNumber(invoiceData.invoiceNumberRaw || invoiceData.invoiceNumber)
     });
-    
+
     if (existingInvoice) {
         // Factura ya existe - solo actualizar invoiceNumberRaw si está vacío
         if (!existingInvoice.invoiceNumberRaw && invoiceData.invoiceNumberRaw) {
             await dbClient.invoice.update({
                 where: { id: existingInvoice.id },
-                data: { 
+                data: {
                     invoiceNumberRaw: invoiceData.invoiceNumberRaw,
                     lastSyncAt: new Date()
                 }
@@ -675,7 +691,7 @@ async function processInvoiceFC(invoiceData, sourceFile, dbClient = prisma) {
         result.skipped = true;
         return result;
     }
-    
+
     // ⭐ Buscar documento para vincular
     let documentId = null;
     const document = await findDocumentByInvoiceNumber(invoiceData.invoiceNumberRaw, dbClient);
@@ -683,12 +699,32 @@ async function processInvoiceFC(invoiceData, sourceFile, dbClient = prisma) {
         documentId = document.id;
         console.log(`[import-koinor-xml] 🔍 Found document ${document.protocolNumber} for invoice ${invoiceData.invoiceNumberRaw}`);
     }
-    
-    // Usar Base Imponible real del XML; fallback a estimación por división
+
+    // ⭐ Extraer Base Imponible real del XML SRI del documento vinculado
     const totalAmt = parseFloat(invoiceData.totalAmount || 0);
-    const subtotalAmount = invoiceData.subtotalAmount != null
-        ? invoiceData.subtotalAmount
-        : (totalAmt > 0 ? Math.round((totalAmt / 1.15) * 100) / 100 : 0);
+    let subtotalAmount = invoiceData.subtotalAmount != null ? invoiceData.subtotalAmount : null;
+
+    if (subtotalAmount == null && documentId) {
+        try {
+            const docWithXml = await dbClient.document.findUnique({
+                where: { id: documentId },
+                select: { xmlOriginal: true }
+            });
+            if (docWithXml?.xmlOriginal) {
+                const match = docWithXml.xmlOriginal.match(/totalSinImpuestos>([0-9.]+)</);
+                if (match) {
+                    subtotalAmount = parseFloat(match[1]);
+                    console.log(`[import-koinor-xml] Extracted subtotal from SRI XML: $${subtotalAmount}`);
+                }
+            }
+        } catch (xmlErr) {
+            console.warn(`[import-koinor-xml] Could not extract subtotal from XML:`, xmlErr.message);
+        }
+    }
+    if (subtotalAmount == null) {
+        subtotalAmount = totalAmt > 0 ? Math.round((totalAmt / 1.15) * 100) / 100 : 0;
+        console.warn(`[import-koinor-xml] Using /1.15 fallback for subtotal: $${subtotalAmount}`);
+    }
     await dbClient.invoice.create({
         data: {
             invoiceNumber: canonicalInvoiceNumber,
@@ -709,12 +745,12 @@ async function processInvoiceFC(invoiceData, sourceFile, dbClient = prisma) {
             })
         }
     });
-    
+
     // Si se vinculó a un documento sin numeroFactura, actualizarlo
     if (documentId && document) {
         await dbClient.document.update({
             where: { id: documentId },
-            data: { 
+            data: {
                 numeroFactura: invoiceData.invoiceNumberRaw,
                 // Actualizar actType si está vacío
                 ...(document.actType && { actType: document.actType })
@@ -722,7 +758,7 @@ async function processInvoiceFC(invoiceData, sourceFile, dbClient = prisma) {
         });
         console.log(`[import-koinor-xml] ✅ Linked invoice ${invoiceData.invoiceNumberRaw} to document ${document.protocolNumber}`);
     }
-    
+
     console.log(`[import-koinor-xml] Invoice FC created: ${invoiceData.invoiceNumberRaw} ($${invoiceData.totalAmount})${documentId ? ' [LINKED TO DOCUMENT]' : ''}`);
     result.created = true;
     return result;
