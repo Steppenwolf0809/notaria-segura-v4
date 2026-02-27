@@ -69,7 +69,8 @@ const DocumentCard = ({ document, onStatusChange }) => {
       PENDIENTE: 'default',
       EN_PROCESO: 'info',
       LISTO: 'success',
-      ENTREGADO: 'secondary'
+      ENTREGADO: 'secondary',
+      ANULADO_NOTA_CREDITO: 'error'
     };
     return statusColors[status] || 'default';
   };
@@ -82,7 +83,8 @@ const DocumentCard = ({ document, onStatusChange }) => {
       PENDIENTE: 'Pendiente',
       EN_PROCESO: 'En Proceso',
       LISTO: 'Listo',
-      ENTREGADO: 'Entregado'
+      ENTREGADO: 'Entregado',
+      ANULADO_NOTA_CREDITO: 'Nota de Crédito'
     };
     return statusTexts[status] || status;
   };

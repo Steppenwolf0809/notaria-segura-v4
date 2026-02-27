@@ -234,6 +234,8 @@ function RecepcionMain() {
         return { bg: '#dbeafe', text: '#1e40af' };
       case 'ENTREGADO':
         return { bg: '#e0e7ff', text: '#3730a3' };
+      case 'ANULADO_NOTA_CREDITO':
+        return { bg: '#fef2f2', text: '#991b1b' };
       default:
         return { bg: '#f3f4f6', text: '#1f2937' };
     }
@@ -252,6 +254,8 @@ function RecepcionMain() {
         return '🔵';
       case 'ENTREGADO':
         return '✅';
+      case 'ANULADO_NOTA_CREDITO':
+        return '🔴';
       default:
         return '⚪';
     }
@@ -933,7 +937,8 @@ function RecepcionMain() {
                               documento.status === 'LISTO' ? 'LSTO' :
                                 documento.status === 'PAGADO' ? 'PAGD' :
                                   documento.status === 'ENTREGADO' ? 'ENTR' :
-                                    documento.status}
+                                    documento.status === 'ANULADO_NOTA_CREDITO' ? 'N/C' :
+                                      documento.status}
                           </Typography>
                         </Box>
                       </Tooltip>

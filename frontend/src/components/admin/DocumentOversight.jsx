@@ -50,6 +50,7 @@ import {
   Pending as PendingIcon,
   PlayArrow as InProgressIcon,
   LocalShipping as DeliveredIcon,
+  CreditCard as CreditCardIcon,
   Edit as EditIcon,
   SwapHoriz as ReassignIcon,
   Timeline as TimelineIcon,
@@ -292,7 +293,8 @@ const DocumentOversight = ({ quickSearch = null, onQuickSearchApplied = null }) 
       PENDIENTE: '#d97706',      // Ámbar
       EN_PROCESO: '#0284c7',     // Azul petróleo
       LISTO: '#047857',          // Verde bosque
-      ENTREGADO: '#64748b'       // Gris pizarra
+      ENTREGADO: '#64748b',      // Gris pizarra
+      ANULADO_NOTA_CREDITO: '#dc2626'  // Rojo
     };
     return colors[status] || '#64748b';
   };
@@ -321,6 +323,11 @@ const DocumentOversight = ({ quickSearch = null, onQuickSearchApplied = null }) 
         bgcolor: 'rgba(100, 116, 139, 0.1)',
         color: '#64748b',
         borderColor: 'rgba(100, 116, 139, 0.2)'
+      },
+      ANULADO_NOTA_CREDITO: {
+        bgcolor: 'rgba(220, 38, 38, 0.1)',
+        color: '#dc2626',
+        borderColor: 'rgba(220, 38, 38, 0.2)'
       }
     };
     return styles[status] || styles.ENTREGADO;
@@ -334,7 +341,8 @@ const DocumentOversight = ({ quickSearch = null, onQuickSearchApplied = null }) 
       PENDIENTE: <PendingIcon />,
       EN_PROCESO: <InProgressIcon />,
       LISTO: <CompletedIcon />,
-      ENTREGADO: <DeliveredIcon />
+      ENTREGADO: <DeliveredIcon />,
+      ANULADO_NOTA_CREDITO: <CreditCardIcon />
     };
     return icons[status] || <PendingIcon />;
   };
