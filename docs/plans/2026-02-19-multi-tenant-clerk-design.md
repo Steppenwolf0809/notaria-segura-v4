@@ -279,7 +279,7 @@ Ultima actualizacion: 2026-02-27
 
 Resumen por fase:
 1. Fase 1 (Fundacion tenant + Clerk mapping): En progreso avanzado.
-2. Fase 2 (RLS robusto): En progreso - OLA A completada en codigo, pendiente validacion final.
+2. Fase 2 (RLS robusto): En progreso - OLA A validada tecnicamente en staging, pendiente smoke manual por rol.
 3. Fase 3 (UAFE schema): Pendiente.
 4. Fase 4 (Modulos/planes): Pendiente.
 
@@ -296,8 +296,10 @@ Resumen por fase:
 - [x] Definir patron obligatorio transaccional con `SET LOCAL` por request.
 - [x] Definir criterio fail-closed (sin contexto tenant = `0` filas).
 - [ ] Aplicar politicas RLS finales en todas las tablas core tenant-protected.
-- [ ] Validar pruebas A/B de aislamiento por endpoint (no solo SQL).
-- [ ] Auditar flujos `SUPER_ADMIN` cross-tenant en endpoints reales.
+- [x] Validar pruebas A/B de aislamiento por endpoint (no solo SQL).
+  - Evidencia 2026-02-27: `backend/tests/e2e/super-admin-isolation.test.js` en staging (`PASS`, 3/3 casos).
+- [x] Auditar flujos `SUPER_ADMIN` cross-tenant en endpoints reales.
+  - Evidencia 2026-02-27: `backend/tests/e2e/super-admin-isolation.test.js` valida lectura, mutacion y aislamiento de pool.
 
 #### OLA A - Endurecimiento de controladores (sesion 2026-02-26)
 

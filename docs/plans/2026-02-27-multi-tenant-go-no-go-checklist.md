@@ -39,10 +39,12 @@ Objetivo: asegurar que endpoints tenant-protected usen `withRequestTenantContext
 
 ### 4.2 Checks criticos de salida (GO para pasar a OLA B)
 
-- [ ] Ningun endpoint tenant-protected ejecuta queries fuera de contexto transaccional tenant.
-  - Estado 2026-02-27: 11/11 controladores endurecidos en codigo. Pendiente validacion E2E/smoke para cierre GO.
-- [ ] Prueba `SUPER_ADMIN` cross-tenant en endpoints reales.
-- [ ] Validacion fail-closed en endpoints: sin contexto tenant -> sin datos.
+- [x] Ningun endpoint tenant-protected ejecuta queries fuera de contexto transaccional tenant.
+  - Estado 2026-02-27: 11/11 controladores endurecidos en codigo + `sync-billing-controller` endurecido con `withTenantContext`.
+- [x] Prueba `SUPER_ADMIN` cross-tenant en endpoints reales.
+  - Evidencia 2026-02-27: `backend/tests/e2e/super-admin-isolation.test.js` -> `PASS` (3/3 casos).
+- [x] Validacion fail-closed en endpoints: sin contexto tenant -> sin datos.
+  - Evidencia 2026-02-27: `backend/scripts/verify-tenant-isolation-ab.js` -> `without_tenant_context` devuelve `0` filas.
 - [ ] Sin regresion de flujos N18 (documentos, recepcion, archivo, admin).
 
 ### 4.3 NO-GO inmediato
@@ -55,9 +57,16 @@ Objetivo: asegurar que endpoints tenant-protected usen `withRequestTenantContext
 ### 4.4 Evidencia minima requerida
 
 1. Diff de controladores endurecidos.
-   - Estado 2026-02-26: Diff disponible en rama `feature/architecture-v2.1-restart` (sin commit aun).
+   - Estado 2026-02-27: Commit `92849ce7` en rama `feature/architecture-v2.1-restart`.
 2. Resultado de `backend/tests/e2e/super-admin-isolation.test.js`.
+   - Estado 2026-02-27: `PASS` (3/3 casos).
 3. Log de smoke tests manuales por rol (`ADMIN`, `CAJA`, `MATRIZADOR`, `RECEPCION`, `ARCHIVO`).
+   - Estado 2026-02-27: pendiente.
+
+### 4.5 Estado operativo OLA A (2026-02-27)
+
+1. Semaforo actual: `Amarillo`.
+2. Motivo: checks tecnicos de aislamiento en verde; falta evidencia de smoke manual por rol para declarar `GO` total.
 
 ## 5) OLA B: notary_id + Backfill + RLS (Grupo A y B)
 

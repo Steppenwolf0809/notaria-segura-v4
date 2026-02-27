@@ -2,7 +2,7 @@
 
 Fecha: 2026-02-26
 Rama: `feature/architecture-v2.1-restart`
-Estado: En progreso (~90% completado)
+Estado: Endurecimiento tecnico completado; pendiente cierre con smoke manual por rol
 
 ## 1) Objetivo de la sesion
 
@@ -101,13 +101,20 @@ Resultado actualizado (2026-02-27): Solo 2 ocurrencias restantes:
 1. `document-controller.js:2677` - Dentro de comentario (no activo)
 2. `billing-controller.js:59` - Helper standalone aceptable
 
+Validacion en staging (2026-02-27):
+1. `npm run test:e2e -- super-admin-isolation.test.js` -> `PASS` (3/3 casos).
+2. `node scripts/verify-tenant-isolation-ab.js` -> `A/B isolation verification passed`.
+3. Evidencia clave:
+   - `without_tenant_context`: 0 filas en `documents`, `document_events`, `whatsapp_notifications`.
+   - `tenant_a_context` y `tenant_b_context`: aislamiento correcto.
+   - `super_admin_context`: visibilidad cross-tenant controlada.
+
 ## 7) Proximos pasos (proxima sesion)
 
 ### Completar OLA A
-1. Ejecutar `backend/tests/e2e/super-admin-isolation.test.js`.
-2. Smoke tests manuales por rol (ADMIN, CAJA, MATRIZADOR, RECEPCION, ARCHIVO).
-3. Hacer commit de todos los cambios de OLA A.
-4. Cerrar checks criticos de salida OLA A en el Go/No-Go checklist.
+1. Ejecutar smoke tests manuales por rol (ADMIN, CAJA, MATRIZADOR, RECEPCION, ARCHIVO).
+2. Cerrar checks criticos de salida OLA A en el Go/No-Go checklist.
+3. Declarar `GO` formal de OLA A e iniciar OLA B.
 
 ### Iniciar OLA B (tras GO de OLA A)
 1. Definir mapping de backfill por tabla (source of truth por fila).
@@ -116,7 +123,7 @@ Resultado actualizado (2026-02-27): Solo 2 ocurrencias restantes:
 4. Activar RLS progresivamente.
 5. Endurecer servicios (deuda tecnica documentada arriba).
 
-## 8) Archivos modificados en esta sesion (sin commit)
+## 8) Archivos modificados y estado de commit
 
 ```
 backend/src/controllers/admin-notification-controller.js
@@ -131,6 +138,9 @@ backend/src/controllers/admin-document-controller.js (sesion previa)
 docs/plans/2026-02-19-multi-tenant-clerk-design.md (checklist actualizado)
 docs/plans/2026-02-27-multi-tenant-go-no-go-checklist.md (OLA A checks actualizados)
 ```
+
+Commit realizado:
+- `92849ce7` - `feat(multitenant): close OLA A code hardening and update go-no-go docs`
 
 ## 9) Decision documentada: Billing multi-tenant
 
