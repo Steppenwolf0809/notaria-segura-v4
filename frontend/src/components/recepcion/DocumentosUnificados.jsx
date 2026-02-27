@@ -73,6 +73,7 @@ const StatusIndicator = ({ status }) => {
     LISTO: { label: '✅ Listo', color: '#2e7d32' },
     ENTREGADO: { label: '📦 Entregado', color: '#616161' },
     PENDIENTE: { label: '⏳ Pendiente', color: '#f57c00' },
+    ANULADO_NOTA_CREDITO: { label: '🔴 Nota de Crédito', color: '#dc2626' },
   };
   const config = statusConfig[status] || { label: `📎 ${status}`, color: '#616161' };
   return (

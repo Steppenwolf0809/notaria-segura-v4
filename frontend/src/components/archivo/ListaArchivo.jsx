@@ -469,7 +469,8 @@ const ListaArchivo = ({
       'PENDIENTE': 'warning',
       'EN_PROCESO': 'info',
       'LISTO': 'success',
-      'ENTREGADO': 'default'
+      'ENTREGADO': 'default',
+      'ANULADO_NOTA_CREDITO': 'error'
     };
     return colores[estado] || 'default';
   };

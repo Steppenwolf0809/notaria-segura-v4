@@ -91,7 +91,8 @@ const ConfirmationModal = ({
       'PENDIENTE': 'Pendiente',
       'EN_PROCESO': 'En Proceso',
       'LISTO': 'Listo para Entrega',
-      'ENTREGADO': 'Entregado'
+      'ENTREGADO': 'Entregado',
+      'ANULADO_NOTA_CREDITO': 'Nota de Crédito'
     };
     return statusTexts[status] || status;
   };
