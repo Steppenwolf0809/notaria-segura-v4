@@ -154,7 +154,8 @@ const ListView = ({
       'EN_PROCESO': { color: 'warning', label: 'En Proceso' },
       'LISTO': { color: 'success', label: 'Listo para Entrega' },
       'ENTREGADO': { color: 'info', label: 'Entregado' },
-      'PENDIENTE': { color: 'default', label: 'Pendiente' }
+      'PENDIENTE': { color: 'default', label: 'Pendiente' },
+      'ANULADO_NOTA_CREDITO': { color: 'error', label: 'Nota de Crédito' }
     };
     return colors[status] || { color: 'default', label: status };
   };
@@ -450,6 +451,11 @@ const ListView = ({
                       '&:hover': { bgcolor: 'action.hover' },
                       ...(bulkActions.selectedDocuments.has(document.id) && {
                         bgcolor: 'action.selected'
+                      }),
+                      ...(document.status === 'ANULADO_NOTA_CREDITO' && {
+                        opacity: 0.6,
+                        bgcolor: 'error.50',
+                        '& td': { textDecoration: 'line-through', textDecorationColor: 'error.main' }
                       })
                     }}
                   >
