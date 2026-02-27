@@ -2,7 +2,7 @@
 
 Fecha: 2026-02-26
 Rama: `feature/architecture-v2.1-restart`
-Estado: Endurecimiento tecnico completado; pendiente cierre con smoke manual por rol
+Estado: OLA A cerrada en verde (GO aprobado el 2026-02-27)
 
 ## 1) Objetivo de la sesion
 
@@ -112,9 +112,9 @@ Validacion en staging (2026-02-27):
 ## 7) Proximos pasos (proxima sesion)
 
 ### Completar OLA A
-1. Ejecutar smoke tests manuales por rol (ADMIN, CAJA, MATRIZADOR, RECEPCION, ARCHIVO).
-2. Cerrar checks criticos de salida OLA A en el Go/No-Go checklist.
-3. Declarar `GO` formal de OLA A e iniciar OLA B.
+1. Smoke tests manuales por rol completados (ADMIN, CAJA, MATRIZADOR, RECEPCION, ARCHIVO).
+2. Checks criticos de salida OLA A cerrados en checklist Go/No-Go.
+3. `GO` formal de OLA A aprobado; siguiente foco: OLA B.
 
 ### Iniciar OLA B (tras GO de OLA A)
 1. Definir mapping de backfill por tabla (source of truth por fila).

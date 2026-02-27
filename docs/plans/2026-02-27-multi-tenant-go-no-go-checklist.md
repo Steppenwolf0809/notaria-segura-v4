@@ -45,7 +45,8 @@ Objetivo: asegurar que endpoints tenant-protected usen `withRequestTenantContext
   - Evidencia 2026-02-27: `backend/tests/e2e/super-admin-isolation.test.js` -> `PASS` (3/3 casos).
 - [x] Validacion fail-closed en endpoints: sin contexto tenant -> sin datos.
   - Evidencia 2026-02-27: `backend/scripts/verify-tenant-isolation-ab.js` -> `without_tenant_context` devuelve `0` filas.
-- [ ] Sin regresion de flujos N18 (documentos, recepcion, archivo, admin).
+- [x] Sin regresion de flujos N18 (documentos, recepcion, archivo, admin).
+  - Evidencia 2026-02-27: smoke manual por rol completado en staging; incidencia de cartera corregida (drift de schema en `pending_receivables`).
 
 ### 4.3 NO-GO inmediato
 
@@ -61,12 +62,13 @@ Objetivo: asegurar que endpoints tenant-protected usen `withRequestTenantContext
 2. Resultado de `backend/tests/e2e/super-admin-isolation.test.js`.
    - Estado 2026-02-27: `PASS` (3/3 casos).
 3. Log de smoke tests manuales por rol (`ADMIN`, `CAJA`, `MATRIZADOR`, `RECEPCION`, `ARCHIVO`).
-   - Estado 2026-02-27: pendiente.
+   - Estado 2026-02-27: completado.
+   - Nota: error 500 en cartera (`/api/billing/my-portfolio` y reportes) resuelto con migracion de columnas `cashierComment*` en `pending_receivables`.
 
 ### 4.5 Estado operativo OLA A (2026-02-27)
 
-1. Semaforo actual: `Amarillo`.
-2. Motivo: checks tecnicos de aislamiento en verde; falta evidencia de smoke manual por rol para declarar `GO` total.
+1. Semaforo actual: `Verde`.
+2. Decision: `GO` aprobado para iniciar OLA B.
 
 ## 5) OLA B: notary_id + Backfill + RLS (Grupo A y B)
 
@@ -74,7 +76,7 @@ Objetivo: completar tenant scoping estructural en tablas pendientes y activar RL
 
 ### 5.1 GO de entrada (para iniciar OLA B)
 
-- [ ] OLA A aprobada en verde.
+- [x] OLA A aprobada en verde.
 - [ ] Definido mapping de backfill por tabla (source of truth por fila).
 - [ ] Query de filas no mapeables definida por tabla.
 

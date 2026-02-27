@@ -279,7 +279,7 @@ Ultima actualizacion: 2026-02-27
 
 Resumen por fase:
 1. Fase 1 (Fundacion tenant + Clerk mapping): En progreso avanzado.
-2. Fase 2 (RLS robusto): En progreso - OLA A validada tecnicamente en staging, pendiente smoke manual por rol.
+2. Fase 2 (RLS robusto): En progreso - OLA A cerrada en verde y lista para iniciar OLA B.
 3. Fase 3 (UAFE schema): Pendiente.
 4. Fase 4 (Modulos/planes): Pendiente.
 
@@ -325,6 +325,12 @@ Servicios con queries directas (deuda tecnica para OLA B):
 - `matrizador-assignment-service.js` (3 queries)
 - `import-mov-service.js` (~10 queries)
 - `import-koinor-xml-service.js` (2 queries)
+
+Estado de cierre OLA A (2026-02-27):
+- [x] E2E `SUPER_ADMIN` en staging (`backend/tests/e2e/super-admin-isolation.test.js`) -> PASS.
+- [x] Script A/B de aislamiento en staging (`backend/scripts/verify-tenant-isolation-ab.js`) -> PASS.
+- [x] Smoke manual por rol completado.
+- [x] GO formal aprobado para iniciar OLA B.
 
 ### Fase 3 - UAFE schema
 
