@@ -332,11 +332,25 @@ Estado de cierre OLA A (2026-02-27):
 - [x] Smoke manual por rol completado.
 - [x] GO formal aprobado para iniciar OLA B.
 
+#### OLA B - notary_id + backfill (sesion 2026-02-27)
+
+Avance ejecutado:
+- [x] Migracion `20260227060000_ola_b_add_notary_id_business_uafe_tables` creada.
+- [x] `notary_id` agregado en 13 tablas objetivo (billing + UAFE + operativas).
+- [x] Backfill aplicado en staging con estrategia deterministica (preferencia `N18`, fallback seguro).
+- [x] Validacion post-backfill: `0` nulos en `notary_id` para todas las tablas objetivo.
+
+Pendiente de OLA B:
+- [ ] Activar RLS (`ENABLE + FORCE`) y politicas tenant en tablas de OLA B.
+- [ ] Endurecer servicios restantes (`alertas`, `bulk-status`, `import-mov`, `import-koinor-xml`, `matrizador-assignment`) antes de RLS final.
+- [ ] Ejecutar validaciones A/B por endpoint sobre tablas OLA B ya con RLS activo.
+
 ### Fase 3 - UAFE schema
 
 - [x] Decidir `uafe` como schema separado en la misma DB.
 - [ ] Crear migraciones SQL base para schema `uafe`.
-- [ ] Agregar `notary_id`, `deleted_at`, indices y uniques por tenant en tablas UAFE.
+- [x] Agregar `notary_id` en tablas UAFE core (`protocolos_uafe`, `personas_protocolo`, `formulario_uafe_asignaciones`, `formulario_uafe_respuestas`, `sesiones_formulario_uafe`, `auditoria_personas`).
+- [ ] Agregar `deleted_at`, indices y uniques por tenant en tablas UAFE.
 - [ ] Activar RLS equivalente en tablas UAFE.
 - [ ] Ejecutar pruebas de no mezcla de datos UAFE entre notarías.
 

@@ -77,8 +77,10 @@ Objetivo: completar tenant scoping estructural en tablas pendientes y activar RL
 ### 5.1 GO de entrada (para iniciar OLA B)
 
 - [x] OLA A aprobada en verde.
-- [ ] Definido mapping de backfill por tabla (source of truth por fila).
-- [ ] Query de filas no mapeables definida por tabla.
+- [x] Definido mapping de backfill por tabla (source of truth por fila).
+  - Evidencia 2026-02-27: migracion `20260227060000_ola_b_add_notary_id_business_uafe_tables`.
+- [x] Query de filas no mapeables definida por tabla.
+  - Evidencia 2026-02-27: validacion post-backfill en staging con `nullNotaryId = 0` en 13 tablas objetivo.
 
 ### 5.2 Secuencia obligatoria de ejecucion
 
@@ -95,7 +97,8 @@ Objetivo: completar tenant scoping estructural en tablas pendientes y activar RL
 
 ### 5.3 Checks criticos de salida (GO para pasar a OLA C)
 
-- [ ] `notary_id` sin nulos en todas las tablas objetivo.
+- [x] `notary_id` sin nulos en todas las tablas objetivo.
+  - Evidencia 2026-02-27: `nullNotaryId = 0` en `invoices`, `payments`, `import_logs`, `pending_receivables`, `escrituras_qr`, `mensajes_internos`, `whatsapp_templates`, `protocolos_uafe`, `personas_protocolo`, `formulario_uafe_asignaciones`, `formulario_uafe_respuestas`, `sesiones_formulario_uafe`, `auditoria_personas`.
 - [ ] Todas las tablas objetivo con `FORCE ROW LEVEL SECURITY`.
 - [ ] Sin contexto tenant, consultas retornan `0` filas.
 - [ ] Tenant A no puede leer/escribir tenant B.
