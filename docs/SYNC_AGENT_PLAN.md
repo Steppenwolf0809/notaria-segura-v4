@@ -1,51 +1,51 @@
-# Koinor Sync Agent - Plan de Implementación (Parte 2)
+# Koinor Sync Agent - Plan de ImplementaciÃ³n (Parte 2)
 
-## ✅ Parte 1 Completada (Railway Endpoint)
+## âœ… Parte 1 Completada (Railway Endpoint)
 
-El endpoint en Railway está listo y desplegado:
+El endpoint en Railway estÃ¡ listo y desplegado:
 
-| Endpoint | Método | URL |
+| Endpoint | MÃ©todo | URL |
 |----------|--------|-----|
 | Sync Billing | POST | `https://notaria-segura-production.up.railway.app/api/sync/billing` |
 | Status | GET | `https://notaria-segura-production.up.railway.app/api/sync/billing/status` |
 | History | GET | `https://notaria-segura-production.up.railway.app/api/sync/billing/history` |
 
-**API Key:** `ns_sync_5468883cebb118f266c21fe81a5925e58e996191c294553f`
+**API Key:** `SYNC_API_KEY_VALUE`
 
-> ⚠️ **Acción Pendiente:** Configurar `SYNC_API_KEY` en Railway Dashboard → Variables
+> âš ï¸ **AcciÃ³n Pendiente:** Configurar `SYNC_API_KEY` en Railway Dashboard â†’ Variables
 
 ---
 
-## 🎯 Parte 2: Sync Agent (Servidor Local Notaría)
+## ðŸŽ¯ Parte 2: Sync Agent (Servidor Local NotarÃ­a)
 
 ### Objetivo
 Crear un agente Node.js que:
 1. Lea la VIEW `vw_facturas_railway` de SQL Server (Koinor)
-2. Envíe los datos al endpoint de Railway cada 15 minutos
+2. EnvÃ­e los datos al endpoint de Railway cada 15 minutos
 3. Funcione como servicio de Windows
 
 ### Arquitectura
 ```
-┌─────────────────────────┐         HTTPS POST          ┌──────────────────┐
-│   Servidor Notaría      │  ─────────────────────────▶ │   Railway        │
-│   (Sync Agent Node.js)  │                             │   PostgreSQL     │
-│          ↑              │  ◀─────────────────────────  │                  │
-│   SQL Server (Koinor)   │      JSON Response          └──────────────────┘
-└─────────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”         HTTPS POST          â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚   Servidor NotarÃ­a      â”‚  â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â–¶ â”‚   Railway        â”‚
+â”‚   (Sync Agent Node.js)  â”‚                             â”‚   PostgreSQL     â”‚
+â”‚          â†‘              â”‚  â—€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€  â”‚                  â”‚
+â”‚   SQL Server (Koinor)   â”‚      JSON Response          â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
 ### Estructura Propuesta
 ```
 sync-agent/
-├── package.json
-├── .env                    # Credenciales SQL Server + API Key
-├── src/
-│   ├── index.js            # Entry point, scheduler
-│   ├── koinor-reader.js    # Conexión SQL Server, lee VIEW
-│   ├── railway-sender.js   # POST a Railway endpoint
-│   └── logger.js           # Logging con rotación
-├── install-service.js      # Instalar como servicio Windows
-└── logs/
+â”œâ”€â”€ package.json
+â”œâ”€â”€ .env                    # Credenciales SQL Server + API Key
+â”œâ”€â”€ src/
+â”‚   â”œâ”€â”€ index.js            # Entry point, scheduler
+â”‚   â”œâ”€â”€ koinor-reader.js    # ConexiÃ³n SQL Server, lee VIEW
+â”‚   â”œâ”€â”€ railway-sender.js   # POST a Railway endpoint
+â”‚   â””â”€â”€ logger.js           # Logging con rotaciÃ³n
+â”œâ”€â”€ install-service.js      # Instalar como servicio Windows
+â””â”€â”€ logs/
 ```
 
 ### Variables de Entorno Requeridas (.env)
@@ -59,9 +59,9 @@ KOINOR_PORT=1433
 
 # Railway Endpoint
 RAILWAY_SYNC_URL=https://notaria-segura-production.up.railway.app/api/sync/billing
-SYNC_API_KEY=ns_sync_5468883cebb118f266c21fe81a5925e58e996191c294553f
+SYNC_API_KEY=SYNC_API_KEY_VALUE
 
-# Configuración
+# ConfiguraciÃ³n
 SYNC_INTERVAL_MINUTES=15
 ```
 
@@ -75,7 +75,7 @@ SELECT
     fecemi AS fecha_emision,
     fecven AS fecha_vencimiento,
     valcob AS total_factura,
-    observ AS numero_protocolo,    -- Número de protocolo para linking
+    observ AS numero_protocolo,    -- NÃºmero de protocolo para linking
     conpag AS condicion_pago,      -- 'E' o 'C'
     -- Desglose de pagos...
     CASE WHEN saldo = 0 THEN 'PAGADA' 
@@ -102,28 +102,28 @@ WHERE fecemi >= DATEADD(YEAR, -2, GETDATE());
 
 ---
 
-## 📋 Checklist Parte 2
+## ðŸ“‹ Checklist Parte 2
 
-- [ ] Crear proyecto `sync-agent` en carpeta del servidor notaría
-- [ ] Configurar conexión a SQL Server
+- [ ] Crear proyecto `sync-agent` en carpeta del servidor notarÃ­a
+- [ ] Configurar conexiÃ³n a SQL Server
 - [ ] Crear VIEW en Koinor (o confirmar que existe)
 - [ ] Implementar lector de datos (`koinor-reader.js`)
 - [ ] Implementar enviador a Railway (`railway-sender.js`)
 - [ ] Configurar scheduler (cada 15 min)
 - [ ] Instalar como servicio Windows
-- [ ] Probar sincronización completa
+- [ ] Probar sincronizaciÃ³n completa
 
 ---
 
-## 🧪 Test del Endpoint
+## ðŸ§ª Test del Endpoint
 
 Una vez configurada la API Key en Railway:
 ```bash
 curl -X GET "https://notaria-segura-production.up.railway.app/api/sync/billing/status" \
-  -H "X-Sync-Api-Key: ns_sync_5468883cebb118f266c21fe81a5925e58e996191c294553f"
+  -H "X-Sync-Api-Key: SYNC_API_KEY_VALUE"
 ```
 
 Respuesta esperada:
 ```json
 {"success":true,"data":{"lastSync":null,"syncHealthy":false}}
-```
+````r`n

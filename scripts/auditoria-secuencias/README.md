@@ -1,26 +1,26 @@
-# 🔍 Script de Auditoría de Secuencias Documentales
+# ðŸ” Script de AuditorÃ­a de Secuencias Documentales
 
-## 📖 Descripción
+## ðŸ“– DescripciÃ³n
 
-Este script analiza las secuencias de documentos registrados en la base de datos PostgreSQL de Railway (staging) y genera un reporte Excel detallado identificando números de documento faltantes ("huecos") en cada libro.
+Este script analiza las secuencias de documentos registrados en la base de datos PostgreSQL de Railway (staging) y genera un reporte Excel detallado identificando nÃºmeros de documento faltantes ("huecos") en cada libro.
 
-## 🎯 Características
+## ðŸŽ¯ CaracterÃ­sticas
 
-- ✅ Conexión directa a PostgreSQL usando `pg` (node-postgres)
-- ✅ Análisis de 5 tipos de libros: Arrendamientos (A), Certificaciones (C), Diligencias (D), Protocolo (P), Otros (O)
-- ✅ Soporte para documentos de 2025 y 2026
-- ✅ Detección automática de números faltantes en secuencias
-- ✅ Estimación de fechas usando interpolación lineal
-- ✅ Generación de reporte Excel con 3 hojas
-- ✅ Progreso en consola con estadísticas en tiempo real
+- âœ… ConexiÃ³n directa a PostgreSQL usando `pg` (node-postgres)
+- âœ… AnÃ¡lisis de 5 tipos de libros: Arrendamientos (A), Certificaciones (C), Diligencias (D), Protocolo (P), Otros (O)
+- âœ… Soporte para documentos de 2025 y 2026
+- âœ… DetecciÃ³n automÃ¡tica de nÃºmeros faltantes en secuencias
+- âœ… EstimaciÃ³n de fechas usando interpolaciÃ³n lineal
+- âœ… GeneraciÃ³n de reporte Excel con 3 hojas
+- âœ… Progreso en consola con estadÃ­sticas en tiempo real
 
-## 📋 Requisitos Previos
+## ðŸ“‹ Requisitos Previos
 
 - Node.js 16 o superior
 - Acceso a la base de datos PostgreSQL en Railway
-- Credenciales de conexión (DATABASE_URL)
+- Credenciales de conexiÃ³n (DATABASE_URL)
 
-## 🚀 Instalación
+## ðŸš€ InstalaciÃ³n
 
 1. **Navegar al directorio del script:**
    ```bash
@@ -39,16 +39,16 @@ Este script analiza las secuencias de documentos registrados en la base de datos
    copy .env.example .env
    ```
    
-   > ✅ **Ya configurado**: El archivo `.env.example` incluye la URL de staging por defecto
+   > âœ… **Ya configurado**: El archivo `.env.example` incluye la URL de staging por defecto
    
-   La URL ya está lista para usar la base de datos de **STAGING**:
+   La URL ya estÃ¡ lista para usar la base de datos de **STAGING**:
    ```env
-   DATABASE_URL=postgresql://postgres:ymGXjRwwZshJaTEwyIpyztWqAZogkzSG@gondola.proxy.rlwy.net:41960/railway
+   DATABASE_URL=postgresql://<user>:<password>@<host>:<port>/<database>
    ```
    
-   > � **Seguridad**: Este script usa STAGING (copia de producción), nunca producción directa
+   > ï¿½ **Seguridad**: Este script usa STAGING (copia de producciÃ³n), nunca producciÃ³n directa
 
-## ▶️ Ejecución
+## â–¶ï¸ EjecuciÃ³n
 
 Ejecuta el script con:
 
@@ -62,116 +62,116 @@ O directamente:
 node index.js
 ```
 
-## 📊 Salida del Script
+## ðŸ“Š Salida del Script
 
 ### Consola
 
-El script mostrará progreso en tiempo real:
+El script mostrarÃ¡ progreso en tiempo real:
 
 ```
-🔍 AUDITORÍA DE SECUENCIAS DOCUMENTALES
+ðŸ” AUDITORÃA DE SECUENCIAS DOCUMENTALES
 =========================================
 
 Conectando a base de datos...  
-✅ Conexión exitosa
+âœ… ConexiÃ³n exitosa
 
 Consultando documentos...      
-✅ 1,247 documentos encontrados
+âœ… 1,247 documentos encontrados
 
 Analizando secuencias por libro:
 
-📚 Arrendamientos (A)...
+ðŸ“š Arrendamientos (A)...
    - 2025: 14/16 documentos, 2 faltantes
    - 2026: 3/3 documentos, 0 faltantes
 
-📚 Certificaciones (C)...
+ðŸ“š Certificaciones (C)...
    - 2025: 290/298 documentos, 8 faltantes
    - 2026: 72/74 documentos, 2 faltantes
 
 [...]
 
 Generando reporte Excel...     
-✅ Reporte guardado
+âœ… Reporte guardado
 
 ==================================================
 RESUMEN GENERAL
 ==================================================
-📊 Total documentos esperados: 1,285
-✅ Total encontrados: 1,247
-❌ Total faltantes: 38
-📈 Completitud general: 97.04%
+ðŸ“Š Total documentos esperados: 1,285
+âœ… Total encontrados: 1,247
+âŒ Total faltantes: 38
+ðŸ“ˆ Completitud general: 97.04%
 ==================================================
 
-📄 Archivo generado: reporte_auditoria_secuencias_20260114_153022.xlsx
-📂 Ubicación: C:\notaria-segura\scripts\auditoria-secuencias\reporte_auditoria_secuencias_20260114_153022.xlsx
+ðŸ“„ Archivo generado: reporte_auditoria_secuencias_20260114_153022.xlsx
+ðŸ“‚ UbicaciÃ³n: C:\notaria-segura\scripts\auditoria-secuencias\reporte_auditoria_secuencias_20260114_153022.xlsx
 ```
 
 ### Reporte Excel
 
 El archivo Excel generado contiene **3 hojas**:
 
-#### 📝 Hoja 1: Resumen
-| Libro | Año | Rango Analizado | Total Esperados | Encontrados | Faltantes | % Completitud |
+#### ðŸ“ Hoja 1: Resumen
+| Libro | AÃ±o | Rango Analizado | Total Esperados | Encontrados | Faltantes | % Completitud |
 |-------|-----|-----------------|-----------------|-------------|-----------|---------------|
 | Arrendamientos | 2025 | 00100 - 00115 | 16 | 14 | 2 | 87.50% |
 | Certificaciones | 2025 | 02505 - 02802 | 298 | 290 | 8 | 97.32% |
 | ... | ... | ... | ... | ... | ... | ... |
 
-#### ⚠️ Hoja 2: Detalle Faltantes
-| # | Libro | Año | Código Completo | Número Secuencial | Fecha Estimada | Doc Anterior | Doc Siguiente |
+#### âš ï¸ Hoja 2: Detalle Faltantes
+| # | Libro | AÃ±o | CÃ³digo Completo | NÃºmero Secuencial | Fecha Estimada | Doc Anterior | Doc Siguiente |
 |---|-------|-----|-----------------|-------------------|----------------|--------------|---------------|
 | 1 | Protocolo | 2025 | 20251701018P02632 | 2632 | 2025-11-12 ~11:36 | #02630 (2025-11-12) | #02635 (2025-11-12) |
 | ... | ... | ... | ... | ... | ... | ... | ... |
 
-#### ✅ Hoja 3: Documentos Encontrados
-| Código Barras | Libro | Año | Número | Fecha Registro |
+#### âœ… Hoja 3: Documentos Encontrados
+| CÃ³digo Barras | Libro | AÃ±o | NÃºmero | Fecha Registro |
 |---------------|-------|-----|--------|----------------|
 | 20251701018P02629 | Protocolo | 2025 | 2629 | 2025-11-12 10:00:00 |
 | ... | ... | ... | ... | ... |
 
-## 🔧 Estructura del Código
+## ðŸ”§ Estructura del CÃ³digo
 
 ```
 scripts/auditoria-secuencias/
-├── index.js          # Script principal
-├── config.js         # Configuración de rangos y utilidades
-├── package.json      # Dependencias
-├── .env              # Variables de entorno (no incluido en git)
-├── .env.example      # Template de configuración
-└── README.md         # Este archivo
+â”œâ”€â”€ index.js          # Script principal
+â”œâ”€â”€ config.js         # ConfiguraciÃ³n de rangos y utilidades
+â”œâ”€â”€ package.json      # Dependencias
+â”œâ”€â”€ .env              # Variables de entorno (no incluido en git)
+â”œâ”€â”€ .env.example      # Template de configuraciÃ³n
+â””â”€â”€ README.md         # Este archivo
 ```
 
-## 🧮 Algoritmo de Estimación de Fechas
+## ðŸ§® Algoritmo de EstimaciÃ³n de Fechas
 
 Para cada documento faltante, el script:
 
-1. **Busca el documento anterior más cercano** (número menor más próximo)
-2. **Busca el documento siguiente más cercano** (número mayor más próximo)
-3. **Interpola linealmente** la fecha basándose en:
+1. **Busca el documento anterior mÃ¡s cercano** (nÃºmero menor mÃ¡s prÃ³ximo)
+2. **Busca el documento siguiente mÃ¡s cercano** (nÃºmero mayor mÃ¡s prÃ³ximo)
+3. **Interpola linealmente** la fecha basÃ¡ndose en:
    - Diferencia de tiempo entre docs anterior y siguiente
-   - Posición relativa del número faltante
+   - PosiciÃ³n relativa del nÃºmero faltante
 
 **Ejemplo:**
 ```
-Doc #02630 → 2025-11-12 10:00
-Doc #02635 → 2025-11-12 14:00
-Faltante #02632 → Estimado: 2025-11-12 ~11:36
+Doc #02630 â†’ 2025-11-12 10:00
+Doc #02635 â†’ 2025-11-12 14:00
+Faltante #02632 â†’ Estimado: 2025-11-12 ~11:36
 ```
 
-Si solo hay documento anterior o siguiente, usa esa fecha con nota "(estimación aproximada)".
+Si solo hay documento anterior o siguiente, usa esa fecha con nota "(estimaciÃ³n aproximada)".
 
-## 🛡️ Manejo de Errores
+## ðŸ›¡ï¸ Manejo de Errores
 
 El script incluye manejo de errores para:
 
-- ❌ **Conexión fallida**: Verifica credenciales y URL
-- ❌ **Tabla no encontrada**: Muestra mensaje para verificar schema
-- ❌ **Sin documentos**: Verifica filtros de fecha
-- ❌ **Error de escritura Excel**: Verifica permisos de carpeta
+- âŒ **ConexiÃ³n fallida**: Verifica credenciales y URL
+- âŒ **Tabla no encontrada**: Muestra mensaje para verificar schema
+- âŒ **Sin documentos**: Verifica filtros de fecha
+- âŒ **Error de escritura Excel**: Verifica permisos de carpeta
 
-## 📝 Configuración de Rangos
+## ðŸ“ ConfiguraciÃ³n de Rangos
 
-Los rangos están definidos en `config.js`:
+Los rangos estÃ¡n definidos en `config.js`:
 
 ```javascript
 RANGOS: {
@@ -180,53 +180,53 @@ RANGOS: {
     2025: { inicio: 2629, fin: 3062 },
     2026: { inicio: 1, fin: 74 }
   },
-  // ... más libros
+  // ... mÃ¡s libros
 }
 ```
 
 Para modificar rangos, edita `config.js` y ejecuta nuevamente el script.
 
-## 🔍 Troubleshooting
+## ðŸ” Troubleshooting
 
-### Error: "DATABASE_URL no está definida"
-**Solución**: Asegúrate de crear el archivo `.env` a partir de `.env.example` y configurar la URL correcta.
+### Error: "DATABASE_URL no estÃ¡ definida"
+**SoluciÃ³n**: AsegÃºrate de crear el archivo `.env` a partir de `.env.example` y configurar la URL correcta.
 
 ### Error: "relation 'documents' does not exist"
-**Solución**: Verifica que:
-1. Estás usando la base de datos correcta (staging)
-2. El nombre de la tabla en el código coincide con tu schema Prisma
+**SoluciÃ³n**: Verifica que:
+1. EstÃ¡s usando la base de datos correcta (staging)
+2. El nombre de la tabla en el cÃ³digo coincide con tu schema Prisma
 
 ### No se encuentran documentos
-**Solución**: Verifica que:
+**SoluciÃ³n**: Verifica que:
 1. Las fechas en `config.js` sean correctas
 2. Los documentos tengan `protocolNumber` no nulo
-3. Estés conectado a la base de datos correcta
+3. EstÃ©s conectado a la base de datos correcta
 
 ### Errores de permisos al guardar Excel
-**Solución**: Cierra cualquier archivo Excel abierto con el mismo nombre y verifica permisos de escritura en la carpeta.
+**SoluciÃ³n**: Cierra cualquier archivo Excel abierto con el mismo nombre y verifica permisos de escritura en la carpeta.
 
-## 📚 Conceptos Educativos
+## ðŸ“š Conceptos Educativos
 
 Este script demuestra:
 
 1. **Uso de `pg` vs Prisma**: Scripts standalone se benefician de `pg` directo por simplicidad
-2. **Interpolación lineal**: Técnica matemática para estimar valores entre puntos conocidos
-3. **Análisis de secuencias**: Patrón común en auditorías de datos numéricos
-4. **Generación de Excel con ExcelJS**: Creación programática de reportes complejos
+2. **InterpolaciÃ³n lineal**: TÃ©cnica matemÃ¡tica para estimar valores entre puntos conocidos
+3. **AnÃ¡lisis de secuencias**: PatrÃ³n comÃºn en auditorÃ­as de datos numÃ©ricos
+4. **GeneraciÃ³n de Excel con ExcelJS**: CreaciÃ³n programÃ¡tica de reportes complejos
 5. **Conexiones remotas a PostgreSQL**: Manejo de conexiones TCP a bases de datos cloud
 
-## 🔐 Seguridad
+## ðŸ” Seguridad
 
-- ✅ Script de **solo lectura** - no modifica datos
-- ✅ Usa base de datos de **STAGING**, no producción
-- ✅ Credenciales en `.env` (no incluido en control de versiones)
+- âœ… Script de **solo lectura** - no modifica datos
+- âœ… Usa base de datos de **STAGING**, no producciÃ³n
+- âœ… Credenciales en `.env` (no incluido en control de versiones)
 
-## 📄 Licencia
+## ðŸ“„ Licencia
 
-PRIVATE - Uso interno de Notaría Segura
+PRIVATE - Uso interno de NotarÃ­a Segura
 
 ---
 
-**Desarrollado para**: Notaría Segura  
-**Versión**: 1.0.0  
-**Última actualización**: Enero 2026
+**Desarrollado para**: NotarÃ­a Segura
+**VersiÃ³n**: 1.0.0
+**Ãšltima actualizaciÃ³n**: Enero 2026`r`n

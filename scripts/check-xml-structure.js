@@ -5,13 +5,19 @@ const { promisify } = require('util');
 const parseXML = promisify(parseString);
 
 async function analyzeInvoiceNumber() {
+    const connectionString = process.env.DATABASE_URL;
+    if (!connectionString) {
+        console.error('ERROR: DATABASE_URL no esta configurada.');
+        process.exit(1);
+    }
+
     const client = new Client({
-        connectionString: 'postgresql://postgres:uXwrkbpPDVXrEngsRCMHdIKkOUDXipic@switchback.proxy.rlwy.net:25513/railway'
+        connectionString
     });
 
     try {
         await client.connect();
-        console.log('✅ Connected to database');
+        console.log('âœ… Connected to database');
 
         const res = await client.query(`
       SELECT id, "protocolNumber", "xmlOriginal" 
@@ -20,7 +26,7 @@ async function analyzeInvoiceNumber() {
       LIMIT 3
     `);
 
-        console.log(`\n📊 Found ${res.rows.length} documents with XML\n`);
+        console.log(`\nðŸ“Š Found ${res.rows.length} documents with XML\n`);
 
         for (const doc of res.rows) {
             console.log('='.repeat(80));
@@ -33,37 +39,37 @@ async function analyzeInvoiceNumber() {
 
                 if (factura && factura.infoTributaria) {
                     const infoTrib = factura.infoTributaria[0];
-                    console.log('\n📄 INFORMACIÓN TRIBUTARIA:');
+                    console.log('\nðŸ“„ INFORMACIÃ“N TRIBUTARIA:');
                     console.log(`  Establecimiento: ${infoTrib.estab?.[0]}`);
-                    console.log(`  Punto Emisión: ${infoTrib.ptoEmi?.[0]}`);
+                    console.log(`  Punto EmisiÃ³n: ${infoTrib.ptoEmi?.[0]}`);
                     console.log(`  Secuencial: ${infoTrib.secuencial?.[0]}`);
 
                     if (infoTrib.estab && infoTrib.ptoEmi && infoTrib.secuencial) {
                         const numeroFactura = `${infoTrib.estab[0]}-${infoTrib.ptoEmi[0]}-${infoTrib.secuencial[0]}`;
-                        console.log(`  ✅ Número de Factura: ${numeroFactura}`);
+                        console.log(`  âœ… NÃºmero de Factura: ${numeroFactura}`);
                     }
                 }
 
                 if (factura && factura.infoFactura) {
                     const infoFact = factura.infoFactura[0];
-                    console.log(`\n💰 INFORMACIÓN FACTURA:`);
-                    console.log(`  Fecha Emisión: ${infoFact.fechaEmision?.[0]}`);
+                    console.log(`\nðŸ’° INFORMACIÃ“N FACTURA:`);
+                    console.log(`  Fecha EmisiÃ³n: ${infoFact.fechaEmision?.[0]}`);
                     console.log(`  Total: $${infoFact.importeTotal?.[0]}`);
                 }
             } catch (xmlError) {
-                console.log(`  ❌ Error parsing XML: ${xmlError.message}`);
+                console.log(`  âŒ Error parsing XML: ${xmlError.message}`);
             }
 
             console.log('');
         }
 
         await client.end();
-        console.log('✅ Connection closed\n');
+        console.log('âœ… Connection closed\n');
     } catch (error) {
-        console.error('❌ Error:', error.message);
+        console.error('âŒ Error:', error.message);
         await client.end();
         process.exit(1);
     }
 }
 
-analyzeInvoiceNumber();
+analyzeInvoiceNumber();`r`n

@@ -77,6 +77,11 @@ prisma/migrations/migration_lock.toml
 .idea/
 *.swp
 *.swo
+.claude/settings.local.json
+.roo/mcp.json
+
+# Local accidental env dump
+*backend.env
 
 # OS
 .DS_Store

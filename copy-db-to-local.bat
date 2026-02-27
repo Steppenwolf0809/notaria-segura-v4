@@ -19,13 +19,17 @@ set PROD_HOST=switchback.proxy.rlwy.net
 set PROD_PORT=25513
 set PROD_USER=postgres
 set PROD_DB=railway
-set PGPASSWORD_PROD=uXwrkbpPDVXrEngsRCMHdIKkOUDXipic
+if "%PGPASSWORD_PROD%"=="" (
+    echo [ERROR] Debes exportar PGPASSWORD_PROD antes de ejecutar este script.
+    pause
+    exit /b
+)
 
 set LOCAL_HOST=localhost
 set LOCAL_PORT=5433
 set LOCAL_USER=postgres
 set LOCAL_DB=notaria_segura_dev
-set LOCAL_PASS=password
+if "%LOCAL_PASS%"=="" set LOCAL_PASS=postgres
 
 echo.
 echo ===================================================

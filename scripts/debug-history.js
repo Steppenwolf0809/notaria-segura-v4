@@ -1,7 +1,9 @@
 import { PrismaClient } from '@prisma/client';
 
-// Use the provided production connection string
-process.env.DATABASE_URL = 'postgresql://postgres:uXwrkbpPDVXrEngsRCMHdIKkOUDXipic@switchback.proxy.rlwy.net:25513/railway';
+if (!process.env.DATABASE_URL) {
+    console.error('ERROR: DATABASE_URL no esta configurada.');
+    process.exit(1);
+}
 
 const prisma = new PrismaClient();
 
@@ -21,14 +23,14 @@ async function main() {
         });
 
         if (!document) {
-            console.log('❌ Document not found!');
+            console.log('âŒ Document not found!');
         } else {
-            console.log('✅ Document found:');
+            console.log('âœ… Document found:');
             console.log(JSON.stringify(document, null, 2));
 
             console.log(`\nEvents found: ${document.events.length}`);
             if (document.events.length === 0) {
-                console.log('⚠️ No events found for this document.');
+                console.log('âš ï¸ No events found for this document.');
 
                 // Let's check if there are ANY events for this user or generic checks
                 // Checking if there are orphan events that might have lost the link (unlikely with FK, but possible if optional)
@@ -64,4 +66,4 @@ async function main() {
     }
 }
 
-main();
+main();`r`n

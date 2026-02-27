@@ -4,16 +4,16 @@ setlocal enabledelayedexpansion
 REM ===================================================
 REM CONFIGURATION
 REM ===================================================
-set PROD_URL=postgresql://postgres:uXwrkbpPDVXrEngsRCMHdIKkOUDXipic@switchback.proxy.rlwy.net:25513/railway
-set STAGING_URL=postgresql://postgres:vzdzHHIVerdjgzWlmfARWiSsbTBSJfvw@gondola.proxy.rlwy.net:39316/railway
+set PROD_URL=postgresql://<user>:<password>@<host>:<port>/<database>
+set STAGING_URL=postgresql://<user>:<password>@<host>:<port>/<database>
 
 echo ===================================================
 echo  NOTARIA SEGURA - DB SYNC
 echo  Production to Staging (Postgres Copy)
 echo ===================================================
 echo.
-echo  SOURCE (Production): switchback.proxy.rlwy.net:25513
-echo  TARGET (Staging):    gondola.proxy.rlwy.net:39316
+echo  SOURCE (Production): configured via PROD_URL
+echo  TARGET (Staging):    configured via STAGING_URL
 echo.
 echo  ONE-WAY SYNC WARNING:
 echo  This will completely ERASE the Staging database and
@@ -70,4 +70,4 @@ echo  PROCESS FAILED
 echo ===================================================
 echo.
 REM pause
-exit /b 1
+exit /b 1`r`n

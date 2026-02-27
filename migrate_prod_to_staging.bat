@@ -9,14 +9,20 @@ set PROD_HOST=gondola.proxy.rlwy.net
 set PROD_PORT=41960
 set PROD_USER=postgres
 set PROD_DB=railway
-set PGPASSWORD_PROD=ymGXjRwwZshJaTEwyIpyztWqAZogkzSG
+if "%PGPASSWORD_PROD%"=="" (
+    echo [ERROR] Debes exportar PGPASSWORD_PROD antes de ejecutar este script.
+    goto :fin
+)
 
 :: CONFIGURACION STAGING (DESTINO)
 set STAGING_HOST=gondola.proxy.rlwy.net
 set STAGING_PORT=39316
 set STAGING_USER=postgres
 set STAGING_DB=railway
-set PGPASSWORD_STAGING=vzdzHHIVerdjgzWlmfARWiSsbTBSJfvw
+if "%PGPASSWORD_STAGING%"=="" (
+    echo [ERROR] Debes exportar PGPASSWORD_STAGING antes de ejecutar este script.
+    goto :fin
+)
 
 echo ===================================================
 echo   MIGRACION AUTOMATICA: PROD - STAGING

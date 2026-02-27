@@ -1,9 +1,15 @@
 import { PrismaClient } from '@prisma/client';
 
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  console.error('ERROR: DATABASE_URL no esta configurada.');
+  process.exit(1);
+}
+
 const prisma = new PrismaClient({
   datasources: {
     db: {
-      url: process.env.DATABASE_URL || 'postgresql://postgres:vzdzHHIVerdjgzWlmfARWiSsbTBSJfvw@gondola.proxy.rlwy.net:39316/railway'
+      url: databaseUrl
     }
   }
 });
@@ -84,4 +90,4 @@ async function check() {
   await prisma.$disconnect();
 }
 
-check().catch(e => { console.error(e); process.exit(1); });
+check().catch(e => { console.error(e); process.exit(1); });`r`n
