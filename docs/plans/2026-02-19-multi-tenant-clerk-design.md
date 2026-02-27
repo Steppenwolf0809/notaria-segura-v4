@@ -261,3 +261,52 @@ Fuentes:
 2. Pricing general: https://railway.com/pricing
 3. Volumes: https://docs.railway.com/reference/volumes
 4. Dominios: https://docs.railway.com/guides/public-networking
+
+## 13) Estado de Avance (Checklist Vivo)
+
+Ultima actualizacion: 2026-02-27
+
+Resumen por fase:
+1. Fase 1 (Fundacion tenant + Clerk mapping): En progreso avanzado.
+2. Fase 2 (RLS robusto): En progreso.
+3. Fase 3 (UAFE schema): Pendiente.
+4. Fase 4 (Modulos/planes): Pendiente.
+
+### Fase 1 - Fundacion tenant + Clerk mapping
+
+- [x] Definir arquitectura objetivo multi-tenant + Clerk + UAFE schema separado.
+- [x] Crear rama dedicada de arquitectura (`feature/architecture-v2.1-restart`).
+- [x] Documentar decisiones cerradas de seguridad (sin `BYPASSRLS` en rol runtime).
+- [ ] Consolidar modelo final de `notaries/users` en `schema.prisma` para v1.
+- [ ] Validar migracion legacy N18 -> Clerk en entorno de prueba end-to-end.
+
+### Fase 2 - RLS robusto
+
+- [x] Definir patron obligatorio transaccional con `SET LOCAL` por request.
+- [x] Definir criterio fail-closed (sin contexto tenant = `0` filas).
+- [ ] Aplicar politicas RLS finales en todas las tablas core tenant-protected.
+- [ ] Validar pruebas A/B de aislamiento por endpoint (no solo SQL).
+- [ ] Auditar flujos `SUPER_ADMIN` cross-tenant en endpoints reales.
+
+### Fase 3 - UAFE schema
+
+- [x] Decidir `uafe` como schema separado en la misma DB.
+- [ ] Crear migraciones SQL base para schema `uafe`.
+- [ ] Agregar `notary_id`, `deleted_at`, indices y uniques por tenant en tablas UAFE.
+- [ ] Activar RLS equivalente en tablas UAFE.
+- [ ] Ejecutar pruebas de no mezcla de datos UAFE entre notarías.
+
+### Fase 4 - Modulos/planes
+
+- [x] Definir modelo normalizado (`plans`, `modules`, `plan_modules`, `notary_subscriptions`, `notary_module_overrides`).
+- [ ] Implementar tablas y migraciones.
+- [ ] Implementar resolucion de entitlements (plan + overrides).
+- [ ] Integrar middleware `requireModule`.
+- [ ] Probar activacion tecnica por modulo (sin cobro in-app).
+
+### Checklist transversal (release gate)
+
+- [ ] Prueba de carga inicial y validacion de capacidad real (objetivo base: 20 notarias activas).
+- [ ] Runbook de escalado (20 -> 30 -> 50) documentado para operacion.
+- [ ] Decidir momento de upgrade Railway Hobby -> Pro con metricas reales.
+- [ ] Cerrar riesgos abiertos y actualizar este checklist al final de cada sesion.
