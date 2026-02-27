@@ -279,8 +279,8 @@ Ultima actualizacion: 2026-02-27
 
 Resumen por fase:
 1. Fase 1 (Fundacion tenant + Clerk mapping): En progreso avanzado.
-2. Fase 2 (RLS robusto): En progreso - OLA A cerrada en verde y lista para iniciar OLA B.
-3. Fase 3 (UAFE schema): Pendiente.
+2. Fase 2 (RLS robusto): OLA A y OLA B cerradas en verde (GO con alcance ajustado).
+3. Fase 3 (UAFE schema): Diferida temporalmente para `UAFE_V2`.
 4. Fase 4 (Modulos/planes): Pendiente.
 
 ### Fase 1 - Fundacion tenant + Clerk mapping
@@ -347,10 +347,12 @@ Pendiente de OLA B:
   - Evidencia 2026-02-27: validacion SQL `nullNotaryId = 0` + `ALTER COLUMN ... SET NOT NULL`.
 - [x] Endurecer servicios restantes (`alertas`, `bulk-status`, `import-mov`, `import-koinor-xml`, `matrizador-assignment`) antes de RLS final.
   - Evidencia 2026-02-27: servicios migrados a `dbClient` + controladores/rutas actualizados para pasar `tx` request-scoped.
-- [ ] Ejecutar validaciones A/B por endpoint sobre tablas OLA B ya con RLS activo.
-  - Estado 2026-02-27: validacion SQL A/B y fail-closed completada; falta evidencia E2E/endpoint.
+- [x] Ejecutar validaciones A/B por endpoint sobre tablas OLA B ya con RLS activo (alcance ajustado).
+  - Estado 2026-02-27: validacion SQL A/B y fail-closed completada para tablas OLA B; evidencia E2E de SUPER_ADMIN y auditoria en endpoint real completada.
+- [x] Cerrar OLA B con GO y excepcion UAFE funcional.
+  - Estado 2026-02-27: UAFE funcional diferido a `UAFE_V2`.
 
-### Fase 3 - UAFE schema
+### Fase 3 - UAFE schema (diferida: UAFE_V2)
 
 - [x] Decidir `uafe` como schema separado en la misma DB.
 - [ ] Crear migraciones SQL base para schema `uafe`.
@@ -358,6 +360,8 @@ Pendiente de OLA B:
 - [ ] Agregar `deleted_at`, indices y uniques por tenant en tablas UAFE.
 - [ ] Activar RLS equivalente en tablas UAFE.
 - [ ] Ejecutar pruebas de no mezcla de datos UAFE entre notarías.
+- [ ] Redefinir modelo funcional completo de `UAFE_V2` antes de nuevas migraciones UAFE.
+- [ ] Rehacer implementacion funcional UAFE cuando el flujo del modulo quede estabilizado.
 
 ### Fase 4 - Modulos/planes
 

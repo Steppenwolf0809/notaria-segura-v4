@@ -107,8 +107,8 @@ Objetivo: completar tenant scoping estructural en tablas pendientes y activar RL
   - Evidencia 2026-02-27: validacion SQL con `SET LOCAL ROLE app_runtime_rls` + `app.current_notary_id=''` retorna `0` en 13/13 tablas.
 - [x] Tenant A no puede leer/escribir tenant B.
   - Evidencia 2026-02-27: validacion SQL A/B (`tenantA` con datos vs `tenantB` UUID distinto con `0` filas) en 13/13 tablas.
-- [ ] `SUPER_ADMIN` funciona cross-tenant con auditoria.
-  - Estado 2026-02-27: validacion SQL de lectura cross-tenant en verde; falta evidencia de endpoint + auditoria funcional.
+- [x] `SUPER_ADMIN` funciona cross-tenant con auditoria.
+  - Evidencia 2026-02-27: `backend/tests/e2e/super-admin-isolation.test.js` -> `PASS`; caso 2 valida mutacion cross-tenant y auditoria inmutable en endpoint real.
 
 ### 5.4 NO-GO inmediato
 
@@ -163,6 +163,12 @@ UNION ALL
 SELECT 'auditoria_personas', COUNT(*) FROM auditoria_personas WHERE notary_id IS NULL;
 ```
 
+### 5.6 Decision de cierre OLA B (2026-02-27)
+
+1. Semaforo: `Verde` con alcance ajustado.
+2. Decision: `GO`.
+3. Excepcion acordada: UAFE funcional se difiere a `UAFE_V2`; no bloquea el cierre de OLA B.
+
 ## 6) OLA C: Modulos y planes (entitlements)
 
 Objetivo: habilitacion tecnica por notaria sin cobro in-app.
@@ -178,7 +184,8 @@ Objetivo: habilitacion tecnica por notaria sin cobro in-app.
 - [ ] `getEnabledModules(notaryId)` resuelve plan + overrides correctamente.
 - [ ] `requireModule(moduleCode)` bloquea con `403` cuando modulo no habilitado.
 - [ ] Notaria sin suscripcion activa queda fail-closed para modulos protegidos.
-- [ ] Endpoints UAFE/Facturacion/QR/Mensajes respetan gating por modulo.
+- [ ] Endpoints Facturacion/QR/Mensajes respetan gating por modulo.
+- [ ] Integrar UAFE al gating por modulo cuando inicie `UAFE_V2`.
 
 ### 6.3 NO-GO inmediato
 
@@ -196,7 +203,7 @@ Objetivo: habilitacion tecnica por notaria sin cobro in-app.
 
 - [ ] Crear tenants A/B de prueba en entorno de validacion.
 - [ ] Validar aislamiento en tablas core y tablas nuevas.
-- [ ] Validar UAFE sin mezcla entre notarias.
+- [ ] Validar UAFE sin mezcla entre notarias (cuando inicie `UAFE_V2`).
 - [ ] Validar `SUPER_ADMIN` cross-tenant auditado.
 - [ ] Validar `requireModule` en rutas reales.
 - [ ] Validar fail-closed sin contexto tenant.

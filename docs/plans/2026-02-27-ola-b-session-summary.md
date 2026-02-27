@@ -2,12 +2,12 @@
 
 Fecha: 2026-02-27  
 Rama: `feature/architecture-v2.1-restart`  
-Estado: En progreso avanzado (RLS activado y validado a nivel SQL; falta cierre E2E por endpoint)
+Estado: Cerrada con GO (alcance ajustado; UAFE funcional diferido a UAFE_V2)
 
 ## 1) Objetivo de la sesion
 
 Iniciar OLA B con cambios estructurales no disruptivos:
-1. Agregar `notary_id` en tablas objetivo de billing/UAFE.
+1. Agregar `notary_id` en tablas objetivo de negocio y base tenant para UAFE.
 2. Backfill deterministico de datos historicos.
 3. Dejar base lista para activar RLS en siguiente sub-fase.
 
@@ -22,7 +22,7 @@ Iniciar OLA B con cambios estructurales no disruptivos:
    - `20260227060000_ola_b_add_notary_id_business_uafe_tables`
    - `20260227113000_enable_rls_ola_b_business_uafe_tables`
 
-## 3) Tablas cubiertas en OLA B (fase actual)
+## 3) Tablas cubiertas en OLA B (alcance ejecutado)
 
 1. `invoices`
 2. `payments`
@@ -37,6 +37,10 @@ Iniciar OLA B con cambios estructurales no disruptivos:
 11. `formulario_uafe_respuestas`
 12. `sesiones_formulario_uafe`
 13. `auditoria_personas`
+
+Nota de alcance 2026-02-27:
+1. Las tablas UAFE entraron solo como base estructural de tenant/RLS.
+2. El rediseno funcional de UAFE se difiere a `UAFE_V2`.
 
 ## 4) Validacion en staging (post-migracion)
 
@@ -71,8 +75,8 @@ Resultado:
    - `withRequestTenantContext` ahora acepta `transactionOptions`.
    - Endpoints de import XML/MOV usan `timeout/maxWait` extendidos.
 
-## 6) Pendiente inmediato (siguiente sesion)
+## 6) Cierre y siguientes pasos acordados
 
-1. Ejecutar smoke tests manuales por rol sobre endpoints de billing/UAFE con RLS OLA B activo.
-2. Ejecutar/actualizar E2E de aislamiento por endpoint para cubrir tablas OLA B.
-3. Cerrar checklist Go/No-Go de OLA B y pasar a OLA C.
+1. OLA B se considera cerrada en `GO` con alcance ajustado (infraestructura multi-tenant + RLS + hardening core).
+2. UAFE queda congelado temporalmente y fuera del desarrollo inmediato.
+3. La siguiente implementacion de UAFE sera `UAFE_V2` (rediseno funcional) cuando se retome ese modulo.
