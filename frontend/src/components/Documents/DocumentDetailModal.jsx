@@ -175,7 +175,8 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
       PENDIENTE: 'warning',
       EN_PROCESO: 'info',
       LISTO: 'success',
-      ENTREGADO: 'default'
+      ENTREGADO: 'default',
+      ANULADO_NOTA_CREDITO: 'error'
     };
     return colors[status] || 'default';
   };
@@ -189,7 +190,8 @@ const DocumentDetailModal = ({ open, onClose, document, onDocumentUpdated, readO
       PENDIENTE: 'Pendiente',
       EN_PROCESO: 'En Proceso',
       LISTO: 'Listo para Entrega',
-      ENTREGADO: 'Entregado'
+      ENTREGADO: 'Entregado',
+      ANULADO_NOTA_CREDITO: 'Nota de Crédito'
     };
     return texts[status] || status;
   };

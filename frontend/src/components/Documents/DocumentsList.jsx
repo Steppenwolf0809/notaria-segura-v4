@@ -219,7 +219,8 @@ const DocumentsList = () => {
       PENDIENTE: 'warning',
       EN_PROCESO: 'info',
       LISTO: 'success',
-      ENTREGADO: 'default'
+      ENTREGADO: 'default',
+      ANULADO_NOTA_CREDITO: 'error'
     };
     return colors[status] || 'default';
   };
@@ -232,7 +233,8 @@ const DocumentsList = () => {
       PENDIENTE: 'Pendiente',
       EN_PROCESO: 'En Proceso',
       LISTO: 'Listo',
-      ENTREGADO: 'Entregado'
+      ENTREGADO: 'Entregado',
+      ANULADO_NOTA_CREDITO: 'Nota de Crédito'
     };
     return texts[status] || status;
   };
