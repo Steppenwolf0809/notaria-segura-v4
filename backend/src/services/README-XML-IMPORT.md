@@ -273,7 +273,7 @@ WHERE "importedAt" > NOW() - INTERVAL '7 days';
 ### Error: "Cannot read properties of null"
 
 **Causa:** Estructura XML inesperada  
-**Solución:** Validar formato XML con script `scripts/check-xml-structure.js`
+**Solución:** Validar formato XML con una inspeccion manual del archivo (nodos `factura/infoTributaria`).
 
 ### Error: "Timeout de transacción"
 
