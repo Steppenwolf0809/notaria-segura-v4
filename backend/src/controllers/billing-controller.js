@@ -1190,6 +1190,14 @@ export async function getSummary(req, res) {
             invoiceWhere.isLegacy = false;
         }
 
+        // Excluir facturas vinculadas a documentos anulados por nota de crédito
+        if (shouldExcludeCancelled) {
+            invoiceWhere.OR = [
+                { documentId: null },
+                { document: { status: { not: 'ANULADO_NOTA_CREDITO' } } }
+            ];
+        }
+
         const rawInvoices = await prisma.invoice.findMany({
             where: invoiceWhere,
             select: {
@@ -1201,7 +1209,9 @@ export async function getSummary(req, res) {
                 totalAmount: true,
                 subtotalAmount: true,
                 paidAmount: true,
-                status: true
+                status: true,
+                montoNotaCredito: true,
+                tieneNotaCredito: true
             }
         });
         const invoices = shouldDeduplicateInvoices
@@ -1238,6 +1248,7 @@ export async function getSummary(req, res) {
         let totalInvoiced = 0;
         let totalSubtotalInvoiced = 0;
         let totalPaid = 0;
+        let totalNotasCredito = 0;
         let pendingCount = 0;
         let paidCount = 0;
         let partialCount = 0;
@@ -1245,19 +1256,22 @@ export async function getSummary(req, res) {
 
         for (const invoice of invoices) {
             const invoiceTotal = Number(invoice.totalAmount || 0);
+            const creditNoteAmount = Number(invoice.montoNotaCredito || 0);
+            const netInvoiceTotal = invoiceTotal - creditNoteAmount;
             const storedSubtotal = invoice.subtotalAmount != null ? Number(invoice.subtotalAmount) : null;
-            const computedSubtotal = invoiceTotal > 0 ? invoiceTotal / IVA_DIVISOR : 0;
+            const computedSubtotal = netInvoiceTotal > 0 ? netInvoiceTotal / IVA_DIVISOR : 0;
             const effectiveSubtotal = useHybridSubtotal
-                ? (storedSubtotal != null ? storedSubtotal : computedSubtotal)
-                : (storedSubtotal ?? 0);
+                ? (storedSubtotal != null ? Math.max(0, storedSubtotal - (creditNoteAmount / IVA_DIVISOR)) : computedSubtotal)
+                : (storedSubtotal != null ? Math.max(0, storedSubtotal - (creditNoteAmount / IVA_DIVISOR)) : 0);
 
             if (useHybridSubtotal && storedSubtotal == null && invoiceTotal > 0) {
                 fallbackCount++;
             }
 
-            totalInvoiced += invoiceTotal;
+            totalInvoiced += netInvoiceTotal;
             totalSubtotalInvoiced += effectiveSubtotal;
             totalPaid += Number(invoice.paidAmount || 0);
+            totalNotasCredito += creditNoteAmount;
 
             if (invoice.status === 'PAID') paidCount++;
             else if (invoice.status === 'PARTIAL') partialCount++;
@@ -1293,12 +1307,13 @@ export async function getSummary(req, res) {
             totalCollected,
             paymentsToday: paymentsCountToday,
             collectedToday,
-            // Invoice-based totals (filtered by issue date)
+            // Invoice-based totals (filtered by issue date, net of credit notes)
             totals: {
                 invoiced: totalInvoiced,
                 subtotalInvoiced: totalSubtotalInvoiced,
                 paid: totalPaid,
-                pending: totalInvoiced - totalPaid
+                pending: totalInvoiced - totalPaid,
+                notasCredito: totalNotasCredito
             },
             counts: {
                 total: invoices.length,

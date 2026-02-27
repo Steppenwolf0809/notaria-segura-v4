@@ -59,7 +59,6 @@ const CajaDashboard = () => {
     fetchMatrizadores,
     assignDocument,
     getDocumentStats,
-    searchDocuments,
     clearError,
     totalDocuments
   } = useDocumentStore();
@@ -123,9 +122,15 @@ const CajaDashboard = () => {
   };
 
   // Refetch on page/size change
+  // Reset page when search changes
   useEffect(() => {
-    fetchAllDocuments(page + 1, rowsPerPage);
-  }, [page, rowsPerPage]);
+    setPage(0);
+  }, [debouncedSearchTerm]);
+
+  // Refetch on page/size/search change
+  useEffect(() => {
+    fetchAllDocuments(page + 1, rowsPerPage, debouncedSearchTerm);
+  }, [page, rowsPerPage, debouncedSearchTerm]);
 
   /**
    * Refrescar datos manualmente
@@ -133,7 +138,7 @@ const CajaDashboard = () => {
   const handleRefresh = async () => {
     setRefreshing(true);
     setPage(0);
-    await fetchAllDocuments(1, rowsPerPage);
+    await fetchAllDocuments(1, rowsPerPage, debouncedSearchTerm);
     await fetchMatrizadores();
     setRefreshing(false);
   };
@@ -239,7 +244,7 @@ const CajaDashboard = () => {
         toast.success('Documento marcado como Nota de Crédito exitosamente');
         handleCloseNotaCreditoDialog();
         // Recargar documentos
-        await fetchAllDocuments(page + 1, rowsPerPage);
+        await fetchAllDocuments(page + 1, rowsPerPage, debouncedSearchTerm);
       } else {
         toast.error(result.error || 'Error al marcar documento como Nota de Crédito');
       }
@@ -258,12 +263,8 @@ const CajaDashboard = () => {
     }).format(value || 0);
   };
 
-  /**
-   * Filtrar documentos según búsqueda - MEJORADO con debouncing
-   */
-  const filteredDocuments = debouncedSearchTerm && debouncedSearchTerm.length >= 2
-    ? searchDocuments(debouncedSearchTerm)
-    : documents;
+  // Documentos ya vienen filtrados del servidor (búsqueda server-side)
+  const filteredDocuments = documents;
 
   /**
    * Estadísticas de documentos

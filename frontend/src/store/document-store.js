@@ -153,10 +153,10 @@ const useDocumentStore = create((set, get) => ({
    * CAJA: Cargar todos los documentos para gestión
    * @returns {Promise<boolean>} True si se cargaron exitosamente
    */
-  fetchAllDocuments: async (page = 1, limit = 50) => {
+  fetchAllDocuments: async (page = 1, limit = 50, search = '') => {
     set({ loading: true, error: null });
     try {
-      const result = await documentService.getAllDocuments({ page, limit });
+      const result = await documentService.getAllDocuments({ page, limit, search });
       if (result.success) {
         const pagination = result.data.pagination || { currentPage: page, pageSize: limit, totalPages: 1 };
         set({
