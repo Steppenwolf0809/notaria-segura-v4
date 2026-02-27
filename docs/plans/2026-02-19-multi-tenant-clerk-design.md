@@ -341,9 +341,14 @@ Avance ejecutado:
 - [x] Validacion post-backfill: `0` nulos en `notary_id` para todas las tablas objetivo.
 
 Pendiente de OLA B:
-- [ ] Activar RLS (`ENABLE + FORCE`) y politicas tenant en tablas de OLA B.
-- [ ] Endurecer servicios restantes (`alertas`, `bulk-status`, `import-mov`, `import-koinor-xml`, `matrizador-assignment`) antes de RLS final.
+- [x] Activar RLS (`ENABLE + FORCE`) y politicas tenant en tablas de OLA B.
+  - Evidencia 2026-02-27: migracion `20260227113000_enable_rls_ola_b_business_uafe_tables` aplicada en staging.
+- [x] Enforzar `NOT NULL` de `notary_id` en 13 tablas OLA B.
+  - Evidencia 2026-02-27: validacion SQL `nullNotaryId = 0` + `ALTER COLUMN ... SET NOT NULL`.
+- [x] Endurecer servicios restantes (`alertas`, `bulk-status`, `import-mov`, `import-koinor-xml`, `matrizador-assignment`) antes de RLS final.
+  - Evidencia 2026-02-27: servicios migrados a `dbClient` + controladores/rutas actualizados para pasar `tx` request-scoped.
 - [ ] Ejecutar validaciones A/B por endpoint sobre tablas OLA B ya con RLS activo.
+  - Estado 2026-02-27: validacion SQL A/B y fail-closed completada; falta evidencia E2E/endpoint.
 
 ### Fase 3 - UAFE schema
 

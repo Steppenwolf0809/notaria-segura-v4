@@ -91,12 +91,12 @@ function invoiceNumbersMatch(num1, num2) {
  * @param {number} userId - ID del usuario ejecutando la importación
  * @returns {Promise<Object>} - Resultado de la importación
  */
-export async function importMovFile(fileBuffer, fileName, userId) {
+export async function importMovFile(fileBuffer, fileName, userId, dbClient = prisma) {
     const startTime = Date.now();
     console.log(`[import-mov] Starting MOV import of ${fileName} by user ${userId}`);
 
     // Crear log de importación
-    const importLog = await prisma.importLog.create({
+    const importLog = await dbClient.importLog.create({
         data: {
             fileName,
             fileType: 'XML_MOV',
@@ -131,7 +131,7 @@ export async function importMovFile(fileBuffer, fileName, userId) {
         // 2. Procesar cada factura
         for (const invoiceData of invoices) {
             try {
-                const result = await processMovInvoice(invoiceData, fileName, userId);
+                const result = await processMovInvoice(invoiceData, fileName, userId, dbClient);
                 
                 if (result.created) stats.facturasNuevas++;
                 if (result.updated) stats.facturasActualizadas++;
@@ -162,7 +162,7 @@ export async function importMovFile(fileBuffer, fileName, userId) {
         }
 
         // 3. Actualizar log con éxito
-        await prisma.importLog.update({
+        await dbClient.importLog.update({
             where: { id: importLog.id },
             data: {
                 totalRows: stats.totalFacturas,
@@ -220,7 +220,7 @@ export async function importMovFile(fileBuffer, fileName, userId) {
     } catch (error) {
         console.error('[import-mov] Import failed:', error);
 
-        await prisma.importLog.update({
+        await dbClient.importLog.update({
             where: { id: importLog.id },
             data: {
                 status: 'FAILED',
@@ -242,7 +242,7 @@ export async function importMovFile(fileBuffer, fileName, userId) {
  * @param {string} sourceFile - Nombre del archivo origen
  * @returns {Promise<Object>} - {created, updated, cashPaymentApplied, isCredit}
  */
-async function processMovInvoice(invoiceData, sourceFile, userId) {
+async function processMovInvoice(invoiceData, sourceFile, userId, dbClient = prisma) {
     const result = {
         created: false,
         updated: false,
@@ -260,7 +260,7 @@ async function processMovInvoice(invoiceData, sourceFile, userId) {
     }
 
     // Buscar factura existente
-    let invoice = await prisma.invoice.findFirst({
+    let invoice = await dbClient.invoice.findFirst({
         where: buildInvoiceWhereByNumber(invoiceNumberRaw),
         include: {
             payments: true,
@@ -276,7 +276,7 @@ async function processMovInvoice(invoiceData, sourceFile, userId) {
         const secuencial = extractSecuencial(invoiceNumber);
         
         // Primero intentar por numeroFactura directo o por secuencial
-        let document = await prisma.document.findFirst({
+        let document = await dbClient.document.findFirst({
             where: {
                 OR: [
                     { numeroFactura: invoiceNumber },
@@ -307,7 +307,7 @@ async function processMovInvoice(invoiceData, sourceFile, userId) {
             const clientNameSearch = invoiceData.clientName ? invoiceData.clientName.trim().substring(0, 20) : '';
             console.log(`[import-mov] Searching document for invoice ${invoiceNumber}: clientName="${clientNameSearch}", totalAmount=${invoiceData.totalAmount}`);
             
-            const candidatos = await prisma.document.findMany({
+            const candidatos = await dbClient.document.findMany({
                 where: {
                     clientName: {
                         contains: clientNameSearch,
@@ -352,7 +352,7 @@ async function processMovInvoice(invoiceData, sourceFile, userId) {
                         console.log(`[import-mov] Found document ${candidato.protocolNumber} by xmlOriginal extraction (${extractedNumero} ≈ ${invoiceNumber})`);
                         
                         // Actualizar el documento con el numeroFactura extraído
-                        await prisma.document.update({
+                        await dbClient.document.update({
                             where: { id: candidato.id },
                             data: { numeroFactura: extractedNumero }
                         });
@@ -398,7 +398,7 @@ async function processMovInvoice(invoiceData, sourceFile, userId) {
         
         // SIEMPRE intentar vincular documento si la factura no tiene uno
         if (documentId && !invoice.documentId) {
-            await prisma.invoice.update({
+            await dbClient.invoice.update({
                 where: { id: invoice.id },
                 data: { documentId }
             });
@@ -408,12 +408,12 @@ async function processMovInvoice(invoiceData, sourceFile, userId) {
             result.updated = true;
             
             // ⭐ NUEVO: Actualizar numeroFactura en el documento si está vacío
-            const document = await prisma.document.findUnique({
+            const document = await dbClient.document.findUnique({
                 where: { id: documentId },
                 select: { numeroFactura: true, protocolNumber: true }
             });
             if (document && !document.numeroFactura) {
-                await prisma.document.update({
+                await dbClient.document.update({
                     where: { id: documentId },
                     data: { numeroFactura: invoiceNumber }
                 });
@@ -424,7 +424,7 @@ async function processMovInvoice(invoiceData, sourceFile, userId) {
         // Solo crear pago si el pago en efectivo es nuevo
         if (invoiceData.isPaid && invoiceData.paymentMethod === 'CASH' && existingPaid === 0) {
             // Crear pago en efectivo
-            await prisma.payment.create({
+            await dbClient.payment.create({
                 data: {
                     invoiceId: invoice.id,
                     receiptNumber: `MOV-${invoiceNumberRaw}`,
@@ -437,7 +437,7 @@ async function processMovInvoice(invoiceData, sourceFile, userId) {
             });
 
             // Actualizar estado de factura
-            await prisma.invoice.update({
+            await dbClient.invoice.update({
                 where: { id: invoice.id },
                 data: {
                     status: 'PAID',
@@ -452,7 +452,7 @@ async function processMovInvoice(invoiceData, sourceFile, userId) {
             // Registrar evento de pago en el timeline del documento
             const payDocId = documentId || invoice.documentId;
             if (payDocId && userId) {
-                await prisma.documentEvent.create({
+                await dbClient.documentEvent.create({
                     data: {
                         documentId: payDocId,
                         userId: userId,
@@ -498,7 +498,7 @@ async function processMovInvoice(invoiceData, sourceFile, userId) {
             invoiceCreateData.documentId = documentId;
         }
         
-        const newInvoice = await prisma.invoice.create({
+        const newInvoice = await dbClient.invoice.create({
             data: invoiceCreateData
         });
 
@@ -507,12 +507,12 @@ async function processMovInvoice(invoiceData, sourceFile, userId) {
         
         // ⭐ NUEVO: Actualizar numeroFactura en el documento si está vacío
         if (documentId) {
-            const document = await prisma.document.findUnique({
+            const document = await dbClient.document.findUnique({
                 where: { id: documentId },
                 select: { numeroFactura: true, protocolNumber: true }
             });
             if (document && !document.numeroFactura) {
-                await prisma.document.update({
+                await dbClient.document.update({
                     where: { id: documentId },
                     data: { numeroFactura: invoiceNumber }
                 });
@@ -522,7 +522,7 @@ async function processMovInvoice(invoiceData, sourceFile, userId) {
 
         // Si fue pagada en efectivo, crear el registro de pago
         if (invoiceData.isPaid && invoiceData.paymentMethod === 'CASH') {
-            await prisma.payment.create({
+            await dbClient.payment.create({
                 data: {
                     invoiceId: newInvoice.id,
                     receiptNumber: `MOV-${invoiceNumberRaw}`,
@@ -537,7 +537,7 @@ async function processMovInvoice(invoiceData, sourceFile, userId) {
 
             // Registrar evento de pago en el timeline del documento
             if (documentId && userId) {
-                await prisma.documentEvent.create({
+                await dbClient.documentEvent.create({
                     data: {
                         documentId,
                         userId: userId,

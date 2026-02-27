@@ -7,14 +7,15 @@ import { applyTenantRlsContext } from './apply-tenant-rls-context.js';
  * @param {import('@prisma/client').PrismaClient} prismaClient
  * @param {{ notaryId?: string|null, isSuperAdmin?: boolean }} tenantContext
  * @param {(tx: import('@prisma/client').Prisma.TransactionClient) => Promise<any>} operation
+ * @param {{ maxWait?: number, timeout?: number, isolationLevel?: import('@prisma/client').Prisma.TransactionIsolationLevel }} [transactionOptions]
  * @returns {Promise<any>}
  */
-export async function withTenantContext(prismaClient, tenantContext, operation) {
+export async function withTenantContext(prismaClient, tenantContext, operation, transactionOptions) {
   return prismaClient.$transaction(async (tx) => {
     await applyTenantRlsContext(tx, tenantContext);
 
     return operation(tx);
-  });
+  }, transactionOptions);
 }
 
 function createTenantContextError(message = 'No existe contexto de notaria para esta sesion') {
@@ -56,12 +57,17 @@ export function resolveRequestTenantContext(req, options = {}) {
  * @param {import('@prisma/client').PrismaClient} prismaClient
  * @param {object} req
  * @param {(tx: import('@prisma/client').Prisma.TransactionClient, tenantContext: { notaryId: string|null, isSuperAdmin: boolean }) => Promise<any>} operation
- * @param {{ requireNotaryForNonSuperAdmin?: boolean, missingNotaryMessage?: string }} [options]
+ * @param {{ requireNotaryForNonSuperAdmin?: boolean, missingNotaryMessage?: string, transactionOptions?: { maxWait?: number, timeout?: number, isolationLevel?: import('@prisma/client').Prisma.TransactionIsolationLevel } }} [options]
  * @returns {Promise<any>}
  */
 export async function withRequestTenantContext(prismaClient, req, operation, options = {}) {
-  const tenantContext = resolveRequestTenantContext(req, options);
-  return withTenantContext(prismaClient, tenantContext, (tx) => operation(tx, tenantContext));
+  const {
+    transactionOptions,
+    ...tenantResolutionOptions
+  } = options || {};
+
+  const tenantContext = resolveRequestTenantContext(req, tenantResolutionOptions);
+  return withTenantContext(prismaClient, tenantContext, (tx) => operation(tx, tenantContext), transactionOptions);
 }
 
 /**

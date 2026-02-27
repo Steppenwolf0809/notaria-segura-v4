@@ -4,6 +4,17 @@ import logger from '../utils/logger.js';
 
 const prisma = getPrismaClient();
 
+function isRootPrismaClient(dbClient) {
+  return typeof dbClient?.$connect === 'function';
+}
+
+async function runInTransaction(dbClient, operation) {
+  if (isRootPrismaClient(dbClient)) {
+    return dbClient.$transaction(operation);
+  }
+  return operation(dbClient);
+}
+
 /**
  * Servicio para cambios masivos de estado de documentos.
  * - Permite a RECEPCION, ARCHIVO, MATRIZADOR y ADMIN marcar documentos como LISTO.
@@ -11,7 +22,7 @@ const prisma = getPrismaClient();
  * - Crea notificaciones WhatsApp automáticamente.
  * - Agrupa documentos nuevos con notificaciones pendientes existentes del mismo cliente.
  */
-export async function bulkMarkReady({ documentIds, actor, sendNotifications = true }) {
+export async function bulkMarkReady({ documentIds, actor, sendNotifications = true, dbClient = prisma }) {
   if (!Array.isArray(documentIds) || documentIds.length === 0) {
     return {
       success: false,
@@ -30,7 +41,7 @@ export async function bulkMarkReady({ documentIds, actor, sendNotifications = tr
   }
 
   // Cargar documentos con datos mínimos necesarios
-  const documents = await prisma.document.findMany({
+  const documents = await dbClient.document.findMany({
     where: { id: { in: documentIds } },
     select: {
       id: true,
@@ -101,7 +112,7 @@ export async function bulkMarkReady({ documentIds, actor, sendNotifications = tr
       const phoneNormalized = firstDoc.clientPhone.trim();
 
       // Buscar notificación pendiente del mismo cliente (últimas 24 horas)
-      const notificacionExistente = await prisma.whatsAppNotification.findFirst({
+      const notificacionExistente = await dbClient.whatsAppNotification.findFirst({
         where: {
           clientPhone: phoneNormalized,
           messageType: 'DOCUMENTO_LISTO',
@@ -120,7 +131,7 @@ export async function bulkMarkReady({ documentIds, actor, sendNotifications = tr
         clientNotificationMap.set(key, {
           codigoRetiro: notificacionExistente.document.codigoRetiro,
           notificacionId: notificacionExistente.id,
-          documentosExistentes: await prisma.document.count({
+          documentosExistentes: await dbClient.document.count({
             where: {
               codigoRetiro: notificacionExistente.document.codigoRetiro,
               status: 'LISTO'
@@ -133,7 +144,7 @@ export async function bulkMarkReady({ documentIds, actor, sendNotifications = tr
   }
 
   // Ejecutar actualización en transacción
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await runInTransaction(dbClient, async (tx) => {
     const updatedDocs = [];
     const notificacionesCreadas = [];
     const now = new Date();
@@ -256,7 +267,7 @@ export async function bulkMarkReady({ documentIds, actor, sendNotifications = tr
 /**
  * Servicio para ENTREGA masiva de documentos (LISTO/AGRUPADO/EN_PROCESO -> ENTREGADO)
  */
-export async function bulkDeliverDocuments({ documentIds, actor, deliveryData, sendNotifications = true }) {
+export async function bulkDeliverDocuments({ documentIds, actor, deliveryData, sendNotifications = true, dbClient = prisma }) {
   if (!Array.isArray(documentIds) || documentIds.length === 0) {
     return {
       success: false,
@@ -275,7 +286,7 @@ export async function bulkDeliverDocuments({ documentIds, actor, deliveryData, s
   }
 
   // Cargar documentos
-  const documents = await prisma.document.findMany({
+  const documents = await dbClient.document.findMany({
     where: { id: { in: documentIds } },
     select: {
       id: true,
@@ -323,7 +334,7 @@ export async function bulkDeliverDocuments({ documentIds, actor, deliveryData, s
   }
 
   // Ejecutar actualización
-  const updated = await prisma.$transaction(async (tx) => {
+  const updated = await runInTransaction(dbClient, async (tx) => {
     const updatedDocs = [];
     const now = new Date();
 

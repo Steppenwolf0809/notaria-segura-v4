@@ -3,6 +3,7 @@
  * Handles billing module endpoints for invoices, payments, and imports
  */
 import { db as prisma } from '../db.js';
+import { withRequestTenantContext } from '../utils/tenant-context.js';
 
 // Normalización de nombres de matrizadores para evitar duplicados visuales
 const MATRIZADOR_NAME_NORMALIZATION = {
@@ -687,11 +688,19 @@ export async function importXmlFile(req, res) {
 
         console.log('[billing-controller] Processing payment XML, using payment import service');
         const { importKoinorXMLFile } = await import('../services/import-koinor-xml-service.js');
-        const result = await importKoinorXMLFile(
-            file.buffer,
-            file.originalname,
-            userId
-        );
+        const result = await withRequestTenantContext(prisma, req, async (tx) => {
+            return importKoinorXMLFile(
+                file.buffer,
+                file.originalname,
+                userId,
+                tx
+            );
+        }, {
+            transactionOptions: {
+                maxWait: 30000,
+                timeout: 600000
+            }
+        });
 
         res.json({
             success: true,
@@ -758,7 +767,9 @@ export async function getStats(req, res) {
 export async function getXMLImportStats(req, res) {
     try {
         const { getXMLImportStats: getStats } = await import('../services/import-koinor-xml-service.js');
-        const data = await getStats();
+        const data = await withRequestTenantContext(prisma, req, async (tx) => {
+            return getStats(tx);
+        });
 
         res.json({
             success: true,
@@ -1509,13 +1520,15 @@ export async function updateClientPhone(req, res) {
         }
 
         // Actualizar clientPhone en todos los documentos con ese clientTaxId
-        const result = await prisma.document.updateMany({
-            where: {
-                clientId: clientTaxId
-            },
-            data: {
-                clientPhone: phone.trim()
-            }
+        const result = await withRequestTenantContext(prisma, req, async (tx) => {
+            return tx.document.updateMany({
+                where: {
+                    clientId: clientTaxId
+                },
+                data: {
+                    clientPhone: phone.trim()
+                }
+            });
         });
 
         console.log(`[billing-controller] Updated ${result.count} documents`);
@@ -1544,60 +1557,91 @@ export async function generateCollectionReminder(req, res) {
         const userId = req.user.id;
 
         // Get invoices for this client from documents assigned to the user
-        const documents = await prisma.document.findMany({
-            where: {
-                assignedToId: userId,
-                invoices: {
-                    some: {
-                        clientTaxId
+        const result = await withRequestTenantContext(prisma, req, async (tx) => {
+            const documents = await tx.document.findMany({
+                where: {
+                    assignedToId: userId,
+                    invoices: {
+                        some: {
+                            clientTaxId
+                        }
+                    }
+                },
+                include: {
+                    invoices: {
+                        where: { clientTaxId },
+                        include: { payments: true }
                     }
                 }
-            },
-            include: {
-                invoices: {
-                    where: { clientTaxId },
-                    include: { payments: true }
+            });
+
+            if (documents.length === 0) {
+                return { empty: true };
+            }
+
+            // Calculate totals
+            let totalDebt = 0;
+            const invoiceDetails = [];
+            let clientName = '';
+            let clientPhone = '';
+
+            for (const doc of documents) {
+                if (!clientPhone && doc.clientPhone) clientPhone = doc.clientPhone;
+
+                for (const invoice of doc.invoices) {
+                    clientName = invoice.clientName;
+                    const paid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+                    const balance = Number(invoice.totalAmount) - paid;
+
+                    if (balance > 0) {
+                        totalDebt += balance;
+                        invoiceDetails.push({
+                            invoiceNumber: invoice.invoiceNumber,
+                            total: Number(invoice.totalAmount),
+                            paid,
+                            balance,
+                            dueDate: invoice.dueDate
+                        });
+                    }
                 }
             }
+
+            if (invoiceDetails.length === 0) {
+                return { noBalance: true };
+            }
+
+            // Log the reminder
+            await tx.documentEvent.create({
+                data: {
+                    documentId: documents[0].id,
+                    userId,
+                    eventType: 'COLLECTION_REMINDER',
+                    description: `Recordatorio de cobro generado para ${clientName}`,
+                    details: JSON.stringify({
+                        clientTaxId,
+                        clientName,
+                        totalDebt,
+                        invoiceCount: invoiceDetails.length,
+                        timestamp: new Date().toISOString()
+                    })
+                }
+            });
+
+            return { documents, totalDebt, invoiceDetails, clientName, clientPhone };
         });
 
-        if (documents.length === 0) {
+        if (result.empty) {
             return res.status(404).json({ error: 'No se encontraron facturas para este cliente' });
         }
 
-        // Calculate totals
-        let totalDebt = 0;
-        const invoiceDetails = [];
-        let clientName = '';
-        let clientPhone = '';
-
-        for (const doc of documents) {
-            if (!clientPhone && doc.clientPhone) clientPhone = doc.clientPhone;
-
-            for (const invoice of doc.invoices) {
-                clientName = invoice.clientName;
-                const paid = invoice.payments.reduce((sum, p) => sum + Number(p.amount), 0);
-                const balance = Number(invoice.totalAmount) - paid;
-
-                if (balance > 0) {
-                    totalDebt += balance;
-                    invoiceDetails.push({
-                        invoiceNumber: invoice.invoiceNumber,
-                        total: Number(invoice.totalAmount),
-                        paid,
-                        balance,
-                        dueDate: invoice.dueDate
-                    });
-                }
-            }
-        }
-
-        if (invoiceDetails.length === 0) {
+        if (result.noBalance) {
             return res.json({
                 success: false,
                 message: 'El cliente no tiene saldo pendiente'
             });
         }
+
+        const { totalDebt, invoiceDetails, clientName, clientPhone } = result;
 
         // Build message
         let message = `📋 *NOTARÍA 18 - RECORDATORIO DE PAGO*\n\nEstimado cliente,\n\nLe recordamos que tiene los siguientes valores pendientes:\n\n`;
@@ -1634,23 +1678,6 @@ export async function generateCollectionReminder(req, res) {
         const waUrl = formattedPhone
             ? `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`
             : null;
-
-        // Log the reminder
-        await prisma.documentEvent.create({
-            data: {
-                documentId: documents[0].id,
-                userId,
-                eventType: 'COLLECTION_REMINDER',
-                description: `Recordatorio de cobro generado para ${clientName}`,
-                details: JSON.stringify({
-                    clientTaxId,
-                    clientName,
-                    totalDebt,
-                    invoiceCount: invoiceDetails.length,
-                    timestamp: new Date().toISOString()
-                })
-            }
-        });
 
         res.json({
             success: true,
@@ -2150,31 +2177,33 @@ export async function getEntregasConSaldo(req, res) {
         console.log('[billing-controller] getEntregasConSaldo');
 
         // Get delivered documents that have invoices with pending balance
-        const documents = await prisma.document.findMany({
-            where: {
-                status: 'ENTREGADO',
-                invoices: {
-                    some: {
-                        status: {
-                            not: 'PAID'
+        const documents = await withRequestTenantContext(prisma, req, async (tx) => {
+            return tx.document.findMany({
+                where: {
+                    status: 'ENTREGADO',
+                    invoices: {
+                        some: {
+                            status: {
+                                not: 'PAID'
+                            }
                         }
                     }
-                }
-            },
-            include: {
-                invoices: {
-                    include: {
-                        payments: true
+                },
+                include: {
+                    invoices: {
+                        include: {
+                            payments: true
+                        }
+                    },
+                    assignedTo: {
+                        select: {
+                            firstName: true,
+                            lastName: true
+                        }
                     }
                 },
-                assignedTo: {
-                    select: {
-                        firstName: true,
-                        lastName: true
-                    }
-                }
-            },
-            orderBy: { updatedAt: 'desc' }
+                orderBy: { updatedAt: 'desc' }
+            });
         });
 
         const data = documents
@@ -2314,11 +2343,19 @@ export async function importMovFile(req, res) {
         const { importMovFile: importMov } = await import('../services/import-mov-service.js');
 
         // Process the file
-        const result = await importMov(
-            file.buffer,
-            file.originalname,
-            userId
-        );
+        const result = await withRequestTenantContext(prisma, req, async (tx) => {
+            return importMov(
+                file.buffer,
+                file.originalname,
+                userId,
+                tx
+            );
+        }, {
+            transactionOptions: {
+                maxWait: 30000,
+                timeout: 600000
+            }
+        });
 
         res.json({
             success: true,

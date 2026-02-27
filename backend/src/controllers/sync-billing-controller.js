@@ -673,15 +673,19 @@ export async function syncCxc(req, res) {
             
             for (const paidInvoice of markedAsPaidInvoiceNumbers) {
                 try {
-                    // Try to find and update the corresponding Invoice
-                    const invoice = await prisma.invoice.findFirst({
-                        where: buildInvoiceWhereByNumber(
-                            paidInvoice.invoiceNumberRaw || paidInvoice.invoiceNumber
-                        )
-                    });
-                    
-                    if (invoice && invoice.status !== 'PAID') {
-                        await prisma.invoice.update({
+                    const syncedInvoice = await withTenantContext(prisma, tenantContext, async (tx) => {
+                        // Try to find and update the corresponding Invoice
+                        const invoice = await tx.invoice.findFirst({
+                            where: buildInvoiceWhereByNumber(
+                                paidInvoice.invoiceNumberRaw || paidInvoice.invoiceNumber
+                            )
+                        });
+
+                        if (!invoice || invoice.status === 'PAID') {
+                            return null;
+                        }
+
+                        await tx.invoice.update({
                             where: { id: invoice.id },
                             data: {
                                 status: 'PAID',
@@ -691,10 +695,9 @@ export async function syncCxc(req, res) {
                                 syncSource: 'KOINOR_SYNC_CXC'
                             }
                         });
-                        
+
                         // Also update Document if linked
                         if (invoice.documentId) {
-                            await withTenantContext(prisma, tenantContext, async (tx) => {
                                 await tx.document.update({
                                     where: { id: invoice.documentId },
                                     data: { pagoConfirmado: true }
@@ -722,9 +725,12 @@ export async function syncCxc(req, res) {
                                 } catch (eventError) {
                                     console.error(`[sync-cxc] Error creating payment event:`, eventError.message);
                                 }
-                            });
                         }
 
+                        return invoice;
+                    });
+
+                    if (syncedInvoice) {
                         invoiceSyncCount++;
                     }
                 } catch (invoiceSyncError) {

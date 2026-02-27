@@ -1,8 +1,8 @@
-# Resumen de Sesion: OLA B - notary_id + Backfill (Fase segura)
+# Resumen de Sesion: OLA B - notary_id + Backfill + RLS
 
 Fecha: 2026-02-27  
 Rama: `feature/architecture-v2.1-restart`  
-Estado: En progreso (estructura y backfill completados, RLS pendiente)
+Estado: En progreso avanzado (RLS activado y validado a nivel SQL; falta cierre E2E por endpoint)
 
 ## 1) Objetivo de la sesion
 
@@ -15,10 +15,12 @@ Iniciar OLA B con cambios estructurales no disruptivos:
 
 1. Migracion SQL creada:
    - `backend/prisma/migrations/20260227060000_ola_b_add_notary_id_business_uafe_tables/migration.sql`
+   - `backend/prisma/migrations/20260227113000_enable_rls_ola_b_business_uafe_tables/migration.sql`
 2. Prisma schema actualizado con `notaryId` + relaciones `Notary` en modelos OLA B.
 3. Migraciones aplicadas en staging:
    - `20260227045500_add_cashier_comments_pending_receivables`
    - `20260227060000_ola_b_add_notary_id_business_uafe_tables`
+   - `20260227113000_enable_rls_ola_b_business_uafe_tables`
 
 ## 3) Tablas cubiertas en OLA B (fase actual)
 
@@ -41,15 +43,36 @@ Iniciar OLA B con cambios estructurales no disruptivos:
 Resultado:
 1. `notary_id` presente en 13/13 tablas objetivo.
 2. `nullNotaryId = 0` en 13/13 tablas objetivo.
-3. RLS aun no activado en estas tablas (`rowSecurity=false`, `forceRowSecurity=false`), segun plan.
+3. `notary_id` en `NOT NULL` para 13/13 tablas objetivo.
+4. RLS activado en 13/13 tablas (`rowsecurity=true`, `force_rowsecurity=true`).
+5. Validacion fail-closed SQL (rol `app_runtime_rls`):
+   - sin contexto tenant: `0` filas en 13/13 tablas.
+   - tenant A real vs UUID tenant B: A ve datos, B ve `0` filas.
+   - `app.is_super_admin=true`: acceso cross-tenant esperado (conteos globales visibles).
 
-## 5) Pendiente inmediato (siguiente sesion)
+## 5) Avance de hardening (codigo)
 
-1. Endurecer servicios restantes para contexto tenant transaccional:
-   - `alertas-service.js`
-   - `bulk-status-service.js`
-   - `import-mov-service.js`
-   - `import-koinor-xml-service.js`
-   - `matrizador-assignment-service.js`
-2. Activar RLS (`ENABLE + FORCE`) en tablas OLA B.
-3. Ejecutar validaciones A/B por endpoint con RLS activo.
+1. Endurecimiento de servicios completado para OLA B:
+   - `alertas-service.js` -> metodos con `dbClient` (tenant tx).
+   - `bulk-status-service.js` -> `bulkMarkReady`/`bulkDeliverDocuments` con `dbClient`.
+   - `import-mov-service.js` -> cadena completa con `dbClient`.
+   - `import-koinor-xml-service.js` -> cadena completa con `dbClient`.
+   - `matrizador-assignment-service.js` -> metodos con `dbClient`.
+2. Controladores/rutas conectados a `tx` tenant-scoped:
+   - `reception-controller.js` (alertas recepcion).
+   - `alertas-routes.js` (todas las rutas de alertas).
+   - `reception-bulk-controller.js`, `archivo-bulk-controller.js`, `bulk-operations-controller.js`.
+   - `billing-controller.js` (import XML, import MOV, stats XML).
+   - `document-controller.js` (autoasignacion y vinculacion de factura en upload XML).
+   - `sync-billing-controller.js` (queries pendientes de invoice sync movidas a contexto tenant).
+3. Validacion tecnica ejecutada:
+   - `node --check` en todos los archivos tocados: `PASS`.
+4. Ajuste de robustez para imports largos:
+   - `withRequestTenantContext` ahora acepta `transactionOptions`.
+   - Endpoints de import XML/MOV usan `timeout/maxWait` extendidos.
+
+## 6) Pendiente inmediato (siguiente sesion)
+
+1. Ejecutar smoke tests manuales por rol sobre endpoints de billing/UAFE con RLS OLA B activo.
+2. Ejecutar/actualizar E2E de aislamiento por endpoint para cubrir tablas OLA B.
+3. Cerrar checklist Go/No-Go de OLA B y pasar a OLA C.

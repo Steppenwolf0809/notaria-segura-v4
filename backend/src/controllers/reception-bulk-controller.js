@@ -1,5 +1,8 @@
 import { getPrismaClient } from '../db.js';
 import bulkStatusService from '../services/bulk-status-service.js';
+import { withRequestTenantContext } from '../utils/tenant-context.js';
+
+const prisma = getPrismaClient();
 
 /**
  * POST /api/reception/documentos/marcar-listos
@@ -25,10 +28,13 @@ export async function marcarVariosListos(req, res) {
       lastName: req.user?.lastName
     };
 
-    const result = await bulkStatusService.bulkMarkReady({
-      documentIds,
-      actor,
-      sendNotifications
+    const result = await withRequestTenantContext(prisma, req, async (tx) => {
+      return bulkStatusService.bulkMarkReady({
+        documentIds,
+        actor,
+        sendNotifications,
+        dbClient: tx
+      });
     });
 
     return res.status(result.status || 200).json({

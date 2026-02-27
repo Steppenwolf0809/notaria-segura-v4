@@ -99,10 +99,16 @@ Objetivo: completar tenant scoping estructural en tablas pendientes y activar RL
 
 - [x] `notary_id` sin nulos en todas las tablas objetivo.
   - Evidencia 2026-02-27: `nullNotaryId = 0` en `invoices`, `payments`, `import_logs`, `pending_receivables`, `escrituras_qr`, `mensajes_internos`, `whatsapp_templates`, `protocolos_uafe`, `personas_protocolo`, `formulario_uafe_asignaciones`, `formulario_uafe_respuestas`, `sesiones_formulario_uafe`, `auditoria_personas`.
-- [ ] Todas las tablas objetivo con `FORCE ROW LEVEL SECURITY`.
-- [ ] Sin contexto tenant, consultas retornan `0` filas.
-- [ ] Tenant A no puede leer/escribir tenant B.
+- [x] Endurecimiento de servicios/rutas OLA B cerrado antes de activar RLS.
+  - Evidencia 2026-02-27: `alertas-service`, `bulk-status-service`, `import-mov-service`, `import-koinor-xml-service`, `matrizador-assignment-service` migrados a `dbClient` tenant-scoped y conectados desde controladores/rutas con `withRequestTenantContext`/`withTenantContext`.
+- [x] Todas las tablas objetivo con `FORCE ROW LEVEL SECURITY`.
+  - Evidencia 2026-02-27: migracion `20260227113000_enable_rls_ola_b_business_uafe_tables` aplicada; `rowsecurity=true` y `force_rowsecurity=true` en 13/13 tablas.
+- [x] Sin contexto tenant, consultas retornan `0` filas.
+  - Evidencia 2026-02-27: validacion SQL con `SET LOCAL ROLE app_runtime_rls` + `app.current_notary_id=''` retorna `0` en 13/13 tablas.
+- [x] Tenant A no puede leer/escribir tenant B.
+  - Evidencia 2026-02-27: validacion SQL A/B (`tenantA` con datos vs `tenantB` UUID distinto con `0` filas) en 13/13 tablas.
 - [ ] `SUPER_ADMIN` funciona cross-tenant con auditoria.
+  - Estado 2026-02-27: validacion SQL de lectura cross-tenant en verde; falta evidencia de endpoint + auditoria funcional.
 
 ### 5.4 NO-GO inmediato
 
