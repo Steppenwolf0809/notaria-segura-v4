@@ -643,15 +643,20 @@ async function processNotaCredito(nc, sourceFile, dbClient = prisma) {
         });
 
         // Si tiene documento, actualizar campos de nota de credito
+        // Si tiene documento y no está ya marcado, actualizar estado y campos de nota de crédito
         if (invoice.documentId) {
-            await tx.document.update({
-                where: { id: invoice.documentId },
-                data: {
-                    notaCreditoMotivo: nc.motivo,
-                    notaCreditoEstadoPrevio: invoice.status,
-                    notaCreditoFecha: nc.fecha
-                }
-            });
+            const doc = await tx.document.findUnique({ where: { id: invoice.documentId }, select: { status: true } });
+            if (doc && doc.status !== 'ANULADO_NOTA_CREDITO') {
+                await tx.document.update({
+                    where: { id: invoice.documentId },
+                    data: {
+                        status: 'ANULADO_NOTA_CREDITO',
+                        notaCreditoMotivo: nc.motivo,
+                        notaCreditoEstadoPrevio: doc.status,
+                        notaCreditoFecha: nc.fecha
+                    }
+                });
+            }
         }
     });
 

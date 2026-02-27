@@ -323,6 +323,25 @@ async function processInvoice(tx, invoiceData) {
         }
     }
 
+    // Si la factura tiene nota de crédito, marcar el documento vinculado como ANULADO
+    if (invoiceData.tiene_nota_credito === 'SI') {
+        const docId = invoice.documentId;
+        if (docId) {
+            const linkedDoc = await tx.document.findUnique({ where: { id: docId }, select: { status: true } });
+            if (linkedDoc && linkedDoc.status !== 'ANULADO_NOTA_CREDITO') {
+                await tx.document.update({
+                    where: { id: docId },
+                    data: {
+                        status: 'ANULADO_NOTA_CREDITO',
+                        notaCreditoMotivo: 'Nota de crédito detectada en sincronización Koinor',
+                        notaCreditoEstadoPrevio: linkedDoc.status,
+                        notaCreditoFecha: new Date()
+                    }
+                });
+            }
+        }
+    }
+
     return { action, documentLinked };
 }
 
