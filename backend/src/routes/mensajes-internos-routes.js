@@ -1,5 +1,6 @@
 import express from 'express';
 import { authenticateToken, requireRoles } from '../middleware/auth-middleware.js';
+import { requireModule } from '../middleware/require-module.js';
 import {
     enviarMensaje,
     enviarMensajeMasivo,
@@ -16,6 +17,8 @@ import {
 } from '../controllers/mensajes-internos-controller.js';
 
 const router = express.Router();
+router.use(authenticateToken);
+router.use(requireModule('MENSAJES_INTERNOS'));
 
 /**
  * RUTAS DE MENSAJES INTERNOS
@@ -35,7 +38,6 @@ const router = express.Router();
  * @access Private (Todos los roles)
  */
 router.get('/estadisticas',
-    authenticateToken,
     obtenerEstadisticas
 );
 
@@ -45,7 +47,6 @@ router.get('/estadisticas',
  * @access Private (ADMIN only)
  */
 router.get('/todos/estadisticas',
-    authenticateToken,
     requireRoles(['ADMIN']),
     obtenerEstadisticasGlobales
 );
@@ -57,7 +58,6 @@ router.get('/todos/estadisticas',
  * @query page, limit, estado, remitenteId, destinatarioId
  */
 router.get('/todos',
-    authenticateToken,
     requireRoles(['ADMIN']),
     listarTodosMensajes
 );
@@ -68,7 +68,6 @@ router.get('/todos',
  * @access Private (ADMIN only)
  */
 router.get('/enviados/estadisticas',
-    authenticateToken,
     requireRoles(['ADMIN']),
     obtenerEstadisticasEnviados
 );
@@ -80,7 +79,6 @@ router.get('/enviados/estadisticas',
  * @query page, limit, resuelto, estado
  */
 router.get('/enviados',
-    authenticateToken,
     requireRoles(['ADMIN']),
     listarMensajesEnviados
 );
@@ -91,7 +89,6 @@ router.get('/enviados',
  * @access Private (Todos los roles)
  */
 router.get('/no-leidos/count',
-    authenticateToken,
     contarNoLeidos
 );
 
@@ -101,7 +98,6 @@ router.get('/no-leidos/count',
  * @access Private (Todos los roles)
  */
 router.put('/leer-todos',
-    authenticateToken,
     marcarTodosLeidos
 );
 
@@ -111,7 +107,6 @@ router.put('/leer-todos',
  * @access Private (ADMIN only)
  */
 router.post('/masivo',
-    authenticateToken,
     requireRoles(['ADMIN']),
     enviarMensajeMasivo
 );
@@ -127,7 +122,6 @@ router.post('/masivo',
  * @query page, limit, leido, estado
  */
 router.get('/',
-    authenticateToken,
     listarMensajes
 );
 
@@ -137,7 +131,6 @@ router.get('/',
  * @access Private (ADMIN y CAJA)
  */
 router.post('/',
-    authenticateToken,
     requireRoles(['ADMIN', 'CAJA']),
     enviarMensaje
 );
@@ -152,7 +145,6 @@ router.post('/',
  * @access Private (Todos los roles)
  */
 router.put('/:id/leer',
-    authenticateToken,
     marcarLeido
 );
 
@@ -163,8 +155,8 @@ router.put('/:id/leer',
  * @body { notaResolucion?: string }
  */
 router.put('/:id/resolver',
-    authenticateToken,
     marcarResuelto
 );
 
 export default router;
+

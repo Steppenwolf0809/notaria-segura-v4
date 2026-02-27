@@ -175,16 +175,17 @@ Objetivo: habilitacion tecnica por notaria sin cobro in-app.
 
 ### 6.1 GO de entrada (para iniciar OLA C)
 
-- [ ] OLA B aprobada.
+- [x] OLA B aprobada.
 - [ ] Tablas de entitlements creadas y migradas en staging.
-- [ ] Seed inicial de modulos definido.
+  - Evidencia codigo: `backend/prisma/migrations/20260227173000_ola_c_entitlements_modules_plans/migration.sql` (pendiente aplicar en staging).
+- [x] Seed inicial de modulos definido.
 
 ### 6.2 Checks criticos de salida (GO de release funcional)
 
-- [ ] `getEnabledModules(notaryId)` resuelve plan + overrides correctamente.
-- [ ] `requireModule(moduleCode)` bloquea con `403` cuando modulo no habilitado.
-- [ ] Notaria sin suscripcion activa queda fail-closed para modulos protegidos.
-- [ ] Endpoints Facturacion/QR/Mensajes respetan gating por modulo.
+- [x] `getEnabledModules(notaryId)` resuelve plan + overrides correctamente.
+- [x] `requireModule(moduleCode)` bloquea con `403` cuando modulo no habilitado.
+- [x] Notaria sin suscripcion activa queda fail-closed para modulos protegidos.
+- [x] Endpoints Facturacion/QR/Mensajes respetan gating por modulo.
 - [ ] Integrar UAFE al gating por modulo cuando inicie `UAFE_V2`.
 
 ### 6.3 NO-GO inmediato
@@ -195,9 +196,9 @@ Objetivo: habilitacion tecnica por notaria sin cobro in-app.
 
 ### 6.4 Evidencia minima requerida
 
-1. Tests de servicio `entitlement-service`.
-2. Tests de middleware `require-module`.
-3. E2E con notaria A habilitada y notaria B bloqueada por modulo.
+1. [x] Tests de servicio `entitlement-service` (`backend/tests/entitlement-service.test.js`).
+2. [x] Tests de middleware `require-module` (`backend/tests/require-module-middleware.test.js`).
+3. [ ] E2E con notaria A habilitada y notaria B bloqueada por modulo.
 
 ## 7) Checklist E2E final de aislamiento (gate de cierre)
 

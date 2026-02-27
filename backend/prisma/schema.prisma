@@ -42,6 +42,8 @@ model Notary {
   payments              Payment[]
   importLogs            ImportLog[]
   pendingReceivables    PendingReceivable[]
+  subscriptions         NotarySubscription[]
+  moduleOverrides       NotaryModuleOverride[]
 
   @@index([isActive])
   @@index([deletedAt])
@@ -924,6 +926,87 @@ model PendingReceivable {
   @@index([cashierCommentUpdatedAt])
   @@index([notaryId])
   @@map("pending_receivables")
+}
+
+// ============================================
+// ENTITLEMENTS (MODULOS/PLANES) - OLA C
+// ============================================
+
+model Plan {
+  id                  String               @id @default(uuid()) @db.Uuid
+  name                String               @unique
+  description         String?
+  isActive            Boolean              @default(true) @map("is_active")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+  planModules         PlanModule[]
+  notarySubscriptions NotarySubscription[]
+
+  @@index([isActive])
+  @@map("plans")
+}
+
+model Module {
+  id              String                @id @default(uuid()) @db.Uuid
+  code            String                @unique
+  name            String
+  description     String?
+  isActive        Boolean               @default(true) @map("is_active")
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+  planModules     PlanModule[]
+  notaryOverrides NotaryModuleOverride[]
+
+  @@index([isActive])
+  @@map("modules")
+}
+
+model PlanModule {
+  id         String   @id @default(uuid()) @db.Uuid
+  planId     String   @db.Uuid @map("plan_id")
+  moduleId   String   @db.Uuid @map("module_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+  plan       Plan     @relation(fields: [planId], references: [id])
+  module     Module   @relation(fields: [moduleId], references: [id])
+
+  @@unique([planId, moduleId])
+  @@index([planId])
+  @@index([moduleId])
+  @@map("plan_modules")
+}
+
+model NotarySubscription {
+  id         String    @id @default(uuid()) @db.Uuid
+  notaryId   String    @db.Uuid @map("notary_id")
+  planId     String    @db.Uuid @map("plan_id")
+  startedAt  DateTime  @default(now()) @map("started_at")
+  expiresAt  DateTime? @map("expires_at")
+  isActive   Boolean   @default(true) @map("is_active")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  notary     Notary    @relation(fields: [notaryId], references: [id])
+  plan       Plan      @relation(fields: [planId], references: [id])
+
+  @@index([notaryId, isActive])
+  @@index([planId])
+  @@index([expiresAt])
+  @@map("notary_subscriptions")
+}
+
+model NotaryModuleOverride {
+  id         String   @id @default(uuid()) @db.Uuid
+  notaryId   String   @db.Uuid @map("notary_id")
+  moduleId   String   @db.Uuid @map("module_id")
+  enabled    Boolean
+  reason     String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  notary     Notary   @relation(fields: [notaryId], references: [id])
+  module     Module   @relation(fields: [moduleId], references: [id])
+
+  @@unique([notaryId, moduleId])
+  @@index([moduleId])
+  @@map("notary_module_overrides")
 }
 
 // ============================================

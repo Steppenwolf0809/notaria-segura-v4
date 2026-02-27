@@ -366,9 +366,9 @@ Pendiente de OLA B:
 ### Fase 4 - Modulos/planes
 
 - [x] Definir modelo normalizado (`plans`, `modules`, `plan_modules`, `notary_subscriptions`, `notary_module_overrides`).
-- [ ] Implementar tablas y migraciones.
-- [ ] Implementar resolucion de entitlements (plan + overrides).
-- [ ] Integrar middleware `requireModule`.
+- [x] Implementar tablas y migraciones.
+- [x] Implementar resolucion de entitlements (plan + overrides).
+- [x] Integrar middleware `requireModule`.
 - [ ] Probar activacion tecnica por modulo (sin cobro in-app).
 
 ### Checklist transversal (release gate)
