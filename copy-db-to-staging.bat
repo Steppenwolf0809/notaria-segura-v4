@@ -31,13 +31,21 @@ set PROD_HOST=switchback.proxy.rlwy.net
 set PROD_PORT=25513
 set PROD_USER=postgres
 set PROD_DB=railway
-set PGPASSWORD_PROD=uXwrkbpPDVXrEngsRCMHdIKkOUDXipic
+if "%PGPASSWORD_PROD%"=="" (
+    echo [ERROR] Debes definir PGPASSWORD_PROD antes de ejecutar este script.
+    pause
+    exit /b
+)
 
 set STAGING_HOST=gondola.proxy.rlwy.net
 set STAGING_PORT=39316
 set STAGING_USER=postgres
 set STAGING_DB=railway
-set PGPASSWORD_STAGING=vzdzHHIVerdjgzWlmfARWiSsbTBSJfvw
+if "%PGPASSWORD_STAGING%"=="" (
+    echo [ERROR] Debes definir PGPASSWORD_STAGING antes de ejecutar este script.
+    pause
+    exit /b
+)
 
 echo.
 echo ===================================================

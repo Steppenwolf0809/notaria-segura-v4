@@ -4,16 +4,24 @@ setlocal enabledelayedexpansion
 REM ===================================================
 REM CONFIGURATION
 REM ===================================================
-set PROD_URL=postgresql://postgres:uXwrkbpPDVXrEngsRCMHdIKkOUDXipic@switchback.proxy.rlwy.net:25513/railway
-set STAGING_URL=postgresql://postgres:vzdzHHIVerdjgzWlmfARWiSsbTBSJfvw@gondola.proxy.rlwy.net:39316/railway
+if "%PROD_URL%"=="" (
+    echo [ERROR] Missing PROD_URL env var.
+    echo Example: set PROD_URL=postgresql://user:pass@host:port/db
+    exit /b 1
+)
+if "%STAGING_URL%"=="" (
+    echo [ERROR] Missing STAGING_URL env var.
+    echo Example: set STAGING_URL=postgresql://user:pass@host:port/db
+    exit /b 1
+)
 
 echo ===================================================
 echo  NOTARIA SEGURA - DB SYNC
 echo  Production to Staging (Postgres Copy)
 echo ===================================================
 echo.
-echo  SOURCE (Production): switchback.proxy.rlwy.net:25513
-echo  TARGET (Staging):    gondola.proxy.rlwy.net:39316
+echo  SOURCE (Production): from PROD_URL
+echo  TARGET (Staging):    from STAGING_URL
 echo.
 echo  ONE-WAY SYNC WARNING:
 echo  This will completely ERASE the Staging database and

@@ -10,7 +10,7 @@ El endpoint en Railway está listo y desplegado:
 | Status | GET | `https://notaria-segura-production.up.railway.app/api/sync/billing/status` |
 | History | GET | `https://notaria-segura-production.up.railway.app/api/sync/billing/history` |
 
-**API Key:** `ns_sync_5468883cebb118f266c21fe81a5925e58e996191c294553f`
+**API Key:** `SYNC_API_KEY_VALUE`
 
 > ⚠️ **Acción Pendiente:** Configurar `SYNC_API_KEY` en Railway Dashboard → Variables
 
@@ -59,7 +59,7 @@ KOINOR_PORT=1433
 
 # Railway Endpoint
 RAILWAY_SYNC_URL=https://notaria-segura-production.up.railway.app/api/sync/billing
-SYNC_API_KEY=ns_sync_5468883cebb118f266c21fe81a5925e58e996191c294553f
+SYNC_API_KEY=SYNC_API_KEY_VALUE
 
 # Configuración
 SYNC_INTERVAL_MINUTES=15
@@ -120,7 +120,7 @@ WHERE fecemi >= DATEADD(YEAR, -2, GETDATE());
 Una vez configurada la API Key en Railway:
 ```bash
 curl -X GET "https://notaria-segura-production.up.railway.app/api/sync/billing/status" \
-  -H "X-Sync-Api-Key: ns_sync_5468883cebb118f266c21fe81a5925e58e996191c294553f"
+  -H "X-Sync-Api-Key: SYNC_API_KEY_VALUE"
 ```
 
 Respuesta esperada:
