@@ -18,6 +18,11 @@ frontend/.env.*
 **/.env
 **/.env.*
 
+# Configuraciones locales de agentes/herramientas (contienen comandos/credenciales)
+.claude/settings.local.json
+.roo/mcp.json
+*notaria-segura*backend.env
+
 # Notas privadas y documentación con credenciales
 **/USUARIOS-REALES.md
 **/CREDENCIALES*.md

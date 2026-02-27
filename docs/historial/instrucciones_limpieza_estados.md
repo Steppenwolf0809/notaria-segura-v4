@@ -198,7 +198,7 @@ Generar archivo con los cambios realizados:
 ```env
 # Conexión a Railway PostgreSQL (PRODUCCIÓN)
 # ⚠️ CUIDADO: Este script MODIFICA datos
-DATABASE_URL=postgresql://usuario:password@switchback.proxy.rlwy.net:25513/railway
+DATABASE_URL=postgresql://<usuario>:<password>@<host>:<puerto>/<base_de_datos>
 ```
 
 ---
