@@ -176,8 +176,10 @@ Objetivo: habilitacion tecnica por notaria sin cobro in-app.
 ### 6.1 GO de entrada (para iniciar OLA C)
 
 - [x] OLA B aprobada.
-- [ ] Tablas de entitlements creadas y migradas en staging.
-  - Evidencia codigo: `backend/prisma/migrations/20260227173000_ola_c_entitlements_modules_plans/migration.sql` (pendiente aplicar en staging).
+- [x] Tablas de entitlements creadas y migradas en staging.
+  - Evidencia 2026-03-02:
+    - SQL aplicada en staging: `npx prisma db execute --file prisma/migrations/20260227173000_ola_c_entitlements_modules_plans/migration.sql`
+    - Tablas verificadas: `plans`, `modules`, `plan_modules`, `notary_subscriptions`, `notary_module_overrides`.
 - [x] Seed inicial de modulos definido.
 
 ### 6.2 Checks criticos de salida (GO de release funcional)
@@ -198,7 +200,8 @@ Objetivo: habilitacion tecnica por notaria sin cobro in-app.
 
 1. [x] Tests de servicio `entitlement-service` (`backend/tests/entitlement-service.test.js`).
 2. [x] Tests de middleware `require-module` (`backend/tests/require-module-middleware.test.js`).
-3. [ ] E2E con notaria A habilitada y notaria B bloqueada por modulo.
+3. [x] E2E tecnico A/B con notaria A habilitada y notaria B bloqueada por modulo.
+   - Evidencia 2026-03-02: `backend/scripts/verify-entitlements-ab.js` (PASS en staging).
 
 ## 7) Checklist E2E final de aislamiento (gate de cierre)
 
