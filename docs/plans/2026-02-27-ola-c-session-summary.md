@@ -2,7 +2,7 @@
 
 Fecha: 2026-02-27  
 Rama: `feature/architecture-v2.1-restart`  
-Estado: En progreso (base tecnica implementada, pendiente validacion en staging)
+Estado: En progreso avanzado (base tecnica + validacion A/B en staging completadas)
 
 ## 1) Objetivo de la sesion
 
@@ -58,10 +58,29 @@ Total: 11 tests en verde.
 
 ## 4) Pendientes inmediatos para cierre OLA C
 
-1. Aplicar migracion OLA C en staging.
-2. Smoke por roles en staging para rutas:
+1. Resolver drift de historial de migraciones en staging para volver a `prisma migrate deploy` sin excepciones.
+   - Nota 2026-03-02: OLA C fue aplicada por SQL directo con `prisma db execute` debido a drift legacy.
+2. Smoke por roles en staging para rutas reales:
    - `/api/billing/*`
    - `/api/escrituras/*` (solo rutas protegidas)
    - `/api/mensajes-internos/*`
-3. E2E A/B de modulo habilitado vs bloqueado (`403`) por notaria.
-4. Definir y ejecutar flujo operativo para cambios de plan/override (runbook basico).
+3. Definir y ejecutar flujo operativo para cambios de plan/override (runbook basico).
+
+## 5) Validacion staging ejecutada (2026-03-02)
+
+1. Migracion OLA C aplicada en staging:
+   - Comando: `npx prisma db execute --file prisma/migrations/20260227173000_ola_c_entitlements_modules_plans/migration.sql`
+   - Resultado: `Script executed successfully`.
+2. Verificacion de seed:
+   - `plans=1`, `modules=6`, `plan_modules=6`, `active_subscriptions=3`.
+3. Verificacion A/B de entitlements + gating:
+   - Script: `backend/scripts/verify-entitlements-ab.js`
+   - Resultado: `Entitlements A/B verification passed`.
+   - Casos validados:
+     - Sin contexto tenant => `0` visibilidad en `notary_subscriptions` y `notary_module_overrides`.
+     - Tenant A con modulo `FACTURACION` activo => acceso permitido (`next()` en middleware).
+     - Tenant B con override `FACTURACION=false` => bloqueado `403`.
+     - Tenant C sin suscripcion activa => bloqueado `403`.
+     - Contexto super admin con tenant context en sesion => visibilidad cross-tenant esperada.
+4. Limpieza:
+   - El script elimina datos temporales al finalizar (`c = 0` notarías de prueba remanentes).
