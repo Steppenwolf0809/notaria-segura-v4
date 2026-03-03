@@ -1,6 +1,20 @@
 import jwt from 'jsonwebtoken';
 import prisma from '../db.js';
 
+async function resolveUserNotaryId(userId) {
+  try {
+    const rows = await prisma.$queryRaw`
+      SELECT "notary_id"::text AS "notaryId"
+      FROM "users"
+      WHERE "id" = ${userId}
+      LIMIT 1
+    `;
+    return rows?.[0]?.notaryId || null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Middleware para verificar token JWT
  * @param {Object} req - Request object
@@ -35,12 +49,18 @@ async function authenticateToken(req, res, next) {
     }
 
     // Agregar información del usuario al request (incluye nombres para auditoría)
+    const notaryId = await resolveUserNotaryId(user.id);
+    const isSuperAdmin = user.role === 'SUPER_ADMIN';
+
     req.user = {
       id: user.id,
       email: user.email,
       role: user.role,
       firstName: user.firstName,
-      lastName: user.lastName
+      lastName: user.lastName,
+      isSuperAdmin,
+      notaryId,
+      activeNotaryId: notaryId
     };
 
     next();
@@ -78,6 +98,10 @@ function requireRoles(allowedRoles) {
   return (req, res, next) => {
     try {
       const userRole = req.user.role;
+
+      if (userRole === 'SUPER_ADMIN') {
+        return next();
+      }
       
       if (!allowedRoles.includes(userRole)) {
         return res.status(403).json({
