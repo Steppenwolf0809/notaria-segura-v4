@@ -210,18 +210,18 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      styleSrcElem: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrcElem: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com"],
-      imgSrc: ["'self'", "data:", "blob:", "https:"], // blob: necesario para copiar QR al portapapeles
-      connectSrc: ["'self'", "'unsafe-inline'", "http://localhost:3001", "https:"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://*.clerk.accounts.dev", "https://*.clerk.com"],
+      styleSrcElem: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://*.clerk.accounts.dev", "https://*.clerk.com"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://*.clerk.accounts.dev", "https://*.clerk.com"],
+      scriptSrcElem: ["'self'", "'unsafe-inline'", "https://cdnjs.cloudflare.com", "https://*.clerk.accounts.dev", "https://*.clerk.com"],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      connectSrc: ["'self'", "'unsafe-inline'", "http://localhost:3001", "https:", "wss://*.clerk.accounts.dev", "wss://*.clerk.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com", "https://*.clerk.accounts.dev", "https://*.clerk.com"],
       objectSrc: ["'none'"],
       mediaSrc: ["'self'"],
-      frameSrc: ["'none'"],
-      workerSrc: ["'self'", "blob:", "https://cdnjs.cloudflare.com"],
-      childSrc: ["'self'", "blob:"],
+      frameSrc: ["'self'", "https://*.clerk.accounts.dev", "https://*.clerk.com"],
+      workerSrc: ["'self'", "blob:", "https://cdnjs.cloudflare.com", "https://*.clerk.accounts.dev"],
+      childSrc: ["'self'", "blob:", "https://*.clerk.accounts.dev", "https://*.clerk.com"],
     },
   },
   crossOriginEmbedderPolicy: false // Permitir embedding para notificaciones WhatsApp
