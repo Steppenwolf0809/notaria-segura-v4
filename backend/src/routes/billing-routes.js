@@ -109,15 +109,14 @@ router.post('/import-xml', csrfProtection, xmlUpload.single('file'), billingCont
 // Get XML import statistics - 🔒 SECURITY: CSRF protection
 router.get('/import-xml-stats', csrfProtection, billingController.getXMLImportStats);
 
-// Import CXC endpoint (Cartera por Cobrar) - 🔒 SECURITY: CSRF protection
-router.post('/import-cxc', csrfProtection, xmlUpload.single('file'), billingController.importCxcFile);
+// Import CXC endpoint - REMOVED: importCxcFile not implemented in staging controller
+// router.post('/import-cxc', csrfProtection, xmlUpload.single('file'), billingController.importCxcFile);
 
 // Import MOV endpoint (Movimientos de Caja - Facturas + Pagos Efectivo) - 🔒 SECURITY: CSRF protection
 router.post('/import-mov', csrfProtection, xmlUpload.single('file'), billingController.importMovFile);
 
-// Import XLS endpoint (LEGACY - Deprecado, mantener 1 mes)
-// TODO: Comentar después del 28 de febrero de 2026
-router.post('/import', csrfProtection, upload.single('file'), billingController.importFile);
+// Import XLS endpoint (LEGACY - Deprecado, ya pasó fecha límite feb 2026)
+// router.post('/import', csrfProtection, upload.single('file'), billingController.importFile);
 
 // ============================================================================
 // SPRINT 6: Cartera de Matrizadores
@@ -162,10 +161,10 @@ router.patch('/invoices/:invoiceId/assign', csrfProtection, billingController.as
 // MÓDULO CXC - CARTERA POR COBRAR (Sync Agent + Legacy XLS)
 // ============================================================================
 
-// --- Legacy XLS import (se deprecará) ---
-router.post('/import-cxc-xls', csrfProtection, upload.single('file'), billingController.importCxcXls);
-router.get('/cartera-pendiente/fechas', billingController.getAvailableReportDates);
-router.delete('/cartera-pendiente/limpiar', csrfProtection, billingController.limpiarCarteraAntigua);
+// --- Legacy XLS import - REMOVED: functions not implemented in staging controller ---
+// router.post('/import-cxc-xls', csrfProtection, upload.single('file'), billingController.importCxcXls);
+// router.get('/cartera-pendiente/fechas', billingController.getAvailableReportDates);
+// router.delete('/cartera-pendiente/limpiar', csrfProtection, billingController.limpiarCarteraAntigua);
 
 // --- Cartera Pendiente (nueva versión - Sync Agent) ---
 router.get('/cartera-pendiente',
