@@ -8,7 +8,7 @@ import { logPasswordChange, logLoginAttempt, extractRequestInfo } from '../utils
 /**
  * Roles válidos del sistema (completo con ARCHIVO)
  */
-const validRoles = ['ADMIN', 'CAJA', 'MATRIZADOR', 'RECEPCION', 'ARCHIVO'];
+const validRoles = ['SUPER_ADMIN', 'ADMIN', 'CAJA', 'MATRIZADOR', 'RECEPCION', 'ARCHIVO'];
 
 /**
  * Obtiene el color asociado a cada rol
@@ -17,8 +17,9 @@ const validRoles = ['ADMIN', 'CAJA', 'MATRIZADOR', 'RECEPCION', 'ARCHIVO'];
  */
 function getRoleColor(role) {
   const roleColors = {
+    SUPER_ADMIN: '#8b5cf6', // Violeta - Super administrador cross-tenant
     ADMIN: '#ef4444',      // Rojo - Control total
-    CAJA: '#22c55e',       // Verde - Gestión financiera  
+    CAJA: '#22c55e',       // Verde - Gestión financiera
     MATRIZADOR: '#3b82f6', // Azul - Creación documentos
     RECEPCION: '#06b6d4',  // Cyan - Entrega documentos
     ARCHIVO: '#f59e0b'     // Naranja/Warning - Archivo histórico
@@ -33,10 +34,12 @@ function getRoleColor(role) {
  */
 function generateToken(user) {
   return jwt.sign(
-    { 
-      id: user.id, 
-      email: user.email, 
-      role: user.role 
+    {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      notaryId: user.notaryId || null,
+      isSuperAdmin: user.role === 'SUPER_ADMIN'
     },
     process.env.JWT_SECRET,
     { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
@@ -65,6 +68,14 @@ async function register(req, res) {
       return res.status(400).json({
         success: false,
         message: 'Rol no válido'
+      });
+    }
+
+    // Solo SUPER_ADMIN puede crear otro SUPER_ADMIN
+    if (role === 'SUPER_ADMIN' && req.user?.role !== 'SUPER_ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo un SUPER_ADMIN puede crear otro SUPER_ADMIN'
       });
     }
 
