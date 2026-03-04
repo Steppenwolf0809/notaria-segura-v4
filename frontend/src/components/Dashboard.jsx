@@ -29,7 +29,6 @@ import RecepcionCenter from './RecepcionCenter';
 import ReceptionCenter from './ReceptionCenter';
 import ArchivoCenter from './ArchivoCenter';
 import AdminCenter from './AdminCenter';
-import ChangePassword from './ChangePassword';
 import CajaLayout from './layout/CajaLayout';
 
 /**
@@ -46,7 +45,6 @@ const Dashboard = () => {
     getUserInitials
   } = useAuth();
 
-  const [showChangePassword, setShowChangePassword] = React.useState(false);
 
   /**
    * Obtiene el mensaje de bienvenida según el rol
@@ -111,10 +109,6 @@ const Dashboard = () => {
     return (
       <CajaLayout>
         <CajaCenter />
-        <ChangePassword
-          open={showChangePassword}
-          onClose={() => setShowChangePassword(false)}
-        />
       </CajaLayout>
     );
   }
@@ -170,21 +164,6 @@ const Dashboard = () => {
               {getFullName()}
             </Typography>
           </Box>
-
-          {/* Settings Button */}
-          <IconButton
-            onClick={() => setShowChangePassword(true)}
-            title="Cambiar Contraseña"
-            sx={{
-              ml: 1,
-              color: 'text.primary',
-              '&:hover': {
-                bgcolor: 'action.hover'
-              }
-            }}
-          >
-            <SettingsIcon sx={{ color: 'text.primary' }} />
-          </IconButton>
 
           {/* Theme Toggle */}
           <ThemeToggle />
@@ -340,11 +319,6 @@ const Dashboard = () => {
         </Grid>
       </Box>
 
-      {/* Modal de cambio de contraseña */}
-      <ChangePassword
-        open={showChangePassword}
-        onClose={() => setShowChangePassword(false)}
-      />
     </Box>
   );
 };

@@ -1,66 +1,93 @@
-import React, { useEffect } from 'react';
-import useAuth from './hooks/use-auth';
-import LoginPage from './pages/LoginPage';
+import React from 'react';
+import { useAuth, SignIn, SignUp } from '@clerk/clerk-react';
+import useAppAuth from './hooks/use-auth';
 import DashboardPage from './pages/DashboardPage';
 import VerificacionPublica from './pages/VerificacionPublica';
+import PendingApproval from './components/PendingApproval';
 import ProtectedRoute from './components/ProtectedRoute';
-import { ThemeProvider, createTheme } from '@mui/material/styles';
+import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import { Box, CircularProgress, Typography, Tab, Tabs, Paper } from '@mui/material';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { useThemeCtx } from './contexts/theme-ctx';
 import { getAppTheme } from './config/theme';
 
 /**
- * Componente raíz de la aplicación
- * - Centraliza ThemeProvider (antes en main.jsx)
- * - Integra ThemeCtx (light|dark|system) y aplica tema enterprise
+ * Pantalla de autenticación con Clerk (SignIn + SignUp)
+ */
+function AuthScreen() {
+  const [tab, setTab] = React.useState(0);
+
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        bgcolor: 'background.default',
+        p: 3
+      }}
+    >
+      <Typography variant="h4" sx={{ mb: 1, fontWeight: 700, color: 'primary.main' }}>
+        Notaria Segura
+      </Typography>
+      <Typography variant="body2" sx={{ mb: 3, color: 'text.secondary' }}>
+        Sistema de Gestion Documental Notarial
+      </Typography>
+
+      <Paper sx={{ mb: 2 }}>
+        <Tabs value={tab} onChange={(_, v) => setTab(v)} centered>
+          <Tab label="Iniciar Sesion" />
+          <Tab label="Registrarse" />
+        </Tabs>
+      </Paper>
+
+      {tab === 0 ? (
+        <SignIn
+          routing="hash"
+          appearance={{
+            elements: {
+              rootBox: { width: '100%', maxWidth: 400 },
+              card: { boxShadow: 'none' }
+            }
+          }}
+        />
+      ) : (
+        <SignUp
+          routing="hash"
+          appearance={{
+            elements: {
+              rootBox: { width: '100%', maxWidth: 400 },
+              card: { boxShadow: 'none' }
+            }
+          }}
+        />
+      )}
+    </Box>
+  );
+}
+
+/**
+ * Componente raiz de la aplicacion
  */
 function App() {
-  const { isAuthenticated, checkAuth, clearAuth } = useAuth();
+  const { isSignedIn, isLoaded } = useAuth();
+  const { user: appUser, isLoading: isLoadingProfile, loadProfile } = useAppAuth();
   const { resolvedIsDark } = useThemeCtx();
 
-  useEffect(() => {
-    // 🔧 FIX: Limpiar tokens corruptos/desincronizados al iniciar
-    try {
-      const zustandData = localStorage.getItem('notaria-auth-storage');
-      const directToken = localStorage.getItem('token');
-
-      if (zustandData) {
-        const parsed = JSON.parse(zustandData);
-        const zustandToken = parsed?.state?.token;
-
-        // Si hay token en Zustand pero no coincide con localStorage directo, sincronizar
-        if (zustandToken && zustandToken !== directToken) {
-          console.warn('[AUTH-FIX] Sincronizando tokens desincronizados');
-          localStorage.setItem('token', zustandToken);
-        }
-      } else if (directToken) {
-        // Si hay token directo pero no en Zustand, está corrupto - limpiar
-        console.warn('[AUTH-FIX] Token corrupto detectado, limpiando...');
-        localStorage.removeItem('token');
-        localStorage.removeItem('refreshToken');
-        clearAuth();
-      }
-    } catch (error) {
-      console.error('[AUTH-FIX] Error sincronizando tokens:', error);
-      // En caso de error, limpiar todo para evitar estados inconsistentes
-      try {
-        localStorage.removeItem('token');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('notaria-auth-storage');
-        clearAuth();
-      } catch { }
+  // Cargar perfil del backend cuando Clerk confirma autenticacion
+  React.useEffect(() => {
+    if (isSignedIn && isLoaded) {
+      loadProfile();
     }
+  }, [isSignedIn, isLoaded, loadProfile]);
 
-    // Verificar autenticación al cargar la aplicación
-    checkAuth();
-  }, [checkAuth, clearAuth]);
-
-  // Configuración de tema (centralizada)
   const theme = React.useMemo(() => getAppTheme(resolvedIsDark), [resolvedIsDark]);
 
-  // Detectar si es una ruta de verificación pública
+  // Detectar ruta de verificacion publica
   const currentPath = window.location.pathname;
   const isVerificationRoute = currentPath.startsWith('/verify/');
 
@@ -81,18 +108,25 @@ function App() {
         style={{ zIndex: 20000 }}
       />
 
-      {/* Ruta pública de verificación */}
       {isVerificationRoute ? (
         <VerificacionPublica />
+      ) : !isLoaded ? (
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+          <CircularProgress />
+        </Box>
+      ) : !isSignedIn ? (
+        <AuthScreen />
+      ) : isLoadingProfile || !appUser ? (
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', flexDirection: 'column', gap: 2 }}>
+          <CircularProgress />
+          <Typography variant="body2" color="text.secondary">Cargando perfil...</Typography>
+        </Box>
+      ) : !appUser.isOnboarded || !appUser.role ? (
+        <PendingApproval user={appUser} />
       ) : (
-        /* Rutas normales del sistema */
-        isAuthenticated ? (
-          <ProtectedRoute>
-            <DashboardPage />
-          </ProtectedRoute>
-        ) : (
-          <LoginPage />
-        )
+        <ProtectedRoute>
+          <DashboardPage />
+        </ProtectedRoute>
       )}
     </ThemeProvider>
   );

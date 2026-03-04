@@ -10,12 +10,14 @@ datasource db {
 
 model User {
   id                         Int                        @id @default(autoincrement())
+  clerkId                    String?                    @unique
   email                      String                     @unique
-  password                   String
+  password                   String?
   firstName                  String
   lastName                   String
-  role                       UserRole
+  role                       UserRole?
   isActive                   Boolean                    @default(true)
+  isOnboarded                Boolean                    @default(false)
   createdAt                  DateTime                   @default(now())
   updatedAt                  DateTime                   @updatedAt
   lastLogin                  DateTime?
@@ -31,6 +33,7 @@ model User {
   mensajesEnviados           MensajeInterno[]           @relation("MensajesEnviados")
   mensajesRecibidos          MensajeInterno[]           @relation("MensajesRecibidos")
   assignedInvoices           Invoice[]                  @relation("AssignedInvoices")
+  consultasListaControl      ConsultaListaControl[]
 
   @@map("users")
 }
@@ -576,6 +579,7 @@ model MensajeInterno {
 }
 
 enum UserRole {
+  SUPER_ADMIN
   ADMIN
   CAJA
   MATRIZADOR
@@ -860,5 +864,38 @@ model SyncLog {
   @@map("sync_logs")
   @@index([syncCompletedAt])
   @@index([status])
+}
+
+// ============================================
+// MÓDULO DE DEBIDA DILIGENCIA - LISTAS DE CONTROL
+// Auditoría de consultas realizadas a listas
+// de control (UAFE / Debida Diligencia)
+// ============================================
+
+model ConsultaListaControl {
+  id                   String   @id @default(uuid())
+
+  // Persona consultada
+  identificacion       String               // CI / RUC / Pasaporte
+  tipoIdentificacion   String   @default("CI") // CI, RUC, PASAPORTE
+  nombreCompleto       String?              // Nombre devuelto por la búsqueda
+
+  // Resultados
+  resultadoResumen     Json                 // { peps: {match: true, detalles: [...]}, ofac: {match: false}, ... }
+  totalCoincidencias   Int      @default(0) // Número de listas con coincidencia
+
+  // Auditoría
+  consultadoPorId      Int
+  consultadoPor        User     @relation(fields: [consultadoPorId], references: [id])
+  pdfGenerado          Boolean  @default(false)
+
+  // Timestamps
+  createdAt            DateTime @default(now())
+
+  @@map("consultas_lista_control")
+  @@index([identificacion])
+  @@index([consultadoPorId])
+  @@index([createdAt])
+  @@index([totalCoincidencias])
 }
 

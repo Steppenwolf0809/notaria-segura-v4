@@ -40,7 +40,6 @@ import {
   Receipt as ReceiptIcon,
   Payments as PaymentsIcon,
   Assessment as AssessmentIcon,
-  Lock as LockIcon,
   Message as MessageIcon,
   Style as StyleIcon,
   Gavel as GavelIcon
@@ -49,7 +48,8 @@ import useAuth from '../hooks/use-auth';
 import { useThemeCtx } from '../contexts/theme-ctx';
 import { ThemeProvider } from '@mui/material/styles';
 import { getAppTheme } from '../config/theme';
-import ChangePassword from './ChangePassword';
+import { useClerk } from '@clerk/clerk-react';
+import { AccountCircle as AccountCircleIcon } from '@mui/icons-material';
 
 // Sidebar widths
 const DRAWER_WIDTH = 260;
@@ -62,10 +62,10 @@ const COLLAPSED_DRAWER_WIDTH = 72;
 const AdminLayout = ({ children, currentView, onViewChange }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [showChangePassword, setShowChangePassword] = useState(false);
   const [billingMenuOpen, setBillingMenuOpen] = useState(false);
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
   const { resolvedIsDark: isDarkMode, setMode } = useThemeCtx();
+  const { openUserProfile } = useClerk();
 
   const toggleTheme = () => {
     setMode(isDarkMode ? 'light' : 'dark');
@@ -529,10 +529,10 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
           />
         </Box>
 
-        {/* Change Password — text link style */}
+        {/* Mi cuenta — text link style */}
         {!sidebarCollapsed && (
           <Box
-            onClick={() => setShowChangePassword(true)}
+            onClick={() => openUserProfile()}
             sx={{
               display: 'flex',
               alignItems: 'center',
@@ -549,9 +549,9 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
               transition: 'all 0.15s ease',
             }}
           >
-            <LockIcon sx={{ fontSize: 14 }} />
+            <AccountCircleIcon sx={{ fontSize: 14 }} />
             <Typography sx={{ fontSize: '0.6875rem', fontWeight: 500 }}>
-              Cambiar Contraseña
+              Mi Cuenta
             </Typography>
           </Box>
         )}
@@ -657,11 +657,6 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
           {children}
         </Box>
 
-        {/* Change Password Modal */}
-        <ChangePassword
-          open={showChangePassword}
-          onClose={() => setShowChangePassword(false)}
-        />
       </Box>
     </ThemeProvider>
   );

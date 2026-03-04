@@ -37,6 +37,8 @@ import encuestaRoutes from './src/routes/encuesta-routes.js'
 import billingRoutes from './src/routes/billing-routes.js'
 import syncRoutes from './src/routes/sync-routes.js'
 import migrationRoutes from './src/routes/migration-routes.js'
+import debidaDiligenciaRoutes from './src/routes/debida-diligencia-routes.js'
+import clerkWebhookRoutes from './src/routes/clerk-webhook-routes.js'
 
 // Cargar variables de entorno
 dotenv.config({ path: './.env' })
@@ -336,6 +338,9 @@ app.get('/api/health/feature-flags', (req, res) => {
 // POST /api/auth/migration/login protected by key
 app.use('/api/auth/migration', migrationRoutes)
 
+// WEBHOOK DE CLERK (sin auth — verificado por firma svix)
+app.use('/api/webhooks/clerk', clerkWebhookRoutes)
+
 // RUTAS DE AUTENTICACIÓN (/api/auth/*)
 app.use('/api/auth', authRoutes)
 
@@ -381,6 +386,9 @@ app.use('/api/billing', billingRoutes)
 
 // RUTAS DE SINCRONIZACIÓN KOINOR (/api/sync/*)
 app.use('/api/sync', syncRoutes)
+
+// RUTAS DE DEBIDA DILIGENCIA (/api/debida-diligencia/*)
+app.use('/api/debida-diligencia', debidaDiligenciaRoutes)
 
 // ============================================================================
 // SERVIR ARCHIVOS ESTÁTICOS DEL FRONTEND

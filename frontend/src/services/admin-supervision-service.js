@@ -1,6 +1,4 @@
-import axios from 'axios';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+import apiClient from './api-client';
 
 /**
  * Obtener estadísticas de supervisión con filtros
@@ -9,8 +7,6 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
  */
 export const getSupervisionStats = async (filters = {}) => {
     try {
-        const token = localStorage.getItem('token');
-
         // Construir query params
         const params = new URLSearchParams();
         if (filters.thresholdDays) params.append('thresholdDays', filters.thresholdDays);
@@ -31,9 +27,7 @@ export const getSupervisionStats = async (filters = {}) => {
         if (filters.billedTimeRange) params.append('billedTimeRange', filters.billedTimeRange);
         if (filters.performanceTimeRange) params.append('performanceTimeRange', filters.performanceTimeRange);
 
-        const response = await axios.get(`${API_URL}/admin/dashboard/stats?${params.toString()}`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
+        const response = await apiClient.get(`/admin/dashboard/stats?${params.toString()}`);
 
         if (response.data.success) {
             return response.data.data;
@@ -51,15 +45,9 @@ export const getSupervisionStats = async (filters = {}) => {
  */
 export const getMatrizadores = async () => {
     try {
-        const token = localStorage.getItem('token');
-        // Obtener tanto MATRIZADOR como ARCHIVO
         const [matRes, archRes] = await Promise.all([
-            axios.get(`${API_URL}/admin/users?role=MATRIZADOR`, {
-                headers: { Authorization: `Bearer ${token}` }
-            }),
-            axios.get(`${API_URL}/admin/users?role=ARCHIVO`, {
-                headers: { Authorization: `Bearer ${token}` }
-            })
+            apiClient.get('/admin/users?role=MATRIZADOR'),
+            apiClient.get('/admin/users?role=ARCHIVO')
         ]);
 
         const matrizadores = matRes.data.success ? matRes.data.data : [];

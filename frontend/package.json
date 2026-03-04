@@ -10,6 +10,7 @@
     "start": "vite preview --host --port $PORT"
   },
   "dependencies": {
+    "@clerk/clerk-react": "^5.61.3",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.2.0",

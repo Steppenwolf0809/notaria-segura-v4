@@ -1,6 +1,4 @@
-import axios from 'axios';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+import apiClient from './api-client';
 
 /**
  * Obtener estadísticas del dashboard
@@ -8,10 +6,7 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
  */
 export const getDashboardStats = async () => {
     try {
-        const token = localStorage.getItem('token');
-        const response = await axios.get(`${API_URL}/admin/dashboard/stats`, {
-            headers: { Authorization: `Bearer ${token}` }
-        });
+        const response = await apiClient.get('/admin/dashboard/stats');
 
         if (response.data.success) {
             return response.data.data;

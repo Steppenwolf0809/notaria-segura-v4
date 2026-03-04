@@ -35,7 +35,7 @@ import {
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import { useThemeCtx } from '../contexts/theme-ctx';
-import ChangePassword from './ChangePassword';
+import { useClerk } from '@clerk/clerk-react';
 import { navItemsByRole } from '../config/nav-items';
 
 // Anchos del sidebar
@@ -49,9 +49,9 @@ const COLLAPSED_DRAWER_WIDTH = 60;
 const RecepcionLayout = ({ children, currentView, onViewChange }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [showChangePassword, setShowChangePassword] = useState(false);
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
   const { resolvedIsDark: isDarkMode, cycleMode: toggleTheme } = useThemeCtx();
+  const { openUserProfile } = useClerk();
 
   // Trazas de verificación del layout
   useEffect(() => {
@@ -335,7 +335,7 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
                 variant="outlined"
                 size="small"
                 startIcon={<SettingsIcon />}
-                onClick={() => setShowChangePassword(true)}
+                onClick={() => openUserProfile()}
                 sx={{
                   fontSize: '0.75rem',
                   borderColor: !isDarkMode ? 'rgba(255, 255, 255, 0.5)' : 'inherit',
@@ -348,7 +348,7 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
                   flex: 1
                 }}
               >
-                Config
+                Mi Cuenta
               </Button>
               <Button
                 variant="outlined"
@@ -388,9 +388,9 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
               </Avatar>
             </Tooltip>
 
-            <Tooltip title="Configuración" placement="right">
+            <Tooltip title="Mi Cuenta" placement="right">
               <IconButton
-                onClick={() => setShowChangePassword(true)}
+                onClick={() => openUserProfile()}
                 size="small"
                 sx={{
                   color: !isDarkMode ? '#ffffff' : 'inherit',
@@ -548,11 +548,6 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
         </Container>
       </Box>
 
-      {/* Modal de cambio de contraseña */}
-      <ChangePassword
-        open={showChangePassword}
-        onClose={() => setShowChangePassword(false)}
-      />
     </Box>
   );
 };
