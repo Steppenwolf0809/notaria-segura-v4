@@ -11,7 +11,9 @@ import {
     marcarResuelto,
     obtenerEstadisticas,
     listarMensajesEnviados,
-    obtenerEstadisticasEnviados
+    obtenerEstadisticasEnviados,
+    listarTodosMensajes,
+    obtenerEstadisticasGlobales
 } from '../controllers/mensajes-internos-controller.js';
 
 const router = express.Router();
