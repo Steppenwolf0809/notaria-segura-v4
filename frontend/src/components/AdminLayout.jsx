@@ -47,13 +47,16 @@ import {
   Assessment as AssessmentIcon,
   Send as SendIcon,
   FolderOpen as FolderOpenIcon,
-  Message as MessageIcon
+  Message as MessageIcon,
+  Style as StyleIcon,
+  Gavel as GavelIcon
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import { useThemeCtx } from '../contexts/theme-ctx';
 import { ThemeProvider } from '@mui/material/styles';
 import { getAppTheme } from '../config/theme';
-import ChangePassword from './ChangePassword';
+import { useClerk } from '@clerk/clerk-react';
+import { AccountCircle as AccountCircleIcon } from '@mui/icons-material';
 
 // Anchos del sidebar
 const DRAWER_WIDTH = 260;
@@ -66,10 +69,10 @@ const COLLAPSED_DRAWER_WIDTH = 72;
 const AdminLayout = ({ children, currentView, onViewChange }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [showChangePassword, setShowChangePassword] = useState(false);
   const [billingMenuOpen, setBillingMenuOpen] = useState(false);
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
   const { resolvedIsDark: isDarkMode, setMode } = useThemeCtx();
+  const { openUserProfile } = useClerk();
 
   const toggleTheme = () => {
     setMode(isDarkMode ? 'light' : 'dark');
@@ -570,14 +573,10 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
           />
         </Box>
 
-        {/* Botón cambiar contraseña */}
+        {/* Mi cuenta — text link style */}
         {!sidebarCollapsed && (
-          <Button
-            variant="outlined"
-            size="small"
-            fullWidth
-            onClick={() => setShowChangePassword(true)}
-            startIcon={<SettingsIcon fontSize="small" />}
+          <Box
+            onClick={() => openUserProfile()}
             sx={{
               mb: 1.5,
               borderColor: isDarkMode ? 'rgba(148, 163, 184, 0.2)' : 'rgba(148, 163, 184, 0.3)',
@@ -588,8 +587,11 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
               }
             }}
           >
-            Cambiar Contraseña
-          </Button>
+            <AccountCircleIcon sx={{ fontSize: 14 }} />
+            <Typography sx={{ fontSize: '0.6875rem', fontWeight: 500 }}>
+              Mi Cuenta
+            </Typography>
+          </Box>
         )}
 
         {/* Botón de Cerrar Sesión */}
@@ -737,11 +739,6 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
           </Container>
         </Box>
 
-        {/* Modal de cambio de contraseña */}
-        <ChangePassword
-          open={showChangePassword}
-          onClose={() => setShowChangePassword(false)}
-        />
       </Box>
     </ThemeProvider>
   );

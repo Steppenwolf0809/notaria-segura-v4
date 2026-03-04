@@ -39,7 +39,7 @@ import {
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import useThemeStore from '../store/theme-store';
-import ChangePassword from './ChangePassword';
+import { useClerk } from '@clerk/clerk-react';
 import { navItemsByRole } from '../config/nav-items';
 import ThemeToggle from './ThemeToggle';
 import NotificacionesDropdown from './notifications/NotificacionesDropdown';
@@ -58,10 +58,10 @@ const COLLAPSED_DRAWER_WIDTH = 60;
 const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [showChangePassword, setShowChangePassword] = useState(false);
   const [userMenuAnchor, setUserMenuAnchor] = useState(null);
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
   const { isDarkMode } = useThemeStore();
+  const { openUserProfile } = useClerk();
   const [unreadCount, setUnreadCount] = useState(0);
 
   // Polling de mensajes no leídos
@@ -158,8 +158,8 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
     setUserMenuAnchor(null);
   };
 
-  const handleChangePassword = () => {
-    setShowChangePassword(true);
+  const handleOpenProfile = () => {
+    openUserProfile();
     handleUserMenuClose();
   };
 
@@ -474,9 +474,9 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
               transformOrigin={{ horizontal: 'right', vertical: 'top' }}
               anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
             >
-              <MenuItem onClick={handleChangePassword}>
+              <MenuItem onClick={handleOpenProfile}>
                 <SettingsIcon sx={{ mr: 1 }} />
-                Cambiar Contraseña
+                Mi Cuenta
               </MenuItem>
               <Divider />
               <MenuItem onClick={handleLogout}>
@@ -559,11 +559,6 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
         </Container>
       </Box>
 
-      {/* Modal de cambio de contraseña */}
-      <ChangePassword
-        open={showChangePassword}
-        onClose={() => setShowChangePassword(false)}
-      />
     </Box>
   );
 };

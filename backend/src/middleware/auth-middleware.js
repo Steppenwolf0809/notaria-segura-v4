@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import { clerkClient, verifyToken } from '@clerk/express';
 import prisma from '../db.js';
 
 async function resolveUserNotaryId(userId) {
@@ -16,15 +16,12 @@ async function resolveUserNotaryId(userId) {
 }
 
 /**
- * Middleware para verificar token JWT
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- * @param {Function} next - Next function
+ * Middleware para verificar token JWT de Clerk y cargar usuario local
  */
 async function authenticateToken(req, res, next) {
   try {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
       return res.status(401).json({
@@ -33,55 +30,61 @@ async function authenticateToken(req, res, next) {
       });
     }
 
-    // Verificar token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    
-    // Verificar que el usuario existe y está activo
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id }
-    });
-
-    if (!user || !user.isActive) {
+    // Verificar token con Clerk
+    let clerkPayload;
+    try {
+      clerkPayload = await verifyToken(token, {
+        secretKey: process.env.CLERK_SECRET_KEY
+      });
+    } catch (err) {
       return res.status(401).json({
         success: false,
-        message: 'Token inválido o usuario desactivado'
+        message: 'Token inválido o expirado'
       });
     }
 
-    // Agregar información del usuario al request (incluye nombres para auditoría)
+    const clerkUserId = clerkPayload.sub;
+
+    // Buscar usuario local por clerkId
+    const user = await prisma.user.findUnique({
+      where: { clerkId: clerkUserId }
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Usuario no registrado en el sistema'
+      });
+    }
+
+    if (!user.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: 'Usuario desactivado'
+      });
+    }
+
+    // Agregar información del usuario al request
     const notaryId = await resolveUserNotaryId(user.id);
     const isSuperAdmin = user.role === 'SUPER_ADMIN';
 
     req.user = {
       id: user.id,
+      clerkId: user.clerkId,
       email: user.email,
       role: user.role,
       firstName: user.firstName,
       lastName: user.lastName,
       isSuperAdmin,
       notaryId,
-      activeNotaryId: notaryId
+      activeNotaryId: notaryId,
+      isOnboarded: user.isOnboarded
     };
 
     next();
 
   } catch (error) {
     console.error('Error en autenticación:', error);
-    
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        success: false,
-        message: 'Token expirado'
-      });
-    }
-    
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({
-        success: false,
-        message: 'Token inválido'
-      });
-    }
-
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor'
@@ -90,19 +93,34 @@ async function authenticateToken(req, res, next) {
 }
 
 /**
+ * Middleware para verificar que el usuario tiene rol asignado (onboarded)
+ */
+function requireOnboarded(req, res, next) {
+  if (!req.user.isOnboarded || !req.user.role) {
+    return res.status(403).json({
+      success: false,
+      message: 'Tu cuenta está pendiente de aprobación por el administrador',
+      code: 'PENDING_APPROVAL'
+    });
+  }
+  next();
+}
+
+/**
  * Middleware para verificar roles específicos
- * @param {Array} allowedRoles - Roles permitidos
- * @returns {Function} Middleware function
+ * SUPER_ADMIN siempre tiene acceso
  */
 function requireRoles(allowedRoles) {
   return (req, res, next) => {
     try {
       const userRole = req.user.role;
 
+      // SUPER_ADMIN siempre tiene acceso
       if (userRole === 'SUPER_ADMIN') {
         return next();
       }
-      
+
+
       if (!allowedRoles.includes(userRole)) {
         return res.status(403).json({
           success: false,
@@ -111,7 +129,7 @@ function requireRoles(allowedRoles) {
       }
 
       next();
-      
+
     } catch (error) {
       console.error('Error verificando roles:', error);
       res.status(500).json({
@@ -122,62 +140,33 @@ function requireRoles(allowedRoles) {
   };
 }
 
-/**
- * Middleware para verificar que el usuario es ADMIN
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- * @param {Function} next - Next function
- */
 function requireAdmin(req, res, next) {
   return requireRoles(['ADMIN'])(req, res, next);
 }
 
-/**
- * Middleware para verificar que el usuario es ADMIN o CAJA
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- * @param {Function} next - Next function
- */
 function requireAdminOrCaja(req, res, next) {
   return requireRoles(['ADMIN', 'CAJA'])(req, res, next);
 }
 
-/**
- * Middleware para verificar que el usuario es RECEPCION
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- * @param {Function} next - Next function
- */
 function requireRecepcion(req, res, next) {
   return requireRoles(['RECEPCION'])(req, res, next);
 }
 
-/**
- * Middleware para verificar que el usuario es MATRIZADOR
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- * @param {Function} next - Next function
- */
 function requireMatrizador(req, res, next) {
   return requireRoles(['MATRIZADOR'])(req, res, next);
 }
 
-/**
- * Middleware para verificar que el usuario es ARCHIVO
- * @param {Object} req - Request object
- * @param {Object} res - Response object
- * @param {Function} next - Next function
- */
 function requireArchivo(req, res, next) {
   return requireRoles(['ARCHIVO'])(req, res, next);
 }
 
 export {
   authenticateToken,
+  requireOnboarded,
   requireRoles,
   requireAdmin,
   requireAdminOrCaja,
   requireRecepcion,
   requireMatrizador,
   requireArchivo
-}; 
+};

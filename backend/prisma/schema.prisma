@@ -52,14 +52,16 @@ model Notary {
 
 model User {
   id                         Int                        @id @default(autoincrement())
+  clerkId                    String?                    @unique
   email                      String                     @unique
   clerkUserId                String?                    @unique @map("clerk_user_id")
-  password                   String
+  password                   String?
   firstName                  String
   lastName                   String
-  role                       UserRole
+  role                       UserRole?
   notaryId                   String?                    @db.Uuid @map("notary_id")
   isActive                   Boolean                    @default(true)
+  isOnboarded                Boolean                    @default(false)
   deletedAt                  DateTime?                  @map("deleted_at")
   createdAt                  DateTime                   @default(now())
   updatedAt                  DateTime                   @updatedAt
@@ -77,6 +79,7 @@ model User {
   mensajesEnviados           MensajeInterno[]           @relation("MensajesEnviados")
   mensajesRecibidos          MensajeInterno[]           @relation("MensajesRecibidos")
   assignedInvoices           Invoice[]                  @relation("AssignedInvoices")
+  consultasListaControl      ConsultaListaControl[]
 
   @@index([notaryId])
   @@index([deletedAt])
@@ -1040,5 +1043,38 @@ model SyncLog {
   @@map("sync_logs")
   @@index([syncCompletedAt])
   @@index([status])
+}
+
+// ============================================
+// MÓDULO DE DEBIDA DILIGENCIA - LISTAS DE CONTROL
+// Auditoría de consultas realizadas a listas
+// de control (UAFE / Debida Diligencia)
+// ============================================
+
+model ConsultaListaControl {
+  id                   String   @id @default(uuid())
+
+  // Persona consultada
+  identificacion       String               // CI / RUC / Pasaporte
+  tipoIdentificacion   String   @default("CI") // CI, RUC, PASAPORTE
+  nombreCompleto       String?              // Nombre devuelto por la búsqueda
+
+  // Resultados
+  resultadoResumen     Json                 // { peps: {match: true, detalles: [...]}, ofac: {match: false}, ... }
+  totalCoincidencias   Int      @default(0) // Número de listas con coincidencia
+
+  // Auditoría
+  consultadoPorId      Int
+  consultadoPor        User     @relation(fields: [consultadoPorId], references: [id])
+  pdfGenerado          Boolean  @default(false)
+
+  // Timestamps
+  createdAt            DateTime @default(now())
+
+  @@map("consultas_lista_control")
+  @@index([identificacion])
+  @@index([consultadoPorId])
+  @@index([createdAt])
+  @@index([totalCoincidencias])
 }
 

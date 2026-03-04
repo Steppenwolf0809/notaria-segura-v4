@@ -13,14 +13,14 @@ import {
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import AccountCircle from '@mui/icons-material/AccountCircle';
+import { useClerk } from '@clerk/clerk-react';
 import ThemeToggle from './ThemeToggle';
 import useAuth from '../hooks/use-auth';
-import ChangePassword from './ChangePassword';
 
-function Topbar({ title = 'Notaría Segura', onMenuClick }) {
-  const { user, getFullName, getUserInitials, getUserRoleColor, logout } = useAuth();
+function Topbar({ title = 'Notaria Segura', onMenuClick }) {
+  const { user, getFullName, getUserInitials, getUserRoleColor } = useAuth();
+  const { signOut, openUserProfile } = useClerk();
   const [anchorEl, setAnchorEl] = React.useState(null);
-  const [openChangePwd, setOpenChangePwd] = React.useState(false);
 
   // Atajo accesibilidad: Shift+D para enfocar buscador si existe
   React.useEffect(() => {
@@ -42,17 +42,17 @@ function Topbar({ title = 'Notaría Segura', onMenuClick }) {
   const handleMenuOpen = (event) => setAnchorEl(event.currentTarget);
   const handleMenuClose = () => setAnchorEl(null);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     handleMenuClose();
-    logout();
+    await signOut();
   };
 
-  const handleOpenChangePwd = () => {
+  const handleProfile = () => {
     handleMenuClose();
-    setOpenChangePwd(true);
+    openUserProfile();
   };
 
-  return (<>
+  return (
     <AppBar
       position="fixed"
       sx={{
@@ -60,18 +60,18 @@ function Topbar({ title = 'Notaría Segura', onMenuClick }) {
       }}
     >
       <Toolbar>
-        {/* Botón menú para móvil */}
+        {/* Boton menu para movil */}
         <IconButton
           color="inherit"
           edge="start"
           onClick={onMenuClick}
           sx={{ mr: 2, display: { md: 'none' } }}
-          aria-label="Abrir menú"
+          aria-label="Abrir menu"
         >
           <MenuIcon />
         </IconButton>
 
-        {/* Título contextual */}
+        {/* Titulo contextual */}
         <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
           {title}
         </Typography>
@@ -85,7 +85,7 @@ function Topbar({ title = 'Notaría Segura', onMenuClick }) {
           </Tooltip>
         </Box>
 
-        {/* Menú de usuario */}
+        {/* Menu de usuario */}
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <Typography
             variant="body2"
@@ -126,18 +126,13 @@ function Topbar({ title = 'Notaría Segura', onMenuClick }) {
             anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             transformOrigin={{ vertical: 'top', horizontal: 'right' }}
           >
-            <MenuItem onClick={handleMenuClose}>Perfil (próximamente)</MenuItem>
-            <MenuItem onClick={handleOpenChangePwd}>Cambiar contraseña</MenuItem>
+            <MenuItem onClick={handleProfile}>Mi cuenta</MenuItem>
             <Divider />
-            <MenuItem onClick={handleLogout}>Cerrar sesión</MenuItem>
+            <MenuItem onClick={handleLogout}>Cerrar sesion</MenuItem>
           </Menu>
         </Box>
       </Toolbar>
     </AppBar>
-
-    {/* Modal Cambiar Contraseña - disponible para todos los roles */}
-    <ChangePassword open={openChangePwd} onClose={() => setOpenChangePwd(false)} />
-    </>
   );
 }
 
