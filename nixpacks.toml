@@ -1,14 +1,15 @@
 # Railway nixpacks.toml para deploy fullstack desde raíz del proyecto
 [phases.setup]
-nixPkgs = ["nodejs_20", "npm-9_x", "openssl"]
+nixPkgs = ["nodejs_22", "npm-9_x", "openssl"]
 
 [phases.install]
 cmds = [
-    "npm install"
+    "npm install --include=dev"
 ]
 
 [phases.build]
 cmds = [
+    "chmod +x node_modules/.bin/* || true",
     "npm run build:frontend",
     "cd backend && npx prisma generate"
 ]
