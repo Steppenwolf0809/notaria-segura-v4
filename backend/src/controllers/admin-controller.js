@@ -33,8 +33,10 @@ async function getAllUsers(req, res) {
       filters: { page, limit, search, role, status }
     });
 
-    // Construir filtros
-    const where = {};
+    // Construir filtros — ocultar SUPER_ADMIN del listado de admin de notaría
+    const where = {
+      role: { not: 'SUPER_ADMIN' }
+    };
 
     if (search) {
       where.OR = [
@@ -313,6 +315,14 @@ async function updateUser(req, res) {
       });
     }
 
+    // Prevenir edición de cuentas SUPER_ADMIN por admin de notaría
+    if (existingUser.role === 'SUPER_ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para modificar esta cuenta'
+      });
+    }
+
     // Preparar datos de actualización
     const updateData = {};
 
@@ -457,6 +467,26 @@ async function toggleUserStatus(req, res) {
       });
     }
 
+    // Prevenir modificación de cuentas SUPER_ADMIN por admin de notaría
+    if (user.role === 'SUPER_ADMIN') {
+      logAdminAction({
+        adminUserId: req.user.id,
+        adminEmail: req.user.email,
+        targetUserId: user.id,
+        targetEmail: user.email,
+        action: AuditEventTypes.USER_DEACTIVATED,
+        success: false,
+        reason: 'Admin de notaría intentó modificar cuenta SUPER_ADMIN',
+        ipAddress: requestInfo.ipAddress,
+        userAgent: requestInfo.userAgent
+      });
+
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para modificar esta cuenta'
+      });
+    }
+
     // Prevenir que admin se desactive a sí mismo
     if (user.id === req.user.id && !isActive) {
       logAdminAction({
@@ -538,6 +568,26 @@ async function deleteUser(req, res) {
       return res.status(404).json({
         success: false,
         message: 'Usuario no encontrado'
+      });
+    }
+
+    // Prevenir eliminación de cuentas SUPER_ADMIN por admin de notaría
+    if (user.role === 'SUPER_ADMIN') {
+      logAdminAction({
+        adminUserId: req.user.id,
+        adminEmail: req.user.email,
+        targetUserId: user.id,
+        targetEmail: user.email,
+        action: AuditEventTypes.USER_DELETED,
+        success: false,
+        reason: 'Admin de notaría intentó eliminar cuenta SUPER_ADMIN',
+        ipAddress: requestInfo.ipAddress,
+        userAgent: requestInfo.userAgent
+      });
+
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permisos para eliminar esta cuenta'
       });
     }
 
