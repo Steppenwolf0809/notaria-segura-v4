@@ -53,14 +53,18 @@ model Notary {
 model User {
   id                         Int                        @id @default(autoincrement())
   email                      String                     @unique
+  clerkUserId                String?                    @unique @map("clerk_user_id")
   password                   String
   firstName                  String
   lastName                   String
   role                       UserRole
+  notaryId                   String?                    @db.Uuid @map("notary_id")
   isActive                   Boolean                    @default(true)
+  deletedAt                  DateTime?                  @map("deleted_at")
   createdAt                  DateTime                   @default(now())
   updatedAt                  DateTime                   @updatedAt
   lastLogin                  DateTime?
+  notary                     Notary?                    @relation(fields: [notaryId], references: [id])
   auditoriaPersonas          AuditoriaPersona[]
   documentEvents             DocumentEvent[]
   documents                  Document[]                 @relation("AssignedDocuments")
@@ -74,11 +78,14 @@ model User {
   mensajesRecibidos          MensajeInterno[]           @relation("MensajesRecibidos")
   assignedInvoices           Invoice[]                  @relation("AssignedInvoices")
 
+  @@index([notaryId])
+  @@index([deletedAt])
   @@map("users")
 }
 
 model Document {
   id                       String                 @id @default(uuid())
+  notaryId                 String?                @db.Uuid @map("notary_id")
   protocolNumber           String                 @unique
   clientName               String
   clientPhone              String?
@@ -124,6 +131,7 @@ model Document {
   mensajeInterno           String?
   
   events                   DocumentEvent[]
+  notary                   Notary?                @relation(fields: [notaryId], references: [id])
   assignedTo               User?                  @relation("AssignedDocuments", fields: [assignedToId], references: [id])
   createdBy                User                   @relation("CreatedDocuments", fields: [createdById], references: [id])
   usuarioEntrega           User?                  @relation("DeliveredDocuments", fields: [usuarioEntregaId], references: [id])
@@ -137,12 +145,15 @@ model Document {
   @@index([clientPhone])
   @@index([clientName])
   @@index([clientId])
+  @@index([notaryId])
   @@index([assignedToId, status])
+  @@index([notaryId, status])
   @@map("documents")
 }
 
 model DocumentEvent {
   id                  String    @id @default(uuid())
+  notaryId            String?   @db.Uuid @map("notary_id")
   documentId          String?
   userId              Int
   eventType           String    @default("UNKNOWN")
@@ -156,8 +167,10 @@ model DocumentEvent {
   userAgent           String?
   createdAt           DateTime  @default(now())
   document            Document? @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  notary              Notary?   @relation(fields: [notaryId], references: [id])
   user                User      @relation(fields: [userId], references: [id])
 
+  @@index([notaryId])
   @@index([documentId, createdAt])
   @@index([userId])
   @@index([eventType])
@@ -166,6 +179,7 @@ model DocumentEvent {
 
 model WhatsAppNotification {
   id           String         @id @default(uuid())
+  notaryId     String?        @db.Uuid @map("notary_id")
   documentId   String?
   clientName   String
   clientPhone  String
@@ -177,22 +191,28 @@ model WhatsAppNotification {
   sentAt       DateTime?
   createdAt    DateTime       @default(now())
   document     Document?      @relation(fields: [documentId], references: [id])
+  notary       Notary?        @relation(fields: [notaryId], references: [id])
 
   @@index([status])
+  @@index([notaryId])
   @@index([documentId])
   @@index([createdAt])
+  @@index([notaryId, status])
   @@map("whatsapp_notifications")
 }
 
 model WhatsAppTemplate {
   id        String   @id @default(uuid())
+  notaryId  String?  @db.Uuid @map("notary_id")
   tipo      String
   titulo    String
   mensaje   String
   activo    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  notary    Notary?  @relation(fields: [notaryId], references: [id])
 
+  @@index([notaryId])
   @@map("whatsapp_templates")
 }
 
@@ -217,6 +237,7 @@ model SystemSetting {
 
 model EscrituraQR {
   id                    Int       @id @default(autoincrement())
+  notaryId              String?   @db.Uuid @map("notary_id")
   token                 String    @unique
   numeroEscritura       String?
   datosCompletos        String?
@@ -237,7 +258,9 @@ model EscrituraQR {
   pdfHiddenPages        String?
   verifyViewCount       Int       @default(0)  // Contador de visitas a página de verificación
   creador               User?     @relation(fields: [createdBy], references: [id])
+  notary                Notary?   @relation(fields: [notaryId], references: [id])
 
+  @@index([notaryId])
   @@index([token])
   @@index([estado])
   @@index([createdAt])
@@ -293,6 +316,7 @@ model SesionPersonal {
 
 model AuditoriaPersona {
   id           String            @id @default(uuid())
+  notaryId     String?           @db.Uuid @map("notary_id")
   personaId    String
   tipo         String
   descripcion  String
@@ -302,7 +326,9 @@ model AuditoriaPersona {
   createdAt    DateTime          @default(now())
   matrizador   User?             @relation(fields: [matrizadorId], references: [id])
   persona      PersonaRegistrada @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  notary       Notary?           @relation(fields: [notaryId], references: [id])
 
+  @@index([notaryId])
   @@index([personaId])
   @@index([tipo])
   @@index([createdAt])
@@ -311,6 +337,7 @@ model AuditoriaPersona {
 
 model FormularioUAFEAsignacion {
   id             String                   @id @default(uuid())
+  notaryId       String?                  @db.Uuid @map("notary_id")
   personaId      String
   numeroMatriz   String
   actoContrato   String
@@ -326,7 +353,9 @@ model FormularioUAFEAsignacion {
   matrizador     User                     @relation(fields: [matrizadorId], references: [id])
   persona        PersonaRegistrada        @relation(fields: [personaId], references: [id], onDelete: Cascade)
   respuesta      FormularioUAFERespuesta? @relation(fields: [respuestaId], references: [id])
+  notary         Notary?                  @relation(fields: [notaryId], references: [id])
 
+  @@index([notaryId])
   @@index([token])
   @@index([personaId])
   @@index([matrizadorId])
@@ -337,6 +366,7 @@ model FormularioUAFEAsignacion {
 
 model FormularioUAFERespuesta {
   id                         String                    @id @default(uuid())
+  notaryId                   String?                   @db.Uuid @map("notary_id")
   asignacionId               String                    @unique
   personaId                  String
   fecha                      DateTime
@@ -422,7 +452,9 @@ model FormularioUAFERespuesta {
   userAgent                  String?
   asignacion                 FormularioUAFEAsignacion?
   persona                    PersonaRegistrada         @relation(fields: [personaId], references: [id], onDelete: Cascade)
+  notary                     Notary?                   @relation(fields: [notaryId], references: [id])
 
+  @@index([notaryId])
   @@index([personaId])
   @@index([asignacionId])
   @@index([numeroMatriz])
@@ -432,6 +464,7 @@ model FormularioUAFERespuesta {
 
 model ProtocoloUAFE {
   id                      String             @id @default(uuid())
+  notaryId                String?            @db.Uuid @map("notary_id")
   
   // IDENTIFICACIÓN (numeroProtocolo ahora opcional para borradores)
   numeroProtocolo         String?            @unique
@@ -481,7 +514,9 @@ model ProtocoloUAFE {
   // RELACIONES
   personas                PersonaProtocolo[]
   creador                 User               @relation(fields: [createdBy], references: [id])
+  notary                  Notary?            @relation(fields: [notaryId], references: [id])
 
+  @@index([notaryId])
   @@index([numeroProtocolo])
   @@index([identificadorTemporal])
   @@index([tipoActo])
@@ -492,6 +527,7 @@ model ProtocoloUAFE {
 
 model PersonaProtocolo {
   id                  String                 @id @default(uuid())
+  notaryId            String?                @db.Uuid @map("notary_id")
   protocoloId         String
   personaCedula       String
   
@@ -532,8 +568,10 @@ model PersonaProtocolo {
   protocolo           ProtocoloUAFE          @relation(fields: [protocoloId], references: [id], onDelete: Cascade)
   representado        PersonaRegistrada?     @relation("Representado", fields: [representadoId], references: [numeroIdentificacion])
   sesiones            SesionFormularioUAFE[]
+  notary              Notary?                @relation(fields: [notaryId], references: [id])
 
   @@unique([protocoloId, personaCedula])
+  @@index([notaryId])
   @@index([protocoloId])
   @@index([personaCedula])
   @@index([completado])
@@ -544,6 +582,7 @@ model PersonaProtocolo {
 
 model SesionFormularioUAFE {
   id                 String           @id @default(uuid())
+  notaryId           String?          @db.Uuid @map("notary_id")
   personaProtocoloId String
   token              String           @unique
   expiraEn           DateTime
@@ -552,7 +591,9 @@ model SesionFormularioUAFE {
   userAgent          String?
   createdAt          DateTime         @default(now())
   personaProtocolo   PersonaProtocolo @relation(fields: [personaProtocoloId], references: [id], onDelete: Cascade)
+  notary             Notary?          @relation(fields: [notaryId], references: [id])
 
+  @@index([notaryId])
   @@index([token])
   @@index([personaProtocoloId])
   @@index([expiraEn])
@@ -579,6 +620,7 @@ model EncuestaSatisfaccion {
 
 model MensajeInterno {
   id              Int       @id @default(autoincrement())
+  notaryId        String?   @db.Uuid @map("notary_id")
   
   // Relaciones
   remitenteId     Int
@@ -610,14 +652,17 @@ model MensajeInterno {
   // Timestamps
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+  notary          Notary?   @relation(fields: [notaryId], references: [id])
 
   @@map("mensajes_internos")
+  @@index([notaryId])
   @@index([destinatarioId, leido])
   @@index([documentoId])
   @@index([createdAt])
 }
 
 enum UserRole {
+  SUPER_ADMIN
   ADMIN
   CAJA
   MATRIZADOR
@@ -631,6 +676,7 @@ enum UserRole {
 
 model Invoice {
   id                String        @id @default(uuid())
+  notaryId          String?       @db.Uuid @map("notary_id")
   
   // Identificación (ÚNICO)
   invoiceNumber     String        @unique  // numtra normalizado: 001-002-000123341
@@ -641,7 +687,8 @@ model Invoice {
   clientName        String                 // nomcli
   
   // Montos
-  totalAmount       Decimal       @db.Decimal(12, 2)  // valcob de FC
+  totalAmount       Decimal       @db.Decimal(12, 2)  // valcob de FC (incluye IVA)
+  subtotalAmount    Decimal?      @db.Decimal(12, 2)  // Base Imponible (sin IVA) — para Participación al Estado
   paidAmount        Decimal?      @db.Decimal(12, 2) @default(0)  // Suma incremental de pagos
   
   // Fechas
@@ -703,8 +750,10 @@ model Invoice {
   
   // Relaciones
   payments          Payment[]
+  notary            Notary?       @relation(fields: [notaryId], references: [id])
   
   @@map("invoices")
+  @@index([notaryId])
   @@index([invoiceNumber])
   @@index([invoiceNumberRaw])
   @@index([clientTaxId])
@@ -716,6 +765,7 @@ model Invoice {
 
 model Payment {
   id              String      @id @default(uuid())
+  notaryId        String?     @db.Uuid @map("notary_id")
   
   // Identificación (NO único - un recibo puede pagar múltiples facturas)
   receiptNumber   String      // numdoc: 001-2601000089
@@ -736,12 +786,14 @@ model Payment {
   // Factura asociada
   invoiceId       String
   invoice         Invoice     @relation(fields: [invoiceId], references: [id])
+  notary          Notary?     @relation(fields: [notaryId], references: [id])
   
   // Metadata
   importedAt      DateTime    @default(now())
   sourceFile      String?
   
   @@map("payments")
+  @@index([notaryId])
   @@index([receiptNumber])
   @@index([invoiceId])
   @@index([paymentDate])
@@ -749,6 +801,7 @@ model Payment {
 
 model ImportLog {
   id              String       @id @default(uuid())
+  notaryId        String?      @db.Uuid @map("notary_id")
   
   // Información del archivo
   fileName        String
@@ -774,12 +827,14 @@ model ImportLog {
   // Usuario que ejecutó
   executedBy      Int?
   executedByUser  User?        @relation(fields: [executedBy], references: [id])
+  notary          Notary?      @relation(fields: [notaryId], references: [id])
   
   // Timestamps
   startedAt       DateTime     @default(now())
   completedAt     DateTime?
   
   @@map("import_logs")
+  @@index([notaryId])
   @@index([status])
   @@index([startedAt])
 }
@@ -818,6 +873,7 @@ enum ImportStatus {
 
 model PendingReceivable {
   id                String   @id @default(uuid())
+  notaryId          String?  @db.Uuid @map("notary_id")
 
   // === IDENTIFICACIÓN DEL CLIENTE ===
   clientTaxId       String                        // Cédula/RUC del cliente
@@ -845,6 +901,12 @@ model PendingReceivable {
   // === ASIGNACIÓN ===
   matrizador        String?                       // Nombre del matrizador (codven mapeado desde Koinor)
 
+  // === COMENTARIOS DE GESTIÓN (CAJA) ===
+  cashierComment              String?             // Comentario operativo visible en Caja/Admin/Matrizador
+  cashierCommentUpdatedAt     DateTime?           // Última actualización del comentario
+  cashierCommentUpdatedById   Int?                // Usuario que actualizó el comentario
+  cashierCommentUpdatedByName String?             // Nombre visible del usuario que actualizó
+
   // === METADATA DE SINCRONIZACIÓN ===
   lastSyncAt        DateTime @default(now())      // Última vez que se actualizó desde Koinor
   syncSource        String   @default("SYNC_AGENT") // SYNC_AGENT o MANUAL_XLS
@@ -852,6 +914,7 @@ model PendingReceivable {
   // === TIMESTAMPS ===
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  notary            Notary?  @relation(fields: [notaryId], references: [id])
 
   // === ÍNDICES ===
   @@index([clientTaxId])
@@ -860,6 +923,8 @@ model PendingReceivable {
   @@index([dueDate])
   @@index([lastSyncAt])
   @@index([matrizador])
+  @@index([cashierCommentUpdatedAt])
+  @@index([notaryId])
   @@map("pending_receivables")
 }
 
