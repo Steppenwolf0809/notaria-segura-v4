@@ -34,8 +34,12 @@ async function getAllUsers(req, res) {
     });
 
     // Construir filtros — ocultar SUPER_ADMIN del listado de admin de notaría
+    // Mostrar usuarios sin rol (pendientes de aprobación Clerk) pero ocultar SUPER_ADMIN
     const where = {
-      role: { not: 'SUPER_ADMIN' }
+      OR: [
+        { role: { not: 'SUPER_ADMIN' } },
+        { role: null }
+      ]
     };
 
     if (search) {
