@@ -40,6 +40,92 @@ function normalizeInvoiceNumber(raw) {
 }
 
 /**
+ * Genera variantes equivalentes de un número de factura para búsquedas robustas.
+ * Cubre formatos raw (001002-00123341), normalizado (001-002-000123341)
+ * y versiones compactas sin separadores.
+ * @param {string} value
+ * @returns {string[]}
+ */
+function buildInvoiceNumberVariants(value) {
+    if (!value || typeof value !== 'string') {
+        return [];
+    }
+
+    const variants = new Set();
+    const cleaned = value.trim();
+    if (!cleaned) return [];
+
+    variants.add(cleaned);
+
+    const normalized = normalizeInvoiceNumber(cleaned);
+    if (normalized) variants.add(normalized);
+
+    const denormalized = denormalizeInvoiceNumber(cleaned);
+    if (denormalized) variants.add(denormalized);
+
+    if (normalized) {
+        const denormFromNormalized = denormalizeInvoiceNumber(normalized);
+        if (denormFromNormalized) variants.add(denormFromNormalized);
+    }
+
+    if (denormalized) {
+        const normFromDenormalized = normalizeInvoiceNumber(denormalized);
+        if (normFromDenormalized) variants.add(normFromDenormalized);
+    }
+
+    const digitsOnly = cleaned.replace(/\D/g, '');
+    if (digitsOnly) {
+        variants.add(digitsOnly);
+    }
+
+    // Caso compacto raw: 00100200123341 (14 dígitos)
+    if (digitsOnly.length === 14) {
+        const rawFromCompact = `${digitsOnly.slice(0, 6)}-${digitsOnly.slice(6)}`;
+        variants.add(rawFromCompact);
+        const normFromCompactRaw = normalizeInvoiceNumber(rawFromCompact);
+        if (normFromCompactRaw) variants.add(normFromCompactRaw);
+    }
+
+    // Caso compacto normalizado: 001002000123341 (15 dígitos)
+    if (digitsOnly.length === 15) {
+        const normalizedFromCompact = `${digitsOnly.slice(0, 3)}-${digitsOnly.slice(3, 6)}-${digitsOnly.slice(6)}`;
+        variants.add(normalizedFromCompact);
+        const rawFromCompactNormalized = denormalizeInvoiceNumber(normalizedFromCompact);
+        if (rawFromCompactNormalized) variants.add(rawFromCompactNormalized);
+    }
+
+    return Array.from(variants).filter(Boolean);
+}
+
+/**
+ * Construye cláusula OR para buscar facturas por invoiceNumber e invoiceNumberRaw
+ * con variantes equivalentes del número.
+ * @param {string} value
+ * @returns {{ OR: Array<object> }}
+ */
+function buildInvoiceWhereByNumber(value) {
+    const variants = buildInvoiceNumberVariants(value);
+    const or = [];
+
+    for (const variant of variants) {
+        or.push({ invoiceNumber: variant });
+        or.push({ invoiceNumberRaw: variant });
+    }
+
+    // Fallback seguro: evita OR vacío
+    if (or.length === 0) {
+        return {
+            OR: [
+                { invoiceNumber: '__INVALID__' },
+                { invoiceNumberRaw: '__INVALID__' }
+            ]
+        };
+    }
+
+    return { OR: or };
+}
+
+/**
  * Convert invoice number from system format back to Koinor format
  * @param {string} normalized - Normalized invoice number (e.g., "001-002-000123341")
  * @returns {string} - Koinor format (e.g., "001002-00123341")
@@ -314,6 +400,8 @@ function detectPaymentTypeFromXML(tipdoc, concep = '') {
 export {
     normalizeInvoiceNumber,
     denormalizeInvoiceNumber,
+    buildInvoiceNumberVariants,
+    buildInvoiceWhereByNumber,
     parseExcelDate,
     parseMoneyAmount,
     detectFileType,
