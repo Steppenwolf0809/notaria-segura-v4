@@ -1,6 +1,7 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { ClerkProvider } from '@clerk/clerk-react'
+import { esES } from '@clerk/localizations'
 import ClerkTokenProvider from './components/ClerkTokenProvider.jsx'
 import App from './App.jsx'
 import { ThemeCtxProvider } from './contexts/theme-ctx.jsx'
@@ -13,7 +14,7 @@ if (!CLERK_PUBLISHABLE_KEY) {
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
+    <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} localization={esES}>
       <ClerkTokenProvider>
         <ThemeCtxProvider>
           <App />
