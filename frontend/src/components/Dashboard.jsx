@@ -125,7 +125,7 @@ const Dashboard = () => {
     return <ArchivoCenter />;
   }
 
-  if (user.role === 'ADMIN') {
+  if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
     return <AdminCenter />;
   }
 
