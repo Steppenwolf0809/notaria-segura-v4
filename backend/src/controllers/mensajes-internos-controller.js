@@ -733,12 +733,12 @@ export const listarTodosMensajes = async (req, res) => {
  */
 export const obtenerEstadisticasGlobales = async (req, res) => {
     try {
-        const [pendientes, resueltos, total] = await Promise.all([
+        const [pendientes, resueltos] = await Promise.all([
             prisma.mensajeInterno.count({ where: { resuelto: false } }),
-            prisma.mensajeInterno.count({ where: { resuelto: true } }),
-            prisma.mensajeInterno.count()
+            prisma.mensajeInterno.count({ where: { resuelto: true } })
         ]);
 
+        const total = pendientes + resueltos;
         const tasaResolucion = total > 0 ? Math.round((resueltos / total) * 100) : 0;
 
         res.json({
