@@ -36,7 +36,6 @@ import formularioUAFERoutes from './src/routes/formulario-uafe-routes.js'
 import encuestaRoutes from './src/routes/encuesta-routes.js'
 import billingRoutes from './src/routes/billing-routes.js'
 import syncRoutes from './src/routes/sync-routes.js'
-import debidaDiligenciaRoutes from './src/routes/debida-diligencia-routes.js'
 import clerkWebhookRoutes from './src/routes/clerk-webhook-routes.js'
 
 // Cargar variables de entorno
@@ -382,9 +381,6 @@ app.use('/api/billing', billingRoutes)
 
 // RUTAS DE SINCRONIZACIÓN KOINOR (/api/sync/*)
 app.use('/api/sync', syncRoutes)
-
-// RUTAS DE DEBIDA DILIGENCIA (/api/debida-diligencia/*)
-app.use('/api/debida-diligencia', debidaDiligenciaRoutes)
 
 // ============================================================================
 // SERVIR ARCHIVOS ESTÁTICOS DEL FRONTEND
