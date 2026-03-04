@@ -372,6 +372,10 @@ async function updateUser(req, res) {
         });
       }
       updateData.role = role;
+      // Si el usuario no estaba onboarded, activarlo al asignar rol
+      if (!existingUser.isOnboarded) {
+        updateData.isOnboarded = true;
+      }
     }
 
     // Si se proporciona nueva contraseña
