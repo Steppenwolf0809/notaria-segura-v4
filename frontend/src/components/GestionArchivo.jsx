@@ -21,8 +21,7 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [totalDocuments, setTotalDocuments] = useState(0);
 
-  // Auth token
-  const { token } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   // Local state for documents
   const [loadingDocuments, setLoadingDocuments] = useState(false);
@@ -53,7 +52,7 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
    * Cargar documentos propios
    */
   const cargarDocumentos = async (customParams = {}) => {
-    if (!token) return;
+    if (!isAuthenticated) return;
 
     setLoadingDocuments(true);
     setError(null);
@@ -66,7 +65,7 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
     const rOrder = customParams.order || order;
 
     try {
-      const response = await archivoService.getMisDocumentos(token, {
+      const response = await archivoService.getMisDocumentos(null, {
         page: rPage,
         limit: rLimit,
         search: rFiltros.search,
@@ -104,7 +103,7 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
   useEffect(() => {
     cargarDocumentos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]); // Solo cargar inicial al tener token, el resto es controlado
+  }, [isAuthenticated]); // Cargar al autenticarse
 
   /**
    * Manejadores de cambios
@@ -148,7 +147,7 @@ const GestionArchivo = ({ dashboardData, loading, onDataUpdate }) => {
    */
   const handleEstadoChange = async (documentoId, nuevoEstado, options = {}) => {
     try {
-      const response = await archivoService.cambiarEstadoDocumento(token, documentoId, nuevoEstado, options);
+      const response = await archivoService.cambiarEstadoDocumento(null, documentoId, nuevoEstado, options);
       if (response.success) {
         // Recargar o actualizar localmente
         cargarDocumentos();

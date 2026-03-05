@@ -107,33 +107,32 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
   // Debounce para la búsqueda (500ms)
   const debouncedSearch = useDebounce(filtros.search, 500);
 
-  const { token } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   /**
    * Cargar datos al montar
    */
   useEffect(() => {
-    cargarDatos();
-  }, [token]);
+    if (isAuthenticated) cargarDatos();
+  }, [isAuthenticated]);
 
   /**
    * Cargar documentos cuando cambian filtros o página
    */
   useEffect(() => {
-    cargarDocumentos();
-  }, [filtros.matrizador, filtros.estado, filtros.tipo, filtros.alerta, filtros.sortDias, debouncedSearch, page, rowsPerPage, token]);
+    if (isAuthenticated) cargarDocumentos();
+  }, [filtros.matrizador, filtros.estado, filtros.tipo, filtros.alerta, filtros.sortDias, debouncedSearch, page, rowsPerPage, isAuthenticated]);
 
   /**
    * Cargar datos iniciales
    */
   const cargarDatos = async () => {
-    if (!token) return;
 
     setLoading(true);
     try {
       const [resumenResponse, matrizadoresResponse] = await Promise.all([
-        archivoService.getResumenGeneral(token),
-        archivoService.getMatrizadores(token)
+        archivoService.getResumenGeneral(null),
+        archivoService.getMatrizadores(null)
       ]);
 
       if (resumenResponse.success) {
@@ -156,7 +155,7 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
    * Cargar documentos con filtros
    */
   const cargarDocumentos = async () => {
-    if (!token) return;
+    if (!isAuthenticated) return;
 
     try {
       const params = {
@@ -174,7 +173,7 @@ const SupervisionGeneral = ({ onDataUpdate }) => {
       });
 
 
-      const response = await archivoService.getSupervisionGeneral(token, params);
+      const response = await archivoService.getSupervisionGeneral(null, params);
 
       if (response.success) {
         setDocumentos(response.data.documentos);

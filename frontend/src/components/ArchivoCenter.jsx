@@ -22,22 +22,21 @@ const ArchivoCenter = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [dashboardData, setDashboardData] = useState(null);
-  const { token } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   /**
    * Cargar datos del dashboard al montar
    */
   useEffect(() => {
-    if (currentView === 'documentos' || currentView === 'dashboard') {
+    if (isAuthenticated && (currentView === 'documentos' || currentView === 'dashboard')) {
       cargarDashboard();
     }
-  }, [currentView, token]);
+  }, [currentView, isAuthenticated]);
 
   /**
    * Cargar datos del dashboard
    */
   const cargarDashboard = async () => {
-    if (!token) return;
 
     setLoading(true);
     try {
