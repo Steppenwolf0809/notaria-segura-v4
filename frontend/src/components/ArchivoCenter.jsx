@@ -40,7 +40,7 @@ const ArchivoCenter = () => {
 
     setLoading(true);
     try {
-      const response = await archivoService.getDashboard(token);
+      const response = await archivoService.getDashboard();
 
       if (response.success) {
         setDashboardData(response.data);
