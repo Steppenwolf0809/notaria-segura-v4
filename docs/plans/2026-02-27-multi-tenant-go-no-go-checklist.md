@@ -199,12 +199,21 @@ Objetivo: habilitacion tecnica por notaria sin cobro in-app.
 
 ## 7) Checklist E2E final de aislamiento (gate de cierre)
 
-- [ ] Crear tenants A/B de prueba en entorno de validacion.
-- [ ] Validar aislamiento en tablas core y tablas nuevas.
+- [x] Crear tenants A/B de prueba en entorno de validacion.
+  - Evidencia 2026-03-05: N18 (prod, 2576 docs) + N99 (test, 3 docs) creados en staging.
+- [x] Validar aislamiento en tablas core y tablas nuevas.
+  - Evidencia 2026-03-05: 11/11 pruebas automatizadas (SELECT/INSERT/UPDATE/DELETE) en `documents`, `document_events`, `whatsapp_notifications`, `audit_logs`.
+  - N18 no ve datos de N99 y viceversa.
+  - INSERT con notary_id ajeno bloqueado por RLS.
+  - UPDATE/DELETE de otro tenant: 0 filas afectadas.
 - [ ] Validar UAFE sin mezcla entre notarias.
-- [ ] Validar `SUPER_ADMIN` cross-tenant auditado.
-- [ ] Validar `requireModule` en rutas reales.
-- [ ] Validar fail-closed sin contexto tenant.
+  - Pendiente: desarrollo UAFE v2.
+- [x] Validar `SUPER_ADMIN` cross-tenant auditado.
+  - Evidencia 2026-03-05: SUPER_ADMIN con `is_super_admin=true` ve 2576 + 3 = 2579 docs.
+- [x] Validar `requireModule` en rutas reales.
+  - Evidencia 2026-03-02: `backend/scripts/verify-entitlements-ab.js` PASS.
+- [x] Validar fail-closed sin contexto tenant.
+  - Evidencia 2026-03-05: sin notary_id = 0 docs; UUID inventado = 0 docs.
 
 Comandos de referencia:
 

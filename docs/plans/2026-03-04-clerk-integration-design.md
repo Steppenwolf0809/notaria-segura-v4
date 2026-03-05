@@ -81,11 +81,16 @@ Usuario → Clerk (SignIn/SignUp) → JWT de Clerk
 - `req.user` mantiene misma estructura: `{ id, email, role, firstName, lastName, notaryId }`
 - `requireAdmin`, `requireRoles`, etc. — NO CAMBIAN
 
-### Nuevo: `webhook-clerk-controller.js`
+### Nuevo: `clerk-webhook-controller.js`
 - `POST /api/webhooks/clerk`
 - Recibe eventos `user.created`, `user.updated`, `user.deleted`
-- Verifica firma del webhook (seguridad)
-- Crea/actualiza/desactiva usuario en tabla `users`
+- Verifica firma del webhook (seguridad via svix)
+- **Logica de merge en `user.created`** (commit `250b9a4a`, 2026-03-05):
+  1. Busca por `clerkId` -> si ya existe, ignora (idempotencia).
+  2. Busca por `email` -> si existe usuario legacy, le vincula el `clerkId` (migracion).
+  3. Si no existe por ninguno -> crea usuario nuevo con `role=null`, `isOnboarded=false`.
+- `user.updated`: actualiza email/nombre.
+- `user.deleted`: soft delete (`isActive=false`).
 
 ### Eliminados:
 - `auth-controller.js`: funciones `login()`, `register()`, `generateToken()`

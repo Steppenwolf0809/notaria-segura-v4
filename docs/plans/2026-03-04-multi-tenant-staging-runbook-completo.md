@@ -26,17 +26,16 @@ Usar estos documentos como base, en este orden:
 3. `docs/plans/2026-02-27-multi-tenant-go-no-go-checklist.md` (gate por olas).
 4. `docs/plans/2026-03-02-ola-c-staging-ab-validation.md` (validacion A/B de OLA C).
 
-## 3) Estado de ramas y commits clave (2026-03-04)
+## 3) Estado de ramas y commits clave (2026-03-05)
 
 `origin/main` (estable):
-1. `38ec5edf` - Merge PR #94 (`hotfix/security-sanitize-main`)
-2. Incluye hardening de secretos y limpieza de scripts temporales.
+1. `f6a5f4c3` - `fix: auto-set isOnboarded=true when admin assigns a role`
+2. Incluye Clerk auth, Spanish localization, CSP fixes.
 
-`origin/staging` (multi-tenant en prueba):
-1. `6a6223c2` - `fix(deploy): restore billing-utils exports used by document controller`
-2. `11b6a4fc` - `chore(migrations): add missing multitenant migration files to staging`
-3. `d2268ab0` - `fix(schema): restore complete notary relations for prisma generate`
-4. `54c33b47` - `fix(deploy): stabilize staging build for vite on Railway`
+`origin/staging` (multi-tenant + Clerk en prueba):
+1. `250b9a4a` - `fix: merge legacy users by email on Clerk webhook instead of creating duplicates`
+2. `52b1729b` - `feat: auto-assign notaryId when admin assigns role to user`
+3. `6a6223c2` - `fix(deploy): restore billing-utils exports used by document controller`
 
 `origin/feature/architecture-v2.1-restart`:
 1. `a3e87abc` - `test(multitenant): validate ola c entitlements on staging`
@@ -104,16 +103,28 @@ Notas:
 1. No guardar credenciales en markdown ni en `.env` trackeado.
 2. Rotar cualquier secreto expuesto historicamente.
 
-## 7) Estado multi-tenant actual (practico)
+## 7) Estado multi-tenant actual (2026-03-05)
 
 Implementado y validado:
 1. `notary_id` y RLS en tablas core y tablas OLA B.
 2. Politica fail-closed (sin contexto tenant => 0 filas).
 3. Entitlements OLA C (`plans`, `modules`, `plan_modules`, `notary_subscriptions`, `notary_module_overrides`).
 4. Pruebas A/B de aislamiento y de modulo en staging (documentadas en planes previos).
+5. **Clerk auth integrado** en staging (login, registro, webhook).
+6. **Webhook corregido** para merge de usuarios legacy por email (commit `250b9a4a`).
 
-Pendiente recomendado:
-1. Cerrar alineacion de auth para `SUPER_ADMIN` en codigo de staging (ver seccion 8).
+Validacion RLS automatizada (2026-03-05):
+1. Datos de prueba: N18 (2,576 docs) + N99 ficticia (3 docs).
+2. 11/11 pruebas de aislamiento pasaron:
+   - SELECT: cada tenant solo ve sus datos.
+   - INSERT: bloqueado por RLS al intentar inyectar notary_id ajeno.
+   - UPDATE/DELETE: 0 filas afectadas en datos de otro tenant.
+   - SUPER_ADMIN: ve todos los datos cross-tenant.
+   - Sin contexto: 0 filas (fail-closed).
+   - Tablas secundarias (document_events, whatsapp_notifications, audit_logs): aislamiento correcto.
+
+Pendiente:
+1. Migracion de usuarios legacy a Clerk (requiere emails reales del equipo N18).
 2. Definir ola de promocion a main por PR acotado.
 
 ## 8) SUPER_ADMIN: operacion actual y restriccion conocida
@@ -229,11 +240,31 @@ Caso C: Staging parece correr main
 2. Si staging fallo healthcheck, Railway mantiene el ultimo release sano.
 3. Corregir fallo runtime y redeploy.
 
-## 14) Proximos pasos concretos (ordenados)
+## 14) Proximos pasos concretos (ordenados, actualizado 2026-03-05)
 
-1. Confirmar deploy saludable del commit `6a6223c2`.
-2. Ejecutar smoke corto por rol en staging.
-3. Aplicar patch de auth para `SUPER_ADMIN` en codigo (eliminar dependencia de provision manual).
-4. Consolidar PR de promotion a main por bloques.
-5. Iniciar documento de arranque UAFE v2 con alcance nuevo (cuando se defina).
+### Fase 1: Migracion de usuarios a Clerk (bloqueante)
+1. Obtener emails reales del equipo N18 (pendiente de Jose Luis).
+2. Actualizar emails en DB de produccion (`UPDATE users SET email = '...' WHERE id = N`).
+3. Desplegar webhook corregido a main (merge de staging o cherry-pick de `250b9a4a`).
+4. Crear cuentas de cada usuario en Clerk con sus emails reales.
+5. Verificar que el webhook vincule automaticamente (clerkId asignado al usuario existente).
+6. Smoke test por rol: cada usuario entra y ve sus documentos.
+
+### Fase 2: Promocion multi-tenant a main (por bloques)
+7. PR Bloque 1: deploy/runtime fixes + webhook Clerk corregido.
+8. PR Bloque 2: schema y migraciones (notary_id en tablas OLA B).
+9. PR Bloque 3: RLS/politicas + tenant context hardening.
+10. PR Bloque 4: entitlements OLA C.
+11. Verificacion SQL de aislamiento en produccion post-merge.
+
+### Fase 3: Funcionalidades nuevas
+12. Formulario UAFE / Informe UAFE (puede desarrollarse en staging en paralelo).
+13. Iniciar documento de arranque UAFE v2 con alcance nuevo.
+
+### Criterio de completitud
+- Deploy staging verde con healthcheck OK.
+- Smoke por rol verde (ADMIN, CAJA, MATRIZADOR, RECEPCION, ARCHIVO).
+- Verificacion SQL de aislamiento verde (11/11 pruebas).
+- Sin secretos en diff de PR.
+- Usuarios legacy vinculados a Clerk correctamente.
 
