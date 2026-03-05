@@ -36,7 +36,6 @@ import formularioUAFERoutes from './src/routes/formulario-uafe-routes.js'
 import encuestaRoutes from './src/routes/encuesta-routes.js'
 import billingRoutes from './src/routes/billing-routes.js'
 import syncRoutes from './src/routes/sync-routes.js'
-import migrationRoutes from './src/routes/migration-routes.js'
 import debidaDiligenciaRoutes from './src/routes/debida-diligencia-routes.js'
 import clerkWebhookRoutes from './src/routes/clerk-webhook-routes.js'
 
@@ -334,10 +333,6 @@ app.get('/api/health/feature-flags', (req, res) => {
   });
 });
 
-// RUTAS DE MIGRACIÓN (Auth0 Custom DB)
-// POST /api/auth/migration/login protected by key
-app.use('/api/auth/migration', migrationRoutes)
-
 // WEBHOOK DE CLERK (sin auth — verificado por firma svix)
 app.use('/api/webhooks/clerk', clerkWebhookRoutes)
 
@@ -411,25 +406,9 @@ app.get('*', (req, res) => {
   if (!req.path.startsWith('/api')) {
     res.sendFile(path.join(frontendPath, 'index.html'));
   } else {
-    // Para rutas API no encontradas, devolver 404 JSON
     res.status(404).json({
       success: false,
-      error: 'Endpoint no encontrado',
-      availableEndpoints: [
-        'GET /api/health',
-        'POST /api/auth/login',
-        'GET /api/auth/verify',
-        'PUT /api/auth/change-password',
-        'GET /api/documents/my-documents',
-        'POST /api/documents/upload-xml',
-        'POST /api/documents/upload-xml-batch',
-        'GET /api/admin/users (ADMIN only)',
-        'POST /api/admin/users (ADMIN only)',
-        'GET /api/archivo/dashboard (ARCHIVO only)',
-        'GET /api/archivo/mis-documentos (ARCHIVO only)',
-        'GET /api/reception/documentos/todos (RECEPCION only)',
-        'POST /api/reception/documentos/:id/marcar-listo (RECEPCION only)'
-      ]
+      error: 'Endpoint no encontrado'
     });
   }
 });
@@ -438,22 +417,7 @@ app.get('*', (req, res) => {
 app.use('/api/*', (req, res) => {
   res.status(404).json({
     success: false,
-    error: 'Endpoint no encontrado',
-    availableEndpoints: [
-      'GET /api/health',
-      'POST /api/auth/login',
-      'GET /api/auth/verify',
-      'PUT /api/auth/change-password',
-      'GET /api/documents/my-documents',
-      'POST /api/documents/upload-xml',
-      'POST /api/documents/upload-xml-batch',
-      'GET /api/admin/users (ADMIN only)',
-      'POST /api/admin/users (ADMIN only)',
-      'GET /api/archivo/dashboard (ARCHIVO only)',
-      'GET /api/archivo/mis-documentos (ARCHIVO only)',
-      'GET /api/reception/documentos/todos (RECEPCION only)',
-      'POST /api/reception/documentos/:id/marcar-listo (RECEPCION only)'
-    ]
+    error: 'Endpoint no encontrado'
   })
 })
 
