@@ -125,12 +125,15 @@ SELECT 'pending_receivables', COUNT(*) FROM pending_receivables WHERE notary_id 
 
 ---
 
-## Fase 4: Hacer `notary_id` NOT NULL (opcional) — PENDIENTE
+## Fase 4: Hacer `notary_id` NOT NULL — COMPLETADA
 
-> Solo despues de verificar que el backfill es 100% completo.
-> **Riesgo**: Si algun INSERT no incluye notary_id, fallara. Requiere que TODOS los controllers lo envien.
+> Backfill 100% completo + Prisma middleware auto-inject activo.
 
-**Decisión**: Mantener nullable hasta que OLA A este 100% completa y todos los controllers inyecten notary_id automaticamente.
+### Cambios en DB:
+- 14 tablas: `ALTER COLUMN notary_id SET NOT NULL`
+- 14 tablas: `ALTER COLUMN notary_id SET DEFAULT 1` (safety para N18)
+- Migration registrada: `20260305_notary_id_not_null`
+- schema.prisma actualizado: `notaryId Int @default(1)` + `notary Notary` (no nullable)
 
 ---
 
@@ -266,7 +269,7 @@ ALTER TABLE documents DISABLE ROW LEVEL SECURITY;
 | 2026-03-05 | 1 | Test + Prod | COMPLETADA | Tabla notaries + N18 insertada |
 | 2026-03-05 | 2 | Test + Prod | COMPLETADA | notary_id nullable + indices en 6 tablas |
 | 2026-03-05 | 3 | Test + Prod | COMPLETADA | Backfill notary_id=1: 14 users, 2627 docs, 13880 events, 19687 invoices, 1752 whatsapp, 919 receivables |
-| | 4 | | PENDIENTE | Deferred until controllers inject notaryId |
+| 2026-03-05 | 4 | Prod | COMPLETADA | notary_id SET NOT NULL + DEFAULT 1 en 14 tablas. schema.prisma synced. Migration 20260305_notary_id_not_null registered. |
 | 2026-03-05 | 5 | Prod | COMPLETADA | RLS Opcion C: FORCE+fallback en 13 tablas, rol app_runtime_rls, politica tenant_isolation. withTenantTransaction() helper en db.js. Verificado: aislamiento funciona con SET ROLE. |
 | 2026-03-05 | 6 | Test + Prod | COMPLETADA | schema.prisma synced, Notary model + notaryId on 6 models, migration 20260305_add_multi_tenant_notary, diff clean |
 | 2026-03-05 | 2b | Test + Prod | COMPLETADA | notary_id + indexes + backfill on 8 secondary tables (whatsapp_templates, escrituras_qr, protocolos_uafe, formulario_uafe_asignaciones, import_logs, mensajes_internos, encuestas_satisfaccion, consultas_lista_control) |
