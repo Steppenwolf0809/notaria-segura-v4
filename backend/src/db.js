@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import cache from './services/cache-service.js';
+import { getCurrentNotaryId } from './middleware/tenant-context.js';
 
 /**
  * Singleton PrismaClient instance
@@ -44,6 +45,41 @@ function createPrismaClient() {
 export function getPrismaClient() {
   if (!prisma) {
     prisma = createPrismaClient();
+    // Auto-inject notaryId en creates para tablas tenant-scoped
+    const TENANT_MODELS = new Set([
+      'Document', 'DocumentEvent', 'Invoice', 'Payment',
+      'WhatsAppNotification', 'WhatsAppTemplate',
+      'EscrituraQR', 'ProtocoloUAFE', 'FormularioUAFEAsignacion',
+      'ImportLog', 'MensajeInterno', 'EncuestaSatisfaccion',
+      'ConsultaListaControl', 'PendingReceivable', 'User'
+    ]);
+
+    prisma.$use(async (params, next) => {
+      const model = params?.model;
+      if (model && TENANT_MODELS.has(model)) {
+        const notaryId = getCurrentNotaryId();
+        if (notaryId != null) {
+          if (params.action === 'create' && params.args?.data) {
+            if (params.args.data.notaryId === undefined) {
+              params.args.data.notaryId = notaryId;
+            }
+          } else if (params.action === 'createMany' && params.args?.data) {
+            const rows = Array.isArray(params.args.data) ? params.args.data : [params.args.data];
+            for (const row of rows) {
+              if (row.notaryId === undefined) {
+                row.notaryId = notaryId;
+              }
+            }
+          } else if (params.action === 'upsert' && params.args?.create) {
+            if (params.args.create.notaryId === undefined) {
+              params.args.create.notaryId = notaryId;
+            }
+          }
+        }
+      }
+      return next(params);
+    });
+
     // Invalidador de caché: cualquier mutación de Document y tablas relacionadas.
     prisma.$use(async (params, next) => {
       const result = await next(params);

@@ -2,6 +2,7 @@
 import express from 'express';
 import { submitEncuesta, getEncuestas, getEstadisticas } from '../controllers/encuesta-controller.js';
 import { authenticateToken, requireRoles } from '../middleware/auth-middleware.js';
+import tenantStorage from '../middleware/tenant-context.js';
 
 const router = express.Router();
 
@@ -14,7 +15,11 @@ const router = express.Router();
  * Registra una nueva encuesta de satisfacción
  * Acceso: Público (clientes desde cPanel)
  */
-router.post('/', submitEncuesta);
+router.post('/', (req, res, next) => {
+  // Public endpoint: default to Notaría N18 (id=1)
+  // TODO: When multi-tenant, resolve notaryId from subdomain or query param
+  tenantStorage.run({ notaryId: 1 }, () => next());
+}, submitEncuesta);
 
 // ============================================================================
 // RUTAS ADMIN - Requieren autenticación y rol ADMIN

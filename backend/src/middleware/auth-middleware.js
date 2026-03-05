@@ -1,5 +1,6 @@
 import { clerkClient, verifyToken } from '@clerk/express';
 import prisma from '../db.js';
+import tenantStorage from './tenant-context.js';
 
 /**
  * Middleware para verificar token JWT de Clerk y cargar usuario local
@@ -62,7 +63,9 @@ async function authenticateToken(req, res, next) {
       isOnboarded: user.isOnboarded
     };
 
-    next();
+    // Establecer contexto del tenant para auto-inject de notaryId en Prisma
+    const notaryId = user.notaryId || null;
+    tenantStorage.run({ notaryId }, () => next());
 
   } catch (error) {
     console.error('Error en autenticación:', error);

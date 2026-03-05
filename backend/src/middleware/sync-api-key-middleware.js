@@ -1,12 +1,18 @@
 /**
  * Sync API Key Middleware
  * Authentication for machine-to-machine communication (Sync Agent → Railway)
- * 
+ *
  * Uses a separate API key from the regular API_SECRET_KEY to:
  * - Allow independent key rotation
  * - Enable specific logging/monitoring
  * - Avoid confusion with user-facing API keys
  */
+
+import tenantStorage from './tenant-context.js';
+
+// Default notaryId for sync operations (Notaría N18)
+// TODO: When multi-tenant sync is implemented, extract notaryId from request body
+const DEFAULT_SYNC_NOTARY_ID = 1;
 
 /**
  * Middleware that validates the X-Sync-Api-Key header
@@ -46,8 +52,9 @@ export function requireSyncApiKey(req, res, next) {
             });
         }
 
-        // Key is valid, proceed
-        next();
+        // Key is valid — set tenant context for Prisma auto-inject
+        const notaryId = req.body?.notaryId || DEFAULT_SYNC_NOTARY_ID;
+        tenantStorage.run({ notaryId }, () => next());
     } catch (err) {
         console.error('[sync-api-key-middleware] Unexpected error:', err);
         return res.status(500).json({
