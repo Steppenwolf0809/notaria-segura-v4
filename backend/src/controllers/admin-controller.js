@@ -304,7 +304,7 @@ async function createUser(req, res) {
 async function updateUser(req, res) {
   try {
     const { id } = req.params;
-    const { email, firstName, lastName, role, password } = req.body;
+    const { email, firstName, lastName, role, password, notaryId } = req.body;
     const requestInfo = extractRequestInfo(req);
 
     // Verificar que el usuario existe
@@ -378,6 +378,24 @@ async function updateUser(req, res) {
       }
     }
 
+    // Asignar notaryId al usuario
+    // SUPER_ADMIN puede enviar notaryId explícito en el body;
+    // ADMIN hereda su propio notaryId (solo gestiona su notaría)
+    if (role && !existingUser.notaryId) {
+      const targetNotaryId = req.user.isSuperAdmin && notaryId
+        ? notaryId
+        : req.user.notaryId;
+
+      if (targetNotaryId) {
+        updateData.notaryId = targetNotaryId;
+      } else if (!req.user.isSuperAdmin) {
+        return res.status(400).json({
+          success: false,
+          message: 'No se puede asignar rol: tu cuenta no tiene notaría asociada'
+        });
+      }
+    }
+
     // Si se proporciona nueva contraseña
     if (password) {
       const sanitizedPassword = sanitizePassword(password);
@@ -412,6 +430,7 @@ async function updateUser(req, res) {
         firstName: true,
         lastName: true,
         role: true,
+        notaryId: true,
         isActive: true,
         updatedAt: true
       }
