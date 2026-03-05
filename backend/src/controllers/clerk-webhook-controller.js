@@ -47,11 +47,32 @@ async function handleClerkWebhook(req, res) {
         }
 
         // Verificar si ya existe un usuario con este clerkId
-        const existing = await prisma.user.findUnique({
+        const existingByClerk = await prisma.user.findUnique({
           where: { clerkId: data.id }
         });
 
-        if (!existing) {
+        if (existingByClerk) {
+          console.log(`[Clerk Webhook] Usuario ya vinculado: ${email} (clerkId: ${data.id})`);
+          break;
+        }
+
+        // Buscar por email para vincular usuario existente (migración legacy → Clerk)
+        const existingByEmail = await prisma.user.findUnique({
+          where: { email: email.toLowerCase() }
+        });
+
+        if (existingByEmail) {
+          await prisma.user.update({
+            where: { id: existingByEmail.id },
+            data: {
+              clerkId: data.id,
+              firstName: data.first_name || existingByEmail.firstName,
+              lastName: data.last_name || existingByEmail.lastName,
+              isActive: true,
+            }
+          });
+          console.log(`[Clerk Webhook] Usuario legacy vinculado a Clerk: ${email} (id: ${existingByEmail.id}, clerkId: ${data.id})`);
+        } else {
           await prisma.user.create({
             data: {
               clerkId: data.id,
@@ -63,7 +84,7 @@ async function handleClerkWebhook(req, res) {
               isActive: true,
             }
           });
-          console.log(`[Clerk Webhook] Usuario creado: ${email} (clerkId: ${data.id})`);
+          console.log(`[Clerk Webhook] Usuario nuevo creado: ${email} (clerkId: ${data.id})`);
         }
         break;
       }
