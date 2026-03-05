@@ -32,6 +32,7 @@ model Notary {
   mensajesInternos            MensajeInterno[]
   encuestasSatisfaccion       EncuestaSatisfaccion[]
   consultasListaControl       ConsultaListaControl[]
+  payments                    Payment[]
 
   @@map("notaries")
 }
@@ -764,14 +765,19 @@ model Payment {
   invoiceId       String
   invoice         Invoice     @relation(fields: [invoiceId], references: [id])
   
+  // Multi-tenant
+  notaryId  Int  @default(1) @map("notary_id")
+  notary    Notary @relation(fields: [notaryId], references: [id])
+
   // Metadata
   importedAt      DateTime    @default(now())
   sourceFile      String?
-  
+
   @@map("payments")
   @@index([receiptNumber])
   @@index([invoiceId])
   @@index([paymentDate])
+  @@index([notaryId])
 }
 
 model ImportLog {

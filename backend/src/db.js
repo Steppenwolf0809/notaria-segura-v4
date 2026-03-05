@@ -54,23 +54,84 @@ export function getPrismaClient() {
       'ConsultaListaControl', 'PendingReceivable', 'User'
     ]);
 
+    // Modelos tenant-scoped que NO se filtran en reads (acceso cross-tenant necesario)
+    const SKIP_READ_FILTER = new Set(['User']);
+
+    const READ_ACTIONS = new Set([
+      'findMany', 'findFirst', 'findFirstOrThrow', 'count', 'aggregate', 'groupBy'
+    ]);
+    const MUTATION_ACTIONS_WITH_WHERE = new Set([
+      'update', 'updateMany', 'delete', 'deleteMany'
+    ]);
+
     prisma.$use(async (params, next) => {
       const model = params?.model;
       if (model && TENANT_MODELS.has(model)) {
         const notaryId = getCurrentNotaryId();
-        if (notaryId != null) {
-          if (params.action === 'create' && params.args?.data) {
+        const isSuperAdmin = getCurrentIsSuperAdmin();
+
+        // SUPER_ADMIN ve todo cross-tenant
+        if (notaryId != null && !isSuperAdmin) {
+          const action = params.action;
+
+          // --- WRITES: auto-inject notaryId en data ---
+          if (action === 'create' && params.args?.data) {
             if (params.args.data.notaryId === undefined) {
               params.args.data.notaryId = notaryId;
             }
-          } else if (params.action === 'createMany' && params.args?.data) {
+          } else if (action === 'createMany' && params.args?.data) {
             const rows = Array.isArray(params.args.data) ? params.args.data : [params.args.data];
             for (const row of rows) {
               if (row.notaryId === undefined) {
                 row.notaryId = notaryId;
               }
             }
-          } else if (params.action === 'upsert' && params.args?.create) {
+          } else if (action === 'upsert' && params.args?.create) {
+            if (params.args.create.notaryId === undefined) {
+              params.args.create.notaryId = notaryId;
+            }
+
+          // --- READS: auto-inject notaryId en where ---
+          } else if (READ_ACTIONS.has(action) && !SKIP_READ_FILTER.has(model)) {
+            params.args = params.args || {};
+            params.args.where = params.args.where || {};
+            if (params.args.where.notaryId === undefined) {
+              params.args.where.notaryId = notaryId;
+            }
+
+          // --- findUnique: agregar notaryId al where (Prisma lo soporta si hay indice) ---
+          } else if (action === 'findUnique' && !SKIP_READ_FILTER.has(model)) {
+            params.args = params.args || {};
+            params.args.where = params.args.where || {};
+            if (params.args.where.notaryId === undefined) {
+              // Convertir a findFirst para poder filtrar por notaryId
+              params.action = 'findFirst';
+              params.args.where.notaryId = notaryId;
+            }
+
+          // --- MUTATIONS con where: agregar notaryId al filtro ---
+          } else if (MUTATION_ACTIONS_WITH_WHERE.has(action) && !SKIP_READ_FILTER.has(model)) {
+            params.args = params.args || {};
+            params.args.where = params.args.where || {};
+            if (params.args.where.notaryId === undefined) {
+              params.args.where.notaryId = notaryId;
+            }
+          }
+        } else if (notaryId != null && isSuperAdmin) {
+          // SUPER_ADMIN: solo auto-inject en creates (no filtra reads)
+          const action = params.action;
+          if (action === 'create' && params.args?.data) {
+            if (params.args.data.notaryId === undefined) {
+              params.args.data.notaryId = notaryId;
+            }
+          } else if (action === 'createMany' && params.args?.data) {
+            const rows = Array.isArray(params.args.data) ? params.args.data : [params.args.data];
+            for (const row of rows) {
+              if (row.notaryId === undefined) {
+                row.notaryId = notaryId;
+              }
+            }
+          } else if (action === 'upsert' && params.args?.create) {
             if (params.args.create.notaryId === undefined) {
               params.args.create.notaryId = notaryId;
             }
