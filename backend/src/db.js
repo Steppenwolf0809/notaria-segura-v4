@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import cache from './services/cache-service.js';
-import { getCurrentNotaryId } from './middleware/tenant-context.js';
+import { getCurrentNotaryId, getCurrentIsSuperAdmin } from './middleware/tenant-context.js';
 
 /**
  * Singleton PrismaClient instance
@@ -107,6 +107,33 @@ export function getPrismaClient() {
     ensureUTF8Encoding(prisma).catch(() => { });
   }
   return prisma;
+}
+
+/**
+ * Ejecuta un callback dentro de una transaccion con RLS activo.
+ * Usa SET LOCAL ROLE app_runtime_rls + SET LOCAL app.current_notary_id.
+ * Si no hay notaryId en el contexto, ejecuta sin RLS (fallback).
+ *
+ * @param {Function} fn - Recibe el transaction client (tx)
+ * @param {Object} opts - Opciones adicionales
+ * @param {number} opts.notaryId - Override del notaryId (opcional)
+ * @returns {Promise<*>} Resultado del callback
+ */
+export async function withTenantTransaction(fn, opts = {}) {
+  const notaryId = opts.notaryId ?? getCurrentNotaryId();
+  const isSuperAdmin = getCurrentIsSuperAdmin();
+  const client = getPrismaClient();
+
+  if (notaryId == null) {
+    // Sin tenant context: ejecutar sin RLS (superuser bypass)
+    return client.$transaction(fn);
+  }
+
+  return client.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe(`SET LOCAL ROLE app_runtime_rls`);
+    await tx.$executeRawUnsafe(`SET LOCAL app.current_notary_id = '${parseInt(notaryId, 10)}'`);
+    return fn(tx);
+  });
 }
 
 export async function closePrismaClient() {

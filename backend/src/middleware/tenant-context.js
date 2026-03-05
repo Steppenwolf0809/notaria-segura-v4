@@ -15,7 +15,8 @@ const tenantStorage = new AsyncLocalStorage();
  */
 export function tenantContextMiddleware(req, res, next) {
   const notaryId = req.user?.notaryId || null;
-  tenantStorage.run({ notaryId }, next);
+  const isSuperAdmin = req.user?.role === 'SUPER_ADMIN';
+  tenantStorage.run({ notaryId, isSuperAdmin }, next);
 }
 
 /**
@@ -25,6 +26,14 @@ export function tenantContextMiddleware(req, res, next) {
 export function getCurrentNotaryId() {
   const store = tenantStorage.getStore();
   return store?.notaryId || null;
+}
+
+/**
+ * Obtener si el usuario actual es SUPER_ADMIN.
+ */
+export function getCurrentIsSuperAdmin() {
+  const store = tenantStorage.getStore();
+  return store?.isSuperAdmin || false;
 }
 
 /**

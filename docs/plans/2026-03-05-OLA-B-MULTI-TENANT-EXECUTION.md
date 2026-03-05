@@ -134,54 +134,60 @@ SELECT 'pending_receivables', COUNT(*) FROM pending_receivables WHERE notary_id 
 
 ---
 
-## Fase 5: Activar RLS — PENDIENTE
+## Fase 5: Activar RLS — COMPLETADA
 
-> PostgreSQL Row-Level Security como safety net.
+> PostgreSQL Row-Level Security como safety net (Opcion C: FORCE + fallback).
 
-### Pre-requisitos:
-- [ ] Todas las tablas tienen `notary_id` (NOT NULL preferible)
-- [ ] Rol de runtime creado: `app_runtime_rls`
-- [ ] Controllers usan `withRequestTenantContext()` para SET LOCAL
+### Estrategia implementada (Opcion C):
+- `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY` en 13 tablas tenant-scoped
+- Politica `tenant_isolation` con fallback: si `app.current_notary_id` no esta seteado, permite acceso
+- Si esta seteado, filtra por `notary_id = current_setting('app.current_notary_id')::INT`
+- `postgres` (superusuario) bypasa RLS automaticamente (para migraciones/admin)
+- Rol `app_runtime_rls` (NOLOGIN, NOBYPASSRLS) para uso con `SET LOCAL ROLE`
 
-### SQL para RLS:
+### Tablas con RLS activo (13):
+documents, document_events, invoices, whatsapp_notifications, pending_receivables,
+whatsapp_templates, escrituras_qr, protocolos_uafe, formulario_uafe_asignaciones,
+import_logs, mensajes_internos, encuestas_satisfaccion, consultas_lista_control
+
+### Tabla SIN RLS:
+- `users` — acceso cross-tenant para login, admin, etc.
+
+### Codigo agregado:
+- `src/db.js`: `withTenantTransaction(fn, opts)` — wrappea en `$transaction` con `SET LOCAL ROLE app_runtime_rls` + `SET LOCAL app.current_notary_id`
+- `src/middleware/tenant-context.js`: `getCurrentIsSuperAdmin()` + almacena `isSuperAdmin` en AsyncLocalStorage
+
+### Politica SQL:
 ```sql
--- 1. Crear rol de runtime (si no existe)
-DO $$ BEGIN
-  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_runtime_rls') THEN
-    CREATE ROLE app_runtime_rls NOLOGIN NOBYPASSRLS;
-  END IF;
-END $$;
-
--- 2. Permisos
-GRANT USAGE ON SCHEMA public TO app_runtime_rls;
-GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_runtime_rls;
-GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_runtime_rls;
-
--- 3. Habilitar RLS en cada tabla
-ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
-ALTER TABLE document_events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
-ALTER TABLE whatsapp_notifications ENABLE ROW LEVEL SECURITY;
-ALTER TABLE pending_receivables ENABLE ROW LEVEL SECURITY;
-
--- 4. Politicas (ejemplo para documents)
-CREATE POLICY tenant_isolation ON documents
+CREATE POLICY tenant_isolation ON <table>
   FOR ALL
-  TO app_runtime_rls
   USING (
-    notary_id = current_setting('app.current_notary_id')::INT
-    OR current_setting('app.is_super_admin', true)::BOOLEAN = true
+    current_setting('app.current_notary_id', true) IS NULL
+    OR current_setting('app.current_notary_id', true) = ''
+    OR notary_id = current_setting('app.current_notary_id', true)::INT
   )
   WITH CHECK (
-    notary_id = current_setting('app.current_notary_id')::INT
-    OR current_setting('app.is_super_admin', true)::BOOLEAN = true
+    current_setting('app.current_notary_id', true) IS NULL
+    OR current_setting('app.current_notary_id', true) = ''
+    OR notary_id = current_setting('app.current_notary_id', true)::INT
   );
-
--- Repetir para cada tabla...
 ```
 
-### Nota sobre `users`:
-La tabla `users` NO lleva RLS — se accede cross-tenant para login, admin, etc.
+### Tests verificados:
+- Sin SET ROLE (superuser): 2627 docs visibles (bypass correcto)
+- Con SET ROLE + notary_id=1: 2627 docs visibles (N18)
+- Con SET ROLE + notary_id=999: 0 docs (aislamiento total)
+- Prisma ORM (document.count()) funciona igual
+- INSERT con tenant no-coincidente: BLOQUEADO por RLS
+
+### Rollback:
+```sql
+ALTER TABLE documents DISABLE ROW LEVEL SECURITY;
+-- repetir para cada tabla...
+```
+
+### Siguiente paso:
+Controllers pueden usar `withTenantTransaction()` de forma opt-in para activar RLS en operaciones criticas. El fallback (sin SET) mantiene compatibilidad total.
 
 ---
 
@@ -261,7 +267,7 @@ ALTER TABLE documents DISABLE ROW LEVEL SECURITY;
 | 2026-03-05 | 2 | Test + Prod | COMPLETADA | notary_id nullable + indices en 6 tablas |
 | 2026-03-05 | 3 | Test + Prod | COMPLETADA | Backfill notary_id=1: 14 users, 2627 docs, 13880 events, 19687 invoices, 1752 whatsapp, 919 receivables |
 | | 4 | | PENDIENTE | Deferred until controllers inject notaryId |
-| | 5 | | PENDIENTE | |
+| 2026-03-05 | 5 | Prod | COMPLETADA | RLS Opcion C: FORCE+fallback en 13 tablas, rol app_runtime_rls, politica tenant_isolation. withTenantTransaction() helper en db.js. Verificado: aislamiento funciona con SET ROLE. |
 | 2026-03-05 | 6 | Test + Prod | COMPLETADA | schema.prisma synced, Notary model + notaryId on 6 models, migration 20260305_add_multi_tenant_notary, diff clean |
 | 2026-03-05 | 2b | Test + Prod | COMPLETADA | notary_id + indexes + backfill on 8 secondary tables (whatsapp_templates, escrituras_qr, protocolos_uafe, formulario_uafe_asignaciones, import_logs, mensajes_internos, encuestas_satisfaccion, consultas_lista_control) |
 | 2026-03-05 | 6b | Test + Prod | COMPLETADA | schema.prisma synced for all 14 tenant-scoped tables, migration 20260305_add_notary_id_secondary_tables, diff clean |
