@@ -499,6 +499,7 @@ async function listarTodosDocumentos(req, res) {
         for (const clause of filterClauses) {
           whereSql = Prisma.sql`${whereSql} AND ${clause}`;
         }
+        whereSql = Prisma.sql`${whereSql} AND d.notary_id = ${req.user.notaryId}`;
 
         // Preparar ORDER BY seguro (solo campos permitidos) - usar Prisma.raw para strings
         const fieldName = (() => {
@@ -607,6 +608,7 @@ async function listarTodosDocumentos(req, res) {
           }
 
           sql = Prisma.sql`${sql} AND d."status"::text = ${status}`;
+          sql = Prisma.sql`${sql} AND d.notary_id = ${req.user.notaryId}`;
 
           if (includeDate) {
             sql = Prisma.sql`${sql} AND d."fechaEntrega" >= ${hoy}`;
@@ -823,6 +825,7 @@ async function getDocumentosEnProceso(req, res) {
             unaccent(COALESCE(d."detalle_documento", '')::text) ILIKE unaccent(${pattern}) OR
             COALESCE(d."clientPhone", '')::text ILIKE ${pattern}
           )`;
+        whereSql = Prisma.sql`${whereSql} AND d.notary_id = ${req.user.notaryId}`;
 
         const documents = await prisma.$queryRaw`
           SELECT d.*, u.id as "_assignedToId", u."firstName" as "_assignedToFirstName", u."lastName" as "_assignedToLastName"
@@ -1578,7 +1581,7 @@ async function getReceptionSuggestions(req, res) {
           unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
           unaccent(COALESCE(d."clientId", '')) ILIKE unaccent(${pattern}) OR
           unaccent(d."protocolNumber") ILIKE unaccent(${pattern})
-        )
+        ) AND d.notary_id = ${req.user.notaryId}
         ORDER BY d."createdAt" DESC
         LIMIT 50
       `;

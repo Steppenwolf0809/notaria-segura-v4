@@ -645,6 +645,7 @@ async function getAllDocuments(req, res) {
             unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
             d."clientPhone" ILIKE ${pattern}
           )
+          AND d.notary_id = ${req.user.notaryId}
           ORDER BY d."createdAt" DESC
           OFFSET ${skip} LIMIT ${limit}
         `;
@@ -661,6 +662,7 @@ async function getAllDocuments(req, res) {
             unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern}) OR
             d."clientPhone" ILIKE ${pattern}
           )
+          AND d.notary_id = ${req.user.notaryId}
         `;
         const total = Array.isArray(countRows) ? (countRows[0]?.count || 0) : (countRows?.count || 0);
 
@@ -1098,10 +1100,11 @@ async function getMyDocuments(req, res) {
         const documents = await prisma.$queryRaw`
           SELECT d.*
           FROM "documents" d
-          WHERE d."assignedToId" = ${req.user.id} 
+          WHERE d."assignedToId" = ${req.user.id}
           ${statusFilter}
           ${typeFilter}
           ${dateFilter}
+          AND d.notary_id = ${req.user.notaryId}
           AND (
             unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
             unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
@@ -1115,10 +1118,11 @@ async function getMyDocuments(req, res) {
         const countRows = await prisma.$queryRaw`
           SELECT COUNT(*)::int AS count
           FROM "documents" d
-          WHERE d."assignedToId" = ${req.user.id} 
+          WHERE d."assignedToId" = ${req.user.id}
           ${statusFilter}
           ${typeFilter}
           ${dateFilter}
+          AND d.notary_id = ${req.user.notaryId}
           AND (
             unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
             unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR

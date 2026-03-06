@@ -247,9 +247,12 @@ async function getAllDocumentsOversight(req, res) {
               unaccent(COALESCE(d."clientId", '')) ILIKE unaccent(${pattern})
             )`;
           
-          const whereSql = filterClauses.length > 0
+          let whereSql = filterClauses.length > 0
             ? Prisma.sql`${searchClause} AND ${Prisma.join(filterClauses, Prisma.sql` AND `)}`
             : searchClause;
+          if (req.user.role !== 'SUPER_ADMIN') {
+            whereSql = Prisma.sql`${whereSql} AND d.notary_id = ${req.user.notaryId}`;
+          }
 
           // Use Prisma.raw for field name and direction since they are safe SQL keywords
           const fieldName = (sortBy === 'updatedAt') ? 'd."updatedAt"' : 'd."createdAt"';
@@ -815,9 +818,12 @@ async function exportDocuments(req, res) {
           unaccent(COALESCE(d."detalle_documento", '')) ILIKE unaccent(${pattern})
         )`;
       
-      const whereSql = filterClauses.length > 0
+      let whereSql = filterClauses.length > 0
         ? Prisma.sql`${searchClause} AND ${Prisma.join(filterClauses, Prisma.sql` AND `)}`
         : searchClause;
+      if (req.user.role !== 'SUPER_ADMIN') {
+        whereSql = Prisma.sql`${whereSql} AND d.notary_id = ${req.user.notaryId}`;
+      }
       documents = await prisma.$queryRaw`
         SELECT d.*, 
                au."firstName" AS "_assignedToFirstName", au."lastName" AS "_assignedToLastName",

@@ -12,7 +12,9 @@
  * - Prioriza usuarios ADMIN sobre MATRIZADOR en caso de empate
  */
 
+import { Prisma } from '@prisma/client';
 import prisma from '../db.js';
+import { getCurrentNotaryId } from '../middleware/tenant-context.js';
 
 class MatrizadorAssignmentService {
   
@@ -274,13 +276,19 @@ class MatrizadorAssignmentService {
    */
   async getAssignmentStats() {
     try {
+      const notaryId = getCurrentNotaryId();
+      const tenantFilter = notaryId
+        ? Prisma.sql`WHERE notary_id = ${notaryId}`
+        : Prisma.empty;
+
       const stats = await prisma.$queryRaw`
-        SELECT 
+        SELECT
           COUNT(*) as total_documentos,
           COUNT(CASE WHEN "assignedToId" IS NOT NULL THEN 1 END) as documentos_asignados,
           COUNT(CASE WHEN "assignedToId" IS NULL THEN 1 END) as documentos_sin_asignar,
           COUNT(DISTINCT "assignedToId") as matrizadores_con_documentos
         FROM documents
+        ${tenantFilter}
       `;
 
       const matrizadoresActivos = await prisma.user.count({

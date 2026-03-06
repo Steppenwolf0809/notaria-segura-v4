@@ -219,10 +219,11 @@ async function listarMisDocumentos(req, res) {
         const documents = await prisma.$queryRaw`
           SELECT d.*
           FROM "documents" d
-          WHERE d."assignedToId" = ${req.user.id} 
+          WHERE d."assignedToId" = ${req.user.id}
           ${statusFilter}
           ${typeFilter}
           ${dateFilter}
+          AND d.notary_id = ${req.user.notaryId}
           AND (
             unaccent(d."clientName") ILIKE unaccent(${pattern}) OR
             unaccent(d."protocolNumber") ILIKE unaccent(${pattern}) OR
@@ -236,7 +237,7 @@ async function listarMisDocumentos(req, res) {
         const countRows = await prisma.$queryRaw`
           SELECT COUNT(*)::int AS count
           FROM "documents" d
-          WHERE d."assignedToId" = ${req.user.id} 
+          WHERE d."assignedToId" = ${req.user.id}
           ${statusFilter}
           ${typeFilter}
           ${dateFilter}
@@ -905,7 +906,12 @@ async function supervisionGeneral(req, res) {
           }
         }
 
-        const whereSql = Prisma.join(conditions, ' AND ');
+        let whereSql = Prisma.join(conditions, ' AND ');
+
+        // Multi-tenant: filter by notary_id
+        if (req.user?.notaryId) {
+          whereSql = Prisma.sql`${whereSql} AND d.notary_id = ${req.user.notaryId}`;
+        }
 
         const sortLower = String(sortDias || '').toLowerCase();
         // Mapear: días desc => updatedAt ASC, días asc => updatedAt DESC
@@ -924,8 +930,8 @@ async function supervisionGeneral(req, res) {
         `;
 
         const countRows = await prisma.$queryRaw`
-          SELECT COUNT(*)::int AS count 
-          FROM "documents" d 
+          SELECT COUNT(*)::int AS count
+          FROM "documents" d
           WHERE ${whereSql}
         `;
         const total = Array.isArray(countRows) ? (countRows[0]?.count || 0) : (countRows?.count || 0);

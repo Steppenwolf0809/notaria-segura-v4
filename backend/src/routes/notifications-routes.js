@@ -1,4 +1,5 @@
 import express from 'express';
+import { Prisma } from '@prisma/client';
 import prisma from '../db.js';
 import { authenticateToken } from '../middleware/auth-middleware.js';
 
@@ -771,14 +772,19 @@ router.get('/stats', authenticateToken, async (req, res) => {
       _count: true
     });
 
+    const notaryId = req.user?.notaryId;
+    const tenantFilter = notaryId
+      ? Prisma.sql`AND notary_id = ${notaryId}`
+      : Prisma.empty;
+
     const dailyStats = await prisma.$queryRaw`
-      SELECT 
-        DATE(createdAt) as date,
+      SELECT
+        DATE("createdAt") as date,
         status,
         COUNT(*) as count
-      FROM whatsapp_notifications 
-      WHERE createdAt >= ${startDate.toISOString()}
-      GROUP BY DATE(createdAt), status
+      FROM whatsapp_notifications
+      WHERE "createdAt" >= ${startDate.toISOString()} ${tenantFilter}
+      GROUP BY DATE("createdAt"), status
       ORDER BY date DESC
     `;
 

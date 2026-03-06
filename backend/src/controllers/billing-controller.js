@@ -789,9 +789,12 @@ export async function getClients(req, res) {
         const searchPattern = search ? `%${search}%` : null;
 
         // Build WHERE clause safely
+        const tenantFilter = req.user?.notaryId
+            ? Prisma.sql`i.notary_id = ${req.user.notaryId}`
+            : Prisma.sql`1=1`;
         const whereClause = search
-            ? Prisma.sql`WHERE i."clientName" ILIKE ${searchPattern} OR i."clientTaxId" LIKE ${searchPattern}`
-            : Prisma.empty;
+            ? Prisma.sql`WHERE ${tenantFilter} AND (i."clientName" ILIKE ${searchPattern} OR i."clientTaxId" LIKE ${searchPattern})`
+            : Prisma.sql`WHERE ${tenantFilter}`;
 
         // Build HAVING clause safely
         const havingClause = hasDebt === 'true'
@@ -822,9 +825,12 @@ export async function getClients(req, res) {
         `;
 
         // Get total count with same WHERE condition
+        const countTenantFilter = req.user?.notaryId
+            ? Prisma.sql`notary_id = ${req.user.notaryId}`
+            : Prisma.sql`1=1`;
         const countWhereClause = search
-            ? Prisma.sql`WHERE "clientName" ILIKE ${searchPattern} OR "clientTaxId" LIKE ${searchPattern}`
-            : Prisma.empty;
+            ? Prisma.sql`WHERE ${countTenantFilter} AND ("clientName" ILIKE ${searchPattern} OR "clientTaxId" LIKE ${searchPattern})`
+            : Prisma.sql`WHERE ${countTenantFilter}`;
 
         const countResult = await prisma.$queryRaw`
             SELECT COUNT(DISTINCT "clientTaxId") as count
@@ -2599,6 +2605,9 @@ export async function getCarteraPendienteResumen(req, res) {
             ? `AND (LOWER("clientName") LIKE LOWER('%${search.replace(/'/g, "''")}%') OR "clientTaxId" LIKE '%${search.replace(/'/g, "''")}%')`
             : '';
 
+        // Multi-tenant filter
+        const tenantFilter = req.user?.notaryId ? `AND notary_id = ${parseInt(req.user.notaryId, 10)}` : '';
+
         // Get grouped data via raw query for full control
         const clientsRaw = await prisma.$queryRawUnsafe(`
             SELECT
@@ -2609,7 +2618,7 @@ export async function getCarteraPendienteResumen(req, res) {
                 MIN("dueDate") AS "oldestDueDate",
                 MAX("daysOverdue")::int AS "maxDaysOverdue"
             FROM pending_receivables
-            WHERE balance > 0 ${searchFilter}
+            WHERE balance > 0 ${searchFilter} ${tenantFilter}
             GROUP BY "clientTaxId"
             ORDER BY SUM(balance) DESC
             LIMIT ${limit}
@@ -2620,7 +2629,7 @@ export async function getCarteraPendienteResumen(req, res) {
         const countResult = await prisma.$queryRawUnsafe(`
             SELECT COUNT(DISTINCT "clientTaxId")::int AS total
             FROM pending_receivables
-            WHERE balance > 0 ${searchFilter}
+            WHERE balance > 0 ${searchFilter} ${tenantFilter}
         `);
         const totalClients = countResult[0]?.total || 0;
 
