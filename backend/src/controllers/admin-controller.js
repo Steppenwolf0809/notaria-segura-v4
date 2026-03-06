@@ -436,14 +436,15 @@ async function updateUser(req, res) {
       }
     });
 
-    // Log actualización
+    // Log actualización (excluir hash de contraseña del audit log)
+    const { password: _pwd, ...safeUpdateData } = updateData;
     logAdminAction({
       adminUserId: req.user.id,
       adminEmail: req.user.email,
       targetUserId: updatedUser.id,
       targetEmail: updatedUser.email,
       action: AuditEventTypes.USER_UPDATED,
-      details: updateData,
+      details: { ...safeUpdateData, ...(password ? { passwordChanged: true } : {}) },
       ipAddress: requestInfo.ipAddress,
       userAgent: requestInfo.userAgent
     });
