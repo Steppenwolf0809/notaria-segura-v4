@@ -276,6 +276,9 @@ async function listarMisDocumentos(req, res) {
             else if (totalPagado > 0) paymentStatus = 'PARCIAL';
             else paymentStatus = 'PENDIENTE';
             paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: docInvoices.length };
+          } else if (d.numeroFactura && d.totalFactura) {
+            paymentStatus = 'PENDIENTE';
+            paymentInfo = { totalFacturado: Number(d.totalFactura), totalPagado: 0, saldoPendiente: Number(d.totalFactura), facturas: 0 };
           }
           return { ...d, paymentStatus, paymentInfo };
         });
@@ -394,8 +397,11 @@ async function listarMisDocumentos(req, res) {
         else paymentStatus = 'PENDIENTE';
         
         paymentInfo = { totalFacturado, totalPagado, saldoPendiente, facturas: doc.invoices.length };
+      } else if (doc.numeroFactura && doc.totalFactura) {
+        paymentStatus = 'PENDIENTE';
+        paymentInfo = { totalFacturado: Number(doc.totalFactura), totalPagado: 0, saldoPendiente: Number(doc.totalFactura), facturas: 0 };
       }
-      
+
       const { invoices, ...docWithoutInvoices } = doc;
       return { ...docWithoutInvoices, paymentStatus, paymentInfo };
     });

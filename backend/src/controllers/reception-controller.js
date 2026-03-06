@@ -99,6 +99,9 @@ function summarizeDocumentPayment(doc, docInvoices) {
     if (!computedNumeroFactura) {
       computedNumeroFactura = docInvoices[0]?.invoiceNumberRaw || docInvoices[0]?.invoiceNumber || null;
     }
+  } else if (doc.numeroFactura && doc.totalFactura) {
+    paymentStatus = 'PENDIENTE';
+    paymentInfo = { totalFacturado: Number(doc.totalFactura), totalPagado: 0, saldoPendiente: Number(doc.totalFactura), facturas: 0 };
   }
 
   return {

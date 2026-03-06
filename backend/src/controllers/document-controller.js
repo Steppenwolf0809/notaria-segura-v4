@@ -1226,6 +1226,10 @@ async function getMyDocuments(req, res) {
                 .sort((a, b) => new Date(a.issueDate) - new Date(b.issueDate));
               computedFechaFactura = byDateAsc[0]?.issueDate || null;
             }
+          } else if (d.numeroFactura && d.totalFactura) {
+            // Documento tiene factura del XML pero no hay registro en tabla invoices
+            paymentStatus = 'PENDIENTE';
+            paymentInfo = { totalFacturado: Number(d.totalFactura), totalPagado: 0, saldoPendiente: Number(d.totalFactura), facturas: 0 };
           }
 
           return {
@@ -1414,6 +1418,9 @@ async function getMyDocuments(req, res) {
             .sort((a, b) => new Date(a.issueDate) - new Date(b.issueDate));
           computedFechaFactura = byDateAsc[0]?.issueDate || null;
         }
+      } else if (doc.numeroFactura && doc.totalFactura) {
+        paymentStatus = 'PENDIENTE';
+        paymentInfo = { totalFacturado: Number(doc.totalFactura), totalPagado: 0, saldoPendiente: Number(doc.totalFactura), facturas: 0 };
       }
 
       const { invoices, ...docWithoutInvoices } = doc;

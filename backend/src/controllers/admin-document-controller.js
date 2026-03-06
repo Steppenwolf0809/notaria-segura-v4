@@ -319,8 +319,11 @@ async function getAllDocumentsOversight(req, res) {
               if (!computedNumeroFactura) {
                 computedNumeroFactura = docInvoices[0]?.invoiceNumberRaw || docInvoices[0]?.invoiceNumber || null;
               }
+            } else if (d.numeroFactura && d.totalFactura) {
+              paymentStatus = 'PENDIENTE';
+              paymentInfo = { totalFacturado: Number(d.totalFactura), totalPagado: 0, saldoPendiente: Number(d.totalFactura), facturas: 0 };
             }
-            
+
             return {
               ...d,
               assignedTo: d._assignedToId ? {
@@ -424,8 +427,11 @@ async function getAllDocumentsOversight(req, res) {
           if (!computedNumeroFactura) {
             computedNumeroFactura = docInvoices[0]?.invoiceNumberRaw || docInvoices[0]?.invoiceNumber || null;
           }
+        } else if (doc.numeroFactura && doc.totalFactura) {
+          paymentStatus = 'PENDIENTE';
+          paymentInfo = { totalFacturado: Number(doc.totalFactura), totalPagado: 0, saldoPendiente: Number(doc.totalFactura), facturas: 0 };
         }
-        
+
         const { invoices, ...docWithoutInvoices } = doc;
         return {
           ...docWithoutInvoices,
