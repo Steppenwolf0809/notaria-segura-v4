@@ -1,9 +1,11 @@
-import { clerkClient, verifyToken } from '@clerk/express';
+import jwt from 'jsonwebtoken';
 import prisma from '../db.js';
 import tenantStorage from './tenant-context.js';
 
+const JWT_SECRET = process.env.JWT_SECRET;
+
 /**
- * Middleware para verificar token JWT de Clerk y cargar usuario local
+ * Middleware para verificar token JWT propio y cargar usuario local
  */
 async function authenticateToken(req, res, next) {
   try {
@@ -17,12 +19,9 @@ async function authenticateToken(req, res, next) {
       });
     }
 
-    // Verificar token con Clerk
-    let clerkPayload;
+    let payload;
     try {
-      clerkPayload = await verifyToken(token, {
-        secretKey: process.env.CLERK_SECRET_KEY
-      });
+      payload = jwt.verify(token, JWT_SECRET);
     } catch (err) {
       return res.status(401).json({
         success: false,
@@ -30,11 +29,8 @@ async function authenticateToken(req, res, next) {
       });
     }
 
-    const clerkUserId = clerkPayload.sub;
-
-    // Buscar usuario local por clerkId
     const user = await prisma.user.findUnique({
-      where: { clerkId: clerkUserId }
+      where: { id: payload.userId }
     });
 
     if (!user) {
@@ -51,10 +47,8 @@ async function authenticateToken(req, res, next) {
       });
     }
 
-    // Agregar información del usuario al request
     req.user = {
       id: user.id,
-      clerkId: user.clerkId,
       email: user.email,
       role: user.role,
       firstName: user.firstName,
@@ -63,9 +57,9 @@ async function authenticateToken(req, res, next) {
       isOnboarded: user.isOnboarded
     };
 
-    // Establecer contexto del tenant para auto-inject de notaryId en Prisma
     const notaryId = user.notaryId || null;
-    tenantStorage.run({ notaryId }, () => next());
+    const isSuperAdmin = user.role === 'SUPER_ADMIN';
+    tenantStorage.run({ notaryId, isSuperAdmin }, () => next());
 
   } catch (error) {
     console.error('Error en autenticación:', error);
@@ -99,7 +93,6 @@ function requireRoles(allowedRoles) {
     try {
       const userRole = req.user.role;
 
-      // SUPER_ADMIN siempre tiene acceso
       if (userRole === 'SUPER_ADMIN') {
         return next();
       }

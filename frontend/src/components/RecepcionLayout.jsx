@@ -35,7 +35,6 @@ import {
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import { useThemeCtx } from '../contexts/theme-ctx';
-import { useClerk } from '@clerk/clerk-react';
 import { navItemsByRole } from '../config/nav-items';
 
 // Anchos del sidebar
@@ -51,7 +50,7 @@ const RecepcionLayout = ({ children, currentView, onViewChange }) => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
   const { resolvedIsDark: isDarkMode, cycleMode: toggleTheme } = useThemeCtx();
-  const { openUserProfile } = useClerk();
+  const openUserProfile = () => {};
 
   // Trazas de verificación del layout
   useEffect(() => {

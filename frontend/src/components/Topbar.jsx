@@ -13,13 +13,11 @@ import {
 } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import AccountCircle from '@mui/icons-material/AccountCircle';
-import { useClerk } from '@clerk/clerk-react';
 import ThemeToggle from './ThemeToggle';
 import useAuth from '../hooks/use-auth';
 
 function Topbar({ title = 'Notaria Segura', onMenuClick }) {
-  const { user, getFullName, getUserInitials, getUserRoleColor } = useAuth();
-  const { signOut, openUserProfile } = useClerk();
+  const { user, getFullName, getUserInitials, getUserRoleColor, logout } = useAuth();
   const [anchorEl, setAnchorEl] = React.useState(null);
 
   // Atajo accesibilidad: Shift+D para enfocar buscador si existe
@@ -42,14 +40,14 @@ function Topbar({ title = 'Notaria Segura', onMenuClick }) {
   const handleMenuOpen = (event) => setAnchorEl(event.currentTarget);
   const handleMenuClose = () => setAnchorEl(null);
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     handleMenuClose();
-    await signOut();
+    logout();
   };
 
   const handleProfile = () => {
     handleMenuClose();
-    openUserProfile();
+    // Profile managed locally — no external provider
   };
 
   return (

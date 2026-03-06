@@ -1,19 +1,16 @@
 import React from 'react';
 import { Box, Typography, Paper, Button } from '@mui/material';
 import { HourglassEmpty, Logout } from '@mui/icons-material';
-import { useClerk } from '@clerk/clerk-react';
 import useAuthStore from '../store/auth-store';
 
 /**
- * Pantalla para usuarios autenticados en Clerk pero sin rol asignado.
+ * Pantalla para usuarios autenticados pero sin rol asignado.
  * El admin de la notaria debe aprobarlos y asignarles rol + notaria.
  */
 function PendingApproval({ user }) {
-  const { signOut } = useClerk();
   const clearAuth = useAuthStore((s) => s.clearAuth);
 
-  const handleLogout = async () => {
-    try { await signOut(); } catch {}
+  const handleLogout = () => {
     clearAuth();
   };
 

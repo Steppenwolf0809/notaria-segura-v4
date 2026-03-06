@@ -99,7 +99,7 @@ const LoginForm = () => {
       return;
     }
 
-    await login(formData);
+    await login(formData.email, formData.password);
   };
 
   /**

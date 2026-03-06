@@ -37,7 +37,7 @@ import encuestaRoutes from './src/routes/encuesta-routes.js'
 import billingRoutes from './src/routes/billing-routes.js'
 import syncRoutes from './src/routes/sync-routes.js'
 import debidaDiligenciaRoutes from './src/routes/debida-diligencia-routes.js'
-import clerkWebhookRoutes from './src/routes/clerk-webhook-routes.js'
+// import clerkWebhookRoutes from './src/routes/clerk-webhook-routes.js' // Clerk removido
 
 // Cargar variables de entorno
 dotenv.config({ path: './.env' })
@@ -334,7 +334,7 @@ app.get('/api/health/feature-flags', (req, res) => {
 });
 
 // WEBHOOK DE CLERK (sin auth — verificado por firma svix)
-app.use('/api/webhooks/clerk', clerkWebhookRoutes)
+// app.use('/api/webhooks/clerk', clerkWebhookRoutes) // Clerk removido
 
 // RUTAS DE AUTENTICACIÓN (/api/auth/*)
 app.use('/api/auth', authRoutes)

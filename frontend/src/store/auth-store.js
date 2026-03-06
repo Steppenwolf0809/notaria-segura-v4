@@ -1,16 +1,21 @@
 import { create } from 'zustand';
 
-/**
- * Store de autenticación usando Zustand
- * Token lo maneja Clerk — aquí solo guardamos perfil del backend
- */
 const useAuthStore = create(
   (set, get) => ({
-    // Estado inicial
     user: null,
-    isAuthenticated: false,
+    token: localStorage.getItem('token') || null,
+    isAuthenticated: !!localStorage.getItem('token'),
     isLoading: false,
     error: null,
+
+    setToken: (token) => {
+      if (token) {
+        localStorage.setItem('token', token);
+      } else {
+        localStorage.removeItem('token');
+      }
+      set({ token, isAuthenticated: !!token });
+    },
 
     setUser: (userData) => {
       set({
@@ -22,8 +27,10 @@ const useAuthStore = create(
     },
 
     clearAuth: () => {
+      localStorage.removeItem('token');
       set({
         user: null,
+        token: null,
         isAuthenticated: false,
         isLoading: false,
         error: null

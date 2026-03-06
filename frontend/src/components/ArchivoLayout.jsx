@@ -34,7 +34,6 @@ import {
 import useAuth from '../hooks/use-auth';
 import ThemeToggle from './ThemeToggle';
 import useThemeStore from '../store/theme-store';
-import { useClerk } from '@clerk/clerk-react';
 import { navItemsByRole } from '../config/nav-items';
 import NotificacionesDropdown from './notifications/NotificacionesDropdown';
 import mensajesInternosService from '../services/mensajes-internos-service';
@@ -68,7 +67,7 @@ const ArchivoLayout = ({ children, currentView, onViewChange }) => {
     localStorage.setItem('archivo-sidebar-collapsed', JSON.stringify(sidebarCollapsed));
   }, [sidebarCollapsed]);
   const { isDarkMode } = useThemeStore();
-  const { openUserProfile } = useClerk();
+  const openUserProfile = () => {};
   const [unreadCount, setUnreadCount] = useState(0);
 
   // Polling de mensajes no leídos

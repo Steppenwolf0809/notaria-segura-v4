@@ -1,18 +1,19 @@
 import { useCallback } from 'react';
-import { useAuth as useClerkAuth, useClerk } from '@clerk/clerk-react';
 import useAuthStore from '../store/auth-store';
 import apiClient from '../services/api-client';
 
 /**
- * Hook personalizado para manejar autenticación
- * Integra Clerk (auth) con el backend (perfil/roles)
+ * Hook personalizado para manejar autenticacion
+ * JWT propio — sin dependencia de Clerk
  */
 const useAuth = () => {
   const {
     user,
+    token,
     isAuthenticated,
     isLoading,
     error,
+    setToken,
     setUser,
     clearAuth,
     setLoading,
@@ -26,79 +27,94 @@ const useAuth = () => {
     getUserInitials
   } = useAuthStore();
 
-  const { getToken } = useClerkAuth();
-  const { signOut } = useClerk();
-
   /**
-   * Carga el perfil del usuario desde el backend
-   * Clerk ya autenticó — aquí obtenemos rol, notaría, etc.
+   * Login con email y password
    */
-  const loadProfile = useCallback(async () => {
+  const login = useCallback(async (email, password) => {
     setLoading(true);
     clearError();
 
     try {
-      const token = await getToken();
-      if (!token) {
-        clearAuth();
+      const response = await apiClient.post('/auth/login', { email, password });
+
+      if (response.data?.success) {
+        setToken(response.data.data.token);
+        setUser(response.data.data.user);
+        return true;
+      } else {
+        setError(response.data?.message || 'Error al iniciar sesion');
         return false;
       }
+    } catch (error) {
+      const message = error?.response?.data?.message || 'Error de conexion';
+      setError(message);
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [setToken, setUser, setLoading, setError, clearError]);
 
-      const response = await apiClient.get('/auth/me', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+  /**
+   * Carga el perfil del usuario desde el backend
+   */
+  const loadProfile = useCallback(async () => {
+    const currentToken = useAuthStore.getState().token;
+    if (!currentToken) {
+      clearAuth();
+      return false;
+    }
+
+    setLoading(true);
+    clearError();
+
+    try {
+      const response = await apiClient.get('/auth/me');
 
       if (response.data?.success) {
         setUser(response.data.data.user);
         return true;
       } else {
-        setError('No se pudo cargar el perfil');
+        clearAuth();
         return false;
       }
     } catch (error) {
       const status = error?.response?.status;
       if (status === 401) {
-        // Usuario autenticado en Clerk pero no existe en DB aún (webhook pendiente)
-        setError('Tu cuenta está siendo configurada. Intenta de nuevo en unos segundos.');
+        clearAuth();
       } else {
-        setError(error?.response?.data?.message || 'Error de conexión');
+        setError(error?.response?.data?.message || 'Error de conexion');
       }
       return false;
     } finally {
       setLoading(false);
     }
-  }, [getToken, setUser, clearAuth, setLoading, setError, clearError]);
+  }, [setUser, clearAuth, setLoading, setError, clearError]);
 
   /**
-   * Cerrar sesión (Clerk + limpiar estado local)
+   * Cerrar sesion
    */
-  const logout = useCallback(async () => {
-    try {
-      await signOut();
-    } catch {}
+  const logout = useCallback(() => {
     clearAuth();
-  }, [signOut, clearAuth]);
+  }, [clearAuth]);
 
   /**
-   * Obtener token de Clerk para requests API
+   * Obtener token para requests API
    */
-  const getAuthToken = useCallback(async () => {
-    try {
-      return await getToken();
-    } catch {
-      return null;
-    }
-  }, [getToken]);
+  const getAuthToken = useCallback(() => {
+    return useAuthStore.getState().token;
+  }, []);
 
   return {
     // Estado
     user,
+    token,
     isAuthenticated,
     isLoading,
     isLoadingProfile: isLoading,
     error,
 
     // Acciones
+    login,
     loadProfile,
     logout,
     getAuthToken,
@@ -113,9 +129,8 @@ const useAuth = () => {
     getFullName,
     getUserInitials,
 
-    // Compatibilidad — los componentes existentes usan checkAuth
-    checkAuth: loadProfile,
-    token: null // Ya no se maneja token manualmente
+    // Compatibilidad
+    checkAuth: loadProfile
   };
 };
 

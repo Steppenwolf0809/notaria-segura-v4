@@ -48,7 +48,6 @@ import useAuth from '../hooks/use-auth';
 import { useThemeCtx } from '../contexts/theme-ctx';
 import { ThemeProvider } from '@mui/material/styles';
 import { getAppTheme } from '../config/theme';
-import { useClerk } from '@clerk/clerk-react';
 import { AccountCircle as AccountCircleIcon } from '@mui/icons-material';
 
 // Sidebar widths
@@ -65,7 +64,7 @@ const AdminLayout = ({ children, currentView, onViewChange }) => {
   const [billingMenuOpen, setBillingMenuOpen] = useState(false);
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
   const { resolvedIsDark: isDarkMode, setMode } = useThemeCtx();
-  const { openUserProfile } = useClerk();
+  const openUserProfile = () => {};
 
   const toggleTheme = () => {
     setMode(isDarkMode ? 'light' : 'dark');

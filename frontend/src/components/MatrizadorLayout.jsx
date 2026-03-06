@@ -39,7 +39,6 @@ import {
 } from '@mui/icons-material';
 import useAuth from '../hooks/use-auth';
 import useThemeStore from '../store/theme-store';
-import { useClerk } from '@clerk/clerk-react';
 import { navItemsByRole } from '../config/nav-items';
 import ThemeToggle from './ThemeToggle';
 import NotificacionesDropdown from './notifications/NotificacionesDropdown';
@@ -61,7 +60,7 @@ const MatrizadorLayout = ({ children, currentView, onViewChange }) => {
   const [userMenuAnchor, setUserMenuAnchor] = useState(null);
   const { user, logout, getUserRoleColor, getFullName, getUserInitials } = useAuth();
   const { isDarkMode } = useThemeStore();
-  const { openUserProfile } = useClerk();
+  const openUserProfile = () => {};
   const [unreadCount, setUnreadCount] = useState(0);
 
   // Polling de mensajes no leídos
