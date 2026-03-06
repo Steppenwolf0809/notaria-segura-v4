@@ -341,6 +341,30 @@ async function processInvoice(tx, invoiceData) {
         }
     }
 
+    // Create payment record when invoice is paid (for billing dashboard)
+    if (invoiceData.estado_pago === 'PAGADA' && invoice && (action === 'created' || action === 'updated')) {
+        try {
+            const existingPayment = await tx.payment.findFirst({
+                where: { invoiceId: invoice.id }
+            });
+            if (!existingPayment) {
+                await tx.payment.create({
+                    data: {
+                        receiptNumber: `SYNC-${invoice.invoiceNumber}`,
+                        amount: invoiceData.total_pagado || invoice.totalAmount,
+                        paymentDate: fechaUltimoPago || new Date(),
+                        concept: `Pago sincronizado desde Koinor`,
+                        paymentType: 'CASH',
+                        invoiceId: invoice.id,
+                        sourceFile: 'KOINOR_SYNC'
+                    }
+                });
+            }
+        } catch (paymentError) {
+            console.error(`[sync-billing] Error creating payment record:`, paymentError.message);
+        }
+    }
+
     return { action, documentLinked };
 }
 
@@ -688,17 +712,41 @@ export async function syncCxc(req, res) {
                     });
                     
                     if (invoice && invoice.status !== 'PAID') {
+                        const paidAmount = paidInvoice.totalAmount || invoice.totalAmount;
                         await prisma.invoice.update({
                             where: { id: invoice.id },
                             data: {
                                 status: 'PAID',
-                                paidAmount: paidInvoice.totalAmount || invoice.totalAmount,
+                                paidAmount,
                                 saldoPendiente: 0,
                                 lastSyncAt: syncedAt,
                                 syncSource: 'KOINOR_SYNC_CXC'
                             }
                         });
-                        
+
+                        // Create payment record for billing dashboard
+                        try {
+                            const existingPayment = await prisma.payment.findFirst({
+                                where: { invoiceId: invoice.id }
+                            });
+                            if (!existingPayment) {
+                                await prisma.payment.create({
+                                    data: {
+                                        receiptNumber: `SYNC-${invoice.invoiceNumber}`,
+                                        amount: paidAmount,
+                                        paymentDate: paidInvoice.lastPaymentDate ? new Date(paidInvoice.lastPaymentDate) : syncedAt,
+                                        concept: `Pago sincronizado desde Koinor CXC`,
+                                        paymentType: 'CASH',
+                                        invoiceId: invoice.id,
+                                        sourceFile: 'KOINOR_SYNC_CXC'
+                                    }
+                                });
+                                console.log(`[sync-cxc] Created payment record for invoice ${invoice.invoiceNumber}`);
+                            }
+                        } catch (paymentError) {
+                            console.error(`[sync-cxc] Error creating payment record:`, paymentError.message);
+                        }
+
                         // Also update Document if linked
                         if (invoice.documentId) {
                             await prisma.document.update({
