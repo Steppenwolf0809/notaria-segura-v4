@@ -52,13 +52,17 @@ import {
 
 function TabPanel({ children, value, index, ...props }) {
   return (
-    <Box role="tabpanel" hidden={value !== index} {...props} sx={{ py: 2.5 }}>
-      {value === index && children}
+    <Box
+      role="tabpanel"
+      {...props}
+      sx={{ py: 2.5, display: value === index ? 'block' : 'none' }}
+    >
+      {children}
     </Box>
   );
 }
 
-function CompletitudSidebar({ protocol }) {
+function ProgresoSidebar({ protocol }) {
   const missingFields = getMissingFields(protocol);
   const semaforo = getSemaforoFromProtocol(protocol);
   const personas = protocol.personas || [];
@@ -96,7 +100,7 @@ function CompletitudSidebar({ protocol }) {
             color: UAFE_COLORS.textSecondary,
           }}
         >
-          Completitud
+          Progreso
         </Typography>
         <SemaforoIndicator level={semaforo.key} variant="chip" missingFields={missingFields} />
       </Box>
@@ -721,14 +725,14 @@ export default function UAFEProtocolDetail({
               },
             }}
           >
+            <Tooltip title="Suba la minuta Word (.docx) para extraer automaticamente comparecientes, cuantia y tipo de acto" arrow>
+              <Tab label="Minuta" />
+            </Tooltip>
             <Tooltip title="Tipo de acto, cuantia, avaluo, datos del bien y ubicacion del inmueble" arrow>
               <Tab label="Datos del Acto" />
             </Tooltip>
             <Tooltip title="Personas que intervienen en el acto. Desde aqui puede enviar el formulario publico para que completen sus datos." arrow>
               <Tab label={`Comparecientes (${(protocol.personas || []).length})`} />
-            </Tooltip>
-            <Tooltip title="Suba la minuta Word (.docx) para extraer automaticamente comparecientes, cuantia y tipo de acto" arrow>
-              <Tab label="Minuta" />
             </Tooltip>
             <Tooltip title="Encabezado y texto de comparecencia generados automaticamente a partir de los datos del protocolo" arrow>
               <Tab label="Textos Generados" />
@@ -737,22 +741,22 @@ export default function UAFEProtocolDetail({
 
           <Box sx={{ px: 3, pb: 2 }}>
             <TabPanel value={tab} index={0}>
+              <MinutaTab protocol={protocol} onMinutaProcessed={onSave} />
+            </TabPanel>
+            <TabPanel value={tab} index={1}>
               <DatosActoTab
                 protocol={mergedProtocol}
                 onFieldChange={handleFieldChange}
                 readOnly={readOnly}
               />
             </TabPanel>
-            <TabPanel value={tab} index={1}>
+            <TabPanel value={tab} index={2}>
               <ComparecientesTab
                 protocol={protocol}
                 onAddPerson={onAddPerson}
                 onEditPerson={onEditPerson}
                 onSendForm={onSendForm}
               />
-            </TabPanel>
-            <TabPanel value={tab} index={2}>
-              <MinutaTab protocol={protocol} onMinutaProcessed={onSave} />
             </TabPanel>
             <TabPanel value={tab} index={3}>
               <TextosTab protocol={protocol} />
@@ -762,7 +766,7 @@ export default function UAFEProtocolDetail({
       </Box>
 
       {/* Sidebar */}
-      <CompletitudSidebar protocol={protocol} />
+      <ProgresoSidebar protocol={protocol} />
     </Box>
   );
 }

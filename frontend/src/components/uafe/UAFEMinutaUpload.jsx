@@ -231,7 +231,7 @@ export default function UAFEMinutaUpload({ protocoloId, onComplete, onCancel }) 
           Procesando minuta...
         </Typography>
         <Typography variant="body2" sx={{ color: UAFE_COLORS.textSecondary }}>
-          Extrayendo datos con regex y Gemini AI. Esto puede tomar unos segundos.
+          Extrayendo datos del documento. Esto puede tomar unos segundos.
         </Typography>
       </Paper>
     );
@@ -275,13 +275,13 @@ export default function UAFEMinutaUpload({ protocoloId, onComplete, onCancel }) 
           </Typography>
           <Box sx={{ display: 'flex', gap: 1, mt: 0.5, alignItems: 'center' }}>
             <Chip
-              label={fuente === 'regex+gemini' ? 'Regex + Gemini AI' : 'Solo Regex'}
+              label="Extraccion automatica"
               size="small"
               sx={{
                 fontSize: '0.7rem',
                 fontWeight: 600,
-                backgroundColor: fuente === 'regex+gemini' ? '#e8f5e9' : '#fff3e0',
-                color: fuente === 'regex+gemini' ? '#2e7d32' : '#e65100',
+                backgroundColor: '#e8f5e9',
+                color: '#2e7d32',
               }}
             />
             <Typography variant="caption" sx={{ color: UAFE_COLORS.textMuted }}>
@@ -396,6 +396,7 @@ export default function UAFEMinutaUpload({ protocoloId, onComplete, onCancel }) 
                   <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>Nombres</TableCell>
                   <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>Apellidos</TableCell>
                   <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>Calidad</TableCell>
+                  <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>Actua Por</TableCell>
                   <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>Estado Civil</TableCell>
                   <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }}>Telefono</TableCell>
                   <TableCell sx={{ fontWeight: 700, fontSize: '0.75rem' }} align="center">Acc.</TableCell>
@@ -442,6 +443,21 @@ export default function UAFEMinutaUpload({ protocoloId, onComplete, onCancel }) 
                         {CALIDADES_COMPARECIENTE.map(c => (
                           <MenuItem key={c} value={c} sx={{ fontSize: '0.8rem' }}>{c}</MenuItem>
                         ))}
+                      </Select>
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        size="small"
+                        variant="standard"
+                        value={comp.actuaPor || 'PROPIOS_DERECHOS'}
+                        onChange={(e) => updateCompareciente(idx, 'actuaPor', e.target.value)}
+                        sx={{ fontSize: '0.8rem', minWidth: 120 }}
+                      >
+                        <MenuItem value="PROPIOS_DERECHOS" sx={{ fontSize: '0.8rem' }}>Propios Derechos</MenuItem>
+                        <MenuItem value="APODERADO_GENERAL" sx={{ fontSize: '0.8rem' }}>Apoderado General</MenuItem>
+                        <MenuItem value="APODERADO_ESPECIAL" sx={{ fontSize: '0.8rem' }}>Apoderado Especial</MenuItem>
+                        <MenuItem value="REPRESENTANTE_LEGAL" sx={{ fontSize: '0.8rem' }}>Representante Legal</MenuItem>
+                        <MenuItem value="REPRESENTANTE_MENOR" sx={{ fontSize: '0.8rem' }}>Representante Menor</MenuItem>
                       </Select>
                     </TableCell>
                     <TableCell>
