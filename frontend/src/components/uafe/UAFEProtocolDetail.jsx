@@ -35,6 +35,7 @@ import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 
 import SemaforoIndicator, { SemaforoPersona } from './SemaforoIndicator';
 import UAFEStatusPipeline from './UAFEStatusPipeline';
+import UAFEMinutaUpload from './UAFEMinutaUpload';
 import {
   UAFE_COLORS,
   ESTADOS_PROTOCOLO,
@@ -476,14 +477,10 @@ function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm }) 
   );
 }
 
-function MinutaTab({ protocol }) {
-  return (
-    <Box>
-      <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, color: UAFE_COLORS.textPrimary, fontSize: '0.85rem' }}>
-        Minuta del Acto
-      </Typography>
-
-      {protocol.minutaUrl ? (
+function MinutaTab({ protocol, onMinutaProcessed }) {
+  if (protocol.minutaParseada && protocol.minutaUrl) {
+    return (
+      <Box>
         <Paper
           elevation={0}
           sx={{
@@ -498,55 +495,23 @@ function MinutaTab({ protocol }) {
           <UploadFileOutlinedIcon sx={{ color: UAFE_COLORS.primary }} />
           <Box sx={{ flex: 1 }}>
             <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.82rem' }}>
-              Minuta cargada
+              Minuta cargada y procesada
             </Typography>
             <Typography variant="caption" sx={{ color: UAFE_COLORS.textMuted }}>
-              {protocol.minutaParseada ? 'Datos extraidos automaticamente' : 'Pendiente de extraccion'}
+              Datos extraidos automaticamente y confirmados por el matrizador
             </Typography>
           </Box>
-          {protocol.minutaParseada && (
-            <Chip size="small" label="Parseada" sx={{ backgroundColor: '#e8f5e9', color: '#2e7d32', fontWeight: 600, fontSize: '0.68rem' }} />
-          )}
+          <Chip size="small" label="Procesada" sx={{ backgroundColor: '#e8f5e9', color: '#2e7d32', fontWeight: 600, fontSize: '0.68rem' }} />
         </Paper>
-      ) : (
-        <Paper
-          elevation={0}
-          sx={{
-            border: `2px dashed ${UAFE_COLORS.border}`,
-            borderRadius: '10px',
-            p: 4,
-            textAlign: 'center',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            '&:hover': {
-              borderColor: UAFE_COLORS.primary,
-              backgroundColor: UAFE_COLORS.primaryLight + '40',
-            },
-          }}
-        >
-          <UploadFileOutlinedIcon sx={{ fontSize: 40, color: UAFE_COLORS.textMuted, mb: 1 }} />
-          <Typography variant="body2" sx={{ fontWeight: 600, color: UAFE_COLORS.textPrimary }}>
-            Subir minuta (.docx)
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            El sistema extraera datos automaticamente (comparecientes, montos, clausulas)
-          </Typography>
-        </Paper>
-      )}
-
-      <Box sx={{ mt: 3, p: 2, backgroundColor: '#fff8e1', borderRadius: '8px', border: '1px solid #ffe082' }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-          <WarningAmberIcon sx={{ fontSize: 16, color: '#f57f17' }} />
-          <Typography variant="caption" sx={{ fontWeight: 700, color: '#e65100', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            Proximamente
-          </Typography>
-        </Box>
-        <Typography variant="caption" sx={{ color: '#5d4037' }}>
-          La subida y extraccion automatica de minutas se habilitara en OLA 2.
-          Por ahora, ingrese los datos manualmente en la pestana &quot;Datos del Acto&quot;.
-        </Typography>
       </Box>
-    </Box>
+    );
+  }
+
+  return (
+    <UAFEMinutaUpload
+      protocoloId={protocol.id}
+      onComplete={(data) => onMinutaProcessed?.(data)}
+    />
   );
 }
 
@@ -761,7 +726,7 @@ export default function UAFEProtocolDetail({
             <Tooltip title="Personas que intervienen en el acto. Desde aqui puede enviar el formulario publico para que completen sus datos." arrow>
               <Tab label={`Comparecientes (${(protocol.personas || []).length})`} />
             </Tooltip>
-            <Tooltip title="Subida de minuta Word para extraccion automatica de datos (proximamente)" arrow>
+            <Tooltip title="Suba la minuta Word (.docx) para extraer automaticamente comparecientes, cuantia y tipo de acto" arrow>
               <Tab label="Minuta" />
             </Tooltip>
             <Tooltip title="Encabezado y texto de comparecencia generados automaticamente a partir de los datos del protocolo" arrow>
@@ -786,7 +751,7 @@ export default function UAFEProtocolDetail({
               />
             </TabPanel>
             <TabPanel value={tab} index={2}>
-              <MinutaTab protocol={protocol} />
+              <MinutaTab protocol={protocol} onMinutaProcessed={onSave} />
             </TabPanel>
             <TabPanel value={tab} index={3}>
               <TextosTab protocol={protocol} />

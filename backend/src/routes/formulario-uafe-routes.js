@@ -1,7 +1,11 @@
 import express from 'express';
+import multer from 'multer';
 import { authenticateToken, requireRoles } from '../middleware/auth-middleware.js';
 import { verifyFormularioUAFESession } from '../middleware/verify-formulario-uafe-session.js';
 import { csrfProtection } from '../middleware/csrf-protection.js';
+import { parseMinuta } from '../services/minuta-parser-service.js';
+import { uploadFile, isStorageConfigured } from '../services/storage-service.js';
+import { getCurrentNotaryId } from '../middleware/tenant-context.js';
 import {
   crearProtocolo,
   agregarPersonaAProtocolo,
@@ -313,6 +317,202 @@ router.delete(
   requireRoles(['ADMIN']),
   csrfProtection,
   eliminarPersonaRegistrada
+);
+
+// ========================================
+// RUTAS OLA 2 - Upload y parsing de minutas
+// ========================================
+
+const minutaUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+  fileFilter: (req, file, cb) => {
+    const allowed = [
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/msword',
+    ];
+    if (allowed.includes(file.mimetype) || file.originalname.endsWith('.docx')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten archivos Word (.docx)'));
+    }
+  },
+});
+
+/**
+ * Subir minuta Word y extraer datos con regex + Gemini
+ * POST /api/formulario-uafe/protocolo/:protocoloId/upload-minuta
+ * Requiere: JWT + role MATRIZADOR o ADMIN
+ * Body: multipart/form-data con campo "minuta"
+ * Retorna: datos extraidos para preview/confirmacion
+ */
+router.post(
+  '/protocolo/:protocoloId/upload-minuta',
+  authenticateToken,
+  requireRoles(['MATRIZADOR', 'ADMIN']),
+  minutaUpload.single('minuta'),
+  async (req, res) => {
+    try {
+      const { protocoloId } = req.params;
+
+      if (!req.file) {
+        return res.status(400).json({ success: false, error: 'No se envio ningun archivo' });
+      }
+
+      // 1. Parsear la minuta (regex + Gemini)
+      const datosExtraidos = await parseMinuta(req.file.buffer, { useGemini: true });
+
+      // 2. Subir archivo a R2 (si esta configurado)
+      let minutaUrl = null;
+      if (isStorageConfigured()) {
+        const notaryId = getCurrentNotaryId() || 1;
+        const result = await uploadFile(req.file.buffer, {
+          notaryId,
+          folder: 'minutas',
+          filename: req.file.originalname,
+          contentType: req.file.mimetype,
+        });
+        minutaUrl = result.key;
+      }
+
+      // 3. Retornar datos para preview (no guardar aun - el usuario confirma)
+      res.json({
+        success: true,
+        data: {
+          protocoloId,
+          minutaUrl,
+          minutaOriginalName: req.file.originalname,
+          datosExtraidos: {
+            tipoActo: datosExtraidos.tipoActo,
+            codigoActo: datosExtraidos.codigoActo,
+            comparecientes: datosExtraidos.comparecientes,
+            cuantia: datosExtraidos.cuantia,
+            avaluoMunicipal: datosExtraidos.avaluoMunicipal,
+            tipoBien: datosExtraidos.tipoBien,
+            descripcionBien: datosExtraidos.descripcionBien,
+            formaPago: datosExtraidos.formaPago,
+          },
+          fuente: datosExtraidos.fuente,
+        },
+      });
+    } catch (error) {
+      console.error('Error procesando minuta:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Error al procesar la minuta',
+      });
+    }
+  }
+);
+
+/**
+ * Confirmar datos extraidos de minuta y guardar en protocolo
+ * POST /api/formulario-uafe/protocolo/:protocoloId/confirmar-minuta
+ * Requiere: JWT + role MATRIZADOR o ADMIN
+ * Body: { minutaUrl, datosExtraidos (editados por el usuario) }
+ */
+router.post(
+  '/protocolo/:protocoloId/confirmar-minuta',
+  authenticateToken,
+  requireRoles(['MATRIZADOR', 'ADMIN']),
+  async (req, res) => {
+    try {
+      const { protocoloId } = req.params;
+      const { minutaUrl, datosConfirmados } = req.body;
+
+      if (!datosConfirmados) {
+        return res.status(400).json({ success: false, error: 'No se enviaron datos confirmados' });
+      }
+
+      // Importar Prisma aqui para evitar circular dependency
+      const { default: prisma } = await import('../db.js');
+
+      // Actualizar protocolo con datos confirmados
+      const updateData = {
+        minutaUrl: minutaUrl || undefined,
+        minutaParseada: true,
+        datosExtraidos: datosConfirmados,
+      };
+
+      // Campos directos del protocolo
+      if (datosConfirmados.tipoActo) updateData.actoContrato = datosConfirmados.tipoActo;
+      if (datosConfirmados.codigoActo) updateData.tipoActo = datosConfirmados.codigoActo;
+      if (datosConfirmados.cuantia != null) updateData.valorContrato = datosConfirmados.cuantia;
+      if (datosConfirmados.avaluoMunicipal != null) updateData.avaluoMunicipal = datosConfirmados.avaluoMunicipal;
+      if (datosConfirmados.tipoBien) updateData.tipoBien = datosConfirmados.tipoBien;
+      if (datosConfirmados.descripcionBien) updateData.descripcionBien = datosConfirmados.descripcionBien;
+      if (datosConfirmados.codigoCanton) updateData.codigoCanton = datosConfirmados.codigoCanton;
+
+      const protocolo = await prisma.protocoloUAFE.update({
+        where: { id: parseInt(protocoloId) },
+        data: updateData,
+      });
+
+      // Agregar comparecientes extraidos como personas del protocolo
+      if (Array.isArray(datosConfirmados.comparecientes)) {
+        for (const comp of datosConfirmados.comparecientes) {
+          if (!comp.cedula) continue;
+
+          // Buscar o crear PersonaUAFE
+          let persona = await prisma.personaUAFE.findUnique({
+            where: { numeroIdentificacion: comp.cedula },
+          });
+
+          if (!persona) {
+            persona = await prisma.personaUAFE.create({
+              data: {
+                numeroIdentificacion: comp.cedula,
+                tipoIdentificacion: comp.cedula.length === 13 ? 'RUC' : 'CEDULA',
+                tipoPersona: 'Natural',
+                datosPersonaNatural: {
+                  nombres: comp.nombres || '',
+                  apellidos: comp.apellidos || '',
+                  nacionalidad: comp.nacionalidad || 'ECUATORIANA',
+                  estadoCivil: comp.estadoCivil || '',
+                  profesion: comp.profesion || '',
+                  telefono: comp.telefono || '',
+                  correoElectronico: comp.correo || '',
+                  domicilio: comp.domicilio || '',
+                },
+              },
+            });
+          }
+
+          // Verificar que no este ya vinculado al protocolo
+          const yaVinculado = await prisma.personaProtocoloUAFE.findFirst({
+            where: {
+              protocoloId: parseInt(protocoloId),
+              personaCedula: comp.cedula,
+            },
+          });
+
+          if (!yaVinculado) {
+            await prisma.personaProtocoloUAFE.create({
+              data: {
+                protocoloId: parseInt(protocoloId),
+                personaCedula: comp.cedula,
+                calidad: comp.calidad || 'OTRO',
+                formaComparecencia: comp.actuaPor || 'PROPIOS_DERECHOS',
+                nombre: `${comp.apellidos || ''} ${comp.nombres || ''}`.trim() || comp.cedula,
+              },
+            });
+          }
+        }
+      }
+
+      res.json({
+        success: true,
+        data: protocolo,
+        message: 'Datos de minuta confirmados y guardados',
+      });
+    } catch (error) {
+      console.error('Error confirmando minuta:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Error al confirmar datos de minuta',
+      });
+    }
+  }
 );
 
 // ========================================
