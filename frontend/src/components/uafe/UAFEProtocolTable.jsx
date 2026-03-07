@@ -21,6 +21,7 @@ import {
   Chip,
   Paper,
   Skeleton,
+  Tooltip,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -193,9 +194,11 @@ function ProtocolRow({ protocol, onView, onEdit }) {
             }}
           >
             {protocol.numeroProtocolo || (
-              <Typography component="span" sx={{ color: UAFE_COLORS.textMuted, fontStyle: 'italic', fontSize: '0.78rem' }}>
-                Sin asignar
-              </Typography>
+              <Tooltip title="Este protocolo aun no tiene numero asignado. Se asigna al facturar el acto notarial." arrow>
+                <Typography component="span" sx={{ color: UAFE_COLORS.textMuted, fontStyle: 'italic', fontSize: '0.78rem' }}>
+                  Sin asignar
+                </Typography>
+              </Tooltip>
             )}
           </Typography>
         </TableCell>
@@ -280,46 +283,52 @@ function ProtocolRow({ protocol, onView, onEdit }) {
               missingFields={missingFields}
               pulsate={semaforo.key === 'ROJO'}
             />
-            <Chip
-              size="small"
-              label={estadoConfig.label}
-              sx={{
-                height: 22,
-                fontSize: '0.63rem',
-                fontWeight: 600,
-                letterSpacing: '0.03em',
-                textTransform: 'uppercase',
-                backgroundColor: estadoConfig.bg,
-                color: estadoConfig.color,
-                border: 'none',
-              }}
-            />
+            <Tooltip title={estadoConfig.description} arrow>
+              <Chip
+                size="small"
+                label={estadoConfig.label}
+                sx={{
+                  height: 22,
+                  fontSize: '0.63rem',
+                  fontWeight: 600,
+                  letterSpacing: '0.03em',
+                  textTransform: 'uppercase',
+                  backgroundColor: estadoConfig.bg,
+                  color: estadoConfig.color,
+                  border: 'none',
+                }}
+              />
+            </Tooltip>
           </Box>
         </TableCell>
 
         {/* Acciones */}
         <TableCell>
           <Box sx={{ display: 'flex', gap: 0.5 }} onClick={(e) => e.stopPropagation()}>
-            <IconButton
-              size="small"
-              onClick={() => onView?.(protocol)}
-              sx={{
-                color: UAFE_COLORS.textMuted,
-                '&:hover': { color: UAFE_COLORS.primary, backgroundColor: UAFE_COLORS.primaryLight },
-              }}
-            >
-              <VisibilityOutlinedIcon sx={{ fontSize: 18 }} />
-            </IconButton>
-            <IconButton
-              size="small"
-              onClick={() => onEdit?.(protocol)}
-              sx={{
-                color: UAFE_COLORS.textMuted,
-                '&:hover': { color: UAFE_COLORS.primary, backgroundColor: UAFE_COLORS.primaryLight },
-              }}
-            >
-              <EditOutlinedIcon sx={{ fontSize: 18 }} />
-            </IconButton>
+            <Tooltip title="Ver detalle del protocolo: datos del acto, comparecientes, textos generados y estado de completitud" arrow>
+              <IconButton
+                size="small"
+                onClick={() => onView?.(protocol)}
+                sx={{
+                  color: UAFE_COLORS.textMuted,
+                  '&:hover': { color: UAFE_COLORS.primary, backgroundColor: UAFE_COLORS.primaryLight },
+                }}
+              >
+                <VisibilityOutlinedIcon sx={{ fontSize: 18 }} />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Editar datos del protocolo: tipo de acto, cuantia, ubicacion y comparecientes" arrow>
+              <IconButton
+                size="small"
+                onClick={() => onEdit?.(protocol)}
+                sx={{
+                  color: UAFE_COLORS.textMuted,
+                  '&:hover': { color: UAFE_COLORS.primary, backgroundColor: UAFE_COLORS.primaryLight },
+                }}
+              >
+                <EditOutlinedIcon sx={{ fontSize: 18 }} />
+              </IconButton>
+            </Tooltip>
           </Box>
         </TableCell>
       </TableRow>

@@ -57,6 +57,10 @@ export const navItemsByRole = {
     { id: 'settings', label: 'Configuración', view: 'settings', icon: 'Settings' },
     { id: 'whatsapp-templates', label: 'Templates WhatsApp', view: 'whatsapp-templates', icon: 'WhatsApp' }
   ],
+  OFICIAL_CUMPLIMIENTO: [
+    { id: 'dashboard', label: 'Dashboard', view: 'dashboard', icon: 'Dashboard' },
+    { id: 'formularios-uafe', label: 'Control UAFE', view: 'formularios-uafe', icon: 'Description' },
+  ],
   ARCHIVO: [
     { id: 'dashboard', label: 'Dashboard', view: 'dashboard', icon: 'Dashboard' },
     { id: 'documentos', label: 'Mis Documentos', view: 'documentos', icon: 'FolderSpecial' },

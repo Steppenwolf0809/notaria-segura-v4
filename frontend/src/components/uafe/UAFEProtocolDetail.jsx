@@ -20,6 +20,7 @@ import {
   ListItemIcon,
   ListItemText,
   Paper,
+  Tooltip,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
@@ -352,24 +353,26 @@ function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm }) 
         <Typography variant="subtitle2" sx={{ fontWeight: 700, color: UAFE_COLORS.textPrimary, fontSize: '0.85rem' }}>
           Comparecientes ({personas.length})
         </Typography>
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<PersonAddOutlinedIcon sx={{ fontSize: 16 }} />}
-          onClick={onAddPerson}
-          sx={{
-            textTransform: 'none',
-            fontSize: '0.78rem',
-            borderColor: UAFE_COLORS.border,
-            color: UAFE_COLORS.textPrimary,
-            '&:hover': {
-              borderColor: UAFE_COLORS.primary,
-              backgroundColor: UAFE_COLORS.primaryLight,
+        <Tooltip title="Agregue a las personas que intervienen en el acto (vendedor, comprador, etc.). Necesita al menos la cedula para registrarlos." arrow>
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<PersonAddOutlinedIcon sx={{ fontSize: 16 }} />}
+            onClick={onAddPerson}
+            sx={{
+              textTransform: 'none',
+              fontSize: '0.78rem',
+              borderColor: UAFE_COLORS.border,
+              color: UAFE_COLORS.textPrimary,
+              '&:hover': {
+                borderColor: UAFE_COLORS.primary,
+                backgroundColor: UAFE_COLORS.primaryLight,
             },
           }}
         >
-          Agregar Compareciente
-        </Button>
+            Agregar Compareciente
+          </Button>
+        </Tooltip>
       </Box>
 
       {personas.length === 0 ? (
@@ -445,22 +448,24 @@ function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm }) 
                 />
 
                 <Box sx={{ display: 'flex', gap: 0.5 }}>
-                  <IconButton
-                    size="small"
-                    onClick={() => onSendForm?.(p)}
-                    title="Copiar enlace formulario"
-                    sx={{ color: UAFE_COLORS.textMuted, '&:hover': { color: UAFE_COLORS.primary } }}
-                  >
-                    <LinkOutlinedIcon sx={{ fontSize: 18 }} />
-                  </IconButton>
-                  <IconButton
-                    size="small"
-                    onClick={() => onEditPerson?.(p)}
-                    title="Editar datos"
-                    sx={{ color: UAFE_COLORS.textMuted, '&:hover': { color: UAFE_COLORS.primary } }}
-                  >
-                    <ContentCopyIcon sx={{ fontSize: 16 }} />
-                  </IconButton>
+                  <Tooltip title="Genera y copia el enlace del formulario publico para que este compareciente complete sus datos personales (direccion, laboral, PEP)" arrow>
+                    <IconButton
+                      size="small"
+                      onClick={() => onSendForm?.(p)}
+                      sx={{ color: UAFE_COLORS.textMuted, '&:hover': { color: UAFE_COLORS.primary } }}
+                    >
+                      <LinkOutlinedIcon sx={{ fontSize: 18 }} />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Editar manualmente los datos de este compareciente. Use esta opcion si el compareciente no puede llenar el formulario en linea." arrow>
+                    <IconButton
+                      size="small"
+                      onClick={() => onEditPerson?.(p)}
+                      sx={{ color: UAFE_COLORS.textMuted, '&:hover': { color: UAFE_COLORS.primary } }}
+                    >
+                      <ContentCopyIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
                 </Box>
               </Paper>
             );
@@ -750,10 +755,18 @@ export default function UAFEProtocolDetail({
               },
             }}
           >
-            <Tab label="Datos del Acto" />
-            <Tab label={`Comparecientes (${(protocol.personas || []).length})`} />
-            <Tab label="Minuta" />
-            <Tab label="Textos Generados" />
+            <Tooltip title="Tipo de acto, cuantia, avaluo, datos del bien y ubicacion del inmueble" arrow>
+              <Tab label="Datos del Acto" />
+            </Tooltip>
+            <Tooltip title="Personas que intervienen en el acto. Desde aqui puede enviar el formulario publico para que completen sus datos." arrow>
+              <Tab label={`Comparecientes (${(protocol.personas || []).length})`} />
+            </Tooltip>
+            <Tooltip title="Subida de minuta Word para extraccion automatica de datos (proximamente)" arrow>
+              <Tab label="Minuta" />
+            </Tooltip>
+            <Tooltip title="Encabezado y texto de comparecencia generados automaticamente a partir de los datos del protocolo" arrow>
+              <Tab label="Textos Generados" />
+            </Tooltip>
           </Tabs>
 
           <Box sx={{ px: 3, pb: 2 }}>

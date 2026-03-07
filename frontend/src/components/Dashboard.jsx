@@ -125,6 +125,10 @@ const Dashboard = () => {
     return <ArchivoCenter />;
   }
 
+  if (user.role === 'OFICIAL_CUMPLIMIENTO') {
+    return <MatrizadorCenter />;
+  }
+
   if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
     return <AdminCenter />;
   }

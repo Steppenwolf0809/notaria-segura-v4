@@ -70,7 +70,7 @@ router.post('/responder', verifyFormularioUAFESession, responderFormulario);
 router.post(
   '/protocolo',
   authenticateToken,
-  requireRoles(['MATRIZADOR', 'ADMIN']),
+  requireRoles(['MATRIZADOR', 'ADMIN', 'OFICIAL_CUMPLIMIENTO']),
   csrfProtection,
   crearProtocolo
 );
@@ -84,7 +84,7 @@ router.post(
 router.post(
   '/protocolo/:protocoloId/persona',
   authenticateToken,
-  requireRoles(['MATRIZADOR', 'ADMIN']),
+  requireRoles(['MATRIZADOR', 'ADMIN', 'OFICIAL_CUMPLIMIENTO']),
   agregarPersonaAProtocolo
 );
 
@@ -96,7 +96,7 @@ router.post(
 router.get(
   '/protocolo/:protocoloId',
   authenticateToken,
-  requireRoles(['MATRIZADOR', 'ADMIN']),
+  requireRoles(['MATRIZADOR', 'ADMIN', 'OFICIAL_CUMPLIMIENTO']),
   obtenerProtocolo
 );
 
@@ -109,7 +109,7 @@ router.get(
 router.put(
   '/protocolo/:protocoloId',
   authenticateToken,
-  requireRoles(['MATRIZADOR', 'ADMIN']),
+  requireRoles(['MATRIZADOR', 'ADMIN', 'OFICIAL_CUMPLIMIENTO']),
   csrfProtection,
   actualizarProtocolo
 );
@@ -123,7 +123,7 @@ router.put(
 router.delete(
   '/protocolo/:protocoloId',
   authenticateToken,
-  requireRoles(['MATRIZADOR', 'ADMIN']),
+  requireRoles(['MATRIZADOR', 'ADMIN', 'OFICIAL_CUMPLIMIENTO']),
   csrfProtection,
   eliminarProtocolo
 );
@@ -137,7 +137,7 @@ router.delete(
 router.put(
   '/protocolo/:protocoloId/persona/:personaProtocoloId',
   authenticateToken,
-  requireRoles(['MATRIZADOR', 'ADMIN']),
+  requireRoles(['MATRIZADOR', 'ADMIN', 'OFICIAL_CUMPLIMIENTO']),
   csrfProtection,
   actualizarPersonaEnProtocolo
 );
@@ -151,7 +151,7 @@ router.put(
 router.delete(
   '/protocolo/:protocoloId/persona/:personaProtocoloId',
   authenticateToken,
-  requireRoles(['MATRIZADOR', 'ADMIN']),
+  requireRoles(['MATRIZADOR', 'ADMIN', 'OFICIAL_CUMPLIMIENTO']),
   csrfProtection,
   eliminarPersonaDeProtocolo
 );
@@ -176,7 +176,7 @@ router.get(
 router.get(
   '/protocolo/:protocoloId/generar-pdfs',
   authenticateToken,
-  requireRoles(['MATRIZADOR', 'ADMIN']),
+  requireRoles(['MATRIZADOR', 'ADMIN', 'OFICIAL_CUMPLIMIENTO']),
   generarPDFs
 );
 
@@ -189,7 +189,7 @@ router.get(
 router.post(
   '/protocolo/:protocoloId/generar-textos',
   authenticateToken,
-  requireRoles(['MATRIZADOR', 'ADMIN']),
+  requireRoles(['MATRIZADOR', 'ADMIN', 'OFICIAL_CUMPLIMIENTO']),
   generarTextos
 );
 
@@ -210,7 +210,7 @@ router.get(
 router.patch(
   '/protocolos/:protocoloId/personas/:personaId',
   authenticateToken,
-  requireRoles(['MATRIZADOR', 'ADMIN']),
+  requireRoles(['MATRIZADOR', 'ADMIN', 'OFICIAL_CUMPLIMIENTO']),
   actualizarPersonaEnProtocolo
 );
 
@@ -222,7 +222,7 @@ router.patch(
 router.delete(
   '/protocolos/:protocoloId/personas/:personaId',
   authenticateToken,
-  requireRoles(['MATRIZADOR', 'ADMIN']),
+  requireRoles(['MATRIZADOR', 'ADMIN', 'OFICIAL_CUMPLIMIENTO']),
   eliminarPersonaDeProtocolo
 );
 
@@ -233,7 +233,7 @@ router.delete(
 router.put(
   '/persona/:cedula',
   authenticateToken,
-  requireRoles(['MATRIZADOR', 'ADMIN']),
+  requireRoles(['MATRIZADOR', 'ADMIN', 'OFICIAL_CUMPLIMIENTO']),
   csrfProtection,
   actualizarDatosPersona
 );
@@ -247,7 +247,7 @@ router.put(
 router.get(
   '/protocolos/:protocoloId/personas/:personaId/pdf',
   authenticateToken,
-  requireRoles(['MATRIZADOR', 'ADMIN']),
+  requireRoles(['MATRIZADOR', 'ADMIN', 'OFICIAL_CUMPLIMIENTO']),
   generarPDFIndividual
 );
 
@@ -256,14 +256,14 @@ router.get(
 // ========================================
 
 /**
- * Listar TODOS los protocolos (solo para ADMIN)
+ * Listar TODOS los protocolos (ADMIN y OFICIAL_CUMPLIMIENTO)
  * GET /api/formulario-uafe/admin/protocolos
- * Requiere: JWT + role ADMIN
+ * Requiere: JWT + role ADMIN u OFICIAL_CUMPLIMIENTO
  */
 router.get(
   '/admin/protocolos',
   authenticateToken,
-  requireRoles(['ADMIN']),
+  requireRoles(['ADMIN', 'OFICIAL_CUMPLIMIENTO']),
   listarTodosProtocolos
 );
 
@@ -295,7 +295,7 @@ router.delete(
 router.get(
   '/admin/personas-registradas',
   authenticateToken,
-  requireRoles(['ADMIN']),
+  requireRoles(['ADMIN', 'OFICIAL_CUMPLIMIENTO']),
   listarPersonasRegistradas
 );
 

@@ -1,4 +1,4 @@
-import { Box, Card, Typography, Skeleton } from '@mui/material';
+import { Box, Card, Typography, Skeleton, Tooltip } from '@mui/material';
 import { UAFE_COLORS, SEMAFORO } from './uafe-constants';
 
 const kpiCardStyles = {
@@ -19,8 +19,8 @@ const kpiCardStyles = {
   },
 };
 
-function KPICard({ label, value, accentColor, subtitle, loading }) {
-  return (
+function KPICard({ label, value, accentColor, subtitle, loading, tooltip }) {
+  const card = (
     <Card sx={kpiCardStyles.card} elevation={0}>
       {/* Left accent bar */}
       <Box
@@ -78,15 +78,14 @@ function KPICard({ label, value, accentColor, subtitle, loading }) {
       )}
     </Card>
   );
+
+  return tooltip ? (
+    <Tooltip title={tooltip} arrow placement="bottom">
+      {card}
+    </Tooltip>
+  ) : card;
 }
 
-/**
- * UAFEKPICards - Summary KPI cards for the UAFE dashboard
- *
- * Props:
- *   - stats: { total, completos, pendientes, criticos, completitud }
- *   - loading: boolean
- */
 export default function UAFEKPICards({ stats = {}, loading = false }) {
   const {
     total = 0,
@@ -109,6 +108,7 @@ export default function UAFEKPICards({ stats = {}, loading = false }) {
         value={total}
         accentColor={UAFE_COLORS.primary}
         loading={loading}
+        tooltip="Total de protocolos UAFE creados este mes. Incluye todos los estados: borradores, en proceso y completos."
       />
       <KPICard
         label="Completos"
@@ -116,6 +116,7 @@ export default function UAFEKPICards({ stats = {}, loading = false }) {
         accentColor={SEMAFORO.VERDE.color}
         subtitle="Listos para reporte"
         loading={loading}
+        tooltip="Protocolos con todos los datos completos: tipo de acto, cuantia, No. protocolo y formularios de todos los comparecientes al 100%."
       />
       <KPICard
         label="Pendientes"
@@ -123,6 +124,7 @@ export default function UAFEKPICards({ stats = {}, loading = false }) {
         accentColor={SEMAFORO.AMARILLO.color}
         subtitle="Datos parciales"
         loading={loading}
+        tooltip="Protocolos que tienen datos parciales. Revise que datos faltan expandiendo la fila en la tabla o haciendo clic en el protocolo."
       />
       <KPICard
         label="Criticos"
@@ -130,12 +132,14 @@ export default function UAFEKPICards({ stats = {}, loading = false }) {
         accentColor={SEMAFORO.ROJO.color}
         subtitle="Faltan datos obligatorios"
         loading={loading}
+        tooltip="Protocolos sin datos obligatorios UAFE: sin tipo de acto, sin cuantia o sin comparecientes. Requieren atencion inmediata."
       />
       <KPICard
         label="Completitud"
         value={`${completitud}%`}
         accentColor={completitud >= 80 ? SEMAFORO.VERDE.color : completitud >= 50 ? SEMAFORO.AMARILLO.color : SEMAFORO.ROJO.color}
         loading={loading}
+        tooltip="Porcentaje de protocolos con semaforo verde sobre el total. Meta: 100% antes de generar el reporte mensual."
       />
     </Box>
   );

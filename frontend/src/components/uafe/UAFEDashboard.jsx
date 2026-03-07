@@ -6,12 +6,14 @@ import {
   Tabs,
   Tab,
   CircularProgress,
+  Tooltip,
 } from '@mui/material';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
 import ListAltOutlinedIcon from '@mui/icons-material/ListAltOutlined';
 
 import apiClient from '../../services/api-client';
+import useAuthStore from '../../store/auth-store';
 
 import UAFEKPICards from './UAFEKPICards';
 import UAFEStatusPipeline from './UAFEStatusPipeline';
@@ -27,6 +29,11 @@ import { UAFE_COLORS, getSemaforoFromProtocol, ESTADOS_PROTOCOLO_FLOW } from './
  * professional compliance dashboard.
  */
 export default function UAFEDashboard() {
+  // ── Auth / Role ─────────────────────────────────────────────
+  const user = useAuthStore((s) => s.user);
+  const userRole = user?.role || '';
+  const isOficialOrAdmin = ['ADMIN', 'SUPER_ADMIN', 'OFICIAL_CUMPLIMIENTO'].includes(userRole);
+
   // ── State ─────────────────────────────────────────────────────
   const [protocols, setProtocols] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,7 +49,11 @@ export default function UAFEDashboard() {
   const fetchProtocols = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await apiClient.get('/formulario-uafe/protocolos', {
+      // OFICIAL_CUMPLIMIENTO and ADMIN see ALL protocols via admin endpoint
+      const endpoint = isOficialOrAdmin
+        ? '/formulario-uafe/admin/protocolos'
+        : '/formulario-uafe/protocolos';
+      const { data } = await apiClient.get(endpoint, {
         params: { limit: 200 },
       });
       setProtocols(data.data || data.protocolos || []);
@@ -52,7 +63,7 @@ export default function UAFEDashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isOficialOrAdmin]);
 
   useEffect(() => {
     fetchProtocols();
@@ -191,25 +202,29 @@ export default function UAFEDashboard() {
             Gestion de protocolos y reportes de la Unidad de Analisis Financiero
           </Typography>
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<AddOutlinedIcon />}
-          sx={{
-            textTransform: 'none',
-            fontWeight: 700,
-            fontSize: '0.82rem',
-            backgroundColor: UAFE_COLORS.primary,
-            borderRadius: '8px',
-            px: 2.5,
-            boxShadow: 'none',
-            '&:hover': {
-              boxShadow: '0 2px 12px rgba(30,90,142,0.3)',
-              backgroundColor: UAFE_COLORS.primaryDark,
-            },
-          }}
-        >
-          Nuevo Protocolo
-        </Button>
+        {userRole !== 'OFICIAL_CUMPLIMIENTO' && (
+          <Tooltip title="Crea un nuevo protocolo UAFE. Ingrese los datos del acto notarial y agregue los comparecientes para iniciar el proceso de debida diligencia." arrow placement="left">
+            <Button
+              variant="contained"
+              startIcon={<AddOutlinedIcon />}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 700,
+                fontSize: '0.82rem',
+                backgroundColor: UAFE_COLORS.primary,
+                borderRadius: '8px',
+                px: 2.5,
+                boxShadow: 'none',
+                '&:hover': {
+                  boxShadow: '0 2px 12px rgba(30,90,142,0.3)',
+                  backgroundColor: UAFE_COLORS.primaryDark,
+                },
+              }}
+            >
+              Nuevo Protocolo
+            </Button>
+          </Tooltip>
+        )}
       </Box>
 
       {/* KPI Cards */}
@@ -270,12 +285,14 @@ export default function UAFEDashboard() {
             label="Protocolos"
             sx={{ gap: 0.75 }}
           />
-          <Tab
-            icon={<AssessmentOutlinedIcon sx={{ fontSize: 18 }} />}
-            iconPosition="start"
-            label="Reportes Mensuales"
-            sx={{ gap: 0.75 }}
-          />
+          {isOficialOrAdmin && (
+            <Tab
+              icon={<AssessmentOutlinedIcon sx={{ fontSize: 18 }} />}
+              iconPosition="start"
+              label="Reportes Mensuales"
+              sx={{ gap: 0.75 }}
+            />
+          )}
         </Tabs>
 
         {activeTab === 0 && (
@@ -289,7 +306,7 @@ export default function UAFEDashboard() {
           />
         )}
 
-        {activeTab === 1 && (
+        {activeTab === 1 && isOficialOrAdmin && (
           <UAFEReportPanel
             stats={{
               total: stats.total,
