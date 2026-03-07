@@ -27,6 +27,7 @@ import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined';
 import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
@@ -464,7 +465,7 @@ function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm }) 
                       onClick={() => onEditPerson?.(p)}
                       sx={{ color: UAFE_COLORS.textMuted, '&:hover': { color: UAFE_COLORS.primary } }}
                     >
-                      <ContentCopyIcon sx={{ fontSize: 16 }} />
+                      <EditOutlinedIcon sx={{ fontSize: 16 }} />
                     </IconButton>
                   </Tooltip>
                 </Box>

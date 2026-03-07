@@ -5,5 +5,6 @@ export { default as UAFEProtocolTable } from './UAFEProtocolTable';
 export { default as UAFEProtocolDetail } from './UAFEProtocolDetail';
 export { default as UAFEReportPanel } from './UAFEReportPanel';
 export { default as UAFEMinutaUpload } from './UAFEMinutaUpload';
+export { default as UAFEPersonaEditDialog } from './UAFEPersonaEditDialog';
 export { default as SemaforoIndicator, SemaforoPersona } from './SemaforoIndicator';
 export * from './uafe-constants';

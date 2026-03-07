@@ -250,7 +250,13 @@ export function getMissingFields(protocol) {
   const personas = protocol.personas || [];
   const pendingPersons = personas.filter((p) => p.estadoCompletitud !== 'completo');
   if (pendingPersons.length > 0) {
-    missing.push(`${pendingPersons.length} persona(s) con datos incompletos`);
+    pendingPersons.forEach((p) => {
+      const nombre = p.nombre || p.nombreTemporal || p.personaCedula || 'Sin nombre';
+      const campos = Array.isArray(p.camposFaltantes) && p.camposFaltantes.length > 0
+        ? `: ${p.camposFaltantes.slice(0, 3).join(', ')}${p.camposFaltantes.length > 3 ? '...' : ''}`
+        : '';
+      missing.push(`${nombre}${campos}`);
+    });
   }
 
   return missing;

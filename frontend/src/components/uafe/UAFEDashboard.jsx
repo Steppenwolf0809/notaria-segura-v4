@@ -7,10 +7,24 @@ import {
   Tab,
   CircularProgress,
   Tooltip,
+  Snackbar,
+  Alert,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Grid,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  IconButton,
 } from '@mui/material';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
 import ListAltOutlinedIcon from '@mui/icons-material/ListAltOutlined';
+import CloseIcon from '@mui/icons-material/Close';
 
 import apiClient from '../../services/api-client';
 import useAuthStore from '../../store/auth-store';
@@ -20,7 +34,8 @@ import UAFEStatusPipeline from './UAFEStatusPipeline';
 import UAFEProtocolTable from './UAFEProtocolTable';
 import UAFEProtocolDetail from './UAFEProtocolDetail';
 import UAFEReportPanel from './UAFEReportPanel';
-import { UAFE_COLORS, getSemaforoFromProtocol, ESTADOS_PROTOCOLO_FLOW } from './uafe-constants';
+import UAFEPersonaEditDialog from './UAFEPersonaEditDialog';
+import { UAFE_COLORS, TIPOS_ACTO_UAFE, getSemaforoFromProtocol, ESTADOS_PROTOCOLO_FLOW } from './uafe-constants';
 
 /**
  * UAFEDashboard - Main container for the redesigned UAFE module
@@ -43,6 +58,19 @@ export default function UAFEDashboard() {
     search: '',
     estado: '',
     tipoActo: '',
+  });
+  // OLA 3: Manual edit dialog
+  const [editPersona, setEditPersona] = useState(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  // Create protocol dialog
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    fecha: new Date().toISOString().slice(0, 10),
+    actoContrato: '',
+    valorContrato: '',
+    avaluoMunicipal: '',
+    numeroProtocolo: '',
   });
 
   // ── Data fetching ─────────────────────────────────────────────
@@ -135,21 +163,89 @@ export default function UAFEDashboard() {
     setSelectedProtocol(null);
   };
 
+  const refreshSelectedProtocol = async () => {
+    if (!selectedProtocol) return;
+    try {
+      const { data } = await apiClient.get(
+        `/formulario-uafe/protocolo/${selectedProtocol.id}`
+      );
+      setSelectedProtocol(data.data || data.protocolo || data);
+    } catch (err) {
+      console.error('Error refreshing protocol:', err);
+    }
+  };
+
   const handleSave = async (updatedFields) => {
     if (!selectedProtocol) return;
     try {
       await apiClient.put(
-        `/formulario-uafe/protocolos/${selectedProtocol.id}`,
+        `/formulario-uafe/protocolo/${selectedProtocol.id}`,
         updatedFields
       );
       await fetchProtocols();
-      // Update selected protocol with fresh data
-      const { data } = await apiClient.get(
-        `/formulario-uafe/protocolos/${selectedProtocol.id}`
-      );
-      setSelectedProtocol(data.data || data.protocolo || data);
+      await refreshSelectedProtocol();
     } catch (err) {
       console.error('Error saving protocol:', err);
+    }
+  };
+
+  // OLA 3: Edit persona manually (fallback matrizador)
+  const handleEditPerson = (persona) => {
+    setEditPersona(persona);
+  };
+
+  const handlePersonaSaved = async () => {
+    setSnackbar({ open: true, message: 'Datos del compareciente actualizados', severity: 'success' });
+    await fetchProtocols();
+    await refreshSelectedProtocol();
+  };
+
+  // OLA 3: Copy form link to clipboard
+  const handleSendForm = (persona) => {
+    if (!selectedProtocol) return;
+    const id = selectedProtocol.numeroProtocolo || selectedProtocol.identificadorTemporal || selectedProtocol.id;
+    const cedula = persona.personaCedula || persona.cedula;
+    const baseUrl = window.location.origin;
+    const link = `${baseUrl}/formulario-uafe?protocolo=${encodeURIComponent(id)}&cedula=${encodeURIComponent(cedula)}`;
+    navigator.clipboard.writeText(link).then(() => {
+      setSnackbar({ open: true, message: `Enlace copiado para ${persona.nombre || cedula}`, severity: 'success' });
+    }).catch(() => {
+      setSnackbar({ open: true, message: `Enlace: ${link}`, severity: 'info' });
+    });
+  };
+
+  // Create new protocol
+  const handleCreateProtocol = async () => {
+    if (!createForm.fecha || !createForm.actoContrato || !createForm.valorContrato) {
+      setSnackbar({ open: true, message: 'Complete fecha, tipo de acto y cuantia', severity: 'warning' });
+      return;
+    }
+    setCreating(true);
+    try {
+      const { data } = await apiClient.post('/formulario-uafe/protocolo', {
+        fecha: createForm.fecha,
+        actoContrato: createForm.actoContrato,
+        valorContrato: parseFloat(createForm.valorContrato),
+        avaluoMunicipal: createForm.avaluoMunicipal ? parseFloat(createForm.avaluoMunicipal) : undefined,
+        numeroProtocolo: createForm.numeroProtocolo || undefined,
+      });
+      setShowCreateDialog(false);
+      setCreateForm({ fecha: new Date().toISOString().slice(0, 10), actoContrato: '', valorContrato: '', avaluoMunicipal: '', numeroProtocolo: '' });
+      setSnackbar({ open: true, message: 'Protocolo creado exitosamente', severity: 'success' });
+      await fetchProtocols();
+      // Open the newly created protocol
+      const proto = data.data || data;
+      if (proto?.id) {
+        try {
+          const { data: detailRes } = await apiClient.get(`/formulario-uafe/protocolo/${proto.id}`);
+          setSelectedProtocol(detailRes.data || detailRes);
+        } catch { setSelectedProtocol(proto); }
+      }
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Error al crear protocolo';
+      setSnackbar({ open: true, message: msg, severity: 'error' });
+    } finally {
+      setCreating(false);
     }
   };
 
@@ -161,7 +257,24 @@ export default function UAFEDashboard() {
           protocol={selectedProtocol}
           onBack={handleBack}
           onSave={handleSave}
+          onEditPerson={handleEditPerson}
+          onSendForm={handleSendForm}
         />
+        <UAFEPersonaEditDialog
+          open={!!editPersona}
+          onClose={() => setEditPersona(null)}
+          persona={editPersona}
+          protocoloId={selectedProtocol.id}
+          onSaved={handlePersonaSaved}
+        />
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={4000}
+          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert severity={snackbar.severity} variant="filled">{snackbar.message}</Alert>
+        </Snackbar>
       </Box>
     );
   }
@@ -207,6 +320,7 @@ export default function UAFEDashboard() {
             <Button
               variant="contained"
               startIcon={<AddOutlinedIcon />}
+              onClick={() => setShowCreateDialog(true)}
               sx={{
                 textTransform: 'none',
                 fontWeight: 700,
@@ -318,6 +432,114 @@ export default function UAFEDashboard() {
           />
         )}
       </Box>
+
+      {/* Create Protocol Dialog */}
+      <Dialog
+        open={showCreateDialog}
+        onClose={() => setShowCreateDialog(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: '12px' } }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Typography sx={{ fontWeight: 700, fontSize: '1rem' }}>Nuevo Protocolo UAFE</Typography>
+          <IconButton size="small" onClick={() => setShowCreateDialog(false)}>
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers sx={{ pt: 2 }}>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Fecha *"
+                type="date"
+                value={createForm.fecha}
+                onChange={(e) => setCreateForm(prev => ({ ...prev, fecha: e.target.value }))}
+                slotProps={{ inputLabel: { shrink: true } }}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                fullWidth
+                size="small"
+                label="No. Protocolo"
+                placeholder="Opcional (se asigna al facturar)"
+                value={createForm.numeroProtocolo}
+                onChange={(e) => setCreateForm(prev => ({ ...prev, numeroProtocolo: e.target.value }))}
+              />
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Tipo de Acto *</InputLabel>
+                <Select
+                  value={createForm.actoContrato}
+                  label="Tipo de Acto *"
+                  onChange={(e) => setCreateForm(prev => ({ ...prev, actoContrato: e.target.value }))}
+                >
+                  {TIPOS_ACTO_UAFE.map((t) => (
+                    <MenuItem key={t.codigo} value={t.codigo}>
+                      <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                        {t.codigo} - {t.descripcion}
+                      </Typography>
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Cuantia (USD) *"
+                type="number"
+                value={createForm.valorContrato}
+                onChange={(e) => setCreateForm(prev => ({ ...prev, valorContrato: e.target.value }))}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <TextField
+                fullWidth
+                size="small"
+                label="Avaluo Municipal (USD)"
+                type="number"
+                value={createForm.avaluoMunicipal}
+                onChange={(e) => setCreateForm(prev => ({ ...prev, avaluoMunicipal: e.target.value }))}
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={() => setShowCreateDialog(false)} disabled={creating}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            onClick={handleCreateProtocol}
+            disabled={creating}
+            startIcon={creating ? <CircularProgress size={16} /> : <AddOutlinedIcon />}
+            sx={{
+              textTransform: 'none',
+              fontWeight: 600,
+              backgroundColor: UAFE_COLORS.primary,
+              '&:hover': { backgroundColor: UAFE_COLORS.primaryDark },
+            }}
+          >
+            {creating ? 'Creando...' : 'Crear Protocolo'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert severity={snackbar.severity} variant="filled">{snackbar.message}</Alert>
+      </Snackbar>
     </Box>
   );
 }
