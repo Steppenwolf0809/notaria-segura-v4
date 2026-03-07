@@ -42,8 +42,10 @@ export default function UAFEDashboard() {
   const fetchProtocols = useCallback(async () => {
     setLoading(true);
     try {
-      const { data } = await apiClient.get('/formulario-uafe/protocolos');
-      setProtocols(data.protocolos || data || []);
+      const { data } = await apiClient.get('/formulario-uafe/protocolos', {
+        params: { limit: 200 },
+      });
+      setProtocols(data.data || data.protocolos || []);
     } catch (err) {
       console.error('Error fetching UAFE protocols:', err);
       setProtocols([]);
@@ -134,7 +136,7 @@ export default function UAFEDashboard() {
       const { data } = await apiClient.get(
         `/formulario-uafe/protocolos/${selectedProtocol.id}`
       );
-      setSelectedProtocol(data.protocolo || data);
+      setSelectedProtocol(data.data || data.protocolo || data);
     } catch (err) {
       console.error('Error saving protocol:', err);
     }
