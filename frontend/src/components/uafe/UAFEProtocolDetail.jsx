@@ -158,9 +158,7 @@ function CompletitudSidebar({ protocol }) {
             Comparecientes: {completasPersonas}/{totalPersonas}
           </Typography>
           {personas.map((p, idx) => {
-            const nombre = p.persona
-              ? `${p.persona.nombres || ''} ${p.persona.apellidos || ''}`.trim()
-              : p.nombreTemporal || 'Sin nombre';
+            const nombre = p.nombre || p.nombreTemporal || 'Sin nombre';
             return (
               <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.5 }}>
                 <SemaforoPersona
@@ -395,9 +393,7 @@ function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm }) 
       ) : (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
           {personas.map((p, idx) => {
-            const nombre = p.persona
-              ? `${p.persona.nombres || ''} ${p.persona.apellidos || ''}`.trim()
-              : p.nombreTemporal || 'Sin nombre';
+            const nombre = p.nombre || p.nombreTemporal || 'Sin nombre';
             const cedula = p.personaCedula || '-';
 
             return (

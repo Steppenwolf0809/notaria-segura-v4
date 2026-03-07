@@ -80,10 +80,8 @@ function ExpandedPersonRow({ personas = [] }) {
       </Typography>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
         {personas.map((p, idx) => {
-          const nombre = p.persona
-            ? `${p.persona.nombres || ''} ${p.persona.apellidos || ''}`.trim()
-            : p.nombreTemporal || 'Sin nombre';
-          const cedula = p.personaCedula || '-';
+          const nombre = p.nombre || p.nombreTemporal || 'Sin nombre';
+          const cedula = p.cedula || p.personaCedula || '-';
 
           return (
             <Box
@@ -155,10 +153,7 @@ function ProtocolRow({ protocol, onView, onEdit }) {
 
   const personNames = personas
     .slice(0, 2)
-    .map((p) => {
-      if (p.persona) return `${p.persona.nombres || ''} ${p.persona.apellidos || ''}`.trim();
-      return p.nombreTemporal || 'Sin nombre';
-    });
+    .map((p) => p.nombre || p.nombreTemporal || 'Sin nombre');
 
   return (
     <>
