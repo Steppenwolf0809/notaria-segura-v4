@@ -104,3 +104,4 @@ docs/historial/*.zip
 docs/*.csv
 docs/historial/*.csv
 *.dump
+haz build cuando hayas terminado todos los cambios

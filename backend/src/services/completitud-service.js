@@ -1,28 +1,74 @@
 /**
  * Servicio de Validación de Completitud de Datos
- * 
+ *
  * Calcula qué tan completos están los datos de una persona
  * para determinar el estado del semáforo (🔴 🟡 🟢)
+ *
+ * OLA 3: Validación flexible
+ * - Campos UAFE obligatorios: nombre, cédula, nacionalidad, calidad (bloquean verde)
+ * - Campos debida diligencia: dirección, laboral, PEP, cónyuge (no bloquean reporte)
  */
 
 import prisma from '../db.js';
 
+// Labels legibles para los campos faltantes
+const LABELS_CAMPOS = {
+    apellidos: 'Apellidos',
+    nombres: 'Nombres',
+    genero: 'Genero',
+    estadoCivil: 'Estado civil',
+    nacionalidad: 'Nacionalidad',
+    celular: 'Celular',
+    correo: 'Correo electronico',
+    callePrincipal: 'Calle principal',
+    numeroCasa: 'Numero de casa',
+    provincia: 'Provincia',
+    canton: 'Canton',
+    parroquia: 'Parroquia',
+    situacionLaboral: 'Situacion laboral',
+    profesion: 'Profesion/Ocupacion',
+    ingresoMensual: 'Ingreso mensual',
+    conyugeApellidos: 'Apellidos conyuge',
+    conyugeNombres: 'Nombres conyuge',
+    conyugeNumeroId: 'Cedula conyuge',
+    pep: 'Declaracion PEP',
+    razonSocial: 'Razon social',
+    ruc: 'RUC',
+    objetoSocial: 'Objeto social',
+    contactoCompania: 'Contacto compania',
+    repApellidos: 'Apellidos representante',
+    repNombres: 'Nombres representante',
+    repNumeroId: 'Cedula representante',
+    repGenero: 'Genero representante',
+    repEstadoCivil: 'Estado civil representante',
+    conyugeRepApellidos: 'Apellidos conyuge representante',
+    conyugeRepNombres: 'Nombres conyuge representante',
+    conyugeRepNumeroId: 'Cedula conyuge representante',
+};
+
+function labelCampo(campo) {
+    return LABELS_CAMPOS[campo] || campo;
+}
+
 /**
  * Calcula la completitud de datos de una Persona Natural
- * 
+ *
  * @param {Object} datos - Datos de persona natural desde PersonaRegistrada
- * @returns {Object} - { estado, porcentaje, camposFaltantes, detalles }
+ * @returns {Object} - { estado, porcentaje, camposFaltantes, camposUafeFaltantes, camposDDFaltantes, detalles }
  */
 export function calcularCompletitudPersonaNatural(datos) {
     const resultado = {
         estado: 'pendiente',
         porcentaje: 0,
         camposFaltantes: [],
+        camposUafeFaltantes: [],  // Obligatorios UAFE (bloquean verde)
+        camposDDFaltantes: [],    // Debida diligencia (no bloquean reporte)
         detalles: {}
     };
 
     if (!datos || !datos.datosPersonaNatural) {
         resultado.camposFaltantes = ['No hay datos registrados'];
+        resultado.camposUafeFaltantes = ['No hay datos registrados'];
         return resultado;
     }
 
@@ -31,76 +77,57 @@ export function calcularCompletitudPersonaNatural(datos) {
     const direccion = datos.datosPersonaNatural.direccion || {};
     const laboral = datos.datosPersonaNatural.informacionLaboral || {};
     const conyuge = datos.datosPersonaNatural.conyuge || {};
+    const declaracion = datos.datosPersonaNatural.declaracionPEP || {};
 
     let camposTotal = 0;
     let camposLlenos = 0;
 
-    // 1. Validar datos personales obligatorios
-    const obligatoriosPersonales = [
-        { campo: 'apellidos', valor: personales.apellidos },
-        { campo: 'nombres', valor: personales.nombres },
-        { campo: 'genero', valor: personales.genero },
-        { campo: 'estadoCivil', valor: personales.estadoCivil },
-        { campo: 'celular', valor: contacto.celular }
-    ];
-
-    obligatoriosPersonales.forEach(item => {
+    const checkField = (campo, valor, esUafe) => {
         camposTotal++;
-        if (item.valor && String(item.valor).trim() !== '') {
+        const lleno = valor && String(valor).trim() !== '';
+        if (lleno) {
             camposLlenos++;
         } else {
-            resultado.camposFaltantes.push(item.campo);
-        }
-    });
-
-    // 2. Validar dirección obligatoria
-    const obligatoriosDireccion = [
-        { campo: 'callePrincipal', valor: direccion.callePrincipal },
-        { campo: 'numeroCasa', valor: direccion.numero },
-        { campo: 'provincia', valor: direccion.provincia },
-        { campo: 'canton', valor: direccion.canton },
-        { campo: 'parroquia', valor: direccion.parroquia }
-    ];
-
-    obligatoriosDireccion.forEach(item => {
-        camposTotal++;
-        if (item.valor && String(item.valor).trim() !== '') {
-            camposLlenos++;
-        } else {
-            resultado.camposFaltantes.push(item.campo);
-        }
-    });
-
-    // 3. Validar información laboral mínima
-    camposTotal += 2;
-    if (laboral.situacion) {
-        camposLlenos++;
-    } else {
-        resultado.camposFaltantes.push('situacionLaboral');
-    }
-
-    if (laboral.profesionOcupacion) {
-        camposLlenos++;
-    } else {
-        resultado.camposFaltantes.push('profesion');
-    }
-
-    // 4. Si es casado o unión libre, validar cónyuge
-    if (personales.estadoCivil === 'CASADO' || personales.estadoCivil === 'UNION_LIBRE') {
-        const obligatoriosConyuge = [
-            { campo: 'conyugeApellidos', valor: conyuge.apellidos },
-            { campo: 'conyugeNombres', valor: conyuge.nombres },
-            { campo: 'conyugeNumeroId', valor: conyuge.numeroIdentificacion }
-        ];
-
-        obligatoriosConyuge.forEach(item => {
-            camposTotal++;
-            if (item.valor && String(item.valor).trim() !== '') {
-                camposLlenos++;
+            const label = labelCampo(campo);
+            resultado.camposFaltantes.push(label);
+            if (esUafe) {
+                resultado.camposUafeFaltantes.push(label);
             } else {
-                resultado.camposFaltantes.push(item.campo);
+                resultado.camposDDFaltantes.push(label);
             }
-        });
+        }
+    };
+
+    // 1. Campos UAFE obligatorios (nombre, nacionalidad)
+    checkField('apellidos', personales.apellidos, true);
+    checkField('nombres', personales.nombres, true);
+    checkField('nacionalidad', personales.nacionalidad, true);
+
+    // 2. Campos debida diligencia (no bloquean reporte)
+    checkField('genero', personales.genero, false);
+    checkField('estadoCivil', personales.estadoCivil, false);
+    checkField('celular', contacto.celular, false);
+    checkField('correo', contacto.correoElectronico || contacto.correo, false);
+
+    // 3. Dirección - debida diligencia
+    checkField('callePrincipal', direccion.callePrincipal, false);
+    checkField('numeroCasa', direccion.numero, false);
+    checkField('provincia', direccion.provincia, false);
+    checkField('canton', direccion.canton, false);
+    checkField('parroquia', direccion.parroquia, false);
+
+    // 4. Información laboral - debida diligencia
+    checkField('situacionLaboral', laboral.situacion, false);
+    checkField('profesion', laboral.profesionOcupacion, false);
+
+    // 5. PEP - debida diligencia
+    checkField('pep', declaracion.esPEP != null ? String(declaracion.esPEP) : null, false);
+
+    // 6. Si es casado o unión libre, cónyuge - debida diligencia
+    if (personales.estadoCivil === 'CASADO' || personales.estadoCivil === 'UNION_LIBRE') {
+        checkField('conyugeApellidos', conyuge.apellidos, false);
+        checkField('conyugeNombres', conyuge.nombres, false);
+        checkField('conyugeNumeroId', conyuge.numeroIdentificacion, false);
     }
 
     // Calcular porcentaje
@@ -108,19 +135,25 @@ export function calcularCompletitudPersonaNatural(datos) {
         resultado.porcentaje = Math.round((camposLlenos / camposTotal) * 100);
     }
 
-    // Determinar estado
-    if (resultado.porcentaje === 0) {
-        resultado.estado = 'pendiente';  // 🔴
-    } else if (resultado.porcentaje < 100) {
-        resultado.estado = 'incompleto'; // 🟡
+    // Determinar estado: ROJO si faltan campos UAFE, AMARILLO si faltan DD, VERDE si todo OK
+    if (resultado.camposUafeFaltantes.length > 0) {
+        resultado.estado = resultado.porcentaje === 0 ? 'pendiente' : 'incompleto';
+    } else if (resultado.camposDDFaltantes.length > 0) {
+        resultado.estado = 'incompleto'; // AMARILLO pero no bloquea reporte
     } else {
-        resultado.estado = 'completo';   // 🟢
+        resultado.estado = 'completo';
+    }
+
+    // Override: si no hay absolutamente nada, es pendiente
+    if (resultado.porcentaje === 0) {
+        resultado.estado = 'pendiente';
     }
 
     resultado.detalles = {
         camposTotal,
         camposLlenos,
-        esCasado: personales.estadoCivil === 'CASADO' || personales.estadoCivil === 'UNION_LIBRE'
+        esCasado: personales.estadoCivil === 'CASADO' || personales.estadoCivil === 'UNION_LIBRE',
+        uafeCompleto: resultado.camposUafeFaltantes.length === 0,
     };
 
     return resultado;
@@ -137,11 +170,14 @@ export function calcularCompletitudPersonaJuridica(datos) {
         estado: 'pendiente',
         porcentaje: 0,
         camposFaltantes: [],
+        camposUafeFaltantes: [],
+        camposDDFaltantes: [],
         detalles: {}
     };
 
     if (!datos || !datos.datosPersonaJuridica) {
         resultado.camposFaltantes = ['No hay datos registrados'];
+        resultado.camposUafeFaltantes = ['No hay datos registrados'];
         return resultado;
     }
 
@@ -153,65 +189,54 @@ export function calcularCompletitudPersonaJuridica(datos) {
     let camposTotal = 0;
     let camposLlenos = 0;
 
-    // 1. Validar datos de la compañía
-    const obligatoriosCompania = [
-        { campo: 'razonSocial', valor: compania.razonSocial },
-        { campo: 'ruc', valor: compania.ruc },
-        { campo: 'objetoSocial', valor: compania.objetoSocial },
-        { campo: 'parroquia', valor: compania.parroquia }
-    ];
-
-    obligatoriosCompania.forEach(item => {
+    const checkField = (campo, valor, esUafe) => {
         camposTotal++;
-        if (item.valor && String(item.valor).trim() !== '') {
+        const lleno = valor && String(valor).trim() !== '';
+        if (lleno) {
             camposLlenos++;
         } else {
-            resultado.camposFaltantes.push(item.campo);
+            const label = labelCampo(campo);
+            resultado.camposFaltantes.push(label);
+            if (esUafe) {
+                resultado.camposUafeFaltantes.push(label);
+            } else {
+                resultado.camposDDFaltantes.push(label);
+            }
         }
-    });
+    };
 
-    // Al menos un contacto
+    // UAFE obligatorio
+    checkField('razonSocial', compania.razonSocial, true);
+    checkField('ruc', compania.ruc, true);
+
+    // Debida diligencia
+    checkField('objetoSocial', compania.objetoSocial, false);
+    checkField('parroquia', compania.parroquia, false);
+
+    // Al menos un contacto - DD
     camposTotal++;
     if (compania.emailCompania || compania.telefonoCompania || compania.celularCompania) {
         camposLlenos++;
     } else {
-        resultado.camposFaltantes.push('contactoCompania');
+        const label = labelCampo('contactoCompania');
+        resultado.camposFaltantes.push(label);
+        resultado.camposDDFaltantes.push(label);
     }
 
-    // 2. Validar representante legal
-    const obligatoriosRepresentante = [
-        { campo: 'repApellidos', valor: representante.apellidos },
-        { campo: 'repNombres', valor: representante.nombres },
-        { campo: 'repNumeroId', valor: representante.numeroIdentificacion },
-        { campo: 'repGenero', valor: representante.genero },
-        { campo: 'repEstadoCivil', valor: representante.estadoCivil }
-    ];
+    // Representante legal - UAFE obligatorio
+    checkField('repApellidos', representante.apellidos, true);
+    checkField('repNombres', representante.nombres, true);
+    checkField('repNumeroId', representante.numeroIdentificacion, true);
 
-    obligatoriosRepresentante.forEach(item => {
-        camposTotal++;
-        if (item.valor && String(item.valor).trim() !== '') {
-            camposLlenos++;
-        } else {
-            resultado.camposFaltantes.push(item.campo);
-        }
-    });
+    // DD
+    checkField('repGenero', representante.genero, false);
+    checkField('repEstadoCivil', representante.estadoCivil, false);
 
-    // 3. Si representante es casado, validar cónyuge
+    // Si representante es casado, validar cónyuge (DD)
     if (representante.estadoCivil === 'CASADO' || representante.estadoCivil === 'UNION_LIBRE') {
-        const obligatoriosConyuge = [
-            { campo: 'conyugeRepApellidos', valor: conyugeRep.apellidos },
-            { campo: 'conyugeRepNombres', valor: conyugeRep.nombres },
-            { campo: 'conyugeRepNumeroId', valor: conyugeRep.numeroIdentificacion }
-        ];
-
-        obligatoriosConyuge.forEach(item => {
-            camposTotal++;
-            if (item.valor && String(item.valor).trim() !== '') {
-                camposLlenos++;
-            } else {
-                resultado.camposFaltantes.push(item.campo);
-            }
-        });
+        checkField('conyugeRepApellidos', conyugeRep.apellidos, false);
+        checkField('conyugeRepNombres', conyugeRep.nombres, false);
+        checkField('conyugeRepNumeroId', conyugeRep.numeroIdentificacion, false);
     }
 
     // Calcular porcentaje
@@ -220,18 +245,23 @@ export function calcularCompletitudPersonaJuridica(datos) {
     }
 
     // Determinar estado
-    if (resultado.porcentaje === 0) {
-        resultado.estado = 'pendiente';  // 🔴
-    } else if (resultado.porcentaje < 100) {
-        resultado.estado = 'incompleto'; // 🟡
+    if (resultado.camposUafeFaltantes.length > 0) {
+        resultado.estado = resultado.porcentaje === 0 ? 'pendiente' : 'incompleto';
+    } else if (resultado.camposDDFaltantes.length > 0) {
+        resultado.estado = 'incompleto';
     } else {
-        resultado.estado = 'completo';   // 🟢
+        resultado.estado = 'completo';
+    }
+
+    if (resultado.porcentaje === 0) {
+        resultado.estado = 'pendiente';
     }
 
     resultado.detalles = {
         camposTotal,
         camposLlenos,
-        repEsCasado: representante.estadoCivil === 'CASADO' || representante.estadoCivil === 'UNION_LIBRE'
+        repEsCasado: representante.estadoCivil === 'CASADO' || representante.estadoCivil === 'UNION_LIBRE',
+        uafeCompleto: resultado.camposUafeFaltantes.length === 0,
     };
 
     return resultado;

@@ -558,7 +558,33 @@ export async function loginFormularioUAFE(req, res) {
       }
     });
 
-    // 6. Retornar datos completos
+    // 6. Pre-llenar datos desde minuta si existen (OLA 3)
+    let datosPreLlenados = null;
+    if (protocolo.datosExtraidos && !personaEnProtocolo.completado) {
+      const extraidos = typeof protocolo.datosExtraidos === 'string'
+        ? JSON.parse(protocolo.datosExtraidos)
+        : protocolo.datosExtraidos;
+
+      if (Array.isArray(extraidos.comparecientes)) {
+        const match = extraidos.comparecientes.find(
+          c => c.cedula === cedula || c.numeroIdentificacion === cedula
+        );
+        if (match) {
+          datosPreLlenados = {
+            nombres: match.nombres || '',
+            apellidos: match.apellidos || '',
+            nacionalidad: match.nacionalidad || '',
+            estadoCivil: match.estadoCivil || '',
+            telefono: match.telefono || '',
+            correo: match.correo || '',
+            profesion: match.profesion || '',
+            fuente: 'minuta',
+          };
+        }
+      }
+    }
+
+    // 7. Retornar datos completos
     res.json({
       success: true,
       message: 'Sesión iniciada correctamente',
@@ -579,6 +605,7 @@ export async function loginFormularioUAFE(req, res) {
         },
         tusDatos: personaEnProtocolo.persona.datosPersonaNatural ||
           personaEnProtocolo.persona.datosPersonaJuridica,
+        datosPreLlenados,
         completado: personaEnProtocolo.completado
       }
     });
@@ -656,6 +683,11 @@ export async function responderFormulario(req, res) {
     });
 
     console.log(`✅ [BIDIRECCIONALIDAD] Datos sincronizados: PersonaProtocolo + PersonaRegistrada (${personaProtocolo.persona.numeroIdentificacion})`);
+
+    // PASO 3: Recalcular completitud (OLA 3 - semáforo granular)
+    await calcularYActualizarCompletitud(req.personaProtocoloVerificada.id).catch(err =>
+      console.warn(`Error recalculando completitud post-respuesta:`, err)
+    );
 
     res.json({
       success: true,
@@ -1002,7 +1034,11 @@ export async function obtenerProtocolo(req, res) {
         // Nuevos campos de completitud (semáforo)
         estadoCompletitud: pp.estadoCompletitud || 'pendiente',
         porcentajeCompletitud: pp.porcentajeCompletitud || 0,
+        camposFaltantes: pp.camposFaltantes || [],
         respuestaFormulario: pp.respuestaFormulario,
+        // Datos completos de la persona para edición manual (OLA 3)
+        datosPersona: pp.persona.datosPersonaNatural || pp.persona.datosPersonaJuridica || null,
+        personaCedula: pp.personaCedula,
         createdAt: pp.createdAt,
         updatedAt: pp.updatedAt
       };
