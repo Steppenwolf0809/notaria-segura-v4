@@ -20,11 +20,13 @@ import {
   Select,
   MenuItem,
   IconButton,
+  Chip,
 } from '@mui/material';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
 import ListAltOutlinedIcon from '@mui/icons-material/ListAltOutlined';
 import CloseIcon from '@mui/icons-material/Close';
+import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined';
 
 import apiClient from '../../services/api-client';
 import useAuthStore from '../../store/auth-store';
@@ -35,7 +37,7 @@ import UAFEProtocolTable from './UAFEProtocolTable';
 import UAFEProtocolDetail from './UAFEProtocolDetail';
 import UAFEReportPanel from './UAFEReportPanel';
 import UAFEPersonaEditDialog from './UAFEPersonaEditDialog';
-import { UAFE_COLORS, TIPOS_ACTO_UAFE, getSemaforoFromProtocol, ESTADOS_PROTOCOLO_FLOW } from './uafe-constants';
+import { UAFE_COLORS, TIPOS_ACTO_UAFE, CALIDADES_COMPARECIENTE, getSemaforoFromProtocol, ESTADOS_PROTOCOLO_FLOW } from './uafe-constants';
 
 /**
  * UAFEDashboard - Main container for the redesigned UAFE module
@@ -62,16 +64,14 @@ export default function UAFEDashboard() {
   // OLA 3: Manual edit dialog
   const [editPersona, setEditPersona] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-  // Create protocol dialog
+  // Create protocol wizard
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [createForm, setCreateForm] = useState({
-    fecha: new Date().toISOString().slice(0, 10),
-    actoContrato: '',
-    valorContrato: '',
-    avaluoMunicipal: '',
-    numeroProtocolo: '',
-  });
+  const [wizardStep, setWizardStep] = useState('upload'); // upload | parsing | preview | creating
+  const [wizardFile, setWizardFile] = useState(null);
+  const [wizardFecha, setWizardFecha] = useState(new Date().toISOString().slice(0, 10));
+  const [wizardMinutaUrl, setWizardMinutaUrl] = useState(null);
+  const [wizardData, setWizardData] = useState(null);
+  const [wizardError, setWizardError] = useState(null);
 
   // ── Data fetching ─────────────────────────────────────────────
   const fetchProtocols = useCallback(async () => {
@@ -214,26 +214,59 @@ export default function UAFEDashboard() {
     });
   };
 
-  // Create new protocol
-  const handleCreateProtocol = async () => {
-    if (!createForm.fecha || !createForm.actoContrato || !createForm.valorContrato) {
-      setSnackbar({ open: true, message: 'Complete fecha, tipo de acto y cuantia', severity: 'warning' });
-      return;
-    }
-    setCreating(true);
+  // Wizard: reset state
+  const resetWizard = () => {
+    setWizardStep('upload');
+    setWizardFile(null);
+    setWizardFecha(new Date().toISOString().slice(0, 10));
+    setWizardMinutaUrl(null);
+    setWizardData(null);
+    setWizardError(null);
+  };
+
+  const openWizard = () => {
+    resetWizard();
+    setShowCreateDialog(true);
+  };
+
+  // Wizard step 1: Upload & parse
+  const handleWizardUpload = async () => {
+    if (!wizardFile) return;
+    setWizardStep('parsing');
+    setWizardError(null);
     try {
-      const { data } = await apiClient.post('/formulario-uafe/protocolo', {
-        fecha: createForm.fecha,
-        actoContrato: createForm.actoContrato,
-        valorContrato: parseFloat(createForm.valorContrato),
-        avaluoMunicipal: createForm.avaluoMunicipal ? parseFloat(createForm.avaluoMunicipal) : undefined,
-        numeroProtocolo: createForm.numeroProtocolo || undefined,
+      const formData = new FormData();
+      formData.append('minuta', wizardFile);
+      const { data } = await apiClient.post('/formulario-uafe/parse-minuta', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 60000,
+      });
+      if (data.success) {
+        setWizardData(data.data.datosExtraidos);
+        setWizardMinutaUrl(data.data.minutaUrl);
+        setWizardStep('preview');
+      } else {
+        throw new Error(data.error || 'Error al procesar');
+      }
+    } catch (err) {
+      setWizardError(err.response?.data?.error || err.message || 'Error al procesar la minuta');
+      setWizardStep('upload');
+    }
+  };
+
+  // Wizard step 2: Confirm & create
+  const handleWizardConfirm = async () => {
+    setWizardStep('creating');
+    setWizardError(null);
+    try {
+      const { data } = await apiClient.post('/formulario-uafe/protocolo-con-minuta', {
+        fecha: wizardFecha,
+        minutaUrl: wizardMinutaUrl,
+        datosConfirmados: wizardData,
       });
       setShowCreateDialog(false);
-      setCreateForm({ fecha: new Date().toISOString().slice(0, 10), actoContrato: '', valorContrato: '', avaluoMunicipal: '', numeroProtocolo: '' });
       setSnackbar({ open: true, message: 'Protocolo creado exitosamente', severity: 'success' });
       await fetchProtocols();
-      // Open the newly created protocol
       const proto = data.data || data;
       if (proto?.id) {
         try {
@@ -244,9 +277,26 @@ export default function UAFEDashboard() {
     } catch (err) {
       const msg = err.response?.data?.message || 'Error al crear protocolo';
       setSnackbar({ open: true, message: msg, severity: 'error' });
-    } finally {
-      setCreating(false);
+      setWizardStep('preview');
     }
+  };
+
+  // Wizard: edit helpers
+  const updateWizardField = (field, value) => {
+    setWizardData(prev => ({ ...prev, [field]: value }));
+  };
+  const updateWizardComp = (index, field, value) => {
+    setWizardData(prev => {
+      const comps = [...(prev.comparecientes || [])];
+      comps[index] = { ...comps[index], [field]: value };
+      return { ...prev, comparecientes: comps };
+    });
+  };
+  const removeWizardComp = (index) => {
+    setWizardData(prev => ({
+      ...prev,
+      comparecientes: prev.comparecientes.filter((_, i) => i !== index),
+    }));
   };
 
   // ── Detail view ───────────────────────────────────────────────
@@ -320,7 +370,7 @@ export default function UAFEDashboard() {
             <Button
               variant="contained"
               startIcon={<AddOutlinedIcon />}
-              onClick={() => setShowCreateDialog(true)}
+              onClick={openWizard}
               sx={{
                 textTransform: 'none',
                 fontWeight: 700,
@@ -433,101 +483,252 @@ export default function UAFEDashboard() {
         )}
       </Box>
 
-      {/* Create Protocol Dialog */}
+      {/* Create Protocol Wizard */}
       <Dialog
         open={showCreateDialog}
-        onClose={() => setShowCreateDialog(false)}
-        maxWidth="sm"
+        onClose={() => { if (wizardStep !== 'parsing' && wizardStep !== 'creating') setShowCreateDialog(false); }}
+        maxWidth={wizardStep === 'preview' ? 'md' : 'sm'}
         fullWidth
         PaperProps={{ sx: { borderRadius: '12px' } }}
       >
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Typography sx={{ fontWeight: 700, fontSize: '1rem' }}>Nuevo Protocolo UAFE</Typography>
-          <IconButton size="small" onClick={() => setShowCreateDialog(false)}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Typography sx={{ fontWeight: 700, fontSize: '1rem' }}>Nuevo Protocolo UAFE</Typography>
+            <Chip
+              size="small"
+              label={wizardStep === 'upload' || wizardStep === 'parsing' ? 'Paso 1 de 2' : 'Paso 2 de 2'}
+              sx={{ fontSize: '0.68rem', fontWeight: 600, backgroundColor: UAFE_COLORS.primaryLight, color: UAFE_COLORS.primary }}
+            />
+          </Box>
+          <IconButton size="small" onClick={() => setShowCreateDialog(false)} disabled={wizardStep === 'parsing' || wizardStep === 'creating'}>
             <CloseIcon />
           </IconButton>
         </DialogTitle>
-        <DialogContent dividers sx={{ pt: 2 }}>
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, sm: 6 }}>
+
+        <DialogContent dividers sx={{ pt: 2, minHeight: 200 }}>
+          {/* Step 1: Upload */}
+          {wizardStep === 'upload' && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
               <TextField
                 fullWidth
                 size="small"
-                label="Fecha *"
+                label="Fecha del tramite *"
                 type="date"
-                value={createForm.fecha}
-                onChange={(e) => setCreateForm(prev => ({ ...prev, fecha: e.target.value }))}
+                value={wizardFecha}
+                onChange={(e) => setWizardFecha(e.target.value)}
                 slotProps={{ inputLabel: { shrink: true } }}
               />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                fullWidth
-                size="small"
-                label="No. Protocolo"
-                placeholder="Opcional (se asigna al facturar)"
-                value={createForm.numeroProtocolo}
-                onChange={(e) => setCreateForm(prev => ({ ...prev, numeroProtocolo: e.target.value }))}
-              />
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <FormControl fullWidth size="small">
-                <InputLabel>Tipo de Acto *</InputLabel>
-                <Select
-                  value={createForm.actoContrato}
-                  label="Tipo de Acto *"
-                  onChange={(e) => setCreateForm(prev => ({ ...prev, actoContrato: e.target.value }))}
-                >
-                  {TIPOS_ACTO_UAFE.map((t) => (
-                    <MenuItem key={t.codigo} value={t.codigo}>
-                      <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                        {t.codigo} - {t.descripcion}
-                      </Typography>
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                fullWidth
-                size="small"
-                label="Cuantia (USD) *"
-                type="number"
-                value={createForm.valorContrato}
-                onChange={(e) => setCreateForm(prev => ({ ...prev, valorContrato: e.target.value }))}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, sm: 6 }}>
-              <TextField
-                fullWidth
-                size="small"
-                label="Avaluo Municipal (USD)"
-                type="number"
-                value={createForm.avaluoMunicipal}
-                onChange={(e) => setCreateForm(prev => ({ ...prev, avaluoMunicipal: e.target.value }))}
-              />
-            </Grid>
-          </Grid>
+              <Box
+                sx={{
+                  border: `2px dashed ${UAFE_COLORS.border}`,
+                  borderRadius: '10px',
+                  p: 4,
+                  textAlign: 'center',
+                  backgroundColor: UAFE_COLORS.surface,
+                  cursor: 'pointer',
+                  transition: 'border-color 0.2s',
+                  '&:hover': { borderColor: UAFE_COLORS.primary },
+                }}
+              >
+                <UploadFileOutlinedIcon sx={{ fontSize: 40, color: UAFE_COLORS.primary, mb: 1 }} />
+                <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5, color: UAFE_COLORS.textPrimary }}>
+                  Seleccione la minuta Word (.docx)
+                </Typography>
+                <Typography variant="caption" sx={{ color: UAFE_COLORS.textMuted, display: 'block', mb: 2 }}>
+                  El sistema extraera automaticamente tipo de acto, cuantia, comparecientes y mas datos
+                </Typography>
+                <Button variant="outlined" component="label" sx={{ textTransform: 'none', fontSize: '0.82rem' }}>
+                  {wizardFile ? wizardFile.name : 'Seleccionar archivo'}
+                  <input
+                    type="file"
+                    hidden
+                    accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) {
+                        if (!f.name.endsWith('.docx')) {
+                          setWizardError('Solo se permiten archivos Word (.docx)');
+                          return;
+                        }
+                        if (f.size > 10 * 1024 * 1024) {
+                          setWizardError('El archivo no puede superar 10MB');
+                          return;
+                        }
+                        setWizardFile(f);
+                        setWizardError(null);
+                      }
+                    }}
+                  />
+                </Button>
+                {wizardFile && (
+                  <Typography variant="caption" sx={{ mt: 1, display: 'block', color: UAFE_COLORS.textMuted }}>
+                    {(wizardFile.size / 1024).toFixed(0)} KB
+                  </Typography>
+                )}
+              </Box>
+              {wizardError && <Alert severity="error" onClose={() => setWizardError(null)}>{wizardError}</Alert>}
+            </Box>
+          )}
+
+          {/* Parsing spinner */}
+          {wizardStep === 'parsing' && (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <CircularProgress size={48} sx={{ color: UAFE_COLORS.primary, mb: 2 }} />
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>Procesando minuta...</Typography>
+              <Typography variant="body2" sx={{ color: UAFE_COLORS.textSecondary }}>
+                Extrayendo datos del documento. Esto puede tomar unos segundos.
+              </Typography>
+            </Box>
+          )}
+
+          {/* Creating spinner */}
+          {wizardStep === 'creating' && (
+            <Box sx={{ textAlign: 'center', py: 4 }}>
+              <CircularProgress size={48} sx={{ color: UAFE_COLORS.primary, mb: 2 }} />
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>Creando protocolo...</Typography>
+            </Box>
+          )}
+
+          {/* Step 2: Preview */}
+          {wizardStep === 'preview' && wizardData && (
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {wizardError && <Alert severity="error" onClose={() => setWizardError(null)}>{wizardError}</Alert>}
+
+              {/* Datos del acto */}
+              <Typography variant="overline" sx={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.08em', color: UAFE_COLORS.textMuted }}>
+                Datos del Acto (editables)
+              </Typography>
+              <Grid container spacing={1.5}>
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <TextField
+                    fullWidth size="small" label="Fecha *" type="date"
+                    value={wizardFecha}
+                    onChange={(e) => setWizardFecha(e.target.value)}
+                    slotProps={{ inputLabel: { shrink: true } }}
+                  />
+                </Grid>
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Tipo de Acto</InputLabel>
+                    <Select
+                      value={wizardData.codigoActo || ''}
+                      label="Tipo de Acto"
+                      onChange={(e) => {
+                        const acto = TIPOS_ACTO_UAFE.find(a => a.codigo === e.target.value);
+                        updateWizardField('codigoActo', e.target.value);
+                        if (acto) updateWizardField('tipoActo', acto.descripcion);
+                      }}
+                    >
+                      {TIPOS_ACTO_UAFE.map(a => (
+                        <MenuItem key={a.codigo} value={a.codigo}>
+                          <Typography variant="body2" sx={{ fontSize: '0.78rem' }}>{a.codigo} - {a.descripcion}</Typography>
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid size={{ xs: 6, sm: 2 }}>
+                  <TextField
+                    fullWidth size="small" label="Cuantia (USD)" type="number"
+                    value={wizardData.cuantia ?? ''}
+                    onChange={(e) => updateWizardField('cuantia', parseFloat(e.target.value) || null)}
+                  />
+                </Grid>
+                <Grid size={{ xs: 6, sm: 2 }}>
+                  <TextField
+                    fullWidth size="small" label="Avaluo (USD)" type="number"
+                    value={wizardData.avaluoMunicipal ?? ''}
+                    onChange={(e) => updateWizardField('avaluoMunicipal', parseFloat(e.target.value) || null)}
+                  />
+                </Grid>
+              </Grid>
+
+              {/* Comparecientes */}
+              <Typography variant="overline" sx={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.08em', color: UAFE_COLORS.textMuted, mt: 1 }}>
+                Comparecientes ({wizardData.comparecientes?.length || 0})
+              </Typography>
+              {(!wizardData.comparecientes || wizardData.comparecientes.length === 0) ? (
+                <Alert severity="warning">
+                  No se encontraron comparecientes. Se pueden agregar manualmente despues de crear el protocolo.
+                </Alert>
+              ) : (
+                <Box sx={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
+                    <thead>
+                      <tr style={{ borderBottom: `2px solid ${UAFE_COLORS.border}` }}>
+                        {['Cedula', 'Nombres', 'Apellidos', 'Calidad', 'Actua Por', ''].map(h => (
+                          <th key={h} style={{ textAlign: 'left', padding: '6px 8px', fontWeight: 700, fontSize: '0.75rem', color: UAFE_COLORS.textSecondary }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {wizardData.comparecientes.map((comp, idx) => (
+                        <tr key={idx} style={{ borderBottom: `1px solid ${UAFE_COLORS.borderLight}` }}>
+                          <td style={{ padding: '4px 8px' }}>
+                            <TextField size="small" variant="standard" value={comp.cedula || ''} onChange={(e) => updateWizardComp(idx, 'cedula', e.target.value)} sx={{ width: 110 }} />
+                          </td>
+                          <td style={{ padding: '4px 8px' }}>
+                            <TextField size="small" variant="standard" value={comp.nombres || ''} onChange={(e) => updateWizardComp(idx, 'nombres', e.target.value)} sx={{ width: 130 }} />
+                          </td>
+                          <td style={{ padding: '4px 8px' }}>
+                            <TextField size="small" variant="standard" value={comp.apellidos || ''} onChange={(e) => updateWizardComp(idx, 'apellidos', e.target.value)} sx={{ width: 130 }} />
+                          </td>
+                          <td style={{ padding: '4px 8px' }}>
+                            <Select size="small" variant="standard" value={comp.calidad || 'OTRO'} onChange={(e) => updateWizardComp(idx, 'calidad', e.target.value)} sx={{ fontSize: '0.78rem', minWidth: 100 }}>
+                              {CALIDADES_COMPARECIENTE.map(c => <MenuItem key={c} value={c} sx={{ fontSize: '0.78rem' }}>{c}</MenuItem>)}
+                            </Select>
+                          </td>
+                          <td style={{ padding: '4px 8px' }}>
+                            <Select size="small" variant="standard" value={comp.actuaPor || 'PROPIOS_DERECHOS'} onChange={(e) => updateWizardComp(idx, 'actuaPor', e.target.value)} sx={{ fontSize: '0.78rem', minWidth: 120 }}>
+                              <MenuItem value="PROPIOS_DERECHOS" sx={{ fontSize: '0.78rem' }}>Propios Derechos</MenuItem>
+                              <MenuItem value="APODERADO_GENERAL" sx={{ fontSize: '0.78rem' }}>Apoderado General</MenuItem>
+                              <MenuItem value="APODERADO_ESPECIAL" sx={{ fontSize: '0.78rem' }}>Apoderado Especial</MenuItem>
+                              <MenuItem value="REPRESENTANTE_LEGAL" sx={{ fontSize: '0.78rem' }}>Representante Legal</MenuItem>
+                            </Select>
+                          </td>
+                          <td style={{ padding: '4px 8px', textAlign: 'center' }}>
+                            <IconButton size="small" onClick={() => removeWizardComp(idx)}><CloseIcon sx={{ fontSize: 16 }} /></IconButton>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </Box>
+              )}
+            </Box>
+          )}
         </DialogContent>
+
         <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={() => setShowCreateDialog(false)} disabled={creating}>
-            Cancelar
-          </Button>
-          <Button
-            variant="contained"
-            onClick={handleCreateProtocol}
-            disabled={creating}
-            startIcon={creating ? <CircularProgress size={16} /> : <AddOutlinedIcon />}
-            sx={{
-              textTransform: 'none',
-              fontWeight: 600,
-              backgroundColor: UAFE_COLORS.primary,
-              '&:hover': { backgroundColor: UAFE_COLORS.primaryDark },
-            }}
-          >
-            {creating ? 'Creando...' : 'Crear Protocolo'}
-          </Button>
+          {wizardStep === 'upload' && (
+            <>
+              <Button onClick={() => setShowCreateDialog(false)} sx={{ textTransform: 'none' }}>Cancelar</Button>
+              <Button
+                variant="contained"
+                onClick={handleWizardUpload}
+                disabled={!wizardFile || !wizardFecha}
+                startIcon={<UploadFileOutlinedIcon />}
+                sx={{ textTransform: 'none', fontWeight: 600, backgroundColor: UAFE_COLORS.primary, '&:hover': { backgroundColor: UAFE_COLORS.primaryDark } }}
+              >
+                Procesar Minuta
+              </Button>
+            </>
+          )}
+          {wizardStep === 'preview' && (
+            <>
+              <Button onClick={() => { setWizardStep('upload'); setWizardFile(null); setWizardData(null); }} sx={{ textTransform: 'none' }}>
+                Volver
+              </Button>
+              <Button
+                variant="contained"
+                onClick={handleWizardConfirm}
+                startIcon={<AddOutlinedIcon />}
+                sx={{ textTransform: 'none', fontWeight: 600, backgroundColor: '#2e7d32', '&:hover': { backgroundColor: '#1b5e20' } }}
+              >
+                Crear Protocolo
+              </Button>
+            </>
+          )}
         </DialogActions>
       </Dialog>
 

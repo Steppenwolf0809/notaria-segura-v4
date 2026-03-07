@@ -516,6 +516,177 @@ router.post(
 );
 
 // ========================================
+// WIZARD: Parse minuta sin protocolo + Crear protocolo con minuta
+// ========================================
+
+/**
+ * Parsear minuta Word sin necesidad de un protocolo existente
+ * POST /api/formulario-uafe/parse-minuta
+ * Requiere: JWT + role MATRIZADOR o ADMIN
+ * Body: multipart/form-data con campo "minuta"
+ * Retorna: datos extraidos + minutaUrl (si R2 configurado)
+ */
+router.post(
+  '/parse-minuta',
+  authenticateToken,
+  requireRoles(['MATRIZADOR', 'ADMIN']),
+  minutaUpload.single('minuta'),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ success: false, error: 'No se envio ningun archivo' });
+      }
+
+      const datosExtraidos = await parseMinuta(req.file.buffer, { useGemini: true });
+
+      let minutaUrl = null;
+      if (isStorageConfigured()) {
+        const notaryId = getCurrentNotaryId() || 1;
+        const result = await uploadFile(req.file.buffer, {
+          notaryId,
+          folder: 'minutas',
+          filename: req.file.originalname,
+          contentType: req.file.mimetype,
+        });
+        minutaUrl = result.key;
+      }
+
+      res.json({
+        success: true,
+        data: {
+          minutaUrl,
+          minutaOriginalName: req.file.originalname,
+          datosExtraidos: {
+            tipoActo: datosExtraidos.tipoActo,
+            codigoActo: datosExtraidos.codigoActo,
+            comparecientes: datosExtraidos.comparecientes,
+            cuantia: datosExtraidos.cuantia,
+            avaluoMunicipal: datosExtraidos.avaluoMunicipal,
+            tipoBien: datosExtraidos.tipoBien,
+            descripcionBien: datosExtraidos.descripcionBien,
+            formaPago: datosExtraidos.formaPago,
+          },
+          fuente: datosExtraidos.fuente,
+        },
+      });
+    } catch (error) {
+      console.error('Error parseando minuta:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Error al procesar la minuta',
+      });
+    }
+  }
+);
+
+/**
+ * Crear protocolo con datos de minuta ya confirmados (wizard paso 2)
+ * POST /api/formulario-uafe/protocolo-con-minuta
+ * Requiere: JWT + role MATRIZADOR o ADMIN
+ * Body: { fecha, minutaUrl, datosConfirmados }
+ * Crea protocolo + personas en una sola operacion
+ */
+router.post(
+  '/protocolo-con-minuta',
+  authenticateToken,
+  requireRoles(['MATRIZADOR', 'ADMIN']),
+  async (req, res) => {
+    try {
+      const { fecha, minutaUrl, datosConfirmados } = req.body;
+
+      if (!fecha || !datosConfirmados) {
+        return res.status(400).json({
+          success: false,
+          message: 'Campos obligatorios: fecha, datosConfirmados',
+        });
+      }
+
+      const { default: prisma } = await import('../db.js');
+
+      // Crear protocolo
+      const protocolo = await prisma.protocoloUAFE.create({
+        data: {
+          fecha: new Date(`${fecha}T12:00:00`),
+          tipoActo: datosConfirmados.codigoActo || datosConfirmados.tipoActo || '',
+          actoContrato: datosConfirmados.codigoActo || datosConfirmados.tipoActo || '',
+          valorContrato: datosConfirmados.cuantia ? parseFloat(datosConfirmados.cuantia) : 0,
+          avaluoMunicipal: datosConfirmados.avaluoMunicipal ? parseFloat(datosConfirmados.avaluoMunicipal) : null,
+          tipoBien: datosConfirmados.tipoBien || null,
+          descripcionBien: datosConfirmados.descripcionBien || null,
+          codigoCanton: datosConfirmados.codigoCanton || '1701',
+          minutaUrl: minutaUrl || null,
+          minutaParseada: true,
+          datosExtraidos: datosConfirmados,
+          formasPago: datosConfirmados.formaPago || [],
+          createdBy: req.user.id,
+        },
+      });
+
+      // Agregar comparecientes
+      if (Array.isArray(datosConfirmados.comparecientes)) {
+        for (const comp of datosConfirmados.comparecientes) {
+          if (!comp.cedula) continue;
+
+          let persona = await prisma.personaUAFE.findUnique({
+            where: { numeroIdentificacion: comp.cedula },
+          });
+
+          if (!persona) {
+            persona = await prisma.personaUAFE.create({
+              data: {
+                numeroIdentificacion: comp.cedula,
+                tipoIdentificacion: comp.cedula.length === 13 ? 'RUC' : 'CEDULA',
+                tipoPersona: 'Natural',
+                datosPersonaNatural: {
+                  nombres: comp.nombres || '',
+                  apellidos: comp.apellidos || '',
+                  nacionalidad: comp.nacionalidad || 'ECUATORIANA',
+                  estadoCivil: comp.estadoCivil || '',
+                  profesion: comp.profesion || '',
+                  telefono: comp.telefono || '',
+                  correoElectronico: comp.correo || '',
+                  domicilio: comp.domicilio || '',
+                },
+              },
+            });
+          }
+
+          await prisma.personaProtocoloUAFE.create({
+            data: {
+              protocoloId: protocolo.id,
+              personaCedula: comp.cedula,
+              calidad: comp.calidad || 'OTRO',
+              formaComparecencia: comp.actuaPor || 'PROPIOS_DERECHOS',
+              nombre: `${comp.apellidos || ''} ${comp.nombres || ''}`.trim() || comp.cedula,
+            },
+          });
+        }
+      }
+
+      // Fetch completo para retornar con personas
+      const protocoloCompleto = await prisma.protocoloUAFE.findUnique({
+        where: { id: protocolo.id },
+        include: {
+          personas: { include: { persona: true } },
+        },
+      });
+
+      res.status(201).json({
+        success: true,
+        message: 'Protocolo creado con datos de minuta',
+        data: protocoloCompleto,
+      });
+    } catch (error) {
+      console.error('Error creando protocolo con minuta:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error al crear protocolo',
+      });
+    }
+  }
+);
+
+// ========================================
 // HEALTH CHECK
 // ========================================
 
