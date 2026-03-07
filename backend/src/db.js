@@ -51,7 +51,8 @@ export function getPrismaClient() {
       'WhatsAppNotification', 'WhatsAppTemplate',
       'EscrituraQR', 'ProtocoloUAFE', 'FormularioUAFEAsignacion',
       'ImportLog', 'MensajeInterno', 'EncuestaSatisfaccion',
-      'ConsultaListaControl', 'PendingReceivable', 'User'
+      'ConsultaListaControl', 'PendingReceivable', 'User',
+      'ReporteUAFE'
     ]);
 
     // Modelos tenant-scoped que NO se filtran en reads (acceso cross-tenant necesario)

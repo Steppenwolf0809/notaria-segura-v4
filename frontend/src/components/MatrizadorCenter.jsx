@@ -7,7 +7,7 @@ import GestionDocumentos from './GestionDocumentos';
 
 import MisMensajes from './MisMensajes';
 import NotificationCenter from './notifications/NotificationCenter';
-import FormulariosUAFE from './FormulariosUAFE';
+import { UAFEDashboard } from './uafe';
 import CarteraCobros from './billing/CarteraCobros';
 import useDocumentStore from '../store/document-store';
 
@@ -121,7 +121,7 @@ const MatrizadorCenter = () => {
         return <NotificationCenter />;
 
       case 'formularios-uafe':
-        return <FormulariosUAFE />;
+        return <UAFEDashboard />;
 
       case 'generador-qr':
         return <GeneradorQR />;

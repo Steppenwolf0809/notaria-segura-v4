@@ -33,6 +33,7 @@ model Notary {
   encuestasSatisfaccion       EncuestaSatisfaccion[]
   consultasListaControl       ConsultaListaControl[]
   payments                    Payment[]
+  reportesUAFE                ReporteUAFE[]
 
   @@map("notaries")
 }
@@ -65,6 +66,7 @@ model User {
   mensajesRecibidos          MensajeInterno[]           @relation("MensajesRecibidos")
   assignedInvoices           Invoice[]                  @relation("AssignedInvoices")
   consultasListaControl      ConsultaListaControl[]
+  reportesUAFEGenerados      ReporteUAFE[]
 
   @@index([notaryId])
   @@map("users")
@@ -125,6 +127,7 @@ model Document {
   notifications            WhatsAppNotification[]
   invoices                  Invoice[]
   mensajesInternos          MensajeInterno[]
+  protocoloUAFE             ProtocoloUAFE?
 
   @@index([status])
   @@index([createdAt])
@@ -478,7 +481,26 @@ model ProtocoloUAFE {
   
   // OTROS
   tipoActoOtro            String?
-  
+
+  // ESTADO DEL PROTOCOLO (flujo UAFE)
+  estado                  String             @default("BORRADOR") // BORRADOR, EN_PROCESO, PENDIENTE_PROTOCOLO, COMPLETO, REPORTADO
+
+  // MINUTA
+  minutaUrl               String?            // Ruta al archivo Word subido
+  minutaParseada          Boolean            @default(false)
+  datosExtraidos          Json?              // Resultado raw del parsing regex+LLM
+
+  // VINCULACION CON DOCUMENTO DEL SISTEMA
+  documentId              String?            @unique
+
+  // REPORTE UAFE
+  reporteUafeId           String?            // FK al ReporteUAFE donde se incluyo
+
+  // CATALOGOS UAFE
+  codigoCanton            String             @default("1701") // Codigo canton UAFE (4 digitos)
+  tipoBien                String?            // CAS, DEP, TER, VEH, EDI, OFI, EMB, OTR
+  descripcionBien         String?            @db.Text
+
   // CACHE DE TEXTOS GENERADOS
   textoEncabezadoGenerado    String?         @db.Text
   textoComparecenciaGenerado String?         @db.Text
@@ -495,6 +517,8 @@ model ProtocoloUAFE {
   personas                PersonaProtocolo[]
   creador                 User               @relation(fields: [createdBy], references: [id])
   notary                  Notary             @relation(fields: [notaryId], references: [id])
+  document                Document?          @relation(fields: [documentId], references: [id])
+  reporteUafe             ReporteUAFE?       @relation(fields: [reporteUafeId], references: [id])
 
   @@index([numeroProtocolo])
   @@index([identificadorTemporal])
@@ -502,6 +526,8 @@ model ProtocoloUAFE {
   @@index([createdBy])
   @@index([createdAt])
   @@index([notaryId])
+  @@index([estado])
+  @@index([reporteUafeId])
   @@map("protocolos_uafe")
 }
 
@@ -572,6 +598,31 @@ model SesionFormularioUAFE {
   @@index([personaProtocoloId])
   @@index([expiraEn])
   @@map("sesiones_formulario_uafe")
+}
+
+model ReporteUAFE {
+  id                    String          @id @default(uuid())
+  mes                   Int
+  anio                  Int
+  estado                String          @default("BORRADOR") // BORRADOR, GENERADO, VERIFICADO
+  totalTransacciones    Int             @default(0)
+  totalIntervinientes   Int             @default(0)
+  archivoTransacciones  String?         // Ruta del xlsx generado
+  archivoIntervinientes String?         // Ruta del xlsx generado
+  generadoPor           Int
+  generadoAt            DateTime?
+  verificadoConCJ       Boolean         @default(false)
+  notaryId              Int             @default(1) @map("notary_id")
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  protocolos            ProtocoloUAFE[]
+  generador             User            @relation(fields: [generadoPor], references: [id])
+  notary                Notary          @relation(fields: [notaryId], references: [id])
+
+  @@unique([mes, anio, notaryId])
+  @@index([notaryId])
+  @@map("reportes_uafe")
 }
 
 model EncuestaSatisfaccion {
