@@ -30,7 +30,7 @@ export const navItemsByRole = {
     { id: 'mensajes', label: 'Mis Mensajes', view: 'mensajes', icon: 'Message' },
     { id: 'historial-notificaciones', label: 'Notificaciones', view: 'historial-notificaciones', icon: 'WhatsApp' },
     { id: 'cartera-cobros', label: 'Cartera de Cobros', view: 'cartera-cobros', icon: 'AccountBalance' },
-    // { id: 'formularios-uafe', label: 'Formularios UAFE', view: 'formularios-uafe', icon: 'Description' },
+    { id: 'formularios-uafe', label: 'Control UAFE', view: 'formularios-uafe', icon: 'Description' },
     { id: 'generador-qr', label: 'Generador QR', view: 'generador-qr', icon: 'QrCode' }
   ],
   ADMIN: [
