@@ -2879,3 +2879,119 @@ export async function generarTextos(req, res) {
   }
 }
 
+// ========================================
+// OLA 4: Reportes + Vinculacion
+// ========================================
+
+export async function generarReporteMensual(req, res) {
+  try {
+    const { mes, anio } = req.body;
+    if (!mes || !anio) {
+      return res.status(400).json({ success: false, message: 'mes y anio son requeridos' });
+    }
+
+    const { generarYGuardarReporte } = await import('../services/reporte-uafe-generator-service.js');
+    const notaryId = req.user?.notaryId || 1;
+    const reporte = await generarYGuardarReporte(parseInt(mes), parseInt(anio), req.user.id, notaryId);
+
+    res.json({ success: true, data: reporte });
+  } catch (error) {
+    console.error('Error generando reporte mensual:', error);
+    res.status(500).json({ success: false, message: error.message || 'Error al generar reporte' });
+  }
+}
+
+export async function descargarReporte(req, res) {
+  try {
+    const { reporteId, tipo } = req.params; // tipo: 'transaccion' | 'interviniente'
+    const reporte = await prisma.reporteUAFE.findUnique({ where: { id: reporteId } });
+
+    if (!reporte) {
+      return res.status(404).json({ success: false, message: 'Reporte no encontrado' });
+    }
+
+    const filePath = tipo === 'transaccion' ? reporte.archivoTransacciones : reporte.archivoIntervinientes;
+    if (!filePath || !fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, message: 'Archivo no encontrado' });
+    }
+
+    const fileName = path.basename(filePath);
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    fs.createReadStream(filePath).pipe(res);
+  } catch (error) {
+    console.error('Error descargando reporte:', error);
+    res.status(500).json({ success: false, message: 'Error al descargar reporte' });
+  }
+}
+
+export async function vincularDocumento(req, res) {
+  try {
+    const { protocoloId } = req.params;
+    const { documentId } = req.body;
+
+    // Verify protocol exists
+    const protocolo = await prisma.protocoloUAFE.findUnique({ where: { id: protocoloId } });
+    if (!protocolo) {
+      return res.status(404).json({ success: false, message: 'Protocolo no encontrado' });
+    }
+
+    // Verify document exists
+    const document = await prisma.document.findUnique({ where: { id: documentId } });
+    if (!document) {
+      return res.status(404).json({ success: false, message: 'Documento no encontrado' });
+    }
+
+    // Update protocol with document link
+    const updated = await prisma.protocoloUAFE.update({
+      where: { id: protocoloId },
+      data: { documentId },
+    });
+
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    if (error.code === 'P2002') {
+      return res.status(400).json({ success: false, message: 'Este documento ya esta vinculado a otro protocolo' });
+    }
+    console.error('Error vinculando documento:', error);
+    res.status(500).json({ success: false, message: 'Error al vincular documento' });
+  }
+}
+
+export async function buscarDocumentosParaVincular(req, res) {
+  try {
+    const { q } = req.query; // search term (protocol number or client name)
+    if (!q || q.length < 2) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const notaryId = req.user?.notaryId || 1;
+
+    const documentos = await prisma.document.findMany({
+      where: {
+        notaryId,
+        protocoloUAFE: null, // Not already linked
+        OR: [
+          { protocolNumber: { contains: q, mode: 'insensitive' } },
+          { clientName: { contains: q, mode: 'insensitive' } },
+        ],
+      },
+      select: {
+        id: true,
+        protocolNumber: true,
+        clientName: true,
+        documentType: true,
+        status: true,
+        createdAt: true,
+      },
+      take: 10,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({ success: true, data: documentos });
+  } catch (error) {
+    console.error('Error buscando documentos:', error);
+    res.status(500).json({ success: false, message: 'Error al buscar documentos' });
+  }
+}
+

@@ -40,13 +40,13 @@ import {
  *   - stats: { total, completos, pendientes, criticos, errors, warnings }
  *   - onGenerate: (type: 'TRANSACCION' | 'INTERVINIENTE', mes, anio) => void
  *   - loading: boolean
- *   - disabled: boolean (OLA 4 not yet implemented)
+ *   - disabled: boolean
  */
 export default function UAFEReportPanel({
   stats = {},
   onGenerate,
   loading = false,
-  disabled = true,
+  disabled = false,
 }) {
   const now = new Date();
   const [mes, setMes] = useState(now.getMonth()); // 0-indexed
@@ -61,7 +61,7 @@ export default function UAFEReportPanel({
     warnings = [],
   } = stats;
 
-  const canGenerate = !disabled && errors.length === 0 && total > 0;
+  const canGenerate = !disabled && completos > 0;
 
   return (
     <Card

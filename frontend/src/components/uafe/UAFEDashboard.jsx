@@ -72,6 +72,8 @@ export default function UAFEDashboard() {
   const [wizardMinutaUrl, setWizardMinutaUrl] = useState(null);
   const [wizardData, setWizardData] = useState(null);
   const [wizardError, setWizardError] = useState(null);
+  // OLA 4: Report generation
+  const [reportLoading, setReportLoading] = useState(false);
 
   // ── Data fetching ─────────────────────────────────────────────
   const fetchProtocols = useCallback(async () => {
@@ -209,6 +211,38 @@ export default function UAFEDashboard() {
     }).catch(() => {
       setSnackbar({ open: true, message: `Enlace: ${link}`, severity: 'info' });
     });
+  };
+
+  // OLA 4: Generate UAFE report
+  const handleGenerateReport = async (type, mes, anio) => {
+    setReportLoading(true);
+    try {
+      const { data } = await apiClient.post('/formulario-uafe/reporte/generar', { mes, anio });
+      if (data.success && data.data) {
+        const reporte = data.data;
+        const reporteId = reporte.id;
+        const tipoArchivo = type === 'TRANSACCION' ? 'transaccion' : 'interviniente';
+        // Download the file
+        const response = await apiClient.get(`/formulario-uafe/reporte/descargar/${reporteId}/${tipoArchivo}`, {
+          responseType: 'blob',
+        });
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `${type}_${anio}_${String(mes).padStart(2, '0')}.xlsx`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+        setSnackbar({ open: true, message: `${type}.xlsx generado y descargado`, severity: 'success' });
+        // Refresh protocols (some may have changed to REPORTADO)
+        fetchProtocols();
+      }
+    } catch (err) {
+      setSnackbar({ open: true, message: err.response?.data?.message || 'Error al generar reporte', severity: 'error' });
+    } finally {
+      setReportLoading(false);
+    }
   };
 
   // Wizard: reset state
@@ -476,7 +510,9 @@ export default function UAFEDashboard() {
               pendientes: stats.pendientes,
               criticos: stats.criticos,
             }}
-            disabled={true} // OLA 4
+            disabled={false}
+            loading={reportLoading}
+            onGenerate={handleGenerateReport}
           />
         )}
       </Box>

@@ -26,7 +26,11 @@ import {
   listarPersonasRegistradas,
   eliminarPersonaRegistrada,
   generarTextos,
-  actualizarDatosPersona
+  actualizarDatosPersona,
+  generarReporteMensual,
+  descargarReporte,
+  vincularDocumento,
+  buscarDocumentosParaVincular
 } from '../controllers/formulario-uafe-controller.js';
 
 const router = express.Router();
@@ -706,6 +710,38 @@ router.post(
       });
     }
   }
+);
+
+// ========================================
+// OLA 4: Reportes + Vinculacion
+// ========================================
+
+// Generar reporte mensual XLSX
+router.post('/reporte/generar',
+  authenticateToken,
+  requireRoles(['ADMIN', 'OFICIAL_CUMPLIMIENTO']),
+  generarReporteMensual
+);
+
+// Descargar archivo de reporte
+router.get('/reporte/descargar/:reporteId/:tipo',
+  authenticateToken,
+  requireRoles(['ADMIN', 'OFICIAL_CUMPLIMIENTO']),
+  descargarReporte
+);
+
+// Vincular protocolo UAFE con documento del sistema
+router.post('/protocolo/:protocoloId/vincular-documento',
+  authenticateToken,
+  requireRoles(['ADMIN', 'MATRIZADOR']),
+  vincularDocumento
+);
+
+// Buscar documentos para vincular (auto-suggest)
+router.get('/documentos/buscar',
+  authenticateToken,
+  requireRoles(['ADMIN', 'MATRIZADOR']),
+  buscarDocumentosParaVincular
 );
 
 // ========================================
