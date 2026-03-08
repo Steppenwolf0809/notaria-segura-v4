@@ -19,7 +19,9 @@ import {
   Tab,
   LinearProgress,
   IconButton,
+  Tooltip,
 } from '@mui/material';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
@@ -497,13 +499,32 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
     }
   };
 
+  const TOOLTIPS = {
+    nacionalidad: 'Escriba su nacionalidad tal como aparece en su cedula',
+    estadoCivil: 'Seleccione su estado civil actual segun su documento de identidad',
+    situacion: 'Publico: empleado del Estado. Privado: empresa privada. No Aplica: sin actividad laboral',
+    profesionOcupacion: 'Titulo profesional o actividad principal (Ej: Abogado, Ingeniero, Comerciante). Si es jubilado, indique su profesion anterior',
+    cargo: 'Puesto actual en su lugar de trabajo. Si es jubilado o no aplica, puede dejar vacio',
+    entidad: 'Empresa o institucion donde trabaja. Si es jubilado, puede indicar la ultima o dejar vacio',
+    ingresoMensual: 'Ingreso aproximado en dolares antes de impuestos',
+    esPEP: 'Funcionarios publicos de alto nivel, jueces, militares de alto rango, directivos de empresas publicas',
+    esFamiliarPEP: 'Padres, hijos, hermanos, conyuge de una persona PEP (1er y 2do grado de consanguinidad)',
+    esColaboradorPEP: 'Socios comerciales o personas con relacion financiera cercana a un PEP',
+  };
+
+  const tipIcon = (key) => TOOLTIPS[key] ? (
+    <Tooltip title={TOOLTIPS[key]} arrow placement="top">
+      <HelpOutlineIcon sx={{ fontSize: 15, color: COLORS.textMuted, ml: 0.5, cursor: 'help', verticalAlign: 'middle' }} />
+    </Tooltip>
+  ) : null;
+
   const field = (label, key, props = {}) => (
-    <TextField fullWidth size="small" label={label} value={form[key]} onChange={e => u(key, e.target.value)} {...props} />
+    <TextField fullWidth size="small" label={<>{label}{tipIcon(key)}</>} value={form[key]} onChange={e => u(key, e.target.value)} {...props} />
   );
 
   const selectField = (label, key, options) => (
     <FormControl fullWidth size="small">
-      <InputLabel>{label}</InputLabel>
+      <InputLabel>{label}{tipIcon(key)}</InputLabel>
       <Select value={form[key]} label={label} onChange={e => u(key, e.target.value)}>
         {options.map(o => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
       </Select>
@@ -592,11 +613,11 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
           </Typography>
         </Alert>
         <FormControlLabel control={<Checkbox checked={form.esPEP} onChange={e => u('esPEP', e.target.checked)} />}
-          label={<Typography variant="body2">¿Se considera una Persona Expuesta Politicamente?</Typography>} sx={{ mb: 1 }} />
+          label={<Typography variant="body2">¿Se considera una Persona Expuesta Politicamente?{tipIcon('esPEP')}</Typography>} sx={{ mb: 1 }} />
         <FormControlLabel control={<Checkbox checked={form.esFamiliarPEP} onChange={e => u('esFamiliarPEP', e.target.checked)} />}
-          label={<Typography variant="body2">¿Es familiar de un PEP? (1er y 2do grado)</Typography>} sx={{ mb: 1 }} />
+          label={<Typography variant="body2">¿Es familiar de un PEP?{tipIcon('esFamiliarPEP')}</Typography>} sx={{ mb: 1 }} />
         <FormControlLabel control={<Checkbox checked={form.esColaboradorPEP} onChange={e => u('esColaboradorPEP', e.target.checked)} />}
-          label={<Typography variant="body2">¿Es colaborador cercano de un PEP?</Typography>} sx={{ mb: 2 }} />
+          label={<Typography variant="body2">¿Es colaborador cercano de un PEP?{tipIcon('esColaboradorPEP')}</Typography>} sx={{ mb: 2 }} />
 
         <Divider sx={{ my: 2 }} />
         <Typography variant="caption" sx={{ color: COLORS.textSecondary, display: 'block', mb: 1, lineHeight: 1.5, whiteSpace: 'pre-line' }}>
