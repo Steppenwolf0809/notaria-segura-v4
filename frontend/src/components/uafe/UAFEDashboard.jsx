@@ -789,6 +789,16 @@ export default function UAFEDashboard() {
                   </table>
                 </Box>
               )}
+              <Button
+                size="small"
+                onClick={() => {
+                  const comps = [...(wizardData.comparecientes || []), { cedula: '', nombres: '', apellidos: '', calidad: 'OTRO', actuaPor: 'PROPIOS_DERECHOS' }];
+                  updateWizardField('comparecientes', comps);
+                }}
+                sx={{ textTransform: 'none', fontSize: '0.75rem', mt: 0.5 }}
+              >
+                + Agregar compareciente
+              </Button>
             </Box>
           )}
         </DialogContent>

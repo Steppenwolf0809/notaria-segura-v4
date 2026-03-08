@@ -1,5 +1,6 @@
 import express from 'express';
 import multer from 'multer';
+import bcrypt from 'bcryptjs';
 import { authenticateToken, requireRoles } from '../middleware/auth-middleware.js';
 import { verifyFormularioUAFESession } from '../middleware/verify-formulario-uafe-session.js';
 import { csrfProtection } from '../middleware/csrf-protection.js';
@@ -459,12 +460,16 @@ router.post(
           });
 
           if (!persona) {
+            // PIN = ultimos 6 digitos de la cedula
+            const pin = comp.cedula.slice(-6);
+            const pinHash = await bcrypt.hash(pin, 10);
+
             persona = await prisma.personaRegistrada.create({
               data: {
                 numeroIdentificacion: comp.cedula,
                 tipoPersona: 'NATURAL',
-                pinHash: 'PENDIENTE_REGISTRO',
-                pinCreado: false,
+                pinHash,
+                pinCreado: true,
                 completado: false,
                 datosPersonaNatural: {
                   datosPersonales: {
@@ -639,12 +644,16 @@ router.post(
           });
 
           if (!persona) {
+            // PIN = ultimos 6 digitos de la cedula
+            const pin = comp.cedula.slice(-6);
+            const pinHash = await bcrypt.hash(pin, 10);
+
             persona = await prisma.personaRegistrada.create({
               data: {
                 numeroIdentificacion: comp.cedula,
                 tipoPersona: 'NATURAL',
-                pinHash: 'PENDIENTE_REGISTRO',
-                pinCreado: false,
+                pinHash,
+                pinCreado: true,
                 completado: false,
                 datosPersonaNatural: {
                   datosPersonales: {
