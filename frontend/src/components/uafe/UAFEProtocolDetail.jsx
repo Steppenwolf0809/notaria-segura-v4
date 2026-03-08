@@ -455,7 +455,7 @@ function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm }) 
                 />
 
                 <Box sx={{ display: 'flex', gap: 0.5 }}>
-                  <Tooltip title="Genera y copia el enlace del formulario publico para que este compareciente complete sus datos personales (direccion, laboral, PEP)" arrow>
+                  <Tooltip title="Copia el enlace del formulario publico UAFE para que los comparecientes completen sus datos personales (direccion, laboral, PEP)" arrow>
                     <IconButton
                       size="small"
                       onClick={() => onSendForm?.(p)}

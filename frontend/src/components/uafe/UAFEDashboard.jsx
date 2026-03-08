@@ -200,15 +200,12 @@ export default function UAFEDashboard() {
     await refreshSelectedProtocol();
   };
 
-  // OLA 3: Copy form link to clipboard
-  const handleSendForm = (persona) => {
-    if (!selectedProtocol) return;
-    const id = selectedProtocol.numeroProtocolo || selectedProtocol.identificadorTemporal || selectedProtocol.id;
-    const cedula = persona.personaCedula || persona.cedula;
+  // OLA 3: Copy global form link to clipboard
+  const handleSendForm = (_persona) => {
     const baseUrl = window.location.origin;
-    const link = `${baseUrl}/formulario-uafe?protocolo=${encodeURIComponent(id)}&cedula=${encodeURIComponent(cedula)}`;
+    const link = `${baseUrl}/formulario-uafe`;
     navigator.clipboard.writeText(link).then(() => {
-      setSnackbar({ open: true, message: `Enlace copiado para ${persona.nombre || cedula}`, severity: 'success' });
+      setSnackbar({ open: true, message: 'Enlace del formulario copiado', severity: 'success' });
     }).catch(() => {
       setSnackbar({ open: true, message: `Enlace: ${link}`, severity: 'info' });
     });

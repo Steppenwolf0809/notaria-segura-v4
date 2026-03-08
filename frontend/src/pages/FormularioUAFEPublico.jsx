@@ -721,6 +721,380 @@ function SuccessScreen() {
   );
 }
 
+// ── Step 3b: Form (Persona Juridica) ────────────────────────
+function JuridicaForm({ sessionToken, onComplete, onLogout }) {
+  const [form, setForm] = useState(null);
+  const [tab, setTab] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [socios, setSocios] = useState([]);
+
+  const SOCIO_EMPTY = { apellidos: '', nombres: '', tipoIdentificacion: 'CEDULA', numeroIdentificacion: '', nacionalidad: 'ECUATORIANA', porcentajeParticipacion: '' };
+
+  useEffect(() => {
+    sessionApi(sessionToken).get('/mi-informacion').then(({ data }) => {
+      const j = data.data?.datosPersonaJuridica || {};
+      const comp = j.compania || {};
+      const dirComp = comp.direccion || {};
+      const ctComp = comp.contacto || {};
+      const rep = j.representanteLegal || {};
+      const dirRep = rep.direccion || {};
+      const con = j.conyugeRepresentante || {};
+      const pep = j.declaracionPEP || {};
+      setForm({
+        // Compania
+        razonSocial: comp.razonSocial || '', ruc: comp.ruc || '', objetoSocial: comp.objetoSocial || '',
+        compCallePrincipal: dirComp.callePrincipal || '', compCalleSecundaria: dirComp.calleSecundaria || '',
+        compNumero: dirComp.numero || '', compProvincia: dirComp.provincia || 'PICHINCHA',
+        compCanton: dirComp.canton || 'QUITO', compParroquia: dirComp.parroquia || '',
+        emailCompania: ctComp.emailCompania || comp.emailCompania || '',
+        telefonoCompania: ctComp.telefonoCompania || comp.telefonoCompania || '',
+        celularCompania: ctComp.celularCompania || comp.celularCompania || '',
+        // Representante Legal
+        repApellidos: rep.apellidos || '', repNombres: rep.nombres || '',
+        repTipoIdentificacion: rep.tipoIdentificacion || 'CEDULA',
+        repNumeroIdentificacion: rep.numeroIdentificacion || '',
+        repNacionalidad: rep.nacionalidad || 'ECUATORIANA',
+        repGenero: rep.genero || '', repEstadoCivil: rep.estadoCivil || '',
+        repNivelEstudio: rep.nivelEstudio || '',
+        repCelular: rep.celular || '', repCorreoElectronico: rep.correoElectronico || '',
+        repCallePrincipal: dirRep.callePrincipal || '', repCalleSecundaria: dirRep.calleSecundaria || '',
+        repNumero: dirRep.numero || '', repProvincia: dirRep.provincia || 'PICHINCHA',
+        repCanton: dirRep.canton || 'QUITO', repParroquia: dirRep.parroquia || '',
+        // Conyuge Representante
+        conApellidos: con.apellidos || '', conNombres: con.nombres || '',
+        conNumeroIdentificacion: con.numeroIdentificacion || '',
+        conNacionalidad: con.nacionalidad || '', conCorreoElectronico: con.correoElectronico || '',
+        conCelular: con.celular || '',
+        // PEP
+        esPEP: pep.esPEP || false, esFamiliarPEP: pep.esFamiliarPEP || false,
+        esColaboradorPEP: pep.esColaboradorPEP || false,
+        aceptaDeclaracion: false,
+      });
+      setSocios(j.socios && j.socios.length > 0 ? j.socios : []);
+    }).catch(() => {
+      setForm({
+        razonSocial: '', ruc: '', objetoSocial: '',
+        compCallePrincipal: '', compCalleSecundaria: '', compNumero: '',
+        compProvincia: 'PICHINCHA', compCanton: 'QUITO', compParroquia: '',
+        emailCompania: '', telefonoCompania: '', celularCompania: '',
+        repApellidos: '', repNombres: '', repTipoIdentificacion: 'CEDULA',
+        repNumeroIdentificacion: '', repNacionalidad: 'ECUATORIANA',
+        repGenero: '', repEstadoCivil: '', repNivelEstudio: '',
+        repCelular: '', repCorreoElectronico: '',
+        repCallePrincipal: '', repCalleSecundaria: '', repNumero: '',
+        repProvincia: 'PICHINCHA', repCanton: 'QUITO', repParroquia: '',
+        conApellidos: '', conNombres: '', conNumeroIdentificacion: '',
+        conNacionalidad: '', conCorreoElectronico: '', conCelular: '',
+        esPEP: false, esFamiliarPEP: false, esColaboradorPEP: false,
+        aceptaDeclaracion: false,
+      });
+      setSocios([]);
+    }).finally(() => setLoading(false));
+  }, [sessionToken]);
+
+  if (loading || !form) {
+    return <PageLayout><Box sx={{ textAlign: 'center', py: 4 }}><CircularProgress /></Box></PageLayout>;
+  }
+
+  const u = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
+
+  const needsConyugeRep = ['CASADO', 'UNION_LIBRE', 'CASADO_CON_DISOLUCION', 'UNION_LIBRE_CON_SEPARACION'].includes(form.repEstadoCivil);
+  const TABS = ['Compania', 'Rep. Legal', needsConyugeRep ? 'Conyuge Rep.' : null, 'Socios', 'PEP'].filter(Boolean);
+  const totalTabs = TABS.length;
+  const progress = ((tab + 1) / totalTabs) * 100;
+
+  // Socios helpers
+  const addSocio = () => setSocios(prev => [...prev, { ...SOCIO_EMPTY }]);
+  const removeSocio = (idx) => setSocios(prev => prev.filter((_, i) => i !== idx));
+  const updateSocio = (idx, field, value) => setSocios(prev => prev.map((s, i) => i === idx ? { ...s, [field]: value } : s));
+
+  const handleSave = async () => {
+    if (!form.aceptaDeclaracion) {
+      setError('Debe aceptar la declaracion UAFE para guardar');
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await sessionApi(sessionToken).put('/mi-informacion', {
+        datosPersonaJuridica: {
+          compania: {
+            razonSocial: form.razonSocial, ruc: form.ruc, objetoSocial: form.objetoSocial,
+            direccion: {
+              callePrincipal: form.compCallePrincipal, calleSecundaria: form.compCalleSecundaria,
+              numero: form.compNumero, provincia: form.compProvincia,
+              canton: form.compCanton, parroquia: form.compParroquia,
+            },
+            emailCompania: form.emailCompania, telefonoCompania: form.telefonoCompania,
+            celularCompania: form.celularCompania,
+          },
+          representanteLegal: {
+            apellidos: form.repApellidos, nombres: form.repNombres,
+            tipoIdentificacion: form.repTipoIdentificacion,
+            numeroIdentificacion: form.repNumeroIdentificacion,
+            nacionalidad: form.repNacionalidad, genero: form.repGenero,
+            estadoCivil: form.repEstadoCivil, nivelEstudio: form.repNivelEstudio,
+            celular: form.repCelular, correoElectronico: form.repCorreoElectronico,
+            direccion: {
+              callePrincipal: form.repCallePrincipal, calleSecundaria: form.repCalleSecundaria,
+              numero: form.repNumero, provincia: form.repProvincia,
+              canton: form.repCanton, parroquia: form.repParroquia,
+            },
+          },
+          conyugeRepresentante: needsConyugeRep ? {
+            apellidos: form.conApellidos, nombres: form.conNombres,
+            numeroIdentificacion: form.conNumeroIdentificacion,
+            nacionalidad: form.conNacionalidad, correoElectronico: form.conCorreoElectronico,
+            celular: form.conCelular,
+          } : null,
+          socios: socios,
+          declaracionPEP: {
+            esPEP: form.esPEP, esFamiliarPEP: form.esFamiliarPEP,
+            esColaboradorPEP: form.esColaboradorPEP,
+          },
+        },
+      });
+      setSaved(true);
+      onComplete();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Error al guardar');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const TOOLTIPS = {
+    razonSocial: 'Nombre legal completo de la compania tal como aparece en el RUC',
+    ruc: 'Registro Unico de Contribuyentes de la compania (13 digitos)',
+    objetoSocial: 'Actividad economica principal segun la escritura de constitucion',
+    porcentajeParticipacion: 'Porcentaje de participacion del socio en la compania (0-100)',
+    esPEP: 'Funcionarios publicos de alto nivel, jueces, militares de alto rango, directivos de empresas publicas',
+    esFamiliarPEP: 'Padres, hijos, hermanos, conyuge de una persona PEP (1er y 2do grado de consanguinidad)',
+    esColaboradorPEP: 'Socios comerciales o personas con relacion financiera cercana a un PEP',
+  };
+
+  const tipIcon = (key) => TOOLTIPS[key] ? (
+    <Tooltip title={TOOLTIPS[key]} arrow placement="top">
+      <HelpOutlineIcon sx={{ fontSize: 15, color: COLORS.textMuted, ml: 0.5, cursor: 'help', verticalAlign: 'middle' }} />
+    </Tooltip>
+  ) : null;
+
+  const field = (label, key, props = {}) => (
+    <TextField fullWidth size="small" label={<>{label}{tipIcon(key)}</>} value={form[key]} onChange={e => u(key, e.target.value)} {...props} />
+  );
+
+  const selectField = (label, key, options) => (
+    <FormControl fullWidth size="small">
+      <InputLabel>{label}{tipIcon(key)}</InputLabel>
+      <Select value={form[key]} label={label} onChange={e => u(key, e.target.value)}>
+        {options.map(o => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
+      </Select>
+    </FormControl>
+  );
+
+  return (
+    <PageLayout>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+        <Typography variant="h6" sx={{ fontWeight: 600 }}>Informacion Empresa</Typography>
+        <Button size="small" variant="outlined" color="error" onClick={onLogout} sx={{ textTransform: 'none' }}>
+          Cerrar Sesion
+        </Button>
+      </Box>
+      <LinearProgress variant="determinate" value={progress} sx={{ mb: 0.5, borderRadius: 4, height: 6, backgroundColor: COLORS.border, '& .MuiLinearProgress-bar': { backgroundColor: COLORS.primary } }} />
+      <Typography variant="caption" sx={{ color: COLORS.textMuted, display: 'block', mb: 2 }}>
+        Paso {tab + 1} de {totalTabs}: {TABS[tab]}
+      </Typography>
+      {error && <Alert severity="error" sx={{ mb: 2, borderRadius: '8px' }}>{error}</Alert>}
+
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" scrollButtons="auto"
+        sx={{ mb: 2, '& .MuiTab-root': { textTransform: 'none', minWidth: 80, fontSize: '0.8rem' } }}>
+        {TABS.map(t => <Tab key={t} label={t} />)}
+      </Tabs>
+
+      {/* Tab: Compania */}
+      <Box sx={{ display: tab === 0 ? 'block' : 'none' }}>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12 }}>{field('Razon Social *', 'razonSocial')}</Grid>
+          <Grid size={{ xs: 6 }}>{field('RUC *', 'ruc')}</Grid>
+          <Grid size={{ xs: 6 }}>{field('Objeto Social', 'objetoSocial')}</Grid>
+          <Grid size={{ xs: 12 }}>
+            <Divider sx={{ my: 1 }}><Typography variant="caption" sx={{ color: COLORS.textMuted }}>Direccion</Typography></Divider>
+          </Grid>
+          <Grid size={{ xs: 8 }}>{field('Calle Principal', 'compCallePrincipal')}</Grid>
+          <Grid size={{ xs: 4 }}>{field('Numero', 'compNumero')}</Grid>
+          <Grid size={{ xs: 12 }}>{field('Calle Secundaria', 'compCalleSecundaria')}</Grid>
+          <Grid size={{ xs: 4 }}>{field('Provincia', 'compProvincia')}</Grid>
+          <Grid size={{ xs: 4 }}>{field('Canton', 'compCanton')}</Grid>
+          <Grid size={{ xs: 4 }}>{field('Parroquia', 'compParroquia')}</Grid>
+          <Grid size={{ xs: 12 }}>
+            <Divider sx={{ my: 1 }}><Typography variant="caption" sx={{ color: COLORS.textMuted }}>Contacto</Typography></Divider>
+          </Grid>
+          <Grid size={{ xs: 4 }}>{field('Email Compania', 'emailCompania', { type: 'email' })}</Grid>
+          <Grid size={{ xs: 4 }}>{field('Telefono', 'telefonoCompania', { type: 'tel' })}</Grid>
+          <Grid size={{ xs: 4 }}>{field('Celular', 'celularCompania', { type: 'tel' })}</Grid>
+        </Grid>
+      </Box>
+
+      {/* Tab: Representante Legal */}
+      <Box sx={{ display: tab === 1 ? 'block' : 'none' }}>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 6 }}>{field('Apellidos *', 'repApellidos')}</Grid>
+          <Grid size={{ xs: 6 }}>{field('Nombres *', 'repNombres')}</Grid>
+          <Grid size={{ xs: 4 }}>
+            {selectField('Tipo Identificacion', 'repTipoIdentificacion', [
+              { value: 'CEDULA', label: 'Cedula' },
+              { value: 'PASAPORTE', label: 'Pasaporte' },
+              { value: 'RUC', label: 'RUC' },
+            ])}
+          </Grid>
+          <Grid size={{ xs: 4 }}>{field('Numero Identificacion *', 'repNumeroIdentificacion')}</Grid>
+          <Grid size={{ xs: 4 }}>{field('Nacionalidad', 'repNacionalidad')}</Grid>
+          <Grid size={{ xs: 4 }}>{selectField('Genero', 'repGenero', [{ value: 'MASCULINO', label: 'Masculino' }, { value: 'FEMENINO', label: 'Femenino' }])}</Grid>
+          <Grid size={{ xs: 4 }}>{selectField('Estado Civil', 'repEstadoCivil', ESTADOS_CIVILES)}</Grid>
+          <Grid size={{ xs: 4 }}>{selectField('Nivel Estudio', 'repNivelEstudio', NIVELES_ESTUDIO)}</Grid>
+          <Grid size={{ xs: 6 }}>{field('Celular', 'repCelular', { type: 'tel' })}</Grid>
+          <Grid size={{ xs: 6 }}>{field('Correo Electronico', 'repCorreoElectronico', { type: 'email' })}</Grid>
+          <Grid size={{ xs: 12 }}>
+            <Divider sx={{ my: 1 }}><Typography variant="caption" sx={{ color: COLORS.textMuted }}>Direccion Representante</Typography></Divider>
+          </Grid>
+          <Grid size={{ xs: 8 }}>{field('Calle Principal', 'repCallePrincipal')}</Grid>
+          <Grid size={{ xs: 4 }}>{field('Numero', 'repNumero')}</Grid>
+          <Grid size={{ xs: 12 }}>{field('Calle Secundaria', 'repCalleSecundaria')}</Grid>
+          <Grid size={{ xs: 4 }}>{field('Provincia', 'repProvincia')}</Grid>
+          <Grid size={{ xs: 4 }}>{field('Canton', 'repCanton')}</Grid>
+          <Grid size={{ xs: 4 }}>{field('Parroquia', 'repParroquia')}</Grid>
+        </Grid>
+      </Box>
+
+      {/* Tab: Conyuge Representante (condicional) */}
+      {needsConyugeRep && (
+        <Box sx={{ display: tab === TABS.indexOf('Conyuge Rep.') ? 'block' : 'none' }}>
+          <Alert severity="info" sx={{ mb: 2, borderRadius: '8px' }}>
+            Complete esta seccion si el representante legal es Casado/a o Union Libre.
+          </Alert>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 6 }}>{field('Apellidos', 'conApellidos')}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Nombres', 'conNombres')}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Numero Identificacion', 'conNumeroIdentificacion')}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Nacionalidad', 'conNacionalidad')}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Correo Electronico', 'conCorreoElectronico', { type: 'email' })}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Celular', 'conCelular', { type: 'tel' })}</Grid>
+          </Grid>
+        </Box>
+      )}
+
+      {/* Tab: Socios */}
+      <Box sx={{ display: tab === TABS.indexOf('Socios') ? 'block' : 'none' }}>
+        <Alert severity="info" sx={{ mb: 2, borderRadius: '8px' }}>
+          Agregue los socios o accionistas de la compania con su porcentaje de participacion.
+        </Alert>
+        {socios.map((socio, idx) => (
+          <Paper key={idx} elevation={0} sx={{ p: 2, mb: 2, borderRadius: '10px', border: `1px solid ${COLORS.border}`, backgroundColor: COLORS.surface }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: COLORS.textPrimary }}>
+                Socio {idx + 1}
+              </Typography>
+              <Button size="small" color="error" onClick={() => removeSocio(idx)} sx={{ textTransform: 'none', minWidth: 'auto' }}>
+                Eliminar
+              </Button>
+            </Box>
+            <Grid container spacing={1.5}>
+              <Grid size={{ xs: 6 }}>
+                <TextField fullWidth size="small" label="Apellidos" value={socio.apellidos}
+                  onChange={e => updateSocio(idx, 'apellidos', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 6 }}>
+                <TextField fullWidth size="small" label="Nombres" value={socio.nombres}
+                  onChange={e => updateSocio(idx, 'nombres', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 4 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Tipo ID</InputLabel>
+                  <Select value={socio.tipoIdentificacion} label="Tipo ID"
+                    onChange={e => updateSocio(idx, 'tipoIdentificacion', e.target.value)}>
+                    <MenuItem value="CEDULA">Cedula</MenuItem>
+                    <MenuItem value="PASAPORTE">Pasaporte</MenuItem>
+                    <MenuItem value="RUC">RUC</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 4 }}>
+                <TextField fullWidth size="small" label="Numero ID" value={socio.numeroIdentificacion}
+                  onChange={e => updateSocio(idx, 'numeroIdentificacion', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 4 }}>
+                <TextField fullWidth size="small" label="Nacionalidad" value={socio.nacionalidad}
+                  onChange={e => updateSocio(idx, 'nacionalidad', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <TextField fullWidth size="small"
+                  label={<>% Participacion{tipIcon('porcentajeParticipacion')}</>}
+                  value={socio.porcentajeParticipacion}
+                  onChange={e => updateSocio(idx, 'porcentajeParticipacion', e.target.value)}
+                  inputProps={{ inputMode: 'decimal' }} />
+              </Grid>
+            </Grid>
+          </Paper>
+        ))}
+        <Box sx={{ textAlign: 'center' }}>
+          <Button variant="outlined" onClick={addSocio}
+            sx={{ textTransform: 'none', borderColor: COLORS.primary, color: COLORS.primary }}>
+            + Agregar Socio
+          </Button>
+        </Box>
+      </Box>
+
+      {/* Tab: PEP */}
+      <Box sx={{ display: tab === TABS.indexOf('PEP') ? 'block' : 'none' }}>
+        <Alert severity="warning" sx={{ mb: 2, borderRadius: '8px' }}>
+          <Typography variant="caption" sx={{ fontWeight: 600 }}>Persona Expuesta Politicamente (PEP)</Typography>
+          <Typography variant="caption" sx={{ display: 'block' }}>
+            Se considera PEP a quienes desempenan o han desempenado funciones publicas destacadas.
+          </Typography>
+        </Alert>
+        <FormControlLabel control={<Checkbox checked={form.esPEP} onChange={e => u('esPEP', e.target.checked)} />}
+          label={<Typography variant="body2">¿El representante legal es una Persona Expuesta Politicamente?{tipIcon('esPEP')}</Typography>} sx={{ mb: 1 }} />
+        <FormControlLabel control={<Checkbox checked={form.esFamiliarPEP} onChange={e => u('esFamiliarPEP', e.target.checked)} />}
+          label={<Typography variant="body2">¿Es familiar de un PEP?{tipIcon('esFamiliarPEP')}</Typography>} sx={{ mb: 1 }} />
+        <FormControlLabel control={<Checkbox checked={form.esColaboradorPEP} onChange={e => u('esColaboradorPEP', e.target.checked)} />}
+          label={<Typography variant="body2">¿Es colaborador cercano de un PEP?{tipIcon('esColaboradorPEP')}</Typography>} sx={{ mb: 2 }} />
+
+        <Divider sx={{ my: 2 }} />
+        <Typography variant="caption" sx={{ color: COLORS.textSecondary, display: 'block', mb: 1, lineHeight: 1.5, whiteSpace: 'pre-line' }}>
+          {DECLARACION_UAFE}
+        </Typography>
+        <FormControlLabel
+          control={<Checkbox checked={form.aceptaDeclaracion} onChange={e => u('aceptaDeclaracion', e.target.checked)} />}
+          label={<Typography variant="body2" sx={{ fontWeight: 600 }}>Acepto la declaracion anterior</Typography>}
+        />
+      </Box>
+
+      {/* Navigation */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
+        <Button variant="outlined" disabled={tab === 0} onClick={() => setTab(tab - 1)}
+          sx={{ textTransform: 'none', borderColor: COLORS.primary, color: COLORS.primary }}>
+          Anterior
+        </Button>
+        {tab < totalTabs - 1 ? (
+          <Button variant="contained" onClick={() => setTab(tab + 1)}
+            sx={{ textTransform: 'none', fontWeight: 600, backgroundColor: COLORS.primary }}>
+            Siguiente
+          </Button>
+        ) : (
+          <Button variant="contained" startIcon={<SaveOutlinedIcon />} onClick={handleSave}
+            disabled={saving || !form.aceptaDeclaracion}
+            sx={{ textTransform: 'none', fontWeight: 600, backgroundColor: COLORS.success }}>
+            {saving ? <CircularProgress size={20} /> : 'Guardar Informacion'}
+          </Button>
+        )}
+      </Box>
+    </PageLayout>
+  );
+}
+
 // ── Main Component ─────────────────────────────────────────
 export default function FormularioUAFEPublico() {
   const [step, setStep] = useState('verify');
@@ -764,7 +1138,9 @@ export default function FormularioUAFEPublico() {
     case 'create-pin':
       return <CreatePinScreen cedula={verifyResult.cedula} onCreated={handleSession} onBack={handleBack} />;
     case 'form':
-      return <NaturalForm sessionToken={session.sessionToken} onComplete={() => setStep('success')} onLogout={handleLogout} />;
+      return session.tipoPersona === 'JURIDICA'
+        ? <JuridicaForm sessionToken={session.sessionToken} onComplete={() => setStep('success')} onLogout={handleLogout} />
+        : <NaturalForm sessionToken={session.sessionToken} onComplete={() => setStep('success')} onLogout={handleLogout} />;
     case 'success':
       return <SuccessScreen />;
     default:

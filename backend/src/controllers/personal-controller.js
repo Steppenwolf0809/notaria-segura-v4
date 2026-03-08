@@ -1,6 +1,7 @@
 import { getPrismaClient } from '../db.js';
 import bcrypt from 'bcryptjs';
 import { validarPIN, generarTokenSesion } from '../utils/pin-validator.js';
+import { sincronizarCompletitudProtocolo } from '../services/completitud-service.js';
 import logger from '../utils/logger.js';
 
 const prisma = getPrismaClient();
@@ -619,6 +620,20 @@ export async function actualizarMiInformacion(req, res) {
         userAgent: req.get('User-Agent')
       }
     });
+
+    // Recalcular completitud en TODOS los protocolos donde participa
+    try {
+      const participaciones = await prisma.personaProtocolo.findMany({
+        where: { personaCedula: req.personaVerificada.cedula },
+        select: { protocoloId: true },
+      });
+      const protocoloIds = [...new Set(participaciones.map(p => p.protocoloId))];
+      await Promise.all(protocoloIds.map(id => sincronizarCompletitudProtocolo(id)));
+      logger.info(`Completitud recalculada para ${protocoloIds.length} protocolos de cedula ${req.personaVerificada.cedula}`);
+    } catch (err) {
+      logger.error('Error recalculando completitud tras actualización:', err);
+      // No fallar la respuesta por esto
+    }
 
     res.json({
       success: true,
