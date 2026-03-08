@@ -469,7 +469,7 @@ router.post(
                 numeroIdentificacion: comp.cedula,
                 tipoPersona: 'NATURAL',
                 pinHash,
-                pinCreado: true,
+                pinCreado: false,
                 completado: false,
                 datosPersonaNatural: {
                   datosPersonales: {
@@ -653,7 +653,7 @@ router.post(
                 numeroIdentificacion: comp.cedula,
                 tipoPersona: 'NATURAL',
                 pinHash,
-                pinCreado: true,
+                pinCreado: false,
                 completado: false,
                 datosPersonaNatural: {
                   datosPersonales: {

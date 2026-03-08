@@ -852,3 +852,144 @@ export async function resetearPIN(req, res) {
     });
   }
 }
+
+/**
+ * Crear PIN propio (cambio obligatorio desde PIN temporal)
+ * POST /api/personal/crear-pin
+ * Body: { cedula, pinTemporal, nuevoPin, confirmacionPin }
+ *
+ * Flujo: el usuario tiene pinCreado=false (PIN temporal = ultimos 6 de cedula).
+ * Valida el PIN temporal y lo reemplaza por uno elegido por el usuario.
+ * Auto-login tras crear el PIN.
+ */
+export async function crearPinPropio(req, res) {
+  try {
+    const { cedula, pinTemporal, nuevoPin, confirmacionPin } = req.body;
+
+    if (!cedula || !pinTemporal || !nuevoPin || !confirmacionPin) {
+      return res.status(400).json({
+        success: false,
+        message: 'Todos los campos son obligatorios'
+      });
+    }
+
+    if (nuevoPin !== confirmacionPin) {
+      return res.status(400).json({
+        success: false,
+        message: 'El nuevo PIN y su confirmacion no coinciden'
+      });
+    }
+
+    // Validar formato del nuevo PIN
+    const validacion = validarPIN(nuevoPin);
+    if (!validacion.valido) {
+      return res.status(400).json({
+        success: false,
+        message: validacion.mensaje || 'PIN no cumple requisitos de seguridad'
+      });
+    }
+
+    const persona = await prisma.personaRegistrada.findUnique({
+      where: { numeroIdentificacion: cedula }
+    });
+
+    if (!persona) {
+      return res.status(404).json({
+        success: false,
+        message: 'Cedula no encontrada'
+      });
+    }
+
+    // Solo permitir si pinCreado es false (PIN temporal)
+    if (persona.pinCreado) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ya tienes un PIN personal. Usa el login normal.'
+      });
+    }
+
+    // Verificar bloqueo
+    if (persona.bloqueadoHasta && persona.bloqueadoHasta > new Date()) {
+      const minutosRestantes = Math.ceil(
+        (persona.bloqueadoHasta - new Date()) / 60000
+      );
+      return res.status(403).json({
+        success: false,
+        message: `Cuenta bloqueada. Intenta en ${minutosRestantes} minutos.`
+      });
+    }
+
+    // Verificar PIN temporal
+    const pinTemporalValido = await bcrypt.compare(pinTemporal, persona.pinHash);
+
+    if (!pinTemporalValido) {
+      const nuevosIntentos = persona.intentosFallidos + 1;
+      const actualizacion = {
+        intentosFallidos: nuevosIntentos,
+        ultimoIntentoFallido: new Date()
+      };
+      if (nuevosIntentos >= SECURITY_CONFIG.maxIntentos) {
+        actualizacion.bloqueadoHasta = new Date(
+          Date.now() + SECURITY_CONFIG.tiempoBloqueo
+        );
+      }
+      await prisma.personaRegistrada.update({
+        where: { id: persona.id },
+        data: actualizacion
+      });
+
+      const intentosRestantes = SECURITY_CONFIG.maxIntentos - nuevosIntentos;
+      return res.status(401).json({
+        success: false,
+        message: intentosRestantes > 0
+          ? `PIN temporal incorrecto. Te quedan ${intentosRestantes} intentos.`
+          : 'Cuenta bloqueada temporalmente por multiples intentos fallidos.',
+        intentosRestantes: Math.max(0, intentosRestantes)
+      });
+    }
+
+    // PIN temporal correcto - crear nuevo PIN
+    const nuevoHash = await bcrypt.hash(nuevoPin, 10);
+    const sessionToken = generarTokenSesion();
+    const sessionExpiry = new Date(Date.now() + SECURITY_CONFIG.duracionSesion);
+
+    await prisma.personaRegistrada.update({
+      where: { id: persona.id },
+      data: {
+        pinHash: nuevoHash,
+        pinCreado: true,
+        intentosFallidos: 0,
+        bloqueadoHasta: null,
+        sessionToken,
+        sessionExpiry
+      }
+    });
+
+    // Auditoria
+    await prisma.auditoriaPersona.create({
+      data: {
+        personaId: persona.id,
+        tipo: 'PIN_CREADO',
+        descripcion: 'PIN personal creado (reemplazo de PIN temporal)',
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
+      }
+    });
+
+    logger.info(`PIN propio creado para cedula ${cedula}`);
+
+    res.json({
+      success: true,
+      message: 'PIN creado exitosamente',
+      sessionToken,
+      sessionExpiry: sessionExpiry.toISOString(),
+      tipoPersona: persona.tipoPersona
+    });
+  } catch (error) {
+    logger.error('Error creando PIN propio:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error al crear PIN'
+    });
+  }
+}

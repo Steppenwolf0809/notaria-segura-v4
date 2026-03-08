@@ -4,6 +4,7 @@ import {
   verificarCedula,
   registrarPersona,
   loginPersona,
+  crearPinPropio,
   obtenerMiInformacion,
   actualizarMiInformacion,
   logoutPersona,
@@ -30,6 +31,9 @@ router.post('/registrar', registrarPersona);
 
 // Login con PIN
 router.post('/login', loginPersona);
+
+// Crear PIN propio (cambio de PIN temporal a personal)
+router.post('/crear-pin', crearPinPropio);
 
 // ========================================
 // RUTAS PROTEGIDAS (Requieren sesión)
