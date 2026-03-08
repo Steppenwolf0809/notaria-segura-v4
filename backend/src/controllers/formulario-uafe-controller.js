@@ -732,10 +732,13 @@ export async function actualizarDatosPersona(req, res) {
     // Determinar campo a actualizar
     const campoDatos = persona.tipoPersona === 'NATURAL' ? 'datosPersonaNatural' : 'datosPersonaJuridica';
 
-    // Actualizar reemplazando el JSON completo o haciendo merge
-    // Para seguridad, hacemos merge de primer nivel, pero idealmente el frontend envía la estructura completa.
+    // Separar metadata del payload
+    const { _origenEdicion, ...datosLimpios } = datosActualizados;
+
+    // Merge de primer nivel: cada sección (datosPersonales, contacto, direccion, etc.)
+    // se reemplaza completamente con lo que envía el frontend
     const datosExistentes = persona[campoDatos] || {};
-    const nuevosDatos = { ...datosExistentes, ...datosActualizados };
+    const nuevosDatos = { ...datosExistentes, ...datosLimpios };
 
     const updated = await prisma.personaRegistrada.update({
       where: { numeroIdentificacion: cedula },

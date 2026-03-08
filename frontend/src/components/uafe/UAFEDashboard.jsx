@@ -629,16 +629,24 @@ export default function UAFEDashboard() {
                 </Grid>
                 <Grid size={{ xs: 6, sm: 2 }}>
                   <TextField
-                    fullWidth size="small" label="Cuantia (USD)" type="number"
+                    fullWidth size="small" label="Cuantia (USD)"
+                    inputProps={{ inputMode: 'decimal' }}
                     value={wizardData.cuantia ?? ''}
-                    onChange={(e) => updateWizardField('cuantia', parseFloat(e.target.value) || null)}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      updateWizardField('cuantia', v === '' ? null : Number(v));
+                    }}
                   />
                 </Grid>
                 <Grid size={{ xs: 6, sm: 2 }}>
                   <TextField
-                    fullWidth size="small" label="Avaluo (USD)" type="number"
+                    fullWidth size="small" label="Avaluo (USD)"
+                    inputProps={{ inputMode: 'decimal' }}
                     value={wizardData.avaluoMunicipal ?? ''}
-                    onChange={(e) => updateWizardField('avaluoMunicipal', parseFloat(e.target.value) || null)}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      updateWizardField('avaluoMunicipal', v === '' ? null : Number(v));
+                    }}
                   />
                 </Grid>
               </Grid>
