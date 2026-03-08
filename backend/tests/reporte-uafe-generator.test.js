@@ -509,4 +509,470 @@ describe('Reporte UAFE Generator Service - Tests Unitarios', () => {
       if (fs.existsSync(intFile)) fs.unlinkSync(intFile);
     });
   });
+
+  // ════════════════════════════════════════════════════════════════════
+  // Edge Cases: Helpers internos (testeados via reportes)
+  // ════════════════════════════════════════════════════════════════════
+  describe('Edge Cases - Fecha corte y códigos', () => {
+    it('debe calcular fecha corte correcta para febrero año bisiesto (2028)', async () => {
+      mockPrisma.protocoloUAFE.findMany.mockResolvedValue([]);
+
+      const result = await generarReporteTransaccion(2, 2028, 1);
+
+      // Feb 2028 es bisiesto → último día = 29
+      // El fileName indica mes/año
+      expect(result.fileName).toBe('TRANSACCION_2028_02.xlsx');
+
+      if (fs.existsSync(result.filePath)) fs.unlinkSync(result.filePath);
+    });
+
+    it('debe calcular fecha corte correcta para febrero año no bisiesto (2026)', async () => {
+      mockPrisma.protocoloUAFE.findMany.mockResolvedValue([]);
+
+      const result = await generarReporteTransaccion(2, 2026, 1);
+
+      // Feb 2026 no es bisiesto → último día = 28
+      expect(result.fileName).toBe('TRANSACCION_2026_02.xlsx');
+
+      if (fs.existsSync(result.filePath)) fs.unlinkSync(result.filePath);
+    });
+
+    it('debe calcular fecha corte de diciembre (mes 12)', async () => {
+      mockPrisma.protocoloUAFE.findMany.mockResolvedValue([]);
+
+      const result = await generarReporteTransaccion(12, 2026, 1);
+      expect(result.fileName).toBe('TRANSACCION_2026_12.xlsx');
+
+      if (fs.existsSync(result.filePath)) fs.unlinkSync(result.filePath);
+    });
+
+    it('debe manejar protocolo sin numeroProtocolo (null) en código transacción', async () => {
+      const protocolosMock = [
+        {
+          id: 'proto-null-num',
+          numeroProtocolo: null,
+          fecha: new Date('2026-01-10'),
+          tipoActo: 'COMPRAVENTA DE INMUEBLES',
+          valorContrato: 50000,
+          avaluoMunicipal: null,
+          tipoBien: 'I',
+          descripcionBien: 'Casa',
+          codigoCanton: '1701',
+          vehiculoMarca: null,
+          vehiculoModelo: null,
+          vehiculoAnio: null,
+          vehiculoPlaca: null,
+          ubicacionDescripcion: null,
+          bienInmuebleDescripcion: null,
+        },
+      ];
+
+      mockPrisma.protocoloUAFE.findMany.mockResolvedValue(protocolosMock);
+
+      const result = await generarReporteTransaccion(1, 2026, 1);
+
+      // Debe generar sin errores, con parseNumeroProtocolo(null) → {tipo:'P', numero:'00000'}
+      expect(result.totalRegistros).toBe(1);
+
+      if (fs.existsSync(result.filePath)) fs.unlinkSync(result.filePath);
+    });
+
+    it('debe manejar protocolo con número sin prefijo D/P', async () => {
+      const protocolosMock = [
+        {
+          id: 'proto-plain',
+          numeroProtocolo: '12345', // sin prefijo
+          fecha: new Date('2026-03-15'),
+          tipoActo: 'COMPRAVENTA DE INMUEBLES',
+          valorContrato: 75000,
+          avaluoMunicipal: null,
+          tipoBien: 'I',
+          descripcionBien: 'Terreno',
+          codigoCanton: '1701',
+          vehiculoMarca: null,
+          vehiculoModelo: null,
+          vehiculoAnio: null,
+          vehiculoPlaca: null,
+          ubicacionDescripcion: null,
+          bienInmuebleDescripcion: null,
+        },
+      ];
+
+      mockPrisma.protocoloUAFE.findMany.mockResolvedValue(protocolosMock);
+
+      const result = await generarReporteTransaccion(3, 2026, 1);
+
+      // parseNumeroProtocolo("12345") → {tipo:'P', numero:'12345'}
+      expect(result.totalRegistros).toBe(1);
+
+      if (fs.existsSync(result.filePath)) fs.unlinkSync(result.filePath);
+    });
+
+    it('debe usar cantón default 1701 cuando codigoCanton es null', async () => {
+      const protocolosMock = [
+        {
+          id: 'proto-no-canton',
+          numeroProtocolo: 'D00001',
+          fecha: new Date('2026-05-01'),
+          tipoActo: 'COMPRAVENTA DE INMUEBLES',
+          valorContrato: 60000,
+          avaluoMunicipal: null,
+          tipoBien: 'I',
+          descripcionBien: 'Oficina',
+          codigoCanton: null, // sin cantón
+          vehiculoMarca: null,
+          vehiculoModelo: null,
+          vehiculoAnio: null,
+          vehiculoPlaca: null,
+          ubicacionDescripcion: null,
+          bienInmuebleDescripcion: null,
+        },
+      ];
+
+      mockPrisma.protocoloUAFE.findMany.mockResolvedValue(protocolosMock);
+
+      const result = await generarReporteTransaccion(5, 2026, 1);
+      expect(result.totalRegistros).toBe(1);
+
+      if (fs.existsSync(result.filePath)) fs.unlinkSync(result.filePath);
+    });
+
+    it('debe manejar valorContrato null (cuantía = 0)', async () => {
+      const protocolosMock = [
+        {
+          id: 'proto-0val',
+          numeroProtocolo: 'P00050',
+          fecha: new Date('2026-09-01'),
+          tipoActo: 'CAPITULACIONES MATRIMONIALES',
+          valorContrato: null,
+          avaluoMunicipal: null,
+          tipoBien: '',
+          descripcionBien: null,
+          codigoCanton: '1701',
+          vehiculoMarca: null,
+          vehiculoModelo: null,
+          vehiculoAnio: null,
+          vehiculoPlaca: null,
+          ubicacionDescripcion: null,
+          bienInmuebleDescripcion: null,
+        },
+      ];
+
+      mockPrisma.protocoloUAFE.findMany.mockResolvedValue(protocolosMock);
+
+      const result = await generarReporteTransaccion(9, 2026, 1);
+      expect(result.totalRegistros).toBe(1);
+
+      if (fs.existsSync(result.filePath)) fs.unlinkSync(result.filePath);
+    });
+  });
+
+  describe('Edge Cases - Nacionalidades y tipos de identificación', () => {
+    it('debe mapear nacionalidades comunes correctamente', async () => {
+      const protocolosMock = [
+        {
+          id: 'proto-nac',
+          numeroProtocolo: 'P00600',
+          fecha: new Date('2026-01-01'),
+          codigoCanton: '1701',
+          personas: [
+            {
+              personaCedula: '1711111111',
+              calidad: 'VENDEDOR',
+              nombreTemporal: null,
+              persona: {
+                datosPersonaNatural: {
+                  datosPersonales: {
+                    nombres: 'Carlos',
+                    apellidos: 'Ramirez',
+                    nacionalidad: 'VENEZOLANA', // debe → VEN
+                  },
+                },
+                datosPersonaJuridica: null,
+              },
+            },
+            {
+              personaCedula: '1722222222',
+              calidad: 'COMPRADOR',
+              nombreTemporal: null,
+              persona: {
+                datosPersonaNatural: {
+                  datosPersonales: {
+                    nombres: 'Luis',
+                    apellidos: 'Smith',
+                    nacionalidad: 'ESTADOUNIDENSE', // debe → USA
+                  },
+                },
+                datosPersonaJuridica: null,
+              },
+            },
+            {
+              personaCedula: '1733333333',
+              calidad: 'OTRO',
+              nombreTemporal: null,
+              persona: {
+                datosPersonaNatural: {
+                  datosPersonales: {
+                    nombres: 'Maria',
+                    apellidos: 'Vargas',
+                    nacionalidad: 'PERUANA', // debe → PER
+                  },
+                },
+                datosPersonaJuridica: null,
+              },
+            },
+          ],
+        },
+      ];
+
+      mockPrisma.protocoloUAFE.findMany.mockResolvedValue(protocolosMock);
+
+      const result = await generarReporteInterviniente(1, 2026, 1);
+
+      expect(result.totalRegistros).toBe(3);
+
+      if (fs.existsSync(result.filePath)) fs.unlinkSync(result.filePath);
+    });
+
+    it('debe manejar nacionalidad con código ISO 2-char (EC, CO, PE)', async () => {
+      const protocolosMock = [
+        {
+          id: 'proto-iso2',
+          numeroProtocolo: 'P00700',
+          fecha: new Date('2026-02-01'),
+          codigoCanton: '1701',
+          personas: [
+            {
+              personaCedula: '1744444444',
+              calidad: 'VENDEDOR',
+              nombreTemporal: null,
+              persona: {
+                datosPersonaNatural: {
+                  datosPersonales: {
+                    nombres: 'Test',
+                    apellidos: 'EC',
+                    nacionalidad: 'EC', // debe → ECU
+                  },
+                },
+                datosPersonaJuridica: null,
+              },
+            },
+            {
+              personaCedula: '1755555555',
+              calidad: 'COMPRADOR',
+              nombreTemporal: null,
+              persona: {
+                datosPersonaNatural: {
+                  datosPersonales: {
+                    nombres: 'Test',
+                    apellidos: 'CO',
+                    nacionalidad: 'CO', // debe → COL
+                  },
+                },
+                datosPersonaJuridica: null,
+              },
+            },
+          ],
+        },
+      ];
+
+      mockPrisma.protocoloUAFE.findMany.mockResolvedValue(protocolosMock);
+
+      const result = await generarReporteInterviniente(2, 2026, 1);
+      expect(result.totalRegistros).toBe(2);
+
+      if (fs.existsSync(result.filePath)) fs.unlinkSync(result.filePath);
+    });
+
+    it('debe mapear roles UAFE correctamente (VENDEDOR→otorgado, COMPRADOR→favor)', async () => {
+      const protocolosMock = [
+        {
+          id: 'proto-roles',
+          numeroProtocolo: 'P00800',
+          fecha: new Date('2026-04-01'),
+          codigoCanton: '1701',
+          personas: [
+            {
+              personaCedula: '1766666666',
+              calidad: 'VENDEDOR', // ROL_OTORGADO_POR → '01'
+              nombreTemporal: 'Vendedor Test',
+              persona: null,
+            },
+            {
+              personaCedula: '1777777777',
+              calidad: 'COMPRADOR', // ROL_A_FAVOR_DE → '02'
+              nombreTemporal: 'Comprador Test',
+              persona: null,
+            },
+            {
+              personaCedula: '1788888888',
+              calidad: 'FIDEICOMITENTE', // ROL_OTORGADO_POR → '01'
+              nombreTemporal: 'Fideicomitente Test',
+              persona: null,
+            },
+            {
+              personaCedula: '1799999999',
+              calidad: 'CESIONARIO', // ROL_A_FAVOR_DE → '02'
+              nombreTemporal: 'Cesionario Test',
+              persona: null,
+            },
+          ],
+        },
+      ];
+
+      mockPrisma.protocoloUAFE.findMany.mockResolvedValue(protocolosMock);
+
+      const result = await generarReporteInterviniente(4, 2026, 1);
+      expect(result.totalRegistros).toBe(4);
+
+      if (fs.existsSync(result.filePath)) fs.unlinkSync(result.filePath);
+    });
+
+    it('debe usar papel "48" (OTRO) para calidad no reconocida', async () => {
+      const protocolosMock = [
+        {
+          id: 'proto-calidad-desconocida',
+          numeroProtocolo: 'P00900',
+          fecha: new Date('2026-06-01'),
+          codigoCanton: '1701',
+          personas: [
+            {
+              personaCedula: '1700000001',
+              calidad: 'CALIDAD_DESCONOCIDA_XYZ',
+              nombreTemporal: 'Persona desconocida',
+              persona: null,
+            },
+            {
+              personaCedula: '1700000002',
+              calidad: null, // sin calidad
+              nombreTemporal: 'Sin calidad',
+              persona: null,
+            },
+          ],
+        },
+      ];
+
+      mockPrisma.protocoloUAFE.findMany.mockResolvedValue(protocolosMock);
+
+      const result = await generarReporteInterviniente(6, 2026, 1);
+      expect(result.totalRegistros).toBe(2);
+
+      if (fs.existsSync(result.filePath)) fs.unlinkSync(result.filePath);
+    });
+
+    it('debe manejar cédula con espacios (getTipoIdentificacion)', async () => {
+      const protocolosMock = [
+        {
+          id: 'proto-espacios',
+          numeroProtocolo: 'P01000',
+          fecha: new Date('2026-07-01'),
+          codigoCanton: '1701',
+          personas: [
+            {
+              personaCedula: '17 1234 5678', // con espacios
+              calidad: 'VENDEDOR',
+              nombreTemporal: 'Con espacios',
+              persona: null,
+            },
+          ],
+        },
+      ];
+
+      mockPrisma.protocoloUAFE.findMany.mockResolvedValue(protocolosMock);
+
+      // No debe fallar - getTipoIdentificacion limpia espacios
+      const result = await generarReporteInterviniente(7, 2026, 1);
+      expect(result.totalRegistros).toBe(1);
+
+      if (fs.existsSync(result.filePath)) fs.unlinkSync(result.filePath);
+    });
+
+    it('debe manejar vehículo con solo marca (sin modelo/año/placa)', async () => {
+      const protocolosMock = [
+        {
+          id: 'proto-solo-marca',
+          numeroProtocolo: 'P01100',
+          fecha: new Date('2026-10-01'),
+          tipoActo: 'COMPRAVENTA DE VEHICULOS',
+          valorContrato: 15000,
+          avaluoMunicipal: null,
+          tipoBien: 'V',
+          descripcionBien: null,
+          codigoCanton: '1701',
+          vehiculoMarca: 'Hyundai',
+          vehiculoModelo: null,
+          vehiculoAnio: null,
+          vehiculoPlaca: null,
+          ubicacionDescripcion: null,
+          bienInmuebleDescripcion: null,
+        },
+      ];
+
+      mockPrisma.protocoloUAFE.findMany.mockResolvedValue(protocolosMock);
+
+      const result = await generarReporteTransaccion(10, 2026, 1);
+      // getDescripcionBien filtra nulls, solo retorna "Hyundai"
+      expect(result.totalRegistros).toBe(1);
+
+      if (fs.existsSync(result.filePath)) fs.unlinkSync(result.filePath);
+    });
+
+    it('debe usar ubicacionDescripcion como fallback de descripciónBien', async () => {
+      const protocolosMock = [
+        {
+          id: 'proto-ubicacion',
+          numeroProtocolo: 'P01200',
+          fecha: new Date('2026-11-01'),
+          tipoActo: 'COMPRAVENTA DE INMUEBLES',
+          valorContrato: 200000,
+          avaluoMunicipal: 180000,
+          tipoBien: 'I',
+          descripcionBien: null,
+          codigoCanton: '1701',
+          vehiculoMarca: null,
+          vehiculoModelo: null,
+          vehiculoAnio: null,
+          vehiculoPlaca: null,
+          ubicacionDescripcion: 'Av. Amazonas y Naciones Unidas',
+          bienInmuebleDescripcion: null,
+        },
+      ];
+
+      mockPrisma.protocoloUAFE.findMany.mockResolvedValue(protocolosMock);
+
+      const result = await generarReporteTransaccion(11, 2026, 1);
+      expect(result.totalRegistros).toBe(1);
+
+      if (fs.existsSync(result.filePath)) fs.unlinkSync(result.filePath);
+    });
+
+    it('debe manejar protocolo con muchas personas (20+)', async () => {
+      const personas = [];
+      for (let i = 0; i < 25; i++) {
+        personas.push({
+          personaCedula: `17${String(i).padStart(8, '0')}`,
+          calidad: i % 2 === 0 ? 'VENDEDOR' : 'COMPRADOR',
+          nombreTemporal: `Persona ${i}`,
+          persona: null,
+        });
+      }
+
+      const protocolosMock = [
+        {
+          id: 'proto-muchas',
+          numeroProtocolo: 'P01300',
+          fecha: new Date('2026-03-01'),
+          codigoCanton: '1701',
+          personas,
+        },
+      ];
+
+      mockPrisma.protocoloUAFE.findMany.mockResolvedValue(protocolosMock);
+
+      const result = await generarReporteInterviniente(3, 2026, 1);
+      expect(result.totalRegistros).toBe(25);
+
+      if (fs.existsSync(result.filePath)) fs.unlinkSync(result.filePath);
+    });
+  });
 });

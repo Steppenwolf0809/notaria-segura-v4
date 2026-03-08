@@ -566,4 +566,314 @@ describe('Billing Controller - Tests Unitarios', () => {
       expect(res.statusCode).toBe(500);
     });
   });
+
+  // ════════════════════════════════════════════════════════════════════
+  // Edge Cases: Sobrepago y cálculos de punto flotante
+  // ════════════════════════════════════════════════════════════════════
+  describe('Edge Cases - Cálculos financieros', () => {
+    it('debe manejar sobrepago (paidAmount > totalAmount)', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(null);
+      mockPrisma.invoice.findMany.mockResolvedValue([
+        {
+          id: 'inv-over',
+          invoiceNumber: '001-001-99999',
+          totalAmount: 100,
+          paidAmount: 150, // sobrepago
+          payments: [{ amount: 150 }],
+        },
+      ]);
+
+      const result = await getPaymentStatusForDocument(100);
+
+      expect(result.hasInvoice).toBe(true);
+      expect(result.status).toBe('PAID'); // totalDebt <= 0
+      expect(result.totalDebt).toBe(-50); // negativo = crédito a favor
+      expect(result.totalPaid).toBe(150);
+      expect(result.infoPago).toBe(''); // no muestra info de pago si no hay deuda
+    });
+
+    it('debe manejar valores decimales sin problemas de punto flotante', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(null);
+      mockPrisma.invoice.findMany.mockResolvedValue([
+        {
+          id: 'inv-decimal',
+          invoiceNumber: '001-001-33333',
+          totalAmount: 99.99,
+          paidAmount: 0,
+          payments: [
+            { amount: 33.33 },
+            { amount: 33.33 },
+            { amount: 33.33 },
+          ],
+        },
+      ]);
+
+      const result = await getPaymentStatusForDocument(200);
+
+      expect(result.totalPaid).toBeCloseTo(99.99, 2);
+      // 99.99 - 99.99 = 0 (o muy cercano)
+      expect(result.totalDebt).toBeCloseTo(0, 2);
+    });
+
+    it('debe manejar factura con totalAmount = 0', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(null);
+      mockPrisma.invoice.findMany.mockResolvedValue([
+        {
+          id: 'inv-zero',
+          invoiceNumber: '001-001-00000',
+          totalAmount: 0,
+          paidAmount: 0,
+          payments: [],
+        },
+      ]);
+
+      const result = await getPaymentStatusForDocument(300);
+
+      expect(result.hasInvoice).toBe(true);
+      expect(result.status).toBe('PAID'); // 0 <= 0
+      expect(result.totalDebt).toBe(0);
+    });
+
+    it('debe calcular correctamente con mix de facturas pagadas y pendientes', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue(null);
+      mockPrisma.invoice.findMany.mockResolvedValue([
+        {
+          id: 'inv-mix-1',
+          invoiceNumber: '001-001-AAA',
+          totalAmount: 1000,
+          paidAmount: 1000,
+          payments: [{ amount: 500 }, { amount: 500 }],
+        },
+        {
+          id: 'inv-mix-2',
+          invoiceNumber: '001-001-BBB',
+          totalAmount: 500,
+          paidAmount: 0,
+          payments: [], // sin pagos
+        },
+        {
+          id: 'inv-mix-3',
+          invoiceNumber: '001-001-CCC',
+          totalAmount: 200,
+          paidAmount: 100,
+          payments: [{ amount: 100 }],
+        },
+      ]);
+
+      const result = await getPaymentStatusForDocument(400);
+
+      expect(result.totalAmount).toBe(1700);
+      expect(result.totalPaid).toBe(1100);
+      expect(result.totalDebt).toBe(600);
+      expect(result.status).toBe('PARTIAL');
+      expect(result.invoices).toHaveLength(3);
+      expect(result.invoices[0].status).toBe('PAID');
+      expect(result.invoices[1].status).toBe('PENDING');
+      expect(result.invoices[2].status).toBe('PARTIAL');
+    });
+
+    it('getDocumentPaymentStatus debe usar max(sync, payments) para paidAmount', async () => {
+      // endpoint version (req/res)
+      mockPrisma.invoice.findMany.mockResolvedValue([
+        {
+          id: 'inv-sync2',
+          invoiceNumber: '001-001-SYNC',
+          totalAmount: 400,
+          paidAmount: 350, // sync mayor que payments
+          payments: [{ amount: 200 }],
+        },
+      ]);
+
+      const req = mockReq({}, { documentId: '88' });
+      const res = mockRes();
+
+      await getDocumentPaymentStatus(req, res);
+
+      // max(350, 200) = 350
+      expect(res.body.totalPaid).toBe(350);
+      expect(res.body.totalDebt).toBe(50);
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════
+  // Edge Cases: getInvoiceById - ownership y roles
+  // ════════════════════════════════════════════════════════════════════
+  describe('Edge Cases - getInvoiceById ownership', () => {
+    it('debe permitir RECEPCION sin verificar ownership', async () => {
+      mockPrisma.invoice.findUnique.mockResolvedValue({
+        id: 'inv-rec',
+        invoiceNumber: '001-001-REC',
+        totalAmount: 100,
+        paidAmount: 0,
+        payments: [],
+        document: {
+          id: 10,
+          protocolNumber: 'P-REC',
+          clientName: 'Test',
+          clientPhone: null,
+          status: 'ACTIVO',
+          codigoRetiro: null,
+          assignedToId: 999, // no es del usuario
+        },
+      });
+
+      const req = mockReq({}, { id: 'inv-rec' }, { id: 5, role: 'RECEPCION' });
+      const res = mockRes();
+
+      await getInvoiceById(req, res);
+
+      expect(res.statusCode).toBe(200);
+    });
+
+    it('debe bloquear ARCHIVO si no tiene ownership', async () => {
+      mockPrisma.invoice.findUnique.mockResolvedValue({
+        id: 'inv-arch',
+        invoiceNumber: '001-001-ARCH',
+        totalAmount: 100,
+        paidAmount: 0,
+        payments: [],
+        document: {
+          id: 11,
+          protocolNumber: 'P-ARCH',
+          clientName: 'Test',
+          clientPhone: null,
+          status: 'ACTIVO',
+          codigoRetiro: null,
+          assignedToId: 999,
+        },
+      });
+
+      const req = mockReq({}, { id: 'inv-arch' }, { id: 5, role: 'ARCHIVO' });
+      const res = mockRes();
+
+      await getInvoiceById(req, res);
+
+      expect(res.statusCode).toBe(403);
+    });
+
+    it('debe permitir MATRIZADOR si es dueño del documento', async () => {
+      mockPrisma.invoice.findUnique.mockResolvedValue({
+        id: 'inv-mat',
+        invoiceNumber: '001-001-MAT',
+        totalAmount: 250,
+        paidAmount: 100,
+        payments: [{ amount: 100 }],
+        document: {
+          id: 12,
+          protocolNumber: 'P-MAT',
+          clientName: 'Test',
+          clientPhone: null,
+          status: 'ACTIVO',
+          codigoRetiro: null,
+          assignedToId: 42, // mismo que userId
+        },
+      });
+
+      const req = mockReq({}, { id: 'inv-mat' }, { id: 42, role: 'MATRIZADOR' });
+      const res = mockRes();
+
+      await getInvoiceById(req, res);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.totalAmount).toBe(250);
+    });
+
+    it('debe manejar factura sin documento asociado (document: null)', async () => {
+      mockPrisma.invoice.findUnique.mockResolvedValue({
+        id: 'inv-nodoc',
+        invoiceNumber: '001-001-NODOC',
+        totalAmount: 100,
+        paidAmount: 0,
+        payments: [],
+        document: null,
+      });
+
+      const req = mockReq({}, { id: 'inv-nodoc' }, { id: 5, role: 'MATRIZADOR' });
+      const res = mockRes();
+
+      await getInvoiceById(req, res);
+
+      // document?.assignedToId → undefined !== userId → 403
+      expect(res.statusCode).toBe(403);
+    });
+  });
+
+  // ════════════════════════════════════════════════════════════════════
+  // Edge Cases: getInvoices - paginación y filtros extremos
+  // ════════════════════════════════════════════════════════════════════
+  describe('Edge Cases - getInvoices paginación', () => {
+    it('debe manejar solo dateFrom sin dateTo', async () => {
+      mockPrisma.invoice.findMany.mockResolvedValue([]);
+      mockPrisma.invoice.count.mockResolvedValue(0);
+
+      const req = mockReq({ page: '1', limit: '10', dateFrom: '2026-01-01' });
+      const res = mockRes();
+
+      await getInvoices(req, res);
+
+      expect(mockPrisma.invoice.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            issueDate: expect.objectContaining({
+              gte: expect.any(Date),
+            }),
+          }),
+        }),
+      );
+      // No debe tener lte
+      const whereArg = mockPrisma.invoice.findMany.mock.calls[0][0].where;
+      expect(whereArg.issueDate.lte).toBeUndefined();
+    });
+
+    it('debe manejar solo dateTo sin dateFrom', async () => {
+      mockPrisma.invoice.findMany.mockResolvedValue([]);
+      mockPrisma.invoice.count.mockResolvedValue(0);
+
+      const req = mockReq({ page: '1', limit: '10', dateTo: '2026-12-31' });
+      const res = mockRes();
+
+      await getInvoices(req, res);
+
+      const whereArg = mockPrisma.invoice.findMany.mock.calls[0][0].where;
+      expect(whereArg.issueDate.lte).toEqual(expect.any(Date));
+      expect(whereArg.issueDate.gte).toBeUndefined();
+    });
+
+    it('debe combinar clientTaxId con otros filtros', async () => {
+      mockPrisma.invoice.findMany.mockResolvedValue([]);
+      mockPrisma.invoice.count.mockResolvedValue(0);
+
+      const req = mockReq({
+        page: '1',
+        limit: '10',
+        clientTaxId: '1712345678',
+        status: 'PENDING',
+      });
+      const res = mockRes();
+
+      await getInvoices(req, res);
+
+      const whereArg = mockPrisma.invoice.findMany.mock.calls[0][0].where;
+      expect(whereArg.clientTaxId).toBe('1712345678');
+      expect(whereArg.status).toBe('PENDING');
+    });
+
+    it('debe calcular skip correctamente para paginación', async () => {
+      mockPrisma.invoice.findMany.mockResolvedValue([]);
+      mockPrisma.invoice.count.mockResolvedValue(100);
+
+      const req = mockReq({ page: '5', limit: '20' });
+      const res = mockRes();
+
+      await getInvoices(req, res);
+
+      expect(mockPrisma.invoice.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          skip: 80, // (5-1) * 20
+          take: 20,
+        }),
+      );
+      expect(res.body.pagination.pages).toBe(5); // 100 / 20
+    });
+  });
 });

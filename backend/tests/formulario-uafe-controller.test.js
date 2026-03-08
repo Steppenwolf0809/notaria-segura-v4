@@ -90,7 +90,13 @@ const bcrypt = (await import('bcryptjs')).default;
 
 // ── Helpers para mock de req/res ────────────────────────────────────
 function mockReq(body = {}, params = {}, user = { id: 1, role: 'ADMIN' }) {
-  return { body, params, user };
+  return {
+    body,
+    params,
+    user,
+    ip: '127.0.0.1',
+    get: jest.fn().mockReturnValue('test-user-agent'),
+  };
 }
 
 function mockRes() {
@@ -361,6 +367,164 @@ describe('Formulario UAFE Controller - Tests Unitarios', () => {
       expect(res.statusCode).toBe(500);
       expect(res.body.success).toBe(false);
     });
+
+    // ── Edge Cases: Datos inválidos / parseFloat ──────────────────────
+    it('debe crear protocolo con valorContrato string numérico y convertirlo a float', async () => {
+      const req = mockReq({
+        fecha: '2026-01-15',
+        actoContrato: 'COMPRAVENTA DE INMUEBLES',
+        valorContrato: '99999.99',
+      });
+      const res = mockRes();
+
+      mockPrisma.protocoloUAFE.create.mockResolvedValue({ id: 'proto-float' });
+
+      await crearProtocolo(req, res);
+
+      expect(res.statusCode).toBe(201);
+      expect(mockPrisma.protocoloUAFE.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          valorContrato: 99999.99,
+        }),
+      });
+    });
+
+    it('debe manejar valorContrato como string no numérico (NaN)', async () => {
+      const req = mockReq({
+        fecha: '2026-01-15',
+        actoContrato: 'COMPRAVENTA DE INMUEBLES',
+        valorContrato: 'abc',
+      });
+      const res = mockRes();
+
+      mockPrisma.protocoloUAFE.create.mockResolvedValue({ id: 'proto-nan' });
+
+      await crearProtocolo(req, res);
+
+      // parseFloat("abc") = NaN - el controller no valida esto explícitamente
+      // por lo que llega a Prisma con NaN. Esto es un edge case real.
+      expect(mockPrisma.protocoloUAFE.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          valorContrato: NaN,
+        }),
+      });
+    });
+
+    it('debe manejar avaluoMunicipal como 0 (falsy pero válido)', async () => {
+      const req = mockReq({
+        fecha: '2026-01-15',
+        actoContrato: 'COMPRAVENTA DE INMUEBLES',
+        valorContrato: '50000',
+        avaluoMunicipal: '0',
+      });
+      const res = mockRes();
+
+      mockPrisma.protocoloUAFE.create.mockResolvedValue({ id: 'proto-aval0' });
+
+      await crearProtocolo(req, res);
+
+      // "0" es falsy como string en JS → debería pasar null (por el ternario)
+      // avaluoMunicipal ? parseFloat(...) : null → "0" es truthy como string
+      expect(res.statusCode).toBe(201);
+      expect(mockPrisma.protocoloUAFE.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          avaluoMunicipal: 0,
+        }),
+      });
+    });
+
+    it('debe manejar avaluoMunicipal undefined (no proporcionado)', async () => {
+      const req = mockReq({
+        fecha: '2026-01-15',
+        actoContrato: 'COMPRAVENTA DE INMUEBLES',
+        valorContrato: '50000',
+      });
+      const res = mockRes();
+
+      mockPrisma.protocoloUAFE.create.mockResolvedValue({ id: 'proto-noaval' });
+
+      await crearProtocolo(req, res);
+
+      expect(res.statusCode).toBe(201);
+      expect(mockPrisma.protocoloUAFE.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          avaluoMunicipal: null,
+        }),
+      });
+    });
+
+    it('debe manejar formasPago como array vacío', async () => {
+      const req = mockReq({
+        fecha: '2026-01-15',
+        actoContrato: 'COMPRAVENTA DE INMUEBLES',
+        valorContrato: '50000',
+        formasPago: [],
+      });
+      const res = mockRes();
+
+      mockPrisma.protocoloUAFE.create.mockResolvedValue({ id: 'proto-fp-empty' });
+
+      await crearProtocolo(req, res);
+
+      // Array vacío es válido - no entra al loop de validación
+      expect(res.statusCode).toBe(201);
+    });
+
+    it('debe rechazar tipoActoOtro con solo espacios en blanco', async () => {
+      const req = mockReq({
+        fecha: '2026-01-15',
+        actoContrato: 'OTROS',
+        tipoActoOtro: '   ',
+        valorContrato: '10000',
+      });
+      const res = mockRes();
+
+      await crearProtocolo(req, res);
+
+      // "   ".trim() es falsy → debería rechazar
+      expect(res.statusCode).toBe(400);
+      expect(res.body.message).toContain('especificar el tipo de acto');
+    });
+
+    it('debe manejar multa como string numérico', async () => {
+      const req = mockReq({
+        fecha: '2026-01-15',
+        actoContrato: 'PROMESA DE COMPRAVENTA DE INMUEBLES',
+        valorContrato: '100000',
+        multa: '5000.50',
+      });
+      const res = mockRes();
+
+      mockPrisma.protocoloUAFE.create.mockResolvedValue({ id: 'proto-multa' });
+
+      await crearProtocolo(req, res);
+
+      expect(res.statusCode).toBe(201);
+      expect(mockPrisma.protocoloUAFE.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          multa: 5000.50,
+        }),
+      });
+    });
+
+    it('debe crear fecha con T12:00:00 para evitar desfase de timezone', async () => {
+      const req = mockReq({
+        fecha: '2026-06-15',
+        actoContrato: 'COMPRAVENTA DE INMUEBLES',
+        valorContrato: '50000',
+      });
+      const res = mockRes();
+
+      mockPrisma.protocoloUAFE.create.mockResolvedValue({ id: 'proto-tz' });
+
+      await crearProtocolo(req, res);
+
+      expect(mockPrisma.protocoloUAFE.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          fecha: new Date('2026-06-15T12:00:00'),
+        }),
+      });
+    });
   });
 
   // ════════════════════════════════════════════════════════════════════
@@ -543,6 +707,206 @@ describe('Formulario UAFE Controller - Tests Unitarios', () => {
       expect(res.statusCode).toBe(404);
       expect(res.body.message).toContain('representado');
     });
+
+    // ── Edge Cases ───────────────────────────────────────────────────
+    it('debe aceptar REPRESENTANDO_A con datosRepresentado sin representadoId', async () => {
+      const req = mockReq(
+        {
+          cedula: '1712345678',
+          calidad: 'COMPRADOR',
+          actuaPor: 'REPRESENTANDO_A',
+          datosRepresentado: {
+            tipoPersona: 'NATURAL',
+            nombres: 'Pedro',
+            apellidos: 'Gomez',
+          },
+        },
+        { protocoloId: 'proto-1' },
+      );
+      const res = mockRes();
+
+      mockPrisma.protocoloUAFE.findUnique.mockResolvedValue({ id: 'proto-1' });
+      mockPrisma.personaRegistrada.findUnique.mockResolvedValue({
+        id: 'persona-1',
+        numeroIdentificacion: '1712345678',
+      });
+      mockPrisma.personaProtocolo.findUnique.mockResolvedValue(null);
+      mockPrisma.personaProtocolo.create.mockResolvedValue({
+        id: 'pp-rep',
+        calidad: 'COMPRADOR',
+        actuaPor: 'REPRESENTANDO_A',
+        completado: false,
+        completadoAt: null,
+        createdAt: new Date(),
+        datosRepresentado: { tipoPersona: 'NATURAL', nombres: 'Pedro', apellidos: 'Gomez' },
+        persona: {
+          numeroIdentificacion: '1712345678',
+          tipoPersona: 'NATURAL',
+          completado: true,
+          datosPersonaNatural: { datosPersonales: { nombres: 'Juan', apellidos: 'Perez' } },
+          datosPersonaJuridica: null,
+        },
+        representado: null,
+      });
+
+      await agregarPersonaAProtocolo(req, res);
+
+      expect(res.statusCode).toBe(201);
+      expect(mockPrisma.personaProtocolo.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          actuaPor: 'REPRESENTANDO_A',
+          datosRepresentado: expect.objectContaining({ nombres: 'Pedro' }),
+        }),
+        include: expect.any(Object),
+      });
+    });
+
+    it('debe propagar compareceConyugeJunto: true en la creación', async () => {
+      const req = mockReq(
+        {
+          cedula: '1712345678',
+          calidad: 'COMPRADOR',
+          actuaPor: 'SI_MISMO',
+          compareceConyugeJunto: true,
+        },
+        { protocoloId: 'proto-1' },
+      );
+      const res = mockRes();
+
+      mockPrisma.protocoloUAFE.findUnique.mockResolvedValue({ id: 'proto-1' });
+      mockPrisma.personaRegistrada.findUnique.mockResolvedValue({
+        id: 'persona-1',
+        numeroIdentificacion: '1712345678',
+      });
+      mockPrisma.personaProtocolo.findUnique.mockResolvedValue(null);
+      mockPrisma.personaProtocolo.create.mockResolvedValue({
+        id: 'pp-conyuge',
+        calidad: 'COMPRADOR',
+        actuaPor: 'SI_MISMO',
+        completado: false,
+        completadoAt: null,
+        createdAt: new Date(),
+        persona: {
+          numeroIdentificacion: '1712345678',
+          tipoPersona: 'NATURAL',
+          completado: false,
+          datosPersonaNatural: { datosPersonales: { nombres: 'Test', apellidos: 'User' } },
+          datosPersonaJuridica: null,
+        },
+        representado: null,
+      });
+
+      await agregarPersonaAProtocolo(req, res);
+
+      expect(res.statusCode).toBe(201);
+      expect(mockPrisma.personaProtocolo.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          compareceConyugeJunto: true,
+        }),
+        include: expect.any(Object),
+      });
+    });
+
+    it('debe continuar correctamente si calcularYActualizarCompletitud falla', async () => {
+      const { calcularYActualizarCompletitud } = await import(
+        '../src/services/completitud-service.js'
+      );
+      calcularYActualizarCompletitud.mockRejectedValueOnce(new Error('Completitud error'));
+
+      const req = mockReq(
+        { cedula: '1712345678', calidad: 'VENDEDOR', actuaPor: 'SI_MISMO' },
+        { protocoloId: 'proto-1' },
+      );
+      const res = mockRes();
+
+      mockPrisma.protocoloUAFE.findUnique.mockResolvedValue({ id: 'proto-1' });
+      mockPrisma.personaRegistrada.findUnique.mockResolvedValue({
+        id: 'persona-1',
+        numeroIdentificacion: '1712345678',
+      });
+      mockPrisma.personaProtocolo.findUnique.mockResolvedValue(null);
+      mockPrisma.personaProtocolo.create.mockResolvedValue({
+        id: 'pp-err',
+        calidad: 'VENDEDOR',
+        actuaPor: 'SI_MISMO',
+        completado: false,
+        completadoAt: null,
+        createdAt: new Date(),
+        persona: {
+          numeroIdentificacion: '1712345678',
+          tipoPersona: 'NATURAL',
+          completado: false,
+          datosPersonaNatural: { datosPersonales: { nombres: 'Ana', apellidos: 'Lopez' } },
+          datosPersonaJuridica: null,
+        },
+        representado: null,
+      });
+
+      await agregarPersonaAProtocolo(req, res);
+
+      // Debe retornar 201 a pesar del error en completitud (catch silencioso)
+      expect(res.statusCode).toBe(201);
+      expect(res.body.success).toBe(true);
+    });
+
+    it('debe extraer nombre de persona jurídica correctamente', async () => {
+      const req = mockReq(
+        { cedula: '1791234567001', calidad: 'COMPRADOR', actuaPor: 'SI_MISMO' },
+        { protocoloId: 'proto-1' },
+      );
+      const res = mockRes();
+
+      mockPrisma.protocoloUAFE.findUnique.mockResolvedValue({ id: 'proto-1' });
+      mockPrisma.personaRegistrada.findUnique.mockResolvedValue({
+        id: 'pj-1',
+        numeroIdentificacion: '1791234567001',
+      });
+      mockPrisma.personaProtocolo.findUnique.mockResolvedValue(null);
+      mockPrisma.personaProtocolo.create.mockResolvedValue({
+        id: 'pp-juridica',
+        calidad: 'COMPRADOR',
+        actuaPor: 'SI_MISMO',
+        completado: false,
+        completadoAt: null,
+        createdAt: new Date(),
+        persona: {
+          numeroIdentificacion: '1791234567001',
+          tipoPersona: 'JURIDICA',
+          completado: true,
+          datosPersonaNatural: null,
+          datosPersonaJuridica: {
+            compania: { razonSocial: 'EMPRESA ABC S.A.' },
+          },
+        },
+        representado: null,
+      });
+
+      await agregarPersonaAProtocolo(req, res);
+
+      expect(res.statusCode).toBe(201);
+      expect(res.body.data.nombre).toBe('EMPRESA ABC S.A.');
+    });
+
+    it('debe manejar error de BD al crear persona en protocolo', async () => {
+      const req = mockReq(
+        { cedula: '1712345678', calidad: 'COMPRADOR', actuaPor: 'SI_MISMO' },
+        { protocoloId: 'proto-1' },
+      );
+      const res = mockRes();
+
+      mockPrisma.protocoloUAFE.findUnique.mockResolvedValue({ id: 'proto-1' });
+      mockPrisma.personaRegistrada.findUnique.mockResolvedValue({
+        id: 'persona-1',
+        numeroIdentificacion: '1712345678',
+      });
+      mockPrisma.personaProtocolo.findUnique.mockResolvedValue(null);
+      mockPrisma.personaProtocolo.create.mockRejectedValue(new Error('Unique constraint violation'));
+
+      await agregarPersonaAProtocolo(req, res);
+
+      expect(res.statusCode).toBe(500);
+      expect(res.body.success).toBe(false);
+    });
   });
 
   // ════════════════════════════════════════════════════════════════════
@@ -683,6 +1047,214 @@ describe('Formulario UAFE Controller - Tests Unitarios', () => {
 
       expect(res.statusCode).toBe(401);
       expect(res.body.message).toContain('PIN incorrecto');
+    });
+
+    // ── Edge Cases ───────────────────────────────────────────────────
+    it('debe aceptar PIN alfanumérico de 6 caracteres (no valida tipo)', async () => {
+      // El controller solo valida pin.length !== 6, no que sea numérico
+      const req = mockReq({
+        numeroProtocolo: 'P001',
+        cedula: '1712345678',
+        pin: '12ab56', // 6 chars pero no numérico
+      });
+      const res = mockRes();
+
+      mockPrisma.protocoloUAFE.findUnique.mockResolvedValue({ id: 'proto-1' });
+      mockPrisma.personaProtocolo.findFirst.mockResolvedValue({
+        id: 'pp-alfa',
+        completado: false,
+        persona: {
+          id: 'p-1',
+          numeroIdentificacion: '1712345678',
+          tipoPersona: 'NATURAL',
+          pinHash: '$2a$10$hash',
+          pinCreado: true,
+          bloqueadoHasta: null,
+          datosPersonaNatural: { datosPersonales: { nombres: 'Test', apellidos: 'User' } },
+          datosPersonaJuridica: null,
+          completado: false,
+        },
+        protocolo: {
+          id: 'proto-1',
+          numeroProtocolo: 'P001',
+          fecha: new Date(),
+          actoContrato: 'COMPRAVENTA',
+          avaluoMunicipal: null,
+          valorContrato: 50000,
+          formasPago: [],
+          datosExtraidos: null,
+        },
+        calidad: 'COMPRADOR',
+        actuaPor: 'SI_MISMO',
+      });
+
+      bcrypt.compare.mockResolvedValue(true);
+
+      mockPrisma.sesionFormularioUAFE.create.mockResolvedValue({ id: 'sesion-1' });
+
+      await loginFormularioUAFE(req, res);
+
+      // Pasa la validación de longitud, bcrypt.compare decide si es válido
+      expect(res.statusCode).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.sessionToken).toBeDefined();
+    });
+
+    it('debe buscar por identificadorTemporal si no encuentra por numeroProtocolo', async () => {
+      const req = mockReq({
+        numeroProtocolo: 'TEMP-001',
+        cedula: '1712345678',
+        pin: '123456',
+      });
+      const res = mockRes();
+
+      // Primera búsqueda por numeroProtocolo: no encontrado
+      // Segunda búsqueda por identificadorTemporal: encontrado
+      mockPrisma.protocoloUAFE.findUnique
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ id: 'proto-temp', identificadorTemporal: 'TEMP-001' });
+
+      mockPrisma.personaProtocolo.findFirst.mockResolvedValue({
+        id: 'pp-temp',
+        completado: false,
+        persona: {
+          id: 'p-1',
+          numeroIdentificacion: '1712345678',
+          tipoPersona: 'NATURAL',
+          pinHash: '$2a$10$hash',
+          pinCreado: true,
+          bloqueadoHasta: null,
+          datosPersonaNatural: { datosPersonales: { nombres: 'Test', apellidos: 'User' } },
+          datosPersonaJuridica: null,
+          completado: false,
+        },
+        protocolo: {
+          id: 'proto-temp',
+          numeroProtocolo: null,
+          identificadorTemporal: 'TEMP-001',
+          fecha: new Date(),
+          actoContrato: 'COMPRAVENTA',
+          avaluoMunicipal: null,
+          valorContrato: 50000,
+          formasPago: [],
+          datosExtraidos: null,
+        },
+        calidad: 'VENDEDOR',
+        actuaPor: 'SI_MISMO',
+      });
+
+      bcrypt.compare.mockResolvedValue(true);
+      mockPrisma.sesionFormularioUAFE.create.mockResolvedValue({ id: 'sesion-2' });
+
+      await loginFormularioUAFE(req, res);
+
+      expect(res.statusCode).toBe(200);
+      expect(res.body.success).toBe(true);
+      // Se hicieron ambas búsquedas
+      expect(mockPrisma.protocoloUAFE.findUnique).toHaveBeenCalledTimes(2);
+    });
+
+    it('debe permitir login si bloqueadoHasta ya expiró', async () => {
+      const req = mockReq({
+        numeroProtocolo: 'P001',
+        cedula: '1712345678',
+        pin: '123456',
+      });
+      const res = mockRes();
+
+      mockPrisma.protocoloUAFE.findUnique.mockResolvedValue({ id: 'proto-1' });
+      mockPrisma.personaProtocolo.findFirst.mockResolvedValue({
+        id: 'pp-desbloqueado',
+        completado: false,
+        persona: {
+          id: 'p-1',
+          numeroIdentificacion: '1712345678',
+          tipoPersona: 'NATURAL',
+          pinHash: '$2a$10$hash',
+          pinCreado: true,
+          bloqueadoHasta: new Date(Date.now() - 60000), // 1 minuto en el pasado
+          datosPersonaNatural: { datosPersonales: { nombres: 'Test', apellidos: 'User' } },
+          datosPersonaJuridica: null,
+          completado: false,
+        },
+        protocolo: {
+          id: 'proto-1',
+          numeroProtocolo: 'P001',
+          fecha: new Date(),
+          actoContrato: 'COMPRAVENTA',
+          avaluoMunicipal: null,
+          valorContrato: 50000,
+          formasPago: [],
+          datosExtraidos: null,
+        },
+        calidad: 'COMPRADOR',
+        actuaPor: 'SI_MISMO',
+      });
+
+      bcrypt.compare.mockResolvedValue(true);
+      mockPrisma.sesionFormularioUAFE.create.mockResolvedValue({ id: 'sesion-3' });
+
+      await loginFormularioUAFE(req, res);
+
+      // bloqueadoHasta en el pasado → no bloquea
+      expect(res.statusCode).toBe(200);
+      expect(res.body.success).toBe(true);
+    });
+
+    it('debe rechazar pinCreado=true pero pinHash=null', async () => {
+      const req = mockReq({
+        numeroProtocolo: 'P001',
+        cedula: '1712345678',
+        pin: '123456',
+      });
+      const res = mockRes();
+
+      mockPrisma.protocoloUAFE.findUnique.mockResolvedValue({ id: 'proto-1' });
+      mockPrisma.personaProtocolo.findFirst.mockResolvedValue({
+        persona: {
+          id: 'p-1',
+          pinHash: null,      // null
+          pinCreado: true,    // true pero sin hash
+          bloqueadoHasta: null,
+        },
+        protocolo: { id: 'proto-1' },
+      });
+
+      await loginFormularioUAFE(req, res);
+
+      // La condición es: !pinCreado || !pinHash → true → PIN reseteado
+      expect(res.statusCode).toBe(403);
+      expect(res.body.pinReseteado).toBe(true);
+    });
+
+    it('debe manejar error interno (ej. fallo al crear sesión)', async () => {
+      const req = mockReq({
+        numeroProtocolo: 'P001',
+        cedula: '1712345678',
+        pin: '123456',
+      });
+      const res = mockRes();
+
+      mockPrisma.protocoloUAFE.findUnique.mockResolvedValue({ id: 'proto-1' });
+      mockPrisma.personaProtocolo.findFirst.mockResolvedValue({
+        id: 'pp-err',
+        completado: false,
+        persona: {
+          id: 'p-1',
+          pinHash: '$2a$10$hash',
+          pinCreado: true,
+          bloqueadoHasta: null,
+        },
+        protocolo: { id: 'proto-1' },
+      });
+
+      bcrypt.compare.mockResolvedValue(true);
+      mockPrisma.sesionFormularioUAFE.create.mockRejectedValue(new Error('DB write failed'));
+
+      await loginFormularioUAFE(req, res);
+
+      expect(res.statusCode).toBe(500);
+      expect(res.body.message).toContain('Error al iniciar sesión');
     });
   });
 });
