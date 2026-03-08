@@ -37,7 +37,7 @@ import UAFEProtocolTable from './UAFEProtocolTable';
 import UAFEProtocolDetail from './UAFEProtocolDetail';
 import UAFEReportPanel from './UAFEReportPanel';
 import UAFEPersonaEditDialog from './UAFEPersonaEditDialog';
-import { UAFE_COLORS, TIPOS_ACTO_UAFE, CALIDADES_COMPARECIENTE, getSemaforoFromProtocol, ESTADOS_PROTOCOLO_FLOW } from './uafe-constants';
+import { UAFE_COLORS, TIPOS_ACTO_UAFE, TIPOS_BIEN, CALIDADES_COMPARECIENTE, FORMAS_PAGO, formatCurrency, getSemaforoFromProtocol, ESTADOS_PROTOCOLO_FLOW } from './uafe-constants';
 
 /**
  * UAFEDashboard - Main container for the redesigned UAFE module
@@ -642,6 +642,100 @@ export default function UAFEDashboard() {
                   />
                 </Grid>
               </Grid>
+
+              {/* Bien y forma de pago */}
+              <Grid container spacing={1.5}>
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Tipo de Bien</InputLabel>
+                    <Select
+                      value={wizardData.tipoBien || ''}
+                      label="Tipo de Bien"
+                      onChange={(e) => updateWizardField('tipoBien', e.target.value)}
+                    >
+                      {TIPOS_BIEN.map(b => (
+                        <MenuItem key={b.codigo} value={b.codigo}>
+                          <Typography variant="body2" sx={{ fontSize: '0.78rem' }}>{b.codigo} - {b.descripcion}</Typography>
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid size={{ xs: 12, sm: 8 }}>
+                  <TextField
+                    fullWidth size="small" label="Descripcion del Bien"
+                    value={wizardData.descripcionBien || ''}
+                    onChange={(e) => updateWizardField('descripcionBien', e.target.value)}
+                  />
+                </Grid>
+              </Grid>
+
+              {/* Forma de pago */}
+              <Typography variant="overline" sx={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.08em', color: UAFE_COLORS.textMuted, mt: 1 }}>
+                Forma de Pago
+              </Typography>
+              {(wizardData.formaPago || []).map((fp, idx) => (
+                <Grid container spacing={1} key={idx} sx={{ mb: 0.5 }}>
+                  <Grid size={{ xs: 4 }}>
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Tipo</InputLabel>
+                      <Select
+                        value={fp.tipo || ''}
+                        label="Tipo"
+                        onChange={(e) => {
+                          const arr = [...(wizardData.formaPago || [])];
+                          arr[idx] = { ...arr[idx], tipo: e.target.value };
+                          updateWizardField('formaPago', arr);
+                        }}
+                      >
+                        {FORMAS_PAGO.map(f => (
+                          <MenuItem key={f.key} value={f.key}>{f.label}</MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  </Grid>
+                  <Grid size={{ xs: 4 }}>
+                    <TextField
+                      fullWidth size="small" label="Monto (USD)" type="number"
+                      value={fp.monto ?? ''}
+                      onChange={(e) => {
+                        const arr = [...(wizardData.formaPago || [])];
+                        arr[idx] = { ...arr[idx], monto: parseFloat(e.target.value) || null };
+                        updateWizardField('formaPago', arr);
+                      }}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 3 }}>
+                    <TextField
+                      fullWidth size="small" label="Detalle"
+                      value={fp.detalle || ''}
+                      onChange={(e) => {
+                        const arr = [...(wizardData.formaPago || [])];
+                        arr[idx] = { ...arr[idx], detalle: e.target.value };
+                        updateWizardField('formaPago', arr);
+                      }}
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 1 }} sx={{ display: 'flex', alignItems: 'center' }}>
+                    <IconButton size="small" onClick={() => {
+                      const arr = (wizardData.formaPago || []).filter((_, i) => i !== idx);
+                      updateWizardField('formaPago', arr);
+                    }}>
+                      <CloseIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Grid>
+                </Grid>
+              ))}
+              <Button
+                size="small"
+                onClick={() => {
+                  const arr = [...(wizardData.formaPago || []), { tipo: '', monto: null, detalle: '' }];
+                  updateWizardField('formaPago', arr);
+                }}
+                sx={{ textTransform: 'none', fontSize: '0.75rem', mt: 0.5 }}
+              >
+                + Agregar forma de pago
+              </Button>
 
               {/* Comparecientes */}
               <Typography variant="overline" sx={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.08em', color: UAFE_COLORS.textMuted, mt: 1 }}>
