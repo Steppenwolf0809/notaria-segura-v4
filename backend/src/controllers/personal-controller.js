@@ -458,6 +458,7 @@ export async function loginPersona(req, res) {
       success: true,
       message: 'Sesión iniciada correctamente',
       sessionToken: tokenSesion,
+      tipoPersona: persona.tipoPersona,
       expiraEn: expiraEn.toISOString()
     });
   } catch (error) {
@@ -960,8 +961,17 @@ export async function crearPinPropio(req, res) {
         pinCreado: true,
         intentosFallidos: 0,
         bloqueadoHasta: null,
-        sessionToken,
-        sessionExpiry
+      }
+    });
+
+    // Crear sesion en tabla sesionPersonal (requerida por middleware)
+    await prisma.sesionPersonal.create({
+      data: {
+        personaId: persona.id,
+        token: sessionToken,
+        expiraEn: sessionExpiry,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent')
       }
     });
 

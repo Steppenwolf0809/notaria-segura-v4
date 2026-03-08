@@ -464,30 +464,32 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
     setError(null);
     try {
       await sessionApi(sessionToken).put('/mi-informacion', {
-        datosPersonales: {
-          apellidos: form.apellidos, nombres: form.nombres, genero: form.genero,
-          estadoCivil: form.estadoCivil, nivelEstudio: form.nivelEstudio,
-          nacionalidad: form.nacionalidad,
-        },
-        contacto: { celular: form.celular, correoElectronico: form.correoElectronico },
-        direccion: {
-          callePrincipal: form.callePrincipal, calleSecundaria: form.calleSecundaria,
-          numero: form.numero, provincia: form.provincia, canton: form.canton,
-          parroquia: form.parroquia,
-        },
-        informacionLaboral: {
-          situacion: form.situacion, profesionOcupacion: form.profesionOcupacion,
-          entidad: form.entidad, cargo: form.cargo, ingresoMensual: form.ingresoMensual ? parseFloat(form.ingresoMensual) : null,
-        },
-        conyuge: needsConyuge ? {
-          apellidos: form.conyugeApellidos, nombres: form.conyugeNombres,
-          numeroIdentificacion: form.conyugeNumeroIdentificacion,
-          nacionalidad: form.conyugeNacionalidad, correoElectronico: form.conyugeEmail,
-          celular: form.conyugeCelular,
-        } : null,
-        declaracionPEP: {
-          esPEP: form.esPEP, esFamiliarPEP: form.esFamiliarPEP,
-          esColaboradorPEP: form.esColaboradorPEP,
+        datosPersonaNatural: {
+          datosPersonales: {
+            apellidos: form.apellidos, nombres: form.nombres, genero: form.genero,
+            estadoCivil: form.estadoCivil, nivelEstudio: form.nivelEstudio,
+            nacionalidad: form.nacionalidad,
+          },
+          contacto: { celular: form.celular, correoElectronico: form.correoElectronico },
+          direccion: {
+            callePrincipal: form.callePrincipal, calleSecundaria: form.calleSecundaria,
+            numero: form.numero, provincia: form.provincia, canton: form.canton,
+            parroquia: form.parroquia,
+          },
+          informacionLaboral: {
+            situacion: form.situacion, profesionOcupacion: form.profesionOcupacion,
+            entidad: form.entidad, cargo: form.cargo, ingresoMensual: form.ingresoMensual ? parseFloat(form.ingresoMensual) : null,
+          },
+          conyuge: needsConyuge ? {
+            apellidos: form.conyugeApellidos, nombres: form.conyugeNombres,
+            numeroIdentificacion: form.conyugeNumeroIdentificacion,
+            nacionalidad: form.conyugeNacionalidad, correoElectronico: form.conyugeEmail,
+            celular: form.conyugeCelular,
+          } : null,
+          declaracionPEP: {
+            esPEP: form.esPEP, esFamiliarPEP: form.esFamiliarPEP,
+            esColaboradorPEP: form.esColaboradorPEP,
+          },
         },
       });
       setSaved(true);
