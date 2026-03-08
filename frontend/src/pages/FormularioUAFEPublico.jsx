@@ -49,6 +49,16 @@ const DECLARACION_UAFE = `La Unidad de Analisis Financiero y Economico UAFE, en 
 
 Declaro bajo juramento que los recursos utilizados para pagar las facturas generadas por la Notaria 18 del canton Quito por concepto de tasas notariales provenientes de los actos y contratos realizados, no proceden de ninguna de las actividades tipificadas en las normas de la legislacion ecuatoriana vigente para prevenir el lavado de activos, eximiendo a la Notaria de toda responsabilidad.`;
 
+const DECLARACION_DATOS = `De conformidad con la Ley Organica de Proteccion de Datos Personales (LOPDP) del Ecuador y la normativa vigente en materia de prevencion de lavado de activos, autorizo a la Notaria Decima Octava del canton Quito a:
+
+1. Recopilar, almacenar y tratar mis datos personales con el fin exclusivo de cumplir las obligaciones legales de debida diligencia y prevencion de lavado de activos establecidas por la UAFE.
+
+2. Utilizar la informacion contenida en documentos notariales (minutas, escrituras y demas instrumentos) en los que intervengo como compareciente, para completar mi perfil de debida diligencia, incluyendo cualquier tratamiento previo de datos efectuado con anterioridad a esta autorizacion y necesario para dicho fin.
+
+3. Compartir mi informacion con la UAFE y organismos de control cuando la ley asi lo requiera.
+
+ADVERTENCIA: Conforme al Art. 47 de la Ley Organica de Prevencion, Deteccion y Combate del Delito de Lavado de Activos y de la Financiacion de Otros Delitos, cuando no se cumplan las medidas de debida diligencia, el sujeto obligado debera realizar un reporte de operacion sospechosa ante la Unidad de Analisis Financiero y Economico (UAFE).`;
+
 const ESTADOS_CIVILES = [
   { value: 'SOLTERO', label: 'Soltero/a' },
   { value: 'CASADO', label: 'Casado/a' },
@@ -221,6 +231,7 @@ function VerifyScreen({ onResult }) {
 function CreateAccountScreen({ cedula, tipoPersona, onCreated, onBack }) {
   const [pin, setPin] = useState('');
   const [pinConfirm, setPinConfirm] = useState('');
+  const [aceptaDatos, setAceptaDatos] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -249,29 +260,50 @@ function CreateAccountScreen({ cedula, tipoPersona, onCreated, onBack }) {
       <Typography variant="h6" sx={{ textAlign: 'center', mb: 1, fontWeight: 600 }}>Crear Cuenta Nueva</Typography>
       <Alert severity="info" sx={{ mb: 2, borderRadius: '8px' }}>Cedula: <strong>{cedula}</strong></Alert>
       {error && <Alert severity="error" sx={{ mb: 2, borderRadius: '8px' }}>{error}</Alert>}
-      <PinInput value={pin} onChange={setPin} label="Cree un PIN de 6 digitos:" />
-      <Box sx={{ mb: 2 }}>
-        <Typography variant="caption" sx={{ color: pin.length === 6 ? COLORS.success : COLORS.textMuted }}>
-          {pin.length === 6 ? '✓' : '○'} 6 digitos numericos
-        </Typography><br />
-        <Typography variant="caption" sx={{ color: pin.length === 6 && !isSeq(pin) ? COLORS.success : COLORS.textMuted }}>
-          {pin.length === 6 && !isSeq(pin) ? '✓' : '○'} No usar secuencias (123456)
-        </Typography><br />
-        <Typography variant="caption" sx={{ color: pin.length === 6 && !isRepeat(pin) ? COLORS.success : COLORS.textMuted }}>
-          {pin.length === 6 && !isRepeat(pin) ? '✓' : '○'} No usar repeticiones (111111)
+
+      <Box sx={{ mb: 2, p: 2, backgroundColor: COLORS.surface, borderRadius: '8px', border: `1px solid ${COLORS.border}`, maxHeight: 200, overflow: 'auto' }}>
+        <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', mb: 1, color: COLORS.textPrimary }}>
+          Autorizacion de Tratamiento de Datos Personales
+        </Typography>
+        <Typography variant="caption" sx={{ color: COLORS.textSecondary, lineHeight: 1.6, whiteSpace: 'pre-line' }}>
+          {DECLARACION_DATOS}
         </Typography>
       </Box>
-      <PinInput value={pinConfirm} onChange={setPinConfirm} label="Confirme su PIN:" />
-      {pinConfirm.length === 6 && !pinsMatch && (
-        <Typography variant="caption" sx={{ color: 'error.main', textAlign: 'center', display: 'block' }}>
-          Los PINs no coinciden
-        </Typography>
+      <FormControlLabel
+        control={<Checkbox checked={aceptaDatos} onChange={e => setAceptaDatos(e.target.checked)} />}
+        label={<Typography variant="body2" sx={{ fontWeight: 600 }}>Acepto la autorizacion de tratamiento de datos personales</Typography>}
+        sx={{ mb: 2 }}
+      />
+
+      {aceptaDatos && (
+        <>
+          <Divider sx={{ my: 2 }} />
+          <PinInput value={pin} onChange={setPin} label="Cree un PIN de 6 digitos:" />
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="caption" sx={{ color: pin.length === 6 ? COLORS.success : COLORS.textMuted }}>
+              {pin.length === 6 ? '✓' : '○'} 6 digitos numericos
+            </Typography><br />
+            <Typography variant="caption" sx={{ color: pin.length === 6 && !isSeq(pin) ? COLORS.success : COLORS.textMuted }}>
+              {pin.length === 6 && !isSeq(pin) ? '✓' : '○'} No usar secuencias (123456)
+            </Typography><br />
+            <Typography variant="caption" sx={{ color: pin.length === 6 && !isRepeat(pin) ? COLORS.success : COLORS.textMuted }}>
+              {pin.length === 6 && !isRepeat(pin) ? '✓' : '○'} No usar repeticiones (111111)
+            </Typography>
+          </Box>
+          <PinInput value={pinConfirm} onChange={setPinConfirm} label="Confirme su PIN:" />
+          {pinConfirm.length === 6 && !pinsMatch && (
+            <Typography variant="caption" sx={{ color: 'error.main', textAlign: 'center', display: 'block' }}>
+              Los PINs no coinciden
+            </Typography>
+          )}
+        </>
       )}
+
       <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mt: 3 }}>
         <Button variant="outlined" onClick={onBack} sx={{ textTransform: 'none', borderColor: COLORS.primary, color: COLORS.primary }}>
           Volver
         </Button>
-        <Button variant="contained" onClick={handleCreate} disabled={!pinValid || !pinsMatch || loading}
+        <Button variant="contained" onClick={handleCreate} disabled={!aceptaDatos || !pinValid || !pinsMatch || loading}
           sx={{ textTransform: 'none', fontWeight: 600, backgroundColor: COLORS.primary, borderRadius: '8px' }}>
           {loading ? <CircularProgress size={20} /> : 'Crear Cuenta'}
         </Button>
@@ -332,6 +364,7 @@ function CreatePinScreen({ cedula, onCreated, onBack }) {
   const [pinTemporal, setPinTemporal] = useState('');
   const [nuevoPin, setNuevoPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
+  const [aceptaDatos, setAceptaDatos] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -364,6 +397,21 @@ function CreatePinScreen({ cedula, onCreated, onBack }) {
         Se le asigno un PIN temporal. Debe crear su propio PIN para acceder a su informacion.
       </Alert>
       {error && <Alert severity="error" sx={{ mb: 2, borderRadius: '8px' }}>{error}</Alert>}
+
+      <Box sx={{ mb: 2, p: 2, backgroundColor: COLORS.surface, borderRadius: '8px', border: `1px solid ${COLORS.border}`, maxHeight: 200, overflow: 'auto' }}>
+        <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', mb: 1, color: COLORS.textPrimary }}>
+          Autorizacion de Tratamiento de Datos Personales
+        </Typography>
+        <Typography variant="caption" sx={{ color: COLORS.textSecondary, lineHeight: 1.6, whiteSpace: 'pre-line' }}>
+          {DECLARACION_DATOS}
+        </Typography>
+      </Box>
+      <FormControlLabel
+        control={<Checkbox checked={aceptaDatos} onChange={e => setAceptaDatos(e.target.checked)} />}
+        label={<Typography variant="body2" sx={{ fontWeight: 600 }}>Acepto la autorizacion de tratamiento de datos personales</Typography>}
+        sx={{ mb: 2 }}
+      />
+
       <PinInput value={pinTemporal} onChange={setPinTemporal} label="PIN temporal (proporcionado por la notaria):" />
       <Divider sx={{ my: 2 }} />
       <PinInput value={nuevoPin} onChange={setNuevoPin} label="Nuevo PIN:" />
@@ -384,7 +432,7 @@ function CreatePinScreen({ cedula, onCreated, onBack }) {
           Volver
         </Button>
         <Button variant="contained" onClick={handleCreate}
-          disabled={pinTemporal.length !== 6 || !pinValid || !pinsMatch || loading}
+          disabled={!aceptaDatos || pinTemporal.length !== 6 || !pinValid || !pinsMatch || loading}
           sx={{ textTransform: 'none', fontWeight: 600, backgroundColor: COLORS.primary, borderRadius: '8px' }}>
           {loading ? <CircularProgress size={20} /> : 'Crear PIN'}
         </Button>
