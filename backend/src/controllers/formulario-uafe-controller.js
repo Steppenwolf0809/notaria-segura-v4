@@ -629,13 +629,13 @@ export async function loginFormularioUAFE(req, res) {
  */
 export async function responderFormulario(req, res) {
   try {
-    const { representadoId, datosRepresentado, ...respuestaData } = req.body;
+    const { representadoId, datosRepresentado, _declaracionAceptada, _declaracionFecha, _origenEdicion, ...respuestaData } = req.body;
 
     // Preparar datos para actualizar PersonaProtocolo
     const dataToUpdate = {
       completado: true,
       completadoAt: new Date(),
-      respuestaFormulario: respuestaData
+      respuestaFormulario: { ...respuestaData, declaracionAceptada: _declaracionAceptada, declaracionFecha: _declaracionFecha }
     };
 
     // Si hay datos de representado, agregarlos

@@ -169,23 +169,23 @@ function FormScreen({ sessionData, sessionToken, onComplete }) {
     // Direccion
     callePrincipal: existingDireccion.callePrincipal || '',
     calleSecundaria: existingDireccion.calleSecundaria || '',
-    numeroCasa: existingDireccion.numeroCasa || '',
+    numeroCasa: existingDireccion.numero || existingDireccion.numeroCasa || '',
     provincia: existingDireccion.provincia || 'PICHINCHA',
     canton: existingDireccion.canton || 'QUITO',
     parroquia: existingDireccion.parroquia || '',
     // Laboral
-    situacionLaboral: existingLaboral.situacionLaboral || '',
-    profesion: existingLaboral.profesion || preFill.profesion || '',
+    situacionLaboral: existingLaboral.situacion || existingLaboral.situacionLaboral || '',
+    profesion: existingLaboral.profesionOcupacion || existingLaboral.profesion || preFill.profesion || '',
     ingresoMensual: existingLaboral.ingresoMensual || '',
-    nombreEntidad: existingLaboral.nombreEntidad || '',
+    nombreEntidad: existingLaboral.entidad || existingLaboral.nombreEntidad || '',
     cargo: existingLaboral.cargo || '',
     // PEP
-    esPEP: existingData.pep?.esPEP || false,
-    pepDetalle: existingData.pep?.detalle || '',
+    esPEP: existingData.declaracionPEP?.esPEP || existingData.pep?.esPEP || false,
+    pepDetalle: existingData.declaracionPEP?.detalle || existingData.pep?.detalle || '',
     // Conyuge
     conyugeNombres: existingData.conyuge?.nombres || '',
     conyugeApellidos: existingData.conyuge?.apellidos || '',
-    conyugeCedula: existingData.conyuge?.cedula || '',
+    conyugeCedula: existingData.conyuge?.numeroIdentificacion || existingData.conyuge?.cedula || '',
     // Declaracion
     aceptaDeclaracion: false,
   };
@@ -220,29 +220,29 @@ function FormScreen({ sessionData, sessionToken, onComplete }) {
         direccion: {
           callePrincipal: form.callePrincipal,
           calleSecundaria: form.calleSecundaria,
-          numeroCasa: form.numeroCasa,
+          numero: form.numeroCasa,
           provincia: form.provincia,
           canton: form.canton,
           parroquia: form.parroquia,
         },
         informacionLaboral: {
-          situacionLaboral: form.situacionLaboral,
-          profesion: form.profesion,
+          situacion: form.situacionLaboral,
+          profesionOcupacion: form.profesion,
           ingresoMensual: form.ingresoMensual ? parseFloat(form.ingresoMensual) : null,
-          nombreEntidad: form.nombreEntidad,
+          entidad: form.nombreEntidad,
           cargo: form.cargo,
         },
-        pep: {
+        declaracionPEP: {
           esPEP: form.esPEP,
           detalle: form.pepDetalle,
         },
         conyuge: needsConyuge ? {
           nombres: form.conyugeNombres,
           apellidos: form.conyugeApellidos,
-          cedula: form.conyugeCedula,
+          numeroIdentificacion: form.conyugeCedula,
         } : null,
-        declaracionAceptada: true,
-        declaracionFecha: new Date().toISOString(),
+        _declaracionAceptada: true,
+        _declaracionFecha: new Date().toISOString(),
       });
       onComplete();
     } catch (err) {
