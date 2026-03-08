@@ -309,6 +309,7 @@ export default function UAFEDashboard() {
           onSave={handleSave}
           onEditPerson={handleEditPerson}
           onSendForm={handleSendForm}
+          onRefresh={refreshSelectedProtocol}
         />
         <UAFEPersonaEditDialog
           open={!!editPersona}

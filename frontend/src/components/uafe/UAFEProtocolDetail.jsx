@@ -29,6 +29,7 @@ import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined';
+import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
@@ -609,10 +610,12 @@ export default function UAFEProtocolDetail({
   onAddPerson,
   onEditPerson,
   onSendForm,
+  onRefresh,
   readOnly = false,
 }) {
   const [tab, setTab] = useState(0);
   const [editedFields, setEditedFields] = useState({});
+  const [refreshing, setRefreshing] = useState(false);
 
   if (!protocol) return null;
 
@@ -666,6 +669,22 @@ export default function UAFEProtocolDetail({
               }}
             />
             <Box sx={{ flex: 1 }} />
+            {onRefresh && (
+              <Tooltip title="Actualizar datos">
+                <IconButton
+                  size="small"
+                  disabled={refreshing}
+                  onClick={async () => {
+                    setRefreshing(true);
+                    await onRefresh();
+                    setRefreshing(false);
+                  }}
+                  sx={{ color: UAFE_COLORS.textMuted }}
+                >
+                  <RefreshOutlinedIcon sx={{ fontSize: 20, animation: refreshing ? 'spin 1s linear infinite' : 'none', '@keyframes spin': { '100%': { transform: 'rotate(360deg)' } } }} />
+                </IconButton>
+              </Tooltip>
+            )}
             {hasChanges && !readOnly && (
               <Button
                 size="small"
