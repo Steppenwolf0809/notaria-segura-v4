@@ -2,6 +2,7 @@ import React from 'react';
 import useAppAuth from './hooks/use-auth';
 import DashboardPage from './pages/DashboardPage';
 import VerificacionPublica from './pages/VerificacionPublica';
+import FormularioUAFEPublico from './pages/FormularioUAFEPublico';
 import PendingApproval from './components/PendingApproval';
 import ProtectedRoute from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
@@ -32,6 +33,7 @@ function App() {
   // Detectar ruta de verificacion publica
   const currentPath = window.location.pathname;
   const isVerificationRoute = currentPath.startsWith('/verify/');
+  const isFormularioUAFERoute = currentPath.startsWith('/formulario-uafe');
 
   return (
     <ThemeProvider theme={theme}>
@@ -50,7 +52,9 @@ function App() {
         style={{ zIndex: 20000 }}
       />
 
-      {isVerificationRoute ? (
+      {isFormularioUAFERoute ? (
+        <FormularioUAFEPublico />
+      ) : isVerificationRoute ? (
         <VerificacionPublica />
       ) : !isAuthenticated ? (
         <LoginPage />

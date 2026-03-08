@@ -305,7 +305,7 @@ function ProtocolRow({ protocol, onView, onEdit }) {
         {/* Acciones */}
         <TableCell>
           <Box sx={{ display: 'flex', gap: 0.5 }} onClick={(e) => e.stopPropagation()}>
-            <Tooltip title="Ver detalle del protocolo: datos del acto, comparecientes, textos generados y estado de completitud" arrow>
+            <Tooltip title="Ver detalle del protocolo: datos del acto, comparecientes, textos generados y progreso" arrow>
               <IconButton
                 size="small"
                 onClick={() => onView?.(protocol)}

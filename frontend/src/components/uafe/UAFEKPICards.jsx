@@ -135,7 +135,7 @@ export default function UAFEKPICards({ stats = {}, loading = false }) {
         tooltip="Protocolos sin datos obligatorios UAFE: sin tipo de acto, sin cuantia o sin comparecientes. Requieren atencion inmediata."
       />
       <KPICard
-        label="Completitud"
+        label="Progreso General"
         value={`${completitud}%`}
         accentColor={completitud >= 80 ? SEMAFORO.VERDE.color : completitud >= 50 ? SEMAFORO.AMARILLO.color : SEMAFORO.ROJO.color}
         loading={loading}

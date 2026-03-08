@@ -171,7 +171,7 @@ export default function UAFEReportPanel({
               Proximamente - OLA 4
             </AlertTitle>
             La generacion automatica de reportes UAFE se habilitara en la OLA 4 del desarrollo.
-            Por ahora, puede revisar el estado de completitud de los protocolos en el dashboard.
+            Por ahora, puede revisar el progreso de los protocolos en el dashboard.
           </Alert>
         ) : (
           <>
