@@ -444,7 +444,7 @@ router.post(
       if (datosConfirmados.codigoCanton) updateData.codigoCanton = datosConfirmados.codigoCanton;
 
       const protocolo = await prisma.protocoloUAFE.update({
-        where: { id: parseInt(protocoloId) },
+        where: { id: protocoloId },
         data: updateData,
       });
 
@@ -453,47 +453,53 @@ router.post(
         for (const comp of datosConfirmados.comparecientes) {
           if (!comp.cedula) continue;
 
-          // Buscar o crear PersonaUAFE
-          let persona = await prisma.personaUAFE.findUnique({
+          // Buscar o crear PersonaRegistrada (placeholder)
+          let persona = await prisma.personaRegistrada.findUnique({
             where: { numeroIdentificacion: comp.cedula },
           });
 
           if (!persona) {
-            persona = await prisma.personaUAFE.create({
+            persona = await prisma.personaRegistrada.create({
               data: {
                 numeroIdentificacion: comp.cedula,
-                tipoIdentificacion: comp.cedula.length === 13 ? 'RUC' : 'CEDULA',
-                tipoPersona: 'Natural',
+                tipoPersona: 'NATURAL',
+                pinHash: 'PENDIENTE_REGISTRO',
+                pinCreado: false,
+                completado: false,
                 datosPersonaNatural: {
-                  nombres: comp.nombres || '',
-                  apellidos: comp.apellidos || '',
-                  nacionalidad: comp.nacionalidad || 'ECUATORIANA',
-                  estadoCivil: comp.estadoCivil || '',
-                  profesion: comp.profesion || '',
-                  telefono: comp.telefono || '',
-                  correoElectronico: comp.correo || '',
-                  domicilio: comp.domicilio || '',
+                  datosPersonales: {
+                    nombres: comp.nombres || '',
+                    apellidos: comp.apellidos || '',
+                    estadoCivil: comp.estadoCivil || '',
+                    nacionalidad: comp.nacionalidad || 'ECUATORIANA',
+                  },
+                  contacto: {
+                    telefono: comp.telefono || '',
+                    correoElectronico: comp.correo || '',
+                  },
+                  direccion: {},
+                  informacionLaboral: {},
                 },
               },
             });
           }
 
           // Verificar que no este ya vinculado al protocolo
-          const yaVinculado = await prisma.personaProtocoloUAFE.findFirst({
+          const yaVinculado = await prisma.personaProtocolo.findFirst({
             where: {
-              protocoloId: parseInt(protocoloId),
+              protocoloId: protocoloId,
               personaCedula: comp.cedula,
             },
           });
 
           if (!yaVinculado) {
-            await prisma.personaProtocoloUAFE.create({
+            await prisma.personaProtocolo.create({
               data: {
-                protocoloId: parseInt(protocoloId),
+                protocoloId: protocoloId,
                 personaCedula: comp.cedula,
                 calidad: comp.calidad || 'OTRO',
-                formaComparecencia: comp.actuaPor || 'PROPIOS_DERECHOS',
-                nombre: `${comp.apellidos || ''} ${comp.nombres || ''}`.trim() || comp.cedula,
+                actuaPor: comp.actuaPor || 'PROPIOS_DERECHOS',
+                nombreTemporal: `${comp.apellidos || ''} ${comp.nombres || ''}`.trim() || null,
               },
             });
           }
@@ -627,37 +633,44 @@ router.post(
         for (const comp of datosConfirmados.comparecientes) {
           if (!comp.cedula) continue;
 
-          let persona = await prisma.personaUAFE.findUnique({
+          // Buscar o crear PersonaRegistrada (placeholder)
+          let persona = await prisma.personaRegistrada.findUnique({
             where: { numeroIdentificacion: comp.cedula },
           });
 
           if (!persona) {
-            persona = await prisma.personaUAFE.create({
+            persona = await prisma.personaRegistrada.create({
               data: {
                 numeroIdentificacion: comp.cedula,
-                tipoIdentificacion: comp.cedula.length === 13 ? 'RUC' : 'CEDULA',
-                tipoPersona: 'Natural',
+                tipoPersona: 'NATURAL',
+                pinHash: 'PENDIENTE_REGISTRO',
+                pinCreado: false,
+                completado: false,
                 datosPersonaNatural: {
-                  nombres: comp.nombres || '',
-                  apellidos: comp.apellidos || '',
-                  nacionalidad: comp.nacionalidad || 'ECUATORIANA',
-                  estadoCivil: comp.estadoCivil || '',
-                  profesion: comp.profesion || '',
-                  telefono: comp.telefono || '',
-                  correoElectronico: comp.correo || '',
-                  domicilio: comp.domicilio || '',
+                  datosPersonales: {
+                    nombres: comp.nombres || '',
+                    apellidos: comp.apellidos || '',
+                    estadoCivil: comp.estadoCivil || '',
+                    nacionalidad: comp.nacionalidad || 'ECUATORIANA',
+                  },
+                  contacto: {
+                    telefono: comp.telefono || '',
+                    correoElectronico: comp.correo || '',
+                  },
+                  direccion: {},
+                  informacionLaboral: {},
                 },
               },
             });
           }
 
-          await prisma.personaProtocoloUAFE.create({
+          await prisma.personaProtocolo.create({
             data: {
               protocoloId: protocolo.id,
               personaCedula: comp.cedula,
               calidad: comp.calidad || 'OTRO',
-              formaComparecencia: comp.actuaPor || 'PROPIOS_DERECHOS',
-              nombre: `${comp.apellidos || ''} ${comp.nombres || ''}`.trim() || comp.cedula,
+              actuaPor: comp.actuaPor || 'PROPIOS_DERECHOS',
+              nombreTemporal: `${comp.apellidos || ''} ${comp.nombres || ''}`.trim() || null,
             },
           });
         }
