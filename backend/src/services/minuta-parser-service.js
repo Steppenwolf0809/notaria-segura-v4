@@ -11,8 +11,9 @@ const CEDULA_PAREN_RE = /\((\d{10})\)/g;
 // RUC: 13 dígitos
 const RUC_RE = /\b(\d{13})\b/g;
 
-// Montos USD: $145.000,00 o USD 145.000,00 o 145.000,00
-const MONTO_RE = /(?:USD?\s*\$?\s*|US\s*\$\s*|\$\s*)([\d.,]+(?:\.\d{2}))/gi;
+// Montos USD: $145.000,00 o USD 145.000,00 o $56,500.00
+// Captura formatos latam (punto=miles, coma=decimal) y US (coma=miles, punto=decimal)
+const MONTO_RE = /(?:USD?\s*\$?\s*|US\s*\$\s*|\$\s*)([\d]{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?)/gi;
 const MONTO_ESCRITO_RE = /(\w[\w\s]+)\s+D[OÓ]LARES\s+DE\s+LOS\s+ESTADOS\s+UNIDOS\s+DE\s+AM[EÉ]RICA/gi;
 
 // Correo electrónico
@@ -21,6 +22,28 @@ const EMAIL_RE = /[\w.-]+@[\w.-]+\.\w{2,}/gi;
 // Teléfono: 09XXXXXXXX o +593XXXXXXXXX
 const TELEFONO_RE = /(?:\+\d{1,3}[\s.-]?)?\(?\d{2,4}\)?\d{6,8}/g;
 const TELEFONO_PAREN_RE = /\((\d{10})\)/g;
+
+/**
+ * Parsea un string de monto detectando formato latam (56.500,00) vs US (56,500.00).
+ * Regla: si el ultimo separador es coma → formato latam (coma=decimal, punto=miles).
+ *        si el ultimo separador es punto → formato US (punto=decimal, coma=miles).
+ *        si no hay separadores → entero.
+ */
+function parseMontoStr(str) {
+  if (!str) return NaN;
+  const lastComma = str.lastIndexOf(',');
+  const lastDot = str.lastIndexOf('.');
+
+  if (lastComma > lastDot) {
+    // Latam: 56.500,00 → quitar puntos, coma→punto
+    return parseFloat(str.replace(/\./g, '').replace(',', '.'));
+  } else if (lastDot > lastComma) {
+    // US: 56,500.00 → quitar comas
+    return parseFloat(str.replace(/,/g, ''));
+  }
+  // Sin separadores o solo uno tipo
+  return parseFloat(str.replace(/,/g, ''));
+}
 
 // ── Section Extraction ───────────────────────────────────────────
 
@@ -130,8 +153,7 @@ function extractWithRegex(text) {
   // Montos
   const montos = [];
   for (const m of text.matchAll(MONTO_RE)) {
-    const clean = m[1].replace(/\./g, '').replace(',', '.');
-    const value = parseFloat(clean);
+    const value = parseMontoStr(m[1]);
     if (!isNaN(value) && value > 0) {
       montos.push(value);
     }
@@ -199,8 +221,7 @@ function extractWithRegex(text) {
   let avaluo = null;
   const avaluoMatch = precioText.match(/aval[uú]o[^$\d]*(?:USD?\s*\$?\s*|US\s*\$\s*|\$\s*)([\d.,]+)/i);
   if (avaluoMatch) {
-    const clean = avaluoMatch[1].replace(/\./g, '').replace(',', '.');
-    avaluo = parseFloat(clean);
+    avaluo = parseMontoStr(avaluoMatch[1]);
   }
 
   return {
