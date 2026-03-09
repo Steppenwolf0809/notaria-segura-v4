@@ -480,11 +480,11 @@ export default function UAFEMinutaUpload({ protocoloId, onComplete, onCancel }) 
                         onChange={(e) => updateCompareciente(idx, 'actuaPor', e.target.value)}
                         sx={{ fontSize: '0.8rem', minWidth: 120 }}
                       >
-                        <MenuItem value="PROPIOS_DERECHOS" sx={{ fontSize: '0.8rem' }}>Propios Derechos</MenuItem>
-                        <MenuItem value="APODERADO_GENERAL" sx={{ fontSize: '0.8rem' }}>Apoderado General</MenuItem>
-                        <MenuItem value="APODERADO_ESPECIAL" sx={{ fontSize: '0.8rem' }}>Apoderado Especial</MenuItem>
-                        <MenuItem value="REPRESENTANTE_LEGAL" sx={{ fontSize: '0.8rem' }}>Representante Legal</MenuItem>
-                        <MenuItem value="REPRESENTANTE_MENOR" sx={{ fontSize: '0.8rem' }}>Representante Menor</MenuItem>
+                        <MenuItem value="PROPIOS_DERECHOS" sx={{ fontSize: '0.8rem' }}>Por sus propios derechos</MenuItem>
+                        <MenuItem value="APODERADO_GENERAL" sx={{ fontSize: '0.8rem' }}>Representado/a por apoderado general</MenuItem>
+                        <MenuItem value="APODERADO_ESPECIAL" sx={{ fontSize: '0.8rem' }}>Representado/a por apoderado especial</MenuItem>
+                        <MenuItem value="REPRESENTANTE_LEGAL" sx={{ fontSize: '0.8rem' }}>Representado/a por rep. legal</MenuItem>
+                        <MenuItem value="REPRESENTANTE_MENOR" sx={{ fontSize: '0.8rem' }}>Representado/a por rep. de menor</MenuItem>
                       </Select>
                     </TableCell>
                     <TableCell>

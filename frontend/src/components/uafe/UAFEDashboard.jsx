@@ -483,16 +483,16 @@ export default function UAFEDashboard() {
               </Select>
             </FormControl>
             <FormControl fullWidth size="small">
-              <InputLabel>Actua por</InputLabel>
+              <InputLabel>Comparece</InputLabel>
               <Select
                 value={addPersonaForm.actuaPor}
-                label="Actua por"
+                label="Comparece"
                 onChange={(e) => setAddPersonaForm(prev => ({ ...prev, actuaPor: e.target.value }))}
               >
-                <MenuItem value="PROPIOS_DERECHOS">Propios derechos</MenuItem>
-                <MenuItem value="APODERADO_GENERAL">Apoderado general</MenuItem>
-                <MenuItem value="APODERADO_ESPECIAL">Apoderado especial</MenuItem>
-                <MenuItem value="REPRESENTANTE_LEGAL">Representante legal</MenuItem>
+                <MenuItem value="PROPIOS_DERECHOS">Por sus propios derechos</MenuItem>
+                <MenuItem value="APODERADO_GENERAL">Representado/a por apoderado general</MenuItem>
+                <MenuItem value="APODERADO_ESPECIAL">Representado/a por apoderado especial</MenuItem>
+                <MenuItem value="REPRESENTANTE_LEGAL">Representado/a por representante legal</MenuItem>
               </Select>
             </FormControl>
           </DialogContent>
@@ -976,10 +976,10 @@ export default function UAFEDashboard() {
                           </td>
                           <td style={{ padding: '4px 8px' }}>
                             <Select size="small" variant="standard" value={comp.actuaPor || 'PROPIOS_DERECHOS'} onChange={(e) => updateWizardComp(idx, 'actuaPor', e.target.value)} sx={{ fontSize: '0.78rem', minWidth: 120 }}>
-                              <MenuItem value="PROPIOS_DERECHOS" sx={{ fontSize: '0.78rem' }}>Propios Derechos</MenuItem>
-                              <MenuItem value="APODERADO_GENERAL" sx={{ fontSize: '0.78rem' }}>Apoderado General</MenuItem>
-                              <MenuItem value="APODERADO_ESPECIAL" sx={{ fontSize: '0.78rem' }}>Apoderado Especial</MenuItem>
-                              <MenuItem value="REPRESENTANTE_LEGAL" sx={{ fontSize: '0.78rem' }}>Representante Legal</MenuItem>
+                              <MenuItem value="PROPIOS_DERECHOS" sx={{ fontSize: '0.78rem' }}>Por sus propios derechos</MenuItem>
+                              <MenuItem value="APODERADO_GENERAL" sx={{ fontSize: '0.78rem' }}>Representado/a por apod. general</MenuItem>
+                              <MenuItem value="APODERADO_ESPECIAL" sx={{ fontSize: '0.78rem' }}>Representado/a por apod. especial</MenuItem>
+                              <MenuItem value="REPRESENTANTE_LEGAL" sx={{ fontSize: '0.78rem' }}>Representado/a por rep. legal</MenuItem>
                             </Select>
                           </td>
                           <td style={{ padding: '4px 8px', textAlign: 'center' }}>

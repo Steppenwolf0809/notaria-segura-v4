@@ -339,7 +339,7 @@ function buildDatosMandante(datos) {
   const ubicParts = [m.parroquia, m.canton, m.provincia].filter(Boolean);
 
   return [
-    sectionTitle('DATOS DEL MANDANTE / BENEFICIARIO FINAL (Art. 30 §1.3)'),
+    sectionTitle('DATOS DEL REPRESENTANTE / APODERADO (Art. 30 §1.3)'),
     twoColumnTable([
       ['Apellidos', safeStr(m.apellidos)],
       ['Nombres', safeStr(m.nombres)],

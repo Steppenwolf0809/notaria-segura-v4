@@ -307,16 +307,16 @@ export default function UAFEPersonaEditDialog({
         <Grid container spacing={2} sx={{ mb: 3 }}>
           <Grid size={{ xs: 12, sm: 6 }}>
             <FormControl fullWidth size="small">
-              <InputLabel>Actua por</InputLabel>
+              <InputLabel>Comparece</InputLabel>
               <Select
                 value={form.actuaPor || 'PROPIOS_DERECHOS'}
-                label="Actua por"
+                label="Comparece"
                 onChange={(e) => handleChange('actuaPor', e.target.value)}
               >
-                <MenuItem value="PROPIOS_DERECHOS">Propios derechos</MenuItem>
-                <MenuItem value="APODERADO_GENERAL">Apoderado general</MenuItem>
-                <MenuItem value="APODERADO_ESPECIAL">Apoderado especial</MenuItem>
-                <MenuItem value="REPRESENTANTE_LEGAL">Representante legal</MenuItem>
+                <MenuItem value="PROPIOS_DERECHOS">Por sus propios derechos</MenuItem>
+                <MenuItem value="APODERADO_GENERAL">Representado/a por apoderado general</MenuItem>
+                <MenuItem value="APODERADO_ESPECIAL">Representado/a por apoderado especial</MenuItem>
+                <MenuItem value="REPRESENTANTE_LEGAL">Representado/a por representante legal</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -530,9 +530,9 @@ export default function UAFEPersonaEditDialog({
         {/* Mandante / Beneficiario Final (condicional) */}
         {isApoderado && (
           <>
-            <SectionTitle title="Datos del Mandante / Beneficiario Final" subtitle="Art. 30 §1.3" badge="UAFE" />
+            <SectionTitle title="Datos del Representante / Apoderado" subtitle="Art. 30 §1.3" badge="UAFE" />
             <Alert severity="info" sx={{ mb: 2, fontSize: '0.8rem' }}>
-              Complete los datos de la persona a quien representa ({persona.actuaPor}).
+              Complete los datos de la persona que representa a {nombre} en este acto.
             </Alert>
             <Grid container spacing={2} sx={{ mb: 3 }}>
               <Grid size={{ xs: 12, sm: 6 }}>
