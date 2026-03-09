@@ -1103,7 +1103,14 @@ export async function actualizarProtocolo(req, res) {
       numeroProtocolo,
       fecha,
       actoContrato,
+      tipoActo,
       tipoActoOtro,
+      tipoBien,
+      descripcionBien,
+      ubicacionDescripcion,
+      ubicacionParroquia,
+      ubicacionCanton,
+      ubicacionProvincia,
       bienInmuebleDescripcion,
       bienInmuebleUbicacion,
       vehiculoPlaca,
@@ -1158,16 +1165,10 @@ export async function actualizarProtocolo(req, res) {
         });
       }
       for (const fp of formasPago) {
-        if (!fp.tipo || !fp.monto || fp.monto <= 0) {
+        if (!fp.tipo) {
           return res.status(400).json({
             success: false,
-            message: 'Cada forma de pago debe tener tipo y monto válido'
-          });
-        }
-        if (['CHEQUE', 'TRANSFERENCIA'].includes(fp.tipo) && !fp.banco) {
-          return res.status(400).json({
-            success: false,
-            message: `El tipo de pago ${fp.tipo} requiere especificar el banco`
+            message: 'Cada forma de pago debe tener un tipo'
           });
         }
       }
@@ -1179,16 +1180,20 @@ export async function actualizarProtocolo(req, res) {
       data: {
         ...(numeroProtocolo && { numeroProtocolo }),
         ...(fecha && { fecha: new Date(fecha) }),
-        ...(actoContrato && { actoContrato }),
-        tipoActoOtro: tipoActoOtro || null,
-        bienInmuebleDescripcion: bienInmuebleDescripcion || null,
-        bienInmuebleUbicacion: bienInmuebleUbicacion || null,
-        vehiculoPlaca: vehiculoPlaca || null,
-        vehiculoMarca: vehiculoMarca || null,
-        vehiculoModelo: vehiculoModelo || null,
-        vehiculoAnio: vehiculoAnio || null,
-        ...(avaluoMunicipal !== undefined && { avaluoMunicipal: parseFloat(avaluoMunicipal) }),
-        ...(valorContrato !== undefined && { valorContrato: parseFloat(valorContrato) }),
+        ...((tipoActo || actoContrato) && { tipoActo: tipoActo || actoContrato }),
+        ...(tipoActoOtro !== undefined && { tipoActoOtro: tipoActoOtro || null }),
+        ...(tipoBien !== undefined && { tipoBien: tipoBien || null }),
+        ...(descripcionBien !== undefined && { descripcionBien: descripcionBien || null }),
+        ...(ubicacionDescripcion !== undefined && { ubicacionDescripcion: ubicacionDescripcion || null }),
+        ...(ubicacionParroquia !== undefined && { ubicacionParroquia: ubicacionParroquia || null }),
+        ...(ubicacionCanton !== undefined && { ubicacionCanton: ubicacionCanton || null }),
+        ...(ubicacionProvincia !== undefined && { ubicacionProvincia: ubicacionProvincia || null }),
+        ...(vehiculoPlaca !== undefined && { vehiculoPlaca: vehiculoPlaca || null }),
+        ...(vehiculoMarca !== undefined && { vehiculoMarca: vehiculoMarca || null }),
+        ...(vehiculoModelo !== undefined && { vehiculoModelo: vehiculoModelo || null }),
+        ...(vehiculoAnio !== undefined && { vehiculoAnio: vehiculoAnio || null }),
+        ...(avaluoMunicipal !== undefined && { avaluoMunicipal: parseFloat(avaluoMunicipal) || null }),
+        ...(valorContrato !== undefined && { valorContrato: parseFloat(valorContrato) || null }),
         ...(formasPago !== undefined && { formasPago })
       }
     });
