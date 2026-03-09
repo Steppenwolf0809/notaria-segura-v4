@@ -369,13 +369,37 @@ export default function UAFEDashboard() {
           }}
           onGenerateWord={async (protocoloId) => {
             try {
-              setSnackbar({ open: true, message: 'Generando formulario Word...', severity: 'info' });
+              setSnackbar({ open: true, message: 'Generando formularios Word...', severity: 'info' });
               const response = await apiClient.get(`/formulario-uafe/protocolo/${protocoloId}/generar-word`, {
                 responseType: 'blob'
               });
               const contentDisposition = response.headers['content-disposition'] || '';
               const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
-              const filename = filenameMatch ? filenameMatch[1] : `FormularioUAFE_${protocoloId}.docx`;
+              const filename = filenameMatch ? filenameMatch[1] : `FormulariosUAFE_${protocoloId}.zip`;
+              const url = window.URL.createObjectURL(new Blob([response.data]));
+              const link = document.createElement('a');
+              link.href = url;
+              link.setAttribute('download', filename);
+              document.body.appendChild(link);
+              link.click();
+              link.remove();
+              window.URL.revokeObjectURL(url);
+              setSnackbar({ open: true, message: 'Formularios Word descargados', severity: 'success' });
+            } catch (err) {
+              console.error('[UAFE] Error generando Word:', err);
+              setSnackbar({ open: true, message: err.response?.data?.message || 'Error al generar formularios Word', severity: 'error' });
+            }
+          }}
+          onGenerateWordPersona={async (protocoloId, personaId) => {
+            try {
+              setSnackbar({ open: true, message: 'Generando formulario Word...', severity: 'info' });
+              const response = await apiClient.get(`/formulario-uafe/protocolo/${protocoloId}/generar-word`, {
+                params: { personaId },
+                responseType: 'blob'
+              });
+              const contentDisposition = response.headers['content-disposition'] || '';
+              const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/);
+              const filename = filenameMatch ? filenameMatch[1] : `FormularioUAFE_${personaId}.docx`;
               const url = window.URL.createObjectURL(new Blob([response.data]));
               const link = document.createElement('a');
               link.href = url;
@@ -386,7 +410,7 @@ export default function UAFEDashboard() {
               window.URL.revokeObjectURL(url);
               setSnackbar({ open: true, message: 'Formulario Word descargado', severity: 'success' });
             } catch (err) {
-              console.error('[UAFE] Error generando Word:', err);
+              console.error('[UAFE] Error generando Word individual:', err);
               setSnackbar({ open: true, message: err.response?.data?.message || 'Error al generar formulario Word', severity: 'error' });
             }
           }}

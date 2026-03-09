@@ -29,6 +29,7 @@ import LinkOutlinedIcon from '@mui/icons-material/LinkOutlined';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined';
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import RefreshOutlinedIcon from '@mui/icons-material/RefreshOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
@@ -468,7 +469,7 @@ function DatosActoTab({ protocol, onFieldChange, readOnly }) {
   );
 }
 
-function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm }) {
+function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm, onGenerateWordPersona }) {
   const personas = protocol.personas || [];
 
   return (
@@ -572,6 +573,15 @@ function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm }) 
                 />
 
                 <Box sx={{ display: 'flex', gap: 0.5 }}>
+                  <Tooltip title="Descargar formulario Word individual de este compareciente" arrow>
+                    <IconButton
+                      size="small"
+                      onClick={() => onGenerateWordPersona?.(protocol.id, p.id || p.persona?.id)}
+                      sx={{ color: UAFE_COLORS.textMuted, '&:hover': { color: UAFE_COLORS.info || '#1976d2' } }}
+                    >
+                      <DescriptionOutlinedIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
                   <Tooltip title="Copia el enlace del formulario publico UAFE para que los comparecientes completen sus datos personales (direccion, laboral, PEP)" arrow>
                     <IconButton
                       size="small"
@@ -785,6 +795,7 @@ export default function UAFEProtocolDetail({
   onRefresh,
   onGenerateTexts,
   onGenerateWord,
+  onGenerateWordPersona,
   readOnly = false,
 }) {
   const [tab, setTab] = useState(0);
@@ -860,7 +871,7 @@ export default function UAFEProtocolDetail({
               </Tooltip>
             )}
             {onGenerateWord && (protocol.personas || []).length > 0 && (
-              <Tooltip title="Descargar formulario de conocimiento del cliente (Word .docx)" arrow>
+              <Tooltip title="Descargar todos los formularios de conocimiento del cliente en un ZIP (Word .docx)" arrow>
                 <Button
                   size="small"
                   variant="outlined"
@@ -874,7 +885,7 @@ export default function UAFEProtocolDetail({
                     color: UAFE_COLORS.textPrimary,
                   }}
                 >
-                  Formulario Word
+                  Descargar Todos
                 </Button>
               </Tooltip>
             )}
@@ -972,6 +983,7 @@ export default function UAFEProtocolDetail({
                 onAddPerson={onAddPerson}
                 onEditPerson={onEditPerson}
                 onSendForm={onSendForm}
+                onGenerateWordPersona={onGenerateWordPersona}
               />
             </TabPanel>
             <TabPanel value={tab} index={3}>
