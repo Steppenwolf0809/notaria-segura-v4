@@ -34,6 +34,8 @@ import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
+import CloseIcon from '@mui/icons-material/Close';
+import AddIcon from '@mui/icons-material/Add';
 
 import SemaforoIndicator, { SemaforoPersona } from './SemaforoIndicator';
 import UAFEStatusPipeline from './UAFEStatusPipeline';
@@ -339,35 +341,76 @@ function DatosActoTab({ protocol, onFieldChange, readOnly }) {
         <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, color: UAFE_COLORS.textPrimary, fontSize: '0.85rem' }}>
           Forma de Pago
         </Typography>
-        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-          {FORMAS_PAGO.map((fp) => {
-            const selected = Array.isArray(protocol.formasPago)
-              ? protocol.formasPago.some(p => (p.tipo || p) === fp.key)
-              : false;
-            return (
-              <Chip
-                key={fp.key}
-                label={fp.label}
-                size="small"
-                variant={selected ? 'filled' : 'outlined'}
-                color={selected ? 'primary' : 'default'}
-                onClick={readOnly ? undefined : () => {
-                  const current = Array.isArray(protocol.formasPago) ? [...protocol.formasPago] : [];
-                  if (selected) {
-                    onFieldChange?.('formasPago', current.filter(p => (p.tipo || p) !== fp.key));
-                  } else {
-                    onFieldChange?.('formasPago', [...current, { tipo: fp.key }]);
-                  }
-                }}
-                sx={{
-                  fontSize: '0.72rem',
-                  borderColor: UAFE_COLORS.border,
-                  cursor: readOnly ? 'default' : 'pointer',
+        {(protocol.formasPago || []).map((fp, idx) => (
+          <Grid container spacing={1} key={idx} sx={{ mb: 1 }}>
+            <Grid size={{ xs: 12, sm: 4 }}>
+              <FormControl fullWidth size="small">
+                <InputLabel>Tipo</InputLabel>
+                <Select
+                  value={fp.tipo || ''}
+                  label="Tipo"
+                  disabled={readOnly}
+                  onChange={(e) => {
+                    const arr = [...(protocol.formasPago || [])];
+                    arr[idx] = { ...arr[idx], tipo: e.target.value };
+                    onFieldChange?.('formasPago', arr);
+                  }}
+                >
+                  {FORMAS_PAGO.map(f => (
+                    <MenuItem key={f.key} value={f.key}>{f.label}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 3 }}>
+              <TextField
+                fullWidth size="small" label="Monto (USD)" type="number"
+                value={fp.monto ?? ''}
+                disabled={readOnly}
+                onChange={(e) => {
+                  const arr = [...(protocol.formasPago || [])];
+                  arr[idx] = { ...arr[idx], monto: parseFloat(e.target.value) || null };
+                  onFieldChange?.('formasPago', arr);
                 }}
               />
-            );
-          })}
-        </Box>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 4 }}>
+              <TextField
+                fullWidth size="small" label="Detalle / Banco"
+                value={fp.detalle || ''}
+                disabled={readOnly}
+                onChange={(e) => {
+                  const arr = [...(protocol.formasPago || [])];
+                  arr[idx] = { ...arr[idx], detalle: e.target.value };
+                  onFieldChange?.('formasPago', arr);
+                }}
+              />
+            </Grid>
+            {!readOnly && (
+              <Grid size={{ xs: 12, sm: 1 }} sx={{ display: 'flex', alignItems: 'center' }}>
+                <IconButton size="small" onClick={() => {
+                  const arr = (protocol.formasPago || []).filter((_, i) => i !== idx);
+                  onFieldChange?.('formasPago', arr);
+                }}>
+                  <CloseIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Grid>
+            )}
+          </Grid>
+        ))}
+        {!readOnly && (
+          <Button
+            size="small"
+            startIcon={<AddIcon sx={{ fontSize: 14 }} />}
+            onClick={() => {
+              const arr = [...(protocol.formasPago || []), { tipo: '', monto: null, detalle: '' }];
+              onFieldChange?.('formasPago', arr);
+            }}
+            sx={{ textTransform: 'none', fontSize: '0.75rem', mt: 0.5 }}
+          >
+            Agregar forma de pago
+          </Button>
+        )}
       </Box>
     </Box>
   );
