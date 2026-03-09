@@ -40,12 +40,17 @@ function negrita(texto, formatoHtml = true) {
 }
 
 /**
- * Obtiene el tratamiento según género
- * @param {string} genero - 'M' o 'F'
+ * Obtiene el tratamiento según género y estado civil
+ * @param {string} genero - 'M', 'F' o 'MASCULINO', 'FEMENINO'
+ * @param {string} estadoCivil - Estado civil (SOLTERO, CASADO, etc.)
  * @returns {string}
  */
-function obtenerTratamiento(genero) {
-    return genero === 'F' ? 'la señora' : 'el señor';
+function obtenerTratamiento(genero, estadoCivil) {
+    const esFemenino = genero === 'F' || genero === 'FEMENINO';
+    if (esFemenino) {
+        return estadoCivil === 'SOLTERO' || estadoCivil === 'SOLTERA' ? 'la señorita' : 'la señora';
+    }
+    return 'el señor';
 }
 
 /**
@@ -251,7 +256,7 @@ function formatearComparecienteIndividual(participante, formatoHtml = true) {
     }
 
     // CASO PERSONA NATURAL
-    const tratamiento = obtenerTratamiento(datos.genero);
+    const tratamiento = obtenerTratamiento(datos.genero, datos.estadoCivil);
 
     let texto = `${tratamiento} ${negrita(datos.nombre || '[NOMBRE PENDIENTE]', formatoHtml)}, `;
     texto += `de estado civil ${formatearEstadoCivil(datos.estadoCivil, datos.genero)}`;
@@ -424,7 +429,7 @@ function formatearConConyugeDesdeDB(participante, formatoHtml = true) {
  */
 function formatearApoderado(apoderado, formatoHtml = true) {
     const datosApoderado = obtenerDatosPersonales(apoderado);
-    const tratamiento = obtenerTratamiento(datosApoderado.genero);
+    const tratamiento = obtenerTratamiento(datosApoderado.genero, datosApoderado.estadoCivil);
     const nombreMandante = apoderado.mandanteNombre || '[MANDANTE PENDIENTE]';
     const cedulaMandante = apoderado.mandanteCedula || '';
 
@@ -481,7 +486,7 @@ function generarDomicilios(participantes, formatoHtml = true) {
             dom = `los cónyuges ${negrita(datos1.nombre, formatoHtml)} y ${negrita(nombre2, formatoHtml)}`;
         } else {
             // Individual o apoderado
-            const tratamiento = obtenerTratamiento(datos1.genero);
+            const tratamiento = obtenerTratamiento(datos1.genero, datos1.estadoCivil);
             dom = `${tratamiento} ${negrita(datos1.nombre || '[NOMBRE]', formatoHtml)}`;
         }
 

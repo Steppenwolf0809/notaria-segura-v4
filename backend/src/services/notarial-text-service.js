@@ -235,10 +235,11 @@ export function convertirFechaNotarial(fecha) {
         throw new Error('Fecha inválida');
     }
 
-    const diaSemana = DIAS_SEMANA[date.getDay()];
-    const dia = date.getDate();
-    const mes = MESES[date.getMonth()];
-    const anio = date.getFullYear();
+    // Usar métodos UTC para evitar que timezone del servidor (GMT-5) cambie el día
+    const diaSemana = DIAS_SEMANA[date.getUTCDay()];
+    const dia = date.getUTCDate();
+    const mes = MESES[date.getUTCMonth()];
+    const anio = date.getUTCFullYear();
 
     // Convertir año a letras
     const miles = Math.floor(anio / 1000);
