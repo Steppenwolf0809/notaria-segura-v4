@@ -6,6 +6,7 @@ import { verifyFormularioUAFESession } from '../middleware/verify-formulario-uaf
 import { csrfProtection } from '../middleware/csrf-protection.js';
 import { parseMinuta } from '../services/minuta-parser-service.js';
 import { uploadFile, isStorageConfigured } from '../services/storage-service.js';
+import { generarFormularioWord } from '../services/formulario-uafe-word-service.js';
 import { getCurrentNotaryId } from '../middleware/tenant-context.js';
 import { uafeLoginRateLimit } from '../middleware/rate-limiter.js';
 import {
@@ -189,6 +190,94 @@ router.get(
   authenticateToken,
   requireRoles(['MATRIZADOR', 'ADMIN', 'OFICIAL_CUMPLIMIENTO']),
   generarPDFs
+);
+
+/**
+ * Generar formularios Word (.docx) de conocimiento del cliente UAFE
+ * GET /api/formulario-uafe/protocolo/:protocoloId/generar-word
+ * Requiere: JWT + role MATRIZADOR o ADMIN
+ * Query: ?personaId=xxx (opcional, si no se indica genera para todos)
+ * Retorna: .docx individual o ZIP con múltiples .docx
+ */
+router.get(
+  '/protocolo/:protocoloId/generar-word',
+  authenticateToken,
+  requireRoles(['MATRIZADOR', 'ADMIN', 'OFICIAL_CUMPLIMIENTO']),
+  async (req, res) => {
+    try {
+      const { protocoloId } = req.params;
+      const { personaId } = req.query;
+      const { db: prisma } = await import('../db.js');
+
+      const protocolo = await prisma.protocoloUAFE.findUnique({
+        where: { id: protocoloId },
+        include: {
+          personas: {
+            include: {
+              persona: {
+                select: {
+                  id: true,
+                  numeroIdentificacion: true,
+                  tipoPersona: true,
+                  datosPersonaNatural: true,
+                  datosPersonaJuridica: true,
+                  completado: true
+                }
+              }
+            }
+          }
+        }
+      });
+
+      if (!protocolo) {
+        return res.status(404).json({ success: false, message: 'Protocolo no encontrado' });
+      }
+
+      if (protocolo.createdBy !== req.user.id && req.user.role !== 'ADMIN') {
+        return res.status(403).json({ success: false, message: 'Sin permisos' });
+      }
+
+      // Filtrar personas con datos
+      let personasTarget = protocolo.personas.filter(pp => {
+        const p = pp.persona;
+        return (p.tipoPersona === 'NATURAL' && p.datosPersonaNatural) ||
+               (p.tipoPersona === 'JURIDICA' && p.datosPersonaJuridica);
+      });
+
+      if (personaId) {
+        personasTarget = personasTarget.filter(pp => pp.id === personaId || pp.persona.id === personaId);
+      }
+
+      if (personasTarget.length === 0) {
+        return res.status(400).json({ success: false, message: 'No hay personas con datos para generar formulario' });
+      }
+
+      // Si es una sola persona, devolver .docx directo
+      if (personasTarget.length === 1) {
+        const { buffer, filename } = await generarFormularioWord(protocolo, personasTarget[0]);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        return res.send(buffer);
+      }
+
+      // Múltiples personas: generar ZIP
+      const archiver = (await import('archiver')).default;
+      const archive = archiver('zip');
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="FormulariosUAFE_${protocolo.numeroProtocolo || protocoloId}.zip"`);
+      archive.pipe(res);
+
+      for (const pp of personasTarget) {
+        const { buffer, filename } = await generarFormularioWord(protocolo, pp);
+        archive.append(buffer, { name: filename });
+      }
+
+      await archive.finalize();
+    } catch (error) {
+      console.error('Error generando Word UAFE:', error);
+      res.status(500).json({ success: false, message: 'Error al generar formulario Word' });
+    }
+  }
 );
 
 /**

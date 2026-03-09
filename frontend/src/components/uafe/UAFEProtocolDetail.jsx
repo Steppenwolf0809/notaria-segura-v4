@@ -784,6 +784,7 @@ export default function UAFEProtocolDetail({
   onSendForm,
   onRefresh,
   onGenerateTexts,
+  onGenerateWord,
   readOnly = false,
 }) {
   const [tab, setTab] = useState(0);
@@ -856,6 +857,25 @@ export default function UAFEProtocolDetail({
                 >
                   <RefreshOutlinedIcon sx={{ fontSize: 20, animation: refreshing ? 'spin 1s linear infinite' : 'none', '@keyframes spin': { '100%': { transform: 'rotate(360deg)' } } }} />
                 </IconButton>
+              </Tooltip>
+            )}
+            {onGenerateWord && (protocol.personas || []).length > 0 && (
+              <Tooltip title="Descargar formulario de conocimiento del cliente (Word .docx)" arrow>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<UploadFileOutlinedIcon sx={{ fontSize: 16 }} />}
+                  onClick={() => onGenerateWord?.(protocol.id)}
+                  sx={{
+                    textTransform: 'none',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    borderColor: UAFE_COLORS.border,
+                    color: UAFE_COLORS.textPrimary,
+                  }}
+                >
+                  Formulario Word
+                </Button>
               </Tooltip>
             )}
             {hasChanges && !readOnly && (

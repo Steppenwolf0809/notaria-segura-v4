@@ -1,0 +1,763 @@
+/**
+ * Servicio generador de Formulario UAFE en Word (.docx)
+ * Genera un documento "Formulario de Conocimiento del Cliente" por compareciente.
+ * Dos variantes: Persona Natural y Persona Jurídica.
+ *
+ * Usa el paquete `docx` v8.5.0 para construir el documento.
+ */
+
+import {
+  Document,
+  Packer,
+  Paragraph,
+  Table,
+  TableRow,
+  TableCell,
+  TextRun,
+  WidthType,
+  AlignmentType,
+  BorderStyle,
+  HeadingLevel,
+  ShadingType,
+  VerticalAlign,
+  TableLayoutType,
+} from 'docx';
+
+import logger from '../utils/logger.js';
+
+// ── Constantes ──────────────────────────────────────────────────────
+
+const TIPOS_ACTO = {
+  'COMPRAVENTA': 'Compraventa',
+  'PROMESA_COMPRAVENTA': 'Promesa de Compraventa',
+  'DONACION': 'Donación',
+  'HIPOTECA': 'Hipoteca',
+  'PODER_GENERAL': 'Poder General',
+  'PODER_ESPECIAL': 'Poder Especial',
+  'CONSTITUCION_COMPANIA': 'Constitución de Compañía',
+  'TESTAMENTO': 'Testamento',
+  'OTROS': 'Otros',
+};
+
+const CALIDADES = {
+  'VENDEDOR': 'Vendedor',
+  'COMPRADOR': 'Comprador',
+  'DONANTE': 'Donante',
+  'DONATARIO': 'Donatario',
+  'HIPOTECANTE': 'Hipotecante',
+  'ACREEDOR_HIPOTECARIO': 'Acreedor Hipotecario',
+  'PODERDANTE': 'Poderdante',
+  'APODERADO': 'Apoderado',
+  'TESTADOR': 'Testador',
+  'COMPARECIENTE': 'Compareciente',
+};
+
+// ── Estilos ─────────────────────────────────────────────────────────
+
+const FONT = 'Calibri';
+const FONT_SIZE_BODY = 20;       // docx uses half-points: 20 = 10pt
+const FONT_SIZE_TITLE = 28;      // 14pt
+const FONT_SIZE_SECTION = 22;    // 11pt
+const HEADER_SHADING = { type: ShadingType.SOLID, color: 'D9E2F3' }; // light blue
+const CELL_MARGINS = { top: 40, bottom: 40, left: 80, right: 80 };
+
+// ── Helpers ─────────────────────────────────────────────────────────
+
+function safeStr(val) {
+  if (val === null || val === undefined) return '—';
+  return String(val);
+}
+
+function formatDate(val) {
+  if (!val) return '—';
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return safeStr(val);
+    return d.toLocaleDateString('es-EC', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      timeZone: 'America/Guayaquil',
+    });
+  } catch {
+    return safeStr(val);
+  }
+}
+
+function formatCurrency(val) {
+  if (val === null || val === undefined) return '—';
+  const num = Number(val);
+  if (isNaN(num)) return safeStr(val);
+  return `$ ${num.toLocaleString('es-EC', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function textRun(text, opts = {}) {
+  return new TextRun({
+    text: safeStr(text),
+    font: FONT,
+    size: opts.size || FONT_SIZE_BODY,
+    bold: opts.bold || false,
+    italics: opts.italics || false,
+  });
+}
+
+function paragraph(text, opts = {}) {
+  return new Paragraph({
+    alignment: opts.alignment || AlignmentType.LEFT,
+    spacing: { after: opts.spacingAfter ?? 60 },
+    children: [textRun(text, opts)],
+  });
+}
+
+function emptyParagraph() {
+  return new Paragraph({ spacing: { after: 0 }, children: [] });
+}
+
+// ── Table helpers ───────────────────────────────────────────────────
+
+const THIN_BORDER = {
+  style: BorderStyle.SINGLE,
+  size: 1,
+  color: '999999',
+};
+
+const CELL_BORDERS = {
+  top: THIN_BORDER,
+  bottom: THIN_BORDER,
+  left: THIN_BORDER,
+  right: THIN_BORDER,
+};
+
+function headerCell(text, widthPct) {
+  return new TableCell({
+    width: { size: widthPct, type: WidthType.PERCENTAGE },
+    shading: HEADER_SHADING,
+    borders: CELL_BORDERS,
+    margins: CELL_MARGINS,
+    verticalAlign: VerticalAlign.CENTER,
+    children: [
+      new Paragraph({
+        spacing: { after: 0 },
+        children: [textRun(text, { bold: true })],
+      }),
+    ],
+  });
+}
+
+function dataCell(text, widthPct) {
+  return new TableCell({
+    width: { size: widthPct, type: WidthType.PERCENTAGE },
+    borders: CELL_BORDERS,
+    margins: CELL_MARGINS,
+    verticalAlign: VerticalAlign.CENTER,
+    children: [
+      new Paragraph({
+        spacing: { after: 0 },
+        children: [textRun(text)],
+      }),
+    ],
+  });
+}
+
+function twoColumnTable(rows) {
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    layout: TableLayoutType.FIXED,
+    rows: rows.map(([label, value]) =>
+      new TableRow({
+        children: [
+          headerCell(label, 35),
+          dataCell(value, 65),
+        ],
+      })
+    ),
+  });
+}
+
+function multiColumnTable(headers, dataRows) {
+  const colWidth = Math.floor(100 / headers.length);
+  const headerRow = new TableRow({
+    children: headers.map(h => headerCell(h, colWidth)),
+  });
+  const rows = dataRows.map(row =>
+    new TableRow({
+      children: row.map(cell => dataCell(cell, colWidth)),
+    })
+  );
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    layout: TableLayoutType.FIXED,
+    rows: [headerRow, ...rows],
+  });
+}
+
+// ── Section builders ────────────────────────────────────────────────
+
+function sectionTitle(text) {
+  return new Paragraph({
+    spacing: { before: 240, after: 120 },
+    children: [
+      textRun(text, { bold: true, size: FONT_SIZE_SECTION }),
+    ],
+  });
+}
+
+function buildHeader(tipoPersona) {
+  const tipoLabel = tipoPersona === 'JURIDICA'
+    ? 'PERSONA JURÍDICA'
+    : 'PERSONA NATURAL';
+
+  return [
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 40 },
+      children: [
+        textRun('NOTARÍA DÉCIMO OCTAVA DEL CANTÓN QUITO', {
+          bold: true,
+          size: FONT_SIZE_TITLE,
+        }),
+      ],
+    }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 40 },
+      children: [
+        textRun(`FORMULARIO DE CONOCIMIENTO DEL USUARIO - ${tipoLabel}`, {
+          bold: true,
+          size: FONT_SIZE_SECTION,
+        }),
+      ],
+    }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 200 },
+      children: [
+        textRun(
+          'Formulario de Prevención de Lavado de Activos y Financiamiento de Delitos (UAFE)',
+          { italics: true, size: FONT_SIZE_BODY }
+        ),
+      ],
+    }),
+  ];
+}
+
+function buildDatosActoNotarial(protocolo, calidad) {
+  return [
+    sectionTitle('1. DATOS DEL ACTO NOTARIAL'),
+    twoColumnTable([
+      ['Tipo de Acto', TIPOS_ACTO[protocolo.tipoActo] || safeStr(protocolo.tipoActo)],
+      ['No. Protocolo', safeStr(protocolo.numeroProtocolo)],
+      ['Fecha', formatDate(protocolo.fecha)],
+      ['Cuantía USD', formatCurrency(protocolo.valorContrato)],
+      ['Avalúo Municipal', formatCurrency(protocolo.avaluoMunicipal)],
+      ['Calidad', CALIDADES[calidad] || safeStr(calidad)],
+    ]),
+  ];
+}
+
+function buildDatosPersonales(datos) {
+  const dp = datos?.datosPersonales || {};
+  return [
+    sectionTitle('2. DATOS PERSONALES'),
+    twoColumnTable([
+      ['Apellidos', safeStr(dp.apellidos)],
+      ['Nombres', safeStr(dp.nombres)],
+      ['Tipo de Identificación', safeStr(dp.tipoIdentificacion)],
+      ['No. Identificación', safeStr(dp.numeroIdentificacion)],
+      ['Fecha de Nacimiento', formatDate(dp.fechaNacimiento)],
+      ['Lugar de Nacimiento', safeStr(dp.lugarNacimiento)],
+      ['Nacionalidad', safeStr(dp.nacionalidad)],
+      ['Género', safeStr(dp.genero)],
+      ['Estado Civil', safeStr(dp.estadoCivil)],
+      ['Profesión / Ocupación', safeStr(dp.profesion)],
+    ]),
+  ];
+}
+
+function buildDomicilio(datos) {
+  const dom = datos?.domicilio || {};
+  return [
+    sectionTitle('3. DOMICILIO'),
+    twoColumnTable([
+      ['Dirección', safeStr(dom.direccion)],
+      ['Ciudad', safeStr(dom.ciudad)],
+      ['Provincia', safeStr(dom.provincia)],
+      ['País', safeStr(dom.pais)],
+      ['Teléfono', safeStr(dom.telefono)],
+      ['Celular', safeStr(dom.celular)],
+      ['Correo Electrónico', safeStr(dom.email)],
+    ]),
+  ];
+}
+
+function buildInformacionLaboral(datos) {
+  const lab = datos?.informacionLaboral || {};
+  return [
+    sectionTitle('4. INFORMACIÓN LABORAL'),
+    twoColumnTable([
+      ['Situación Laboral', safeStr(lab.situacionLaboral)],
+      ['Nombre de la Empresa', safeStr(lab.nombreEmpresa)],
+      ['Cargo', safeStr(lab.cargo)],
+      ['Dirección de la Empresa', safeStr(lab.direccionEmpresa)],
+      ['Teléfono de la Empresa', safeStr(lab.telefonoEmpresa)],
+      ['Ingreso Mensual Aprox.', formatCurrency(lab.ingresoMensual)],
+    ]),
+  ];
+}
+
+function buildDatosConyuge(datos) {
+  const ec = datos?.datosPersonales?.estadoCivil;
+  if (ec !== 'CASADO' && ec !== 'UNION_LIBRE') return [];
+
+  const con = datos?.datosConyuge || {};
+  return [
+    sectionTitle('5. DATOS DEL CÓNYUGE'),
+    twoColumnTable([
+      ['Nombres', safeStr(con.nombres)],
+      ['Apellidos', safeStr(con.apellidos)],
+      ['Tipo de Identificación', safeStr(con.tipoIdentificacion)],
+      ['No. Identificación', safeStr(con.numeroIdentificacion)],
+      ['Nacionalidad', safeStr(con.nacionalidad)],
+    ]),
+  ];
+}
+
+function buildDeclaracionPEP(datos) {
+  const pep = datos?.pep || {};
+  const esPEP = pep.esPEP === true || pep.esPEP === 'SI';
+  const vinculoPEP = pep.vinculoPEP === true || pep.vinculoPEP === 'SI';
+
+  const rows = [
+    ['¿Es Persona Expuesta Políticamente (PEP)?', esPEP ? 'SÍ' : 'NO'],
+  ];
+
+  if (esPEP) {
+    rows.push(
+      ['Cargo PEP', safeStr(pep.cargo)],
+      ['Institución', safeStr(pep.institucion)],
+      ['Fecha Desde', formatDate(pep.fechaDesde)],
+      ['Fecha Hasta', formatDate(pep.fechaHasta)],
+    );
+  }
+
+  rows.push(['¿Tiene vínculo con un PEP?', vinculoPEP ? 'SÍ' : 'NO']);
+
+  if (vinculoPEP) {
+    rows.push(
+      ['Nombre del PEP', safeStr(pep.nombrePEP)],
+      ['Parentesco con el PEP', safeStr(pep.parentescoPEP)],
+      ['Cargo del PEP', safeStr(pep.cargoPEP)],
+    );
+  }
+
+  // Dynamic section number based on whether cónyuge was included
+  const ec = datos?.datosPersonales?.estadoCivil;
+  const hasConyuge = ec === 'CASADO' || ec === 'UNION_LIBRE';
+  const secNum = hasConyuge ? '6' : '5';
+
+  return [
+    sectionTitle(`${secNum}. DECLARACIÓN PEP (Persona Expuesta Políticamente)`),
+    twoColumnTable(rows),
+  ];
+}
+
+function buildFormasPago(protocolo, datos) {
+  const ec = datos?.datosPersonales?.estadoCivil;
+  const hasConyuge = ec === 'CASADO' || ec === 'UNION_LIBRE';
+  const secNum = hasConyuge ? '7' : '6';
+
+  const formas = protocolo.formasPago || [];
+  if (formas.length === 0) {
+    return [
+      sectionTitle(`${secNum}. FORMAS DE PAGO`),
+      paragraph('No se registraron formas de pago.'),
+    ];
+  }
+
+  const dataRows = formas.map(fp => [
+    safeStr(fp.tipo),
+    formatCurrency(fp.monto),
+    safeStr(fp.detalle),
+  ]);
+
+  return [
+    sectionTitle(`${secNum}. FORMAS DE PAGO`),
+    multiColumnTable(['Tipo', 'Monto', 'Detalle'], dataRows),
+  ];
+}
+
+function buildDatosBien(protocolo, datos) {
+  const ec = datos?.datosPersonales?.estadoCivil;
+  const hasConyuge = ec === 'CASADO' || ec === 'UNION_LIBRE';
+  const secNum = hasConyuge ? '8' : '7';
+
+  if (!protocolo.tipoBien && !protocolo.descripcionBien) return [];
+
+  const rows = [
+    ['Tipo de Bien', safeStr(protocolo.tipoBien)],
+    ['Descripción del Bien', safeStr(protocolo.descripcionBien)],
+  ];
+
+  if (protocolo.ubicacionDescripcion || protocolo.ubicacionCanton) {
+    rows.push(
+      ['Ubicación', safeStr(protocolo.ubicacionDescripcion)],
+      ['Parroquia', safeStr(protocolo.ubicacionParroquia)],
+      ['Cantón', safeStr(protocolo.ubicacionCanton)],
+      ['Provincia', safeStr(protocolo.ubicacionProvincia)],
+    );
+  }
+
+  return [
+    sectionTitle(`${secNum}. DATOS DEL BIEN`),
+    twoColumnTable(rows),
+  ];
+}
+
+function buildDeclaracionOrigenLicito(datos) {
+  const ec = datos?.datosPersonales?.estadoCivil;
+  const hasConyuge = ec === 'CASADO' || ec === 'UNION_LIBRE';
+  const hasBien = true; // approximate – always include the section
+  let secNum = hasConyuge ? 9 : 8;
+
+  return [
+    sectionTitle(`${secNum}. DECLARACIÓN DE ORIGEN LÍCITO DE RECURSOS`),
+    new Paragraph({
+      spacing: { after: 120 },
+      children: [
+        textRun(
+          'Declaro bajo juramento que los recursos, bienes y/o valores que empleo en la presente ' +
+          'transacción son de origen lícito, no provienen ni se encuentran destinados a la ' +
+          'realización de ninguna actividad ilícita, especialmente las relacionadas con el lavado ' +
+          'de activos, financiamiento del terrorismo y otros delitos. Me comprometo a entregar ' +
+          'toda la documentación e información adicional que me sea requerida para verificar la ' +
+          'procedencia lícita de mis fondos. Autorizo a la Notaría a reportar cualquier operación ' +
+          'inusual o sospechosa a la Unidad de Análisis Financiero y Económico (UAFE), de ' +
+          'conformidad con la Ley Orgánica de Prevención, Detección y Erradicación del Delito ' +
+          'de Lavado de Activos y del Financiamiento de Delitos.',
+        ),
+      ],
+    }),
+  ];
+}
+
+function buildFirma(datos) {
+  const dp = datos?.datosPersonales || {};
+  const nombreCompleto = [dp.nombres, dp.apellidos].filter(Boolean).join(' ') || '—';
+
+  return [
+    new Paragraph({ spacing: { before: 400, after: 0 }, children: [] }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 0 },
+      children: [textRun('_________________________________________')],
+    }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 0 },
+      children: [textRun('Firma', { bold: true })],
+    }),
+    new Paragraph({ spacing: { after: 200 }, children: [] }),
+    twoColumnTable([
+      ['Nombre', nombreCompleto],
+      ['Cédula / RUC', safeStr(dp.numeroIdentificacion)],
+      ['Fecha', '______________________'],
+    ]),
+  ];
+}
+
+// ── Persona Jurídica specific sections ──────────────────────────────
+
+function buildDatosCompania(datos) {
+  const comp = datos?.compania || {};
+  return [
+    sectionTitle('2. DATOS DE LA COMPAÑÍA'),
+    twoColumnTable([
+      ['Razón Social', safeStr(comp.razonSocial)],
+      ['RUC', safeStr(comp.ruc)],
+      ['Actividad Económica', safeStr(comp.actividadEconomica)],
+      ['Fecha de Constitución', formatDate(comp.fechaConstitucion)],
+      ['Objeto Social', safeStr(comp.objetoSocial)],
+    ]),
+  ];
+}
+
+function buildRepresentanteLegal(datos) {
+  const rep = datos?.representanteLegal || {};
+  return [
+    sectionTitle('3. REPRESENTANTE LEGAL'),
+    twoColumnTable([
+      ['Apellidos', safeStr(rep.apellidos)],
+      ['Nombres', safeStr(rep.nombres)],
+      ['Cargo', safeStr(rep.cargo)],
+      ['Tipo de Identificación', safeStr(rep.tipoIdentificacion)],
+      ['No. Identificación', safeStr(rep.numeroIdentificacion)],
+    ]),
+  ];
+}
+
+function buildSocios(datos) {
+  const socios = datos?.socios || [];
+  if (socios.length === 0) {
+    return [
+      sectionTitle('4. SOCIOS / ACCIONISTAS'),
+      paragraph('No se registraron socios o accionistas.'),
+    ];
+  }
+
+  const dataRows = socios.map(s => [
+    safeStr(s.nombre),
+    safeStr(s.identificacion),
+    s.porcentaje != null ? `${s.porcentaje}%` : '—',
+    safeStr(s.nacionalidad),
+  ]);
+
+  return [
+    sectionTitle('4. SOCIOS / ACCIONISTAS'),
+    multiColumnTable(
+      ['Nombre', 'Identificación', 'Participación %', 'Nacionalidad'],
+      dataRows,
+    ),
+  ];
+}
+
+function buildDomicilioJuridica(datos) {
+  const dom = datos?.domicilio || {};
+  return [
+    sectionTitle('5. DOMICILIO'),
+    twoColumnTable([
+      ['Dirección', safeStr(dom.direccion)],
+      ['Ciudad', safeStr(dom.ciudad)],
+      ['Provincia', safeStr(dom.provincia)],
+      ['País', safeStr(dom.pais)],
+      ['Teléfono', safeStr(dom.telefono)],
+      ['Celular', safeStr(dom.celular)],
+      ['Correo Electrónico', safeStr(dom.email)],
+    ]),
+  ];
+}
+
+function buildPEPJuridica(datos) {
+  const pep = datos?.pep || {};
+  const esPEP = pep.esPEP === true || pep.esPEP === 'SI';
+  const vinculoPEP = pep.vinculoPEP === true || pep.vinculoPEP === 'SI';
+
+  const rows = [
+    ['¿Es Persona Expuesta Políticamente (PEP)?', esPEP ? 'SÍ' : 'NO'],
+  ];
+
+  if (esPEP) {
+    rows.push(
+      ['Cargo PEP', safeStr(pep.cargo)],
+      ['Institución', safeStr(pep.institucion)],
+      ['Fecha Desde', formatDate(pep.fechaDesde)],
+      ['Fecha Hasta', formatDate(pep.fechaHasta)],
+    );
+  }
+
+  rows.push(['¿Tiene vínculo con un PEP?', vinculoPEP ? 'SÍ' : 'NO']);
+
+  if (vinculoPEP) {
+    rows.push(
+      ['Nombre del PEP', safeStr(pep.nombrePEP)],
+      ['Parentesco con el PEP', safeStr(pep.parentescoPEP)],
+      ['Cargo del PEP', safeStr(pep.cargoPEP)],
+    );
+  }
+
+  return [
+    sectionTitle('6. DECLARACIÓN PEP (Persona Expuesta Políticamente)'),
+    twoColumnTable(rows),
+  ];
+}
+
+function buildFormasPagoJuridica(protocolo) {
+  const formas = protocolo.formasPago || [];
+  if (formas.length === 0) {
+    return [
+      sectionTitle('7. FORMAS DE PAGO'),
+      paragraph('No se registraron formas de pago.'),
+    ];
+  }
+
+  const dataRows = formas.map(fp => [
+    safeStr(fp.tipo),
+    formatCurrency(fp.monto),
+    safeStr(fp.detalle),
+  ]);
+
+  return [
+    sectionTitle('7. FORMAS DE PAGO'),
+    multiColumnTable(['Tipo', 'Monto', 'Detalle'], dataRows),
+  ];
+}
+
+function buildDatosBienJuridica(protocolo) {
+  if (!protocolo.tipoBien && !protocolo.descripcionBien) return [];
+
+  const rows = [
+    ['Tipo de Bien', safeStr(protocolo.tipoBien)],
+    ['Descripción del Bien', safeStr(protocolo.descripcionBien)],
+  ];
+
+  if (protocolo.ubicacionDescripcion || protocolo.ubicacionCanton) {
+    rows.push(
+      ['Ubicación', safeStr(protocolo.ubicacionDescripcion)],
+      ['Parroquia', safeStr(protocolo.ubicacionParroquia)],
+      ['Cantón', safeStr(protocolo.ubicacionCanton)],
+      ['Provincia', safeStr(protocolo.ubicacionProvincia)],
+    );
+  }
+
+  return [
+    sectionTitle('8. DATOS DEL BIEN'),
+    twoColumnTable(rows),
+  ];
+}
+
+function buildDeclaracionOrigenLicitoJuridica() {
+  return [
+    sectionTitle('9. DECLARACIÓN DE ORIGEN LÍCITO DE RECURSOS'),
+    new Paragraph({
+      spacing: { after: 120 },
+      children: [
+        textRun(
+          'Declaro bajo juramento que los recursos, bienes y/o valores que empleo en la presente ' +
+          'transacción son de origen lícito, no provienen ni se encuentran destinados a la ' +
+          'realización de ninguna actividad ilícita, especialmente las relacionadas con el lavado ' +
+          'de activos, financiamiento del terrorismo y otros delitos. Me comprometo a entregar ' +
+          'toda la documentación e información adicional que me sea requerida para verificar la ' +
+          'procedencia lícita de mis fondos. Autorizo a la Notaría a reportar cualquier operación ' +
+          'inusual o sospechosa a la Unidad de Análisis Financiero y Económico (UAFE), de ' +
+          'conformidad con la Ley Orgánica de Prevención, Detección y Erradicación del Delito ' +
+          'de Lavado de Activos y del Financiamiento de Delitos.',
+        ),
+      ],
+    }),
+  ];
+}
+
+function buildFirmaJuridica(datos) {
+  const rep = datos?.representanteLegal || {};
+  const nombreCompleto = [rep.nombres, rep.apellidos].filter(Boolean).join(' ') || '—';
+
+  return [
+    new Paragraph({ spacing: { before: 400, after: 0 }, children: [] }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 0 },
+      children: [textRun('_________________________________________')],
+    }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 0 },
+      children: [textRun('Firma del Representante Legal', { bold: true })],
+    }),
+    new Paragraph({ spacing: { after: 200 }, children: [] }),
+    twoColumnTable([
+      ['Nombre', nombreCompleto],
+      ['Cédula / RUC', safeStr(rep.numeroIdentificacion)],
+      ['Cargo', safeStr(rep.cargo)],
+      ['Fecha', '______________________'],
+    ]),
+  ];
+}
+
+// ── Main export ─────────────────────────────────────────────────────
+
+/**
+ * Genera un documento Word (.docx) con el formulario UAFE KYC para un compareciente.
+ *
+ * @param {object} protocolo - ProtocoloUAFE record (includes tipoActo, numeroProtocolo, fecha, etc.)
+ * @param {object} personaProtocolo - PersonaProtocolo record (includes calidad, tipo, datos JSON)
+ * @returns {Promise<{ buffer: Buffer, filename: string }>}
+ */
+export async function generarFormularioWord(protocolo, personaProtocolo) {
+  const tipo = personaProtocolo.tipo; // 'NATURAL' or 'JURIDICA'
+  const calidad = personaProtocolo.calidad;
+  const datos = typeof personaProtocolo.datos === 'string'
+    ? JSON.parse(personaProtocolo.datos)
+    : (personaProtocolo.datos || {});
+
+  logger.info(
+    `[formulario-uafe-word] Generando formulario ${tipo} para protocolo ${protocolo.id}, calidad ${calidad}`,
+  );
+
+  let sections;
+
+  if (tipo === 'JURIDICA') {
+    sections = [
+      ...buildHeader('JURIDICA'),
+      ...buildDatosActoNotarial(protocolo, calidad),
+      ...buildDatosCompania(datos),
+      ...buildRepresentanteLegal(datos),
+      ...buildSocios(datos),
+      ...buildDomicilioJuridica(datos),
+      ...buildPEPJuridica(datos),
+      ...buildFormasPagoJuridica(protocolo),
+      ...buildDatosBienJuridica(protocolo),
+      ...buildDeclaracionOrigenLicitoJuridica(),
+      ...buildFirmaJuridica(datos),
+    ];
+  } else {
+    // NATURAL (default)
+    sections = [
+      ...buildHeader('NATURAL'),
+      ...buildDatosActoNotarial(protocolo, calidad),
+      ...buildDatosPersonales(datos),
+      ...buildDomicilio(datos),
+      ...buildInformacionLaboral(datos),
+      ...buildDatosConyuge(datos),
+      ...buildDeclaracionPEP(datos),
+      ...buildFormasPago(protocolo, datos),
+      ...buildDatosBien(protocolo, datos),
+      ...buildDeclaracionOrigenLicito(datos),
+      ...buildFirma(datos),
+    ];
+  }
+
+  const doc = new Document({
+    styles: {
+      default: {
+        document: {
+          run: {
+            font: FONT,
+            size: FONT_SIZE_BODY,
+          },
+        },
+      },
+    },
+    sections: [
+      {
+        properties: {
+          page: {
+            margin: {
+              top: 720,    // 0.5 inch
+              bottom: 720,
+              left: 1080,  // 0.75 inch
+              right: 1080,
+            },
+          },
+        },
+        children: sections,
+      },
+    ],
+  });
+
+  const buffer = await Packer.toBuffer(doc);
+
+  // Build filename
+  const dp = datos?.datosPersonales || datos?.representanteLegal || {};
+  const nombreCorto = [dp.apellidos, dp.nombres]
+    .filter(Boolean)
+    .join('_')
+    .replace(/\s+/g, '_')
+    .replace(/[^a-zA-Z0-9_áéíóúñÁÉÍÓÚÑ]/g, '')
+    .substring(0, 40) || 'formulario';
+
+  const tipoLabel = tipo === 'JURIDICA' ? 'PJ' : 'PN';
+  const filename = `FormularioUAFE_${tipoLabel}_${nombreCorto}_${protocolo.id}.docx`;
+
+  logger.info(`[formulario-uafe-word] Generado: ${filename} (${buffer.length} bytes)`);
+
+  return { buffer, filename };
+}
