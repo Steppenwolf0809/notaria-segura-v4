@@ -7,6 +7,7 @@ import { csrfProtection } from '../middleware/csrf-protection.js';
 import { parseMinuta } from '../services/minuta-parser-service.js';
 import { uploadFile, isStorageConfigured } from '../services/storage-service.js';
 import { getCurrentNotaryId } from '../middleware/tenant-context.js';
+import { uafeLoginRateLimit } from '../middleware/rate-limiter.js';
 import {
   crearProtocolo,
   agregarPersonaAProtocolo,
@@ -45,7 +46,8 @@ console.log('✅ Formulario UAFE routes loaded successfully (Sistema de Protocol
  * Login al formulario con Protocolo + Cédula + PIN
  * POST /api/formulario-uafe/login
  */
-router.post('/login', loginFormularioUAFE);
+// 🔒 SECURITY FIX: Rate limit applied to prevent PIN brute force attacks
+router.post('/login', uafeLoginRateLimit, loginFormularioUAFE);
 
 /**
  * Buscar persona para ser representado (por cédula/RUC)

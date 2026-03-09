@@ -52,9 +52,8 @@ export async function verifyFormularioUAFESession(req, res, next) {
       });
     }
 
-    // Verificar si expiró
+    // Verificar si expiró (inactivity timeout)
     if (sesion.expiraEn < new Date()) {
-      // Eliminar sesión expirada
       await prisma.sesionFormularioUAFE.delete({
         where: { id: sesion.id }
       });
@@ -62,6 +61,19 @@ export async function verifyFormularioUAFESession(req, res, next) {
       return res.status(401).json({
         success: false,
         message: 'Sesión expirada. Por favor inicia sesión nuevamente.'
+      });
+    }
+
+    // 🔒 SECURITY FIX: Hard timeout - max 2 hours regardless of activity
+    const HARD_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 hours
+    if (new Date() - new Date(sesion.createdAt) > HARD_TIMEOUT_MS) {
+      await prisma.sesionFormularioUAFE.delete({
+        where: { id: sesion.id }
+      });
+
+      return res.status(401).json({
+        success: false,
+        message: 'Sesión expirada por tiempo máximo. Por favor inicia sesión nuevamente.'
       });
     }
 

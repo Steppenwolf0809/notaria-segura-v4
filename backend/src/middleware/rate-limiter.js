@@ -284,6 +284,100 @@ const archivoRateLimit = rateLimit({
   }
 });
 
+/**
+ * 🔒 SECURITY FIX: Rate limiter for UAFE form login (public endpoint)
+ * Strict limit by IP + cedula to prevent PIN brute force attacks
+ */
+const uafeLoginRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Max 10 attempts per 15 minutes per IP+cedula
+  message: {
+    success: false,
+    message: 'Demasiados intentos de inicio de sesión. Intente nuevamente en 15 minutos.',
+    retryAfter: '15 minutos'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  trustProxy: TRUST_PROXY,
+  keyGenerator: (req) => {
+    const clientIP = ipKeyGenerator(req);
+    const cedula = req.body?.cedula || 'no-cedula';
+    return `uafe:${cedula}:${clientIP}`;
+  },
+  handler: (req, res) => {
+    const clientIP = ipKeyGenerator(req);
+    logSecurityViolation({
+      userId: null,
+      userEmail: req.body?.cedula || 'unknown',
+      ipAddress: clientIP,
+      userAgent: req.headers['user-agent'] || 'unknown',
+      violation: 'Excedido límite de intentos de login UAFE por cedula+IP',
+      severity: 'high'
+    });
+    console.warn(`[SECURITY] UAFE login rate limit exceeded - Cedula: ${req.body?.cedula || 'unknown'}, IP: ${clientIP}`);
+    res.status(429).json({
+      success: false,
+      message: 'Demasiados intentos de inicio de sesión. Intente nuevamente en 15 minutos.',
+      retryAfter: '15 minutos'
+    });
+  }
+});
+
+/**
+ * 🔒 SECURITY FIX: Rate limiter for personal login (public endpoint)
+ * Strict limit by IP + cedula to prevent PIN brute force attacks
+ */
+const personalLoginRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Max 10 attempts per 15 minutes per IP+cedula
+  message: {
+    success: false,
+    message: 'Demasiados intentos de inicio de sesión. Intente nuevamente en 15 minutos.',
+    retryAfter: '15 minutos'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  trustProxy: TRUST_PROXY,
+  keyGenerator: (req) => {
+    const clientIP = ipKeyGenerator(req);
+    const cedula = req.body?.cedula || 'no-cedula';
+    return `personal:${cedula}:${clientIP}`;
+  },
+  handler: (req, res) => {
+    const clientIP = ipKeyGenerator(req);
+    logSecurityViolation({
+      userId: null,
+      userEmail: req.body?.cedula || 'unknown',
+      ipAddress: clientIP,
+      userAgent: req.headers['user-agent'] || 'unknown',
+      violation: 'Excedido límite de intentos de login personal por cedula+IP',
+      severity: 'high'
+    });
+    console.warn(`[SECURITY] Personal login rate limit exceeded - Cedula: ${req.body?.cedula || 'unknown'}, IP: ${clientIP}`);
+    res.status(429).json({
+      success: false,
+      message: 'Demasiados intentos de inicio de sesión. Intente nuevamente en 15 minutos.',
+      retryAfter: '15 minutos'
+    });
+  }
+});
+
+/**
+ * 🔒 SECURITY FIX: Rate limiter for personal registration (public endpoint)
+ */
+const personalRegisterRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5, // Max 5 registrations per hour per IP
+  message: {
+    success: false,
+    message: 'Demasiados intentos de registro. Intente nuevamente en 1 hora.',
+    retryAfter: '1 hora'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  trustProxy: TRUST_PROXY
+});
+
 export {
   passwordChangeRateLimit,
   loginRateLimit,
@@ -293,5 +387,8 @@ export {
   documentsRateLimit,
   receptionRateLimit,
   archivoRateLimit,
-  addRateLimitHeaders
+  addRateLimitHeaders,
+  uafeLoginRateLimit,
+  personalLoginRateLimit,
+  personalRegisterRateLimit
 };

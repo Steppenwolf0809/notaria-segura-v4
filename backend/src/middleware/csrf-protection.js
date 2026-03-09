@@ -1,5 +1,6 @@
 import { doubleCsrf } from 'csrf-csrf';
 import cookieParser from 'cookie-parser';
+import crypto from 'crypto';
 
 /**
  * Configuración de CSRF Protection con csrf-csrf (moderna alternativa a csurf)
@@ -10,7 +11,11 @@ import cookieParser from 'cookie-parser';
  * Usa el patrón "Double Submit Cookie" más seguro que el viejo csurf.
  */
 
-const CSRF_SECRET = process.env.CSRF_SECRET || 'notaria-segura-csrf-secret-change-in-production';
+// 🔒 SECURITY FIX: Require CSRF_SECRET in production, no hardcoded fallback
+if (process.env.NODE_ENV === 'production' && !process.env.CSRF_SECRET) {
+  throw new Error('CRITICAL: CSRF_SECRET environment variable is required in production');
+}
+const CSRF_SECRET = process.env.CSRF_SECRET || `dev-csrf-${crypto.randomBytes(32).toString('hex')}`;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
 // __Host- prefix requiere HTTPS, así que solo lo usamos en producción

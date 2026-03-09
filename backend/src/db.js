@@ -192,8 +192,10 @@ export async function withTenantTransaction(fn, opts = {}) {
   }
 
   return client.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe(`SET LOCAL ROLE app_runtime_rls`);
-    await tx.$executeRawUnsafe(`SET LOCAL app.current_notary_id = '${parseInt(notaryId, 10)}'`);
+    // 🔒 SECURITY FIX: Use $executeRaw with tagged template literals instead of $executeRawUnsafe
+    await tx.$executeRaw`SET LOCAL ROLE app_runtime_rls`;
+    const safeNotaryId = String(parseInt(notaryId, 10));
+    await tx.$executeRaw`SET LOCAL app.current_notary_id = ${safeNotaryId}`;
     return fn(tx);
   });
 }

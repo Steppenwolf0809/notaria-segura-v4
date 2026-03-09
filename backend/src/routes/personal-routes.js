@@ -1,6 +1,5 @@
 import express from 'express';
 import {
-  debugPersona,
   verificarCedula,
   registrarPersona,
   loginPersona,
@@ -13,6 +12,7 @@ import {
 } from '../controllers/personal-controller.js';
 import { verifyPersonalSession } from '../middleware/verify-personal-session.js';
 import { authenticateToken, requireRoles } from '../middleware/auth-middleware.js';
+import { personalLoginRateLimit, personalRegisterRateLimit } from '../middleware/rate-limiter.js';
 
 const router = express.Router();
 
@@ -20,20 +20,19 @@ const router = express.Router();
 // RUTAS PÚBLICAS (Sin autenticación)
 // ========================================
 
-// ENDPOINT TEMPORAL DE DEBUG
-router.get('/debug/:cedula', debugPersona);
+// 🔒 SECURITY: Debug endpoint removed (exposed PIN hashes without auth)
 
 // Verificar si cédula existe
 router.get('/verificar-cedula/:cedula', verificarCedula);
 
-// Crear cuenta con PIN
-router.post('/registrar', registrarPersona);
+// Crear cuenta con PIN - 🔒 SECURITY FIX: Rate limited
+router.post('/registrar', personalRegisterRateLimit, registrarPersona);
 
-// Login con PIN
-router.post('/login', loginPersona);
+// Login con PIN - 🔒 SECURITY FIX: Rate limited to prevent brute force
+router.post('/login', personalLoginRateLimit, loginPersona);
 
-// Crear PIN propio (cambio de PIN temporal a personal)
-router.post('/crear-pin', crearPinPropio);
+// Crear PIN propio (cambio de PIN temporal a personal) - 🔒 SECURITY FIX: Rate limited
+router.post('/crear-pin', personalRegisterRateLimit, crearPinPropio);
 
 // ========================================
 // RUTAS PROTEGIDAS (Requieren sesión)

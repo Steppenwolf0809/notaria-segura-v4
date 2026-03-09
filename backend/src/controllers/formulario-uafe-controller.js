@@ -497,6 +497,7 @@ export async function loginFormularioUAFE(req, res) {
             pinHash: true,
             pinCreado: true,
             bloqueadoHasta: true,
+            intentosFallidos: true,
             datosPersonaNatural: true,
             datosPersonaJuridica: true,
             completado: true
@@ -538,9 +539,41 @@ export async function loginFormularioUAFE(req, res) {
     const pinValido = await bcrypt.compare(pin, personaEnProtocolo.persona.pinHash);
 
     if (!pinValido) {
+      // 🔒 SECURITY FIX: Track failed PIN attempts and lock account after threshold
+      const intentosActuales = (personaEnProtocolo.persona.intentosFallidos || 0) + 1;
+      const MAX_INTENTOS = 5;
+      const TIEMPO_BLOQUEO_MS = 15 * 60 * 1000; // 15 minutes
+
+      const updateData = {
+        intentosFallidos: intentosActuales,
+        ultimoIntentoFallido: new Date()
+      };
+
+      // Lock account if max attempts exceeded
+      if (intentosActuales >= MAX_INTENTOS) {
+        updateData.bloqueadoHasta = new Date(Date.now() + TIEMPO_BLOQUEO_MS);
+        console.warn(`[SECURITY] Account locked after ${intentosActuales} failed PIN attempts: cedula=${cedula}, IP=${req.ip}`);
+      }
+
+      await prisma.personaRegistrada.update({
+        where: { id: personaEnProtocolo.persona.id },
+        data: updateData
+      });
+
+      const intentosRestantes = Math.max(0, MAX_INTENTOS - intentosActuales);
       return res.status(401).json({
         success: false,
-        message: 'PIN incorrecto. Verifica e intenta nuevamente.'
+        message: intentosRestantes > 0
+          ? `PIN incorrecto. Te quedan ${intentosRestantes} intento(s) antes del bloqueo temporal.`
+          : 'PIN incorrecto. Tu cuenta ha sido bloqueada temporalmente por 15 minutos.'
+      });
+    }
+
+    // 🔒 SECURITY: Reset failed attempts on successful login
+    if (personaEnProtocolo.persona.intentosFallidos > 0) {
+      await prisma.personaRegistrada.update({
+        where: { id: personaEnProtocolo.persona.id },
+        data: { intentosFallidos: 0, bloqueadoHasta: null }
       });
     }
 
@@ -2277,7 +2310,28 @@ export async function descargarArchivo(req, res) {
   try {
     const { folder, filename } = req.params;
 
-    const filePath = path.join(__dirname, '../../temp', folder, filename);
+    // 🔒 SECURITY FIX: Prevent path traversal attacks
+    // Validate folder and filename contain only safe characters (alphanumeric, dash, underscore, dot)
+    const safePattern = /^[a-zA-Z0-9_\-\.]+$/;
+    if (!safePattern.test(folder) || !safePattern.test(filename)) {
+      console.warn(`[SECURITY] Path traversal attempt blocked: folder="${folder}", filename="${filename}", IP=${req.ip}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Nombre de archivo inválido'
+      });
+    }
+
+    const tempDir = path.resolve(__dirname, '../../temp');
+    const filePath = path.resolve(tempDir, folder, filename);
+
+    // 🔒 SECURITY: Ensure resolved path is within the temp directory
+    if (!filePath.startsWith(tempDir + path.sep)) {
+      console.warn(`[SECURITY] Path traversal attempt blocked (resolve check): "${filePath}", IP=${req.ip}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Nombre de archivo inválido'
+      });
+    }
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({

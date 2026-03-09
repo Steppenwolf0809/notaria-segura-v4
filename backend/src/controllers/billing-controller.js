@@ -3,6 +3,7 @@
  * Handles billing module endpoints for invoices, payments, and imports
  */
 import { db as prisma } from '../db.js';
+import { Prisma } from '@prisma/client';
 
 // Normalización de nombres de matrizadores para evitar duplicados visuales
 const MATRIZADOR_NAME_NORMALIZATION = {
@@ -970,18 +971,34 @@ export async function getClientBalance(req, res) {
 export async function getInvoicePayments(req, res) {
     try {
         const { id } = req.params;
+        const userId = req.user?.id;
+        const userRole = req.user?.role;
 
         const invoice = await prisma.invoice.findUnique({
             where: { id },
             include: {
                 payments: {
                     orderBy: { paymentDate: 'desc' }
+                },
+                document: {
+                    select: { assignedToId: true }
                 }
             }
         });
 
         if (!invoice) {
             return res.status(404).json({ error: 'Factura no encontrada' });
+        }
+
+        // 🔒 SECURITY FIX: IDOR protection - verify ownership like getInvoiceById()
+        if (userRole !== 'ADMIN' && userRole !== 'CAJA' && userRole !== 'RECEPCION') {
+            if (invoice.document?.assignedToId !== userId) {
+                console.warn(`[SECURITY] IDOR attempt on payments: User ${userId} (${userRole}) tried to access payments for invoice ${id}`);
+                return res.status(403).json({
+                    success: false,
+                    message: 'No tienes permisos para acceder a los pagos de esta factura'
+                });
+            }
         }
 
         let totalPaid = 0;
@@ -2599,17 +2616,21 @@ export async function getCarteraPendienteResumen(req, res) {
         const search = req.query.search ? String(req.query.search).trim() : null;
         const detail = req.query.detail === 'true';
 
-        // Use raw SQL for groupBy with sorting and pagination
-        // Build search filter
-        const searchFilter = search
-            ? `AND (LOWER("clientName") LIKE LOWER('%${search.replace(/'/g, "''")}%') OR "clientTaxId" LIKE '%${search.replace(/'/g, "''")}%')`
-            : '';
+        // 🔒 SECURITY FIX: Use Prisma.sql with parameterized queries instead of string concatenation
+        // This prevents SQL injection attacks via the search parameter
+        const searchPattern = search ? `%${search}%` : null;
 
-        // Multi-tenant filter
-        const tenantFilter = req.user?.notaryId ? `AND notary_id = ${parseInt(req.user.notaryId, 10)}` : '';
+        // Build safe WHERE conditions using Prisma.sql
+        const tenantCondition = req.user?.notaryId
+            ? Prisma.sql`AND notary_id = ${parseInt(req.user.notaryId, 10)}`
+            : Prisma.sql``;
 
-        // Get grouped data via raw query for full control
-        const clientsRaw = await prisma.$queryRawUnsafe(`
+        const searchCondition = searchPattern
+            ? Prisma.sql`AND (LOWER("clientName") LIKE LOWER(${searchPattern}) OR "clientTaxId" LIKE ${searchPattern})`
+            : Prisma.sql``;
+
+        // Get grouped data via raw query with safe parameterization
+        const clientsRaw = await prisma.$queryRaw`
             SELECT
                 "clientTaxId",
                 MAX("clientName") AS "clientName",
@@ -2618,19 +2639,19 @@ export async function getCarteraPendienteResumen(req, res) {
                 MIN("dueDate") AS "oldestDueDate",
                 MAX("daysOverdue")::int AS "maxDaysOverdue"
             FROM pending_receivables
-            WHERE balance > 0 ${searchFilter} ${tenantFilter}
+            WHERE balance > 0 ${searchCondition} ${tenantCondition}
             GROUP BY "clientTaxId"
             ORDER BY SUM(balance) DESC
             LIMIT ${limit}
             OFFSET ${(page - 1) * limit}
-        `);
+        `;
 
         // Get total distinct clients count
-        const countResult = await prisma.$queryRawUnsafe(`
+        const countResult = await prisma.$queryRaw`
             SELECT COUNT(DISTINCT "clientTaxId")::int AS total
             FROM pending_receivables
-            WHERE balance > 0 ${searchFilter} ${tenantFilter}
-        `);
+            WHERE balance > 0 ${searchCondition} ${tenantCondition}
+        `;
         const totalClients = countResult[0]?.total || 0;
 
         // Get overall summary
