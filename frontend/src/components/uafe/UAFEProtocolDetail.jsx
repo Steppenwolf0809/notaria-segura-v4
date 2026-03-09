@@ -668,7 +668,16 @@ function TextosTab({ protocol, onGenerateTexts }) {
   };
 
   const encabezado = resultado?.data?.encabezado || protocol.textoEncabezadoGenerado;
-  const comparecenciaHtml = resultado?.data?.comparecenciaHtml || protocol.textoComparecenciaGenerado;
+  const comparecenciaCache = protocol.textoComparecenciaGenerado;
+  const comparecenciaHtml = resultado?.data?.comparecenciaHtml || comparecenciaCache;
+
+  // Auto-regenerar si el cache no tiene formato HTML (legacy sin <strong>)
+  useEffect(() => {
+    if (comparecenciaCache && !comparecenciaCache.includes('<strong>') && !resultado && !loading) {
+      handleGenerar(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comparecenciaCache]);
 
   const copiarTexto = async (texto, tipo) => {
     try {
