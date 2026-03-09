@@ -64,6 +64,10 @@ export default function UAFEDashboard() {
   // OLA 3: Manual edit dialog
   const [editPersona, setEditPersona] = useState(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  // Add compareciente dialog
+  const [showAddPersona, setShowAddPersona] = useState(false);
+  const [addPersonaForm, setAddPersonaForm] = useState({ cedula: '', calidad: 'OTRO', actuaPor: 'PROPIOS_DERECHOS' });
+  const [addPersonaLoading, setAddPersonaLoading] = useState(false);
   // Create protocol wizard
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [wizardStep, setWizardStep] = useState('upload'); // upload | parsing | preview | creating
@@ -216,6 +220,35 @@ export default function UAFEDashboard() {
     await refreshSelectedProtocol();
   };
 
+  // Add compareciente to protocol
+  const handleAddPerson = () => {
+    setAddPersonaForm({ cedula: '', calidad: 'OTRO', actuaPor: 'PROPIOS_DERECHOS' });
+    setShowAddPersona(true);
+  };
+
+  const handleAddPersonaConfirm = async () => {
+    if (!addPersonaForm.cedula || addPersonaForm.cedula.length < 10) {
+      setSnackbar({ open: true, message: 'Ingrese una cedula o RUC valido', severity: 'error' });
+      return;
+    }
+    setAddPersonaLoading(true);
+    try {
+      await apiClient.post(`/formulario-uafe/protocolo/${selectedProtocol.id}/persona`, {
+        cedula: addPersonaForm.cedula,
+        calidad: addPersonaForm.calidad,
+        actuaPor: addPersonaForm.actuaPor,
+      });
+      setShowAddPersona(false);
+      setSnackbar({ open: true, message: 'Compareciente agregado', severity: 'success' });
+      await fetchProtocols();
+      await refreshSelectedProtocol();
+    } catch (err) {
+      setSnackbar({ open: true, message: err.response?.data?.message || 'Error al agregar compareciente', severity: 'error' });
+    } finally {
+      setAddPersonaLoading(false);
+    }
+  };
+
   // OLA 3: Copy global form link to clipboard
   const handleSendForm = (_persona) => {
     const baseUrl = window.location.origin;
@@ -352,6 +385,7 @@ export default function UAFEDashboard() {
           protocol={selectedProtocol}
           onBack={handleBack}
           onSave={handleSave}
+          onAddPerson={handleAddPerson}
           onEditPerson={handleEditPerson}
           onSendForm={handleSendForm}
           onRefresh={refreshSelectedProtocol}
@@ -422,6 +456,59 @@ export default function UAFEDashboard() {
           protocoloId={selectedProtocol.id}
           onSaved={handlePersonaSaved}
         />
+
+        {/* Dialog: Agregar Compareciente */}
+        <Dialog open={showAddPersona} onClose={() => setShowAddPersona(false)} maxWidth="xs" fullWidth>
+          <DialogTitle sx={{ pb: 1, fontWeight: 700 }}>Agregar Compareciente</DialogTitle>
+          <DialogContent sx={{ pt: 2 }}>
+            <TextField
+              fullWidth
+              label="Cedula o RUC"
+              value={addPersonaForm.cedula}
+              onChange={(e) => setAddPersonaForm(prev => ({ ...prev, cedula: e.target.value.replace(/\D/g, '').slice(0, 13) }))}
+              inputProps={{ inputMode: 'numeric' }}
+              sx={{ mb: 2, mt: 1 }}
+              size="small"
+            />
+            <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+              <InputLabel>Calidad</InputLabel>
+              <Select
+                value={addPersonaForm.calidad}
+                label="Calidad"
+                onChange={(e) => setAddPersonaForm(prev => ({ ...prev, calidad: e.target.value }))}
+              >
+                {CALIDADES_COMPARECIENTE.map(c => (
+                  <MenuItem key={c} value={c}>{c}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth size="small">
+              <InputLabel>Actua por</InputLabel>
+              <Select
+                value={addPersonaForm.actuaPor}
+                label="Actua por"
+                onChange={(e) => setAddPersonaForm(prev => ({ ...prev, actuaPor: e.target.value }))}
+              >
+                <MenuItem value="PROPIOS_DERECHOS">Propios derechos</MenuItem>
+                <MenuItem value="APODERADO_GENERAL">Apoderado general</MenuItem>
+                <MenuItem value="APODERADO_ESPECIAL">Apoderado especial</MenuItem>
+                <MenuItem value="REPRESENTANTE_LEGAL">Representante legal</MenuItem>
+              </Select>
+            </FormControl>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setShowAddPersona(false)} sx={{ textTransform: 'none' }}>Cancelar</Button>
+            <Button
+              variant="contained"
+              onClick={handleAddPersonaConfirm}
+              disabled={addPersonaLoading || addPersonaForm.cedula.length < 10}
+              sx={{ textTransform: 'none', fontWeight: 600 }}
+            >
+              {addPersonaLoading ? <CircularProgress size={20} /> : 'Agregar'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
         <Snackbar
           open={snackbar.open}
           autoHideDuration={4000}
