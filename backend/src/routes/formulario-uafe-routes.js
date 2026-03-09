@@ -437,6 +437,39 @@ router.get(
   generarPDFIndividual
 );
 
+/**
+ * Obtener datos de una PersonaRegistrada por cédula (para auto-fill representante)
+ * GET /api/formulario-uafe/persona/:cedula/datos
+ */
+router.get(
+  '/persona/:cedula/datos',
+  authenticateToken,
+  requireRoles(['MATRIZADOR', 'ADMIN']),
+  async (req, res) => {
+    try {
+      const { cedula } = req.params;
+      const { db: prisma } = await import('../db.js');
+
+      const persona = await prisma.personaRegistrada.findUnique({
+        where: { numeroIdentificacion: cedula },
+        select: {
+          numeroIdentificacion: true,
+          datosPersonaNatural: true,
+        },
+      });
+
+      if (!persona) {
+        return res.status(404).json({ success: false, message: 'Persona no encontrada' });
+      }
+
+      res.json({ success: true, data: persona });
+    } catch (error) {
+      console.error('Error buscando persona por cédula:', error);
+      res.status(500).json({ success: false, message: 'Error al buscar persona' });
+    }
+  }
+);
+
 // ========================================
 // RUTAS ADMIN - Gestión de todos los protocolos
 // ========================================

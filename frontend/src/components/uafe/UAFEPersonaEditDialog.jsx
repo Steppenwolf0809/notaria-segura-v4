@@ -20,11 +20,14 @@ import {
   FormControlLabel,
   Checkbox,
   IconButton,
+  InputAdornment,
+  Tooltip,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import SearchIcon from '@mui/icons-material/Search';
 
 import apiClient from '../../services/api-client';
 import SemaforoIndicator from './SemaforoIndicator';
@@ -86,6 +89,7 @@ export default function UAFEPersonaEditDialog({
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [buscandoRepresentante, setBuscandoRepresentante] = useState(false);
 
   useEffect(() => {
     if (persona && open) {
@@ -164,6 +168,42 @@ export default function UAFEPersonaEditDialog({
 
   const handleChange = (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Buscar datos del representante por cédula en la BD
+  const buscarRepresentante = async () => {
+    const ced = form.mandanteNumeroIdentificacion?.trim();
+    if (!ced || ced.length < 10) return;
+    setBuscandoRepresentante(true);
+    try {
+      const { data } = await apiClient.get(`/formulario-uafe/persona/${ced}/datos`);
+      if (data.success && data.data) {
+        const d = data.data.datosPersonaNatural || {};
+        const dp = d.datosPersonales || {};
+        const contacto = d.contacto || {};
+        const direccion = d.direccion || {};
+        const laboral = d.informacionLaboral || {};
+        setForm(prev => ({
+          ...prev,
+          mandanteApellidos: dp.apellidos || prev.mandanteApellidos,
+          mandanteNombres: dp.nombres || prev.mandanteNombres,
+          mandanteTipoIdentificacion: dp.tipoIdentificacion || (ced.length === 13 ? 'RUC' : 'CEDULA'),
+          mandanteNacionalidad: dp.nacionalidad || prev.mandanteNacionalidad,
+          mandanteGenero: dp.genero || prev.mandanteGenero,
+          mandanteDireccion: direccion.callePrincipal || prev.mandanteDireccion,
+          mandanteProvincia: direccion.provincia || prev.mandanteProvincia,
+          mandanteCanton: direccion.canton || prev.mandanteCanton,
+          mandanteParroquia: direccion.parroquia || prev.mandanteParroquia,
+          mandanteSector: direccion.sector || prev.mandanteSector,
+          mandanteReferencia: direccion.referencia || prev.mandanteReferencia,
+          mandanteCelular: contacto.celular || prev.mandanteCelular,
+          mandanteCorreo: contacto.correoElectronico || contacto.correo || prev.mandanteCorreo,
+          mandanteActividadOcupacional: laboral.profesionOcupacion || prev.mandanteActividadOcupacional,
+          mandanteIngresoMensual: laboral.ingresoMensual || prev.mandanteIngresoMensual,
+        }));
+      }
+    } catch { /* persona no encontrada, se llena manual */ }
+    setBuscandoRepresentante(false);
   };
 
   const handleSave = async () => {
@@ -552,7 +592,32 @@ export default function UAFEPersonaEditDialog({
                 </FormControl>
               </Grid>
               <Grid size={{ xs: 12, sm: 4 }}>
-                <TextField fullWidth size="small" label="Numero de identificacion *" value={form.mandanteNumeroIdentificacion} onChange={e => handleChange('mandanteNumeroIdentificacion', e.target.value)} />
+                <TextField
+                  fullWidth
+                  size="small"
+                  label="Numero de identificacion *"
+                  value={form.mandanteNumeroIdentificacion}
+                  onChange={e => handleChange('mandanteNumeroIdentificacion', e.target.value)}
+                  slotProps={{
+                    input: {
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <Tooltip title="Buscar datos en la base de datos">
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={buscarRepresentante}
+                                disabled={buscandoRepresentante || !form.mandanteNumeroIdentificacion || form.mandanteNumeroIdentificacion.trim().length < 10}
+                              >
+                                {buscandoRepresentante ? <CircularProgress size={18} /> : <SearchIcon fontSize="small" />}
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </InputAdornment>
+                      ),
+                    },
+                  }}
+                />
               </Grid>
               <Grid size={{ xs: 12, sm: 4 }}>
                 <TextField fullWidth size="small" label="Nacionalidad" value={form.mandanteNacionalidad} onChange={e => handleChange('mandanteNacionalidad', e.target.value)} />
