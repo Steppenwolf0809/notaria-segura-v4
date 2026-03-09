@@ -359,32 +359,24 @@ function LoginScreen({ cedula, onLogin, onBack }) {
   );
 }
 
-// ── Step 2c: Crear PIN propio (reemplaza temporal) ─────────
+// ── Step 2c: PIN temporal → login automático ───────────────
 function CreatePinScreen({ cedula, onCreated, onBack }) {
-  const [pinTemporal, setPinTemporal] = useState('');
-  const [nuevoPin, setNuevoPin] = useState('');
-  const [confirmPin, setConfirmPin] = useState('');
-  const [aceptaDatos, setAceptaDatos] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [aceptaDatos, setAceptaDatos] = useState(false);
 
-  const isSeq = (p) => '012345678901234567890123456789'.includes(p) || '098765432109876543210'.includes(p);
-  const isRepeat = (p) => /^(.)\1{5}$/.test(p);
-  const pinValid = nuevoPin.length === 6 && !isSeq(nuevoPin) && !isRepeat(nuevoPin);
-  const pinsMatch = nuevoPin === confirmPin && confirmPin.length === 6;
-
-  const handleCreate = async () => {
+  const handleAutoLogin = async () => {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await api.post('/crear-pin', {
-        cedula, pinTemporal, nuevoPin, confirmacionPin: confirmPin,
-      });
+      // Auto-login con PIN temporal (ultimos 6 digitos de la cedula)
+      const pinTemporal = cedula.slice(-6);
+      const { data } = await api.post('/login', { cedula, pin: pinTemporal });
       if (data.success) {
         onCreated({ sessionToken: data.sessionToken, tipoPersona: data.tipoPersona });
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al crear PIN');
+      setError(err.response?.data?.message || 'Error al acceder. Contacte a la notaria.');
     } finally {
       setLoading(false);
     }
@@ -392,9 +384,9 @@ function CreatePinScreen({ cedula, onCreated, onBack }) {
 
   return (
     <PageLayout>
-      <Typography variant="h6" sx={{ textAlign: 'center', mb: 1, fontWeight: 600 }}>Crear su PIN Personal</Typography>
+      <Typography variant="h6" sx={{ textAlign: 'center', mb: 1, fontWeight: 600 }}>Bienvenido/a</Typography>
       <Alert severity="info" sx={{ mb: 2, borderRadius: '8px' }}>
-        Se le asigno un PIN temporal. Debe crear su propio PIN para acceder a su informacion.
+        Es la primera vez que accede al sistema. Antes de continuar, debe aceptar la autorizacion de tratamiento de datos personales.
       </Alert>
       {error && <Alert severity="error" sx={{ mb: 2, borderRadius: '8px' }}>{error}</Alert>}
 
@@ -412,29 +404,14 @@ function CreatePinScreen({ cedula, onCreated, onBack }) {
         sx={{ mb: 2 }}
       />
 
-      <PinInput value={pinTemporal} onChange={setPinTemporal} label="PIN temporal (proporcionado por la notaria):" />
-      <Divider sx={{ my: 2 }} />
-      <PinInput value={nuevoPin} onChange={setNuevoPin} label="Nuevo PIN:" />
-      <Box sx={{ mb: 2 }}>
-        <Typography variant="caption" sx={{ color: nuevoPin.length === 6 ? COLORS.success : COLORS.textMuted }}>
-          {nuevoPin.length === 6 ? '✓' : '○'} 6 digitos numericos
-        </Typography><br />
-        <Typography variant="caption" sx={{ color: nuevoPin.length === 6 && !isSeq(nuevoPin) ? COLORS.success : COLORS.textMuted }}>
-          {nuevoPin.length === 6 && !isSeq(nuevoPin) ? '✓' : '○'} No usar secuencias
-        </Typography><br />
-        <Typography variant="caption" sx={{ color: nuevoPin.length === 6 && !isRepeat(nuevoPin) ? COLORS.success : COLORS.textMuted }}>
-          {nuevoPin.length === 6 && !isRepeat(nuevoPin) ? '✓' : '○'} No usar repeticiones
-        </Typography>
-      </Box>
-      <PinInput value={confirmPin} onChange={setConfirmPin} label="Confirme nuevo PIN:" />
       <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mt: 3 }}>
         <Button variant="outlined" onClick={onBack} sx={{ textTransform: 'none', borderColor: COLORS.primary, color: COLORS.primary }}>
           Volver
         </Button>
-        <Button variant="contained" onClick={handleCreate}
-          disabled={!aceptaDatos || pinTemporal.length !== 6 || !pinValid || !pinsMatch || loading}
+        <Button variant="contained" onClick={handleAutoLogin}
+          disabled={!aceptaDatos || loading}
           sx={{ textTransform: 'none', fontWeight: 600, backgroundColor: COLORS.primary, borderRadius: '8px' }}>
-          {loading ? <CircularProgress size={20} /> : 'Crear PIN'}
+          {loading ? <CircularProgress size={20} /> : 'Continuar'}
         </Button>
       </Box>
     </PageLayout>

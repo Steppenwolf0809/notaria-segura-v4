@@ -290,11 +290,11 @@ export async function loginPersona(req, res) {
       });
     }
 
-    // Verificar si el PIN fue reseteado
-    if (!persona.pinCreado || !persona.pinHash) {
+    // Verificar si no tiene PIN hash (persona sin PIN asignado)
+    if (!persona.pinHash) {
       return res.status(403).json({
         success: false,
-        message: 'Tu PIN ha sido reseteado. Por favor crea un nuevo PIN.',
+        message: 'No tiene un PIN asignado. Contacte a la notaria.',
         pinReseteado: true
       });
     }
@@ -351,12 +351,17 @@ export async function loginPersona(req, res) {
     }
 
     // PIN CORRECTO - Resetear intentos fallidos y crear sesión
+    // Si es primer login (pinCreado=false), marcar como creado
+    const updateData = {
+      intentosFallidos: 0,
+      ultimoAcceso: new Date(),
+    };
+    if (!persona.pinCreado) {
+      updateData.pinCreado = true;
+    }
     await prisma.personaRegistrada.update({
       where: { id: persona.id },
-      data: {
-        intentosFallidos: 0,
-        ultimoAcceso: new Date()
-      }
+      data: updateData,
     });
 
     // Crear nueva sesión
