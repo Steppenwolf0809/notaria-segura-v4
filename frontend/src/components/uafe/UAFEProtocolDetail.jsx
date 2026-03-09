@@ -280,18 +280,25 @@ function DatosActoTab({ protocol, onFieldChange, readOnly }) {
 
       {/* Ubicacion */}
       <Box>
-        <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, color: UAFE_COLORS.textPrimary, fontSize: '0.85rem' }}>
-          Ubicacion del Inmueble
-        </Typography>
+        <Tooltip title="Se incluye en el reporte UAFE. Ej: DEPARTAMENTO No. 411, EDIFICIO PRAGA, MARIANO PAREDES Y RODRIGO DE VILLALOBOS, BARRIO MARISOL" arrow>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, color: UAFE_COLORS.textPrimary, fontSize: '0.85rem', cursor: 'help' }}>
+            Ubicacion del Inmueble
+          </Typography>
+        </Tooltip>
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, sm: 6 }}>
             <TextField
               fullWidth
               size="small"
-              label="Descripcion"
+              label="Dirección"
+              placeholder="Ej: DEPTO No. 411, ED. PRAGA, MARIANO PAREDES Y R. VILLALOBOS"
               value={protocol.ubicacionDescripcion || ''}
-              onChange={(e) => onFieldChange?.('ubicacionDescripcion', e.target.value)}
+              onChange={(e) => {
+                if (e.target.value.length <= 150) onFieldChange?.('ubicacionDescripcion', e.target.value);
+              }}
               disabled={readOnly}
+              inputProps={{ maxLength: 150 }}
+              helperText={`${(protocol.ubicacionDescripcion || '').length}/150`}
             />
           </Grid>
           <Grid size={{ xs: 12, sm: 2 }}>
@@ -327,24 +334,39 @@ function DatosActoTab({ protocol, onFieldChange, readOnly }) {
         </Grid>
       </Box>
 
-      {/* Forma de pago (read-only summary for now) */}
+      {/* Forma de pago */}
       <Box>
         <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, color: UAFE_COLORS.textPrimary, fontSize: '0.85rem' }}>
           Forma de Pago
         </Typography>
         <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-          {FORMAS_PAGO.map((fp) => (
-            <Chip
-              key={fp.key}
-              label={fp.label}
-              size="small"
-              variant="outlined"
-              sx={{
-                fontSize: '0.72rem',
-                borderColor: UAFE_COLORS.border,
-              }}
-            />
-          ))}
+          {FORMAS_PAGO.map((fp) => {
+            const selected = Array.isArray(protocol.formasPago)
+              ? protocol.formasPago.some(p => (p.tipo || p) === fp.key)
+              : false;
+            return (
+              <Chip
+                key={fp.key}
+                label={fp.label}
+                size="small"
+                variant={selected ? 'filled' : 'outlined'}
+                color={selected ? 'primary' : 'default'}
+                onClick={readOnly ? undefined : () => {
+                  const current = Array.isArray(protocol.formasPago) ? [...protocol.formasPago] : [];
+                  if (selected) {
+                    onFieldChange?.('formasPago', current.filter(p => (p.tipo || p) !== fp.key));
+                  } else {
+                    onFieldChange?.('formasPago', [...current, { tipo: fp.key }]);
+                  }
+                }}
+                sx={{
+                  fontSize: '0.72rem',
+                  borderColor: UAFE_COLORS.border,
+                  cursor: readOnly ? 'default' : 'pointer',
+                }}
+              />
+            );
+          })}
         </Box>
       </Box>
     </Box>

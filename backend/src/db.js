@@ -192,10 +192,12 @@ export async function withTenantTransaction(fn, opts = {}) {
   }
 
   return client.$transaction(async (tx) => {
-    // 🔒 SECURITY FIX: Use $executeRaw with tagged template literals instead of $executeRawUnsafe
     await tx.$executeRaw`SET LOCAL ROLE app_runtime_rls`;
-    const safeNotaryId = String(parseInt(notaryId, 10));
-    await tx.$executeRaw`SET LOCAL app.current_notary_id = ${safeNotaryId}`;
+    // SET LOCAL no acepta prepared statement params ($1) en PostgreSQL,
+    // pero parseInt() garantiza que solo puede ser un entero — no hay riesgo de SQL injection
+    const safeId = parseInt(notaryId, 10);
+    if (isNaN(safeId)) throw new Error('notaryId inválido para RLS');
+    await tx.$executeRawUnsafe(`SET LOCAL app.current_notary_id = '${safeId}'`);
     return fn(tx);
   });
 }
