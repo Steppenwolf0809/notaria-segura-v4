@@ -341,6 +341,18 @@ export default function UAFEDashboard() {
           onEditPerson={handleEditPerson}
           onSendForm={handleSendForm}
           onRefresh={refreshSelectedProtocol}
+          onGenerateTexts={async (protocoloId, forzar) => {
+            try {
+              const { data } = await apiClient.post(`/formulario-uafe/protocolo/${protocoloId}/generar-textos`, { forzar });
+              if (data.success) {
+                setSnackbar({ open: true, message: data.message, severity: data.tieneIncompletos ? 'warning' : 'success' });
+                refreshSelectedProtocol();
+                return data;
+              }
+            } catch (err) {
+              setSnackbar({ open: true, message: err.response?.data?.message || 'Error al generar textos', severity: 'error' });
+            }
+          }}
         />
         <UAFEPersonaEditDialog
           open={!!editPersona}

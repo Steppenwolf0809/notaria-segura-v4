@@ -543,12 +543,67 @@ function MinutaTab({ protocol, onMinutaProcessed }) {
   );
 }
 
-function TextosTab({ protocol }) {
+function TextosTab({ protocol, onGenerateTexts }) {
+  const [loading, setLoading] = useState(false);
+  const [resultado, setResultado] = useState(null);
+
+  const yaGenerado = !!(protocol.textoEncabezadoGenerado || protocol.textoComparecenciaGenerado);
+
+  const handleGenerar = async (forzar = false) => {
+    setLoading(true);
+    try {
+      const data = await onGenerateTexts?.(protocol.id, forzar);
+      if (data) setResultado(data);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const encabezado = resultado?.data?.encabezado || protocol.textoEncabezadoGenerado;
+  const comparecenciaHtml = resultado?.data?.comparecenciaHtml || protocol.textoComparecenciaGenerado;
+
   return (
     <Box>
-      <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, color: UAFE_COLORS.textPrimary, fontSize: '0.85rem' }}>
-        Textos Generados
-      </Typography>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 700, color: UAFE_COLORS.textPrimary, fontSize: '0.85rem' }}>
+          Textos Generados
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          {yaGenerado && (
+            <Tooltip title="Regenerar textos con los datos actuales de los comparecientes" arrow>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<RefreshOutlinedIcon sx={{ fontSize: 14 }} />}
+                onClick={() => handleGenerar(true)}
+                disabled={loading}
+                sx={{ fontSize: '0.7rem', textTransform: 'none', borderColor: UAFE_COLORS.border }}
+              >
+                Regenerar
+              </Button>
+            </Tooltip>
+          )}
+          <Tooltip title="Generar encabezado y texto de comparecencia a partir de los datos del protocolo y comparecientes" arrow>
+            <Button
+              size="small"
+              variant="contained"
+              onClick={() => handleGenerar(false)}
+              disabled={loading || (protocol.personas || []).length === 0}
+              sx={{ fontSize: '0.7rem', textTransform: 'none' }}
+            >
+              {loading ? 'Generando...' : yaGenerado ? 'Ver textos' : 'Generar textos'}
+            </Button>
+          </Tooltip>
+        </Box>
+      </Box>
+
+      {resultado?.tieneIncompletos && (
+        <Paper elevation={0} sx={{ p: 1.5, mb: 2, backgroundColor: '#fff8e1', border: '1px solid #ffe082', borderRadius: '6px' }}>
+          <Typography variant="caption" sx={{ color: '#e65100', fontWeight: 600, fontSize: '0.7rem' }}>
+            Algunos comparecientes tienen datos incompletos. Los campos faltantes aparecen como [PENDIENTE].
+          </Typography>
+        </Paper>
+      )}
 
       {/* Encabezado */}
       <Box sx={{ mb: 3 }}>
@@ -571,9 +626,9 @@ function TextosTab({ protocol }) {
             minHeight: 60,
           }}
         >
-          {protocol.textoEncabezadoGenerado || (
+          {encabezado || (
             <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'inherit' }}>
-              No generado aun. Agregue comparecientes para generar el encabezado.
+              No generado aun. Presione &quot;Generar textos&quot; para crear el encabezado.
             </Typography>
           )}
         </Paper>
@@ -600,11 +655,11 @@ function TextosTab({ protocol }) {
             minHeight: 60,
           }}
         >
-          {protocol.textoComparecenciaGenerado ? (
-            <span dangerouslySetInnerHTML={{ __html: protocol.textoComparecenciaGenerado }} />
+          {comparecenciaHtml ? (
+            <span dangerouslySetInnerHTML={{ __html: comparecenciaHtml }} />
           ) : (
             <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'inherit' }}>
-              No generado aun. Agregue comparecientes para generar la comparecencia.
+              No generado aun. Presione &quot;Generar textos&quot; para crear la comparecencia.
             </Typography>
           )}
         </Paper>
@@ -633,6 +688,7 @@ export default function UAFEProtocolDetail({
   onEditPerson,
   onSendForm,
   onRefresh,
+  onGenerateTexts,
   readOnly = false,
 }) {
   const [tab, setTab] = useState(0);
@@ -800,7 +856,7 @@ export default function UAFEProtocolDetail({
               />
             </TabPanel>
             <TabPanel value={tab} index={3}>
-              <TextosTab protocol={protocol} />
+              <TextosTab protocol={protocol} onGenerateTexts={onGenerateTexts} />
             </TabPanel>
           </Box>
         </Card>
