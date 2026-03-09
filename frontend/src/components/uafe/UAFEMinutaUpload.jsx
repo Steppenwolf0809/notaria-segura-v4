@@ -52,6 +52,7 @@ export default function UAFEMinutaUpload({ protocoloId, onComplete, onCancel }) 
   const [minutaUrl, setMinutaUrl] = useState(null);
   const [fuente, setFuente] = useState(null);
   const [advertencias, setAdvertencias] = useState([]);
+  const [observaciones, setObservaciones] = useState('');
   const [editingField, setEditingField] = useState(null);
 
   // ── Upload & Parse ─────────────────────────────────────────────
@@ -92,7 +93,12 @@ export default function UAFEMinutaUpload({ protocoloId, onComplete, onCancel }) 
         setExtractedData(data.data.datosExtraidos);
         setMinutaUrl(data.data.minutaUrl);
         setFuente(data.data.fuente);
-        setAdvertencias(data.data.advertencias || []);
+        const advs = data.data.advertencias || [];
+        setAdvertencias(advs);
+        // Pre-cargar observaciones con advertencias detectadas
+        if (advs.length > 0) {
+          setObservaciones(advs.map(a => `⚠ ${a.mensaje}`).join('\n'));
+        }
         setStep('preview');
       } else {
         throw new Error(data.error || 'Error al procesar');
@@ -112,7 +118,7 @@ export default function UAFEMinutaUpload({ protocoloId, onComplete, onCancel }) 
     try {
       const { data } = await apiClient.post(
         `/formulario-uafe/protocolo/${protocoloId}/confirmar-minuta`,
-        { minutaUrl, datosConfirmados: extractedData }
+        { minutaUrl, datosConfirmados: { ...extractedData, observaciones: observaciones || null } }
       );
 
       if (data.success) {
@@ -126,7 +132,7 @@ export default function UAFEMinutaUpload({ protocoloId, onComplete, onCancel }) 
       setError(err.response?.data?.error || err.message || 'Error al confirmar');
       setStep('preview');
     }
-  }, [protocoloId, minutaUrl, extractedData, onComplete]);
+  }, [protocoloId, minutaUrl, extractedData, observaciones, onComplete]);
 
   // ── Edit helpers ───────────────────────────────────────────────
   const updateField = (field, value) => {
@@ -532,6 +538,24 @@ export default function UAFEMinutaUpload({ protocoloId, onComplete, onCancel }) 
           </Box>
         </Paper>
       )}
+
+      {/* Observaciones */}
+      <Paper sx={{ p: 2.5, borderRadius: '10px', border: `1px solid ${UAFE_COLORS.border}` }}>
+        <Typography variant="overline" sx={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.08em', color: UAFE_COLORS.textMuted }}>
+          Observaciones
+        </Typography>
+        <TextField
+          fullWidth
+          multiline
+          minRows={2}
+          maxRows={6}
+          size="small"
+          placeholder="Ingrese observaciones sobre el documento o la extraccion de datos..."
+          value={observaciones}
+          onChange={(e) => setObservaciones(e.target.value)}
+          sx={{ mt: 1 }}
+        />
+      </Paper>
     </Box>
   );
 }
