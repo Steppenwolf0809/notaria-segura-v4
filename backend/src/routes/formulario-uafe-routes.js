@@ -244,15 +244,31 @@ router.get(
           return (p.tipoPersona === 'NATURAL' && p.datosPersonaNatural) ||
                  (p.tipoPersona === 'JURIDICA' && p.datosPersonaJuridica);
         })
-        .map(pp => ({
-          tipo: pp.persona.tipoPersona,
-          calidad: pp.calidad,
-          datos: pp.persona.tipoPersona === 'NATURAL'
+        .map(pp => {
+          const datosRaw = pp.persona.tipoPersona === 'NATURAL'
             ? pp.persona.datosPersonaNatural
-            : pp.persona.datosPersonaJuridica,
-          _personaProtocoloId: pp.id,
-          _personaId: pp.persona.id,
-        }));
+            : pp.persona.datosPersonaJuridica;
+          // Inyectar cédula y tipo identificación desde PersonaRegistrada
+          // (estos campos viven en el modelo, no siempre dentro del JSON)
+          const datos = datosRaw ? { ...datosRaw } : {};
+          if (pp.persona.tipoPersona === 'NATURAL') {
+            if (!datos.datosPersonales) datos.datosPersonales = {};
+            if (!datos.datosPersonales.numeroIdentificacion) {
+              datos.datosPersonales.numeroIdentificacion = pp.persona.numeroIdentificacion;
+            }
+            if (!datos.datosPersonales.tipoIdentificacion) {
+              datos.datosPersonales.tipoIdentificacion =
+                (pp.persona.numeroIdentificacion || '').length === 13 ? 'RUC' : 'CEDULA';
+            }
+          }
+          return {
+            tipo: pp.persona.tipoPersona,
+            calidad: pp.calidad,
+            datos,
+            _personaProtocoloId: pp.id,
+            _personaId: pp.persona.id,
+          };
+        });
 
       if (personaId) {
         personasTarget = personasTarget.filter(pp => pp._personaProtocoloId === personaId || pp._personaId === personaId);

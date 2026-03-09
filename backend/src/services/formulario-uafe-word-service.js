@@ -265,8 +265,6 @@ function buildDatosPersonales(datos) {
       ['Nombres', safeStr(dp.nombres)],
       ['Tipo de Identificación', safeStr(dp.tipoIdentificacion)],
       ['No. Identificación', safeStr(dp.numeroIdentificacion)],
-      ['Fecha de Nacimiento', formatDate(dp.fechaNacimiento)],
-      ['Lugar de Nacimiento', safeStr(dp.lugarNacimiento)],
       ['Nacionalidad', safeStr(dp.nacionalidad)],
       ['Nivel de Estudio', safeStr(dp.nivelEstudio)],
       ['Género', safeStr(dp.genero)],
