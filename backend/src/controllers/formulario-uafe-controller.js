@@ -1104,6 +1104,7 @@ export async function actualizarProtocolo(req, res) {
       fecha,
       actoContrato,
       tipoActo,
+      estado,
       tipoActoOtro,
       tipoBien,
       descripcionBien,
@@ -1180,6 +1181,7 @@ export async function actualizarProtocolo(req, res) {
       data: {
         ...(numeroProtocolo && { numeroProtocolo }),
         ...(fecha && { fecha: new Date(fecha) }),
+        ...(estado && { estado }),
         ...((tipoActo || actoContrato) && { tipoActo: tipoActo || actoContrato }),
         ...(tipoActoOtro !== undefined && { tipoActoOtro: tipoActoOtro || null }),
         ...(tipoBien !== undefined && { tipoBien: tipoBien || null }),

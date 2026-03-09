@@ -43,6 +43,7 @@ import UAFEMinutaUpload from './UAFEMinutaUpload';
 import {
   UAFE_COLORS,
   ESTADOS_PROTOCOLO,
+  ESTADOS_PROTOCOLO_FLOW,
   TIPOS_ACTO_UAFE,
   TIPOS_BIEN,
   FORMAS_PAGO,
@@ -197,6 +198,45 @@ function DatosActoTab({ protocol, onFieldChange, readOnly }) {
         <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5, color: UAFE_COLORS.textPrimary, fontSize: '0.85rem' }}>
           Datos de la Transaccion
         </Typography>
+        <Grid container spacing={2} sx={{ mb: 2 }}>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <TextField
+              fullWidth
+              size="small"
+              label="No. Protocolo"
+              value={protocol.numeroProtocolo || ''}
+              onChange={(e) => onFieldChange?.('numeroProtocolo', e.target.value)}
+              disabled={readOnly}
+              placeholder="Ej: 2026-0001"
+            />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Estado</InputLabel>
+              <Select
+                value={protocol.estado || 'BORRADOR'}
+                label="Estado"
+                onChange={(e) => onFieldChange?.('estado', e.target.value)}
+                disabled={readOnly}
+              >
+                {ESTADOS_PROTOCOLO_FLOW.map((key) => (
+                  <MenuItem key={key} value={key}>
+                    <Chip
+                      size="small"
+                      label={ESTADOS_PROTOCOLO[key].label}
+                      sx={{
+                        fontSize: '0.68rem',
+                        fontWeight: 600,
+                        backgroundColor: ESTADOS_PROTOCOLO[key].bg,
+                        color: ESTADOS_PROTOCOLO[key].color,
+                      }}
+                    />
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+        </Grid>
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, sm: 5 }}>
             <FormControl fullWidth size="small">
