@@ -198,7 +198,7 @@ function DatosActoTab({ protocol, onFieldChange, readOnly }) {
           Datos de la Transaccion
         </Typography>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 12, sm: 6 }}>
+          <Grid size={{ xs: 12, sm: 5 }}>
             <FormControl fullWidth size="small">
               <InputLabel>Tipo de Acto</InputLabel>
               <Select
@@ -217,7 +217,19 @@ function DatosActoTab({ protocol, onFieldChange, readOnly }) {
               </Select>
             </FormControl>
           </Grid>
-          <Grid size={{ xs: 12, sm: 3 }}>
+          <Grid size={{ xs: 12, sm: 2 }}>
+            <TextField
+              fullWidth
+              size="small"
+              label="Fecha del acto"
+              type="date"
+              value={protocol.fecha ? new Date(protocol.fecha).toISOString().split('T')[0] : ''}
+              onChange={(e) => onFieldChange?.('fecha', e.target.value)}
+              disabled={readOnly}
+              slotProps={{ inputLabel: { shrink: true } }}
+            />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 2.5 }}>
             <TextField
               fullWidth
               size="small"
@@ -228,7 +240,7 @@ function DatosActoTab({ protocol, onFieldChange, readOnly }) {
               disabled={readOnly}
             />
           </Grid>
-          <Grid size={{ xs: 12, sm: 3 }}>
+          <Grid size={{ xs: 12, sm: 2.5 }}>
             <TextField
               fullWidth
               size="small"

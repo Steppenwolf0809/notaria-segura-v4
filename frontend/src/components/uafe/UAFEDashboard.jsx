@@ -153,13 +153,18 @@ export default function UAFEDashboard() {
   }, [protocols, filters]);
 
   // ── Handlers ──────────────────────────────────────────────────
-  const handleView = (protocol) => {
-    setSelectedProtocol(protocol);
+  const loadFullProtocol = async (protocol) => {
+    setSelectedProtocol(protocol); // Mostrar inmediato con datos parciales
+    try {
+      const { data } = await apiClient.get(`/formulario-uafe/protocolo/${protocol.id}`);
+      setSelectedProtocol(data.data || data.protocolo || data);
+    } catch (err) {
+      console.error('[UAFE] Error cargando detalle:', err);
+    }
   };
 
-  const handleEdit = (protocol) => {
-    setSelectedProtocol(protocol);
-  };
+  const handleView = (protocol) => loadFullProtocol(protocol);
+  const handleEdit = (protocol) => loadFullProtocol(protocol);
 
   const handleBack = () => {
     setSelectedProtocol(null);
