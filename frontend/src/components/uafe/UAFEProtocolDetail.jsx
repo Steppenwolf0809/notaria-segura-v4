@@ -651,6 +651,7 @@ function MinutaTab({ protocol, onMinutaProcessed }) {
 function TextosTab({ protocol, onGenerateTexts }) {
   const [loading, setLoading] = useState(false);
   const [resultado, setResultado] = useState(null);
+  const [copiado, setCopiado] = useState(null); // 'encabezado' | 'comparecencia' | null
 
   const yaGenerado = !!(protocol.textoEncabezadoGenerado || protocol.textoComparecenciaGenerado);
 
@@ -666,6 +667,29 @@ function TextosTab({ protocol, onGenerateTexts }) {
 
   const encabezado = resultado?.data?.encabezado || protocol.textoEncabezadoGenerado;
   const comparecenciaHtml = resultado?.data?.comparecenciaHtml || protocol.textoComparecenciaGenerado;
+
+  const copiarTexto = async (texto, tipo) => {
+    try {
+      await navigator.clipboard.writeText(texto);
+      setCopiado(tipo);
+      setTimeout(() => setCopiado(null), 2000);
+    } catch { /* ignore */ }
+  };
+
+  const copiarHtmlConFormato = async (html, tipo) => {
+    try {
+      const htmlCompleto = `<html><body style="font-family:'Times New Roman',serif;font-size:12pt">${html}</body></html>`;
+      const blobHtml = new Blob([htmlCompleto], { type: 'text/html' });
+      const textoPlano = html.replace(/<[^>]*>/g, '');
+      const blobText = new Blob([textoPlano], { type: 'text/plain' });
+      await navigator.clipboard.write([new ClipboardItem({ 'text/html': blobHtml, 'text/plain': blobText })]);
+      setCopiado(tipo);
+      setTimeout(() => setCopiado(null), 2000);
+    } catch {
+      // Fallback: copiar texto plano
+      copiarTexto(html.replace(/<[^>]*>/g, ''), tipo);
+    }
+  };
 
   return (
     <Box>
@@ -712,9 +736,21 @@ function TextosTab({ protocol, onGenerateTexts }) {
 
       {/* Encabezado */}
       <Box sx={{ mb: 3 }}>
-        <Typography variant="caption" sx={{ fontWeight: 700, color: UAFE_COLORS.textSecondary, textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: '0.63rem' }}>
-          Encabezado
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="caption" sx={{ fontWeight: 700, color: UAFE_COLORS.textSecondary, textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: '0.63rem' }}>
+            Encabezado
+          </Typography>
+          {encabezado && (
+            <Button
+              size="small"
+              startIcon={<ContentCopyIcon sx={{ fontSize: 13 }} />}
+              onClick={() => copiarTexto(encabezado, 'encabezado')}
+              sx={{ fontSize: '0.68rem', textTransform: 'none', color: copiado === 'encabezado' ? '#2e7d32' : UAFE_COLORS.textSecondary }}
+            >
+              {copiado === 'encabezado' ? 'Copiado!' : 'Copiar'}
+            </Button>
+          )}
+        </Box>
         <Paper
           elevation={0}
           sx={{
@@ -741,9 +777,21 @@ function TextosTab({ protocol, onGenerateTexts }) {
 
       {/* Comparecencia */}
       <Box>
-        <Typography variant="caption" sx={{ fontWeight: 700, color: UAFE_COLORS.textSecondary, textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: '0.63rem' }}>
-          Comparecencia
-        </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="caption" sx={{ fontWeight: 700, color: UAFE_COLORS.textSecondary, textTransform: 'uppercase', letterSpacing: '0.06em', fontSize: '0.63rem' }}>
+            Comparecencia
+          </Typography>
+          {comparecenciaHtml && (
+            <Button
+              size="small"
+              startIcon={<ContentCopyIcon sx={{ fontSize: 13 }} />}
+              onClick={() => copiarHtmlConFormato(comparecenciaHtml, 'comparecencia')}
+              sx={{ fontSize: '0.68rem', textTransform: 'none', color: copiado === 'comparecencia' ? '#2e7d32' : UAFE_COLORS.textSecondary }}
+            >
+              {copiado === 'comparecencia' ? 'Copiado!' : 'Copiar con formato'}
+            </Button>
+          )}
+        </Box>
         <Paper
           elevation={0}
           sx={{
@@ -758,6 +806,7 @@ function TextosTab({ protocol, onGenerateTexts }) {
             color: UAFE_COLORS.textPrimary,
             backgroundColor: UAFE_COLORS.surface,
             minHeight: 60,
+            '& strong': { fontWeight: 'bold' },
           }}
         >
           {comparecenciaHtml ? (
