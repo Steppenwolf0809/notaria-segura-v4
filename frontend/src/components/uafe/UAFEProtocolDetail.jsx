@@ -671,9 +671,9 @@ function TextosTab({ protocol, onGenerateTexts }) {
   const comparecenciaCache = protocol.textoComparecenciaGenerado;
   const comparecenciaHtml = resultado?.data?.comparecenciaHtml || comparecenciaCache;
 
-  // Auto-regenerar si el cache no tiene formato HTML (legacy sin <strong>)
+  // Auto-regenerar si el cache no tiene formato HTML (legacy sin negritas)
   useEffect(() => {
-    if (comparecenciaCache && !comparecenciaCache.includes('<strong>') && !resultado && !loading) {
+    if (comparecenciaCache && !comparecenciaCache.includes('<b ') && !comparecenciaCache.includes('<b>') && !resultado && !loading) {
       handleGenerar(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -817,7 +817,7 @@ function TextosTab({ protocol, onGenerateTexts }) {
             color: UAFE_COLORS.textPrimary,
             backgroundColor: UAFE_COLORS.surface,
             minHeight: 60,
-            '& strong': { fontWeight: 'bold' },
+            '& b': { fontWeight: 'bold' },
           }}
         >
           {comparecenciaHtml ? (

@@ -36,7 +36,7 @@ const NOTARIA_TEXTO = 'DOCTORA GLENDA ZAPATA SILVA, NOTARIA DÉCIMA OCTAVA DEL C
  */
 function negrita(texto, formatoHtml = true) {
     if (!texto) return '';
-    return formatoHtml ? `<strong>${texto}</strong>` : texto;
+    return formatoHtml ? `<b style="font-weight:bold">${texto}</b>` : texto;
 }
 
 /**
@@ -723,7 +723,7 @@ export function generarComparecencia(protocolo, participantes, opciones = {}) {
         texto += generarCierre();
 
         // Generar versión sin HTML
-        const textoPlano = texto.replace(/<strong>/g, '').replace(/<\/strong>/g, '');
+        const textoPlano = texto.replace(/<b[^>]*>/g, '').replace(/<\/b>/g, '');
 
         return {
             success: true,
