@@ -375,17 +375,51 @@ function extractWithRegex(text) {
   // Advertencias de parseo (feedback para el matrizador)
   const advertencias = [];
 
-  // Detectar posibles cédulas malformadas (8-9 dígitos con guión)
-  const cedulasMalformadas = [...text.matchAll(/c[eé]dula[^.]{0,30}?(\d{7,9}[-]\d{1,2})/gi)];
-  for (const m of cedulasMalformadas) {
+  // Detectar posibles cédulas malformadas:
+  // 1. Con guión y total != 10 dígitos (ej: "17192122-9" = 9 dígitos)
+  const cedulasConGuion = [...text.matchAll(/c[eé]dula[^.]{0,40}?(\d{7,9}[-]\d{1,2})/gi)];
+  for (const m of cedulasConGuion) {
     const raw = m[1];
     const clean = raw.replace(/-/g, '');
     if (clean.length !== 10) {
       advertencias.push({
         campo: 'cedula',
-        mensaje: `Posible cédula malformada: "${raw}" (${clean.length} dígitos, se esperan 10). Verifique el documento original.`,
+        mensaje: `Posible cedula malformada: "${raw}" (${clean.length} digitos, se esperan 10). Verifique el documento original.`,
         valor: raw,
       });
+    }
+  }
+
+  // 2. Sin guión: números de 9 u 11 dígitos cerca de "cédula" (posible error de digitación)
+  // Excluir los que son seguidos de guión+dígito (ya capturados en paso 1)
+  const cedulasCercanas = [...text.matchAll(/c[eé]dula[^.]{0,40}?(\d{9}|\d{11})(?![\d-])/gi)];
+  for (const m of cedulasCercanas) {
+    const raw = m[1];
+    // Evitar falsos positivos: no advertir si es substring de una cédula válida
+    const esSubstring = [...cedulas].some(c => c.includes(raw) || raw.includes(c));
+    if (!esSubstring) {
+      advertencias.push({
+        campo: 'cedula',
+        mensaje: `Posible cedula malformada: "${raw}" (${raw.length} digitos, se esperan 10). Verifique el documento original.`,
+        valor: raw,
+      });
+    }
+  }
+
+  // 3. Números de 9 u 11 dígitos cerca de "identificación" o "identidad"
+  const idCercanas = [...text.matchAll(/identifica(?:ci[oó]n|d)[^.]{0,40}?(\d{9}|\d{11})(?![\d-])/gi)];
+  for (const m of idCercanas) {
+    const raw = m[1];
+    const esSubstring = [...cedulas].some(c => c.includes(raw) || raw.includes(c));
+    if (!esSubstring) {
+      const yaAdvertido = advertencias.some(a => a.valor === raw);
+      if (!yaAdvertido) {
+        advertencias.push({
+          campo: 'cedula',
+          mensaje: `Posible cedula malformada: "${raw}" (${raw.length} digitos, se esperan 10). Verifique el documento original.`,
+          valor: raw,
+        });
+      }
     }
   }
 
@@ -393,7 +427,7 @@ function extractWithRegex(text) {
   if (cedulas.size === 0 && comparecientesText.length > 100) {
     advertencias.push({
       campo: 'cedula',
-      mensaje: 'No se detectaron cédulas en el documento. Verifique que la minuta contenga números de cédula.',
+      mensaje: 'No se detectaron cedulas en el documento. Verifique que la minuta contenga numeros de cedula.',
       valor: null,
     });
   }
