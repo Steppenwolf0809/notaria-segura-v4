@@ -28,6 +28,7 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 
 import apiClient from '../../services/api-client';
 import {
@@ -50,6 +51,7 @@ export default function UAFEMinutaUpload({ protocoloId, onComplete, onCancel }) 
   const [extractedData, setExtractedData] = useState(null);
   const [minutaUrl, setMinutaUrl] = useState(null);
   const [fuente, setFuente] = useState(null);
+  const [advertencias, setAdvertencias] = useState([]);
   const [editingField, setEditingField] = useState(null);
 
   // ── Upload & Parse ─────────────────────────────────────────────
@@ -90,6 +92,7 @@ export default function UAFEMinutaUpload({ protocoloId, onComplete, onCancel }) 
         setExtractedData(data.data.datosExtraidos);
         setMinutaUrl(data.data.minutaUrl);
         setFuente(data.data.fuente);
+        setAdvertencias(data.data.advertencias || []);
         setStep('preview');
       } else {
         throw new Error(data.error || 'Error al procesar');
@@ -314,6 +317,24 @@ export default function UAFEMinutaUpload({ protocoloId, onComplete, onCancel }) 
       </Box>
 
       {error && <Alert severity="error" onClose={() => setError(null)}>{error}</Alert>}
+
+      {/* Advertencias del parseo */}
+      {advertencias.length > 0 && (
+        <Alert
+          severity="warning"
+          icon={<WarningAmberOutlinedIcon />}
+          sx={{ borderRadius: '10px' }}
+        >
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
+            Advertencias del documento
+          </Typography>
+          {advertencias.map((adv, i) => (
+            <Typography key={i} variant="body2" sx={{ fontSize: '0.82rem' }}>
+              {adv.mensaje}
+            </Typography>
+          ))}
+        </Alert>
+      )}
 
       {/* Datos del Acto */}
       <Paper sx={{ p: 2.5, borderRadius: '10px', border: `1px solid ${UAFE_COLORS.border}` }}>

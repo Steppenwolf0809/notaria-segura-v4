@@ -284,10 +284,11 @@ function buildDomicilio(datos) {
     sectionTitle('3. DOMICILIO'),
     twoColumnTable([
       ['Dirección', safeStr(direccionStr)],
+      ['Sector', safeStr(dir.sector)],
+      ['Referencia', safeStr(dir.referencia)],
       ['Parroquia', safeStr(dir.parroquia)],
       ['Cantón / Ciudad', safeStr(dir.canton || dir.ciudad)],
       ['Provincia', safeStr(dir.provincia)],
-      ['País', safeStr(dir.pais)],
       ['Celular', safeStr(ct.celular || dir.celular)],
       ['Correo Electrónico', safeStr(ct.correoElectronico || ct.email || dir.email)],
     ]),
@@ -303,8 +304,9 @@ function buildInformacionLaboral(datos) {
       ['Profesión / Ocupación', safeStr(lab.profesionOcupacion)],
       ['Nombre de la Empresa / Entidad', safeStr(lab.entidad || lab.nombreEmpresa)],
       ['Cargo', safeStr(lab.cargo)],
-      ['Dirección de la Empresa', safeStr(lab.direccionEmpresa)],
-      ['Teléfono de la Empresa', safeStr(lab.telefonoEmpresa)],
+      ['Dirección de la Empresa', safeStr(lab.direccionLaboral || lab.direccionEmpresa)],
+      ['Provincia Laboral', safeStr(lab.provinciaLaboral)],
+      ['Cantón Laboral', safeStr(lab.cantonLaboral)],
       ['Ingreso Mensual Aprox.', formatCurrency(lab.ingresoMensual)],
     ]),
   ];
@@ -329,6 +331,32 @@ function buildDatosConyuge(datos) {
   ];
 }
 
+function buildDatosMandante(datos) {
+  const m = datos?.mandante;
+  if (!m || !m.nombres) return [];
+
+  const dirParts = [m.direccion, m.sector, m.referencia].filter(Boolean);
+  const ubicParts = [m.parroquia, m.canton, m.provincia].filter(Boolean);
+
+  return [
+    sectionTitle('DATOS DEL MANDANTE / BENEFICIARIO FINAL (Art. 30 §1.3)'),
+    twoColumnTable([
+      ['Apellidos', safeStr(m.apellidos)],
+      ['Nombres', safeStr(m.nombres)],
+      ['Tipo de Identificación', safeStr(m.tipoIdentificacion)],
+      ['No. Identificación', safeStr(m.numeroIdentificacion)],
+      ['Nacionalidad', safeStr(m.nacionalidad)],
+      ['Género', safeStr(m.genero)],
+      ['Dirección', safeStr(dirParts.join(', '))],
+      ['Parroquia / Cantón / Provincia', safeStr(ubicParts.join(', '))],
+      ['Celular', safeStr(m.celular)],
+      ['Correo Electrónico', safeStr(m.correo)],
+      ['Actividad Ocupacional', safeStr(m.actividadOcupacional)],
+      ['Ingreso Mensual Aprox.', safeStr(m.ingresoMensual)],
+    ]),
+  ];
+}
+
 function buildDeclaracionPEP(datos) {
   const pep = datos?.declaracionPEP || datos?.pep || {};
   const esPEP = pep.esPEP === true || pep.esPEP === 'SI';
@@ -341,10 +369,11 @@ function buildDeclaracionPEP(datos) {
 
   if (esPEP) {
     rows.push(
-      ['Cargo PEP', safeStr(pep.cargo)],
-      ['Institución', safeStr(pep.institucion)],
-      ['Fecha Desde', formatDate(pep.fechaDesde)],
-      ['Fecha Hasta', formatDate(pep.fechaHasta)],
+      ['Institución donde labora', safeStr(pep.pepInstitucion || pep.institucion)],
+      ['Cargo que desempeña', safeStr(pep.pepCargo || pep.cargo)],
+      ['Dirección laboral', safeStr(pep.pepDireccionLaboral)],
+      ['Fecha de designación', formatDate(pep.pepFechaDesde || pep.fechaDesde)],
+      ['Fecha de culminación', formatDate(pep.pepFechaHasta || pep.fechaHasta)],
     );
   }
 
@@ -352,13 +381,21 @@ function buildDeclaracionPEP(datos) {
 
   if (esFamiliarPEP) {
     rows.push(
-      ['Nombre del PEP', safeStr(pep.nombrePEP)],
-      ['Parentesco con el PEP', safeStr(pep.parentescoPEP)],
-      ['Cargo del PEP', safeStr(pep.cargoPEP)],
+      ['Nombre del PEP', safeStr(pep.pepFamiliarNombre || pep.nombrePEP)],
+      ['Parentesco con el PEP', safeStr(pep.pepFamiliarParentesco || pep.parentescoPEP)],
+      ['Cargo del PEP', safeStr(pep.pepFamiliarCargo || pep.cargoPEP)],
+      ['Institución del PEP', safeStr(pep.pepFamiliarInstitucion)],
     );
   }
 
   rows.push(['¿Es colaborador cercano de un PEP?', esColaboradorPEP ? 'SÍ' : 'NO']);
+
+  if (esColaboradorPEP) {
+    rows.push(
+      ['Nombre del PEP', safeStr(pep.pepColaboradorNombre)],
+      ['Tipo de relación', safeStr(pep.pepColaboradorTipoRelacion)],
+    );
+  }
 
   // Dynamic section number based on whether cónyuge was included
   const ec = datos?.datosPersonales?.estadoCivil;
@@ -719,6 +756,7 @@ export async function generarFormularioWord(protocolo, personaProtocolo) {
       ...buildDomicilio(datos),
       ...buildInformacionLaboral(datos),
       ...buildDatosConyuge(datos),
+      ...buildDatosMandante(datos),
       ...buildDeclaracionPEP(datos),
       ...buildFormasPago(protocolo, datos),
       ...buildDatosBien(protocolo, datos),

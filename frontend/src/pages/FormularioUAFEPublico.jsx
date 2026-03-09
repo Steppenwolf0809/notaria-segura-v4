@@ -467,6 +467,7 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
         callePrincipal: dir.callePrincipal || '', calleSecundaria: dir.calleSecundaria || '',
         numero: dir.numero || '', provincia: dir.provincia || 'PICHINCHA',
         canton: dir.canton || 'QUITO', parroquia: dir.parroquia || '',
+        sector: dir.sector || '', referencia: dir.referencia || '',
         situacion: lab.situacion || '', profesionOcupacion: lab.profesionOcupacion || '',
         entidad: lab.entidad || '', cargo: lab.cargo || '',
         ingresoMensual: lab.ingresoMensual || '',
@@ -476,6 +477,12 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
         conyugeCelular: con.celular || '',
         esPEP: pep.esPEP || false, esFamiliarPEP: pep.esFamiliarPEP || false,
         esColaboradorPEP: pep.esColaboradorPEP || false,
+        pepInstitucion: pep.pepInstitucion || '', pepCargo: pep.pepCargo || '',
+        pepDireccionLaboral: pep.pepDireccionLaboral || '',
+        pepFechaDesde: pep.pepFechaDesde || '', pepFechaHasta: pep.pepFechaHasta || '',
+        pepFamiliarNombre: pep.pepFamiliarNombre || '', pepFamiliarParentesco: pep.pepFamiliarParentesco || '',
+        pepFamiliarCargo: pep.pepFamiliarCargo || '', pepFamiliarInstitucion: pep.pepFamiliarInstitucion || '',
+        pepColaboradorNombre: pep.pepColaboradorNombre || '', pepColaboradorTipoRelacion: pep.pepColaboradorTipoRelacion || '',
         aceptaDeclaracion: false,
       });
     }).catch(() => {
@@ -483,11 +490,16 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
         apellidos: '', nombres: '', genero: '', estadoCivil: '', nivelEstudio: '',
         nacionalidad: 'ECUATORIANA', celular: '', correoElectronico: '',
         callePrincipal: '', calleSecundaria: '', numero: '', provincia: 'PICHINCHA',
-        canton: 'QUITO', parroquia: '', situacion: '', profesionOcupacion: '',
+        canton: 'QUITO', parroquia: '', sector: '', referencia: '',
+        situacion: '', profesionOcupacion: '',
         entidad: '', cargo: '', ingresoMensual: '',
         conyugeApellidos: '', conyugeNombres: '', conyugeNumeroIdentificacion: '',
         conyugeNacionalidad: '', conyugeEmail: '', conyugeCelular: '',
         esPEP: false, esFamiliarPEP: false, esColaboradorPEP: false,
+        pepInstitucion: '', pepCargo: '', pepDireccionLaboral: '',
+        pepFechaDesde: '', pepFechaHasta: '',
+        pepFamiliarNombre: '', pepFamiliarParentesco: '', pepFamiliarCargo: '', pepFamiliarInstitucion: '',
+        pepColaboradorNombre: '', pepColaboradorTipoRelacion: '',
         aceptaDeclaracion: false,
       });
     }).finally(() => setLoading(false));
@@ -522,7 +534,7 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
           direccion: {
             callePrincipal: form.callePrincipal, calleSecundaria: form.calleSecundaria,
             numero: form.numero, provincia: form.provincia, canton: form.canton,
-            parroquia: form.parroquia,
+            parroquia: form.parroquia, sector: form.sector, referencia: form.referencia,
           },
           informacionLaboral: {
             situacion: form.situacion, profesionOcupacion: form.profesionOcupacion,
@@ -537,6 +549,12 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
           declaracionPEP: {
             esPEP: form.esPEP, esFamiliarPEP: form.esFamiliarPEP,
             esColaboradorPEP: form.esColaboradorPEP,
+            pepInstitucion: form.pepInstitucion, pepCargo: form.pepCargo,
+            pepDireccionLaboral: form.pepDireccionLaboral,
+            pepFechaDesde: form.pepFechaDesde, pepFechaHasta: form.pepFechaHasta,
+            pepFamiliarNombre: form.pepFamiliarNombre, pepFamiliarParentesco: form.pepFamiliarParentesco,
+            pepFamiliarCargo: form.pepFamiliarCargo, pepFamiliarInstitucion: form.pepFamiliarInstitucion,
+            pepColaboradorNombre: form.pepColaboradorNombre, pepColaboradorTipoRelacion: form.pepColaboradorTipoRelacion,
           },
         },
       });
@@ -623,6 +641,8 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
           <Grid size={{ xs: 4 }}>{field('Provincia', 'provincia')}</Grid>
           <Grid size={{ xs: 4 }}>{field('Canton', 'canton')}</Grid>
           <Grid size={{ xs: 4 }}>{field('Parroquia', 'parroquia')}</Grid>
+          <Grid size={{ xs: 6 }}>{field('Sector', 'sector')}</Grid>
+          <Grid size={{ xs: 6 }}>{field('Referencia', 'referencia')}</Grid>
         </Grid>
       </Box>
 
@@ -664,10 +684,41 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
         </Alert>
         <FormControlLabel control={<Checkbox checked={form.esPEP} onChange={e => u('esPEP', e.target.checked)} />}
           label={<Typography variant="body2">¿Se considera una Persona Expuesta Politicamente?{tipIcon('esPEP')}</Typography>} sx={{ mb: 1 }} />
+        {form.esPEP && (
+          <Grid container spacing={2} sx={{ ml: 3, mb: 2 }}>
+            <Grid size={{ xs: 6 }}>{field('Institucion donde labora', 'pepInstitucion')}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Cargo que desempena', 'pepCargo')}</Grid>
+            <Grid size={{ xs: 12 }}>{field('Direccion laboral (completa)', 'pepDireccionLaboral')}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Fecha de designacion', 'pepFechaDesde', { type: 'date', InputLabelProps: { shrink: true } })}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Fecha de culminacion (si aplica)', 'pepFechaHasta', { type: 'date', InputLabelProps: { shrink: true } })}</Grid>
+          </Grid>
+        )}
+
         <FormControlLabel control={<Checkbox checked={form.esFamiliarPEP} onChange={e => u('esFamiliarPEP', e.target.checked)} />}
           label={<Typography variant="body2">¿Es familiar de un PEP?{tipIcon('esFamiliarPEP')}</Typography>} sx={{ mb: 1 }} />
+        {form.esFamiliarPEP && (
+          <Grid container spacing={2} sx={{ ml: 3, mb: 2 }}>
+            <Grid size={{ xs: 6 }}>{field('Nombre completo del PEP', 'pepFamiliarNombre')}</Grid>
+            <Grid size={{ xs: 6 }}>
+              {selectField('Parentesco', 'pepFamiliarParentesco', [
+                { value: 'CONYUGE', label: 'Conyuge' }, { value: 'PADRE', label: 'Padre' },
+                { value: 'MADRE', label: 'Madre' }, { value: 'HIJO_A', label: 'Hijo/a' },
+                { value: 'HERMANO_A', label: 'Hermano/a' }, { value: 'OTRO', label: 'Otro' },
+              ])}
+            </Grid>
+            <Grid size={{ xs: 6 }}>{field('Cargo del PEP', 'pepFamiliarCargo')}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Institucion del PEP', 'pepFamiliarInstitucion')}</Grid>
+          </Grid>
+        )}
+
         <FormControlLabel control={<Checkbox checked={form.esColaboradorPEP} onChange={e => u('esColaboradorPEP', e.target.checked)} />}
-          label={<Typography variant="body2">¿Es colaborador cercano de un PEP?{tipIcon('esColaboradorPEP')}</Typography>} sx={{ mb: 2 }} />
+          label={<Typography variant="body2">¿Es colaborador cercano de un PEP?{tipIcon('esColaboradorPEP')}</Typography>} sx={{ mb: 1 }} />
+        {form.esColaboradorPEP && (
+          <Grid container spacing={2} sx={{ ml: 3, mb: 2 }}>
+            <Grid size={{ xs: 6 }}>{field('Nombre completo del PEP', 'pepColaboradorNombre')}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Tipo de relacion', 'pepColaboradorTipoRelacion')}</Grid>
+          </Grid>
+        )}
 
         <Divider sx={{ my: 2 }} />
         <Typography variant="caption" sx={{ color: COLORS.textSecondary, display: 'block', mb: 1, lineHeight: 1.5, whiteSpace: 'pre-line' }}>

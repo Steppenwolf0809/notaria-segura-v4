@@ -54,6 +54,24 @@ const SITUACIONES_LABORALES = [
   { value: 'OTRO', label: 'Otro' },
 ];
 
+const NIVELES_ESTUDIO = [
+  { value: 'PRIMARIA', label: 'Primaria' },
+  { value: 'SECUNDARIA', label: 'Secundaria' },
+  { value: 'TECNICO', label: 'Tecnico/Tecnologico' },
+  { value: 'UNIVERSITARIO', label: 'Universitario' },
+  { value: 'POSTGRADO', label: 'Postgrado' },
+  { value: 'NINGUNO', label: 'Ninguno' },
+];
+
+const PARENTESCOS_PEP = [
+  { value: 'CONYUGE', label: 'Conyuge' },
+  { value: 'PADRE', label: 'Padre' },
+  { value: 'MADRE', label: 'Madre' },
+  { value: 'HIJO_A', label: 'Hijo/a' },
+  { value: 'HERMANO_A', label: 'Hermano/a' },
+  { value: 'OTRO', label: 'Otro' },
+];
+
 /**
  * UAFEPersonaEditDialog - Modal para que el matrizador llene/edite
  * manualmente los datos de un compareciente (fallback OLA 3)
@@ -84,6 +102,7 @@ export default function UAFEPersonaEditDialog({
         nombres: dp.nombres || '',
         genero: dp.genero || '',
         estadoCivil: dp.estadoCivil || '',
+        nivelEstudio: dp.nivelEstudio || '',
         nacionalidad: dp.nacionalidad || '',
         celular: contacto.celular || '',
         correoElectronico: contacto.correoElectronico || contacto.correo || '',
@@ -93,16 +112,50 @@ export default function UAFEPersonaEditDialog({
         provincia: direccion.provincia || '',
         canton: direccion.canton || '',
         parroquia: direccion.parroquia || '',
+        sector: direccion.sector || '',
+        referencia: direccion.referencia || '',
         situacion: laboral.situacion || '',
         profesionOcupacion: laboral.profesionOcupacion || '',
         entidad: laboral.entidad || '',
         cargo: laboral.cargo || '',
         ingresoMensual: laboral.ingresoMensual || '',
+        direccionLaboral: laboral.direccionLaboral || '',
+        provinciaLaboral: laboral.provinciaLaboral || '',
+        cantonLaboral: laboral.cantonLaboral || '',
         conyugeApellidos: conyuge.apellidos || '',
         conyugeNombres: conyuge.nombres || '',
         conyugeNumeroIdentificacion: conyuge.numeroIdentificacion || '',
         esPEP: pep.esPEP || false,
-        pepDetalle: pep.detalle || '',
+        esFamiliarPEP: pep.esFamiliarPEP || false,
+        esColaboradorPEP: pep.esColaboradorPEP || false,
+        pepInstitucion: pep.pepInstitucion || '',
+        pepCargo: pep.pepCargo || '',
+        pepDireccionLaboral: pep.pepDireccionLaboral || '',
+        pepFechaDesde: pep.pepFechaDesde || '',
+        pepFechaHasta: pep.pepFechaHasta || '',
+        pepFamiliarNombre: pep.pepFamiliarNombre || '',
+        pepFamiliarParentesco: pep.pepFamiliarParentesco || '',
+        pepFamiliarCargo: pep.pepFamiliarCargo || '',
+        pepFamiliarInstitucion: pep.pepFamiliarInstitucion || '',
+        pepColaboradorNombre: pep.pepColaboradorNombre || '',
+        pepColaboradorTipoRelacion: pep.pepColaboradorTipoRelacion || '',
+        // Mandante (beneficiario final)
+        mandanteApellidos: datos.mandante?.apellidos || '',
+        mandanteNombres: datos.mandante?.nombres || '',
+        mandanteTipoIdentificacion: datos.mandante?.tipoIdentificacion || 'CEDULA',
+        mandanteNumeroIdentificacion: datos.mandante?.numeroIdentificacion || '',
+        mandanteNacionalidad: datos.mandante?.nacionalidad || '',
+        mandanteGenero: datos.mandante?.genero || '',
+        mandanteDireccion: datos.mandante?.direccion || '',
+        mandanteProvincia: datos.mandante?.provincia || '',
+        mandanteCanton: datos.mandante?.canton || '',
+        mandanteParroquia: datos.mandante?.parroquia || '',
+        mandanteSector: datos.mandante?.sector || '',
+        mandanteReferencia: datos.mandante?.referencia || '',
+        mandanteCelular: datos.mandante?.celular || '',
+        mandanteCorreo: datos.mandante?.correo || '',
+        mandanteActividadOcupacional: datos.mandante?.actividadOcupacional || '',
+        mandanteIngresoMensual: datos.mandante?.ingresoMensual || '',
       });
       setError(null);
     }
@@ -123,6 +176,7 @@ export default function UAFEPersonaEditDialog({
           nombres: form.nombres,
           genero: form.genero,
           estadoCivil: form.estadoCivil,
+          nivelEstudio: form.nivelEstudio,
           nacionalidad: form.nacionalidad,
         },
         contacto: {
@@ -136,6 +190,8 @@ export default function UAFEPersonaEditDialog({
           provincia: form.provincia,
           canton: form.canton,
           parroquia: form.parroquia,
+          sector: form.sector,
+          referencia: form.referencia,
         },
         informacionLaboral: {
           situacion: form.situacion,
@@ -143,6 +199,9 @@ export default function UAFEPersonaEditDialog({
           entidad: form.entidad,
           cargo: form.cargo,
           ingresoMensual: form.ingresoMensual,
+          direccionLaboral: form.direccionLaboral,
+          provinciaLaboral: form.provinciaLaboral,
+          cantonLaboral: form.cantonLaboral,
         },
         conyuge: {
           apellidos: form.conyugeApellidos,
@@ -151,8 +210,27 @@ export default function UAFEPersonaEditDialog({
         },
         declaracionPEP: {
           esPEP: form.esPEP,
-          detalle: form.pepDetalle,
+          esFamiliarPEP: form.esFamiliarPEP,
+          esColaboradorPEP: form.esColaboradorPEP,
+          pepInstitucion: form.pepInstitucion, pepCargo: form.pepCargo,
+          pepDireccionLaboral: form.pepDireccionLaboral,
+          pepFechaDesde: form.pepFechaDesde, pepFechaHasta: form.pepFechaHasta,
+          pepFamiliarNombre: form.pepFamiliarNombre, pepFamiliarParentesco: form.pepFamiliarParentesco,
+          pepFamiliarCargo: form.pepFamiliarCargo, pepFamiliarInstitucion: form.pepFamiliarInstitucion,
+          pepColaboradorNombre: form.pepColaboradorNombre, pepColaboradorTipoRelacion: form.pepColaboradorTipoRelacion,
         },
+        mandante: isApoderado ? {
+          apellidos: form.mandanteApellidos, nombres: form.mandanteNombres,
+          tipoIdentificacion: form.mandanteTipoIdentificacion,
+          numeroIdentificacion: form.mandanteNumeroIdentificacion,
+          nacionalidad: form.mandanteNacionalidad, genero: form.mandanteGenero,
+          direccion: form.mandanteDireccion, provincia: form.mandanteProvincia,
+          canton: form.mandanteCanton, parroquia: form.mandanteParroquia,
+          sector: form.mandanteSector, referencia: form.mandanteReferencia,
+          celular: form.mandanteCelular, correo: form.mandanteCorreo,
+          actividadOcupacional: form.mandanteActividadOcupacional,
+          ingresoMensual: form.mandanteIngresoMensual,
+        } : null,
         _origenEdicion: 'MATRIZADOR',
       };
 
@@ -172,6 +250,7 @@ export default function UAFEPersonaEditDialog({
   const nombre = persona.nombre || `${form.apellidos} ${form.nombres}`.trim() || 'Sin nombre';
   const cedula = persona.personaCedula || persona.cedula || '-';
   const esCasado = form.estadoCivil === 'CASADO' || form.estadoCivil === 'UNION_LIBRE';
+  const isApoderado = persona.actuaPor && persona.actuaPor !== 'PROPIOS_DERECHOS';
 
   return (
     <Dialog
@@ -241,6 +320,14 @@ export default function UAFEPersonaEditDialog({
               </Select>
             </FormControl>
           </Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Nivel de Estudio</InputLabel>
+              <Select value={form.nivelEstudio} label="Nivel de Estudio" onChange={e => handleChange('nivelEstudio', e.target.value)}>
+                {NIVELES_ESTUDIO.map(n => <MenuItem key={n.value} value={n.value}>{n.label}</MenuItem>)}
+              </Select>
+            </FormControl>
+          </Grid>
         </Grid>
 
         {/* Contacto */}
@@ -275,6 +362,12 @@ export default function UAFEPersonaEditDialog({
           <Grid size={{ xs: 12, sm: 4 }}>
             <TextField fullWidth size="small" label="Parroquia" value={form.parroquia} onChange={e => handleChange('parroquia', e.target.value)} />
           </Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <TextField fullWidth size="small" label="Sector" value={form.sector} onChange={e => handleChange('sector', e.target.value)} />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <TextField fullWidth size="small" label="Referencia" value={form.referencia} onChange={e => handleChange('referencia', e.target.value)} />
+          </Grid>
         </Grid>
 
         {/* Información Laboral */}
@@ -300,6 +393,15 @@ export default function UAFEPersonaEditDialog({
           <Grid size={{ xs: 12, sm: 6 }}>
             <TextField fullWidth size="small" label="Cargo" value={form.cargo} onChange={e => handleChange('cargo', e.target.value)} />
           </Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <TextField fullWidth size="small" label="Direccion empresa" value={form.direccionLaboral} onChange={e => handleChange('direccionLaboral', e.target.value)} />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <TextField fullWidth size="small" label="Provincia laboral" value={form.provinciaLaboral} onChange={e => handleChange('provinciaLaboral', e.target.value)} />
+          </Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <TextField fullWidth size="small" label="Canton laboral" value={form.cantonLaboral} onChange={e => handleChange('cantonLaboral', e.target.value)} />
+          </Grid>
         </Grid>
 
         {/* Cónyuge (condicional) */}
@@ -321,20 +423,151 @@ export default function UAFEPersonaEditDialog({
         )}
 
         {/* PEP */}
-        <SectionTitle title="Declaracion PEP" subtitle="Debida diligencia" />
-        <Grid container spacing={2}>
+        <SectionTitle title="Declaracion PEP" subtitle="Art. 30 Reglamento" badge="UAFE" />
+        <Grid container spacing={2} sx={{ mb: 3 }}>
           <Grid size={{ xs: 12 }}>
             <FormControlLabel
               control={<Checkbox checked={!!form.esPEP} onChange={e => handleChange('esPEP', e.target.checked)} />}
-              label="Es Persona Expuesta Politicamente (PEP)"
+              label="¿Es Persona Expuesta Politicamente (PEP)?"
             />
           </Grid>
           {form.esPEP && (
-            <Grid size={{ xs: 12 }}>
-              <TextField fullWidth size="small" label="Detalle PEP (cargo, institucion)" value={form.pepDetalle} onChange={e => handleChange('pepDetalle', e.target.value)} multiline rows={2} />
-            </Grid>
+            <>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth size="small" label="Institucion donde labora" value={form.pepInstitucion} onChange={e => handleChange('pepInstitucion', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth size="small" label="Cargo que desempena" value={form.pepCargo} onChange={e => handleChange('pepCargo', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <TextField fullWidth size="small" label="Direccion laboral (completa)" value={form.pepDireccionLaboral} onChange={e => handleChange('pepDireccionLaboral', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth size="small" label="Fecha de designacion" type="date" InputLabelProps={{ shrink: true }} value={form.pepFechaDesde} onChange={e => handleChange('pepFechaDesde', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth size="small" label="Fecha de culminacion (si aplica)" type="date" InputLabelProps={{ shrink: true }} value={form.pepFechaHasta} onChange={e => handleChange('pepFechaHasta', e.target.value)} />
+              </Grid>
+            </>
+          )}
+
+          <Grid size={{ xs: 12 }}>
+            <FormControlLabel
+              control={<Checkbox checked={!!form.esFamiliarPEP} onChange={e => handleChange('esFamiliarPEP', e.target.checked)} />}
+              label="¿Es familiar de un PEP?"
+            />
+          </Grid>
+          {form.esFamiliarPEP && (
+            <>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth size="small" label="Nombre completo del PEP" value={form.pepFamiliarNombre} onChange={e => handleChange('pepFamiliarNombre', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Parentesco</InputLabel>
+                  <Select value={form.pepFamiliarParentesco} label="Parentesco" onChange={e => handleChange('pepFamiliarParentesco', e.target.value)}>
+                    {PARENTESCOS_PEP.map(p => <MenuItem key={p.value} value={p.value}>{p.label}</MenuItem>)}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth size="small" label="Cargo del PEP" value={form.pepFamiliarCargo} onChange={e => handleChange('pepFamiliarCargo', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth size="small" label="Institucion del PEP" value={form.pepFamiliarInstitucion} onChange={e => handleChange('pepFamiliarInstitucion', e.target.value)} />
+              </Grid>
+            </>
+          )}
+
+          <Grid size={{ xs: 12 }}>
+            <FormControlLabel
+              control={<Checkbox checked={!!form.esColaboradorPEP} onChange={e => handleChange('esColaboradorPEP', e.target.checked)} />}
+              label="¿Es colaborador cercano de un PEP?"
+            />
+          </Grid>
+          {form.esColaboradorPEP && (
+            <>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth size="small" label="Nombre completo del PEP" value={form.pepColaboradorNombre} onChange={e => handleChange('pepColaboradorNombre', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth size="small" label="Tipo de relacion" value={form.pepColaboradorTipoRelacion} onChange={e => handleChange('pepColaboradorTipoRelacion', e.target.value)} />
+              </Grid>
+            </>
           )}
         </Grid>
+
+        {/* Mandante / Beneficiario Final (condicional) */}
+        {isApoderado && (
+          <>
+            <SectionTitle title="Datos del Mandante / Beneficiario Final" subtitle="Art. 30 §1.3" badge="UAFE" />
+            <Alert severity="info" sx={{ mb: 2, fontSize: '0.8rem' }}>
+              Complete los datos de la persona a quien representa ({persona.actuaPor}).
+            </Alert>
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth size="small" label="Apellidos *" value={form.mandanteApellidos} onChange={e => handleChange('mandanteApellidos', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth size="small" label="Nombres *" value={form.mandanteNombres} onChange={e => handleChange('mandanteNombres', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 4 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Tipo ID</InputLabel>
+                  <Select value={form.mandanteTipoIdentificacion} label="Tipo ID" onChange={e => handleChange('mandanteTipoIdentificacion', e.target.value)}>
+                    <MenuItem value="CEDULA">Cedula</MenuItem>
+                    <MenuItem value="PASAPORTE">Pasaporte</MenuItem>
+                    <MenuItem value="RUC">RUC</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 4 }}>
+                <TextField fullWidth size="small" label="Numero de identificacion *" value={form.mandanteNumeroIdentificacion} onChange={e => handleChange('mandanteNumeroIdentificacion', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 4 }}>
+                <TextField fullWidth size="small" label="Nacionalidad" value={form.mandanteNacionalidad} onChange={e => handleChange('mandanteNacionalidad', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 4 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Genero</InputLabel>
+                  <Select value={form.mandanteGenero} label="Genero" onChange={e => handleChange('mandanteGenero', e.target.value)}>
+                    {GENEROS.map(g => <MenuItem key={g.value} value={g.value}>{g.label}</MenuItem>)}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 8 }}>
+                <TextField fullWidth size="small" label="Direccion completa" value={form.mandanteDireccion} onChange={e => handleChange('mandanteDireccion', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 4 }}>
+                <TextField fullWidth size="small" label="Provincia" value={form.mandanteProvincia} onChange={e => handleChange('mandanteProvincia', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 4 }}>
+                <TextField fullWidth size="small" label="Canton" value={form.mandanteCanton} onChange={e => handleChange('mandanteCanton', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 4 }}>
+                <TextField fullWidth size="small" label="Parroquia" value={form.mandanteParroquia} onChange={e => handleChange('mandanteParroquia', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 3 }}>
+                <TextField fullWidth size="small" label="Sector" value={form.mandanteSector} onChange={e => handleChange('mandanteSector', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 3 }}>
+                <TextField fullWidth size="small" label="Referencia" value={form.mandanteReferencia} onChange={e => handleChange('mandanteReferencia', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 3 }}>
+                <TextField fullWidth size="small" label="Celular" value={form.mandanteCelular} onChange={e => handleChange('mandanteCelular', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 3 }}>
+                <TextField fullWidth size="small" label="Correo" value={form.mandanteCorreo} onChange={e => handleChange('mandanteCorreo', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth size="small" label="Actividad ocupacional" value={form.mandanteActividadOcupacional} onChange={e => handleChange('mandanteActividadOcupacional', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth size="small" label="Ingreso mensual (USD)" value={form.mandanteIngresoMensual} onChange={e => handleChange('mandanteIngresoMensual', e.target.value)} />
+              </Grid>
+            </Grid>
+          </>
+        )}
       </DialogContent>
 
       <DialogActions sx={{ px: 3, py: 2 }}>

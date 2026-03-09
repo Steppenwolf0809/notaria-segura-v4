@@ -380,6 +380,8 @@ model FormularioUAFERespuesta {
   callePrincipal             String
   numeroDomicilio            String?
   calleSecundaria            String?
+  sector                     String?
+  referencia                 String?
   situacionLaboral           String
   relacionDependencia        Boolean?
   nombreEntidad              String?
@@ -427,10 +429,36 @@ model FormularioUAFERespuesta {
   beneficiarioTelefono       String?
   beneficiarioCelular        String?
   esPEP                      Boolean                   @default(false)
+  pepInstitucion             String?
+  pepCargo                   String?
+  pepDireccionLaboral        String?
+  pepFechaDesde              DateTime?
+  pepFechaHasta              DateTime?
   esFamiliarPEP              Boolean                   @default(false)
-  relacionPEP                String?
+  pepFamiliarNombre          String?
+  pepFamiliarParentesco      String?
+  pepFamiliarCargo           String?
+  pepFamiliarInstitucion     String?
   esColaboradorPEP           Boolean                   @default(false)
-  tipoColaborador            String?
+  pepColaboradorNombre       String?
+  pepColaboradorTipoRelacion String?
+  // Mandante / Beneficiario final (cuando actuaPor != PROPIOS_DERECHOS)
+  mandanteApellidos              String?
+  mandanteNombres                String?
+  mandanteTipoIdentificacion     String?
+  mandanteNumeroIdentificacion   String?
+  mandanteNacionalidad           String?
+  mandanteGenero                 String?
+  mandanteDireccion              String?
+  mandanteProvincia              String?
+  mandanteCanton                 String?
+  mandanteParroquia              String?
+  mandanteSector                 String?
+  mandanteReferencia             String?
+  mandanteCelular                String?
+  mandanteCorreo                 String?
+  mandanteActividadOcupacional   String?
+  mandanteIngresoMensual         String?
   completadoEn               DateTime                  @default(now())
   ipAddress                  String?
   userAgent                  String?

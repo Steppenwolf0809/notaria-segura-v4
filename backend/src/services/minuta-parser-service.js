@@ -23,6 +23,34 @@ const EMAIL_RE = /[\w.-]+@[\w.-]+\.\w{2,}/gi;
 const TELEFONO_RE = /(?:\+\d{1,3}[\s.-]?)?\(?\d{2,4}\)?\d{6,8}/g;
 const TELEFONO_PAREN_RE = /\((\d{10})\)/g;
 
+// Prefijo de teléfono móvil Ecuador (09XX) — seguro que NO es cédula
+const TELEFONO_MOVIL_RE = /^09\d{8}$/;
+
+// Tipo de bien — detectar por palabras clave en antecedentes/objeto
+const TIPO_BIEN_PATTERNS = [
+  { re: /\bDEPARTAMENTO\b/i, codigo: 'DEP', descripcion: 'Departamento' },
+  { re: /\bCASA\b/i, codigo: 'CAS', descripcion: 'Casa' },
+  { re: /\bLOTE\s+(?:DE\s+)?TERRENO\b/i, codigo: 'TER', descripcion: 'Terreno' },
+  { re: /\bTERRENO\b/i, codigo: 'TER', descripcion: 'Terreno' },
+  { re: /\bEDIFICIO\b/i, codigo: 'EDI', descripcion: 'Edificio' },
+  { re: /\bOFICINA\b/i, codigo: 'OFI', descripcion: 'Oficina' },
+  { re: /\bVEH[IÍ]CULO\b/i, codigo: 'VEH', descripcion: 'Vehiculo' },
+  { re: /\bEMBARCACI[OÓ]N\b/i, codigo: 'EMB', descripcion: 'Embarcacion' },
+];
+
+// Forma de pago — detectar tipo por palabras clave
+const FORMA_PAGO_PATTERNS = [
+  { re: /\btransferencia\s+bancaria\b/i, tipo: 'TRANSFERENCIA' },
+  { re: /\btransferencia\b/i, tipo: 'TRANSFERENCIA' },
+  { re: /\bcheque\s+certificado\b/i, tipo: 'CHEQUE' },
+  { re: /\bcheque\b/i, tipo: 'CHEQUE' },
+  { re: /\bdep[oó]sito\b/i, tipo: 'DEPOSITO' },
+  { re: /\bcr[eé]dito\s+hipotecario\b/i, tipo: 'CREDITO_HIPOTECARIO' },
+  { re: /\bhipoteca(?:rio)?\b/i, tipo: 'CREDITO_HIPOTECARIO' },
+  { re: /\banticipo\b/i, tipo: 'EFECTIVO' },
+  { re: /\befectivo\b/i, tipo: 'EFECTIVO' },
+];
+
 /**
  * Parsea un string de monto detectando formato latam (56.500,00) vs US (56,500.00).
  * Regla: si el ultimo separador es coma → formato latam (coma=decimal, punto=miles).
@@ -101,6 +129,124 @@ function getComparecientesText(sections, fullText) {
 }
 
 /**
+ * Identifica las secciones de antecedentes y objeto (SEGUNDA + TERCERA).
+ * Aquí se describe el bien inmueble: tipo, ubicación, linderos, superficie.
+ */
+function getAntecedentesObjetoText(sections, fullText) {
+  const parts = [];
+
+  if (sections.SEGUNDA) {
+    parts.push(sections.SEGUNDA);
+  }
+  if (sections.TERCERA) {
+    parts.push(sections.TERCERA);
+  }
+
+  if (parts.length > 0) return parts.join('\n');
+
+  // Fallback: buscar "ANTECEDENTES" en texto completo
+  const antIdx = fullText.toUpperCase().indexOf('ANTECEDENTES');
+  if (antIdx >= 0) {
+    return fullText.substring(antIdx, antIdx + 5000);
+  }
+
+  return '';
+}
+
+/**
+ * Extrae tipo de bien por regex desde texto de antecedentes/objeto.
+ */
+function detectTipoBien(antecedentesText) {
+  if (!antecedentesText) return null;
+  const upper = antecedentesText.toUpperCase();
+  for (const pat of TIPO_BIEN_PATTERNS) {
+    if (pat.re.test(upper)) {
+      return { codigo: pat.codigo, descripcion: pat.descripcion };
+    }
+  }
+  return null;
+}
+
+/**
+ * Extrae descripción del bien desde antecedentes/objeto.
+ * Busca el fragmento que describe el inmueble concreto.
+ */
+function detectDescripcionBien(antecedentesText) {
+  if (!antecedentesText) return null;
+
+  // Patrón: capturar desde tipo de bien concreto hasta próximo punto final o cláusula
+  const patterns = [
+    // "un LOTE de terreno signado con el número 5, que forma parte de..."
+    /(?:un\s+)?LOTE\s+(?:DE\s+)?TERRENO[^.]*?(?:Parroquia|Cant[oó]n|Provincia|ubicad)[^.]{0,200}/i,
+    // "DEPARTAMENTO 5F, NIVEL 14.41... QUE FORMA PARTE DEL EDIFICIO..."
+    /DEPARTAMENTO\s+\w+[^.]*?(?:EDIFICIO|CONJUNTO|PARROQUIA|QUE\s+FORMA\s+PARTE)[^.]{0,200}/i,
+    // "inmueble consistente en DEPARTAMENTO 5F..."
+    /inmueble\s+consistente\s+en\s+[^.]{10,300}/i,
+    // Fallback simple: tipo de bien + hasta 200 chars
+    /(?:un\s+)?(?:LOTE\s+(?:DE\s+)?TERRENO|DEPARTAMENTO|CASA|OFICINA)\s+[^.]{10,200}/i,
+  ];
+
+  for (const re of patterns) {
+    const match = antecedentesText.match(re);
+    if (match) {
+      return match[0].trim().substring(0, 300);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Extrae forma de pago por regex desde texto de precio.
+ * Busca bloques con monto USD y tipo de pago en contexto cercano.
+ */
+function detectFormaPago(precioText) {
+  if (!precioText) return [];
+  const pagos = [];
+
+  // Buscar cada monto USD con su contexto (200 chars alrededor)
+  const montoMatches = [...precioText.matchAll(MONTO_RE)];
+
+  for (const mm of montoMatches) {
+    const monto = parseMontoStr(mm[1]);
+    if (isNaN(monto) || monto <= 0) continue;
+
+    // Contexto: 200 chars antes y después del monto
+    const start = Math.max(0, mm.index - 200);
+    const end = Math.min(precioText.length, mm.index + mm[0].length + 200);
+    const contexto = precioText.substring(start, end);
+
+    // Detectar tipo de pago en el contexto cercano
+    let tipo = null;
+    for (const pat of FORMA_PAGO_PATTERNS) {
+      if (pat.re.test(contexto)) {
+        tipo = pat.tipo;
+        break;
+      }
+    }
+
+    // Solo registrar si encontramos un tipo de pago explícito
+    if (tipo) {
+      const bancoMatch = contexto.match(/(?:Banco|BANCO)\s+[\w]+(?:\s+(?:de[l]?\s+)?[\w]+)*/i);
+      pagos.push({
+        tipo,
+        monto,
+        detalle: bancoMatch ? bancoMatch[0].trim() : null,
+      });
+    }
+  }
+
+  // Deduplicar: mismo tipo + mismo monto = mismo pago mencionado varias veces
+  const seen = new Set();
+  return pagos.filter(p => {
+    const key = `${p.tipo}-${p.monto}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+/**
  * Identifica la sección de precio/cuantía.
  */
 function getPrecioText(sections, fullText) {
@@ -130,8 +276,9 @@ function extractWithRegex(text) {
   const sections = extractSections(text);
   const comparecientesText = getComparecientesText(sections, text);
   const precioText = getPrecioText(sections, text);
+  const antecedentesObjetoText = getAntecedentesObjetoText(sections, text);
 
-  // Cédulas
+  // Cédulas (filtrar teléfonos móviles y números no válidos)
   const cedulas = new Set();
   const allCedulaMatches = [
     ...text.matchAll(CEDULA_PAREN_RE),
@@ -139,9 +286,20 @@ function extractWithRegex(text) {
   ];
   for (const m of allCedulaMatches) {
     const clean = m[1].replace(/-/g, '');
-    if (clean.length === 10 && /^\d+$/.test(clean)) {
-      cedulas.add(clean);
+    if (clean.length !== 10 || !/^\d+$/.test(clean)) continue;
+    // Filtrar teléfonos móviles (09XX — estos NUNCA son cédulas)
+    if (TELEFONO_MOVIL_RE.test(clean)) continue;
+    // Cédula ecuatoriana: primeros 2 dígitos = provincia (01-24) o 30 (extranjeros)
+    const prov = parseInt(clean.substring(0, 2), 10);
+    if (prov < 1 || (prov > 24 && prov !== 30)) continue;
+    // Filtrar por contexto: cuentas bancarias, repertorios, teléfonos
+    const idx = text.indexOf(m[0]);
+    if (idx >= 0) {
+      const before = text.substring(Math.max(0, idx - 80), idx).toLowerCase();
+      if (/(?:cuenta|repertorio|inscri(?:ta|to)|nro\.|número de cuenta)/i.test(before)) continue;
+      if (/(?:tel[eé]fono|celular|tel\.)\s*$/i.test(before.trim())) continue;
     }
+    cedulas.add(clean);
   }
 
   // RUCs
@@ -214,6 +372,32 @@ function extractWithRegex(text) {
     tipoActoDetectado = { codigo: '92', descripcion: 'HIPOTECA ABIERTA' };
   }
 
+  // Advertencias de parseo (feedback para el matrizador)
+  const advertencias = [];
+
+  // Detectar posibles cédulas malformadas (8-9 dígitos con guión)
+  const cedulasMalformadas = [...text.matchAll(/c[eé]dula[^.]{0,30}?(\d{7,9}[-]\d{1,2})/gi)];
+  for (const m of cedulasMalformadas) {
+    const raw = m[1];
+    const clean = raw.replace(/-/g, '');
+    if (clean.length !== 10) {
+      advertencias.push({
+        campo: 'cedula',
+        mensaje: `Posible cédula malformada: "${raw}" (${clean.length} dígitos, se esperan 10). Verifique el documento original.`,
+        valor: raw,
+      });
+    }
+  }
+
+  // Advertir si se detectaron muy pocas cédulas vs comparecientes esperados
+  if (cedulas.size === 0 && comparecientesText.length > 100) {
+    advertencias.push({
+      campo: 'cedula',
+      mensaje: 'No se detectaron cédulas en el documento. Verifique que la minuta contenga números de cédula.',
+      valor: null,
+    });
+  }
+
   // Cuantía principal (monto más grande generalmente es el precio)
   const cuantia = montos.length > 0 ? Math.max(...montos) : null;
 
@@ -224,6 +408,15 @@ function extractWithRegex(text) {
     avaluo = parseMontoStr(avaluoMatch[1]);
   }
 
+  // Tipo de bien (regex desde antecedentes/objeto)
+  const tipoBienDetectado = detectTipoBien(antecedentesObjetoText);
+
+  // Descripción del bien (regex desde antecedentes/objeto)
+  const descripcionBienDetectada = detectDescripcionBien(antecedentesObjetoText);
+
+  // Forma de pago (regex desde sección precio)
+  const formaPagoDetectada = detectFormaPago(precioText);
+
   return {
     cedulas: [...cedulas],
     rucs: [...rucs],
@@ -233,9 +426,14 @@ function extractWithRegex(text) {
     emails,
     telefonos: [...telefonos],
     tipoActoDetectado,
+    tipoBienDetectado,
+    descripcionBienDetectada,
+    formaPagoDetectada,
+    advertencias,
     sections,
     comparecientesText,
     precioText,
+    antecedentesObjetoText,
   };
 }
 
@@ -248,6 +446,8 @@ INSTRUCCIONES:
 - Identifica claramente quién es vendedor/comprador (o prominente vendedor/comprador en promesas)
 - Las cédulas pueden aparecer como números o escritas en letras
 - Los montos pueden estar en letras o números
+- tipoBien y descripcionBien se encuentran en la SECCION ANTECEDENTES Y OBJETO, NO en comparecientes
+- formaPago: identifica CADA pago individual (anticipo, cheque, transferencia, crédito, saldo, etc.) con su monto y tipo
 - Si un dato no aparece, usa null
 - Responde SOLO con JSON válido, sin texto adicional
 
@@ -303,9 +503,9 @@ FRAGMENTO DE MINUTA:
 
 /**
  * Extrae datos semánticos con Gemini.
- * Solo envía las secciones relevantes (comparecientes + precio).
+ * Envía comparecientes + antecedentes/objeto + precio.
  */
-async function extractWithGemini(comparecientesText, precioText) {
+async function extractWithGemini(comparecientesText, precioText, antecedentesObjetoText) {
   const apiKey = process.env.GOOGLE_API_KEY;
   if (!apiKey) {
     console.log('⚠️  GOOGLE_API_KEY no configurada, omitiendo extracción Gemini');
@@ -316,13 +516,15 @@ async function extractWithGemini(comparecientesText, precioText) {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-    // Limitar texto para mantener tokens bajos
     const inputText = [
       'SECCION COMPARECIENTES:',
       comparecientesText.substring(0, 4000),
       '',
+      'SECCION ANTECEDENTES Y OBJETO (aquí se describe el bien inmueble):',
+      (antecedentesObjetoText || '').substring(0, 4000),
+      '',
       'SECCION PRECIO Y FORMA DE PAGO:',
-      precioText.substring(0, 2000),
+      precioText.substring(0, 4000),
     ].join('\n');
 
     const prompt = MINUTA_PROMPT + inputText;
@@ -386,7 +588,8 @@ export async function parseMinuta(docxBuffer, { useGemini = true } = {}) {
   if (useGemini && process.env.GOOGLE_API_KEY) {
     geminiData = await extractWithGemini(
       regexData.comparecientesText,
-      regexData.precioText
+      regexData.precioText,
+      regexData.antecedentesObjetoText
     );
   }
 
@@ -395,6 +598,7 @@ export async function parseMinuta(docxBuffer, { useGemini = true } = {}) {
 
   return {
     ...combined,
+    advertencias: regexData.advertencias || [],
     textoCompleto: fullText,
     regexRaw: regexData,
     geminiRaw: geminiData,
@@ -428,9 +632,9 @@ function mergeResults(regexData, geminiData) {
       })),
       cuantia: regexData.cuantia,
       avaluoMunicipal: regexData.avaluo,
-      tipoBien: null,
-      descripcionBien: null,
-      formaPago: [],
+      tipoBien: regexData.tipoBienDetectado?.codigo || null,
+      descripcionBien: regexData.descripcionBienDetectada || null,
+      formaPago: regexData.formaPagoDetectada || [],
       emails: regexData.emails,
       telefonos: regexData.telefonos,
     };
@@ -443,9 +647,11 @@ function mergeResults(regexData, geminiData) {
     comparecientes: geminiData.comparecientes || [],
     cuantia: geminiData.cuantia || regexData.cuantia,
     avaluoMunicipal: geminiData.avaluoMunicipal || regexData.avaluo,
-    tipoBien: geminiData.tipoBien || null,
-    descripcionBien: geminiData.descripcionBien || null,
-    formaPago: geminiData.formaPago || [],
+    tipoBien: geminiData.tipoBien || regexData.tipoBienDetectado?.codigo || null,
+    descripcionBien: geminiData.descripcionBien || regexData.descripcionBienDetectada || null,
+    formaPago: (geminiData.formaPago && geminiData.formaPago.length > 0)
+      ? geminiData.formaPago
+      : (regexData.formaPagoDetectada || []),
     emails: regexData.emails,
     telefonos: regexData.telefonos,
   };

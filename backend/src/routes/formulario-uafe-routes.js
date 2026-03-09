@@ -514,6 +514,7 @@ router.post(
             descripcionBien: datosExtraidos.descripcionBien,
             formaPago: datosExtraidos.formaPago,
           },
+          advertencias: datosExtraidos.advertencias || [],
           fuente: datosExtraidos.fuente,
         },
       });
@@ -698,6 +699,7 @@ router.post(
             descripcionBien: datosExtraidos.descripcionBien,
             formaPago: datosExtraidos.formaPago,
           },
+          advertencias: datosExtraidos.advertencias || [],
           fuente: datosExtraidos.fuente,
         },
       });
