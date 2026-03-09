@@ -257,6 +257,7 @@ function buildDatosActoNotarial(protocolo, calidad) {
 
 function buildDatosPersonales(datos) {
   const dp = datos?.datosPersonales || {};
+  const lab = datos?.informacionLaboral || {};
   return [
     sectionTitle('2. DATOS PERSONALES'),
     twoColumnTable([
@@ -267,25 +268,30 @@ function buildDatosPersonales(datos) {
       ['Fecha de Nacimiento', formatDate(dp.fechaNacimiento)],
       ['Lugar de Nacimiento', safeStr(dp.lugarNacimiento)],
       ['Nacionalidad', safeStr(dp.nacionalidad)],
+      ['Nivel de Estudio', safeStr(dp.nivelEstudio)],
       ['Género', safeStr(dp.genero)],
       ['Estado Civil', safeStr(dp.estadoCivil)],
-      ['Profesión / Ocupación', safeStr(dp.profesion)],
+      ['Profesión / Ocupación', safeStr(lab.profesionOcupacion || dp.profesion)],
     ]),
   ];
 }
 
 function buildDomicilio(datos) {
-  const dom = datos?.domicilio || {};
+  const dir = datos?.direccion || {};
+  const ct = datos?.contacto || {};
+  // Build address string from components
+  const partesDireccion = [dir.callePrincipal, dir.numero, dir.calleSecundaria].filter(Boolean);
+  const direccionStr = partesDireccion.join(' ') || dir.direccion;
   return [
     sectionTitle('3. DOMICILIO'),
     twoColumnTable([
-      ['Dirección', safeStr(dom.direccion)],
-      ['Ciudad', safeStr(dom.ciudad)],
-      ['Provincia', safeStr(dom.provincia)],
-      ['País', safeStr(dom.pais)],
-      ['Teléfono', safeStr(dom.telefono)],
-      ['Celular', safeStr(dom.celular)],
-      ['Correo Electrónico', safeStr(dom.email)],
+      ['Dirección', safeStr(direccionStr)],
+      ['Parroquia', safeStr(dir.parroquia)],
+      ['Cantón / Ciudad', safeStr(dir.canton || dir.ciudad)],
+      ['Provincia', safeStr(dir.provincia)],
+      ['País', safeStr(dir.pais)],
+      ['Celular', safeStr(ct.celular || dir.celular)],
+      ['Correo Electrónico', safeStr(ct.correoElectronico || ct.email || dir.email)],
     ]),
   ];
 }
@@ -295,8 +301,9 @@ function buildInformacionLaboral(datos) {
   return [
     sectionTitle('4. INFORMACIÓN LABORAL'),
     twoColumnTable([
-      ['Situación Laboral', safeStr(lab.situacionLaboral)],
-      ['Nombre de la Empresa', safeStr(lab.nombreEmpresa)],
+      ['Situación Laboral', safeStr(lab.situacion || lab.situacionLaboral)],
+      ['Profesión / Ocupación', safeStr(lab.profesionOcupacion)],
+      ['Nombre de la Empresa / Entidad', safeStr(lab.entidad || lab.nombreEmpresa)],
       ['Cargo', safeStr(lab.cargo)],
       ['Dirección de la Empresa', safeStr(lab.direccionEmpresa)],
       ['Teléfono de la Empresa', safeStr(lab.telefonoEmpresa)],
@@ -309,23 +316,26 @@ function buildDatosConyuge(datos) {
   const ec = datos?.datosPersonales?.estadoCivil;
   if (ec !== 'CASADO' && ec !== 'UNION_LIBRE') return [];
 
-  const con = datos?.datosConyuge || {};
+  const con = datos?.conyuge || datos?.datosConyuge || {};
   return [
     sectionTitle('5. DATOS DEL CÓNYUGE'),
     twoColumnTable([
-      ['Nombres', safeStr(con.nombres)],
       ['Apellidos', safeStr(con.apellidos)],
+      ['Nombres', safeStr(con.nombres)],
       ['Tipo de Identificación', safeStr(con.tipoIdentificacion)],
       ['No. Identificación', safeStr(con.numeroIdentificacion)],
       ['Nacionalidad', safeStr(con.nacionalidad)],
+      ['Correo Electrónico', safeStr(con.correoElectronico)],
+      ['Celular', safeStr(con.celular)],
     ]),
   ];
 }
 
 function buildDeclaracionPEP(datos) {
-  const pep = datos?.pep || {};
+  const pep = datos?.declaracionPEP || datos?.pep || {};
   const esPEP = pep.esPEP === true || pep.esPEP === 'SI';
-  const vinculoPEP = pep.vinculoPEP === true || pep.vinculoPEP === 'SI';
+  const esFamiliarPEP = pep.esFamiliarPEP === true || pep.vinculoPEP === true || pep.vinculoPEP === 'SI';
+  const esColaboradorPEP = pep.esColaboradorPEP === true;
 
   const rows = [
     ['¿Es Persona Expuesta Políticamente (PEP)?', esPEP ? 'SÍ' : 'NO'],
@@ -340,15 +350,17 @@ function buildDeclaracionPEP(datos) {
     );
   }
 
-  rows.push(['¿Tiene vínculo con un PEP?', vinculoPEP ? 'SÍ' : 'NO']);
+  rows.push(['¿Es familiar de un PEP? (1er y 2do grado)', esFamiliarPEP ? 'SÍ' : 'NO']);
 
-  if (vinculoPEP) {
+  if (esFamiliarPEP) {
     rows.push(
       ['Nombre del PEP', safeStr(pep.nombrePEP)],
       ['Parentesco con el PEP', safeStr(pep.parentescoPEP)],
       ['Cargo del PEP', safeStr(pep.cargoPEP)],
     );
   }
+
+  rows.push(['¿Es colaborador cercano de un PEP?', esColaboradorPEP ? 'SÍ' : 'NO']);
 
   // Dynamic section number based on whether cónyuge was included
   const ec = datos?.datosPersonales?.estadoCivil;
@@ -521,25 +533,27 @@ function buildSocios(datos) {
 }
 
 function buildDomicilioJuridica(datos) {
+  const comp = datos?.compania || {};
   const dom = datos?.domicilio || {};
   return [
     sectionTitle('5. DOMICILIO'),
     twoColumnTable([
-      ['Dirección', safeStr(dom.direccion)],
-      ['Ciudad', safeStr(dom.ciudad)],
-      ['Provincia', safeStr(dom.provincia)],
-      ['País', safeStr(dom.pais)],
-      ['Teléfono', safeStr(dom.telefono)],
-      ['Celular', safeStr(dom.celular)],
-      ['Correo Electrónico', safeStr(dom.email)],
+      ['Dirección', safeStr(comp.direccion || dom.direccion)],
+      ['Parroquia', safeStr(comp.parroquia || dom.parroquia)],
+      ['Cantón / Ciudad', safeStr(dom.canton || dom.ciudad || 'Quito')],
+      ['Provincia', safeStr(dom.provincia || 'Pichincha')],
+      ['País', safeStr(dom.pais || 'Ecuador')],
+      ['Teléfono', safeStr(comp.telefonoCompania || dom.telefono)],
+      ['Celular', safeStr(comp.celularCompania || dom.celular)],
+      ['Correo Electrónico', safeStr(comp.emailCompania || dom.email)],
     ]),
   ];
 }
 
 function buildPEPJuridica(datos) {
-  const pep = datos?.pep || {};
+  const pep = datos?.declaracionPEP || datos?.pep || {};
   const esPEP = pep.esPEP === true || pep.esPEP === 'SI';
-  const vinculoPEP = pep.vinculoPEP === true || pep.vinculoPEP === 'SI';
+  const esFamiliarPEP = pep.esFamiliarPEP === true || pep.vinculoPEP === true || pep.vinculoPEP === 'SI';
 
   const rows = [
     ['¿Es Persona Expuesta Políticamente (PEP)?', esPEP ? 'SÍ' : 'NO'],
@@ -554,9 +568,9 @@ function buildPEPJuridica(datos) {
     );
   }
 
-  rows.push(['¿Tiene vínculo con un PEP?', vinculoPEP ? 'SÍ' : 'NO']);
+  rows.push(['¿Es familiar de un PEP?', esFamiliarPEP ? 'SÍ' : 'NO']);
 
-  if (vinculoPEP) {
+  if (esFamiliarPEP) {
     rows.push(
       ['Nombre del PEP', safeStr(pep.nombrePEP)],
       ['Parentesco con el PEP', safeStr(pep.parentescoPEP)],
@@ -745,7 +759,7 @@ export async function generarFormularioWord(protocolo, personaProtocolo) {
 
   const buffer = await Packer.toBuffer(doc);
 
-  // Build filename
+  // Build filename with person name and date
   const dp = datos?.datosPersonales || datos?.representanteLegal || {};
   const nombreCorto = [dp.apellidos, dp.nombres]
     .filter(Boolean)
@@ -755,7 +769,12 @@ export async function generarFormularioWord(protocolo, personaProtocolo) {
     .substring(0, 40) || 'formulario';
 
   const tipoLabel = tipo === 'JURIDICA' ? 'PJ' : 'PN';
-  const filename = `FormularioUAFE_${tipoLabel}_${nombreCorto}_${protocolo.id}.docx`;
+  // Include date in filename for easier identification
+  const fechaStr = protocolo.fecha
+    ? new Date(protocolo.fecha).toISOString().slice(0, 10).replace(/-/g, '')
+    : new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const numProt = protocolo.numeroProtocolo || protocolo.id;
+  const filename = `FormularioUAFE_${tipoLabel}_${nombreCorto}_Prot${numProt}_${fechaStr}.docx`;
 
   logger.info(`[formulario-uafe-word] Generado: ${filename} (${buffer.length} bytes)`);
 

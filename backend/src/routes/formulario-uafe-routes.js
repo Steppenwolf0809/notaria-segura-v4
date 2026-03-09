@@ -237,15 +237,25 @@ router.get(
         return res.status(403).json({ success: false, message: 'Sin permisos' });
       }
 
-      // Filtrar personas con datos
-      let personasTarget = protocolo.personas.filter(pp => {
-        const p = pp.persona;
-        return (p.tipoPersona === 'NATURAL' && p.datosPersonaNatural) ||
-               (p.tipoPersona === 'JURIDICA' && p.datosPersonaJuridica);
-      });
+      // Filtrar personas con datos y mapear a la estructura que espera el servicio Word
+      let personasTarget = protocolo.personas
+        .filter(pp => {
+          const p = pp.persona;
+          return (p.tipoPersona === 'NATURAL' && p.datosPersonaNatural) ||
+                 (p.tipoPersona === 'JURIDICA' && p.datosPersonaJuridica);
+        })
+        .map(pp => ({
+          tipo: pp.persona.tipoPersona,
+          calidad: pp.calidad,
+          datos: pp.persona.tipoPersona === 'NATURAL'
+            ? pp.persona.datosPersonaNatural
+            : pp.persona.datosPersonaJuridica,
+          _personaProtocoloId: pp.id,
+          _personaId: pp.persona.id,
+        }));
 
       if (personaId) {
-        personasTarget = personasTarget.filter(pp => pp.id === personaId || pp.persona.id === personaId);
+        personasTarget = personasTarget.filter(pp => pp._personaProtocoloId === personaId || pp._personaId === personaId);
       }
 
       if (personasTarget.length === 0) {
