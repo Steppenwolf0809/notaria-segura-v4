@@ -260,6 +260,24 @@ router.get(
               datos.datosPersonales.tipoIdentificacion =
                 (pp.persona.numeroIdentificacion || '').length === 13 ? 'RUC' : 'CEDULA';
             }
+            // Inyectar datos de mandante cuando actúa como apoderado
+            if (pp.actuaPor && pp.actuaPor !== 'PROPIOS_DERECHOS' && !datos.mandante) {
+              // Fuente 1: respuestaFormulario del protocolo
+              const rfMandante = pp.respuestaFormulario?.mandante;
+              // Fuente 2: campos directos de PersonaProtocolo
+              if (rfMandante && rfMandante.nombres) {
+                datos.mandante = rfMandante;
+              } else if (pp.mandanteNombre || pp.mandanteCedula) {
+                // Construir mandante mínimo desde campos de PersonaProtocolo
+                const partes = (pp.mandanteNombre || '').split(' ');
+                datos.mandante = {
+                  apellidos: partes.length > 1 ? partes.slice(-2).join(' ') : partes[0] || '',
+                  nombres: partes.length > 2 ? partes.slice(0, -2).join(' ') : partes[0] || '',
+                  numeroIdentificacion: pp.mandanteCedula || '',
+                  tipoIdentificacion: (pp.mandanteCedula || '').length === 13 ? 'RUC' : 'CEDULA',
+                };
+              }
+            }
           }
           return {
             tipo: pp.persona.tipoPersona,
@@ -362,6 +380,48 @@ router.put(
   requireRoles(['MATRIZADOR', 'ADMIN', 'OFICIAL_CUMPLIMIENTO']),
   csrfProtection,
   actualizarDatosPersona
+);
+
+/**
+ * Actualizar campos de PersonaProtocolo (actuaPor, calidad, etc.)
+ * PATCH /api/formulario-uafe/persona-protocolo/:personaProtocoloId
+ */
+router.patch(
+  '/persona-protocolo/:personaProtocoloId',
+  authenticateToken,
+  requireRoles(['MATRIZADOR', 'ADMIN']),
+  csrfProtection,
+  async (req, res) => {
+    try {
+      const { personaProtocoloId } = req.params;
+      const { actuaPor, calidad } = req.body;
+      const { db: prisma } = await import('../db.js');
+
+      const pp = await prisma.personaProtocolo.findUnique({
+        where: { id: personaProtocoloId },
+      });
+      if (!pp) {
+        return res.status(404).json({ success: false, message: 'PersonaProtocolo no encontrada' });
+      }
+
+      const updateData = {};
+      if (actuaPor) {
+        updateData.actuaPor = actuaPor;
+        updateData.esApoderado = actuaPor !== 'PROPIOS_DERECHOS';
+      }
+      if (calidad) updateData.calidad = calidad;
+
+      const updated = await prisma.personaProtocolo.update({
+        where: { id: personaProtocoloId },
+        data: updateData,
+      });
+
+      res.json({ success: true, data: updated });
+    } catch (error) {
+      console.error('Error actualizando PersonaProtocolo:', error);
+      res.status(500).json({ success: false, message: 'Error al actualizar' });
+    }
+  }
 );
 
 /**

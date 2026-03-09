@@ -554,7 +554,9 @@ function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm, on
                     {nombre}
                   </Typography>
                   <Typography variant="caption" sx={{ color: UAFE_COLORS.textMuted }}>
-                    {cedula} &middot; {p.calidad || 'Sin calidad'} &middot; {p.porcentajeCompletitud ?? 0}% completo
+                    {cedula} &middot; {p.calidad || 'Sin calidad'}
+                    {p.actuaPor && p.actuaPor !== 'PROPIOS_DERECHOS' && ` &middot; ${p.actuaPor.replace(/_/g, ' ')}`}
+                    {' '}&middot; {p.porcentajeCompletitud ?? 0}% completo
                   </Typography>
                 </Box>
 

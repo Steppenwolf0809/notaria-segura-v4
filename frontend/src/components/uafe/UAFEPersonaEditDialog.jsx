@@ -98,6 +98,7 @@ export default function UAFEPersonaEditDialog({
       const pep = datos.declaracionPEP || {};
 
       setForm({
+        actuaPor: persona.actuaPor || 'PROPIOS_DERECHOS',
         apellidos: dp.apellidos || '',
         nombres: dp.nombres || '',
         genero: dp.genero || '',
@@ -235,6 +236,15 @@ export default function UAFEPersonaEditDialog({
       };
 
       await apiClient.put(`/formulario-uafe/persona/${cedula}`, payload);
+
+      // Actualizar actuaPor en PersonaProtocolo si cambió
+      const ppId = persona.id || persona._personaProtocoloId;
+      if (ppId && form.actuaPor !== persona.actuaPor) {
+        await apiClient.patch(`/formulario-uafe/persona-protocolo/${ppId}`, {
+          actuaPor: form.actuaPor,
+        });
+      }
+
       onSaved?.();
       onClose();
     } catch (err) {
@@ -250,7 +260,8 @@ export default function UAFEPersonaEditDialog({
   const nombre = persona.nombre || `${form.apellidos} ${form.nombres}`.trim() || 'Sin nombre';
   const cedula = persona.personaCedula || persona.cedula || '-';
   const esCasado = form.estadoCivil === 'CASADO' || form.estadoCivil === 'UNION_LIBRE';
-  const isApoderado = persona.actuaPor && persona.actuaPor !== 'PROPIOS_DERECHOS';
+  const actuaPorActual = form.actuaPor || persona.actuaPor || 'PROPIOS_DERECHOS';
+  const isApoderado = actuaPorActual && actuaPorActual !== 'PROPIOS_DERECHOS';
 
   return (
     <Dialog
@@ -291,6 +302,25 @@ export default function UAFEPersonaEditDialog({
           Esta edicion se registra en auditoria como origen MATRIZADOR.
           Use esta opcion si el compareciente no puede llenar el formulario en linea.
         </Alert>
+
+        {/* Tipo de representación */}
+        <Grid container spacing={2} sx={{ mb: 3 }}>
+          <Grid size={{ xs: 12, sm: 6 }}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Actua por</InputLabel>
+              <Select
+                value={form.actuaPor || 'PROPIOS_DERECHOS'}
+                label="Actua por"
+                onChange={(e) => handleChange('actuaPor', e.target.value)}
+              >
+                <MenuItem value="PROPIOS_DERECHOS">Propios derechos</MenuItem>
+                <MenuItem value="APODERADO_GENERAL">Apoderado general</MenuItem>
+                <MenuItem value="APODERADO_ESPECIAL">Apoderado especial</MenuItem>
+                <MenuItem value="REPRESENTANTE_LEGAL">Representante legal</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+        </Grid>
 
         {/* Datos Personales */}
         <SectionTitle title="Datos Personales" subtitle="Obligatorio UAFE" badge="UAFE" />
