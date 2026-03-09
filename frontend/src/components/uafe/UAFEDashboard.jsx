@@ -180,14 +180,23 @@ export default function UAFEDashboard() {
   const handleSave = async (updatedFields) => {
     if (!selectedProtocol) return;
     try {
-      await apiClient.put(
+      console.log('[UAFE] Guardando campos:', Object.keys(updatedFields), updatedFields);
+      const { data } = await apiClient.put(
         `/formulario-uafe/protocolo/${selectedProtocol.id}`,
         updatedFields
       );
+      console.log('[UAFE] Respuesta guardado:', data);
+      setSnackbar({ open: true, message: 'Protocolo guardado', severity: 'success' });
       await fetchProtocols();
       await refreshSelectedProtocol();
     } catch (err) {
-      console.error('Error saving protocol:', err);
+      console.error('[UAFE] Error guardando protocolo:', err.response?.status, err.response?.data);
+      setSnackbar({
+        open: true,
+        message: err.response?.data?.message || 'Error al guardar protocolo',
+        severity: 'error'
+      });
+      throw err; // Re-throw para que el detail no limpie editedFields
     }
   };
 

@@ -811,9 +811,13 @@ export default function UAFEProtocolDetail({
                 size="small"
                 variant="contained"
                 startIcon={<SaveOutlinedIcon sx={{ fontSize: 16 }} />}
-                onClick={() => {
-                  onSave?.(editedFields);
-                  setEditedFields({});
+                onClick={async () => {
+                  try {
+                    await onSave?.(editedFields);
+                    setEditedFields({});
+                  } catch {
+                    // Error se maneja en el Dashboard (snackbar)
+                  }
                 }}
                 sx={{
                   textTransform: 'none',
