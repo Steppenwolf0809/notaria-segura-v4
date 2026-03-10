@@ -514,10 +514,66 @@ export async function calcularYActualizarCompletitud(personaProtocoloId) {
     }
 }
 
+/**
+ * Calcula automáticamente el estado de un protocolo UAFE basado en sus datos.
+ * REPORTADO es irreversible (solo lo pone reporte-uafe-generator-service).
+ *
+ * BORRADOR           → Falta tipoActo, valorContrato, o 0 comparecientes
+ * EN_PROCESO         → Tiene datos base pero comparecientes incompletos
+ * PENDIENTE_PROTOCOLO → Comparecientes completos pero falta No. protocolo
+ * COMPLETO           → Todo listo para reporte
+ *
+ * @param {string} protocoloId
+ * @returns {Promise<string>} nuevo estado
+ */
+export async function calcularEstadoProtocolo(protocoloId) {
+    const protocolo = await prisma.protocoloUAFE.findUnique({
+        where: { id: protocoloId },
+        include: {
+            personas: { select: { estadoCompletitud: true } }
+        }
+    });
+
+    if (!protocolo) throw new Error('Protocolo no encontrado');
+
+    // REPORTADO es irreversible
+    if (protocolo.estado === 'REPORTADO') return 'REPORTADO';
+
+    const personas = protocolo.personas || [];
+    const hasTipoActo = !!protocolo.tipoActo;
+    const hasCuantia = protocolo.valorContrato != null;
+    const hasPersonas = personas.length > 0;
+    const hasProtocolNumber = !!protocolo.numeroProtocolo;
+    const allComplete = hasPersonas && personas.every(p => p.estadoCompletitud === 'completo');
+
+    let nuevoEstado;
+
+    if (!hasTipoActo || !hasCuantia || !hasPersonas) {
+        nuevoEstado = 'BORRADOR';
+    } else if (!allComplete) {
+        nuevoEstado = 'EN_PROCESO';
+    } else if (!hasProtocolNumber) {
+        nuevoEstado = 'PENDIENTE_PROTOCOLO';
+    } else {
+        nuevoEstado = 'COMPLETO';
+    }
+
+    // Solo actualizar si cambió
+    if (nuevoEstado !== protocolo.estado) {
+        await prisma.protocoloUAFE.update({
+            where: { id: protocoloId },
+            data: { estado: nuevoEstado }
+        });
+    }
+
+    return nuevoEstado;
+}
+
 export default {
     calcularCompletitudPersonaNatural,
     calcularCompletitudPersonaJuridica,
     sincronizarCompletitudProtocolo,
     obtenerEstadoGeneralProtocolo,
-    calcularYActualizarCompletitud
+    calcularYActualizarCompletitud,
+    calcularEstadoProtocolo
 };

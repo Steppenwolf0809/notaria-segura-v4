@@ -26,7 +26,7 @@ import {
 } from '../utils/pdf-uafe-helpers.js';
 import { generarEncabezado } from '../services/encabezado-generator-service.js';
 import { generarComparecencia } from '../services/comparecencia-generator-service.js';
-import { obtenerEstadoGeneralProtocolo, calcularYActualizarCompletitud } from '../services/completitud-service.js';
+import { obtenerEstadoGeneralProtocolo, calcularYActualizarCompletitud, calcularEstadoProtocolo } from '../services/completitud-service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -348,6 +348,9 @@ export async function agregarPersonaAProtocolo(req, res) {
         createdAt: personaProtocolo.createdAt
       }
     });
+
+    // Recalcular estado automático del protocolo
+    calcularEstadoProtocolo(protocoloId).catch(err => console.error('Error recalculando estado:', err));
   } catch (error) {
     console.error('Error agregando persona al protocolo:', error);
     res.status(500).json({
@@ -1178,13 +1181,12 @@ export async function actualizarProtocolo(req, res) {
       }
     }
 
-    // Actualizar protocolo
+    // Actualizar protocolo (estado se ignora del request, se calcula automáticamente)
     const protocoloActualizado = await prisma.protocoloUAFE.update({
       where: { id: protocoloId },
       data: {
         ...(numeroProtocolo && { numeroProtocolo }),
         ...(fecha && { fecha: new Date(fecha) }),
-        ...(estado && { estado }),
         ...((tipoActo || actoContrato) && { tipoActo: tipoActo || actoContrato }),
         ...(tipoActoOtro !== undefined && { tipoActoOtro: tipoActoOtro || null }),
         ...(tipoBien !== undefined && { tipoBien: tipoBien || null }),
@@ -1203,10 +1205,13 @@ export async function actualizarProtocolo(req, res) {
       }
     });
 
+    // Recalcular estado automáticamente
+    const nuevoEstado = await calcularEstadoProtocolo(protocoloId);
+
     res.json({
       success: true,
       message: 'Protocolo actualizado exitosamente',
-      data: protocoloActualizado
+      data: { ...protocoloActualizado, estado: nuevoEstado }
     });
   } catch (error) {
     console.error('Error actualizando protocolo:', error);
@@ -1421,6 +1426,9 @@ export async function eliminarPersonaDeProtocolo(req, res) {
     await prisma.personaProtocolo.delete({
       where: { id: personaIdFinal }
     });
+
+    // Recalcular estado automático del protocolo
+    await calcularEstadoProtocolo(protocoloId);
 
     res.json({
       success: true,

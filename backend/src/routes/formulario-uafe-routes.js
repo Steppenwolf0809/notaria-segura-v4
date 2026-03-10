@@ -8,6 +8,7 @@ import { parseMinuta } from '../services/minuta-parser-service.js';
 import { uploadFile, isStorageConfigured } from '../services/storage-service.js';
 import { generarFormularioWord } from '../services/formulario-uafe-word-service.js';
 import { getCurrentNotaryId } from '../middleware/tenant-context.js';
+import { calcularEstadoProtocolo } from '../services/completitud-service.js';
 import { uafeLoginRateLimit } from '../middleware/rate-limiter.js';
 import {
   crearProtocolo,
@@ -725,6 +726,9 @@ router.post(
           }
         }
       }
+
+      // Recalcular estado automático tras agregar comparecientes
+      await calcularEstadoProtocolo(protocoloId);
 
       res.json({
         success: true,
