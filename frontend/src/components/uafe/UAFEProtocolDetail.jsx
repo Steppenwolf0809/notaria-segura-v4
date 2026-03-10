@@ -568,13 +568,25 @@ function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm, on
                     {(p.camposFaltantes || []).length > 0 && p.estadoCompletitud !== 'completo' && (
                       <Tooltip
                         arrow
+                        slotProps={{
+                          tooltip: {
+                            sx: {
+                              maxWidth: 360,
+                              maxHeight: 400,
+                              overflowY: 'auto',
+                              backgroundColor: 'rgba(33, 33, 33, 0.95)',
+                              color: '#fff',
+                              p: 1.5,
+                            },
+                          },
+                        }}
                         title={
-                          <Box sx={{ maxWidth: 280 }}>
-                            <Typography variant="caption" sx={{ fontWeight: 700, display: 'block', mb: 0.5 }}>
-                              Campos pendientes:
+                          <Box>
+                            <Typography variant="caption" sx={{ fontWeight: 700, display: 'block', mb: 0.5, color: '#fff' }}>
+                              Campos pendientes ({(p.camposFaltantes || []).length}):
                             </Typography>
                             {(p.camposFaltantes || []).map((c, i) => (
-                              <Typography key={i} variant="caption" sx={{ display: 'block', fontSize: '0.68rem' }}>
+                              <Typography key={i} variant="caption" sx={{ display: 'block', fontSize: '0.68rem', color: 'rgba(255,255,255,0.9)' }}>
                                 • {c}
                               </Typography>
                             ))}
