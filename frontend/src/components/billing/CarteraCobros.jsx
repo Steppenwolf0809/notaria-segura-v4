@@ -498,6 +498,7 @@ const CarteraCobros = () => {
                                             {formatCurrency(client.totalDebt)}
                                         </Typography>
                                         <Button
+                                            component="span"
                                             variant="contained"
                                             color="success"
                                             size="small"
