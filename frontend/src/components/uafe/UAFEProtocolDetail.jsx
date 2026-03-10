@@ -37,6 +37,7 @@ import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 
 import SemaforoIndicator, { SemaforoPersona } from './SemaforoIndicator';
 import UAFEStatusPipeline from './UAFEStatusPipeline';
@@ -479,7 +480,7 @@ function DatosActoTab({ protocol, onFieldChange, readOnly }) {
   );
 }
 
-function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm, onGenerateWordPersona }) {
+function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm, onGenerateWordPersona, onDeletePerson }) {
   const personas = protocol.personas || [];
 
   return (
@@ -610,6 +611,19 @@ function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm, on
                       sx={{ color: UAFE_COLORS.textMuted, '&:hover': { color: UAFE_COLORS.primary } }}
                     >
                       <EditOutlinedIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </Tooltip>
+                  <Tooltip title="Eliminar este compareciente del protocolo" arrow>
+                    <IconButton
+                      size="small"
+                      onClick={() => {
+                        if (window.confirm(`¿Eliminar a ${nombre} de este protocolo?`)) {
+                          onDeletePerson?.(p);
+                        }
+                      }}
+                      sx={{ color: UAFE_COLORS.textMuted, '&:hover': { color: '#d32f2f' } }}
+                    >
+                      <DeleteOutlineIcon sx={{ fontSize: 16 }} />
                     </IconButton>
                   </Tooltip>
                 </Box>
@@ -862,6 +876,7 @@ export default function UAFEProtocolDetail({
   onSave,
   onAddPerson,
   onEditPerson,
+  onDeletePerson,
   onSendForm,
   onRefresh,
   onGenerateTexts,
@@ -1053,6 +1068,7 @@ export default function UAFEProtocolDetail({
                 protocol={protocol}
                 onAddPerson={onAddPerson}
                 onEditPerson={onEditPerson}
+                onDeletePerson={onDeletePerson}
                 onSendForm={onSendForm}
                 onGenerateWordPersona={onGenerateWordPersona}
               />

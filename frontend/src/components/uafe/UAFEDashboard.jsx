@@ -393,6 +393,15 @@ export default function UAFEDashboard() {
           onSave={handleSave}
           onAddPerson={handleAddPerson}
           onEditPerson={handleEditPerson}
+          onDeletePerson={async (persona) => {
+            try {
+              await apiClient.delete(`/formulario-uafe/protocolo/${selectedProtocol.id}/persona/${persona.id}`);
+              setSnackbar({ open: true, message: 'Compareciente eliminado', severity: 'success' });
+              refreshSelectedProtocol();
+            } catch (err) {
+              setSnackbar({ open: true, message: err.response?.data?.message || 'Error al eliminar compareciente', severity: 'error' });
+            }
+          }}
           onSendForm={handleSendForm}
           onRefresh={refreshSelectedProtocol}
           onGenerateTexts={async (protocoloId, forzar) => {

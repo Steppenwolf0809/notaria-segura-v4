@@ -843,10 +843,10 @@ export async function crearPinPropio(req, res) {
 
     // Validar formato del nuevo PIN
     const validacion = validarPIN(nuevoPin);
-    if (!validacion.valido) {
+    if (!validacion.valid) {
       return res.status(400).json({
         success: false,
-        message: validacion.mensaje || 'PIN no cumple requisitos de seguridad'
+        message: validacion.error || 'PIN no cumple requisitos de seguridad'
       });
     }
 
