@@ -119,6 +119,26 @@ export const UAFE_COLORS = {
   accent: '#ff6f00',
 };
 
+/** Theme-aware UAFE colors – use with useTheme() or pass isDark boolean */
+export function getUAFEColors(isDark) {
+  if (!isDark) return UAFE_COLORS;
+  return {
+    primary: '#5ba3d9',
+    primaryDark: '#3d8ac4',
+    primaryLight: 'rgba(30, 90, 142, 0.2)',
+    surface: '#242830',
+    surfaceElevated: '#2d333c',
+    textPrimary: '#f1f5f9',
+    textSecondary: '#94a3b8',
+    textMuted: '#64748b',
+    border: 'rgba(148, 163, 184, 0.15)',
+    borderLight: 'rgba(148, 163, 184, 0.08)',
+    divider: 'rgba(148, 163, 184, 0.1)',
+    headerBg: '#0f1923',
+    accent: '#ff9800',
+  };
+}
+
 // ── UAFE Catalog: Tipos de Acto ──────────────────────────────────
 export const TIPOS_ACTO_UAFE = [
   { codigo: '73', descripcion: 'COMPRAVENTA DE INMUEBLES' },

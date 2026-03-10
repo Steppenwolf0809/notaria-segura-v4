@@ -27,11 +27,13 @@ import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
 
 import SemaforoIndicator from './SemaforoIndicator';
 import {
-  UAFE_COLORS,
+  UAFE_COLORS as UAFE_COLORS_STATIC,
+  getUAFEColors,
   SEMAFORO,
   MESES,
   formatCurrency,
 } from './uafe-constants';
+import { useTheme } from '@mui/material/styles';
 
 /**
  * UAFEReportPanel - Monthly UAFE report generation dashboard
@@ -48,6 +50,9 @@ export default function UAFEReportPanel({
   loading = false,
   disabled = false,
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  const UAFE_COLORS = getUAFEColors(isDark);
   const now = new Date();
   const [mes, setMes] = useState(now.getMonth()); // 0-indexed
   const [anio, setAnio] = useState(now.getFullYear());
@@ -106,7 +111,7 @@ export default function UAFEReportPanel({
               value={mes}
               label="Mes"
               onChange={(e) => setMes(e.target.value)}
-              sx={{ fontSize: '0.82rem', backgroundColor: '#fff', borderRadius: '8px' }}
+              sx={{ fontSize: '0.82rem', backgroundColor: isDark ? 'transparent' : '#fff', borderRadius: '8px' }}
             >
               {MESES.map((m, idx) => (
                 <MenuItem key={idx} value={idx}>{m}</MenuItem>
@@ -119,7 +124,7 @@ export default function UAFEReportPanel({
               value={anio}
               label="Ano"
               onChange={(e) => setAnio(e.target.value)}
-              sx={{ fontSize: '0.82rem', backgroundColor: '#fff', borderRadius: '8px' }}
+              sx={{ fontSize: '0.82rem', backgroundColor: isDark ? 'transparent' : '#fff', borderRadius: '8px' }}
             >
               {[2025, 2026, 2027].map((y) => (
                 <MenuItem key={y} value={y}>{y}</MenuItem>
@@ -308,6 +313,8 @@ export default function UAFEReportPanel({
 }
 
 function SummaryBox({ label, value, color, subtitle }) {
+  const theme = useTheme();
+  const UAFE_COLORS = getUAFEColors(theme.palette.mode === 'dark');
   return (
     <Paper
       elevation={0}

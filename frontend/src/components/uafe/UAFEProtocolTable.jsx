@@ -32,7 +32,8 @@ import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 
 import SemaforoIndicator, { SemaforoPersona } from './SemaforoIndicator';
 import {
-  UAFE_COLORS,
+  UAFE_COLORS as UAFE_COLORS_STATIC,
+  getUAFEColors,
   ESTADOS_PROTOCOLO,
   TIPOS_ACTO_UAFE,
   getSemaforoFromProtocol,
@@ -40,6 +41,12 @@ import {
   formatCurrency,
   formatDate,
 } from './uafe-constants';
+import { useTheme } from '@mui/material/styles';
+
+function useUAFEColors() {
+  const theme = useTheme();
+  return getUAFEColors(theme.palette.mode === 'dark');
+}
 
 const headCells = [
   { id: 'expand', label: '', width: 40, sortable: false },
@@ -53,6 +60,7 @@ const headCells = [
 ];
 
 function ExpandedPersonRow({ personas = [] }) {
+  const UAFE_COLORS = useUAFEColors();
   if (personas.length === 0) {
     return (
       <Box sx={{ py: 2, px: 3 }}>
@@ -144,6 +152,7 @@ function ExpandedPersonRow({ personas = [] }) {
 }
 
 function ProtocolRow({ protocol, onView, onEdit }) {
+  const UAFE_COLORS = useUAFEColors();
   const [expanded, setExpanded] = useState(false);
 
   const semaforo = getSemaforoFromProtocol(protocol);
@@ -364,6 +373,8 @@ export default function UAFEProtocolTable({
   filters = {},
   onFiltersChange,
 }) {
+  const UAFE_COLORS = useUAFEColors();
+  const isDark = useTheme().palette.mode === 'dark';
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [orderBy, setOrderBy] = useState('fecha');
@@ -439,7 +450,7 @@ export default function UAFEProtocolTable({
             minWidth: 240,
             '& .MuiOutlinedInput-root': {
               fontSize: '0.82rem',
-              backgroundColor: '#fff',
+              backgroundColor: isDark ? 'transparent' : '#fff',
               borderRadius: '8px',
             },
           }}
@@ -451,7 +462,7 @@ export default function UAFEProtocolTable({
             value={filters.estado || ''}
             label="Estado"
             onChange={(e) => onFiltersChange?.({ ...filters, estado: e.target.value })}
-            sx={{ fontSize: '0.82rem', backgroundColor: '#fff', borderRadius: '8px' }}
+            sx={{ fontSize: '0.82rem', backgroundColor: isDark ? 'transparent' : '#fff', borderRadius: '8px' }}
           >
             <MenuItem value="">Todos</MenuItem>
             {Object.values(ESTADOS_PROTOCOLO).map((e) => (
@@ -471,7 +482,7 @@ export default function UAFEProtocolTable({
             value={filters.tipoActo || ''}
             label="Tipo de Acto"
             onChange={(e) => onFiltersChange?.({ ...filters, tipoActo: e.target.value })}
-            sx={{ fontSize: '0.82rem', backgroundColor: '#fff', borderRadius: '8px' }}
+            sx={{ fontSize: '0.82rem', backgroundColor: isDark ? 'transparent' : '#fff', borderRadius: '8px' }}
           >
             <MenuItem value="">Todos</MenuItem>
             {TIPOS_ACTO_UAFE.map((t) => (

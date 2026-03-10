@@ -22,6 +22,7 @@ import {
   Paper,
   Tooltip,
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import PersonAddOutlinedIcon from '@mui/icons-material/PersonAddOutlined';
@@ -44,8 +45,8 @@ import UAFEStatusPipeline from './UAFEStatusPipeline';
 import UAFEMinutaUpload from './UAFEMinutaUpload';
 import {
   UAFE_COLORS,
+  getUAFEColors,
   ESTADOS_PROTOCOLO,
-  ESTADOS_PROTOCOLO_FLOW,
   TIPOS_ACTO_UAFE,
   TIPOS_BIEN,
   FORMAS_PAGO,
@@ -55,6 +56,12 @@ import {
   formatCurrency,
   formatDate,
 } from './uafe-constants';
+
+/** Resolve UAFE colors based on current MUI theme mode */
+function useUAFEColors() {
+  const theme = useTheme();
+  return getUAFEColors(theme.palette.mode === 'dark');
+}
 
 function TabPanel({ children, value, index, ...props }) {
   return (
@@ -69,6 +76,8 @@ function TabPanel({ children, value, index, ...props }) {
 }
 
 function ProgresoSidebar({ protocol }) {
+  const UAFE_COLORS = useUAFEColors();
+  const isDark = useTheme().palette.mode === 'dark';
   const missingFields = getMissingFields(protocol);
   const semaforo = getSemaforoFromProtocol(protocol);
   const personas = protocol.personas || [];
@@ -140,7 +149,7 @@ function ProgresoSidebar({ protocol }) {
           <ListItem key={idx} disableGutters sx={{ py: 0.25 }}>
             <ListItemIcon sx={{ minWidth: 28 }}>
               {check.done ? (
-                <CheckCircleOutlineIcon sx={{ fontSize: 16, color: '#2e7d32' }} />
+                <CheckCircleOutlineIcon sx={{ fontSize: 16, color: isDark ? '#81c784' : '#2e7d32' }} />
               ) : (
                 <RadioButtonUncheckedIcon sx={{ fontSize: 16, color: UAFE_COLORS.textMuted }} />
               )}
@@ -193,6 +202,7 @@ function ProgresoSidebar({ protocol }) {
 }
 
 function DatosActoTab({ protocol, onFieldChange, readOnly }) {
+  const UAFE_COLORS = useUAFEColors();
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
       {/* Datos principales */}
@@ -212,31 +222,19 @@ function DatosActoTab({ protocol, onFieldChange, readOnly }) {
               placeholder="Ej: 2026-0001"
             />
           </Grid>
-          <Grid size={{ xs: 12, sm: 4 }}>
-            <FormControl fullWidth size="small">
-              <InputLabel>Estado</InputLabel>
-              <Select
-                value={protocol.estado || 'BORRADOR'}
-                label="Estado"
-                onChange={(e) => onFieldChange?.('estado', e.target.value)}
-                disabled={readOnly}
-              >
-                {ESTADOS_PROTOCOLO_FLOW.map((key) => (
-                  <MenuItem key={key} value={key}>
-                    <Chip
-                      size="small"
-                      label={ESTADOS_PROTOCOLO[key].label}
-                      sx={{
-                        fontSize: '0.68rem',
-                        fontWeight: 600,
-                        backgroundColor: ESTADOS_PROTOCOLO[key].bg,
-                        color: ESTADOS_PROTOCOLO[key].color,
-                      }}
-                    />
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+          <Grid size={{ xs: 12, sm: 4 }} sx={{ display: 'flex', alignItems: 'center' }}>
+            <Tooltip title={`Estado calculado automaticamente: ${(ESTADOS_PROTOCOLO[protocol.estado] || ESTADOS_PROTOCOLO.BORRADOR).description}`} arrow>
+              <Chip
+                label={`Estado: ${(ESTADOS_PROTOCOLO[protocol.estado] || ESTADOS_PROTOCOLO.BORRADOR).label}`}
+                sx={{
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  backgroundColor: (ESTADOS_PROTOCOLO[protocol.estado] || ESTADOS_PROTOCOLO.BORRADOR).bg,
+                  color: (ESTADOS_PROTOCOLO[protocol.estado] || ESTADOS_PROTOCOLO.BORRADOR).color,
+                  cursor: 'help',
+                }}
+              />
+            </Tooltip>
           </Grid>
         </Grid>
         <Grid container spacing={2}>
@@ -481,6 +479,8 @@ function DatosActoTab({ protocol, onFieldChange, readOnly }) {
 }
 
 function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm, onGenerateWordPersona, onDeletePerson }) {
+  const UAFE_COLORS = useUAFEColors();
+  const isDark = useTheme().palette.mode === 'dark';
   const personas = protocol.personas || [];
 
   return (
@@ -503,9 +503,9 @@ function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm, on
               '&:hover': {
                 borderColor: UAFE_COLORS.primary,
                 backgroundColor: UAFE_COLORS.primaryLight,
-            },
-          }}
-        >
+              },
+            }}
+          >
             Agregar Compareciente
           </Button>
         </Tooltip>
@@ -589,10 +589,19 @@ function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm, on
                             fontSize: '0.63rem',
                             fontWeight: 600,
                             height: 22,
-                            backgroundColor: p.estadoCompletitud === 'pendiente' ? '#ffebee' : '#fff8e1',
-                            color: p.estadoCompletitud === 'pendiente' ? '#c62828' : '#e65100',
+                            backgroundColor: isDark
+                              ? (p.estadoCompletitud === 'pendiente' ? 'rgba(198, 40, 40, 0.2)' : 'rgba(230, 81, 0, 0.2)')
+                              : (p.estadoCompletitud === 'pendiente' ? '#fce4ec' : '#fff3e0'),
+                            color: isDark
+                              ? (p.estadoCompletitud === 'pendiente' ? '#ef9a9a' : '#ffcc80')
+                              : (p.estadoCompletitud === 'pendiente' ? '#b71c1c' : '#e65100'),
+                            border: isDark
+                              ? (p.estadoCompletitud === 'pendiente' ? '1px solid rgba(239, 154, 154, 0.3)' : '1px solid rgba(255, 204, 128, 0.3)')
+                              : (p.estadoCompletitud === 'pendiente' ? '1px solid #ef9a9a' : '1px solid #ffcc80'),
                             '& .MuiChip-icon': {
-                              color: p.estadoCompletitud === 'pendiente' ? '#c62828' : '#e65100',
+                              color: isDark
+                                ? (p.estadoCompletitud === 'pendiente' ? '#ef9a9a' : '#ffcc80')
+                                : (p.estadoCompletitud === 'pendiente' ? '#b71c1c' : '#e65100'),
                             },
                             cursor: 'help',
                           }}
@@ -673,6 +682,8 @@ function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm, on
 }
 
 function MinutaTab({ protocol, onMinutaProcessed }) {
+  const UAFE_COLORS = useUAFEColors();
+  const isDark = useTheme().palette.mode === 'dark';
   if (protocol.minutaParseada && protocol.minutaUrl) {
     return (
       <Box>
@@ -696,7 +707,7 @@ function MinutaTab({ protocol, onMinutaProcessed }) {
               Datos extraidos automaticamente y confirmados por el matrizador
             </Typography>
           </Box>
-          <Chip size="small" label="Procesada" sx={{ backgroundColor: '#e8f5e9', color: '#2e7d32', fontWeight: 600, fontSize: '0.68rem' }} />
+          <Chip size="small" label="Procesada" sx={{ backgroundColor: isDark ? 'rgba(46, 125, 50, 0.2)' : '#e8f5e9', color: isDark ? '#81c784' : '#2e7d32', fontWeight: 600, fontSize: '0.68rem' }} />
         </Paper>
       </Box>
     );
@@ -711,6 +722,8 @@ function MinutaTab({ protocol, onMinutaProcessed }) {
 }
 
 function TextosTab({ protocol, onGenerateTexts }) {
+  const UAFE_COLORS = useUAFEColors();
+  const isDark = useTheme().palette.mode === 'dark';
   const [loading, setLoading] = useState(false);
   const [resultado, setResultado] = useState(null);
   const [copiado, setCopiado] = useState(null); // 'encabezado' | 'comparecencia' | null
@@ -798,8 +811,8 @@ function TextosTab({ protocol, onGenerateTexts }) {
       </Box>
 
       {resultado?.tieneIncompletos && (
-        <Paper elevation={0} sx={{ p: 1.5, mb: 2, backgroundColor: '#fff8e1', border: '1px solid #ffe082', borderRadius: '6px' }}>
-          <Typography variant="caption" sx={{ color: '#e65100', fontWeight: 600, fontSize: '0.7rem' }}>
+        <Paper elevation={0} sx={{ p: 1.5, mb: 2, backgroundColor: isDark ? 'rgba(230, 81, 0, 0.15)' : '#fff8e1', border: isDark ? '1px solid rgba(255, 224, 130, 0.2)' : '1px solid #ffe082', borderRadius: '6px' }}>
+          <Typography variant="caption" sx={{ color: isDark ? '#ffcc80' : '#e65100', fontWeight: 600, fontSize: '0.7rem' }}>
             Algunos comparecientes tienen datos incompletos. Los campos faltantes aparecen como [PENDIENTE].
           </Typography>
         </Paper>
@@ -920,6 +933,8 @@ export default function UAFEProtocolDetail({
   onGenerateWordPersona,
   readOnly = false,
 }) {
+  const UAFE_COLORS = useUAFEColors();
+  const isDark = useTheme().palette.mode === 'dark';
   const [tab, setTab] = useState(0);
   const [editedFields, setEditedFields] = useState({});
   const [refreshing, setRefreshing] = useState(false);

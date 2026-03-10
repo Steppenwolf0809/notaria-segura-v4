@@ -1,5 +1,6 @@
 import { Box, Typography, Tooltip } from '@mui/material';
-import { ESTADOS_PROTOCOLO, ESTADOS_PROTOCOLO_FLOW, UAFE_COLORS } from './uafe-constants';
+import { useTheme } from '@mui/material/styles';
+import { ESTADOS_PROTOCOLO, ESTADOS_PROTOCOLO_FLOW, UAFE_COLORS as UAFE_COLORS_STATIC, getUAFEColors } from './uafe-constants';
 
 /**
  * UAFEStatusPipeline - Visual state flow indicator
@@ -20,6 +21,8 @@ export default function UAFEStatusPipeline({
   counts = {},
   currentState = null,
 }) {
+  const theme = useTheme();
+  const UAFE_COLORS = getUAFEColors(theme.palette.mode === 'dark');
   const states = ESTADOS_PROTOCOLO_FLOW.map((key) => ESTADOS_PROTOCOLO[key]);
 
   if (mode === 'indicator') {

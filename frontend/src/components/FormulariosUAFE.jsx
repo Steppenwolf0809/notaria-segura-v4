@@ -852,7 +852,7 @@ const FormulariosUAFE = ({ adminMode = false }) => {
    * Copiar link del formulario UAFE al portapapeles
    */
   const copiarLinkFormulario = () => {
-    const link = 'https://notaria18quito.com.ec/formulario-uafe/';
+    const link = 'https://notaria18quito.com.ec/formulario';
     navigator.clipboard.writeText(link).then(() => {
       mostrarSnackbar('Link del formulario UAFE copiado al portapapeles', 'success');
     }).catch(err => {
