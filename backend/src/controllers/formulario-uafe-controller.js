@@ -2902,7 +2902,8 @@ export async function generarTextos(req, res) {
       }
     });
 
-    console.log(`[UAFE] Textos generados para protocolo ${protocolo.numeroProtocolo || protocolo.identificadorTemporal}`);
+    const tieneNegritas = resultadoComparecencia.comparecenciaHtml?.includes('<b ');
+    console.log(`[UAFE] Textos generados para protocolo ${protocolo.numeroProtocolo || protocolo.identificadorTemporal} | HTML tiene negritas: ${tieneNegritas} | primeros 200 chars: ${resultadoComparecencia.comparecenciaHtml?.substring(0, 200)}`);
 
     // 7. Retornar textos con advertencia si hay incompletos
     res.json({

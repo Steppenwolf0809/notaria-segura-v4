@@ -671,6 +671,9 @@ function TextosTab({ protocol, onGenerateTexts }) {
   const comparecenciaCache = protocol.textoComparecenciaGenerado;
   const comparecenciaHtml = resultado?.data?.comparecenciaHtml || comparecenciaCache;
 
+  // DEBUG: verificar si el HTML tiene negritas
+  console.log('[UAFE TextosTab] comparecenciaHtml tiene <b>:', comparecenciaHtml?.includes('<b '), '| tiene <strong>:', comparecenciaHtml?.includes('<strong'), '| primeros 200:', comparecenciaHtml?.substring(0, 200));
+
   // Auto-regenerar si el cache no tiene formato HTML (legacy sin negritas)
   useEffect(() => {
     if (comparecenciaCache && !comparecenciaCache.includes('<b ') && !comparecenciaCache.includes('<b>') && !resultado && !loading) {
