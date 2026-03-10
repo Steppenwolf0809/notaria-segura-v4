@@ -1,27 +1,28 @@
 import { Box, Card, Typography, Skeleton, Tooltip } from '@mui/material';
-import { UAFE_COLORS, SEMAFORO } from './uafe-constants';
+import { useTheme } from '@mui/material/styles';
+import { getUAFEColors, SEMAFORO } from './uafe-constants';
 
-const kpiCardStyles = {
-  card: {
-    position: 'relative',
-    overflow: 'hidden',
-    borderRadius: '10px',
-    border: `1px solid ${UAFE_COLORS.border}`,
-    boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-    p: 2.5,
-    flex: 1,
-    minWidth: 160,
-    transition: 'box-shadow 0.2s ease, transform 0.15s ease',
-    '&:hover': {
-      boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-      transform: 'translateY(-1px)',
-    },
-  },
-};
-
-function KPICard({ label, value, accentColor, subtitle, loading, tooltip }) {
+function KPICard({ label, value, accentColor, subtitle, loading, tooltip, UAFE_COLORS, isDark }) {
   const card = (
-    <Card sx={kpiCardStyles.card} elevation={0}>
+    <Card
+      elevation={0}
+      sx={{
+        position: 'relative',
+        overflow: 'hidden',
+        borderRadius: '10px',
+        border: `1px solid ${UAFE_COLORS.border}`,
+        boxShadow: isDark ? 'none' : '0 1px 3px rgba(0,0,0,0.04)',
+        backgroundColor: UAFE_COLORS.surfaceElevated,
+        p: 2.5,
+        flex: 1,
+        minWidth: 160,
+        transition: 'box-shadow 0.2s ease, transform 0.15s ease',
+        '&:hover': {
+          boxShadow: isDark ? '0 4px 12px rgba(0,0,0,0.3)' : '0 4px 12px rgba(0,0,0,0.08)',
+          transform: 'translateY(-1px)',
+        },
+      }}
+    >
       {/* Left accent bar */}
       <Box
         sx={{
@@ -87,6 +88,10 @@ function KPICard({ label, value, accentColor, subtitle, loading, tooltip }) {
 }
 
 export default function UAFEKPICards({ stats = {}, loading = false }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
+  const UAFE_COLORS = getUAFEColors(isDark);
+
   const {
     total = 0,
     completos = 0,
@@ -109,6 +114,8 @@ export default function UAFEKPICards({ stats = {}, loading = false }) {
         accentColor={UAFE_COLORS.primary}
         loading={loading}
         tooltip="Total de protocolos UAFE creados este mes. Incluye todos los estados: borradores, en proceso y completos."
+        UAFE_COLORS={UAFE_COLORS}
+        isDark={isDark}
       />
       <KPICard
         label="Completos"
@@ -117,6 +124,8 @@ export default function UAFEKPICards({ stats = {}, loading = false }) {
         subtitle="Listos para reporte"
         loading={loading}
         tooltip="Protocolos con todos los datos completos: tipo de acto, cuantia, No. protocolo y formularios de todos los comparecientes al 100%."
+        UAFE_COLORS={UAFE_COLORS}
+        isDark={isDark}
       />
       <KPICard
         label="Pendientes"
@@ -125,6 +134,8 @@ export default function UAFEKPICards({ stats = {}, loading = false }) {
         subtitle="Datos parciales"
         loading={loading}
         tooltip="Protocolos que tienen datos parciales. Revise que datos faltan expandiendo la fila en la tabla o haciendo clic en el protocolo."
+        UAFE_COLORS={UAFE_COLORS}
+        isDark={isDark}
       />
       <KPICard
         label="Criticos"
@@ -133,6 +144,8 @@ export default function UAFEKPICards({ stats = {}, loading = false }) {
         subtitle="Faltan datos obligatorios"
         loading={loading}
         tooltip="Protocolos sin datos obligatorios UAFE: sin tipo de acto, sin cuantia o sin comparecientes. Requieren atencion inmediata."
+        UAFE_COLORS={UAFE_COLORS}
+        isDark={isDark}
       />
       <KPICard
         label="Progreso General"
@@ -140,6 +153,8 @@ export default function UAFEKPICards({ stats = {}, loading = false }) {
         accentColor={completitud >= 80 ? SEMAFORO.VERDE.color : completitud >= 50 ? SEMAFORO.AMARILLO.color : SEMAFORO.ROJO.color}
         loading={loading}
         tooltip="Porcentaje de protocolos con semaforo verde sobre el total. Meta: 100% antes de generar el reporte mensual."
+        UAFE_COLORS={UAFE_COLORS}
+        isDark={isDark}
       />
     </Box>
   );
