@@ -254,8 +254,7 @@ export default function UAFEDashboard() {
 
   // OLA 3: Copy global form link to clipboard
   const handleSendForm = (_persona) => {
-    const baseUrl = window.location.origin;
-    const link = `${baseUrl}/formulario-uafe`;
+    const link = 'https://notaria18quito.com.ec/formulario';
     navigator.clipboard.writeText(link).then(() => {
       setSnackbar({ open: true, message: 'Enlace del formulario copiado', severity: 'success' });
     }).catch(() => {
