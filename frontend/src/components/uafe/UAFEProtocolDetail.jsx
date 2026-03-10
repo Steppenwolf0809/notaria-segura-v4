@@ -775,6 +775,7 @@ function TextosTab({ protocol, onGenerateTexts }) {
             fontFamily: '"Courier New", monospace',
             fontSize: '0.72rem',
             lineHeight: 1.6,
+            fontWeight: 'bold',
             whiteSpace: 'pre-wrap',
             color: UAFE_COLORS.textPrimary,
             backgroundColor: UAFE_COLORS.surface,
