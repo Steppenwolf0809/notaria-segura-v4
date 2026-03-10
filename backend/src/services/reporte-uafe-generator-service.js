@@ -446,6 +446,26 @@ export async function generarReporteInterviniente(mes, anio, notaryId = 1) {
       ]);
 
       totalRegistros++;
+
+      // Si tiene mandante (representado), agregar fila extra con la misma calidad
+      if (personaProtocolo.actuaPor && personaProtocolo.actuaPor !== 'PROPIOS_DERECHOS' && personaProtocolo.mandanteCedula) {
+        const mandanteCedula = personaProtocolo.mandanteCedula;
+        const mandanteNombre = (personaProtocolo.mandanteNombre || '').toUpperCase();
+        const mandanteTipoId = getTipoIdentificacion(mandanteCedula);
+
+        dataRows.push([
+          codigoTransaccion,
+          mandanteTipoId,
+          mandanteCedula,
+          mandanteNombre,
+          'ECU', // nacionalidad por defecto para mandante
+          rolCodigo,
+          papelCodigo, // misma calidad que el compareciente
+          SECUENCIAL_NOTARIO,
+        ]);
+
+        totalRegistros++;
+      }
     }
   }
 
