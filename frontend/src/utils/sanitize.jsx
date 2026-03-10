@@ -27,7 +27,7 @@ const DEFAULT_CONFIG = {
  */
 const RICH_TEXT_CONFIG = {
   ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'p', 'br', 'ul', 'ol', 'li'],
-  ALLOWED_ATTR: [],
+  ALLOWED_ATTR: ['style'],
   KEEP_CONTENT: true,
 };
 
@@ -92,7 +92,7 @@ export function sanitizeObject(obj) {
   if (Array.isArray(obj)) {
     return obj.map(item => {
       if (typeof item === 'string') {
-        return sanitize(item);
+        return sanitizeRichText(item);
       } else if (typeof item === 'object') {
         return sanitizeObject(item);
       }
@@ -103,7 +103,7 @@ export function sanitizeObject(obj) {
   const sanitized = {};
   for (const [key, value] of Object.entries(obj)) {
     if (typeof value === 'string') {
-      sanitized[key] = sanitize(value);
+      sanitized[key] = sanitizeRichText(value);
     } else if (typeof value === 'object' && value !== null) {
       sanitized[key] = sanitizeObject(value);
     } else {
