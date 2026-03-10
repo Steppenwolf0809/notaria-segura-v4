@@ -1,5 +1,6 @@
 import { Box, Chip, Tooltip, Typography } from '@mui/material';
-import { SEMAFORO, ESTADOS_PERSONA } from './uafe-constants';
+import { useTheme } from '@mui/material/styles';
+import { SEMAFORO, ESTADOS_PERSONA, getUAFEColors } from './uafe-constants';
 
 /**
  * SemaforoIndicator - Reusable compliance status indicator
@@ -26,15 +27,32 @@ export default function SemaforoIndicator({
   pulsate = false,
   sx = {},
 }) {
+  const theme = useTheme();
+  const isDark = theme.palette.mode === 'dark';
   const config = SEMAFORO[level] || SEMAFORO.ROJO;
 
+  const tooltipProps = {
+    slotProps: {
+      tooltip: {
+        sx: {
+          maxWidth: 380,
+          maxHeight: 400,
+          overflowY: 'auto',
+          backgroundColor: 'rgba(33, 33, 33, 0.96)',
+          color: '#fff',
+          p: 1.5,
+        },
+      },
+    },
+  };
+
   const tooltipContent = missingFields.length > 0 ? (
-    <Box sx={{ p: 0.5 }}>
-      <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', mb: 0.5 }}>
+    <Box>
+      <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', mb: 0.5, color: '#fff' }}>
         {config.description}
       </Typography>
       {missingFields.map((field, i) => (
-        <Typography key={i} variant="caption" sx={{ display: 'block', opacity: 0.9 }}>
+        <Typography key={i} variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.9)', lineHeight: 1.4 }}>
           &bull; {field}
         </Typography>
       ))}
@@ -67,7 +85,7 @@ export default function SemaforoIndicator({
 
   if (variant === 'dot') {
     return showTooltip ? (
-      <Tooltip title={tooltipContent} arrow placement="top">
+      <Tooltip title={tooltipContent} arrow placement="top" {...tooltipProps}>
         {dot}
       </Tooltip>
     ) : dot;
@@ -93,21 +111,23 @@ export default function SemaforoIndicator({
     );
 
     return showTooltip ? (
-      <Tooltip title={tooltipContent} arrow placement="top">
+      <Tooltip title={tooltipContent} arrow placement="top" {...tooltipProps}>
         {badge}
       </Tooltip>
     ) : badge;
   }
 
   // Default: chip variant
+  const chipBg = isDark ? `${config.color}22` : config.bg;
+  const chipBorder = isDark ? `${config.color}44` : config.border;
   const chip = (
     <Chip
       size={size}
       label={config.label}
       sx={{
-        backgroundColor: config.bg,
+        backgroundColor: chipBg,
         color: config.color,
-        borderColor: config.border,
+        borderColor: chipBorder,
         border: '1px solid',
         fontWeight: 600,
         fontSize: '0.7rem',
@@ -123,7 +143,7 @@ export default function SemaforoIndicator({
   );
 
   return showTooltip ? (
-    <Tooltip title={tooltipContent} arrow placement="top">
+    <Tooltip title={tooltipContent} arrow placement="top" {...tooltipProps}>
       {chip}
     </Tooltip>
   ) : chip;

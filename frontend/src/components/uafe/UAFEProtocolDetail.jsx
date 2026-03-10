@@ -568,15 +568,20 @@ function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm, on
                     {(p.camposFaltantes || []).length > 0 && p.estadoCompletitud !== 'completo' && (
                       <Tooltip
                         arrow
+                        placement="bottom"
+                        enterDelay={200}
+                        leaveDelay={100}
                         slotProps={{
+                          popper: { sx: { zIndex: 1500 } },
                           tooltip: {
                             sx: {
                               maxWidth: 360,
-                              maxHeight: 400,
+                              maxHeight: 350,
                               overflowY: 'auto',
-                              backgroundColor: 'rgba(33, 33, 33, 0.95)',
+                              backgroundColor: 'rgba(33, 33, 33, 0.96)',
                               color: '#fff',
                               p: 1.5,
+                              fontSize: '0.72rem',
                             },
                           },
                         }}
@@ -586,7 +591,7 @@ function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm, on
                               Campos pendientes ({(p.camposFaltantes || []).length}):
                             </Typography>
                             {(p.camposFaltantes || []).map((c, i) => (
-                              <Typography key={i} variant="caption" sx={{ display: 'block', fontSize: '0.68rem', color: 'rgba(255,255,255,0.9)' }}>
+                              <Typography key={i} variant="caption" sx={{ display: 'block', fontSize: '0.68rem', color: 'rgba(255,255,255,0.9)', lineHeight: 1.4 }}>
                                 • {c}
                               </Typography>
                             ))}
