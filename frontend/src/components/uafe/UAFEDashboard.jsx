@@ -27,6 +27,8 @@ import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
 import ListAltOutlinedIcon from '@mui/icons-material/ListAltOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined';
+import LockResetIcon from '@mui/icons-material/LockReset';
+import ResetearPinDialog from '../ResetearPinDialog';
 
 import apiClient from '../../services/api-client';
 import useAuthStore from '../../store/auth-store';
@@ -68,6 +70,7 @@ export default function UAFEDashboard() {
   const [showAddPersona, setShowAddPersona] = useState(false);
   const [addPersonaForm, setAddPersonaForm] = useState({ cedula: '', calidad: 'OTRO', actuaPor: 'PROPIOS_DERECHOS' });
   const [addPersonaLoading, setAddPersonaLoading] = useState(false);
+  const [openResetearPin, setOpenResetearPin] = useState(false);
   // Create protocol wizard
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [wizardStep, setWizardStep] = useState('upload'); // upload | parsing | preview | creating
@@ -337,10 +340,13 @@ export default function UAFEDashboard() {
     setWizardStep('creating');
     setWizardError(null);
     try {
+      const datosParaEnviar = { ...wizardData };
+      if (datosParaEnviar.cuantia != null) datosParaEnviar.cuantia = parseFloat(datosParaEnviar.cuantia) || null;
+      if (datosParaEnviar.avaluoMunicipal != null) datosParaEnviar.avaluoMunicipal = parseFloat(datosParaEnviar.avaluoMunicipal) || null;
       const { data } = await apiClient.post('/formulario-uafe/protocolo-con-minuta', {
         fecha: wizardFecha,
         minutaUrl: wizardMinutaUrl,
-        datosConfirmados: wizardData,
+        datosConfirmados: datosParaEnviar,
       });
       setShowCreateDialog(false);
       setSnackbar({ open: true, message: 'Protocolo creado exitosamente', severity: 'success' });
@@ -558,28 +564,48 @@ export default function UAFEDashboard() {
           </Typography>
         </Box>
         {userRole !== 'OFICIAL_CUMPLIMIENTO' && (
-          <Tooltip title="Crea un nuevo protocolo UAFE. Ingrese los datos del acto notarial y agregue los comparecientes para iniciar el proceso de debida diligencia." arrow placement="left">
-            <Button
-              variant="contained"
-              startIcon={<AddOutlinedIcon />}
-              onClick={openWizard}
-              sx={{
-                textTransform: 'none',
-                fontWeight: 700,
-                fontSize: '0.82rem',
-                backgroundColor: UAFE_COLORS.primary,
-                borderRadius: '8px',
-                px: 2.5,
-                boxShadow: 'none',
-                '&:hover': {
-                  boxShadow: '0 2px 12px rgba(30,90,142,0.3)',
-                  backgroundColor: UAFE_COLORS.primaryDark,
-                },
-              }}
-            >
-              Nuevo Protocolo
-            </Button>
-          </Tooltip>
+          <Box sx={{ display: 'flex', gap: 1.5 }}>
+            <Tooltip title="Resetear PIN de un usuario que olvido su clave de acceso al formulario publico" arrow>
+              <Button
+                variant="outlined"
+                startIcon={<LockResetIcon />}
+                onClick={() => setOpenResetearPin(true)}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.82rem',
+                  borderRadius: '8px',
+                  borderColor: '#ed6c02',
+                  color: '#ed6c02',
+                  '&:hover': { borderColor: '#e65100', color: '#e65100', backgroundColor: 'rgba(237,108,2,0.04)' },
+                }}
+              >
+                Resetear PIN
+              </Button>
+            </Tooltip>
+            <Tooltip title="Crea un nuevo protocolo UAFE. Ingrese los datos del acto notarial y agregue los comparecientes para iniciar el proceso de debida diligencia." arrow placement="left">
+              <Button
+                variant="contained"
+                startIcon={<AddOutlinedIcon />}
+                onClick={openWizard}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.82rem',
+                  backgroundColor: UAFE_COLORS.primary,
+                  borderRadius: '8px',
+                  px: 2.5,
+                  boxShadow: 'none',
+                  '&:hover': {
+                    boxShadow: '0 2px 12px rgba(30,90,142,0.3)',
+                    backgroundColor: UAFE_COLORS.primaryDark,
+                  },
+                }}
+              >
+                Nuevo Protocolo
+              </Button>
+            </Tooltip>
+          </Box>
         )}
       </Box>
 
@@ -827,8 +853,8 @@ export default function UAFEDashboard() {
                     inputProps={{ inputMode: 'decimal' }}
                     value={wizardData.cuantia ?? ''}
                     onChange={(e) => {
-                      const v = e.target.value;
-                      updateWizardField('cuantia', v === '' ? null : Number(v));
+                      const v = e.target.value.replace(',', '.');
+                      if (v === '' || /^\d*\.?\d*$/.test(v)) updateWizardField('cuantia', v === '' ? null : v);
                     }}
                   />
                 </Grid>
@@ -838,8 +864,8 @@ export default function UAFEDashboard() {
                     inputProps={{ inputMode: 'decimal' }}
                     value={wizardData.avaluoMunicipal ?? ''}
                     onChange={(e) => {
-                      const v = e.target.value;
-                      updateWizardField('avaluoMunicipal', v === '' ? null : Number(v));
+                      const v = e.target.value.replace(',', '.');
+                      if (v === '' || /^\d*\.?\d*$/.test(v)) updateWizardField('avaluoMunicipal', v === '' ? null : v);
                     }}
                   />
                 </Grid>
@@ -898,12 +924,16 @@ export default function UAFEDashboard() {
                   </Grid>
                   <Grid size={{ xs: 4 }}>
                     <TextField
-                      fullWidth size="small" label="Monto (USD)" type="number"
+                      fullWidth size="small" label="Monto (USD)"
+                      inputProps={{ inputMode: 'decimal' }}
                       value={fp.monto ?? ''}
                       onChange={(e) => {
-                        const arr = [...(wizardData.formaPago || [])];
-                        arr[idx] = { ...arr[idx], monto: parseFloat(e.target.value) || null };
-                        updateWizardField('formaPago', arr);
+                        const v = e.target.value.replace(',', '.');
+                        if (v === '' || /^\d*\.?\d*$/.test(v)) {
+                          const arr = [...(wizardData.formaPago || [])];
+                          arr[idx] = { ...arr[idx], monto: v === '' ? null : v };
+                          updateWizardField('formaPago', arr);
+                        }
                       }}
                     />
                   </Grid>
@@ -1047,6 +1077,13 @@ export default function UAFEDashboard() {
       >
         <Alert severity={snackbar.severity} variant="filled">{snackbar.message}</Alert>
       </Snackbar>
+
+      {/* Dialog resetear PIN */}
+      <ResetearPinDialog
+        open={openResetearPin}
+        onClose={() => setOpenResetearPin(false)}
+        onSuccess={() => setSnackbar({ open: true, message: 'PIN reseteado exitosamente', severity: 'success' })}
+      />
     </Box>
   );
 }

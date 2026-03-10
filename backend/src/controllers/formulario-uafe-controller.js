@@ -190,11 +190,14 @@ export async function agregarPersonaAProtocolo(req, res) {
     let personaCreada = false;
     if (!persona) {
       console.log(`[UAFE] Creando registro placeholder para cédula ${cedula}`);
+      // PIN temporal = ultimos 6 digitos de la cedula
+      const pinTemporal = cedula.slice(-6);
+      const pinHash = await bcrypt.hash(pinTemporal, 10);
       persona = await prisma.personaRegistrada.create({
         data: {
           numeroIdentificacion: cedula,
           tipoPersona: 'NATURAL',
-          pinHash: 'PENDIENTE_REGISTRO', // No se puede usar para login
+          pinHash,
           pinCreado: false,
           completado: false,
           datosPersonaNatural: {

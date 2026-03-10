@@ -299,8 +299,15 @@ export async function loginPersona(req, res) {
       });
     }
 
-    // Verificar PIN usando bcrypt.compare
-    const pinValido = await bcrypt.compare(pin, persona.pinHash);
+    // Verificar PIN: si el hash no es bcrypt valido (placeholder), comparar directamente
+    const esBcryptHash = persona.pinHash.startsWith('$2');
+    let pinValido = false;
+    if (esBcryptHash) {
+      pinValido = await bcrypt.compare(pin, persona.pinHash);
+    } else {
+      // Hash placeholder (ej: 'PENDIENTE_REGISTRO'): aceptar ultimos 6 digitos de cedula
+      pinValido = pin === persona.numeroIdentificacion.slice(-6);
+    }
 
     if (!pinValido) {
       // PIN INCORRECTO - Incrementar contador de intentos fallidos
@@ -732,11 +739,15 @@ export async function resetearPIN(req, res) {
         pinHash_antes: persona.pinHash ? `[${persona.pinHash.substring(0, 10)}...]` : 'null/undefined'
       });
 
+      // PIN temporal = ultimos 6 digitos de la cedula
+      const pinTemporal = persona.numeroIdentificacion.slice(-6);
+      const pinHashTemporal = await bcrypt.hash(pinTemporal, 10);
+
       const personaActualizada = await tx.personaRegistrada.update({
         where: { id: personaId },
         data: {
           pinCreado: false,                            // Fuerza a crear nuevo PIN
-          pinHash: '',                                  // Elimina el hash anterior (cadena vacía)
+          pinHash: pinHashTemporal,                     // Hash del PIN temporal (ultimos 6 de cedula)
           intentosFallidos: 0,                          // Resetea intentos fallidos
           bloqueadoHasta: null,                         // Desbloquea la cuenta
           pinResetCount: persona.pinResetCount + 1     // Incrementa contador de resets
@@ -870,7 +881,16 @@ export async function crearPinPropio(req, res) {
     }
 
     // Verificar PIN temporal
-    const pinTemporalValido = await bcrypt.compare(pinTemporal, persona.pinHash);
+    // Si el hash no es un hash bcrypt valido (ej: 'PENDIENTE_REGISTRO' o cadena vacia),
+    // aceptamos el PIN temporal si coincide con los ultimos 6 digitos de la cedula
+    const esBcryptHash = persona.pinHash && persona.pinHash.startsWith('$2');
+    let pinTemporalValido = false;
+    if (esBcryptHash) {
+      pinTemporalValido = await bcrypt.compare(pinTemporal, persona.pinHash);
+    } else {
+      // Hash invalido/placeholder: aceptar si el PIN temporal son los ultimos 6 digitos
+      pinTemporalValido = pinTemporal === persona.numeroIdentificacion.slice(-6);
+    }
 
     if (!pinTemporalValido) {
       const nuevosIntentos = persona.intentosFallidos + 1;

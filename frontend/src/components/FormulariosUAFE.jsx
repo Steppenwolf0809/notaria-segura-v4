@@ -2016,7 +2016,7 @@ const FormulariosUAFE = ({ adminMode = false }) => {
                     {protocoloSeleccionado.avaluoMunicipal && (
                       <Grid item xs={6}>
                         <Typography variant="body2" color="text.secondary">Avalúo Municipal:</Typography>
-                        <Typography variant="body1">${parseFloat(protocoloSeleccionado.avaluoMunicipal).toFixed(2)}</Typography>
+                        <Typography variant="body1">${(parseFloat(protocoloSeleccionado.avaluoMunicipal) || 0).toFixed(2)}</Typography>
                       </Grid>
                     )}
                   </Grid>

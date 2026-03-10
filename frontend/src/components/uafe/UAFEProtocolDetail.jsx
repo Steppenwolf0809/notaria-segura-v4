@@ -275,9 +275,12 @@ function DatosActoTab({ protocol, onFieldChange, readOnly }) {
               fullWidth
               size="small"
               label="Cuantia (USD)"
-              type="number"
+              inputProps={{ inputMode: 'decimal' }}
               value={protocol.valorContrato ?? ''}
-              onChange={(e) => onFieldChange?.('valorContrato', e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value.replace(',', '.');
+                if (v === '' || /^\d*\.?\d*$/.test(v)) onFieldChange?.('valorContrato', v);
+              }}
               disabled={readOnly}
             />
           </Grid>
@@ -286,9 +289,12 @@ function DatosActoTab({ protocol, onFieldChange, readOnly }) {
               fullWidth
               size="small"
               label="Avaluo Municipal (USD)"
-              type="number"
+              inputProps={{ inputMode: 'decimal' }}
               value={protocol.avaluoMunicipal ?? ''}
-              onChange={(e) => onFieldChange?.('avaluoMunicipal', e.target.value)}
+              onChange={(e) => {
+                const v = e.target.value.replace(',', '.');
+                if (v === '' || /^\d*\.?\d*$/.test(v)) onFieldChange?.('avaluoMunicipal', v);
+              }}
               disabled={readOnly}
             />
           </Grid>
@@ -417,13 +423,17 @@ function DatosActoTab({ protocol, onFieldChange, readOnly }) {
             </Grid>
             <Grid size={{ xs: 12, sm: 3 }}>
               <TextField
-                fullWidth size="small" label="Monto (USD)" type="number"
+                fullWidth size="small" label="Monto (USD)"
+                inputProps={{ inputMode: 'decimal' }}
                 value={fp.monto ?? ''}
                 disabled={readOnly}
                 onChange={(e) => {
-                  const arr = [...(protocol.formasPago || [])];
-                  arr[idx] = { ...arr[idx], monto: parseFloat(e.target.value) || null };
-                  onFieldChange?.('formasPago', arr);
+                  const v = e.target.value.replace(',', '.');
+                  if (v === '' || /^\d*\.?\d*$/.test(v)) {
+                    const arr = [...(protocol.formasPago || [])];
+                    arr[idx] = { ...arr[idx], monto: v === '' ? null : v };
+                    onFieldChange?.('formasPago', arr);
+                  }
                 }}
               />
             </Grid>

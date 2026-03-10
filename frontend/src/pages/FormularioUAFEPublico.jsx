@@ -359,24 +359,35 @@ function LoginScreen({ cedula, onLogin, onBack }) {
   );
 }
 
-// ── Step 2c: PIN temporal → login automático ───────────────
+// ── Step 2c: PIN temporal → crear PIN propio ───────────────
 function CreatePinScreen({ cedula, onCreated, onBack }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [aceptaDatos, setAceptaDatos] = useState(false);
+  const [pin, setPin] = useState('');
+  const [pinConfirm, setPinConfirm] = useState('');
 
-  const handleAutoLogin = async () => {
+  const isSeq = (p) => '012345678901234567890123456789'.includes(p) || '098765432109876543210'.includes(p);
+  const isRepeat = (p) => /^(.)\1{5}$/.test(p);
+  const pinValid = pin.length === 6 && !isSeq(pin) && !isRepeat(pin);
+  const pinsMatch = pin === pinConfirm && pinConfirm.length === 6;
+
+  const handleCreatePin = async () => {
     setLoading(true);
     setError(null);
     try {
-      // Auto-login con PIN temporal (ultimos 6 digitos de la cedula)
       const pinTemporal = cedula.slice(-6);
-      const { data } = await api.post('/login', { cedula, pin: pinTemporal });
+      const { data } = await api.post('/crear-pin', {
+        cedula,
+        pinTemporal,
+        nuevoPin: pin,
+        confirmacionPin: pinConfirm,
+      });
       if (data.success) {
         onCreated({ sessionToken: data.sessionToken, tipoPersona: data.tipoPersona });
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al acceder. Contacte a la notaria.');
+      setError(err.response?.data?.message || 'Error al crear PIN. Contacte a la notaria.');
     } finally {
       setLoading(false);
     }
@@ -386,7 +397,7 @@ function CreatePinScreen({ cedula, onCreated, onBack }) {
     <PageLayout>
       <Typography variant="h6" sx={{ textAlign: 'center', mb: 1, fontWeight: 600 }}>Bienvenido/a</Typography>
       <Alert severity="info" sx={{ mb: 2, borderRadius: '8px' }}>
-        Es la primera vez que accede al sistema. Antes de continuar, debe aceptar la autorizacion de tratamiento de datos personales.
+        Es la primera vez que accede al sistema. Acepte la autorizacion y cree un PIN personal para proteger su informacion.
       </Alert>
       {error && <Alert severity="error" sx={{ mb: 2, borderRadius: '8px' }}>{error}</Alert>}
 
@@ -404,14 +415,38 @@ function CreatePinScreen({ cedula, onCreated, onBack }) {
         sx={{ mb: 2 }}
       />
 
+      {aceptaDatos && (
+        <>
+          <Divider sx={{ my: 2 }} />
+          <PinInput value={pin} onChange={setPin} label="Cree un PIN de 6 digitos:" />
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="caption" sx={{ color: pin.length === 6 ? COLORS.success : COLORS.textMuted }}>
+              {pin.length === 6 ? '\u2713' : '\u25CB'} 6 digitos numericos
+            </Typography><br />
+            <Typography variant="caption" sx={{ color: pin.length === 6 && !isSeq(pin) ? COLORS.success : COLORS.textMuted }}>
+              {pin.length === 6 && !isSeq(pin) ? '\u2713' : '\u25CB'} No usar secuencias (123456)
+            </Typography><br />
+            <Typography variant="caption" sx={{ color: pin.length === 6 && !isRepeat(pin) ? COLORS.success : COLORS.textMuted }}>
+              {pin.length === 6 && !isRepeat(pin) ? '\u2713' : '\u25CB'} No usar repeticiones (111111)
+            </Typography>
+          </Box>
+          <PinInput value={pinConfirm} onChange={setPinConfirm} label="Confirme su PIN:" />
+          {pinConfirm.length === 6 && !pinsMatch && (
+            <Typography variant="caption" sx={{ color: 'error.main', textAlign: 'center', display: 'block' }}>
+              Los PINs no coinciden
+            </Typography>
+          )}
+        </>
+      )}
+
       <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mt: 3 }}>
         <Button variant="outlined" onClick={onBack} sx={{ textTransform: 'none', borderColor: COLORS.primary, color: COLORS.primary }}>
           Volver
         </Button>
-        <Button variant="contained" onClick={handleAutoLogin}
-          disabled={!aceptaDatos || loading}
+        <Button variant="contained" onClick={handleCreatePin}
+          disabled={!aceptaDatos || !pinValid || !pinsMatch || loading}
           sx={{ textTransform: 'none', fontWeight: 600, backgroundColor: COLORS.primary, borderRadius: '8px' }}>
-          {loading ? <CircularProgress size={20} /> : 'Continuar'}
+          {loading ? <CircularProgress size={20} /> : 'Crear PIN y Continuar'}
         </Button>
       </Box>
     </PageLayout>
@@ -515,7 +550,7 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
           },
           informacionLaboral: {
             situacion: form.situacion, profesionOcupacion: form.profesionOcupacion,
-            entidad: form.entidad, cargo: form.cargo, ingresoMensual: form.ingresoMensual ? parseFloat(form.ingresoMensual) : null,
+            entidad: form.entidad, cargo: form.cargo, ingresoMensual: form.ingresoMensual && !isNaN(parseFloat(String(form.ingresoMensual).replace(',', '.'))) ? parseFloat(String(form.ingresoMensual).replace(',', '.')) : null,
           },
           conyuge: needsConyuge ? {
             apellidos: form.conyugeApellidos, nombres: form.conyugeNombres,
@@ -598,13 +633,13 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
       {/* Tab: Personales */}
       <Box sx={{ display: tab === 0 ? 'block' : 'none' }}>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 6 }}>{field('Apellidos *', 'apellidos')}</Grid>
-          <Grid size={{ xs: 6 }}>{field('Nombres *', 'nombres')}</Grid>
+          <Grid size={{ xs: 6 }}>{field('Apellidos *', 'apellidos', { autoComplete: 'family-name', inputProps: { autoCapitalize: 'words' } })}</Grid>
+          <Grid size={{ xs: 6 }}>{field('Nombres *', 'nombres', { autoComplete: 'given-name', inputProps: { autoCapitalize: 'words' } })}</Grid>
           <Grid size={{ xs: 4 }}>{selectField('Genero', 'genero', [{ value: 'MASCULINO', label: 'Masculino' }, { value: 'FEMENINO', label: 'Femenino' }])}</Grid>
           <Grid size={{ xs: 4 }}>{selectField('Estado Civil', 'estadoCivil', ESTADOS_CIVILES)}</Grid>
           <Grid size={{ xs: 4 }}>{selectField('Nivel Estudio', 'nivelEstudio', NIVELES_ESTUDIO)}</Grid>
-          <Grid size={{ xs: 6 }}>{field('Email', 'correoElectronico', { type: 'email' })}</Grid>
-          <Grid size={{ xs: 6 }}>{field('Celular', 'celular', { type: 'tel' })}</Grid>
+          <Grid size={{ xs: 6 }}>{field('Email', 'correoElectronico', { type: 'email', autoComplete: 'email', inputProps: { inputMode: 'email' } })}</Grid>
+          <Grid size={{ xs: 6 }}>{field('Celular', 'celular', { type: 'tel', autoComplete: 'tel', inputProps: { inputMode: 'tel' } })}</Grid>
           <Grid size={{ xs: 12 }}>{field('Nacionalidad *', 'nacionalidad')}</Grid>
         </Grid>
       </Box>
@@ -630,7 +665,7 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
           <Grid size={{ xs: 6 }}>{field('Profesion / Ocupacion', 'profesionOcupacion')}</Grid>
           <Grid size={{ xs: 12 }}>{field('Nombre de la Entidad', 'entidad')}</Grid>
           <Grid size={{ xs: 6 }}>{field('Cargo', 'cargo')}</Grid>
-          <Grid size={{ xs: 6 }}>{field('Ingreso Mensual', 'ingresoMensual', { inputProps: { inputMode: 'decimal' } })}</Grid>
+          <Grid size={{ xs: 6 }}>{field('Ingreso Mensual (USD)', 'ingresoMensual', { inputProps: { inputMode: 'decimal' }, placeholder: 'Ej: 1500.00' })}</Grid>
         </Grid>
       </Box>
 
@@ -641,12 +676,12 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
             Complete esta seccion si su estado civil es Casado/a o Union Libre.
           </Alert>
           <Grid container spacing={2}>
-            <Grid size={{ xs: 6 }}>{field('Apellidos', 'conyugeApellidos')}</Grid>
-            <Grid size={{ xs: 6 }}>{field('Nombres', 'conyugeNombres')}</Grid>
-            <Grid size={{ xs: 6 }}>{field('Numero Identificacion', 'conyugeNumeroIdentificacion')}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Apellidos', 'conyugeApellidos', { inputProps: { autoCapitalize: 'words' } })}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Nombres', 'conyugeNombres', { inputProps: { autoCapitalize: 'words' } })}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Numero Identificacion', 'conyugeNumeroIdentificacion', { inputProps: { inputMode: 'numeric', pattern: '[0-9]*' } })}</Grid>
             <Grid size={{ xs: 6 }}>{field('Nacionalidad', 'conyugeNacionalidad')}</Grid>
-            <Grid size={{ xs: 6 }}>{field('Email', 'conyugeEmail', { type: 'email' })}</Grid>
-            <Grid size={{ xs: 6 }}>{field('Celular', 'conyugeCelular', { type: 'tel' })}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Email', 'conyugeEmail', { type: 'email', inputProps: { inputMode: 'email' } })}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Celular', 'conyugeCelular', { type: 'tel', inputProps: { inputMode: 'tel' } })}</Grid>
           </Grid>
         </Box>
       )}
@@ -758,6 +793,7 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [socios, setSocios] = useState([]);
+  const [fieldErrors, setFieldErrors] = useState({});
 
   const SOCIO_EMPTY = { apellidos: '', nombres: '', tipoIdentificacion: 'CEDULA', numeroIdentificacion: '', nacionalidad: 'ECUATORIANA', porcentajeParticipacion: '' };
 
@@ -799,6 +835,13 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
         // PEP
         esPEP: pep.esPEP || false, esFamiliarPEP: pep.esFamiliarPEP || false,
         esColaboradorPEP: pep.esColaboradorPEP || false,
+        pepInstitucion: pep.pepInstitucion || '', pepCargo: pep.pepCargo || '',
+        pepDireccionLaboral: pep.pepDireccionLaboral || '',
+        pepFechaDesde: pep.pepFechaDesde || '', pepFechaHasta: pep.pepFechaHasta || '',
+        pepFamiliarNombre: pep.pepFamiliarNombre || '', pepFamiliarParentesco: pep.pepFamiliarParentesco || '',
+        pepFamiliarCargo: pep.pepFamiliarCargo || '', pepFamiliarInstitucion: pep.pepFamiliarInstitucion || '',
+        pepSocioNombre: pep.pepSocioNombre || '', pepSocioCargo: pep.pepSocioCargo || '',
+        pepSocioInstitucion: pep.pepSocioInstitucion || '',
         aceptaDeclaracion: false,
       });
       setSocios(j.socios && j.socios.length > 0 ? j.socios : []);
@@ -817,6 +860,10 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
         conApellidos: '', conNombres: '', conNumeroIdentificacion: '',
         conNacionalidad: '', conCorreoElectronico: '', conCelular: '',
         esPEP: false, esFamiliarPEP: false, esColaboradorPEP: false,
+        pepInstitucion: '', pepCargo: '', pepDireccionLaboral: '',
+        pepFechaDesde: '', pepFechaHasta: '',
+        pepFamiliarNombre: '', pepFamiliarParentesco: '', pepFamiliarCargo: '', pepFamiliarInstitucion: '',
+        pepSocioNombre: '', pepSocioCargo: '', pepSocioInstitucion: '',
         aceptaDeclaracion: false,
       });
       setSocios([]);
@@ -837,11 +884,68 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
   // Socios helpers
   const addSocio = () => setSocios(prev => [...prev, { ...SOCIO_EMPTY }]);
   const removeSocio = (idx) => setSocios(prev => prev.filter((_, i) => i !== idx));
-  const updateSocio = (idx, field, value) => setSocios(prev => prev.map((s, i) => i === idx ? { ...s, [field]: value } : s));
+  const updateSocio = (idx, fld, value) => setSocios(prev => prev.map((s, i) => i === idx ? { ...s, [fld]: value } : s));
+
+  // Validation
+  const isValidEmail = (v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  const isValidRuc = (v) => /^\d{13}$/.test(v);
+  const isValidCedula = (v) => /^\d{10}$/.test(v);
+  const isValidPhone = (v) => !v || /^\d{7,15}$/.test(v.replace(/[\s\-+]/g, ''));
+
+  const validate = () => {
+    const errs = {};
+    // Compania
+    if (!form.razonSocial.trim()) errs.razonSocial = 'Requerido';
+    if (!form.ruc.trim()) errs.ruc = 'Requerido';
+    else if (!isValidRuc(form.ruc.trim())) errs.ruc = 'RUC debe tener 13 digitos';
+    if (form.emailCompania && !isValidEmail(form.emailCompania)) errs.emailCompania = 'Email invalido';
+    if (form.telefonoCompania && !isValidPhone(form.telefonoCompania)) errs.telefonoCompania = 'Formato invalido';
+    if (form.celularCompania && !isValidPhone(form.celularCompania)) errs.celularCompania = 'Formato invalido';
+    // Rep. Legal
+    if (!form.repApellidos.trim()) errs.repApellidos = 'Requerido';
+    if (!form.repNombres.trim()) errs.repNombres = 'Requerido';
+    if (!form.repNumeroIdentificacion.trim()) errs.repNumeroIdentificacion = 'Requerido';
+    else if (form.repTipoIdentificacion === 'CEDULA' && !isValidCedula(form.repNumeroIdentificacion.trim()))
+      errs.repNumeroIdentificacion = 'Cedula debe tener 10 digitos';
+    if (form.repCorreoElectronico && !isValidEmail(form.repCorreoElectronico)) errs.repCorreoElectronico = 'Email invalido';
+    if (form.repCelular && !isValidPhone(form.repCelular)) errs.repCelular = 'Formato invalido';
+    // Conyuge
+    if (needsConyugeRep) {
+      if (!form.conApellidos.trim()) errs.conApellidos = 'Requerido';
+      if (!form.conNombres.trim()) errs.conNombres = 'Requerido';
+      if (!form.conNumeroIdentificacion.trim()) errs.conNumeroIdentificacion = 'Requerido';
+      if (form.conCorreoElectronico && !isValidEmail(form.conCorreoElectronico)) errs.conCorreoElectronico = 'Email invalido';
+    }
+    // Socios: validar % participacion
+    socios.forEach((s, i) => {
+      const pct = parseFloat(s.porcentajeParticipacion);
+      if (s.porcentajeParticipacion !== '' && (isNaN(pct) || pct < 0 || pct > 100))
+        errs[`socio_${i}_porcentaje`] = 'Debe ser entre 0 y 100';
+    });
+    // PEP
+    if (!form.aceptaDeclaracion) errs.aceptaDeclaracion = 'Debe aceptar la declaracion';
+    setFieldErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      // Navigate to the first tab with errors
+      const companiaFields = ['razonSocial', 'ruc', 'emailCompania', 'telefonoCompania', 'celularCompania'];
+      const repFields = ['repApellidos', 'repNombres', 'repNumeroIdentificacion', 'repCorreoElectronico', 'repCelular'];
+      const conFields = ['conApellidos', 'conNombres', 'conNumeroIdentificacion', 'conCorreoElectronico'];
+      const socioFields = Object.keys(errs).filter(k => k.startsWith('socio_'));
+      const pepFields = ['aceptaDeclaracion'];
+      const errorKeys = Object.keys(errs);
+      if (errorKeys.some(k => companiaFields.includes(k))) setTab(0);
+      else if (errorKeys.some(k => repFields.includes(k))) setTab(1);
+      else if (needsConyugeRep && errorKeys.some(k => conFields.includes(k))) setTab(TABS.indexOf('Conyuge Rep.'));
+      else if (socioFields.length > 0) setTab(TABS.indexOf('Socios'));
+      else if (errorKeys.some(k => pepFields.includes(k))) setTab(TABS.indexOf('PEP'));
+      return false;
+    }
+    return true;
+  };
 
   const handleSave = async () => {
-    if (!form.aceptaDeclaracion) {
-      setError('Debe aceptar la declaracion UAFE para guardar');
+    if (!validate()) {
+      setError('Hay campos con errores. Revise los campos marcados en rojo.');
       return;
     }
     setSaving(true);
@@ -882,6 +986,13 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
           declaracionPEP: {
             esPEP: form.esPEP, esFamiliarPEP: form.esFamiliarPEP,
             esColaboradorPEP: form.esColaboradorPEP,
+            pepInstitucion: form.pepInstitucion, pepCargo: form.pepCargo,
+            pepDireccionLaboral: form.pepDireccionLaboral,
+            pepFechaDesde: form.pepFechaDesde, pepFechaHasta: form.pepFechaHasta,
+            pepFamiliarNombre: form.pepFamiliarNombre, pepFamiliarParentesco: form.pepFamiliarParentesco,
+            pepFamiliarCargo: form.pepFamiliarCargo, pepFamiliarInstitucion: form.pepFamiliarInstitucion,
+            pepSocioNombre: form.pepSocioNombre, pepSocioCargo: form.pepSocioCargo,
+            pepSocioInstitucion: form.pepSocioInstitucion,
           },
         },
       });
@@ -900,8 +1011,8 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
     objetoSocial: 'Actividad economica principal segun la escritura de constitucion',
     porcentajeParticipacion: 'Porcentaje de participacion del socio en la compania (0-100)',
     esPEP: 'Funcionarios publicos de alto nivel, jueces, militares de alto rango, directivos de empresas publicas',
-    esFamiliarPEP: 'Padres, hijos, hermanos, conyuge de una persona PEP (1er y 2do grado de consanguinidad)',
-    esColaboradorPEP: 'Socios comerciales o personas con relacion financiera cercana a un PEP',
+    esFamiliarPEP: 'Padres, hijos, hermanos, conyuge del representante legal que sean PEP (1er y 2do grado de consanguinidad)',
+    esColaboradorPEP: 'Si alguno de los socios de la compania es o ha sido PEP, el representante legal se considera colaborador cercano',
   };
 
   const tipIcon = (key) => TOOLTIPS[key] ? (
@@ -911,13 +1022,15 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
   ) : null;
 
   const field = (label, key, props = {}) => (
-    <TextField fullWidth size="small" label={<>{label}{tipIcon(key)}</>} value={form[key]} onChange={e => u(key, e.target.value)} {...props} />
+    <TextField fullWidth size="small" label={<>{label}{tipIcon(key)}</>} value={form[key]}
+      onChange={e => { u(key, e.target.value); if (fieldErrors[key]) setFieldErrors(prev => { const n = { ...prev }; delete n[key]; return n; }); }}
+      error={!!fieldErrors[key]} helperText={fieldErrors[key] || ''} {...props} />
   );
 
   const selectField = (label, key, options) => (
-    <FormControl fullWidth size="small">
+    <FormControl fullWidth size="small" error={!!fieldErrors[key]}>
       <InputLabel>{label}{tipIcon(key)}</InputLabel>
-      <Select value={form[key]} label={label} onChange={e => u(key, e.target.value)}>
+      <Select value={form[key]} label={label} onChange={e => { u(key, e.target.value); if (fieldErrors[key]) setFieldErrors(prev => { const n = { ...prev }; delete n[key]; return n; }); }}>
         {options.map(o => <MenuItem key={o.value} value={o.value}>{o.label}</MenuItem>)}
       </Select>
     </FormControl>
@@ -945,13 +1058,13 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
       {/* Tab: Compania */}
       <Box sx={{ display: tab === 0 ? 'block' : 'none' }}>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 12 }}>{field('Razon Social *', 'razonSocial')}</Grid>
-          <Grid size={{ xs: 6 }}>{field('RUC *', 'ruc')}</Grid>
+          <Grid size={{ xs: 12 }}>{field('Razon Social *', 'razonSocial', { inputProps: { autoCapitalize: 'words' } })}</Grid>
+          <Grid size={{ xs: 6 }}>{field('RUC *', 'ruc', { inputProps: { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 13 }, placeholder: '13 digitos' })}</Grid>
           <Grid size={{ xs: 6 }}>{field('Objeto Social', 'objetoSocial')}</Grid>
           <Grid size={{ xs: 12 }}>
             <Divider sx={{ my: 1 }}><Typography variant="caption" sx={{ color: COLORS.textMuted }}>Direccion</Typography></Divider>
           </Grid>
-          <Grid size={{ xs: 8 }}>{field('Calle Principal', 'compCallePrincipal')}</Grid>
+          <Grid size={{ xs: 8 }}>{field('Calle Principal', 'compCallePrincipal', { autoComplete: 'street-address' })}</Grid>
           <Grid size={{ xs: 4 }}>{field('Numero', 'compNumero')}</Grid>
           <Grid size={{ xs: 12 }}>{field('Calle Secundaria', 'compCalleSecundaria')}</Grid>
           <Grid size={{ xs: 4 }}>{field('Provincia', 'compProvincia')}</Grid>
@@ -960,17 +1073,17 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
           <Grid size={{ xs: 12 }}>
             <Divider sx={{ my: 1 }}><Typography variant="caption" sx={{ color: COLORS.textMuted }}>Contacto</Typography></Divider>
           </Grid>
-          <Grid size={{ xs: 4 }}>{field('Email Compania', 'emailCompania', { type: 'email' })}</Grid>
-          <Grid size={{ xs: 4 }}>{field('Telefono', 'telefonoCompania', { type: 'tel' })}</Grid>
-          <Grid size={{ xs: 4 }}>{field('Celular', 'celularCompania', { type: 'tel' })}</Grid>
+          <Grid size={{ xs: 4 }}>{field('Email Compania', 'emailCompania', { type: 'email', inputProps: { inputMode: 'email' } })}</Grid>
+          <Grid size={{ xs: 4 }}>{field('Telefono', 'telefonoCompania', { type: 'tel', inputProps: { inputMode: 'tel' } })}</Grid>
+          <Grid size={{ xs: 4 }}>{field('Celular', 'celularCompania', { type: 'tel', inputProps: { inputMode: 'tel' } })}</Grid>
         </Grid>
       </Box>
 
       {/* Tab: Representante Legal */}
       <Box sx={{ display: tab === 1 ? 'block' : 'none' }}>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 6 }}>{field('Apellidos *', 'repApellidos')}</Grid>
-          <Grid size={{ xs: 6 }}>{field('Nombres *', 'repNombres')}</Grid>
+          <Grid size={{ xs: 6 }}>{field('Apellidos *', 'repApellidos', { autoComplete: 'family-name', inputProps: { autoCapitalize: 'words' } })}</Grid>
+          <Grid size={{ xs: 6 }}>{field('Nombres *', 'repNombres', { autoComplete: 'given-name', inputProps: { autoCapitalize: 'words' } })}</Grid>
           <Grid size={{ xs: 4 }}>
             {selectField('Tipo Identificacion', 'repTipoIdentificacion', [
               { value: 'CEDULA', label: 'Cedula' },
@@ -978,17 +1091,17 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
               { value: 'RUC', label: 'RUC' },
             ])}
           </Grid>
-          <Grid size={{ xs: 4 }}>{field('Numero Identificacion *', 'repNumeroIdentificacion')}</Grid>
+          <Grid size={{ xs: 4 }}>{field('Numero Identificacion *', 'repNumeroIdentificacion', { inputProps: { inputMode: 'numeric', pattern: '[0-9]*' } })}</Grid>
           <Grid size={{ xs: 4 }}>{field('Nacionalidad', 'repNacionalidad')}</Grid>
           <Grid size={{ xs: 4 }}>{selectField('Genero', 'repGenero', [{ value: 'MASCULINO', label: 'Masculino' }, { value: 'FEMENINO', label: 'Femenino' }])}</Grid>
           <Grid size={{ xs: 4 }}>{selectField('Estado Civil', 'repEstadoCivil', ESTADOS_CIVILES)}</Grid>
           <Grid size={{ xs: 4 }}>{selectField('Nivel Estudio', 'repNivelEstudio', NIVELES_ESTUDIO)}</Grid>
-          <Grid size={{ xs: 6 }}>{field('Celular', 'repCelular', { type: 'tel' })}</Grid>
-          <Grid size={{ xs: 6 }}>{field('Correo Electronico', 'repCorreoElectronico', { type: 'email' })}</Grid>
+          <Grid size={{ xs: 6 }}>{field('Celular', 'repCelular', { type: 'tel', autoComplete: 'tel', inputProps: { inputMode: 'tel' } })}</Grid>
+          <Grid size={{ xs: 6 }}>{field('Correo Electronico', 'repCorreoElectronico', { type: 'email', autoComplete: 'email', inputProps: { inputMode: 'email' } })}</Grid>
           <Grid size={{ xs: 12 }}>
             <Divider sx={{ my: 1 }}><Typography variant="caption" sx={{ color: COLORS.textMuted }}>Direccion Representante</Typography></Divider>
           </Grid>
-          <Grid size={{ xs: 8 }}>{field('Calle Principal', 'repCallePrincipal')}</Grid>
+          <Grid size={{ xs: 8 }}>{field('Calle Principal', 'repCallePrincipal', { autoComplete: 'street-address' })}</Grid>
           <Grid size={{ xs: 4 }}>{field('Numero', 'repNumero')}</Grid>
           <Grid size={{ xs: 12 }}>{field('Calle Secundaria', 'repCalleSecundaria')}</Grid>
           <Grid size={{ xs: 4 }}>{field('Provincia', 'repProvincia')}</Grid>
@@ -1004,12 +1117,12 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
             Complete esta seccion si el representante legal es Casado/a o Union Libre.
           </Alert>
           <Grid container spacing={2}>
-            <Grid size={{ xs: 6 }}>{field('Apellidos', 'conApellidos')}</Grid>
-            <Grid size={{ xs: 6 }}>{field('Nombres', 'conNombres')}</Grid>
-            <Grid size={{ xs: 6 }}>{field('Numero Identificacion', 'conNumeroIdentificacion')}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Apellidos *', 'conApellidos', { inputProps: { autoCapitalize: 'words' } })}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Nombres *', 'conNombres', { inputProps: { autoCapitalize: 'words' } })}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Numero Identificacion *', 'conNumeroIdentificacion', { inputProps: { inputMode: 'numeric', pattern: '[0-9]*' } })}</Grid>
             <Grid size={{ xs: 6 }}>{field('Nacionalidad', 'conNacionalidad')}</Grid>
-            <Grid size={{ xs: 6 }}>{field('Correo Electronico', 'conCorreoElectronico', { type: 'email' })}</Grid>
-            <Grid size={{ xs: 6 }}>{field('Celular', 'conCelular', { type: 'tel' })}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Correo Electronico', 'conCorreoElectronico', { type: 'email', inputProps: { inputMode: 'email' } })}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Celular', 'conCelular', { type: 'tel', inputProps: { inputMode: 'tel' } })}</Grid>
           </Grid>
         </Box>
       )}
@@ -1032,11 +1145,13 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
             <Grid container spacing={1.5}>
               <Grid size={{ xs: 6 }}>
                 <TextField fullWidth size="small" label="Apellidos" value={socio.apellidos}
-                  onChange={e => updateSocio(idx, 'apellidos', e.target.value)} />
+                  onChange={e => updateSocio(idx, 'apellidos', e.target.value)}
+                  inputProps={{ autoCapitalize: 'words' }} />
               </Grid>
               <Grid size={{ xs: 6 }}>
                 <TextField fullWidth size="small" label="Nombres" value={socio.nombres}
-                  onChange={e => updateSocio(idx, 'nombres', e.target.value)} />
+                  onChange={e => updateSocio(idx, 'nombres', e.target.value)}
+                  inputProps={{ autoCapitalize: 'words' }} />
               </Grid>
               <Grid size={{ xs: 4 }}>
                 <FormControl fullWidth size="small">
@@ -1051,7 +1166,8 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
               </Grid>
               <Grid size={{ xs: 4 }}>
                 <TextField fullWidth size="small" label="Numero ID" value={socio.numeroIdentificacion}
-                  onChange={e => updateSocio(idx, 'numeroIdentificacion', e.target.value)} />
+                  onChange={e => updateSocio(idx, 'numeroIdentificacion', e.target.value)}
+                  inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }} />
               </Grid>
               <Grid size={{ xs: 4 }}>
                 <TextField fullWidth size="small" label="Nacionalidad" value={socio.nacionalidad}
@@ -1062,6 +1178,8 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
                   label={<>% Participacion{tipIcon('porcentajeParticipacion')}</>}
                   value={socio.porcentajeParticipacion}
                   onChange={e => updateSocio(idx, 'porcentajeParticipacion', e.target.value)}
+                  error={!!fieldErrors[`socio_${idx}_porcentaje`]}
+                  helperText={fieldErrors[`socio_${idx}_porcentaje`] || ''}
                   inputProps={{ inputMode: 'decimal' }} />
               </Grid>
             </Grid>
@@ -1080,15 +1198,55 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
         <Alert severity="warning" sx={{ mb: 2, borderRadius: '8px' }}>
           <Typography variant="caption" sx={{ fontWeight: 600 }}>Persona Expuesta Politicamente (PEP)</Typography>
           <Typography variant="caption" sx={{ display: 'block' }}>
-            Se considera PEP a quienes desempenan o han desempenado funciones publicas destacadas.
+            Se considera PEP a quienes desempenan o han desempenado funciones publicas destacadas en los ultimos 5 anos.
           </Typography>
         </Alert>
+
         <FormControlLabel control={<Checkbox checked={form.esPEP} onChange={e => u('esPEP', e.target.checked)} />}
           label={<Typography variant="body2">¿El representante legal es una Persona Expuesta Politicamente?{tipIcon('esPEP')}</Typography>} sx={{ mb: 1 }} />
+        {form.esPEP && (
+          <Grid container spacing={2} sx={{ ml: 3, mb: 2 }}>
+            <Grid size={{ xs: 6 }}>{field('Institucion donde labora', 'pepInstitucion')}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Cargo que desempena', 'pepCargo')}</Grid>
+            <Grid size={{ xs: 12 }}>{field('Direccion laboral (completa)', 'pepDireccionLaboral')}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Fecha de designacion', 'pepFechaDesde', { type: 'date', InputLabelProps: { shrink: true } })}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Fecha de culminacion (si aplica)', 'pepFechaHasta', { type: 'date', InputLabelProps: { shrink: true } })}</Grid>
+          </Grid>
+        )}
+
         <FormControlLabel control={<Checkbox checked={form.esFamiliarPEP} onChange={e => u('esFamiliarPEP', e.target.checked)} />}
-          label={<Typography variant="body2">¿Es familiar de un PEP?{tipIcon('esFamiliarPEP')}</Typography>} sx={{ mb: 1 }} />
+          label={<Typography variant="body2">¿El representante legal es familiar de un PEP?{tipIcon('esFamiliarPEP')}</Typography>} sx={{ mb: 1 }} />
+        {form.esFamiliarPEP && (
+          <Grid container spacing={2} sx={{ ml: 3, mb: 2 }}>
+            <Grid size={{ xs: 6 }}>{field('Nombre completo del PEP', 'pepFamiliarNombre')}</Grid>
+            <Grid size={{ xs: 6 }}>
+              {selectField('Parentesco', 'pepFamiliarParentesco', [
+                { value: 'CONYUGE', label: 'Conyuge' }, { value: 'PADRE', label: 'Padre' },
+                { value: 'MADRE', label: 'Madre' }, { value: 'HIJO_A', label: 'Hijo/a' },
+                { value: 'HERMANO_A', label: 'Hermano/a' }, { value: 'OTRO', label: 'Otro' },
+              ])}
+            </Grid>
+            <Grid size={{ xs: 6 }}>{field('Cargo del PEP', 'pepFamiliarCargo')}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Institucion del PEP', 'pepFamiliarInstitucion')}</Grid>
+          </Grid>
+        )}
+
         <FormControlLabel control={<Checkbox checked={form.esColaboradorPEP} onChange={e => u('esColaboradorPEP', e.target.checked)} />}
-          label={<Typography variant="body2">¿Es colaborador cercano de un PEP?{tipIcon('esColaboradorPEP')}</Typography>} sx={{ mb: 2 }} />
+          label={<Typography variant="body2">¿Alguno de los socios de la compania es PEP?{tipIcon('esColaboradorPEP')}</Typography>} sx={{ mb: 1 }} />
+        {form.esColaboradorPEP && (
+          <Grid container spacing={2} sx={{ ml: 3, mb: 2 }}>
+            <Grid size={{ xs: 12 }}>
+              <Alert severity="info" sx={{ borderRadius: '8px', mb: 1 }}>
+                <Typography variant="caption">
+                  Si un socio es PEP, el representante legal se considera colaborador cercano de dicho PEP.
+                </Typography>
+              </Alert>
+            </Grid>
+            <Grid size={{ xs: 6 }}>{field('Nombre completo del socio PEP', 'pepSocioNombre')}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Cargo publico del socio', 'pepSocioCargo')}</Grid>
+            <Grid size={{ xs: 12 }}>{field('Institucion donde labora/laboraba el socio', 'pepSocioInstitucion')}</Grid>
+          </Grid>
+        )}
 
         <Divider sx={{ my: 2 }} />
         <Typography variant="caption" sx={{ color: COLORS.textSecondary, display: 'block', mb: 1, lineHeight: 1.5, whiteSpace: 'pre-line' }}>

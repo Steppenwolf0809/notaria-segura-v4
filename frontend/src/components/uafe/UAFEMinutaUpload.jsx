@@ -368,17 +368,23 @@ export default function UAFEMinutaUpload({ protocoloId, onComplete, onCancel }) 
           <TextField
             size="small"
             label="Cuantia (USD)"
-            type="number"
+            inputProps={{ inputMode: 'decimal' }}
             value={extractedData?.cuantia ?? ''}
-            onChange={(e) => updateField('cuantia', parseFloat(e.target.value) || null)}
+            onChange={(e) => {
+              const v = e.target.value.replace(',', '.');
+              if (v === '' || /^\d*\.?\d*$/.test(v)) updateField('cuantia', v === '' ? null : v);
+            }}
           />
 
           <TextField
             size="small"
             label="Avaluo Municipal (USD)"
-            type="number"
+            inputProps={{ inputMode: 'decimal' }}
             value={extractedData?.avaluoMunicipal ?? ''}
-            onChange={(e) => updateField('avaluoMunicipal', parseFloat(e.target.value) || null)}
+            onChange={(e) => {
+              const v = e.target.value.replace(',', '.');
+              if (v === '' || /^\d*\.?\d*$/.test(v)) updateField('avaluoMunicipal', v === '' ? null : v);
+            }}
           />
 
           <FormControl size="small" fullWidth>
