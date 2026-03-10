@@ -11,36 +11,64 @@
 
 import prisma from '../db.js';
 
-// Labels legibles para los campos faltantes
+// Labels legibles para los campos faltantes (alineados con formulario Word)
 const LABELS_CAMPOS = {
+    // Persona Natural - Datos personales
     apellidos: 'Apellidos',
     nombres: 'Nombres',
     genero: 'Genero',
     estadoCivil: 'Estado civil',
     nacionalidad: 'Nacionalidad',
+    nivelEstudio: 'Nivel de estudio',
+    // Contacto
     celular: 'Celular',
     correo: 'Correo electronico',
+    // Direccion
     callePrincipal: 'Calle principal',
     numeroCasa: 'Numero de casa',
+    calleSecundaria: 'Calle secundaria',
     provincia: 'Provincia',
     canton: 'Canton',
     parroquia: 'Parroquia',
+    sector: 'Sector',
+    // Laboral
     situacionLaboral: 'Situacion laboral',
     profesion: 'Profesion/Ocupacion',
+    entidadLaboral: 'Entidad donde trabaja',
+    cargoLaboral: 'Cargo laboral',
     ingresoMensual: 'Ingreso mensual',
+    // Conyuge
     conyugeApellidos: 'Apellidos conyuge',
     conyugeNombres: 'Nombres conyuge',
+    conyugeTipoId: 'Tipo ID conyuge',
     conyugeNumeroId: 'Cedula conyuge',
+    conyugeNacionalidad: 'Nacionalidad conyuge',
+    // PEP
     pep: 'Declaracion PEP',
+    // Persona Juridica - Compania
     razonSocial: 'Razon social',
     ruc: 'RUC',
     objetoSocial: 'Objeto social',
     contactoCompania: 'Contacto compania',
+    dirCompCallePrincipal: 'Calle principal compania',
+    dirCompProvincia: 'Provincia compania',
+    dirCompCanton: 'Canton compania',
+    dirCompParroquia: 'Parroquia compania',
+    // Representante legal
     repApellidos: 'Apellidos representante',
     repNombres: 'Nombres representante',
+    repTipoId: 'Tipo ID representante',
     repNumeroId: 'Cedula representante',
     repGenero: 'Genero representante',
     repEstadoCivil: 'Estado civil representante',
+    repNivelEstudio: 'Nivel estudio representante',
+    repCelular: 'Celular representante',
+    repCorreo: 'Correo representante',
+    dirRepCallePrincipal: 'Calle principal representante',
+    dirRepProvincia: 'Provincia representante',
+    dirRepCanton: 'Canton representante',
+    dirRepParroquia: 'Parroquia representante',
+    // Conyuge representante
     conyugeRepApellidos: 'Apellidos conyuge representante',
     conyugeRepNombres: 'Nombres conyuge representante',
     conyugeRepNumeroId: 'Cedula conyuge representante',
@@ -103,31 +131,42 @@ export function calcularCompletitudPersonaNatural(datos) {
     checkField('nombres', personales.nombres, true);
     checkField('nacionalidad', personales.nacionalidad, true);
 
-    // 2. Campos debida diligencia (no bloquean reporte)
+    // 2. Datos personales (aparecen en Word)
     checkField('genero', personales.genero, false);
     checkField('estadoCivil', personales.estadoCivil, false);
+    checkField('nivelEstudio', personales.nivelEstudio, false);
+
+    // 3. Contacto
     checkField('celular', contacto.celular, false);
     checkField('correo', contacto.correoElectronico || contacto.correo, false);
 
-    // 3. Dirección - debida diligencia
+    // 4. Dirección completa (todos aparecen en Word)
     checkField('callePrincipal', direccion.callePrincipal, false);
     checkField('numeroCasa', direccion.numero, false);
+    checkField('calleSecundaria', direccion.calleSecundaria, false);
     checkField('provincia', direccion.provincia, false);
     checkField('canton', direccion.canton, false);
     checkField('parroquia', direccion.parroquia, false);
+    checkField('sector', direccion.sector, false);
 
-    // 4. Información laboral - debida diligencia
-    checkField('situacionLaboral', laboral.situacion, false);
+    // 5. Información laboral completa (todos aparecen en Word)
+    checkField('situacionLaboral', laboral.situacion || laboral.situacionLaboral, false);
     checkField('profesion', laboral.profesionOcupacion, false);
+    checkField('entidadLaboral', laboral.entidad || laboral.nombreEmpresa, false);
+    checkField('cargoLaboral', laboral.cargo, false);
+    checkField('ingresoMensual', laboral.ingresoMensual, false);
 
-    // 5. PEP - debida diligencia
+    // 6. PEP
     checkField('pep', declaracion.esPEP != null ? String(declaracion.esPEP) : null, false);
 
-    // 6. Si es casado o unión libre, cónyuge - debida diligencia
-    if (personales.estadoCivil === 'CASADO' || personales.estadoCivil === 'UNION_LIBRE') {
+    // 7. Si es casado o unión libre, cónyuge completo (todos aparecen en Word)
+    const esCasado = ['CASADO', 'UNION_LIBRE', 'CASADO_CON_DISOLUCION', 'UNION_LIBRE_CON_SEPARACION'].includes(personales.estadoCivil);
+    if (esCasado) {
         checkField('conyugeApellidos', conyuge.apellidos, false);
         checkField('conyugeNombres', conyuge.nombres, false);
+        checkField('conyugeTipoId', conyuge.tipoIdentificacion, false);
         checkField('conyugeNumeroId', conyuge.numeroIdentificacion, false);
+        checkField('conyugeNacionalidad', conyuge.nacionalidad, false);
     }
 
     // Calcular porcentaje
@@ -152,7 +191,7 @@ export function calcularCompletitudPersonaNatural(datos) {
     resultado.detalles = {
         camposTotal,
         camposLlenos,
-        esCasado: personales.estadoCivil === 'CASADO' || personales.estadoCivil === 'UNION_LIBRE',
+        esCasado,
         uafeCompleto: resultado.camposUafeFaltantes.length === 0,
     };
 
@@ -183,7 +222,9 @@ export function calcularCompletitudPersonaJuridica(datos) {
 
     const juridica = datos.datosPersonaJuridica;
     const compania = juridica.compania || {};
+    const dirComp = compania.direccion || {};
     const representante = juridica.representanteLegal || {};
+    const dirRep = representante.direccion || {};
     const conyugeRep = juridica.conyugeRepresentante || {};
 
     let camposTotal = 0;
@@ -205,15 +246,14 @@ export function calcularCompletitudPersonaJuridica(datos) {
         }
     };
 
-    // UAFE obligatorio
+    // 1. Compania - UAFE obligatorio
     checkField('razonSocial', compania.razonSocial, true);
     checkField('ruc', compania.ruc, true);
 
-    // Debida diligencia
+    // 2. Compania - debida diligencia
     checkField('objetoSocial', compania.objetoSocial, false);
-    checkField('parroquia', compania.parroquia, false);
 
-    // Al menos un contacto - DD
+    // 3. Contacto compania
     camposTotal++;
     if (compania.emailCompania || compania.telefonoCompania || compania.celularCompania) {
         camposLlenos++;
@@ -223,17 +263,38 @@ export function calcularCompletitudPersonaJuridica(datos) {
         resultado.camposDDFaltantes.push(label);
     }
 
-    // Representante legal - UAFE obligatorio
+    // 4. Direccion compania (aparece en Word)
+    checkField('dirCompCallePrincipal', dirComp.callePrincipal, false);
+    checkField('dirCompProvincia', dirComp.provincia, false);
+    checkField('dirCompCanton', dirComp.canton, false);
+    checkField('dirCompParroquia', dirComp.parroquia, false);
+
+    // 5. Representante legal - UAFE obligatorio
     checkField('repApellidos', representante.apellidos, true);
     checkField('repNombres', representante.nombres, true);
+    checkField('repTipoId', representante.tipoIdentificacion, false);
     checkField('repNumeroId', representante.numeroIdentificacion, true);
 
-    // DD
+    // 6. Representante - debida diligencia
     checkField('repGenero', representante.genero, false);
     checkField('repEstadoCivil', representante.estadoCivil, false);
+    checkField('repNivelEstudio', representante.nivelEstudio, false);
+    checkField('repCelular', representante.celular, false);
+    checkField('repCorreo', representante.correoElectronico, false);
 
-    // Si representante es casado, validar cónyuge (DD)
-    if (representante.estadoCivil === 'CASADO' || representante.estadoCivil === 'UNION_LIBRE') {
+    // 7. Direccion representante (aparece en Word)
+    checkField('dirRepCallePrincipal', dirRep.callePrincipal, false);
+    checkField('dirRepProvincia', dirRep.provincia, false);
+    checkField('dirRepCanton', dirRep.canton, false);
+    checkField('dirRepParroquia', dirRep.parroquia, false);
+
+    // 8. PEP
+    const pep = juridica.declaracionPEP || {};
+    checkField('pep', pep.esPEP != null ? String(pep.esPEP) : null, false);
+
+    // 9. Si representante es casado, validar cónyuge
+    const repEsCasado = ['CASADO', 'UNION_LIBRE', 'CASADO_CON_DISOLUCION', 'UNION_LIBRE_CON_SEPARACION'].includes(representante.estadoCivil);
+    if (repEsCasado) {
         checkField('conyugeRepApellidos', conyugeRep.apellidos, false);
         checkField('conyugeRepNombres', conyugeRep.nombres, false);
         checkField('conyugeRepNumeroId', conyugeRep.numeroIdentificacion, false);
@@ -260,7 +321,7 @@ export function calcularCompletitudPersonaJuridica(datos) {
     resultado.detalles = {
         camposTotal,
         camposLlenos,
-        repEsCasado: representante.estadoCivil === 'CASADO' || representante.estadoCivil === 'UNION_LIBRE',
+        repEsCasado,
         uafeCompleto: resultado.camposUafeFaltantes.length === 0,
     };
 

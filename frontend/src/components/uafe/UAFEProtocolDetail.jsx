@@ -561,9 +561,45 @@ function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm, on
                 />
 
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography sx={{ fontWeight: 600, fontSize: '0.85rem', color: UAFE_COLORS.textPrimary }}>
-                    {nombre}
-                  </Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                    <Typography sx={{ fontWeight: 600, fontSize: '0.85rem', color: UAFE_COLORS.textPrimary }}>
+                      {nombre}
+                    </Typography>
+                    {(p.camposFaltantes || []).length > 0 && p.estadoCompletitud !== 'completo' && (
+                      <Tooltip
+                        arrow
+                        title={
+                          <Box sx={{ maxWidth: 280 }}>
+                            <Typography variant="caption" sx={{ fontWeight: 700, display: 'block', mb: 0.5 }}>
+                              Campos pendientes:
+                            </Typography>
+                            {(p.camposFaltantes || []).map((c, i) => (
+                              <Typography key={i} variant="caption" sx={{ display: 'block', fontSize: '0.68rem' }}>
+                                • {c}
+                              </Typography>
+                            ))}
+                          </Box>
+                        }
+                      >
+                        <Chip
+                          size="small"
+                          icon={<WarningAmberIcon sx={{ fontSize: '13px !important' }} />}
+                          label={`${(p.camposFaltantes || []).length} pendientes`}
+                          sx={{
+                            fontSize: '0.63rem',
+                            fontWeight: 600,
+                            height: 22,
+                            backgroundColor: p.estadoCompletitud === 'pendiente' ? '#ffebee' : '#fff8e1',
+                            color: p.estadoCompletitud === 'pendiente' ? '#c62828' : '#e65100',
+                            '& .MuiChip-icon': {
+                              color: p.estadoCompletitud === 'pendiente' ? '#c62828' : '#e65100',
+                            },
+                            cursor: 'help',
+                          }}
+                        />
+                      </Tooltip>
+                    )}
+                  </Box>
                   <Typography variant="caption" sx={{ color: UAFE_COLORS.textMuted }}>
                     {cedula} &middot; {p.calidad || 'Sin calidad'}
                     {p.actuaPor && p.actuaPor !== 'PROPIOS_DERECHOS' && ` · Representado/a`}
