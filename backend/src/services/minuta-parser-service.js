@@ -379,41 +379,39 @@ function extractWithRegex(text) {
   const intlMatches = comparecientesText.match(/\+\d[\d()\s.-]{8,}/g) || [];
   intlMatches.forEach(t => telefonos.add(t.replace(/[\s.-]/g, '')));
 
-  // Tipo de acto - detectar del encabezado
+  // Tipo de acto - detectar del encabezado (códigos: Catalogo-Notarios.xls)
   let tipoActoDetectado = null;
   const upperText = text.toUpperCase();
-  if (upperText.includes('PROMESA DE COMPRAVENTA') || upperText.includes('PROMESA DE COMPRA VENTA')) {
-    tipoActoDetectado = { codigo: '85', descripcion: 'PROMESA DE COMPRAVENTA DE INMUEBLES' };
+  // Buscar frases exactas para transferencia de dominio con hipoteca (evitar falsos positivos)
+  const hasTransferenciaHipoteca = /TRANSFERENCIA\s+DE\s+DOMINIO\s+CON\s+(?:CONSTITUCI[OÓ]N\s+DE\s+)?HIPOTECA/i.test(upperText);
+  if (upperText.includes('PROMESA DE COMPRAVENTA') || upperText.includes('PROMESA DE COMPRA VENTA') || upperText.includes('PROMESA DE CELEBRAR')) {
+    tipoActoDetectado = { codigo: '73', descripcion: 'PROMESA DE CELEBRAR CONTRATOS' };
+  } else if (hasTransferenciaHipoteca && (upperText.includes('BIESS') || upperText.includes('ISSFA') || upperText.includes('ISSPOL'))) {
+    tipoActoDetectado = { codigo: '78', descripcion: 'CONSTITUCION DE HIPOTECA A FAVOR DEL BIESS' };
+  } else if (hasTransferenciaHipoteca) {
+    tipoActoDetectado = { codigo: '76', descripcion: 'TRANSFERENCIA DE DOMINIO CON CONSTITUCION DE HIPOTECA' };
   } else if (upperText.includes('COMPRAVENTA') && !upperText.includes('PROMESA')) {
-    tipoActoDetectado = { codigo: '73', descripcion: 'COMPRAVENTA DE INMUEBLES' };
+    tipoActoDetectado = { codigo: '74', descripcion: 'COMPRAVENTA' };
   } else if (upperText.includes('DONACI')) {
-    if (upperText.includes('VEHICULO') || upperText.includes('VEHÍCULO')) {
-      tipoActoDetectado = { codigo: '76', descripcion: 'DONACION DE VEHICULOS' };
-    } else {
-      tipoActoDetectado = { codigo: '75', descripcion: 'DONACION DE INMUEBLES' };
-    }
+    tipoActoDetectado = { codigo: '81', descripcion: 'DONACION' };
   } else if (upperText.includes('PERMUTA')) {
-    tipoActoDetectado = { codigo: '77', descripcion: 'PERMUTA DE INMUEBLES' };
-  } else if (upperText.includes('DACI[OÓ]N EN PAGO')) {
-    tipoActoDetectado = { codigo: '79', descripcion: 'DACION EN PAGO DE INMUEBLES' };
-  } else if (upperText.includes('APORTE') && upperText.includes('SOCIEDAD')) {
-    tipoActoDetectado = { codigo: '81', descripcion: 'APORTE A SOCIEDAD DE INMUEBLES' };
-  } else if (upperText.includes('FIDEICOMISO')) {
-    tipoActoDetectado = { codigo: '83', descripcion: 'FIDEICOMISO DE INMUEBLES' };
-  } else if (upperText.includes('CAPITULACIONES MATRIMONIALES')) {
-    tipoActoDetectado = { codigo: '86', descripcion: 'CAPITULACIONES MATRIMONIALES' };
+    tipoActoDetectado = { codigo: '82', descripcion: 'PERMUTA' };
+  } else if (/DACI[OÓ]N\s+EN\s+PAGO/.test(upperText)) {
+    tipoActoDetectado = { codigo: '85', descripcion: 'DACION EN PAGO' };
   } else if (upperText.includes('LIQUIDACI') && upperText.includes('CONYUGAL')) {
-    tipoActoDetectado = { codigo: '87', descripcion: 'LIQUIDACION DE SOCIEDAD CONYUGAL' };
-  } else if (upperText.includes('PARTICI') && upperText.includes('BIENES')) {
-    tipoActoDetectado = { codigo: '88', descripcion: 'PARTICION DE BIENES' };
-  } else if (upperText.includes('ADJUDICACI')) {
-    tipoActoDetectado = { codigo: '89', descripcion: 'ADJUDICACION DE INMUEBLES' };
-  } else if (upperText.includes('CESI[OÓ]N') && upperText.includes('HERENCIALES')) {
-    tipoActoDetectado = { codigo: '90', descripcion: 'CESION DE DERECHOS HERENCIALES' };
-  } else if (upperText.includes('PATRIMONIO FAMILIAR')) {
-    tipoActoDetectado = { codigo: '91', descripcion: 'CONSTITUCION DE PATRIMONIO FAMILIAR' };
+    tipoActoDetectado = { codigo: '83', descripcion: 'LIQUIDACION DE LA SOCIEDAD CONYUGAL' };
+  } else if (upperText.includes('LIQUIDACI') && upperText.includes('BIENES')) {
+    tipoActoDetectado = { codigo: '84', descripcion: 'LIQUIDACION DE LA SOCIEDAD DE BIENES' };
+  } else if (/CESI[OÓ]N\s+DE\s+DERECHOS/.test(upperText)) {
+    tipoActoDetectado = { codigo: '86', descripcion: 'CESION DE DERECHOS ONEROSOS' };
+  } else if (upperText.includes('COMODATO')) {
+    tipoActoDetectado = { codigo: '87', descripcion: 'COMODATO' };
+  } else if (/CESI[OÓ]N\s+DE\s+PARTICIPACIONES/.test(upperText)) {
+    tipoActoDetectado = { codigo: '90', descripcion: 'CESION DE PARTICIPACIONES' };
+  } else if (upperText.includes('HIPOTECA ABIERTA')) {
+    tipoActoDetectado = { codigo: '79', descripcion: 'CONSTITUCION DE HIPOTECA ABIERTA' };
   } else if (upperText.includes('HIPOTECA')) {
-    tipoActoDetectado = { codigo: '92', descripcion: 'HIPOTECA ABIERTA' };
+    tipoActoDetectado = { codigo: '77', descripcion: 'CONSTITUCION DE HIPOTECA' };
   }
 
   // Advertencias de parseo (feedback para el matrizador)
@@ -531,8 +529,8 @@ INSTRUCCIONES:
 
 FORMATO JSON REQUERIDO:
 {
-  "tipoActo": "COMPRAVENTA DE INMUEBLES",
-  "codigoActo": "73",
+  "tipoActo": "COMPRAVENTA",
+  "codigoActo": "74",
   "comparecientes": [
     {
       "nombres": "NOMBRE1 NOMBRE2",
@@ -559,22 +557,22 @@ FORMATO JSON REQUERIDO:
   ]
 }
 
-CODIGOS DE TIPO ACTO:
-73=COMPRAVENTA INMUEBLES, 74=COMPRAVENTA VEHICULOS, 75=DONACION INMUEBLES,
-76=DONACION VEHICULOS, 77=PERMUTA INMUEBLES, 78=PERMUTA VEHICULOS,
-79=DACION EN PAGO INMUEBLES, 80=DACION EN PAGO VEHICULOS,
-81=APORTE SOCIEDAD INMUEBLES, 82=APORTE SOCIEDAD VEHICULOS,
-83=FIDEICOMISO INMUEBLES, 84=FIDEICOMISO VEHICULOS,
-85=PROMESA COMPRAVENTA INMUEBLES, 86=CAPITULACIONES MATRIMONIALES,
-87=LIQUIDACION SOCIEDAD CONYUGAL, 88=PARTICION DE BIENES,
-89=ADJUDICACION INMUEBLES, 90=CESION DERECHOS HERENCIALES,
-91=PATRIMONIO FAMILIAR, 92=HIPOTECA ABIERTA, 93=OTROS
+CODIGOS DE TIPO ACTO (Catálogo UAFE):
+73=PROMESA DE CELEBRAR CONTRATOS, 74=COMPRAVENTA,
+75=COMPRAVENTA MIDUVI, 76=TRANSFERENCIA DE DOMINIO CON HIPOTECA,
+77=CONSTITUCION DE HIPOTECA, 78=HIPOTECA BIESS/ISSFA/ISSPOL,
+79=HIPOTECA ABIERTA, 80=HIPOTECA MIDUVI,
+81=DONACION, 82=PERMUTA,
+83=LIQUIDACION SOCIEDAD CONYUGAL, 84=LIQUIDACION SOCIEDAD DE BIENES,
+85=DACION EN PAGO, 86=CESION DE DERECHOS ONEROSOS,
+87=COMODATO, 88=CONSTITUCION DE CONSORCIOS,
+89=TRASPASO DE CREDITO, 90=CESION DE PARTICIPACIONES
 
 CODIGOS TIPO BIEN: CAS=Casa, DEP=Departamento, TER=Terreno, EDI=Edificio, OFI=Oficina, VEH=Vehiculo, EMB=Embarcacion, OTR=Otro
 
-CALIDADES: VENDEDOR, COMPRADOR, DONANTE, DONATARIO, PERMUTANTE, PROMITENTE_VENDEDOR, PROMITENTE_COMPRADOR, CEDENTE, CESIONARIO, ADJUDICATARIO, OTRO
+CALIDADES: VENDEDOR, COMPRADOR, COMPRADOR_DEUDOR_HIPOTECARIO, DONANTE, DONATARIO, PERMUTANTE, DEUDOR_HIPOTECARIO, ACREEDOR_HIPOTECARIO, PROMITENTE_VENDEDOR, PROMITENTE_COMPRADOR, CEDENTE, CESIONARIO, COMPARECIENTE, COMODANTE, COMODATARIO
 
-ACTUA POR: PROPIOS_DERECHOS, APODERADO_GENERAL, APODERADO_ESPECIAL, REPRESENTANTE_LEGAL, REPRESENTANTE_MENOR
+ACTUA POR: PROPIOS_DERECHOS, APODERADO_GENERAL, APODERADO_ESPECIAL, REPRESENTANTE_LEGAL
 
 FRAGMENTO DE MINUTA:
 `;

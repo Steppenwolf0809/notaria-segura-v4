@@ -140,28 +140,26 @@ export function getUAFEColors(isDark) {
 }
 
 // ── UAFE Catalog: Tipos de Acto ──────────────────────────────────
+// Catálogo oficial UAFE — fuente: Catalogo-Notarios.xls, hoja Tipo_Transacción
 export const TIPOS_ACTO_UAFE = [
-  { codigo: '73', descripcion: 'COMPRAVENTA DE INMUEBLES' },
-  { codigo: '74', descripcion: 'COMPRAVENTA DE VEHICULOS' },
-  { codigo: '75', descripcion: 'DONACION DE INMUEBLES' },
-  { codigo: '76', descripcion: 'DONACION DE VEHICULOS' },
-  { codigo: '77', descripcion: 'PERMUTA DE INMUEBLES' },
-  { codigo: '78', descripcion: 'PERMUTA DE VEHICULOS' },
-  { codigo: '79', descripcion: 'DACION EN PAGO DE INMUEBLES' },
-  { codigo: '80', descripcion: 'DACION EN PAGO DE VEHICULOS' },
-  { codigo: '81', descripcion: 'APORTE A SOCIEDAD DE INMUEBLES' },
-  { codigo: '82', descripcion: 'APORTE A SOCIEDAD DE VEHICULOS' },
-  { codigo: '83', descripcion: 'FIDEICOMISO DE INMUEBLES' },
-  { codigo: '84', descripcion: 'FIDEICOMISO DE VEHICULOS' },
-  { codigo: '85', descripcion: 'PROMESA DE COMPRAVENTA DE INMUEBLES' },
-  { codigo: '86', descripcion: 'CAPITULACIONES MATRIMONIALES' },
-  { codigo: '87', descripcion: 'LIQUIDACION DE SOCIEDAD CONYUGAL' },
-  { codigo: '88', descripcion: 'PARTICION DE BIENES' },
-  { codigo: '89', descripcion: 'ADJUDICACION DE INMUEBLES' },
-  { codigo: '90', descripcion: 'CESION DE DERECHOS HERENCIALES' },
-  { codigo: '91', descripcion: 'CONSTITUCION DE PATRIMONIO FAMILIAR' },
-  { codigo: '92', descripcion: 'HIPOTECA ABIERTA' },
-  { codigo: '93', descripcion: 'OTROS ACTOS NOTARIALES SUJETOS A REPORTE' },
+  { codigo: '73', descripcion: 'PROMESA DE CELEBRAR CONTRATOS' },
+  { codigo: '74', descripcion: 'COMPRAVENTA' },
+  { codigo: '75', descripcion: 'COMPRAVENTA DE INMUEBLES FINANCIADAS CON EL BONO QUE OTORGA EL ESTADO A TRAVES DEL MIDUVI' },
+  { codigo: '76', descripcion: 'TRANSFERENCIA DE DOMINIO CON CONSTITUCION DE HIPOTECA' },
+  { codigo: '77', descripcion: 'CONSTITUCION DE HIPOTECA' },
+  { codigo: '78', descripcion: 'CONSTITUCION DE HIPOTECA A FAVOR DEL BIESS - ISSFA - ISSPOL - MUNICIPALIDADES - MUTUALISTAS O COOPERATIVAS DE AHORRO Y CREDITO PARA LA VIVIENDA' },
+  { codigo: '79', descripcion: 'CONSTITUCION DE HIPOTECA ABIERTA' },
+  { codigo: '80', descripcion: 'CONSTITUCION DE HIPOTECA EN LA QUE INTERVENGA EL MIDUVI' },
+  { codigo: '81', descripcion: 'DONACION' },
+  { codigo: '82', descripcion: 'PERMUTA' },
+  { codigo: '83', descripcion: 'LIQUIDACION DE LA SOCIEDAD CONYUGAL' },
+  { codigo: '84', descripcion: 'LIQUIDACION DE LA SOCIEDAD DE BIENES' },
+  { codigo: '85', descripcion: 'DACION EN PAGO' },
+  { codigo: '86', descripcion: 'CESION DE DERECHOS ONEROSOS' },
+  { codigo: '87', descripcion: 'COMODATO' },
+  { codigo: '88', descripcion: 'CONSTITUCION DE CONSORCIOS CON CUANTIA DETERMINADA' },
+  { codigo: '89', descripcion: 'TRASPASO DE UN CREDITO CON CUANTIA' },
+  { codigo: '90', descripcion: 'CESION DE PARTICIPACIONES' },
 ];
 
 // ── UAFE Catalog: Tipos de Bien ──────────────────────────────────
@@ -190,24 +188,54 @@ export const ROLES_INTERVINIENTE = [
   { codigo: '02', descripcion: 'A favor de' },
 ];
 
-// ── UAFE Catalog: Calidades del Compareciente ────────────────────
+// ── UAFE Catalog: Papeles del Interviniente (Catalogo-Notarios.xls) ──
+// Los papeles disponibles dependen del tipo de transacción
+export const PAPELES_INTERVINIENTE = [
+  { codigo: '01', nombre: 'ACCIONISTA' },
+  { codigo: '02', nombre: 'ACREEDOR(A)', actos: ['85'] },
+  { codigo: '03', nombre: 'ACREEDOR(A) HIPOTECARIO(A)', actos: ['77', '76'] },
+  { codigo: '07', nombre: 'ADJUDICATARIO(A)' },
+  { codigo: '08', nombre: 'ADJUDICATARIO(A) DEUDOR(A) HIPOTECARIO(A)', actos: ['76'] },
+  { codigo: '09', nombre: 'APODERADO(A)' },
+  { codigo: '10', nombre: 'APODERADO(A) ESPECIAL' },
+  { codigo: '11', nombre: 'APODERADO(A) GENERAL' },
+  { codigo: '15', nombre: 'CEDENTE', actos: ['90', '86'] },
+  { codigo: '16', nombre: 'CESIONARIO(A)', actos: ['90', '86'] },
+  { codigo: '18', nombre: 'COMODANTE', actos: ['87'] },
+  { codigo: '19', nombre: 'COMODATARIO(A)', actos: ['87'] },
+  { codigo: '20', nombre: 'COMPRADOR(A)', actos: ['74'] },
+  { codigo: '21', nombre: 'COMPRADOR(A)-DEUDOR(A)' },
+  { codigo: '22', nombre: 'COMPRADOR(A)-DEUDOR(A)-HIPOTECARIO(A)', actos: ['76'] },
+  { codigo: '24', nombre: 'COMPARECIENTE', actos: ['83', '84'] },
+  { codigo: '29', nombre: 'DEUDOR(A) HIPOTECARIO(A)', actos: ['77', '78'] },
+  { codigo: '31', nombre: 'DEUDOR(A) PRINCIPAL', actos: ['85', '78'] },
+  { codigo: '32', nombre: 'DONANTE', actos: ['81'] },
+  { codigo: '33', nombre: 'DONATARIO(A)', actos: ['81'] },
+  { codigo: '42', nombre: 'MANDANTE' },
+  { codigo: '43', nombre: 'MANDATARIO(A)' },
+  { codigo: '45', nombre: 'PERMUTANTE', actos: ['82'] },
+  { codigo: '52', nombre: 'PROMITENTE COMPRADOR(A)', actos: ['73'] },
+  { codigo: '55', nombre: 'PROMITENTE VENDEDOR(A)', actos: ['73'] },
+  { codigo: '57', nombre: 'REPRESENTANTE LEGAL' },
+  { codigo: '63', nombre: 'VENDEDOR(A)', actos: ['74', '76'] },
+];
+
+// Calidades simples para el formulario del matrizador
 export const CALIDADES_COMPARECIENTE = [
   'VENDEDOR',
   'COMPRADOR',
   'DONANTE',
   'DONATARIO',
   'PERMUTANTE',
-  'DEUDOR',
-  'ACREEDOR',
+  'DEUDOR_HIPOTECARIO',
+  'ACREEDOR_HIPOTECARIO',
   'PROMITENTE_VENDEDOR',
   'PROMITENTE_COMPRADOR',
-  'FIDEICOMITENTE',
-  'FIDEICOMISARIO',
-  'APORTANTE',
-  'CESIONARIO',
   'CEDENTE',
-  'ADJUDICATARIO',
-  'OTRO',
+  'CESIONARIO',
+  'COMPARECIENTE',
+  'COMODANTE',
+  'COMODATARIO',
 ];
 
 // ── Formas de Pago ───────────────────────────────────────────────

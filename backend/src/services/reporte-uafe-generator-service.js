@@ -28,29 +28,26 @@ const SECUENCIAL_NOTARIO = '7866';
 const CANTON_DEFAULT = '1701';
 const NOTARIA_NUMERO = '018'; // Notaria 18
 
-// ── Catalogo TIPOS_ACTO: descripcion → codigo ──────────────────────
+// ── Catalogo TIPOS_ACTO: descripcion → codigo (fuente: Catalogo-Notarios.xls) ──
 const TIPOS_ACTO_CATALOGO = [
-  { codigo: '73', descripcion: 'COMPRAVENTA DE INMUEBLES' },
-  { codigo: '74', descripcion: 'COMPRAVENTA DE VEHICULOS' },
-  { codigo: '75', descripcion: 'DONACION DE INMUEBLES' },
-  { codigo: '76', descripcion: 'DONACION DE VEHICULOS' },
-  { codigo: '77', descripcion: 'PERMUTA DE INMUEBLES' },
-  { codigo: '78', descripcion: 'PERMUTA DE VEHICULOS' },
-  { codigo: '79', descripcion: 'DACION EN PAGO DE INMUEBLES' },
-  { codigo: '80', descripcion: 'DACION EN PAGO DE VEHICULOS' },
-  { codigo: '81', descripcion: 'APORTE A SOCIEDAD DE INMUEBLES' },
-  { codigo: '82', descripcion: 'APORTE A SOCIEDAD DE VEHICULOS' },
-  { codigo: '83', descripcion: 'FIDEICOMISO DE INMUEBLES' },
-  { codigo: '84', descripcion: 'FIDEICOMISO DE VEHICULOS' },
-  { codigo: '85', descripcion: 'PROMESA DE COMPRAVENTA DE INMUEBLES' },
-  { codigo: '86', descripcion: 'CAPITULACIONES MATRIMONIALES' },
-  { codigo: '87', descripcion: 'LIQUIDACION DE SOCIEDAD CONYUGAL' },
-  { codigo: '88', descripcion: 'PARTICION DE BIENES' },
-  { codigo: '89', descripcion: 'ADJUDICACION DE INMUEBLES' },
-  { codigo: '90', descripcion: 'CESION DE DERECHOS HERENCIALES' },
-  { codigo: '91', descripcion: 'CONSTITUCION DE PATRIMONIO FAMILIAR' },
-  { codigo: '92', descripcion: 'HIPOTECA ABIERTA' },
-  { codigo: '93', descripcion: 'OTROS ACTOS NOTARIALES SUJETOS A REPORTE' },
+  { codigo: '73', descripcion: 'PROMESA DE CELEBRAR CONTRATOS' },
+  { codigo: '74', descripcion: 'COMPRAVENTA' },
+  { codigo: '75', descripcion: 'COMPRAVENTA DE INMUEBLES FINANCIADAS CON EL BONO QUE OTORGA EL ESTADO A TRAVES DEL MIDUVI' },
+  { codigo: '76', descripcion: 'TRANSFERENCIA DE DOMINIO CON CONSTITUCION DE HIPOTECA' },
+  { codigo: '77', descripcion: 'CONSTITUCION DE HIPOTECA' },
+  { codigo: '78', descripcion: 'CONSTITUCION DE HIPOTECA A FAVOR DEL BIESS - ISSFA - ISSPOL - MUNICIPALIDADES - MUTUALISTAS O COOPERATIVAS DE AHORRO Y CREDITO PARA LA VIVIENDA' },
+  { codigo: '79', descripcion: 'CONSTITUCION DE HIPOTECA ABIERTA' },
+  { codigo: '80', descripcion: 'CONSTITUCION DE HIPOTECA EN LA QUE INTERVENGA EL MIDUVI' },
+  { codigo: '81', descripcion: 'DONACION' },
+  { codigo: '82', descripcion: 'PERMUTA' },
+  { codigo: '83', descripcion: 'LIQUIDACION DE LA SOCIEDAD CONYUGAL' },
+  { codigo: '84', descripcion: 'LIQUIDACION DE LA SOCIEDAD DE BIENES' },
+  { codigo: '85', descripcion: 'DACION EN PAGO' },
+  { codigo: '86', descripcion: 'CESION DE DERECHOS ONEROSOS' },
+  { codigo: '87', descripcion: 'COMODATO' },
+  { codigo: '88', descripcion: 'CONSTITUCION DE CONSORCIOS CON CUANTIA DETERMINADA' },
+  { codigo: '89', descripcion: 'TRASPASO DE UN CREDITO CON CUANTIA' },
+  { codigo: '90', descripcion: 'CESION DE PARTICIPACIONES' },
 ];
 
 // Mapa inverso: descripcion (normalizada) → codigo
@@ -58,35 +55,63 @@ const DESCRIPCION_TO_CODIGO = {};
 for (const item of TIPOS_ACTO_CATALOGO) {
   DESCRIPCION_TO_CODIGO[item.descripcion.toUpperCase().trim()] = item.codigo;
 }
+// Aliases retrocompatibles (nombres viejos que pueden estar en BD)
+DESCRIPCION_TO_CODIGO['COMPRAVENTA DE INMUEBLES'] = '74';
+DESCRIPCION_TO_CODIGO['COMPRAVENTA DE VEHICULOS'] = '74';
+DESCRIPCION_TO_CODIGO['PROMESA DE COMPRAVENTA DE INMUEBLES'] = '73';
+DESCRIPCION_TO_CODIGO['PROMESA DE COMPRAVENTA'] = '73';
+DESCRIPCION_TO_CODIGO['DONACION DE INMUEBLES'] = '81';
+DESCRIPCION_TO_CODIGO['DONACION DE VEHICULOS'] = '81';
+DESCRIPCION_TO_CODIGO['PERMUTA DE INMUEBLES'] = '82';
+DESCRIPCION_TO_CODIGO['PERMUTA DE VEHICULOS'] = '82';
+DESCRIPCION_TO_CODIGO['DACION EN PAGO DE INMUEBLES'] = '85';
+DESCRIPCION_TO_CODIGO['DACION EN PAGO DE VEHICULOS'] = '85';
+DESCRIPCION_TO_CODIGO['HIPOTECA ABIERTA'] = '79';
+DESCRIPCION_TO_CODIGO['LIQUIDACION DE SOCIEDAD CONYUGAL'] = '83';
+DESCRIPCION_TO_CODIGO['CESION DE DERECHOS HERENCIALES'] = '86';
+DESCRIPCION_TO_CODIGO['RECONOCIMIENTO DE FIRMAS DE VEHÍCULO - COMPRAVENTA'] = '74';
+DESCRIPCION_TO_CODIGO['RECONOCIMIENTO DE FIRMAS DE VEHICULO - COMPRAVENTA'] = '74';
 
-// ── Calidad → Papel UAFE ───────────────────────────────────────────
+// ── Calidad → Papel UAFE (fuente: Catalogo-Notarios.xls, hoja Papel_Interviniente) ──
 const CALIDAD_PAPEL_MAP = {
   'VENDEDOR': '63',
   'COMPRADOR': '20',
-  'DONANTE': '23',
-  'DONATARIO': '22',
-  'PERMUTANTE': '51',
-  'DEUDOR': '21',
-  'ACREEDOR': '01',
+  'COMPRADOR_DEUDOR': '21',
+  'COMPRADOR_DEUDOR_HIPOTECARIO': '22',
+  'DONANTE': '32',
+  'DONATARIO': '33',
+  'PERMUTANTE': '45',
+  'DEUDOR_HIPOTECARIO': '29',
+  'DEUDOR_PRINCIPAL': '31',
+  'ACREEDOR': '02',
+  'ACREEDOR_HIPOTECARIO': '03',
   'PROMITENTE_VENDEDOR': '55',
   'PROMITENTE_COMPRADOR': '52',
-  'FIDEICOMITENTE': '25',
-  'FIDEICOMISARIO': '24',
-  'APORTANTE': '05',
-  'CESIONARIO': '12',
-  'CEDENTE': '11',
-  'ADJUDICATARIO': '02',
-  'OTRO': '48',
+  'CEDENTE': '15',
+  'CESIONARIO': '16',
+  'ADJUDICATARIO': '07',
+  'COMPARECIENTE': '24',
+  'COMODANTE': '18',
+  'COMODATARIO': '19',
+  'MANDANTE': '42',
+  'MANDATARIO': '43',
+  'APODERADO': '09',
+  'APODERADO_ESPECIAL': '10',
+  'APODERADO_GENERAL': '11',
+  'REPRESENTANTE_LEGAL': '57',
 };
 
 // ── Calidad → Rol UAFE ─────────────────────────────────────────────
+// 01 = Otorgado por (quien transfiere/entrega/debe)
+// 02 = A favor de (quien recibe/adquiere/acreedor)
 const ROL_OTORGADO_POR = new Set([
-  'VENDEDOR', 'DONANTE', 'PERMUTANTE', 'DEUDOR',
-  'PROMITENTE_VENDEDOR', 'FIDEICOMITENTE', 'APORTANTE', 'CEDENTE',
+  'VENDEDOR', 'DONANTE', 'PERMUTANTE', 'DEUDOR_HIPOTECARIO', 'DEUDOR_PRINCIPAL',
+  'PROMITENTE_VENDEDOR', 'CEDENTE', 'COMODANTE',
 ]);
 const ROL_A_FAVOR_DE = new Set([
-  'COMPRADOR', 'DONATARIO', 'ACREEDOR', 'PROMITENTE_COMPRADOR',
-  'FIDEICOMISARIO', 'CESIONARIO', 'ADJUDICATARIO',
+  'COMPRADOR', 'COMPRADOR_DEUDOR', 'COMPRADOR_DEUDOR_HIPOTECARIO',
+  'DONATARIO', 'ACREEDOR', 'ACREEDOR_HIPOTECARIO',
+  'PROMITENTE_COMPRADOR', 'CESIONARIO', 'ADJUDICATARIO', 'COMODATARIO',
 ]);
 
 // ── Helpers ─────────────────────────────────────────────────────────
@@ -205,9 +230,9 @@ function getRolCodigo(calidad) {
  * Obtiene el papel UAFE desde la calidad del compareciente.
  */
 function getPapelCodigo(calidad) {
-  if (!calidad) return '48'; // OTRO
+  if (!calidad) return '24'; // COMPARECIENTE (default)
   const calidadUpper = calidad.toUpperCase().trim();
-  return CALIDAD_PAPEL_MAP[calidadUpper] || '48';
+  return CALIDAD_PAPEL_MAP[calidadUpper] || '24';
 }
 
 /**
