@@ -284,6 +284,8 @@ router.get(
             tipo: pp.persona.tipoPersona,
             calidad: pp.calidad,
             datos,
+            actuaPor: pp.actuaPor,
+            cedula: pp.persona.cedula || pp.persona.numeroIdentificacion,
             _personaProtocoloId: pp.id,
             _personaId: pp.persona.id,
           };

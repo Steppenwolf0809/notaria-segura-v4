@@ -129,7 +129,11 @@ export default function UAFEPersonaEditDialog({
         cantonLaboral: laboral.cantonLaboral || '',
         conyugeApellidos: conyuge.apellidos || '',
         conyugeNombres: conyuge.nombres || '',
+        conyugeTipoIdentificacion: conyuge.tipoIdentificacion || 'CEDULA',
         conyugeNumeroIdentificacion: conyuge.numeroIdentificacion || '',
+        conyugeNacionalidad: conyuge.nacionalidad || '',
+        conyugeCorreoElectronico: conyuge.correoElectronico || '',
+        conyugeCelular: conyuge.celular || '',
         esPEP: pep.esPEP || false,
         esFamiliarPEP: pep.esFamiliarPEP || false,
         esColaboradorPEP: pep.esColaboradorPEP || false,
@@ -247,7 +251,11 @@ export default function UAFEPersonaEditDialog({
         conyuge: {
           apellidos: form.conyugeApellidos,
           nombres: form.conyugeNombres,
+          tipoIdentificacion: form.conyugeTipoIdentificacion,
           numeroIdentificacion: form.conyugeNumeroIdentificacion,
+          nacionalidad: form.conyugeNacionalidad,
+          correoElectronico: form.conyugeCorreoElectronico,
+          celular: form.conyugeCelular,
         },
         declaracionPEP: {
           esPEP: form.esPEP,
@@ -479,14 +487,33 @@ export default function UAFEPersonaEditDialog({
           <>
             <SectionTitle title="Datos del Conyuge" subtitle="Debida diligencia" />
             <Grid container spacing={2} sx={{ mb: 3 }}>
-              <Grid size={{ xs: 12, sm: 4 }}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField fullWidth size="small" label="Apellidos conyuge" value={form.conyugeApellidos} onChange={e => handleChange('conyugeApellidos', e.target.value)} />
               </Grid>
-              <Grid size={{ xs: 12, sm: 4 }}>
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField fullWidth size="small" label="Nombres conyuge" value={form.conyugeNombres} onChange={e => handleChange('conyugeNombres', e.target.value)} />
               </Grid>
-              <Grid size={{ xs: 12, sm: 4 }}>
-                <TextField fullWidth size="small" label="Cedula conyuge" value={form.conyugeNumeroIdentificacion} onChange={e => handleChange('conyugeNumeroIdentificacion', e.target.value)} />
+              <Grid size={{ xs: 12, sm: 3 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Tipo ID</InputLabel>
+                  <Select value={form.conyugeTipoIdentificacion} label="Tipo ID" onChange={e => handleChange('conyugeTipoIdentificacion', e.target.value)}>
+                    <MenuItem value="CEDULA">Cedula</MenuItem>
+                    <MenuItem value="PASAPORTE">Pasaporte</MenuItem>
+                    <MenuItem value="RUC">RUC</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 3 }}>
+                <TextField fullWidth size="small" label="No. Identificacion conyuge" value={form.conyugeNumeroIdentificacion} onChange={e => handleChange('conyugeNumeroIdentificacion', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 3 }}>
+                <TextField fullWidth size="small" label="Nacionalidad conyuge" value={form.conyugeNacionalidad} onChange={e => handleChange('conyugeNacionalidad', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 3 }}>
+                <TextField fullWidth size="small" label="Celular conyuge" type="tel" value={form.conyugeCelular} onChange={e => handleChange('conyugeCelular', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth size="small" label="Correo electronico conyuge" type="email" value={form.conyugeCorreoElectronico} onChange={e => handleChange('conyugeCorreoElectronico', e.target.value)} />
               </Grid>
             </Grid>
           </>

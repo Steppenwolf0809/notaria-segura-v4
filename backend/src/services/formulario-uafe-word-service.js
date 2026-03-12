@@ -255,16 +255,26 @@ function buildDatosActoNotarial(protocolo, calidad) {
   ];
 }
 
-function buildDatosPersonales(datos) {
+function inferTipoIdentificacion(tipoExplicito, numId) {
+  if (tipoExplicito) return safeStr(tipoExplicito);
+  if (!numId) return '—';
+  const len = String(numId).replace(/\D/g, '').length;
+  if (len === 13) return 'RUC';
+  if (len === 10) return 'Cédula';
+  return 'Pasaporte';
+}
+
+function buildDatosPersonales(datos, cedula) {
   const dp = datos?.datosPersonales || {};
   const lab = datos?.informacionLaboral || {};
+  const numId = dp.numeroIdentificacion || cedula;
   return [
     sectionTitle('2. DATOS PERSONALES'),
     twoColumnTable([
       ['Apellidos', safeStr(dp.apellidos)],
       ['Nombres', safeStr(dp.nombres)],
-      ['Tipo de Identificación', safeStr(dp.tipoIdentificacion)],
-      ['No. Identificación', safeStr(dp.numeroIdentificacion)],
+      ['Tipo de Identificación', inferTipoIdentificacion(dp.tipoIdentificacion, numId)],
+      ['No. Identificación', safeStr(numId)],
       ['Nacionalidad', safeStr(dp.nacionalidad)],
       ['Nivel de Estudio', safeStr(dp.nivelEstudio)],
       ['Género', safeStr(dp.genero)],
@@ -322,7 +332,7 @@ function buildDatosConyuge(datos) {
     twoColumnTable([
       ['Apellidos', safeStr(con.apellidos)],
       ['Nombres', safeStr(con.nombres)],
-      ['Tipo de Identificación', safeStr(con.tipoIdentificacion)],
+      ['Tipo de Identificación', inferTipoIdentificacion(con.tipoIdentificacion, con.numeroIdentificacion)],
       ['No. Identificación', safeStr(con.numeroIdentificacion)],
       ['Nacionalidad', safeStr(con.nacionalidad)],
       ['Correo Electrónico', safeStr(con.correoElectronico)],
@@ -487,9 +497,35 @@ function buildDeclaracionOrigenLicito(datos) {
   ];
 }
 
-function buildFirma(datos) {
+function buildFirma(datos, cedula, actuaPor) {
   const dp = datos?.datosPersonales || {};
-  const nombreCompleto = [dp.nombres, dp.apellidos].filter(Boolean).join(' ') || '—';
+  const m = datos?.mandante || {};
+  const nombrePersona = [dp.nombres, dp.apellidos].filter(Boolean).join(' ') || '—';
+  const fechaHoy = new Date().toLocaleDateString('es-EC', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    timeZone: 'America/Guayaquil',
+  });
+
+  const isApoderado = actuaPor && actuaPor !== 'PROPIOS_DERECHOS' && m.nombres;
+
+  const firmaLabel = isApoderado ? 'Firma del Apoderado / Representante' : 'Firma';
+  const rows = [];
+
+  if (isApoderado) {
+    const nombreApoderado = [m.nombres, m.apellidos].filter(Boolean).join(' ') || '—';
+    rows.push(
+      ['Apoderado / Representante', nombreApoderado],
+      ['Cédula del Apoderado', safeStr(m.numeroIdentificacion)],
+      ['En representación de', nombrePersona],
+      ['Cédula del Representado', safeStr(dp.numeroIdentificacion || cedula)],
+    );
+  } else {
+    rows.push(
+      ['Nombre', nombrePersona],
+      ['Cédula / RUC', safeStr(dp.numeroIdentificacion || cedula)],
+    );
+  }
+  rows.push(['Fecha', fechaHoy]);
 
   return [
     new Paragraph({ spacing: { before: 400, after: 0 }, children: [] }),
@@ -501,14 +537,10 @@ function buildFirma(datos) {
     new Paragraph({
       alignment: AlignmentType.CENTER,
       spacing: { after: 0 },
-      children: [textRun('Firma', { bold: true })],
+      children: [textRun(firmaLabel, { bold: true })],
     }),
     new Paragraph({ spacing: { after: 200 }, children: [] }),
-    twoColumnTable([
-      ['Nombre', nombreCompleto],
-      ['Cédula / RUC', safeStr(dp.numeroIdentificacion)],
-      ['Fecha', '______________________'],
-    ]),
+    twoColumnTable(rows),
   ];
 }
 
@@ -521,9 +553,8 @@ function buildDatosCompania(datos) {
     twoColumnTable([
       ['Razón Social', safeStr(comp.razonSocial)],
       ['RUC', safeStr(comp.ruc)],
-      ['Actividad Económica', safeStr(comp.actividadEconomica)],
+      ['Actividad Económica / Objeto Social', safeStr(comp.actividadEconomica || comp.objetoSocial)],
       ['Fecha de Constitución', formatDate(comp.fechaConstitucion)],
-      ['Objeto Social', safeStr(comp.objetoSocial)],
     ]),
   ];
 }
@@ -535,9 +566,16 @@ function buildRepresentanteLegal(datos) {
     twoColumnTable([
       ['Apellidos', safeStr(rep.apellidos)],
       ['Nombres', safeStr(rep.nombres)],
-      ['Cargo', safeStr(rep.cargo)],
-      ['Tipo de Identificación', safeStr(rep.tipoIdentificacion)],
+      ['Tipo de Identificación', inferTipoIdentificacion(rep.tipoIdentificacion, rep.numeroIdentificacion)],
       ['No. Identificación', safeStr(rep.numeroIdentificacion)],
+      ['Nacionalidad', safeStr(rep.nacionalidad)],
+      ['Género', safeStr(rep.genero)],
+      ['Estado Civil', safeStr(rep.estadoCivil)],
+      ['Nivel de Estudio', safeStr(rep.nivelEstudio)],
+      ['Cargo', safeStr(rep.cargo)],
+      ['Celular', safeStr(rep.celular)],
+      ['Correo Electrónico', safeStr(rep.correoElectronico)],
+      ['Dirección', safeStr(rep.direccion)],
     ]),
   ];
 }
@@ -546,20 +584,25 @@ function buildSocios(datos) {
   const socios = datos?.socios || [];
   if (socios.length === 0) {
     return [
-      sectionTitle('4. SOCIOS / ACCIONISTAS'),
+      sectionTitle('5. SOCIOS / ACCIONISTAS'),
       paragraph('No se registraron socios o accionistas.'),
     ];
   }
 
-  const dataRows = socios.map(s => [
-    safeStr(s.nombre),
-    safeStr(s.identificacion),
-    s.porcentaje != null ? `${s.porcentaje}%` : '—',
-    safeStr(s.nacionalidad),
-  ]);
+  const dataRows = socios.map(s => {
+    const nombre = s.nombre || [s.apellidos, s.nombres].filter(Boolean).join(' ');
+    const identificacion = s.identificacion || s.numeroIdentificacion;
+    const pct = s.porcentaje ?? s.porcentajeParticipacion;
+    return [
+      safeStr(nombre),
+      safeStr(identificacion),
+      pct != null ? `${pct}%` : '—',
+      safeStr(s.nacionalidad),
+    ];
+  });
 
   return [
-    sectionTitle('4. SOCIOS / ACCIONISTAS'),
+    sectionTitle('5. SOCIOS / ACCIONISTAS'),
     multiColumnTable(
       ['Nombre', 'Identificación', 'Participación %', 'Nacionalidad'],
       dataRows,
@@ -567,11 +610,31 @@ function buildSocios(datos) {
   ];
 }
 
+function buildConyugeRepresentante(datos) {
+  const rep = datos?.representanteLegal || {};
+  const ec = rep.estadoCivil;
+  if (ec !== 'CASADO' && ec !== 'UNION_LIBRE') return [];
+
+  const con = datos?.conyugeRepresentante || {};
+  return [
+    sectionTitle('4. DATOS DEL CÓNYUGE DEL REPRESENTANTE LEGAL'),
+    twoColumnTable([
+      ['Apellidos', safeStr(con.apellidos)],
+      ['Nombres', safeStr(con.nombres)],
+      ['Tipo de Identificación', inferTipoIdentificacion(con.tipoIdentificacion, con.numeroIdentificacion)],
+      ['No. Identificación', safeStr(con.numeroIdentificacion)],
+      ['Nacionalidad', safeStr(con.nacionalidad)],
+      ['Correo Electrónico', safeStr(con.correoElectronico)],
+      ['Celular', safeStr(con.celular)],
+    ]),
+  ];
+}
+
 function buildDomicilioJuridica(datos) {
   const comp = datos?.compania || {};
   const dom = datos?.domicilio || {};
   return [
-    sectionTitle('5. DOMICILIO'),
+    sectionTitle('6. DOMICILIO'),
     twoColumnTable([
       ['Dirección', safeStr(comp.direccion || dom.direccion)],
       ['Parroquia', safeStr(comp.parroquia || dom.parroquia)],
@@ -614,7 +677,7 @@ function buildPEPJuridica(datos) {
   }
 
   return [
-    sectionTitle('6. DECLARACIÓN PEP (Persona Expuesta Políticamente)'),
+    sectionTitle('7. DECLARACIÓN PEP (Persona Expuesta Políticamente)'),
     twoColumnTable(rows),
   ];
 }
@@ -623,7 +686,7 @@ function buildFormasPagoJuridica(protocolo) {
   const formas = protocolo.formasPago || [];
   if (formas.length === 0) {
     return [
-      sectionTitle('7. FORMAS DE PAGO'),
+      sectionTitle('8. FORMAS DE PAGO'),
       paragraph('No se registraron formas de pago.'),
     ];
   }
@@ -635,7 +698,7 @@ function buildFormasPagoJuridica(protocolo) {
   ]);
 
   return [
-    sectionTitle('7. FORMAS DE PAGO'),
+    sectionTitle('8. FORMAS DE PAGO'),
     multiColumnTable(['Tipo', 'Monto', 'Detalle'], dataRows),
   ];
 }
@@ -658,14 +721,14 @@ function buildDatosBienJuridica(protocolo) {
   }
 
   return [
-    sectionTitle('8. DATOS DEL BIEN'),
+    sectionTitle('9. DATOS DEL BIEN'),
     twoColumnTable(rows),
   ];
 }
 
 function buildDeclaracionOrigenLicitoJuridica() {
   return [
-    sectionTitle('9. DECLARACIÓN DE ORIGEN LÍCITO DE RECURSOS'),
+    sectionTitle('10. DECLARACIÓN DE ORIGEN LÍCITO DE RECURSOS'),
     new Paragraph({
       spacing: { after: 120 },
       children: [
@@ -688,6 +751,10 @@ function buildDeclaracionOrigenLicitoJuridica() {
 function buildFirmaJuridica(datos) {
   const rep = datos?.representanteLegal || {};
   const nombreCompleto = [rep.nombres, rep.apellidos].filter(Boolean).join(' ') || '—';
+  const fechaHoy = new Date().toLocaleDateString('es-EC', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    timeZone: 'America/Guayaquil',
+  });
 
   return [
     new Paragraph({ spacing: { before: 400, after: 0 }, children: [] }),
@@ -706,7 +773,7 @@ function buildFirmaJuridica(datos) {
       ['Nombre', nombreCompleto],
       ['Cédula / RUC', safeStr(rep.numeroIdentificacion)],
       ['Cargo', safeStr(rep.cargo)],
-      ['Fecha', '______________________'],
+      ['Fecha', fechaHoy],
     ]),
   ];
 }
@@ -731,6 +798,8 @@ export async function generarFormularioWord(protocolo, personaProtocolo) {
     `[formulario-uafe-word] Generando formulario ${tipo} para protocolo ${protocolo.id}, calidad ${calidad}`,
   );
 
+  const cedula = personaProtocolo.cedula || personaProtocolo.personaCedula;
+
   let sections;
 
   if (tipo === 'JURIDICA') {
@@ -739,6 +808,7 @@ export async function generarFormularioWord(protocolo, personaProtocolo) {
       ...buildDatosActoNotarial(protocolo, calidad),
       ...buildDatosCompania(datos),
       ...buildRepresentanteLegal(datos),
+      ...buildConyugeRepresentante(datos),
       ...buildSocios(datos),
       ...buildDomicilioJuridica(datos),
       ...buildPEPJuridica(datos),
@@ -752,7 +822,7 @@ export async function generarFormularioWord(protocolo, personaProtocolo) {
     sections = [
       ...buildHeader('NATURAL'),
       ...buildDatosActoNotarial(protocolo, calidad),
-      ...buildDatosPersonales(datos),
+      ...buildDatosPersonales(datos, cedula),
       ...buildDomicilio(datos),
       ...buildInformacionLaboral(datos),
       ...buildDatosConyuge(datos),
@@ -761,7 +831,7 @@ export async function generarFormularioWord(protocolo, personaProtocolo) {
       ...buildFormasPago(protocolo, datos),
       ...buildDatosBien(protocolo, datos),
       ...buildDeclaracionOrigenLicito(datos),
-      ...buildFirma(datos),
+      ...buildFirma(datos, cedula, personaProtocolo.actuaPor),
     ];
   }
 
