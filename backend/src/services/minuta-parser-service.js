@@ -38,7 +38,7 @@ const TIPO_BIEN_PATTERNS = [
   { re: /\bEMBARCACI[OÓ]N\b/i, codigo: 'EMB', descripcion: 'Embarcacion' },
 ];
 
-// Forma de pago — detectar tipo por palabras clave
+// Forma de pago — detectar tipo por palabras clave (orden: más específico primero)
 const FORMA_PAGO_PATTERNS = [
   { re: /\btransferencia\s+bancaria\b/i, tipo: 'TRANSFERENCIA' },
   { re: /\btransferencia\b/i, tipo: 'TRANSFERENCIA' },
@@ -47,8 +47,18 @@ const FORMA_PAGO_PATTERNS = [
   { re: /\bdep[oó]sito\b/i, tipo: 'DEPOSITO' },
   { re: /\bcr[eé]dito\s+hipotecario\b/i, tipo: 'CREDITO_HIPOTECARIO' },
   { re: /\bhipoteca(?:rio)?\b/i, tipo: 'CREDITO_HIPOTECARIO' },
+  { re: /\bfinanciamiento\b/i, tipo: 'CREDITO_HIPOTECARIO' },
+  { re: /\bpr[eé]stamo\b/i, tipo: 'CREDITO_HIPOTECARIO' },
+  { re: /\ba\s+cr[eé]dito\b/i, tipo: 'CREDITO_HIPOTECARIO' },
+  { re: /\bdinero\s+en\s+efectivo\b/i, tipo: 'EFECTIVO' },
+  { re: /\ben\s+(?:dinero\s+)?efectivo\b/i, tipo: 'EFECTIVO' },
+  { re: /\bespecie\s+monetaria\b/i, tipo: 'EFECTIVO' },
   { re: /\banticipo\b/i, tipo: 'EFECTIVO' },
   { re: /\befectivo\b/i, tipo: 'EFECTIVO' },
+  { re: /\bal?\s+contado\b/i, tipo: 'EFECTIVO' },
+  { re: /\bletra\s+de\s+cambio\b/i, tipo: 'OTRO' },
+  { re: /\bpagar[eé]\b/i, tipo: 'OTRO' },
+  { re: /\bcompensaci[oó]n\b/i, tipo: 'OTRO' },
 ];
 
 /**
@@ -82,26 +92,34 @@ function extractSections(text) {
   const sections = {};
   const normalized = text.replace(/\r\n/g, '\n');
 
-  // Patrones de cláusulas (PRIMERA, SEGUNDA, etc. o Primera, Segunda)
+  // Ordinales compuestos primero (más específicos), luego simples
   const clauseNames = [
-    'PRIMERA', 'SEGUNDA', 'TERCERA', 'CUARTA', 'QUINTA',
-    'SEXTA', 'S[EÉ]PTIMA', 'OCTAVA', 'NOVENA', 'D[EÉ]CIMA',
-    'D[EÉ]CIMA\\s*PRIMERA', 'D[EÉ]CIMA\\s*SEGUNDA', 'D[EÉ]CIMA\\s*TERCERA',
-    'D[EÉ]CIMA\\s*CUARTA',
+    'D[EÉ]CIMA\\s*SEXTA', 'D[EÉ]CIMA\\s*QUINTA', 'D[EÉ]CIMA\\s*CUARTA',
+    'D[EÉ]CIMA\\s*TERCERA', 'D[EÉ]CIMA\\s*SEGUNDA', 'D[EÉ]CIMA\\s*PRIMERA',
+    'D[EÉ]CIMA', 'NOVENA', 'OCTAVA', 'S[EÉ]PTIMA', 'SEXTA',
+    'QUINTA', 'CUARTA', 'TERCERA', 'SEGUNDA', 'PRIMERA',
   ];
 
+  // Soporta prefijo opcional "CLÁUSULA" / "CLAUSULA"
   const clausePattern = new RegExp(
-    `(${clauseNames.join('|')})\\s*[.:\\-–—]+\\s*`,
+    `(?:CL[AÁ]USULA\\s+)?(${clauseNames.join('|')})\\s*[.:\\-–—]+\\s*`,
     'gi'
   );
 
   const matches = [...normalized.matchAll(clausePattern)];
 
+  // Ordenar por posición en el texto (matchAll ya lo hace, pero por seguridad)
+  matches.sort((a, b) => a.index - b.index);
+
   for (let i = 0; i < matches.length; i++) {
-    const name = matches[i][1].toUpperCase().replace(/\s+/g, '_');
+    const rawName = matches[i][1].toUpperCase()
+      .replace(/É/g, 'E')
+      .replace(/\s+/g, '_');
+    // Evitar duplicados: si ya existe la sección, usar la primera ocurrencia
+    if (sections[rawName]) continue;
     const start = matches[i].index + matches[i][0].length;
     const end = i + 1 < matches.length ? matches[i + 1].index : normalized.length;
-    sections[name] = normalized.substring(start, end).trim();
+    sections[rawName] = normalized.substring(start, end).trim();
   }
 
   return sections;
@@ -199,21 +217,22 @@ function detectDescripcionBien(antecedentesText) {
 /**
  * Extrae forma de pago por regex desde texto de precio.
  * Busca bloques con monto USD y tipo de pago en contexto cercano.
+ * Fallback: si no encuentra montos con tipo, busca tipos de pago sin monto.
  */
 function detectFormaPago(precioText) {
   if (!precioText) return [];
   const pagos = [];
 
-  // Buscar cada monto USD con su contexto (200 chars alrededor)
+  // Buscar cada monto USD con su contexto (300 chars alrededor)
   const montoMatches = [...precioText.matchAll(MONTO_RE)];
 
   for (const mm of montoMatches) {
     const monto = parseMontoStr(mm[1]);
     if (isNaN(monto) || monto <= 0) continue;
 
-    // Contexto: 200 chars antes y después del monto
-    const start = Math.max(0, mm.index - 200);
-    const end = Math.min(precioText.length, mm.index + mm[0].length + 200);
+    // Contexto: 300 chars antes y después del monto
+    const start = Math.max(0, mm.index - 300);
+    const end = Math.min(precioText.length, mm.index + mm[0].length + 300);
     const contexto = precioText.substring(start, end);
 
     // Detectar tipo de pago en el contexto cercano
@@ -236,6 +255,21 @@ function detectFormaPago(precioText) {
     }
   }
 
+  // Fallback: si no se encontraron pagos con monto, buscar tipos de pago mencionados en el texto
+  if (pagos.length === 0) {
+    for (const pat of FORMA_PAGO_PATTERNS) {
+      if (pat.re.test(precioText)) {
+        const bancoMatch = precioText.match(/(?:Banco|BANCO)\s+[\w]+(?:\s+(?:de[l]?\s+)?[\w]+)*/i);
+        pagos.push({
+          tipo: pat.tipo,
+          monto: null,
+          detalle: bancoMatch ? bancoMatch[0].trim() : null,
+        });
+        break; // Solo el tipo de pago más relevante (primero en la lista de prioridad)
+      }
+    }
+  }
+
   // Deduplicar: mismo tipo + mismo monto = mismo pago mencionado varias veces
   const seen = new Set();
   return pagos.filter(p => {
@@ -247,20 +281,30 @@ function detectFormaPago(precioText) {
 }
 
 /**
- * Identifica la sección de precio/cuantía.
+ * Identifica la sección de precio/cuantía/forma de pago.
+ * Combina todas las secciones relevantes para no perder datos.
  */
 function getPrecioText(sections, fullText) {
-  // Buscar cláusula que contenga "PRECIO"
+  const keywords = ['PRECIO', 'CUANT', 'FORMA DE PAGO', 'FORMA_DE_PAGO'];
+  const parts = [];
+
+  // Buscar en claves y valores de secciones
   for (const [key, value] of Object.entries(sections)) {
-    if (value.toUpperCase().includes('PRECIO') || value.toUpperCase().includes('CUANT')) {
-      return value;
+    const upper = (key + ' ' + value).toUpperCase();
+    if (keywords.some(kw => upper.includes(kw))) {
+      parts.push(value);
     }
   }
 
-  // Fallback
-  const precioIdx = fullText.toUpperCase().indexOf('PRECIO');
-  if (precioIdx >= 0) {
-    return fullText.substring(Math.max(0, precioIdx - 200), precioIdx + 2000);
+  if (parts.length > 0) return parts.join('\n\n');
+
+  // Fallback: buscar directamente en texto completo
+  const upperFull = fullText.toUpperCase();
+  for (const kw of ['PRECIO', 'FORMA DE PAGO', 'CUANTIA', 'CUANTÍA']) {
+    const idx = upperFull.indexOf(kw);
+    if (idx >= 0) {
+      return fullText.substring(Math.max(0, idx - 200), idx + 3000);
+    }
   }
 
   return '';
