@@ -2504,7 +2504,9 @@ export async function listarTodosProtocolos(req, res) {
           calidad: pp.calidad,
           actuaPor: pp.actuaPor,
           completado: pp.completado,
-          completadoAt: pp.completadoAt
+          completadoAt: pp.completadoAt,
+          estadoCompletitud: pp.estadoCompletitud || 'pendiente',
+          porcentajeCompletitud: pp.porcentajeCompletitud || 0
         };
       });
 
@@ -2531,7 +2533,7 @@ export async function listarTodosProtocolos(req, res) {
         },
         personas: personasFormateadas,
         totalPersonas: personasFormateadas.length,
-        personasCompletadas: personasFormateadas.filter(p => p.completado).length
+        personasCompletadas: personasFormateadas.filter(p => p.estadoCompletitud === 'completo').length
       };
     });
 
