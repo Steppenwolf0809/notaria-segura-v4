@@ -243,7 +243,8 @@ const adminService = {
     { value: 'CAJA', label: 'Caja', color: '#22c55e' },
     { value: 'MATRIZADOR', label: 'Matrizador', color: '#3b82f6' },
     { value: 'RECEPCION', label: 'Recepción', color: '#06b6d4' },
-    { value: 'ARCHIVO', label: 'Archivo', color: '#f59e0b' }
+    { value: 'ARCHIVO', label: 'Archivo', color: '#f59e0b' },
+    { value: 'OFICIAL_CUMPLIMIENTO', label: 'Oficial de Cumplimiento', color: '#7c3aed' }
   ],
 
   /**
