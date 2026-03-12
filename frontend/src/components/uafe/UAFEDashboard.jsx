@@ -85,6 +85,8 @@ export default function UAFEDashboard() {
   const [reportLoading, setReportLoading] = useState(false);
   // Vehicle form dialog
   const [showVehiculoForm, setShowVehiculoForm] = useState(false);
+  // Threshold alerts
+  const [umbralAlertas, setUmbralAlertas] = useState(0);
 
   // ── Data fetching ─────────────────────────────────────────────
   const fetchProtocols = useCallback(async () => {
@@ -106,9 +108,25 @@ export default function UAFEDashboard() {
     }
   }, [isOficialOrAdmin]);
 
+  // Fetch threshold alerts for current month
+  const fetchUmbral = useCallback(async () => {
+    try {
+      const now = new Date();
+      const mes = now.getMonth() + 1;
+      const anio = now.getFullYear();
+      const { data } = await apiClient.get(`/formulario-uafe/umbral/${mes}/${anio}`);
+      if (data.success) {
+        setUmbralAlertas(data.data?.totalAlertas || 0);
+      }
+    } catch (err) {
+      console.warn('[UAFE] Error fetching umbral:', err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchProtocols();
-  }, [fetchProtocols]);
+    fetchUmbral();
+  }, [fetchProtocols, fetchUmbral]);
 
   // ── Computed stats ────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -640,7 +658,7 @@ export default function UAFEDashboard() {
       </Box>
 
       {/* KPI Cards */}
-      <UAFEKPICards stats={stats} loading={loading} />
+      <UAFEKPICards stats={stats} loading={loading} umbralAlertas={umbralAlertas} />
 
       {/* Status pipeline */}
       <Box

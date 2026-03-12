@@ -87,7 +87,7 @@ function KPICard({ label, value, accentColor, subtitle, loading, tooltip, UAFE_C
   ) : card;
 }
 
-export default function UAFEKPICards({ stats = {}, loading = false }) {
+export default function UAFEKPICards({ stats = {}, loading = false, umbralAlertas = 0 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
   const UAFE_COLORS = getUAFEColors(isDark);
@@ -144,6 +144,16 @@ export default function UAFEKPICards({ stats = {}, loading = false }) {
         subtitle="Faltan datos obligatorios"
         loading={loading}
         tooltip="Protocolos sin datos obligatorios UAFE: sin tipo de acto, sin cuantia o sin comparecientes. Requieren atencion inmediata."
+        UAFE_COLORS={UAFE_COLORS}
+        isDark={isDark}
+      />
+      <KPICard
+        label="Umbral $10K"
+        value={umbralAlertas}
+        accentColor={umbralAlertas > 0 ? '#e65100' : SEMAFORO.VERDE.color}
+        subtitle={umbralAlertas > 0 ? 'Personas con acumulacion' : 'Sin alertas'}
+        loading={loading}
+        tooltip="Personas cuya suma de actos en el mes supera $10,000 pero que tienen al menos un acto individual menor a ese monto. Estos actos menores se incluiran automaticamente en el reporte mensual UAFE."
         UAFE_COLORS={UAFE_COLORS}
         isDark={isDark}
       />

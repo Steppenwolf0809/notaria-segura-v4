@@ -330,39 +330,94 @@ function getDescripcionBien(protocolo) {
 
 // ── Consulta comun de protocolos ────────────────────────────────────
 
+const UMBRAL_UAFE = 10000;
+
 /**
  * Consulta protocolos UAFE para un periodo dado.
+ *
+ * Lógica de inclusión:
+ * 1. Protocolos COMPLETO/REPORTADO se incluyen siempre (actos >= $10K ya reportables).
+ * 2. Protocolos de cualquier estado con valorContrato < $10K se incluyen
+ *    si alguno de sus comparecientes acumula >= $10K en el mes (umbral UAFE).
  */
 async function queryProtocolos(mes, anio, notaryId, includePersonas = false) {
   const startDate = new Date(anio, mes - 1, 1);
   const endDate = new Date(anio, mes, 0, 23, 59, 59, 999);
 
-  const include = includePersonas
-    ? {
-        personas: {
-          include: {
-            persona: true,
-          },
-        },
-      }
-    : undefined;
+  const include = {
+    personas: {
+      include: includePersonas ? { persona: true } : undefined,
+    },
+  };
 
-  const protocolos = await prisma.protocoloUAFE.findMany({
+  // Paso 1: traer COMPLETO/REPORTADO (siempre se reportan)
+  const protocolosBase = await prisma.protocoloUAFE.findMany({
     where: {
-      fecha: {
-        gte: startDate,
-        lte: endDate,
-      },
-      estado: {
-        in: ['COMPLETO', 'REPORTADO'],
-      },
+      fecha: { gte: startDate, lte: endDate },
+      estado: { in: ['COMPLETO', 'REPORTADO'] },
       notaryId,
     },
     include,
     orderBy: { fecha: 'asc' },
   });
 
-  return protocolos;
+  // Paso 2: traer TODOS los protocolos del mes para calcular acumulación
+  const todosProtocolos = await prisma.protocoloUAFE.findMany({
+    where: {
+      fecha: { gte: startDate, lte: endDate },
+      notaryId,
+    },
+    include: { personas: true },
+    orderBy: { fecha: 'asc' },
+  });
+
+  // Paso 3: acumular por cédula
+  const acumuladoPorCedula = {};
+  for (const proto of todosProtocolos) {
+    const valor = Number(proto.valorContrato) || 0;
+    for (const pp of proto.personas) {
+      const cedula = pp.personaCedula;
+      if (!cedula) continue;
+      acumuladoPorCedula[cedula] = (acumuladoPorCedula[cedula] || 0) + valor;
+    }
+  }
+
+  // Paso 4: encontrar protocolos NO incluidos en base que tienen persona con acumulación >= umbral
+  const idsBase = new Set(protocolosBase.map(p => p.id));
+  const protocolosUmbral = [];
+
+  for (const proto of todosProtocolos) {
+    if (idsBase.has(proto.id)) continue; // ya incluido
+    const valor = Number(proto.valorContrato) || 0;
+    if (valor >= UMBRAL_UAFE) continue; // >= $10K ya se reporta solo (si no está COMPLETO, no lo forzamos)
+
+    // ¿Algún compareciente supera el umbral acumulado?
+    const superaUmbral = proto.personas.some(pp =>
+      pp.personaCedula && (acumuladoPorCedula[pp.personaCedula] || 0) >= UMBRAL_UAFE
+    );
+
+    if (superaUmbral) {
+      protocolosUmbral.push(proto.id);
+    }
+  }
+
+  // Paso 5: si hay protocolos por umbral, cargarlos con el include correcto
+  let protocolosExtra = [];
+  if (protocolosUmbral.length > 0) {
+    protocolosExtra = await prisma.protocoloUAFE.findMany({
+      where: { id: { in: protocolosUmbral } },
+      include,
+      orderBy: { fecha: 'asc' },
+    });
+    logger.info(`[UAFE] Umbral: ${protocolosExtra.length} protocolos adicionales incluidos por acumulación >= $${UMBRAL_UAFE}`);
+  }
+
+  // Combinar y ordenar por fecha
+  const todos = [...protocolosBase, ...protocolosExtra].sort((a, b) =>
+    new Date(a.fecha) - new Date(b.fecha)
+  );
+
+  return todos;
 }
 
 // ── Generadores de reportes ─────────────────────────────────────────
