@@ -12,7 +12,7 @@ import {
 /**
  * Roles válidos del sistema
  */
-const validRoles = ['ADMIN', 'CAJA', 'MATRIZADOR', 'RECEPCION', 'ARCHIVO'];
+const validRoles = ['ADMIN', 'CAJA', 'MATRIZADOR', 'RECEPCION', 'ARCHIVO', 'OFICIAL_CUMPLIMIENTO'];
 
 /**
  * Obtiene todos los usuarios (solo admin)

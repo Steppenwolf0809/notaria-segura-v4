@@ -8,7 +8,7 @@ import { logPasswordChange, logLoginAttempt, extractRequestInfo } from '../utils
 /**
  * Roles válidos del sistema (completo con ARCHIVO)
  */
-const validRoles = ['ADMIN', 'CAJA', 'MATRIZADOR', 'RECEPCION', 'ARCHIVO'];
+const validRoles = ['ADMIN', 'CAJA', 'MATRIZADOR', 'RECEPCION', 'ARCHIVO', 'OFICIAL_CUMPLIMIENTO'];
 
 /**
  * Obtiene el color asociado a cada rol
@@ -21,7 +21,8 @@ function getRoleColor(role) {
     CAJA: '#22c55e',       // Verde - Gestión financiera  
     MATRIZADOR: '#3b82f6', // Azul - Creación documentos
     RECEPCION: '#06b6d4',  // Cyan - Entrega documentos
-    ARCHIVO: '#f59e0b'     // Naranja/Warning - Archivo histórico
+    ARCHIVO: '#f59e0b',     // Naranja/Warning - Archivo histórico
+    OFICIAL_CUMPLIMIENTO: '#7c3aed' // Púrpura - Cumplimiento UAFE
   };
   return roleColors[role] || '#6b7280';
 }
