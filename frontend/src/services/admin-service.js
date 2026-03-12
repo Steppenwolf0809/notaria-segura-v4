@@ -187,7 +187,7 @@ const adminService = {
     }
 
     // Validar rol
-    const validRoles = ['ADMIN', 'CAJA', 'MATRIZADOR', 'RECEPCION', 'ARCHIVO'];
+    const validRoles = ['ADMIN', 'CAJA', 'MATRIZADOR', 'RECEPCION', 'ARCHIVO', 'OFICIAL_CUMPLIMIENTO'];
     if (!userData.role || !validRoles.includes(userData.role)) {
       errors.role = 'Debe seleccionar un rol válido';
     }
