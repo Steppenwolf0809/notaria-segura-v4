@@ -28,6 +28,7 @@ import ListAltOutlinedIcon from '@mui/icons-material/ListAltOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined';
 import LockResetIcon from '@mui/icons-material/LockReset';
+import DirectionsCarOutlinedIcon from '@mui/icons-material/DirectionsCarOutlined';
 import ResetearPinDialog from '../ResetearPinDialog';
 
 import apiClient from '../../services/api-client';
@@ -39,6 +40,7 @@ import UAFEProtocolTable from './UAFEProtocolTable';
 import UAFEProtocolDetail from './UAFEProtocolDetail';
 import UAFEReportPanel from './UAFEReportPanel';
 import UAFEPersonaEditDialog from './UAFEPersonaEditDialog';
+import UAFEVehiculoForm from './UAFEVehiculoForm';
 import { UAFE_COLORS, TIPOS_ACTO_UAFE, TIPOS_BIEN, CALIDADES_COMPARECIENTE, FORMAS_PAGO, formatCurrency, getSemaforoFromProtocol, ESTADOS_PROTOCOLO_FLOW } from './uafe-constants';
 
 /**
@@ -81,6 +83,8 @@ export default function UAFEDashboard() {
   const [wizardError, setWizardError] = useState(null);
   // OLA 4: Report generation
   const [reportLoading, setReportLoading] = useState(false);
+  // Vehicle form dialog
+  const [showVehiculoForm, setShowVehiculoForm] = useState(false);
 
   // ── Data fetching ─────────────────────────────────────────────
   const fetchProtocols = useCallback(async () => {
@@ -591,6 +595,24 @@ export default function UAFEDashboard() {
                 Resetear PIN
               </Button>
             </Tooltip>
+            <Tooltip title="Registrar reconocimiento de firma de vehiculo. Formulario manual para actos sin minuta Word." arrow>
+              <Button
+                variant="outlined"
+                startIcon={<DirectionsCarOutlinedIcon />}
+                onClick={() => setShowVehiculoForm(true)}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  fontSize: '0.82rem',
+                  borderRadius: '8px',
+                  borderColor: '#e65100',
+                  color: '#e65100',
+                  '&:hover': { borderColor: '#bf360c', color: '#bf360c', backgroundColor: 'rgba(230,81,0,0.04)' },
+                }}
+              >
+                Vehiculo
+              </Button>
+            </Tooltip>
             <Tooltip title="Crea un nuevo protocolo UAFE. Ingrese los datos del acto notarial y agregue los comparecientes para iniciar el proceso de debida diligencia." arrow placement="left">
               <Button
                 variant="contained"
@@ -1085,6 +1107,23 @@ export default function UAFEDashboard() {
       >
         <Alert severity={snackbar.severity} variant="filled">{snackbar.message}</Alert>
       </Snackbar>
+
+      {/* Vehicle form dialog */}
+      <UAFEVehiculoForm
+        open={showVehiculoForm}
+        onClose={() => setShowVehiculoForm(false)}
+        onSaved={async (proto) => {
+          setSnackbar({ open: true, message: 'Protocolo vehiculo creado exitosamente', severity: 'success' });
+          setShowVehiculoForm(false);
+          await fetchProtocols();
+          if (proto?.id) {
+            try {
+              const { data } = await apiClient.get(`/formulario-uafe/protocolo/${proto.id}`);
+              setSelectedProtocol(data.data || data);
+            } catch { setSelectedProtocol(proto); }
+          }
+        }}
+      />
 
       {/* Dialog resetear PIN */}
       <ResetearPinDialog
