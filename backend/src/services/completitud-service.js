@@ -31,12 +31,16 @@ const LABELS_CAMPOS = {
     canton: 'Canton',
     parroquia: 'Parroquia',
     sector: 'Sector',
+    referencia: 'Referencia (direccion)',
     // Laboral
     situacionLaboral: 'Situacion laboral',
     profesion: 'Profesion/Ocupacion',
     entidadLaboral: 'Entidad donde trabaja',
     cargoLaboral: 'Cargo laboral',
     ingresoMensual: 'Ingreso mensual',
+    direccionLaboral: 'Direccion empresa',
+    provinciaLaboral: 'Provincia laboral',
+    cantonLaboral: 'Canton laboral',
     // Conyuge
     conyugeApellidos: 'Apellidos conyuge',
     conyugeNombres: 'Nombres conyuge',
@@ -148,6 +152,7 @@ export function calcularCompletitudPersonaNatural(datos) {
     checkField('canton', direccion.canton, false);
     checkField('parroquia', direccion.parroquia, false);
     checkField('sector', direccion.sector, false);
+    checkField('referencia', direccion.referencia, false);
 
     // 5. Información laboral completa (todos aparecen en Word)
     checkField('situacionLaboral', laboral.situacion || laboral.situacionLaboral, false);
@@ -155,6 +160,9 @@ export function calcularCompletitudPersonaNatural(datos) {
     checkField('entidadLaboral', laboral.entidad || laboral.nombreEmpresa, false);
     checkField('cargoLaboral', laboral.cargo, false);
     checkField('ingresoMensual', laboral.ingresoMensual, false);
+    checkField('direccionLaboral', laboral.direccionLaboral, false);
+    checkField('provinciaLaboral', laboral.provinciaLaboral, false);
+    checkField('cantonLaboral', laboral.cantonLaboral, false);
 
     // 6. PEP
     checkField('pep', declaracion.esPEP != null ? String(declaracion.esPEP) : null, false);

@@ -76,6 +76,12 @@ const SITUACIONES_LABORALES = [
   { value: 'NO_APLICA', label: 'No Aplica' },
 ];
 
+const TIPOS_IDENTIFICACION = [
+  { value: 'CEDULA', label: 'Cedula' },
+  { value: 'RUC', label: 'RUC' },
+  { value: 'PASAPORTE', label: 'Pasaporte' },
+];
+
 const NIVELES_ESTUDIO = [
   { value: 'BACHILLER', label: 'Bachiller' },
   { value: 'UNIVERSITARIO', label: 'Universitario' },
@@ -483,7 +489,11 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
         situacion: lab.situacion || '', profesionOcupacion: lab.profesionOcupacion || '',
         entidad: lab.entidad || '', cargo: lab.cargo || '',
         ingresoMensual: lab.ingresoMensual || '',
+        direccionLaboral: lab.direccionLaboral || '',
+        provinciaLaboral: lab.provinciaLaboral || '',
+        cantonLaboral: lab.cantonLaboral || '',
         conyugeApellidos: con.apellidos || '', conyugeNombres: con.nombres || '',
+        conyugeTipoIdentificacion: con.tipoIdentificacion || '',
         conyugeNumeroIdentificacion: con.numeroIdentificacion || '',
         conyugeNacionalidad: con.nacionalidad || '', conyugeEmail: con.correoElectronico || '',
         conyugeCelular: con.celular || '',
@@ -505,7 +515,8 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
         canton: 'QUITO', parroquia: '', sector: '', referencia: '',
         situacion: '', profesionOcupacion: '',
         entidad: '', cargo: '', ingresoMensual: '',
-        conyugeApellidos: '', conyugeNombres: '', conyugeNumeroIdentificacion: '',
+        direccionLaboral: '', provinciaLaboral: '', cantonLaboral: '',
+        conyugeApellidos: '', conyugeNombres: '', conyugeTipoIdentificacion: '', conyugeNumeroIdentificacion: '',
         conyugeNacionalidad: '', conyugeEmail: '', conyugeCelular: '',
         esPEP: false, esFamiliarPEP: false, esColaboradorPEP: false,
         pepInstitucion: '', pepCargo: '', pepDireccionLaboral: '',
@@ -551,9 +562,11 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
           informacionLaboral: {
             situacion: form.situacion, profesionOcupacion: form.profesionOcupacion,
             entidad: form.entidad, cargo: form.cargo, ingresoMensual: form.ingresoMensual && !isNaN(parseFloat(String(form.ingresoMensual).replace(',', '.'))) ? parseFloat(String(form.ingresoMensual).replace(',', '.')) : null,
+            direccionLaboral: form.direccionLaboral, provinciaLaboral: form.provinciaLaboral, cantonLaboral: form.cantonLaboral,
           },
           conyuge: needsConyuge ? {
             apellidos: form.conyugeApellidos, nombres: form.conyugeNombres,
+            tipoIdentificacion: form.conyugeTipoIdentificacion,
             numeroIdentificacion: form.conyugeNumeroIdentificacion,
             nacionalidad: form.conyugeNacionalidad, correoElectronico: form.conyugeEmail,
             celular: form.conyugeCelular,
@@ -666,6 +679,9 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
           <Grid size={{ xs: 12 }}>{field('Nombre de la Entidad', 'entidad')}</Grid>
           <Grid size={{ xs: 6 }}>{field('Cargo', 'cargo')}</Grid>
           <Grid size={{ xs: 6 }}>{field('Ingreso Mensual (USD)', 'ingresoMensual', { inputProps: { inputMode: 'decimal' }, placeholder: 'Ej: 1500.00' })}</Grid>
+          <Grid size={{ xs: 12 }}>{field('Direccion de la empresa', 'direccionLaboral', { placeholder: 'Ej: Av. Amazonas N24-45 y Colon' })}</Grid>
+          <Grid size={{ xs: 6 }}>{field('Provincia (laboral)', 'provinciaLaboral', { placeholder: 'Ej: PICHINCHA' })}</Grid>
+          <Grid size={{ xs: 6 }}>{field('Canton (laboral)', 'cantonLaboral', { placeholder: 'Ej: QUITO' })}</Grid>
         </Grid>
       </Box>
 
@@ -678,8 +694,9 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
           <Grid container spacing={2}>
             <Grid size={{ xs: 6 }}>{field('Apellidos', 'conyugeApellidos', { inputProps: { autoCapitalize: 'words' } })}</Grid>
             <Grid size={{ xs: 6 }}>{field('Nombres', 'conyugeNombres', { inputProps: { autoCapitalize: 'words' } })}</Grid>
-            <Grid size={{ xs: 6 }}>{field('Numero Identificacion', 'conyugeNumeroIdentificacion', { inputProps: { inputMode: 'numeric', pattern: '[0-9]*' } })}</Grid>
-            <Grid size={{ xs: 6 }}>{field('Nacionalidad', 'conyugeNacionalidad')}</Grid>
+            <Grid size={{ xs: 4 }}>{selectField('Tipo Identificacion', 'conyugeTipoIdentificacion', TIPOS_IDENTIFICACION)}</Grid>
+            <Grid size={{ xs: 4 }}>{field('Numero Identificacion', 'conyugeNumeroIdentificacion', { inputProps: { inputMode: 'numeric', pattern: '[0-9]*' } })}</Grid>
+            <Grid size={{ xs: 4 }}>{field('Nacionalidad', 'conyugeNacionalidad')}</Grid>
             <Grid size={{ xs: 6 }}>{field('Email', 'conyugeEmail', { type: 'email', inputProps: { inputMode: 'email' } })}</Grid>
             <Grid size={{ xs: 6 }}>{field('Celular', 'conyugeCelular', { type: 'tel', inputProps: { inputMode: 'tel' } })}</Grid>
           </Grid>
