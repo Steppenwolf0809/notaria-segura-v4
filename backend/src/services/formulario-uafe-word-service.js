@@ -580,6 +580,40 @@ function buildRepresentanteLegal(datos) {
   ];
 }
 
+function flattenSocios(socios, prefix = '') {
+  const rows = [];
+  for (const s of socios) {
+    const isJuridica = s.tipoSocio === 'JURIDICA';
+    if (isJuridica) {
+      const nombre = prefix + (s.razonSocial || '(Empresa sin nombre)');
+      const identificacion = s.ruc || '';
+      const pct = s.porcentaje ?? s.porcentajeParticipacion;
+      rows.push([
+        safeStr(nombre),
+        safeStr(identificacion),
+        pct != null && pct !== '' ? `${pct}%` : '—',
+        safeStr(s.nacionalidad),
+      ]);
+      // Recursively add sub-socios with indent
+      if (s.subSocios && s.subSocios.length > 0) {
+        rows.push(...flattenSocios(s.subSocios, prefix + '  ↳ '));
+      }
+    } else {
+      // Persona natural (default if no tipoSocio)
+      const nombre = prefix + (s.nombre || [s.apellidos, s.nombres].filter(Boolean).join(' ') || '—');
+      const identificacion = s.identificacion || s.numeroIdentificacion;
+      const pct = s.porcentaje ?? s.porcentajeParticipacion;
+      rows.push([
+        safeStr(nombre),
+        safeStr(identificacion),
+        pct != null && pct !== '' ? `${pct}%` : '—',
+        safeStr(s.nacionalidad),
+      ]);
+    }
+  }
+  return rows;
+}
+
 function buildSocios(datos) {
   const socios = datos?.socios || [];
   if (socios.length === 0) {
@@ -589,17 +623,7 @@ function buildSocios(datos) {
     ];
   }
 
-  const dataRows = socios.map(s => {
-    const nombre = s.nombre || [s.apellidos, s.nombres].filter(Boolean).join(' ');
-    const identificacion = s.identificacion || s.numeroIdentificacion;
-    const pct = s.porcentaje ?? s.porcentajeParticipacion;
-    return [
-      safeStr(nombre),
-      safeStr(identificacion),
-      pct != null ? `${pct}%` : '—',
-      safeStr(s.nacionalidad),
-    ];
-  });
+  const dataRows = flattenSocios(socios);
 
   return [
     sectionTitle('5. SOCIOS / ACCIONISTAS'),

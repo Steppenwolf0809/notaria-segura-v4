@@ -27,6 +27,7 @@ import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
 import SearchIcon from '@mui/icons-material/Search';
+import AddIcon from '@mui/icons-material/Add';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import PersonIcon from '@mui/icons-material/Person';
@@ -691,16 +692,16 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
       {needsConyuge && (
         <Box sx={{ display: tab === TABS.indexOf('Conyuge') ? 'block' : 'none' }}>
           <Alert severity="info" sx={{ mb: 2, borderRadius: '8px' }}>
-            Complete esta seccion si su estado civil es Casado/a o Union Libre.
+            Ingrese primero el numero de identificacion del conyuge para buscar si ya tiene datos registrados.
           </Alert>
           <Grid container spacing={2}>
+            <Grid size={{ xs: 4 }}>{selectField('Tipo Identificacion', 'conyugeTipoIdentificacion', TIPOS_IDENTIFICACION)}</Grid>
+            <Grid size={{ xs: 8 }}>{field('Numero Identificacion', 'conyugeNumeroIdentificacion', { inputProps: { inputMode: 'numeric', pattern: '[0-9]*' } })}</Grid>
             <Grid size={{ xs: 6 }}>{field('Apellidos', 'conyugeApellidos', { inputProps: { autoCapitalize: 'words' } })}</Grid>
             <Grid size={{ xs: 6 }}>{field('Nombres', 'conyugeNombres', { inputProps: { autoCapitalize: 'words' } })}</Grid>
-            <Grid size={{ xs: 4 }}>{selectField('Tipo Identificacion', 'conyugeTipoIdentificacion', TIPOS_IDENTIFICACION)}</Grid>
-            <Grid size={{ xs: 4 }}>{field('Numero Identificacion', 'conyugeNumeroIdentificacion', { inputProps: { inputMode: 'numeric', pattern: '[0-9]*' } })}</Grid>
             <Grid size={{ xs: 4 }}>{field('Nacionalidad', 'conyugeNacionalidad')}</Grid>
-            <Grid size={{ xs: 6 }}>{field('Email', 'conyugeEmail', { type: 'email', inputProps: { inputMode: 'email' } })}</Grid>
-            <Grid size={{ xs: 6 }}>{field('Celular', 'conyugeCelular', { type: 'tel', inputProps: { inputMode: 'tel' } })}</Grid>
+            <Grid size={{ xs: 4 }}>{field('Email', 'conyugeEmail', { type: 'email', inputProps: { inputMode: 'email' } })}</Grid>
+            <Grid size={{ xs: 4 }}>{field('Celular', 'conyugeCelular', { type: 'tel', inputProps: { inputMode: 'tel' } })}</Grid>
           </Grid>
         </Box>
       )}
@@ -819,7 +820,8 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
   const [buscandoSocio, setBuscandoSocio] = useState(null);
   const [busquedaMsg, setBusquedaMsg] = useState({});
 
-  const SOCIO_EMPTY = { apellidos: '', nombres: '', tipoIdentificacion: 'CEDULA', numeroIdentificacion: '', nacionalidad: 'ECUATORIANA', porcentajeParticipacion: '' };
+  const SOCIO_NATURAL_EMPTY = { tipoSocio: 'NATURAL', apellidos: '', nombres: '', tipoIdentificacion: 'CEDULA', numeroIdentificacion: '', nacionalidad: 'ECUATORIANA', porcentajeParticipacion: '' };
+  const SOCIO_JURIDICA_EMPTY = { tipoSocio: 'JURIDICA', razonSocial: '', ruc: '', nacionalidad: 'ECUATORIANA', porcentajeParticipacion: '', subSocios: [] };
 
   const buscarPorCedula = async (cedula) => {
     if (!cedula || cedula.length < 10) return null;
@@ -1010,7 +1012,7 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
   const progress = ((tab + 1) / totalTabs) * 100;
 
   // Socios helpers
-  const addSocio = () => setSocios(prev => [...prev, { ...SOCIO_EMPTY }]);
+  const addSocio = (tipo = 'NATURAL') => setSocios(prev => [...prev, tipo === 'JURIDICA' ? { ...SOCIO_JURIDICA_EMPTY, subSocios: [] } : { ...SOCIO_NATURAL_EMPTY }]);
   const removeSocio = (idx) => setSocios(prev => prev.filter((_, i) => i !== idx));
   const updateSocio = (idx, fld, value) => setSocios(prev => prev.map((s, i) => i === idx ? { ...s, [fld]: value } : s));
 
@@ -1209,9 +1211,10 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
 
       {/* Tab: Representante Legal */}
       <Box sx={{ display: tab === 1 ? 'block' : 'none' }}>
+        <Alert severity="info" icon={<SearchIcon />} sx={{ mb: 2, borderRadius: '8px', '& .MuiAlert-message': { fontSize: '0.85rem' } }}>
+          Ingrese primero el numero de identificacion y presione 🔍 para buscar datos existentes en el sistema.
+        </Alert>
         <Grid container spacing={2}>
-          <Grid size={{ xs: 6 }}>{field('Apellidos *', 'repApellidos', { autoComplete: 'family-name', inputProps: { autoCapitalize: 'words' } })}</Grid>
-          <Grid size={{ xs: 6 }}>{field('Nombres *', 'repNombres', { autoComplete: 'given-name', inputProps: { autoCapitalize: 'words' } })}</Grid>
           <Grid size={{ xs: 4 }}>
             {selectField('Tipo Identificacion', 'repTipoIdentificacion', [
               { value: 'CEDULA', label: 'Cedula' },
@@ -1219,7 +1222,7 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
               { value: 'RUC', label: 'RUC' },
             ])}
           </Grid>
-          <Grid size={{ xs: 4 }}>
+          <Grid size={{ xs: 8 }}>
             {field('Numero Identificacion *', 'repNumeroIdentificacion', {
               inputProps: { inputMode: 'numeric', pattern: '[0-9]*' },
               InputProps: {
@@ -1239,12 +1242,14 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
               </Alert>
             )}
           </Grid>
+          <Grid size={{ xs: 6 }}>{field('Apellidos *', 'repApellidos', { autoComplete: 'family-name', inputProps: { autoCapitalize: 'words' } })}</Grid>
+          <Grid size={{ xs: 6 }}>{field('Nombres *', 'repNombres', { autoComplete: 'given-name', inputProps: { autoCapitalize: 'words' } })}</Grid>
           <Grid size={{ xs: 4 }}>{field('Nacionalidad', 'repNacionalidad')}</Grid>
           <Grid size={{ xs: 4 }}>{selectField('Genero', 'repGenero', [{ value: 'MASCULINO', label: 'Masculino' }, { value: 'FEMENINO', label: 'Femenino' }])}</Grid>
           <Grid size={{ xs: 4 }}>{selectField('Estado Civil', 'repEstadoCivil', ESTADOS_CIVILES)}</Grid>
           <Grid size={{ xs: 4 }}>{selectField('Nivel Estudio', 'repNivelEstudio', NIVELES_ESTUDIO)}</Grid>
-          <Grid size={{ xs: 6 }}>{field('Celular', 'repCelular', { type: 'tel', autoComplete: 'tel', inputProps: { inputMode: 'tel' } })}</Grid>
-          <Grid size={{ xs: 6 }}>{field('Correo Electronico', 'repCorreoElectronico', { type: 'email', autoComplete: 'email', inputProps: { inputMode: 'email' } })}</Grid>
+          <Grid size={{ xs: 4 }}>{field('Celular', 'repCelular', { type: 'tel', autoComplete: 'tel', inputProps: { inputMode: 'tel' } })}</Grid>
+          <Grid size={{ xs: 4 }}>{field('Correo Electronico', 'repCorreoElectronico', { type: 'email', autoComplete: 'email', inputProps: { inputMode: 'email' } })}</Grid>
           <Grid size={{ xs: 12 }}>
             <Divider sx={{ my: 1 }}><Typography variant="caption" sx={{ color: COLORS.textMuted }}>Direccion Representante</Typography></Divider>
           </Grid>
@@ -1260,13 +1265,11 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
       {/* Tab: Conyuge Representante (condicional) */}
       {needsConyugeRep && (
         <Box sx={{ display: tab === TABS.indexOf('Conyuge Rep.') ? 'block' : 'none' }}>
-          <Alert severity="info" sx={{ mb: 2, borderRadius: '8px' }}>
-            Complete esta seccion si el representante legal es Casado/a o Union Libre.
+          <Alert severity="info" icon={<SearchIcon />} sx={{ mb: 2, borderRadius: '8px', '& .MuiAlert-message': { fontSize: '0.85rem' } }}>
+            Ingrese primero el numero de identificacion y presione 🔍 para buscar datos existentes en el sistema.
           </Alert>
           <Grid container spacing={2}>
-            <Grid size={{ xs: 6 }}>{field('Apellidos *', 'conApellidos', { inputProps: { autoCapitalize: 'words' } })}</Grid>
-            <Grid size={{ xs: 6 }}>{field('Nombres *', 'conNombres', { inputProps: { autoCapitalize: 'words' } })}</Grid>
-            <Grid size={{ xs: 6 }}>
+            <Grid size={{ xs: 12 }}>
               {field('Numero Identificacion *', 'conNumeroIdentificacion', {
                 inputProps: { inputMode: 'numeric', pattern: '[0-9]*' },
                 InputProps: {
@@ -1286,9 +1289,11 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
                 </Alert>
               )}
             </Grid>
-            <Grid size={{ xs: 6 }}>{field('Nacionalidad', 'conNacionalidad')}</Grid>
-            <Grid size={{ xs: 6 }}>{field('Correo Electronico', 'conCorreoElectronico', { type: 'email', inputProps: { inputMode: 'email' } })}</Grid>
-            <Grid size={{ xs: 6 }}>{field('Celular', 'conCelular', { type: 'tel', inputProps: { inputMode: 'tel' } })}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Apellidos *', 'conApellidos', { inputProps: { autoCapitalize: 'words' } })}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Nombres *', 'conNombres', { inputProps: { autoCapitalize: 'words' } })}</Grid>
+            <Grid size={{ xs: 4 }}>{field('Nacionalidad', 'conNacionalidad')}</Grid>
+            <Grid size={{ xs: 4 }}>{field('Correo Electronico', 'conCorreoElectronico', { type: 'email', inputProps: { inputMode: 'email' } })}</Grid>
+            <Grid size={{ xs: 4 }}>{field('Celular', 'conCelular', { type: 'tel', inputProps: { inputMode: 'tel' } })}</Grid>
           </Grid>
         </Box>
       )}
@@ -1296,80 +1301,312 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
       {/* Tab: Socios */}
       <Box sx={{ display: tab === TABS.indexOf('Socios') ? 'block' : 'none' }}>
         <Alert severity="info" sx={{ mb: 2, borderRadius: '8px' }}>
-          Agregue los socios o accionistas de la compania con su porcentaje de participacion.
+          Agregue los socios o accionistas de la compania. Si un socio es otra empresa, seleccione "Persona Juridica" y agregue sus sub-socios hasta llegar a la persona natural final.
         </Alert>
-        {socios.map((socio, idx) => (
+        {socios.map((socio, idx) => {
+          const isJuridica = socio.tipoSocio === 'JURIDICA';
+          return (
           <Paper key={idx} elevation={0} sx={{ p: 2, mb: 2, borderRadius: '10px', border: `1px solid ${COLORS.border}`, backgroundColor: COLORS.surface }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
               <Typography variant="body2" sx={{ fontWeight: 600, color: COLORS.textPrimary }}>
-                Socio {idx + 1}
+                Socio {idx + 1} {isJuridica ? '(Empresa)' : '(Persona)'}
               </Typography>
               <Button size="small" color="error" onClick={() => removeSocio(idx)} sx={{ textTransform: 'none', minWidth: 'auto' }}>
                 Eliminar
               </Button>
             </Box>
-            <Grid container spacing={1.5}>
-              <Grid size={{ xs: 6 }}>
-                <TextField fullWidth size="small" label="Apellidos" value={socio.apellidos}
-                  onChange={e => updateSocio(idx, 'apellidos', e.target.value)}
-                  inputProps={{ autoCapitalize: 'words' }} />
+            {/* Tipo de socio selector */}
+            <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+              {[
+                { value: 'NATURAL', label: 'Persona Natural', icon: <PersonIcon sx={{ fontSize: 16 }} /> },
+                { value: 'JURIDICA', label: 'Persona Juridica', icon: <BusinessIcon sx={{ fontSize: 16 }} /> },
+              ].map(opt => (
+                <Paper key={opt.value} elevation={0} onClick={() => {
+                  if ((socio.tipoSocio || 'NATURAL') !== opt.value) {
+                    const newSocio = opt.value === 'JURIDICA'
+                      ? { ...SOCIO_JURIDICA_EMPTY, porcentajeParticipacion: socio.porcentajeParticipacion, subSocios: [] }
+                      : { ...SOCIO_NATURAL_EMPTY, porcentajeParticipacion: socio.porcentajeParticipacion };
+                    setSocios(prev => prev.map((s, i) => i === idx ? newSocio : s));
+                  }
+                }}
+                  sx={{
+                    flex: 1, p: 1, textAlign: 'center', cursor: 'pointer', borderRadius: '8px',
+                    border: `2px solid ${(socio.tipoSocio || 'NATURAL') === opt.value ? COLORS.primary : COLORS.border}`,
+                    backgroundColor: (socio.tipoSocio || 'NATURAL') === opt.value ? COLORS.primaryLight : 'white',
+                    transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5,
+                  }}>
+                  <Box sx={{ color: (socio.tipoSocio || 'NATURAL') === opt.value ? COLORS.primary : COLORS.textMuted }}>{opt.icon}</Box>
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: (socio.tipoSocio || 'NATURAL') === opt.value ? COLORS.primary : COLORS.textSecondary }}>
+                    {opt.label}
+                  </Typography>
+                </Paper>
+              ))}
+            </Box>
+            {isJuridica ? (
+              /* Socio Persona Juridica */
+              <Grid container spacing={1.5}>
+                <Grid size={{ xs: 12 }}>
+                  <TextField fullWidth size="small" label="Razon Social *" value={socio.razonSocial}
+                    onChange={e => updateSocio(idx, 'razonSocial', e.target.value)}
+                    inputProps={{ autoCapitalize: 'words' }} />
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <TextField fullWidth size="small" label="RUC *" value={socio.ruc}
+                    onChange={e => updateSocio(idx, 'ruc', e.target.value)}
+                    inputProps={{ inputMode: 'numeric', pattern: '[0-9]*', maxLength: 13 }}
+                    placeholder="13 digitos" />
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <TextField fullWidth size="small" label="Nacionalidad" value={socio.nacionalidad}
+                    onChange={e => updateSocio(idx, 'nacionalidad', e.target.value)} />
+                </Grid>
+                <Grid size={{ xs: 12 }}>
+                  <TextField fullWidth size="small"
+                    label={<>% Participacion{tipIcon('porcentajeParticipacion')}</>}
+                    value={socio.porcentajeParticipacion}
+                    onChange={e => updateSocio(idx, 'porcentajeParticipacion', e.target.value)}
+                    error={!!fieldErrors[`socio_${idx}_porcentaje`]}
+                    helperText={fieldErrors[`socio_${idx}_porcentaje`] || ''}
+                    inputProps={{ inputMode: 'decimal' }} />
+                </Grid>
+                {/* Sub-socios */}
+                <Grid size={{ xs: 12 }}>
+                  <Divider sx={{ my: 1 }}>
+                    <Typography variant="caption" sx={{ color: COLORS.textMuted }}>Socios de {socio.razonSocial || 'esta empresa'}</Typography>
+                  </Divider>
+                  {(socio.subSocios || []).map((sub, subIdx) => {
+                    const isSubJuridica = sub.tipoSocio === 'JURIDICA';
+                    return (
+                      <Paper key={subIdx} elevation={0} sx={{ p: 1.5, mb: 1.5, borderRadius: '8px', border: `1px dashed ${COLORS.primary}`, backgroundColor: 'white', ml: 1 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                          <Typography variant="caption" sx={{ fontWeight: 600, color: COLORS.primary }}>
+                            Sub-socio {subIdx + 1} {isSubJuridica ? '(Empresa)' : '(Persona)'}
+                          </Typography>
+                          <Button size="small" color="error" sx={{ textTransform: 'none', minWidth: 'auto', fontSize: '0.7rem' }}
+                            onClick={() => {
+                              const newSubSocios = (socio.subSocios || []).filter((_, si) => si !== subIdx);
+                              updateSocio(idx, 'subSocios', newSubSocios);
+                            }}>Eliminar</Button>
+                        </Box>
+                        {/* Tipo selector sub-socio */}
+                        <Box sx={{ display: 'flex', gap: 0.5, mb: 1.5 }}>
+                          {['NATURAL', 'JURIDICA'].map(tp => (
+                            <Paper key={tp} elevation={0} onClick={() => {
+                              if ((sub.tipoSocio || 'NATURAL') !== tp) {
+                                const newSub = tp === 'JURIDICA'
+                                  ? { ...SOCIO_JURIDICA_EMPTY, porcentajeParticipacion: sub.porcentajeParticipacion, subSocios: [] }
+                                  : { ...SOCIO_NATURAL_EMPTY, porcentajeParticipacion: sub.porcentajeParticipacion };
+                                const newSubSocios = [...(socio.subSocios || [])];
+                                newSubSocios[subIdx] = newSub;
+                                updateSocio(idx, 'subSocios', newSubSocios);
+                              }
+                            }}
+                              sx={{
+                                flex: 1, p: 0.5, textAlign: 'center', cursor: 'pointer', borderRadius: '6px',
+                                border: `1px solid ${(sub.tipoSocio || 'NATURAL') === tp ? COLORS.primary : COLORS.border}`,
+                                backgroundColor: (sub.tipoSocio || 'NATURAL') === tp ? COLORS.primaryLight : 'white',
+                              }}>
+                              <Typography variant="caption" sx={{ fontSize: '0.65rem', fontWeight: 600, color: (sub.tipoSocio || 'NATURAL') === tp ? COLORS.primary : COLORS.textMuted }}>
+                                {tp === 'NATURAL' ? 'Persona' : 'Empresa'}
+                              </Typography>
+                            </Paper>
+                          ))}
+                        </Box>
+                        {isSubJuridica ? (
+                          <Grid container spacing={1}>
+                            <Grid size={{ xs: 12 }}>
+                              <TextField fullWidth size="small" label="Razon Social" value={sub.razonSocial || ''}
+                                onChange={e => { const ns = [...(socio.subSocios || [])]; ns[subIdx] = { ...sub, razonSocial: e.target.value }; updateSocio(idx, 'subSocios', ns); }} />
+                            </Grid>
+                            <Grid size={{ xs: 6 }}>
+                              <TextField fullWidth size="small" label="RUC" value={sub.ruc || ''}
+                                onChange={e => { const ns = [...(socio.subSocios || [])]; ns[subIdx] = { ...sub, ruc: e.target.value }; updateSocio(idx, 'subSocios', ns); }}
+                                inputProps={{ inputMode: 'numeric', maxLength: 13 }} />
+                            </Grid>
+                            <Grid size={{ xs: 6 }}>
+                              <TextField fullWidth size="small" label="% Participacion" value={sub.porcentajeParticipacion || ''}
+                                onChange={e => { const ns = [...(socio.subSocios || [])]; ns[subIdx] = { ...sub, porcentajeParticipacion: e.target.value }; updateSocio(idx, 'subSocios', ns); }}
+                                inputProps={{ inputMode: 'decimal' }} />
+                            </Grid>
+                            {/* Nivel 3: sub-sub-socios */}
+                            <Grid size={{ xs: 12 }}>
+                              <Divider sx={{ my: 0.5 }}>
+                                <Typography variant="caption" sx={{ color: COLORS.textMuted, fontSize: '0.65rem' }}>Socios de {sub.razonSocial || 'esta empresa'}</Typography>
+                              </Divider>
+                              {(sub.subSocios || []).map((sub3, sub3Idx) => (
+                                <Paper key={sub3Idx} elevation={0} sx={{ p: 1, mb: 1, borderRadius: '6px', border: `1px dotted ${COLORS.textMuted}`, backgroundColor: COLORS.surface, ml: 1 }}>
+                                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
+                                    <Typography variant="caption" sx={{ fontWeight: 600, fontSize: '0.7rem', color: COLORS.textSecondary }}>
+                                      Socio Final {sub3Idx + 1}
+                                    </Typography>
+                                    <Button size="small" color="error" sx={{ textTransform: 'none', minWidth: 'auto', fontSize: '0.6rem', p: 0 }}
+                                      onClick={() => {
+                                        const newSub3s = (sub.subSocios || []).filter((_, si) => si !== sub3Idx);
+                                        const ns = [...(socio.subSocios || [])]; ns[subIdx] = { ...sub, subSocios: newSub3s }; updateSocio(idx, 'subSocios', ns);
+                                      }}>✕</Button>
+                                  </Box>
+                                  <Grid container spacing={1}>
+                                    <Grid size={{ xs: 6 }}>
+                                      <TextField fullWidth size="small" label="Apellidos" value={sub3.apellidos || ''}
+                                        onChange={e => { const newSub3s = [...(sub.subSocios || [])]; newSub3s[sub3Idx] = { ...sub3, apellidos: e.target.value }; const ns = [...(socio.subSocios || [])]; ns[subIdx] = { ...sub, subSocios: newSub3s }; updateSocio(idx, 'subSocios', ns); }}
+                                        inputProps={{ style: { fontSize: '0.8rem' } }} />
+                                    </Grid>
+                                    <Grid size={{ xs: 6 }}>
+                                      <TextField fullWidth size="small" label="Nombres" value={sub3.nombres || ''}
+                                        onChange={e => { const newSub3s = [...(sub.subSocios || [])]; newSub3s[sub3Idx] = { ...sub3, nombres: e.target.value }; const ns = [...(socio.subSocios || [])]; ns[subIdx] = { ...sub, subSocios: newSub3s }; updateSocio(idx, 'subSocios', ns); }}
+                                        inputProps={{ style: { fontSize: '0.8rem' } }} />
+                                    </Grid>
+                                    <Grid size={{ xs: 6 }}>
+                                      <TextField fullWidth size="small" label="Numero ID" value={sub3.numeroIdentificacion || ''}
+                                        onChange={e => { const newSub3s = [...(sub.subSocios || [])]; newSub3s[sub3Idx] = { ...sub3, numeroIdentificacion: e.target.value }; const ns = [...(socio.subSocios || [])]; ns[subIdx] = { ...sub, subSocios: newSub3s }; updateSocio(idx, 'subSocios', ns); }}
+                                        inputProps={{ inputMode: 'numeric', style: { fontSize: '0.8rem' } }} />
+                                    </Grid>
+                                    <Grid size={{ xs: 6 }}>
+                                      <TextField fullWidth size="small" label="% Participacion" value={sub3.porcentajeParticipacion || ''}
+                                        onChange={e => { const newSub3s = [...(sub.subSocios || [])]; newSub3s[sub3Idx] = { ...sub3, porcentajeParticipacion: e.target.value }; const ns = [...(socio.subSocios || [])]; ns[subIdx] = { ...sub, subSocios: newSub3s }; updateSocio(idx, 'subSocios', ns); }}
+                                        inputProps={{ inputMode: 'decimal', style: { fontSize: '0.8rem' } }} />
+                                    </Grid>
+                                  </Grid>
+                                </Paper>
+                              ))}
+                              <Button size="small" variant="text" onClick={() => {
+                                const newSub3 = { tipoSocio: 'NATURAL', apellidos: '', nombres: '', numeroIdentificacion: '', porcentajeParticipacion: '' };
+                                const ns = [...(socio.subSocios || [])]; ns[subIdx] = { ...sub, subSocios: [...(sub.subSocios || []), newSub3] }; updateSocio(idx, 'subSocios', ns);
+                              }}
+                                sx={{ textTransform: 'none', fontSize: '0.7rem', color: COLORS.primary }}>
+                                + Agregar socio persona natural
+                              </Button>
+                            </Grid>
+                          </Grid>
+                        ) : (
+                          <Grid container spacing={1}>
+                            <Grid size={{ xs: 4 }}>
+                              <TextField fullWidth size="small" label="Numero ID" value={sub.numeroIdentificacion || ''}
+                                onChange={e => { const ns = [...(socio.subSocios || [])]; ns[subIdx] = { ...sub, numeroIdentificacion: e.target.value }; updateSocio(idx, 'subSocios', ns); }}
+                                inputProps={{ inputMode: 'numeric' }}
+                                InputProps={{
+                                  endAdornment: (
+                                    <InputAdornment position="end">
+                                      <IconButton size="small" onClick={async () => {
+                                        const datos = await buscarPorCedula(sub.numeroIdentificacion);
+                                        if (datos) {
+                                          const dp = datos.datosPersonales || {};
+                                          const ns = [...(socio.subSocios || [])]; ns[subIdx] = { ...sub, apellidos: dp.apellidos || sub.apellidos, nombres: dp.nombres || sub.nombres, nacionalidad: datos.identificacion?.nacionalidad || sub.nacionalidad }; updateSocio(idx, 'subSocios', ns);
+                                        }
+                                      }} title="Buscar">
+                                        <SearchIcon sx={{ fontSize: 14 }} />
+                                      </IconButton>
+                                    </InputAdornment>
+                                  ),
+                                }} />
+                            </Grid>
+                            <Grid size={{ xs: 4 }}>
+                              <TextField fullWidth size="small" label="Apellidos" value={sub.apellidos || ''}
+                                onChange={e => { const ns = [...(socio.subSocios || [])]; ns[subIdx] = { ...sub, apellidos: e.target.value }; updateSocio(idx, 'subSocios', ns); }} />
+                            </Grid>
+                            <Grid size={{ xs: 4 }}>
+                              <TextField fullWidth size="small" label="Nombres" value={sub.nombres || ''}
+                                onChange={e => { const ns = [...(socio.subSocios || [])]; ns[subIdx] = { ...sub, nombres: e.target.value }; updateSocio(idx, 'subSocios', ns); }} />
+                            </Grid>
+                            <Grid size={{ xs: 6 }}>
+                              <TextField fullWidth size="small" label="Nacionalidad" value={sub.nacionalidad || ''}
+                                onChange={e => { const ns = [...(socio.subSocios || [])]; ns[subIdx] = { ...sub, nacionalidad: e.target.value }; updateSocio(idx, 'subSocios', ns); }} />
+                            </Grid>
+                            <Grid size={{ xs: 6 }}>
+                              <TextField fullWidth size="small" label="% Participacion" value={sub.porcentajeParticipacion || ''}
+                                onChange={e => { const ns = [...(socio.subSocios || [])]; ns[subIdx] = { ...sub, porcentajeParticipacion: e.target.value }; updateSocio(idx, 'subSocios', ns); }}
+                                inputProps={{ inputMode: 'decimal' }} />
+                            </Grid>
+                          </Grid>
+                        )}
+                      </Paper>
+                    );
+                  })}
+                  <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center', mt: 1 }}>
+                    <Button size="small" variant="text" startIcon={<PersonIcon sx={{ fontSize: 14 }} />}
+                      onClick={() => updateSocio(idx, 'subSocios', [...(socio.subSocios || []), { ...SOCIO_NATURAL_EMPTY }])}
+                      sx={{ textTransform: 'none', fontSize: '0.75rem', color: COLORS.primary }}>
+                      + Persona Natural
+                    </Button>
+                    <Button size="small" variant="text" startIcon={<BusinessIcon sx={{ fontSize: 14 }} />}
+                      onClick={() => updateSocio(idx, 'subSocios', [...(socio.subSocios || []), { ...SOCIO_JURIDICA_EMPTY, subSocios: [] }])}
+                      sx={{ textTransform: 'none', fontSize: '0.75rem', color: COLORS.primary }}>
+                      + Persona Juridica
+                    </Button>
+                  </Box>
+                </Grid>
               </Grid>
-              <Grid size={{ xs: 6 }}>
-                <TextField fullWidth size="small" label="Nombres" value={socio.nombres}
-                  onChange={e => updateSocio(idx, 'nombres', e.target.value)}
-                  inputProps={{ autoCapitalize: 'words' }} />
+            ) : (
+              /* Socio Persona Natural */
+              <Grid container spacing={1.5}>
+                <Grid size={{ xs: 4 }}>
+                  <FormControl fullWidth size="small">
+                    <InputLabel>Tipo ID</InputLabel>
+                    <Select value={socio.tipoIdentificacion} label="Tipo ID"
+                      onChange={e => updateSocio(idx, 'tipoIdentificacion', e.target.value)}>
+                      <MenuItem value="CEDULA">Cedula</MenuItem>
+                      <MenuItem value="PASAPORTE">Pasaporte</MenuItem>
+                      <MenuItem value="RUC">RUC</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+                <Grid size={{ xs: 8 }}>
+                  <TextField fullWidth size="small" label="Numero ID" value={socio.numeroIdentificacion}
+                    onChange={e => updateSocio(idx, 'numeroIdentificacion', e.target.value)}
+                    inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
+                    helperText="Ingrese la cedula y presione 🔍 para autocompletar"
+                    InputProps={{
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton size="small" onClick={() => buscarSocioPorCedula(idx)}
+                            disabled={buscandoSocio === idx} title="Buscar por cedula">
+                            {buscandoSocio === idx ? <CircularProgress size={16} /> : <SearchIcon sx={{ fontSize: 16 }} />}
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }} />
+                  {busquedaMsg[`socio_${idx}`] && (
+                    <Alert severity={busquedaMsg[`socio_${idx}`].tipo} sx={{ mt: 0.5, py: 0, fontSize: '0.7rem', borderRadius: '6px' }}>
+                      {busquedaMsg[`socio_${idx}`].texto}
+                    </Alert>
+                  )}
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <TextField fullWidth size="small" label="Apellidos" value={socio.apellidos}
+                    onChange={e => updateSocio(idx, 'apellidos', e.target.value)}
+                    inputProps={{ autoCapitalize: 'words' }} />
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <TextField fullWidth size="small" label="Nombres" value={socio.nombres}
+                    onChange={e => updateSocio(idx, 'nombres', e.target.value)}
+                    inputProps={{ autoCapitalize: 'words' }} />
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <TextField fullWidth size="small" label="Nacionalidad" value={socio.nacionalidad}
+                    onChange={e => updateSocio(idx, 'nacionalidad', e.target.value)} />
+                </Grid>
+                <Grid size={{ xs: 6 }}>
+                  <TextField fullWidth size="small"
+                    label={<>% Participacion{tipIcon('porcentajeParticipacion')}</>}
+                    value={socio.porcentajeParticipacion}
+                    onChange={e => updateSocio(idx, 'porcentajeParticipacion', e.target.value)}
+                    error={!!fieldErrors[`socio_${idx}_porcentaje`]}
+                    helperText={fieldErrors[`socio_${idx}_porcentaje`] || ''}
+                    inputProps={{ inputMode: 'decimal' }} />
+                </Grid>
               </Grid>
-              <Grid size={{ xs: 4 }}>
-                <FormControl fullWidth size="small">
-                  <InputLabel>Tipo ID</InputLabel>
-                  <Select value={socio.tipoIdentificacion} label="Tipo ID"
-                    onChange={e => updateSocio(idx, 'tipoIdentificacion', e.target.value)}>
-                    <MenuItem value="CEDULA">Cedula</MenuItem>
-                    <MenuItem value="PASAPORTE">Pasaporte</MenuItem>
-                    <MenuItem value="RUC">RUC</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid size={{ xs: 4 }}>
-                <TextField fullWidth size="small" label="Numero ID" value={socio.numeroIdentificacion}
-                  onChange={e => updateSocio(idx, 'numeroIdentificacion', e.target.value)}
-                  inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton size="small" onClick={() => buscarSocioPorCedula(idx)}
-                          disabled={buscandoSocio === idx} title="Buscar por cedula">
-                          {buscandoSocio === idx ? <CircularProgress size={16} /> : <SearchIcon sx={{ fontSize: 16 }} />}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  }} />
-                {busquedaMsg[`socio_${idx}`] && (
-                  <Alert severity={busquedaMsg[`socio_${idx}`].tipo} sx={{ mt: 0.5, py: 0, fontSize: '0.7rem', borderRadius: '6px' }}>
-                    {busquedaMsg[`socio_${idx}`].texto}
-                  </Alert>
-                )}
-              </Grid>
-              <Grid size={{ xs: 4 }}>
-                <TextField fullWidth size="small" label="Nacionalidad" value={socio.nacionalidad}
-                  onChange={e => updateSocio(idx, 'nacionalidad', e.target.value)} />
-              </Grid>
-              <Grid size={{ xs: 12 }}>
-                <TextField fullWidth size="small"
-                  label={<>% Participacion{tipIcon('porcentajeParticipacion')}</>}
-                  value={socio.porcentajeParticipacion}
-                  onChange={e => updateSocio(idx, 'porcentajeParticipacion', e.target.value)}
-                  error={!!fieldErrors[`socio_${idx}_porcentaje`]}
-                  helperText={fieldErrors[`socio_${idx}_porcentaje`] || ''}
-                  inputProps={{ inputMode: 'decimal' }} />
-              </Grid>
-            </Grid>
+            )}
           </Paper>
-        ))}
-        <Box sx={{ textAlign: 'center' }}>
-          <Button variant="outlined" onClick={addSocio}
+          );
+        })}
+        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
+          <Button variant="outlined" startIcon={<PersonIcon />} onClick={() => addSocio('NATURAL')}
             sx={{ textTransform: 'none', borderColor: COLORS.primary, color: COLORS.primary }}>
-            + Agregar Socio
+            + Socio Persona Natural
+          </Button>
+          <Button variant="outlined" startIcon={<BusinessIcon />} onClick={() => addSocio('JURIDICA')}
+            sx={{ textTransform: 'none', borderColor: COLORS.primary, color: COLORS.primary }}>
+            + Socio Persona Juridica
           </Button>
         </Box>
       </Box>
