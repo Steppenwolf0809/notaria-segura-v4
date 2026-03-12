@@ -267,7 +267,7 @@ function CreateAccountScreen({ cedula, tipoPersona, onCreated, onBack }) {
   return (
     <PageLayout>
       <Typography variant="h6" sx={{ textAlign: 'center', mb: 1, fontWeight: 600 }}>Crear Cuenta Nueva</Typography>
-      <Alert severity="info" sx={{ mb: 2, borderRadius: '8px' }}>Cedula: <strong>{cedula}</strong></Alert>
+      <Alert severity="info" sx={{ mb: 2, borderRadius: '8px' }}>{cedula.length === 13 ? 'RUC' : cedula.length === 10 ? 'Cedula' : 'Identificacion'}: <strong>{cedula}</strong></Alert>
       {error && <Alert severity="error" sx={{ mb: 2, borderRadius: '8px' }}>{error}</Alert>}
 
       <Box sx={{ mb: 2, p: 2, backgroundColor: COLORS.surface, borderRadius: '8px', border: `1px solid ${COLORS.border}`, maxHeight: 200, overflow: 'auto' }}>
@@ -345,7 +345,7 @@ function LoginScreen({ cedula, onLogin, onBack }) {
   return (
     <PageLayout>
       <Typography variant="h6" sx={{ textAlign: 'center', mb: 1, fontWeight: 600 }}>Iniciar Sesion</Typography>
-      <Alert severity="info" sx={{ mb: 2, borderRadius: '8px' }}>Cedula: <strong>{cedula}</strong></Alert>
+      <Alert severity="info" sx={{ mb: 2, borderRadius: '8px' }}>{cedula.length === 13 ? 'RUC' : cedula.length === 10 ? 'Cedula' : 'Identificacion'}: <strong>{cedula}</strong></Alert>
       {error && <Alert severity="error" sx={{ mb: 2, borderRadius: '8px' }}>{error}</Alert>}
       <PinInput value={pin} onChange={setPin} label="Ingrese su PIN de 6 digitos:" />
       <Box sx={{ display: 'flex', gap: 2, justifyContent: 'center', mt: 3 }}>
