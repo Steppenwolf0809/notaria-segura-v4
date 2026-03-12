@@ -505,6 +505,9 @@ model ProtocoloUAFE {
   vehiculoMarca           String?
   vehiculoModelo          String?
   vehiculoPlaca           String?
+  vehiculoMotor           String?            // Número de motor (del CUV)
+  vehiculoChasis          String?            // VIN/Chasis (del CUV)
+  vehiculoColor           String?            // Color del vehículo
   vehiculoCiudadComercializacion String?      // Ciudad donde se comercializa
   
   // OTROS

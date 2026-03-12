@@ -31,6 +31,22 @@ import { obtenerEstadoGeneralProtocolo, calcularYActualizarCompletitud, calcular
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Umbral UAFE: actos o acumulación >= $10,000 se reportan
+const UMBRAL_UAFE = 10000;
+
+/**
+ * Genera la descripción del bien para vehículos en formato UAFE.
+ * Formato: "VEHÍCULO COMERCIALIZADO EN QUITO, MARCA: FORD, Placa: PDG9514, Motor: JBC41552, Chasis: 2FMPK3J80JBC41552"
+ */
+function buildDescripcionBienVehiculo({ vehiculoMarca, vehiculoPlaca, vehiculoMotor, vehiculoChasis, vehiculoCiudadComercializacion }) {
+  const ciudad = (vehiculoCiudadComercializacion || 'QUITO').toUpperCase();
+  const parts = [`VEHÍCULO COMERCIALIZADO EN ${ciudad}`];
+  if (vehiculoMarca) parts.push(`MARCA: ${vehiculoMarca.toUpperCase()}`);
+  if (vehiculoPlaca) parts.push(`Placa: ${vehiculoPlaca.toUpperCase()}`);
+  if (vehiculoMotor) parts.push(`Motor: ${vehiculoMotor}`);
+  if (vehiculoChasis) parts.push(`Chasis: ${vehiculoChasis}`);
+  return parts.join(', ');
+}
 
 /**
  * Crear nuevo protocolo UAFE
@@ -50,6 +66,10 @@ export async function crearProtocolo(req, res) {
       vehiculoMarca,
       vehiculoModelo,
       vehiculoAnio,
+      vehiculoMotor,
+      vehiculoChasis,
+      vehiculoColor,
+      vehiculoCiudadComercializacion,
       avaluoMunicipal,
       valorContrato,
       multa,                    // Para promesas de compraventa
@@ -128,6 +148,15 @@ export async function crearProtocolo(req, res) {
         vehiculoMarca: vehiculoMarca || null,
         vehiculoModelo: vehiculoModelo || null,
         vehiculoAnio: vehiculoAnio || null,
+        vehiculoMotor: vehiculoMotor || null,
+        vehiculoChasis: vehiculoChasis || null,
+        vehiculoColor: vehiculoColor || null,
+        vehiculoCiudadComercializacion: vehiculoCiudadComercializacion || null,
+        // Auto-generar descripcionBien para vehículos
+        ...(vehiculoMarca && {
+          tipoBien: 'VEH',
+          descripcionBien: buildDescripcionBienVehiculo({ vehiculoMarca, vehiculoPlaca, vehiculoMotor, vehiculoChasis, vehiculoCiudadComercializacion }),
+        }),
         avaluoMunicipal: avaluoMunicipal ? parseFloat(avaluoMunicipal) : null,
         valorContrato: parseFloat(valorContrato),
         multa: multa ? parseFloat(multa) : null,
@@ -1124,6 +1153,10 @@ export async function actualizarProtocolo(req, res) {
       vehiculoMarca,
       vehiculoModelo,
       vehiculoAnio,
+      vehiculoMotor,
+      vehiculoChasis,
+      vehiculoColor,
+      vehiculoCiudadComercializacion,
       avaluoMunicipal,
       valorContrato,
       formasPago
@@ -1181,6 +1214,19 @@ export async function actualizarProtocolo(req, res) {
       }
     }
 
+    // Auto-regenerar descripcionBien si se actualizan datos de vehículo
+    const marca = vehiculoMarca !== undefined ? vehiculoMarca : protocoloExistente.vehiculoMarca;
+    const autoDescripcionVeh = marca ? {
+      tipoBien: 'VEH',
+      descripcionBien: buildDescripcionBienVehiculo({
+        vehiculoMarca: marca,
+        vehiculoPlaca: vehiculoPlaca !== undefined ? vehiculoPlaca : protocoloExistente.vehiculoPlaca,
+        vehiculoMotor: vehiculoMotor !== undefined ? vehiculoMotor : protocoloExistente.vehiculoMotor,
+        vehiculoChasis: vehiculoChasis !== undefined ? vehiculoChasis : protocoloExistente.vehiculoChasis,
+        vehiculoCiudadComercializacion: vehiculoCiudadComercializacion !== undefined ? vehiculoCiudadComercializacion : protocoloExistente.vehiculoCiudadComercializacion,
+      }),
+    } : {};
+
     // Actualizar protocolo (estado se ignora del request, se calcula automáticamente)
     const protocoloActualizado = await prisma.protocoloUAFE.update({
       where: { id: protocoloId },
@@ -1199,6 +1245,11 @@ export async function actualizarProtocolo(req, res) {
         ...(vehiculoMarca !== undefined && { vehiculoMarca: vehiculoMarca || null }),
         ...(vehiculoModelo !== undefined && { vehiculoModelo: vehiculoModelo || null }),
         ...(vehiculoAnio !== undefined && { vehiculoAnio: vehiculoAnio || null }),
+        ...(vehiculoMotor !== undefined && { vehiculoMotor: vehiculoMotor || null }),
+        ...(vehiculoChasis !== undefined && { vehiculoChasis: vehiculoChasis || null }),
+        ...(vehiculoColor !== undefined && { vehiculoColor: vehiculoColor || null }),
+        ...(vehiculoCiudadComercializacion !== undefined && { vehiculoCiudadComercializacion: vehiculoCiudadComercializacion || null }),
+        ...autoDescripcionVeh,
         ...(avaluoMunicipal !== undefined && { avaluoMunicipal: parseFloat(avaluoMunicipal) || null }),
         ...(valorContrato !== undefined && { valorContrato: parseFloat(valorContrato) || null }),
         ...(formasPago !== undefined && { formasPago })
@@ -3064,6 +3115,114 @@ export async function buscarDocumentosParaVincular(req, res) {
   } catch (error) {
     console.error('Error buscando documentos:', error);
     res.status(500).json({ success: false, message: 'Error al buscar documentos' });
+  }
+}
+
+/**
+ * Consultar umbral UAFE — acumulación mensual por cédula
+ * GET /api/formulario-uafe/umbral/:mes/:anio
+ *
+ * Retorna comparecientes cuya suma de actos en el mes/año supera $10,000
+ * Incluye desglose de actos individuales por persona.
+ * Solo alerta cuando actos individuales < $10K pero la suma mensual >= $10K.
+ */
+export async function consultarUmbral(req, res) {
+  try {
+    const mes = parseInt(req.params.mes, 10);
+    const anio = parseInt(req.params.anio, 10);
+
+    if (!mes || !anio || mes < 1 || mes > 12 || anio < 2020) {
+      return res.status(400).json({ success: false, message: 'Mes y año inválidos' });
+    }
+
+    const notaryId = req.user?.notaryId || 1;
+
+    // Rango de fechas del mes
+    const fechaInicio = new Date(anio, mes - 1, 1);
+    const fechaFin = new Date(anio, mes, 1); // primer día del mes siguiente
+
+    // Obtener todos los protocolos del mes con sus personas
+    const protocolos = await prisma.protocoloUAFE.findMany({
+      where: {
+        notaryId,
+        fecha: {
+          gte: fechaInicio,
+          lt: fechaFin,
+        },
+      },
+      include: {
+        personas: {
+          include: {
+            persona: {
+              select: {
+                numeroIdentificacion: true,
+                datosPersonaNatural: true,
+                tipoPersona: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { fecha: 'asc' },
+    });
+
+    // Acumular por cédula
+    const acumulado = {}; // { cedula: { nombre, actos: [{ id, fecha, tipoActo, valor }], total } }
+
+    for (const proto of protocolos) {
+      const valor = proto.valorContrato || 0;
+
+      for (const pp of proto.personas) {
+        const cedula = pp.personaCedula || pp.persona?.numeroIdentificacion;
+        if (!cedula) continue;
+
+        if (!acumulado[cedula]) {
+          // Extraer nombre de datosPersonaNatural
+          const datos = pp.persona?.datosPersonaNatural;
+          const nombres = datos?.datosPersonales?.nombres || '';
+          const apellidos = datos?.datosPersonales?.apellidos || '';
+          const nombre = `${apellidos} ${nombres}`.trim() || pp.nombreTemporal || cedula;
+
+          acumulado[cedula] = { cedula, nombre, actos: [], total: 0 };
+        }
+
+        acumulado[cedula].actos.push({
+          protocoloId: proto.id,
+          numeroProtocolo: proto.numeroProtocolo,
+          numeroDiligencia: proto.numeroDiligencia,
+          fecha: proto.fecha,
+          tipoActo: proto.actoContrato || proto.tipoActo,
+          tipoBien: proto.tipoBien,
+          valor,
+        });
+        acumulado[cedula].total += valor;
+      }
+    }
+
+    // Filtrar: solo personas cuya suma >= UMBRAL y que tengan al menos un acto < UMBRAL
+    // (Si todos los actos son >= $10K, ya se reportan individualmente, no necesita alerta)
+    const alertas = Object.values(acumulado)
+      .filter(persona => {
+        if (persona.total < UMBRAL_UAFE) return false;
+        // Al menos un acto debe ser < UMBRAL (ese es el que no se reportaría sin la acumulación)
+        const tieneActoMenor = persona.actos.some(a => a.valor < UMBRAL_UAFE);
+        return tieneActoMenor;
+      })
+      .sort((a, b) => b.total - a.total);
+
+    res.json({
+      success: true,
+      data: {
+        mes,
+        anio,
+        umbral: UMBRAL_UAFE,
+        totalAlertas: alertas.length,
+        alertas,
+      },
+    });
+  } catch (error) {
+    console.error('Error consultando umbral UAFE:', error);
+    res.status(500).json({ success: false, message: 'Error al consultar umbral' });
   }
 }
 

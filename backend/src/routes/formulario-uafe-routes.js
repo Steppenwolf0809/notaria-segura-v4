@@ -33,7 +33,8 @@ import {
   generarReporteMensual,
   descargarReporte,
   vincularDocumento,
-  buscarDocumentosParaVincular
+  buscarDocumentosParaVincular,
+  consultarUmbral
 } from '../controllers/formulario-uafe-controller.js';
 
 const router = express.Router();
@@ -960,6 +961,13 @@ router.get('/documentos/buscar',
   authenticateToken,
   requireRoles(['ADMIN', 'MATRIZADOR']),
   buscarDocumentosParaVincular
+);
+
+// Consultar umbral UAFE — acumulación mensual por cédula (alertas $10K)
+router.get('/umbral/:mes/:anio',
+  authenticateToken,
+  requireRoles(['ADMIN', 'MATRIZADOR', 'OFICIAL_CUMPLIMIENTO']),
+  consultarUmbral
 );
 
 // ========================================
