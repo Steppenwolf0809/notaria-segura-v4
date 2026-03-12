@@ -20,11 +20,13 @@ import {
   LinearProgress,
   IconButton,
   Tooltip,
+  InputAdornment,
 } from '@mui/material';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
+import SearchIcon from '@mui/icons-material/Search';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import PersonIcon from '@mui/icons-material/Person';
@@ -812,7 +814,116 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
   const [socios, setSocios] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({});
 
+  const [buscandoRep, setBuscandoRep] = useState(false);
+  const [buscandoCon, setBuscandoCon] = useState(false);
+  const [buscandoSocio, setBuscandoSocio] = useState(null);
+  const [busquedaMsg, setBusquedaMsg] = useState({});
+
   const SOCIO_EMPTY = { apellidos: '', nombres: '', tipoIdentificacion: 'CEDULA', numeroIdentificacion: '', nacionalidad: 'ECUATORIANA', porcentajeParticipacion: '' };
+
+  const buscarPorCedula = async (cedula) => {
+    if (!cedula || cedula.length < 10) return null;
+    try {
+      const { data } = await axios.get(`${API_BASE}/verificar-cedula/${cedula}`);
+      if (data.success && data.existe && data.tipoPersona === 'NATURAL' && data.datosPersonaNatural) {
+        return data.datosPersonaNatural;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  const buscarRepresentante = async () => {
+    const cedula = form.repNumeroIdentificacion?.trim();
+    if (!cedula || cedula.length < 10) {
+      setBusquedaMsg({ rep: { tipo: 'warning', texto: 'Ingrese una cedula valida (min. 10 digitos)' } });
+      return;
+    }
+    setBuscandoRep(true);
+    setBusquedaMsg(prev => ({ ...prev, rep: null }));
+    const datos = await buscarPorCedula(cedula);
+    setBuscandoRep(false);
+    if (datos) {
+      const dp = datos.datosPersonales || {};
+      const contacto = datos.contacto || {};
+      const dir = datos.direccion || {};
+      setForm(prev => ({
+        ...prev,
+        repApellidos: dp.apellidos || prev.repApellidos,
+        repNombres: dp.nombres || prev.repNombres,
+        repNacionalidad: datos.identificacion?.nacionalidad || prev.repNacionalidad,
+        repGenero: dp.genero || prev.repGenero,
+        repEstadoCivil: dp.estadoCivil || prev.repEstadoCivil,
+        repNivelEstudio: dp.nivelEstudio || prev.repNivelEstudio,
+        repCelular: contacto.celular || prev.repCelular,
+        repCorreoElectronico: contacto.email || prev.repCorreoElectronico,
+        repCallePrincipal: dir.callePrincipal || prev.repCallePrincipal,
+        repCalleSecundaria: dir.calleSecundaria || prev.repCalleSecundaria,
+        repNumero: dir.numero || prev.repNumero,
+        repProvincia: dir.provincia || prev.repProvincia,
+        repCanton: dir.canton || prev.repCanton,
+        repParroquia: dir.parroquia || prev.repParroquia,
+      }));
+      const nombre = `${dp.nombres || ''} ${dp.apellidos || ''}`.trim();
+      setBusquedaMsg(prev => ({ ...prev, rep: { tipo: 'success', texto: `Datos encontrados: ${nombre}` } }));
+    } else {
+      setBusquedaMsg(prev => ({ ...prev, rep: { tipo: 'info', texto: 'No se encontraron datos previos para esta cedula' } }));
+    }
+  };
+
+  const buscarConyugeRep = async () => {
+    const cedula = form.conNumeroIdentificacion?.trim();
+    if (!cedula || cedula.length < 10) {
+      setBusquedaMsg(prev => ({ ...prev, con: { tipo: 'warning', texto: 'Ingrese una cedula valida (min. 10 digitos)' } }));
+      return;
+    }
+    setBuscandoCon(true);
+    setBusquedaMsg(prev => ({ ...prev, con: null }));
+    const datos = await buscarPorCedula(cedula);
+    setBuscandoCon(false);
+    if (datos) {
+      const dp = datos.datosPersonales || {};
+      const contacto = datos.contacto || {};
+      setForm(prev => ({
+        ...prev,
+        conApellidos: dp.apellidos || prev.conApellidos,
+        conNombres: dp.nombres || prev.conNombres,
+        conNacionalidad: datos.identificacion?.nacionalidad || prev.conNacionalidad,
+        conCelular: contacto.celular || prev.conCelular,
+        conCorreoElectronico: contacto.email || prev.conCorreoElectronico,
+      }));
+      const nombre = `${dp.nombres || ''} ${dp.apellidos || ''}`.trim();
+      setBusquedaMsg(prev => ({ ...prev, con: { tipo: 'success', texto: `Datos encontrados: ${nombre}` } }));
+    } else {
+      setBusquedaMsg(prev => ({ ...prev, con: { tipo: 'info', texto: 'No se encontraron datos previos para esta cedula' } }));
+    }
+  };
+
+  const buscarSocioPorCedula = async (idx) => {
+    const cedula = socios[idx]?.numeroIdentificacion?.trim();
+    if (!cedula || cedula.length < 10) {
+      setBusquedaMsg(prev => ({ ...prev, [`socio_${idx}`]: { tipo: 'warning', texto: 'Ingrese una cedula valida' } }));
+      return;
+    }
+    setBuscandoSocio(idx);
+    setBusquedaMsg(prev => ({ ...prev, [`socio_${idx}`]: null }));
+    const datos = await buscarPorCedula(cedula);
+    setBuscandoSocio(null);
+    if (datos) {
+      const dp = datos.datosPersonales || {};
+      setSocios(prev => prev.map((s, i) => i === idx ? {
+        ...s,
+        apellidos: dp.apellidos || s.apellidos,
+        nombres: dp.nombres || s.nombres,
+        nacionalidad: datos.identificacion?.nacionalidad || s.nacionalidad,
+      } : s));
+      const nombre = `${dp.nombres || ''} ${dp.apellidos || ''}`.trim();
+      setBusquedaMsg(prev => ({ ...prev, [`socio_${idx}`]: { tipo: 'success', texto: `Encontrado: ${nombre}` } }));
+    } else {
+      setBusquedaMsg(prev => ({ ...prev, [`socio_${idx}`]: { tipo: 'info', texto: 'No encontrado' } }));
+    }
+  };
 
   useEffect(() => {
     sessionApi(sessionToken).get('/mi-informacion').then(({ data }) => {
@@ -1108,7 +1219,26 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
               { value: 'RUC', label: 'RUC' },
             ])}
           </Grid>
-          <Grid size={{ xs: 4 }}>{field('Numero Identificacion *', 'repNumeroIdentificacion', { inputProps: { inputMode: 'numeric', pattern: '[0-9]*' } })}</Grid>
+          <Grid size={{ xs: 4 }}>
+            {field('Numero Identificacion *', 'repNumeroIdentificacion', {
+              inputProps: { inputMode: 'numeric', pattern: '[0-9]*' },
+              InputProps: {
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={buscarRepresentante} disabled={buscandoRep}
+                      title="Buscar datos por cedula">
+                      {buscandoRep ? <CircularProgress size={18} /> : <SearchIcon fontSize="small" />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              },
+            })}
+            {busquedaMsg.rep && (
+              <Alert severity={busquedaMsg.rep.tipo} sx={{ mt: 0.5, py: 0, fontSize: '0.75rem', borderRadius: '6px' }}>
+                {busquedaMsg.rep.texto}
+              </Alert>
+            )}
+          </Grid>
           <Grid size={{ xs: 4 }}>{field('Nacionalidad', 'repNacionalidad')}</Grid>
           <Grid size={{ xs: 4 }}>{selectField('Genero', 'repGenero', [{ value: 'MASCULINO', label: 'Masculino' }, { value: 'FEMENINO', label: 'Femenino' }])}</Grid>
           <Grid size={{ xs: 4 }}>{selectField('Estado Civil', 'repEstadoCivil', ESTADOS_CIVILES)}</Grid>
@@ -1136,7 +1266,26 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
           <Grid container spacing={2}>
             <Grid size={{ xs: 6 }}>{field('Apellidos *', 'conApellidos', { inputProps: { autoCapitalize: 'words' } })}</Grid>
             <Grid size={{ xs: 6 }}>{field('Nombres *', 'conNombres', { inputProps: { autoCapitalize: 'words' } })}</Grid>
-            <Grid size={{ xs: 6 }}>{field('Numero Identificacion *', 'conNumeroIdentificacion', { inputProps: { inputMode: 'numeric', pattern: '[0-9]*' } })}</Grid>
+            <Grid size={{ xs: 6 }}>
+              {field('Numero Identificacion *', 'conNumeroIdentificacion', {
+                inputProps: { inputMode: 'numeric', pattern: '[0-9]*' },
+                InputProps: {
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton size="small" onClick={buscarConyugeRep} disabled={buscandoCon}
+                        title="Buscar datos por cedula">
+                        {buscandoCon ? <CircularProgress size={18} /> : <SearchIcon fontSize="small" />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                },
+              })}
+              {busquedaMsg.con && (
+                <Alert severity={busquedaMsg.con.tipo} sx={{ mt: 0.5, py: 0, fontSize: '0.75rem', borderRadius: '6px' }}>
+                  {busquedaMsg.con.texto}
+                </Alert>
+              )}
+            </Grid>
             <Grid size={{ xs: 6 }}>{field('Nacionalidad', 'conNacionalidad')}</Grid>
             <Grid size={{ xs: 6 }}>{field('Correo Electronico', 'conCorreoElectronico', { type: 'email', inputProps: { inputMode: 'email' } })}</Grid>
             <Grid size={{ xs: 6 }}>{field('Celular', 'conCelular', { type: 'tel', inputProps: { inputMode: 'tel' } })}</Grid>
@@ -1184,7 +1333,22 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
               <Grid size={{ xs: 4 }}>
                 <TextField fullWidth size="small" label="Numero ID" value={socio.numeroIdentificacion}
                   onChange={e => updateSocio(idx, 'numeroIdentificacion', e.target.value)}
-                  inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }} />
+                  inputProps={{ inputMode: 'numeric', pattern: '[0-9]*' }}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton size="small" onClick={() => buscarSocioPorCedula(idx)}
+                          disabled={buscandoSocio === idx} title="Buscar por cedula">
+                          {buscandoSocio === idx ? <CircularProgress size={16} /> : <SearchIcon sx={{ fontSize: 16 }} />}
+                        </IconButton>
+                      </InputAdornment>
+                    ),
+                  }} />
+                {busquedaMsg[`socio_${idx}`] && (
+                  <Alert severity={busquedaMsg[`socio_${idx}`].tipo} sx={{ mt: 0.5, py: 0, fontSize: '0.7rem', borderRadius: '6px' }}>
+                    {busquedaMsg[`socio_${idx}`].texto}
+                  </Alert>
+                )}
               </Grid>
               <Grid size={{ xs: 4 }}>
                 <TextField fullWidth size="small" label="Nacionalidad" value={socio.nacionalidad}
