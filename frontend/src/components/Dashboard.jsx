@@ -28,6 +28,7 @@ import MatrizadorCenter from './MatrizadorCenter';
 import RecepcionCenter from './RecepcionCenter';
 import ReceptionCenter from './ReceptionCenter';
 import ArchivoCenter from './ArchivoCenter';
+import OficialCumplimientoCenter from './OficialCumplimientoCenter';
 import AdminCenter from './AdminCenter';
 import CajaLayout from './layout/CajaLayout';
 
@@ -126,7 +127,7 @@ const Dashboard = () => {
   }
 
   if (user.role === 'OFICIAL_CUMPLIMIENTO') {
-    return <MatrizadorCenter />;
+    return <OficialCumplimientoCenter />;
   }
 
   if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
