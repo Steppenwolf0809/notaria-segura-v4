@@ -24,6 +24,7 @@ import {
 } from '@mui/material';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
+import CompareArrowsOutlinedIcon from '@mui/icons-material/CompareArrowsOutlined';
 import ListAltOutlinedIcon from '@mui/icons-material/ListAltOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined';
@@ -41,6 +42,7 @@ import UAFEProtocolDetail from './UAFEProtocolDetail';
 import UAFEReportPanel from './UAFEReportPanel';
 import UAFEPersonaEditDialog from './UAFEPersonaEditDialog';
 import UAFEVehiculoForm from './UAFEVehiculoForm';
+import UAFEIndiceCruce from './UAFEIndiceCruce';
 import { UAFE_COLORS, TIPOS_ACTO_UAFE, TIPOS_BIEN, CALIDADES_COMPARECIENTE, FORMAS_PAGO, formatCurrency, getSemaforoFromProtocol, ESTADOS_PROTOCOLO_FLOW } from './uafe-constants';
 
 /**
@@ -723,6 +725,14 @@ export default function UAFEDashboard() {
               sx={{ gap: 0.75 }}
             />
           )}
+          {isOficialOrAdmin && (
+            <Tab
+              icon={<CompareArrowsOutlinedIcon sx={{ fontSize: 18 }} />}
+              iconPosition="start"
+              label="Cruce Indice"
+              sx={{ gap: 0.75 }}
+            />
+          )}
         </Tabs>
 
         {activeTab === 0 && (
@@ -748,6 +758,10 @@ export default function UAFEDashboard() {
             loading={reportLoading}
             onGenerate={handleGenerateReport}
           />
+        )}
+
+        {activeTab === 2 && isOficialOrAdmin && (
+          <UAFEIndiceCruce />
         )}
       </Box>
 

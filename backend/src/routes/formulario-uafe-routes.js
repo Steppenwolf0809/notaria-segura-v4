@@ -5,6 +5,7 @@ import { authenticateToken, requireRoles } from '../middleware/auth-middleware.j
 import { verifyFormularioUAFESession } from '../middleware/verify-formulario-uafe-session.js';
 import { csrfProtection } from '../middleware/csrf-protection.js';
 import { parseMinuta } from '../services/minuta-parser-service.js';
+import { parseIndiceConsejo, cruzarConProtocolos } from '../services/indice-consejo-parser-service.js';
 import { uploadFile, isStorageConfigured } from '../services/storage-service.js';
 import { generarFormularioWord } from '../services/formulario-uafe-word-service.js';
 import { getCurrentNotaryId } from '../middleware/tenant-context.js';
@@ -978,6 +979,60 @@ router.get('/umbral/:mes/:anio',
  * GET /api/formulario-uafe/health
  * Health check para verificar que las rutas están funcionando
  */
+// ========================================
+// RUTA: Cruce Índice del Consejo
+// ========================================
+
+const indiceUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+    ];
+    if (allowed.includes(file.mimetype) || file.originalname.endsWith('.xlsx') || file.originalname.endsWith('.xls')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Solo se permiten archivos Excel (.xlsx, .xls)'));
+    }
+  }
+});
+
+/**
+ * POST /api/formulario-uafe/indice/cruce
+ * Sube índice del Consejo, parsea y cruza contra protocolos UAFE del mes
+ */
+router.post(
+  '/indice/cruce',
+  authenticateToken,
+  requireRoles(['ADMIN', 'OFICIAL_CUMPLIMIENTO']),
+  indiceUpload.single('indice'),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ success: false, error: 'No se envio ningun archivo' });
+      }
+
+      const { escrituras, mesDetectado, anioDetectado } = parseIndiceConsejo(req.file.buffer);
+
+      const mes = req.body.mes ? parseInt(req.body.mes) : mesDetectado;
+      const anio = req.body.anio ? parseInt(req.body.anio) : anioDetectado;
+
+      if (!mes || !anio) {
+        return res.status(400).json({ success: false, error: 'No se pudo detectar el mes/año del indice. Envie mes y anio en el body.' });
+      }
+
+      const resultado = await cruzarConProtocolos(escrituras, mes, anio);
+
+      res.json({ success: true, data: resultado });
+    } catch (error) {
+      console.error('Error en cruce indice:', error);
+      res.status(500).json({ success: false, error: error.message || 'Error al procesar el indice' });
+    }
+  }
+);
+
 router.get('/health', (req, res) => {
   res.json({
     success: true,

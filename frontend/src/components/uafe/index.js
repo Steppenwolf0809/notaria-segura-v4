@@ -7,5 +7,6 @@ export { default as UAFEReportPanel } from './UAFEReportPanel';
 export { default as UAFEMinutaUpload } from './UAFEMinutaUpload';
 export { default as UAFEPersonaEditDialog } from './UAFEPersonaEditDialog';
 export { default as UAFEVehiculoForm } from './UAFEVehiculoForm';
+export { default as UAFEIndiceCruce } from './UAFEIndiceCruce';
 export { default as SemaforoIndicator, SemaforoPersona } from './SemaforoIndicator';
 export * from './uafe-constants';
