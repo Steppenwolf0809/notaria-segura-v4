@@ -9,8 +9,8 @@ Se ha implementado **exitosamente** el rol de ARCHIVO con funcionalidad dual:
 ## 👤 USUARIO CREADO
 
 **Maria Lucinda Diaz Pilatasig**
-- 📧 **Email**: `maria.diaz@notaria.com`
-- 🔑 **Password**: `archivo123`
+- 📧 **Email**: 
+- 🔑 **Password**: 
 - 🆔 **ID**: 6
 - 🎭 **Rol**: ARCHIVO
 - 🟢 **Estado**: Activo

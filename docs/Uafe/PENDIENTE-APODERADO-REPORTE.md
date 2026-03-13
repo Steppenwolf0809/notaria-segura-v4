@@ -1,7 +1,7 @@
 # Pendiente: Apoderado/Mandante en Reporte UAFE INTERVINIENTE
 
 **Fecha:** 2026-03-07
-**Estado:** Pendiente validacion con responsable UAFE (reunion lunes 2026-03-10)
+**Estado:** RESUELTO (2026-03-09) - Mandante se reporta con misma calidad del contrato
 
 ## Problema
 
@@ -55,11 +55,9 @@ codigo_transaccion         tipo_id  cedula          nombre                      
 - 63: VENDEDOR(A)
 - 20: COMPRADOR(A)
 
-## Decision temporal
+## Decision final (2026-03-09)
 
-Hasta tener respuesta del responsable:
-- El campo `calidad` se mantiene simplificado (VENDEDOR, COMPRADOR, etc.)
-- El campo `actuaPor` registra como comparece (propios derechos, apoderado, etc.)
-- El campo `representadoDe` registra a quien representa (nombre + cedula)
-- Al generar el reporte xlsx, se mapea `calidad` -> codigo papel interviniente
-- NO se generan filas extra por representacion (1 persona = 1 fila)
+Confirmado con responsable UAFE: el mandante (persona representada) SÍ debe reportarse.
+- Ambos (mandatario y mandante) aparecen con la misma calidad del contrato
+- Ejemplo: Ana Lucía (mandataria) → papel 55, Norma (mandante) → papel 55
+- Implementado en `reporte-uafe-generator-service.js`: fila extra automática cuando `actuaPor !== PROPIOS_DERECHOS` y existe `mandanteCedula`

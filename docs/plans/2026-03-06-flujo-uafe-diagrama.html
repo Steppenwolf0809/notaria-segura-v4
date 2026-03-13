@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flujo UAFE - Notaria Segura</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    h1 {
+      text-align: center;
+      color: #1a237e;
+      margin-bottom: 5px;
+    }
+    .subtitle {
+      text-align: center;
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    .diagram-section {
+      background: white;
+      border-radius: 12px;
+      padding: 30px;
+      margin-bottom: 30px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .diagram-section h2 {
+      color: #1a237e;
+      border-bottom: 2px solid #e8eaf6;
+      padding-bottom: 10px;
+      margin-top: 0;
+    }
+    .legend {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+      padding: 15px;
+      background: #fafafa;
+      border-radius: 8px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+    .legend-color {
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+    }
+    .mermaid {
+      display: flex;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>Formulario UAFE - Flujo de Trabajo</h1>
+  <p class="subtitle">Notaria Segura | Plan de diseno 2026-03-06 | Pendiente validacion con operadores</p>
+
+  <!-- FLUJO GENERAL -->
+  <div class="diagram-section">
+    <h2>1. Flujo General del Proceso</h2>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-color" style="background:#bbdefb"></div> Matrizador</div>
+      <div class="legend-item"><div class="legend-color" style="background:#c8e6c9"></div> Sistema automatico</div>
+      <div class="legend-item"><div class="legend-color" style="background:#fff9c4"></div> Cliente/Compareciente</div>
+      <div class="legend-item"><div class="legend-color" style="background:#f8bbd0"></div> Responsable UAFE</div>
+    </div>
+    <div class="mermaid">
+flowchart TD
+    A["fa:fa-upload MATRIZADOR\nsube minuta Word"]:::matrizador
+    B["fa:fa-cogs SISTEMA extrae datos\nregex + LLM"]:::sistema
+    C["fa:fa-edit MATRIZADOR revisa\ny corrige datos"]:::matrizador
+    D["fa:fa-clipboard SISTEMA crea\nProtocolo UAFE\nestado: BORRADOR"]:::sistema
+    E["fa:fa-paper-plane MATRIZADOR envia\nformulario a comparecientes"]:::matrizador
+    F["fa:fa-user CLIENTE llena\ndatos personales\ndireccion, laboral, PEP"]:::cliente
+    G["fa:fa-file-text SISTEMA genera\nencabezado escritura"]:::sistema
+    H["fa:fa-money SE FACTURA\nDocument obtiene\nNo. protocolo"]:::matrizador
+    I["fa:fa-link VINCULACION\nProtocolo UAFE ←→ Document\nauto-suggest o manual"]:::sistema
+    J["fa:fa-check-circle PROTOCOLO COMPLETO\nlisto para reporte"]:::sistema
+    K["fa:fa-download RESPONSABLE UAFE\ngenera reporte mensual\nTRANSACCION + INTERVINIENTE xlsx"]:::uafe
+    L["fa:fa-search VERIFICACION\ncruce con indice CJ"]:::uafe
+
+    A --> B --> C --> D --> E --> F
+    D --> G
+    F --> |"semaforo actualiza"| D
+    G --> H --> I --> J --> K --> L
+
+    classDef matrizador fill:#bbdefb,stroke:#1565c0,color:#0d47a1
+    classDef sistema fill:#c8e6c9,stroke:#2e7d32,color:#1b5e20
+    classDef cliente fill:#fff9c4,stroke:#f9a825,color:#e65100
+    classDef uafe fill:#f8bbd0,stroke:#c2185b,color:#880e4f
+    </div>
+  </div>
+
+  <!-- ESTADOS DEL PROTOCOLO -->
+  <div class="diagram-section">
+    <h2>2. Estados del Protocolo UAFE</h2>
+    <div class="mermaid">
+stateDiagram-v2
+    [*] --> BORRADOR: Minuta subida\ndatos parciales
+    BORRADOR --> EN_PROCESO: Se envian formularios\na comparecientes
+    EN_PROCESO --> PENDIENTE_PROTOCOLO: Datos completos\npero falta No. protocolo
+    PENDIENTE_PROTOCOLO --> COMPLETO: Se vincula\nNo. protocolo
+    BORRADOR --> COMPLETO: Matrizador llena\ntodo manualmente
+    COMPLETO --> REPORTADO: Incluido en\nreporte mensual
+
+    state BORRADOR {
+        direction LR
+        [*] --> datos_minuta: Extraccion automatica
+        datos_minuta --> revision_matrizador: Revision manual
+    }
+
+    state EN_PROCESO {
+        direction LR
+        [*] --> formularios_enviados
+        formularios_enviados --> esperando_clientes
+        esperando_clientes --> datos_recibidos
+    }
+    </div>
+  </div>
+
+  <!-- EXTRACCION DE MINUTA -->
+  <div class="diagram-section">
+    <h2>3. Extraccion de Datos de la Minuta</h2>
+    <div class="mermaid">
+flowchart LR
+    A["fa:fa-file-word\nMinuta Word"]:::input
+
+    subgraph FASE1["FASE 1: Regex - Gratis"]
+        B1["Identificar secciones\nCOMPARECIENTES\nPRECIO\nFORMA DE PAGO"]
+        B2["Extraer patrones\ncedulas, montos\nfrases clave"]
+    end
+
+    subgraph FASE2["FASE 2: LLM - Solo secciones"]
+        C1["Enviar ~1500 tokens\nsolo secciones relevantes"]
+        C2["Respuesta JSON\ncomparecientes, cuantia\nbien, forma pago"]
+    end
+
+    D["fa:fa-check\nDatos pre-llenados\nen protocolo UAFE"]:::output
+    E["fa:fa-user\nMatrizador revisa\ny corrige"]:::matrizador
+
+    A --> FASE1 --> FASE2 --> D --> E
+
+    classDef input fill:#e3f2fd,stroke:#1565c0
+    classDef output fill:#e8f5e9,stroke:#2e7d32
+    classDef matrizador fill:#bbdefb,stroke:#1565c0,color:#0d47a1
+
+    style FASE1 fill:#f3e5f5,stroke:#7b1fa2
+    style FASE2 fill:#fce4ec,stroke:#c2185b
+    </div>
+  </div>
+
+  <!-- SEMAFORO -->
+  <div class="diagram-section">
+    <h2>4. Semaforo de Completitud</h2>
+    <div class="mermaid">
+flowchart TD
+    subgraph PROTOCOLO["Semaforo por Protocolo"]
+        P_R["🔴 ROJO\nFaltan datos obligatorios UAFE\nsin comparecientes, sin cuantia\nsin tipo acto"]:::rojo
+        P_A["🟡 AMARILLO\nDatos transaccion OK\npero faltan datos personales\no falta No. protocolo"]:::amarillo
+        P_V["🟢 VERDE\nTodos los datos completos\nlisto para reporte"]:::verde
+    end
+
+    subgraph PERSONA["Semaforo por Persona"]
+        PE_R["🔴 ROJO\nNo ha llenado formulario\nsolo datos de minuta"]:::rojo
+        PE_A["🟡 AMARILLO\nFormulario parcial\nfaltan campos opcionales"]:::amarillo
+        PE_V["🟢 VERDE\nFormulario completo\ntodos los datos"]:::verde
+    end
+
+    subgraph REGLAS["Regla importante"]
+        R1["El semaforo NUNCA bloquea\n🟡 se puede incluir en reporte\n🔴 genera advertencia\npero no impide generacion"]:::nota
+    end
+
+    classDef rojo fill:#ffcdd2,stroke:#c62828,color:#b71c1c
+    classDef amarillo fill:#fff9c4,stroke:#f9a825,color:#e65100
+    classDef verde fill:#c8e6c9,stroke:#2e7d32,color:#1b5e20
+    classDef nota fill:#e0e0e0,stroke:#616161,color:#212121
+    </div>
+  </div>
+
+  <!-- FUENTES DE DATOS -->
+  <div class="diagram-section">
+    <h2>5. Fuentes de Datos para el Reporte UAFE</h2>
+    <div class="mermaid">
+flowchart LR
+    subgraph MINUTA["Minuta Word"]
+        M1["Comparecientes + cedulas"]
+        M2["Cuantia / avaluo"]
+        M3["Tipo acto"]
+        M4["Forma de pago"]
+        M5["Descripcion del bien"]
+        M6["Nacionalidad, estado civil"]
+        M7["Telefono, correo, profesion"]
+        M8["Ubicacion inmueble"]
+    end
+
+    subgraph FORM["Formulario Publico"]
+        F1["Direccion domicilio"]
+        F2["Situacion laboral"]
+        F3["Datos conyugue"]
+        F4["Declaracion PEP"]
+        F5["Ingreso mensual"]
+    end
+
+    subgraph DOC["Document Sistema"]
+        D1["No. protocolo"]
+        D2["Fecha"]
+    end
+
+    subgraph REPORTE["Reporte UAFE mensual"]
+        R1["TRANSACCION.xlsx"]
+        R2["INTERVINIENTE.xlsx"]
+    end
+
+    MINUTA --> |"Disponible al inicio"| REPORTE
+    FORM --> |"Cuando cliente llena"| REPORTE
+    DOC --> |"Al facturar"| REPORTE
+
+    style MINUTA fill:#e3f2fd,stroke:#1565c0
+    style FORM fill:#fff9c4,stroke:#f9a825
+    style DOC fill:#f3e5f5,stroke:#7b1fa2
+    style REPORTE fill:#c8e6c9,stroke:#2e7d32
+    </div>
+  </div>
+
+  <!-- REPORTE MENSUAL -->
+  <div class="diagram-section">
+    <h2>6. Generacion del Reporte Mensual</h2>
+    <div class="mermaid">
+flowchart TD
+    A["Responsable UAFE\nabre Dashboard mensual"]:::uafe
+    B["Ve resumen:\ntotal protocolos\n🟢 74 | 🟡 6 | 🔴 2"]:::sistema
+    C{"Hay protocolos\n🔴?"}
+    D["Revisa y completa\nprotocolos con datos faltantes"]:::uafe
+    E["Genera\nTRANSACCION.xlsx\nINTERVINIENTE.xlsx"]:::sistema
+    F["Sube indice CJ\npara verificacion"]:::uafe
+    G["Sistema cruza:\n✅ 80/82 coinciden\n⚠️ 2 no encontradas"]:::sistema
+    H["Envia reportes\na la UAFE"]:::uafe
+
+    A --> B --> C
+    C -->|"Si"| D --> C
+    C -->|"No / Acepta advertencias"| E --> F --> G --> H
+
+    classDef uafe fill:#f8bbd0,stroke:#c2185b,color:#880e4f
+    classDef sistema fill:#c8e6c9,stroke:#2e7d32,color:#1b5e20
+    </div>
+  </div>
+
+  <!-- PROTECCION DE DATOS -->
+  <div class="diagram-section">
+    <h2>7. Acceso al Formulario Publico (Opciones de Seguridad)</h2>
+    <div class="mermaid">
+flowchart TD
+    subgraph OPCION_A["Opcion A: Link + Cedula (recomendada)"]
+        A1["Matrizador genera\nlink con token UUID"]
+        A2["Compareciente abre link"]
+        A3["Ingresa su cedula\npara verificar identidad"]
+        A4["Accede al formulario\nlink expira en 48-72h"]
+        A1 --> A2 --> A3 --> A4
+    end
+
+    subgraph OPCION_B["Opcion B: PIN mejorado (actual)"]
+        B1["Sistema genera\nPIN de 6 digitos"]
+        B2["Matrizador entrega\nPIN al compareciente"]
+        B3["Compareciente ingresa\ncedula + PIN"]
+        B4["Max 3 intentos\nbloqueo 15 min"]
+        B1 --> B2 --> B3 --> B4
+    end
+
+    subgraph FALLBACK["Fallback: Llenado manual"]
+        FB1["Compareciente llega\nsin haber llenado"]
+        FB2["Matrizador llena\ndesde su panel"]
+        FB3["Se registra en auditoria\norigen = MATRIZADOR"]
+        FB1 --> FB2 --> FB3
+    end
+
+    style OPCION_A fill:#e8f5e9,stroke:#2e7d32
+    style OPCION_B fill:#fff9c4,stroke:#f9a825
+    style FALLBACK fill:#ffebee,stroke:#c62828
+    </div>
+  </div>
+
+  <div class="diagram-section" style="background:#e8eaf6;">
+    <h2>Nota</h2>
+    <p>Este diagrama corresponde al plan de diseno <strong>2026-03-06-formulario-uafe-reportes-design.md</strong>.</p>
+    <p>Pendiente validacion con partes interesadas antes de implementacion.</p>
+    <p>Fase vehiculos no incluida en este diseno.</p>
+  </div>
+
+  <script>
+    mermaid.initialize({
+      startOnLoad: true,
+      theme: 'base',
+      themeVariables: {
+        primaryColor: '#e3f2fd',
+        primaryBorderColor: '#1565c0',
+        primaryTextColor: '#0d47a1',
+        lineColor: '#616161',
+        secondaryColor: '#f3e5f5',
+        tertiaryColor: '#fff9c4',
+        fontSize: '14px'
+      },
+      flowchart: {
+        useMaxWidth: true,
+        htmlLabels: true,
+        curve: 'basis'
+      },
+      stateDiagram: {
+        useMaxWidth: true
+      }
+    });
+  </script>
+</body>
+</html>

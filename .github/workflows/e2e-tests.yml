@@ -1,0 +1,55 @@
+name: E2E Multi-tenant Isolation
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  e2e-multi-tenant:
+    name: E2E (tenant isolation + immutable audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: notaria_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d notaria_e2e"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      NODE_ENV: test
+      JWT_SECRET: ci-jwt-secret-for-e2e
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/notaria_e2e?schema=public
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.12.0
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Apply database schema (migrations)
+        working-directory: backend
+        run: npx prisma migrate deploy
+
+      - name: Run E2E suite
+        run: npm run test:e2e

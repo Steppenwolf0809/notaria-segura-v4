@@ -43,8 +43,7 @@ Este script analiza las secuencias de documentos registrados en la base de datos
    
    La URL ya está lista para usar la base de datos de **STAGING**:
    ```env
-   DATABASE_URL=postgresql://<user>:<password>@<host>:<port>/<database>
-   ```
+   DATABASE_URL=DATABASEURL
    
    > ⚠️ **Seguridad**: Este script usa STAGING (copia de producción), nunca producción directa
 
