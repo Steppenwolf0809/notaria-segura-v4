@@ -322,7 +322,7 @@ function CreateAccountScreen({ cedula, tipoPersona, onCreated, onBack }) {
 }
 
 // ── Step 2b: Login ─────────────────────────────────────────
-function LoginScreen({ cedula, onLogin, onBack }) {
+function LoginScreen({ cedula, onLogin, onBack, onPinReset }) {
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -336,7 +336,12 @@ function LoginScreen({ cedula, onLogin, onBack }) {
         onLogin({ sessionToken: data.sessionToken, tipoPersona: data.tipoPersona });
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Error al iniciar sesion');
+      const respData = err.response?.data;
+      if (respData?.pinReseteado && onPinReset) {
+        onPinReset();
+        return;
+      }
+      setError(respData?.message || 'Error al iniciar sesion');
     } finally {
       setLoading(false);
     }
@@ -1738,7 +1743,7 @@ export default function FormularioUAFEPublico() {
     case 'create-account':
       return <CreateAccountScreen cedula={verifyResult.cedula} tipoPersona={verifyResult.tipoPersona} onCreated={handleSession} onBack={handleBack} />;
     case 'login':
-      return <LoginScreen cedula={verifyResult.cedula} onLogin={handleSession} onBack={handleBack} />;
+      return <LoginScreen cedula={verifyResult.cedula} onLogin={handleSession} onBack={handleBack} onPinReset={() => setStep('create-pin')} />;
     case 'create-pin':
       return <CreatePinScreen cedula={verifyResult.cedula} onCreated={handleSession} onBack={handleBack} />;
     case 'form':

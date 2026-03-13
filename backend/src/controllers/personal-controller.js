@@ -299,6 +299,16 @@ export async function loginPersona(req, res) {
       });
     }
 
+    // Si el PIN fue reseteado (pinCreado=false), no permitir login normal
+    // El usuario debe crear un nuevo PIN primero via /crear-pin
+    if (!persona.pinCreado) {
+      return res.status(403).json({
+        success: false,
+        message: 'Tu PIN ha sido reseteado. Debes crear un nuevo PIN antes de continuar.',
+        pinReseteado: true
+      });
+    }
+
     // Verificar PIN: si el hash no es bcrypt valido (placeholder), comparar directamente
     const esBcryptHash = persona.pinHash.startsWith('$2');
     let pinValido = false;
@@ -358,14 +368,10 @@ export async function loginPersona(req, res) {
     }
 
     // PIN CORRECTO - Resetear intentos fallidos y crear sesión
-    // Si es primer login (pinCreado=false), marcar como creado
     const updateData = {
       intentosFallidos: 0,
       ultimoAcceso: new Date(),
     };
-    if (!persona.pinCreado) {
-      updateData.pinCreado = true;
-    }
     await prisma.personaRegistrada.update({
       where: { id: persona.id },
       data: updateData,
@@ -671,8 +677,8 @@ export async function buscarPersonaPorCedula(req, res) {
         ...persona,
         bloqueado,
         nombreCompleto: persona.tipoPersona === 'NATURAL'
-          ? `${persona.datosPersonaNatural?.nombres || ''} ${persona.datosPersonaNatural?.apellidos || ''}`.trim()
-          : persona.datosPersonaJuridica?.razonSocial || 'N/A'
+          ? `${persona.datosPersonaNatural?.datosPersonales?.nombres || ''} ${persona.datosPersonaNatural?.datosPersonales?.apellidos || ''}`.trim() || 'N/A'
+          : persona.datosPersonaJuridica?.razonSocial || persona.datosPersonaJuridica?.informacionGeneral?.razonSocial || 'N/A'
       }
     });
   } catch (error) {
