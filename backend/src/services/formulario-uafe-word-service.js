@@ -241,6 +241,26 @@ function buildHeader(tipoPersona) {
   ];
 }
 
+function buildDeclaracionAutorizacion() {
+  return [
+    new Paragraph({
+      spacing: { after: 200 },
+      alignment: AlignmentType.JUSTIFIED,
+      children: [
+        textRun(
+          'La Unidad de Análisis Financiero y Económico UAFE, en cumplimiento a las políticas internas de prevención ' +
+          'de lavado de activos, requiere la entrega de la siguiente información (favor completar todos los campos ' +
+          'obligatoriamente). Autorizo expresamente a la UAFE, a través de la Notaría Décima Octava del cantón Quito, ' +
+          'cuando lo considere oportuno, obtenga información ampliada relativa a mi persona o a la empresa que represento, ' +
+          'de instituciones financieras y de control. Acepto que la presente información servirá como insumo para controles ' +
+          'sobre prevención, detección y erradicación del delito de lavado de activos y financiamiento de delitos.',
+          { size: FONT_SIZE_BODY }
+        ),
+      ],
+    }),
+  ];
+}
+
 function buildDatosActoNotarial(protocolo, calidad) {
   return [
     sectionTitle('1. DATOS DEL ACTO NOTARIAL'),
@@ -829,6 +849,7 @@ export async function generarFormularioWord(protocolo, personaProtocolo) {
   if (tipo === 'JURIDICA') {
     sections = [
       ...buildHeader('JURIDICA'),
+      ...buildDeclaracionAutorizacion(),
       ...buildDatosActoNotarial(protocolo, calidad),
       ...buildDatosCompania(datos),
       ...buildRepresentanteLegal(datos),
@@ -845,6 +866,7 @@ export async function generarFormularioWord(protocolo, personaProtocolo) {
     // NATURAL (default)
     sections = [
       ...buildHeader('NATURAL'),
+      ...buildDeclaracionAutorizacion(),
       ...buildDatosActoNotarial(protocolo, calidad),
       ...buildDatosPersonales(datos, cedula),
       ...buildDomicilio(datos),
