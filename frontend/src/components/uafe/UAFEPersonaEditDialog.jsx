@@ -296,12 +296,18 @@ export default function UAFEPersonaEditDialog({
 
       await apiClient.put(`/formulario-uafe/persona/${cedula}`, payload);
 
-      // Actualizar actuaPor en PersonaProtocolo si cambió
+      // Actualizar actuaPor + mandante en PersonaProtocolo
       const ppId = persona.id || persona._personaProtocoloId;
-      if (ppId && form.actuaPor !== persona.actuaPor) {
-        await apiClient.patch(`/formulario-uafe/persona-protocolo/${ppId}`, {
-          actuaPor: form.actuaPor,
-        });
+      if (ppId) {
+        const ppPayload = { actuaPor: form.actuaPor };
+        if (isApoderado) {
+          ppPayload.mandanteCedula = form.mandanteNumeroIdentificacion || null;
+          ppPayload.mandanteNombre = [form.mandanteNombres, form.mandanteApellidos].filter(Boolean).join(' ').toUpperCase() || null;
+        } else {
+          ppPayload.mandanteCedula = null;
+          ppPayload.mandanteNombre = null;
+        }
+        await apiClient.patch(`/formulario-uafe/persona-protocolo/${ppId}`, ppPayload);
       }
 
       onSaved?.();

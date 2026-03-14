@@ -400,7 +400,7 @@ router.patch(
   async (req, res) => {
     try {
       const { personaProtocoloId } = req.params;
-      const { actuaPor, calidad } = req.body;
+      const { actuaPor, calidad, mandanteCedula, mandanteNombre } = req.body;
       const { db: prisma } = await import('../db.js');
 
       const pp = await prisma.personaProtocolo.findUnique({
@@ -416,6 +416,9 @@ router.patch(
         updateData.esApoderado = actuaPor !== 'PROPIOS_DERECHOS';
       }
       if (calidad) updateData.calidad = calidad;
+      // Guardar datos del mandatario/apoderado en PersonaProtocolo
+      if (mandanteNombre !== undefined) updateData.mandanteNombre = mandanteNombre;
+      if (mandanteCedula !== undefined) updateData.mandanteCedula = mandanteCedula;
 
       const updated = await prisma.personaProtocolo.update({
         where: { id: personaProtocoloId },

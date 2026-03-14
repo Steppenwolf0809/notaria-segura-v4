@@ -275,7 +275,8 @@ export async function agregarPersonaAProtocolo(req, res) {
     };
 
     // Agregar datos de representación si aplican
-    if (actuaPor === 'REPRESENTANDO_A') {
+    const esApoderadoCreate = ['REPRESENTANDO_A', 'APODERADO_GENERAL', 'APODERADO_ESPECIAL'].includes(actuaPor);
+    if (esApoderadoCreate) {
       if (representadoId) {
         // Verificar que el representado existe
         const representado = await prisma.personaRegistrada.findUnique({
@@ -293,6 +294,11 @@ export async function agregarPersonaAProtocolo(req, res) {
       if (datosRepresentado) {
         dataToCreate.datosRepresentado = datosRepresentado;
       }
+
+      // Guardar mandante datos si vienen en el body
+      const { mandanteCedula: mCedula, mandanteNombre: mNombre } = req.body;
+      if (mCedula) dataToCreate.mandanteCedula = mCedula;
+      if (mNombre) dataToCreate.mandanteNombre = mNombre;
     }
 
     // Agregar persona al protocolo
@@ -1364,8 +1370,9 @@ export async function actualizarPersonaEnProtocolo(req, res) {
       dataToUpdate.procedenciaFondos = procedenciaFondos || null;
     }
 
-    // Manejar mandanteCedula
-    if (actuaPor === 'REPRESENTANDO_A' && mandanteCedula) {
+    // Manejar mandanteCedula (apoderado general, especial o legacy REPRESENTANDO_A)
+    const esActuaPorApoderado = ['REPRESENTANDO_A', 'APODERADO_GENERAL', 'APODERADO_ESPECIAL'].includes(actuaPor);
+    if (esActuaPorApoderado && mandanteCedula) {
       dataToUpdate.mandanteCedula = mandanteCedula;
       // Buscar nombre del mandante
       const mandante = await prisma.personaRegistrada.findUnique({
