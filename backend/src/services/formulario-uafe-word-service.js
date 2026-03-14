@@ -490,6 +490,16 @@ function buildDatosBien(protocolo, datos) {
   ];
 }
 
+function buildProcedenciaFondos(calidad, procedenciaFondos) {
+  if (!procedenciaFondos || !['COMPRADOR', 'DONATARIO', 'PERMUTANTE', 'CESIONARIO'].includes(calidad)) return [];
+  return [
+    sectionTitle('PROCEDENCIA DE FONDOS'),
+    twoColumnTable([
+      ['Justificación de procedencia del dinero', safeStr(procedenciaFondos)],
+    ]),
+  ];
+}
+
 function buildDeclaracionOrigenLicito(datos) {
   const ec = datos?.datosPersonales?.estadoCivil;
   const hasConyuge = ec === 'CASADO' || ec === 'UNION_LIBRE';
@@ -859,6 +869,7 @@ export async function generarFormularioWord(protocolo, personaProtocolo) {
       ...buildPEPJuridica(datos),
       ...buildFormasPagoJuridica(protocolo),
       ...buildDatosBienJuridica(protocolo),
+      ...buildProcedenciaFondos(calidad, personaProtocolo.procedenciaFondos),
       ...buildDeclaracionOrigenLicitoJuridica(),
       ...buildFirmaJuridica(datos),
     ];
@@ -876,6 +887,7 @@ export async function generarFormularioWord(protocolo, personaProtocolo) {
       ...buildDeclaracionPEP(datos),
       ...buildFormasPago(protocolo, datos),
       ...buildDatosBien(protocolo, datos),
+      ...buildProcedenciaFondos(calidad, personaProtocolo.procedenciaFondos),
       ...buildDeclaracionOrigenLicito(datos),
       ...buildFirma(datos, cedula, personaProtocolo.actuaPor),
     ];

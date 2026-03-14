@@ -478,10 +478,31 @@ function DatosActoTab({ protocol, onFieldChange, readOnly }) {
   );
 }
 
-function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm, onGenerateWordPersona, onDeletePerson }) {
+function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm, onGenerateWordPersona, onDeletePerson, onUpdatePersonaProtocolo }) {
   const UAFE_COLORS = useUAFEColors();
   const isDark = useTheme().palette.mode === 'dark';
   const personas = protocol.personas || [];
+  const [procedenciaLocal, setProcedenciaLocal] = useState({});
+  const [savingProcedencia, setSavingProcedencia] = useState({});
+
+  // Initialize procedenciaLocal from protocol data
+  useEffect(() => {
+    const init = {};
+    personas.forEach(p => {
+      if (p.procedenciaFondos) init[p.id] = p.procedenciaFondos;
+    });
+    setProcedenciaLocal(init);
+  }, [protocol.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSaveProcedencia = async (personaId) => {
+    if (!onUpdatePersonaProtocolo) return;
+    setSavingProcedencia(prev => ({ ...prev, [personaId]: true }));
+    try {
+      await onUpdatePersonaProtocolo(protocol.id, personaId, { procedenciaFondos: procedenciaLocal[personaId] || '' });
+    } finally {
+      setSavingProcedencia(prev => ({ ...prev, [personaId]: false }));
+    }
+  };
 
   return (
     <Box>
@@ -536,8 +557,8 @@ function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm, on
             const cedula = p.personaCedula || '-';
 
             return (
+              <Box key={idx}>
               <Paper
-                key={idx}
                 elevation={0}
                 sx={{
                   border: `1px solid ${UAFE_COLORS.border}`,
@@ -690,6 +711,36 @@ function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm, on
                   </Tooltip>
                 </Box>
               </Paper>
+              {['COMPRADOR', 'DONATARIO', 'PERMUTANTE', 'CESIONARIO'].includes(p.calidad) && (
+                <Box sx={{ mt: 0.5, ml: 4, display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                  <TextField
+                    size="small"
+                    fullWidth
+                    multiline
+                    minRows={1}
+                    maxRows={3}
+                    label="Procedencia de fondos"
+                    placeholder="Ej: Ahorros personales, venta de inmueble anterior, credito hipotecario..."
+                    value={procedenciaLocal[p.id] || ''}
+                    onChange={(e) => setProcedenciaLocal(prev => ({ ...prev, [p.id]: e.target.value }))}
+                    sx={{ '& .MuiInputBase-root': { fontSize: '0.82rem' } }}
+                  />
+                  <Tooltip title="Guardar procedencia de fondos" arrow>
+                    <span>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        disabled={savingProcedencia[p.id] || (procedenciaLocal[p.id] || '') === (p.procedenciaFondos || '')}
+                        onClick={() => handleSaveProcedencia(p.id)}
+                        sx={{ minWidth: 'auto', px: 1.5, textTransform: 'none', fontSize: '0.75rem', whiteSpace: 'nowrap' }}
+                      >
+                        {savingProcedencia[p.id] ? 'Guardando...' : 'Guardar'}
+                      </Button>
+                    </span>
+                  </Tooltip>
+                </Box>
+              )}
+              </Box>
             );
           })}
         </Box>
@@ -948,6 +999,7 @@ export default function UAFEProtocolDetail({
   onGenerateTexts,
   onGenerateWord,
   onGenerateWordPersona,
+  onUpdatePersonaProtocolo,
   readOnly = false,
 }) {
   const UAFE_COLORS = useUAFEColors();
@@ -1139,6 +1191,7 @@ export default function UAFEProtocolDetail({
                 onDeletePerson={onDeletePerson}
                 onSendForm={onSendForm}
                 onGenerateWordPersona={onGenerateWordPersona}
+                onUpdatePersonaProtocolo={onUpdatePersonaProtocolo}
               />
             </TabPanel>
             <TabPanel value={tab} index={3}>

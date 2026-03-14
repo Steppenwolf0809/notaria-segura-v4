@@ -425,6 +425,15 @@ export default function UAFEDashboard() {
               setSnackbar({ open: true, message: err.response?.data?.message || 'Error al eliminar compareciente', severity: 'error' });
             }
           }}
+          onUpdatePersonaProtocolo={async (protocoloId, personaId, data) => {
+            try {
+              await apiClient.put(`/formulario-uafe/protocolo/${protocoloId}/persona/${personaId}`, data);
+              setSnackbar({ open: true, message: 'Procedencia de fondos guardada', severity: 'success' });
+              refreshSelectedProtocol();
+            } catch (err) {
+              setSnackbar({ open: true, message: err.response?.data?.message || 'Error al guardar', severity: 'error' });
+            }
+          }}
           onSendForm={handleSendForm}
           onRefresh={refreshSelectedProtocol}
           onGenerateTexts={async (protocoloId, forzar) => {

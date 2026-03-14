@@ -1288,7 +1288,7 @@ export async function actualizarPersonaEnProtocolo(req, res) {
   try {
     const { protocoloId, personaProtocoloId, personaId } = req.params;
     const personaIdFinal = personaProtocoloId || personaId; // Soportar ambos nombres
-    const { calidad, actuaPor, compareceConyugeJunto, mandanteCedula } = req.body;
+    const { calidad, actuaPor, compareceConyugeJunto, mandanteCedula, procedenciaFondos } = req.body;
 
     // Verificar que el protocolo existe y pertenece al usuario
     const protocolo = await prisma.protocoloUAFE.findUnique({
@@ -1355,6 +1355,11 @@ export async function actualizarPersonaEnProtocolo(req, res) {
     // Manejar compareceConyugeJunto
     if (typeof compareceConyugeJunto === 'boolean') {
       dataToUpdate.compareceConyugeJunto = compareceConyugeJunto;
+    }
+
+    // Manejar procedenciaFondos (solo para compradores)
+    if (procedenciaFondos !== undefined) {
+      dataToUpdate.procedenciaFondos = procedenciaFondos || null;
     }
 
     // Manejar mandanteCedula
@@ -2137,6 +2142,15 @@ function generateNaturalPersonPDF(doc, startY, datos, persona) {
     drawField(doc, 60, y, 'Profesión', profesionConyuge, 240);
     drawField(doc, 320, y, 'Situación Laboral', datos.conyuge?.situacionLaboral, 220);
 
+    y += 40;
+    const entidadConyuge = datos.conyuge?.entidad || datos.conyuge?.nombreEntidad || datos.informacionConyuge?.entidad;
+    drawField(doc, 60, y, 'Entidad / Empresa', entidadConyuge, 240);
+    drawField(doc, 320, y, 'Cargo', datos.conyuge?.cargo, 220);
+
+    y += 40;
+    const ingresoConyuge = datos.conyuge?.ingresoMensual != null ? `$${Number(datos.conyuge.ingresoMensual).toLocaleString('es-EC', { minimumFractionDigits: 2 })}` : '';
+    drawField(doc, 60, y, 'Ingreso Mensual', ingresoConyuge, 480);
+
     y += 55; // Reducido de 70 a 55
   }
 
@@ -2301,7 +2315,16 @@ function generateJuridicalPersonPDF(doc, startY, datos, persona) {
     drawField(doc, 320, y, 'Celular', conyuge.celular, 220);
 
     y += 40;
-    drawField(doc, 60, y, 'Profesión', conyuge.profesionOcupacion, 480);
+    drawField(doc, 60, y, 'Profesión', conyuge.profesionOcupacion, 240);
+    drawField(doc, 320, y, 'Situación Laboral', conyuge.situacionLaboral, 220);
+
+    y += 40;
+    drawField(doc, 60, y, 'Entidad / Empresa', conyuge.entidad, 240);
+    drawField(doc, 320, y, 'Cargo', conyuge.cargo, 220);
+
+    y += 40;
+    const ingresoConRep = conyuge.ingresoMensual != null ? `$${Number(conyuge.ingresoMensual).toLocaleString('es-EC', { minimumFractionDigits: 2 })}` : '';
+    drawField(doc, 60, y, 'Ingreso Mensual', ingresoConRep, 480);
 
     y += 55;
   }

@@ -414,6 +414,8 @@ model FormularioUAFERespuesta {
   conyugeDireccionLaboral    String?
   conyugeProvinciaLaboral    String?
   conyugeCantonLaboral       String?
+  conyugeCargo               String?
+  conyugeIngresoMensual      Float?
   tieneBeneficiario          Boolean                   @default(false)
   beneficiarioApellidos      String?
   beneficiarioNombres        String?
@@ -579,6 +581,9 @@ model PersonaProtocolo {
   porcentajeCompletitud Int                  @default(0) // 0-100%
   camposFaltantes     Json?                  // Lista de campos que faltan para verde
   
+  // JUSTIFICACIÓN ORIGEN DE FONDOS (solo compradores)
+  procedenciaFondos   String?                @db.Text // Justificación de procedencia del dinero
+
   // CAMPOS PARA REDACCIÓN
   compareceConyugeJunto Boolean              @default(false) // Si comparece con su cónyuge
   esApoderado         Boolean                @default(false) // Si actúa como apoderado

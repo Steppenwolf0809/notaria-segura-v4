@@ -287,6 +287,7 @@ router.get(
             calidad: pp.calidad,
             datos,
             actuaPor: pp.actuaPor,
+            procedenciaFondos: pp.procedenciaFondos || null,
             cedula: pp.persona.cedula || pp.persona.numeroIdentificacion,
             _personaProtocoloId: pp.id,
             _personaId: pp.persona.id,

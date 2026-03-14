@@ -47,6 +47,9 @@ const LABELS_CAMPOS = {
     conyugeTipoId: 'Tipo ID conyuge',
     conyugeNumeroId: 'Cedula conyuge',
     conyugeNacionalidad: 'Nacionalidad conyuge',
+    conyugeSituacionLaboral: 'Situacion laboral conyuge',
+    conyugeProfesion: 'Profesion conyuge',
+    conyugeIngresoMensual: 'Ingreso mensual conyuge',
     // PEP
     pep: 'Declaracion PEP',
     // Persona Juridica - Compania
@@ -175,6 +178,9 @@ export function calcularCompletitudPersonaNatural(datos) {
         checkField('conyugeTipoId', conyuge.tipoIdentificacion, false);
         checkField('conyugeNumeroId', conyuge.numeroIdentificacion, false);
         checkField('conyugeNacionalidad', conyuge.nacionalidad, false);
+        checkField('conyugeSituacionLaboral', conyuge.situacionLaboral, false);
+        checkField('conyugeProfesion', conyuge.profesionOcupacion || conyuge.profesion, false);
+        checkField('conyugeIngresoMensual', conyuge.ingresoMensual != null ? String(conyuge.ingresoMensual) : null, false);
     }
 
     // Calcular porcentaje

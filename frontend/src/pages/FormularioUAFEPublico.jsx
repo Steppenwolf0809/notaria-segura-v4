@@ -505,6 +505,9 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
         conyugeNumeroIdentificacion: con.numeroIdentificacion || '',
         conyugeNacionalidad: con.nacionalidad || '', conyugeEmail: con.correoElectronico || '',
         conyugeCelular: con.celular || '',
+        conyugeSituacionLaboral: con.situacionLaboral || '', conyugeProfesionOcupacion: con.profesionOcupacion || '',
+        conyugeEntidad: con.entidad || '', conyugeCargo: con.cargo || '',
+        conyugeIngresoMensual: con.ingresoMensual || '',
         esPEP: pep.esPEP || false, esFamiliarPEP: pep.esFamiliarPEP || false,
         esColaboradorPEP: pep.esColaboradorPEP || false,
         pepInstitucion: pep.pepInstitucion || '', pepCargo: pep.pepCargo || '',
@@ -526,6 +529,7 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
         direccionLaboral: '', provinciaLaboral: '', cantonLaboral: '',
         conyugeApellidos: '', conyugeNombres: '', conyugeTipoIdentificacion: '', conyugeNumeroIdentificacion: '',
         conyugeNacionalidad: '', conyugeEmail: '', conyugeCelular: '',
+        conyugeSituacionLaboral: '', conyugeProfesionOcupacion: '', conyugeEntidad: '', conyugeCargo: '', conyugeIngresoMensual: '',
         esPEP: false, esFamiliarPEP: false, esColaboradorPEP: false,
         pepInstitucion: '', pepCargo: '', pepDireccionLaboral: '',
         pepFechaDesde: '', pepFechaHasta: '',
@@ -578,6 +582,11 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
             numeroIdentificacion: form.conyugeNumeroIdentificacion,
             nacionalidad: form.conyugeNacionalidad, correoElectronico: form.conyugeEmail,
             celular: form.conyugeCelular,
+            situacionLaboral: form.conyugeSituacionLaboral || null,
+            profesionOcupacion: form.conyugeProfesionOcupacion || null,
+            entidad: form.conyugeEntidad || null,
+            cargo: form.conyugeCargo || null,
+            ingresoMensual: form.conyugeIngresoMensual && !isNaN(parseFloat(String(form.conyugeIngresoMensual).replace(',', '.'))) ? parseFloat(String(form.conyugeIngresoMensual).replace(',', '.')) : null,
           } : null,
           declaracionPEP: {
             esPEP: form.esPEP, esFamiliarPEP: form.esFamiliarPEP,
@@ -707,6 +716,12 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
             <Grid size={{ xs: 4 }}>{field('Nacionalidad', 'conyugeNacionalidad')}</Grid>
             <Grid size={{ xs: 4 }}>{field('Email', 'conyugeEmail', { type: 'email', inputProps: { inputMode: 'email' } })}</Grid>
             <Grid size={{ xs: 4 }}>{field('Celular', 'conyugeCelular', { type: 'tel', inputProps: { inputMode: 'tel' } })}</Grid>
+            <Grid size={{ xs: 12 }}><Typography variant="subtitle2" sx={{ mt: 2, mb: 1, color: '#1976d2', fontWeight: 600 }}>Informacion Laboral del Conyuge</Typography></Grid>
+            <Grid size={{ xs: 6 }}>{selectField('Situacion Laboral', 'conyugeSituacionLaboral', SITUACIONES_LABORALES)}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Profesion / Ocupacion', 'conyugeProfesionOcupacion')}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Nombre de la Entidad', 'conyugeEntidad')}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Cargo', 'conyugeCargo')}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Ingreso Mensual (USD)', 'conyugeIngresoMensual', { inputProps: { inputMode: 'decimal' }, placeholder: 'Ej: 1500.00' })}</Grid>
           </Grid>
         </Box>
       )}
@@ -967,6 +982,8 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
         conNumeroIdentificacion: con.numeroIdentificacion || '',
         conNacionalidad: con.nacionalidad || '', conCorreoElectronico: con.correoElectronico || '',
         conCelular: con.celular || '',
+        conSituacionLaboral: con.situacionLaboral || '', conProfesionOcupacion: con.profesionOcupacion || '',
+        conEntidad: con.entidad || '', conCargo: con.cargo || '', conIngresoMensual: con.ingresoMensual || '',
         // PEP
         esPEP: pep.esPEP || false, esFamiliarPEP: pep.esFamiliarPEP || false,
         esColaboradorPEP: pep.esColaboradorPEP || false,
@@ -994,6 +1011,7 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
         repProvincia: 'PICHINCHA', repCanton: 'QUITO', repParroquia: '',
         conApellidos: '', conNombres: '', conNumeroIdentificacion: '',
         conNacionalidad: '', conCorreoElectronico: '', conCelular: '',
+        conSituacionLaboral: '', conProfesionOcupacion: '', conEntidad: '', conCargo: '', conIngresoMensual: '',
         esPEP: false, esFamiliarPEP: false, esColaboradorPEP: false,
         pepInstitucion: '', pepCargo: '', pepDireccionLaboral: '',
         pepFechaDesde: '', pepFechaHasta: '',
@@ -1116,6 +1134,11 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
             numeroIdentificacion: form.conNumeroIdentificacion,
             nacionalidad: form.conNacionalidad, correoElectronico: form.conCorreoElectronico,
             celular: form.conCelular,
+            situacionLaboral: form.conSituacionLaboral || null,
+            profesionOcupacion: form.conProfesionOcupacion || null,
+            entidad: form.conEntidad || null,
+            cargo: form.conCargo || null,
+            ingresoMensual: form.conIngresoMensual && !isNaN(parseFloat(String(form.conIngresoMensual).replace(',', '.'))) ? parseFloat(String(form.conIngresoMensual).replace(',', '.')) : null,
           } : null,
           socios: socios,
           declaracionPEP: {
@@ -1299,6 +1322,12 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
             <Grid size={{ xs: 4 }}>{field('Nacionalidad', 'conNacionalidad')}</Grid>
             <Grid size={{ xs: 4 }}>{field('Correo Electronico', 'conCorreoElectronico', { type: 'email', inputProps: { inputMode: 'email' } })}</Grid>
             <Grid size={{ xs: 4 }}>{field('Celular', 'conCelular', { type: 'tel', inputProps: { inputMode: 'tel' } })}</Grid>
+            <Grid size={{ xs: 12 }}><Typography variant="subtitle2" sx={{ mt: 2, mb: 1, color: '#1976d2', fontWeight: 600 }}>Informacion Laboral del Conyuge</Typography></Grid>
+            <Grid size={{ xs: 6 }}>{selectField('Situacion Laboral', 'conSituacionLaboral', SITUACIONES_LABORALES)}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Profesion / Ocupacion', 'conProfesionOcupacion')}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Nombre de la Entidad', 'conEntidad')}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Cargo', 'conCargo')}</Grid>
+            <Grid size={{ xs: 6 }}>{field('Ingreso Mensual (USD)', 'conIngresoMensual', { inputProps: { inputMode: 'decimal' }, placeholder: 'Ej: 1500.00' })}</Grid>
           </Grid>
         </Box>
       )}
