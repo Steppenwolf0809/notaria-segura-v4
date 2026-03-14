@@ -279,6 +279,8 @@ function getNacionalidad(persona) {
   if (persona.datosPersonaNatural) {
     const datos = persona.datosPersonaNatural;
     const personales = datos.datosPersonales || datos;
+    // Usar código directo si existe (datos nuevos con autocomplete)
+    if (personales.nacionalidadCodigo) return personales.nacionalidadCodigo;
     const nac = personales.nacionalidad || personales.pais || '';
     if (nac) {
       // Si ya es 3 caracteres, devolverlo

@@ -33,6 +33,8 @@ import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import PersonIcon from '@mui/icons-material/Person';
 import BusinessIcon from '@mui/icons-material/Business';
 import axios from 'axios';
+import CatalogoAutocomplete from '../components/uafe/CatalogoAutocomplete';
+import { NACIONALIDADES_UAFE, CANTONES_UAFE } from '../data/catalogos-uafe';
 
 const API_BASE = '/api/personal';
 
@@ -670,7 +672,10 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
           <Grid size={{ xs: 4 }}>{selectField('Nivel Estudio', 'nivelEstudio', NIVELES_ESTUDIO)}</Grid>
           <Grid size={{ xs: 6 }}>{field('Email', 'correoElectronico', { type: 'email', autoComplete: 'email', inputProps: { inputMode: 'email' } })}</Grid>
           <Grid size={{ xs: 6 }}>{field('Celular', 'celular', { type: 'tel', autoComplete: 'tel', inputProps: { inputMode: 'tel' } })}</Grid>
-          <Grid size={{ xs: 12 }}>{field('Nacionalidad *', 'nacionalidad')}</Grid>
+          <Grid size={{ xs: 12 }}>
+            <CatalogoAutocomplete options={NACIONALIDADES_UAFE} value={form.nacionalidad} label="Nacionalidad *" placeholder="Buscar nacionalidad..."
+              onChange={(opt) => setForm(f => ({ ...f, nacionalidad: opt?.label || '', nacionalidadCodigo: opt?.codigo || '' }))} />
+          </Grid>
         </Grid>
       </Box>
 
@@ -680,8 +685,11 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
           <Grid size={{ xs: 8 }}>{field('Calle Principal', 'callePrincipal')}</Grid>
           <Grid size={{ xs: 4 }}>{field('Numero', 'numero')}</Grid>
           <Grid size={{ xs: 12 }}>{field('Calle Secundaria', 'calleSecundaria')}</Grid>
-          <Grid size={{ xs: 4 }}>{field('Provincia', 'provincia')}</Grid>
-          <Grid size={{ xs: 4 }}>{field('Canton', 'canton')}</Grid>
+          <Grid size={{ xs: 4 }}>
+            <CatalogoAutocomplete options={CANTONES_UAFE} value={form.canton} label="Canton" placeholder="Buscar canton..."
+              onChange={(opt) => setForm(f => ({ ...f, canton: opt?.canton || '', cantonCodigo: opt?.codigo || '', provincia: opt?.provincia || '' }))} />
+          </Grid>
+          <Grid size={{ xs: 4 }}>{field('Provincia', 'provincia', { disabled: !!form.cantonCodigo })}</Grid>
           <Grid size={{ xs: 4 }}>{field('Parroquia', 'parroquia')}</Grid>
           <Grid size={{ xs: 6 }}>{field('Sector', 'sector')}</Grid>
           <Grid size={{ xs: 6 }}>{field('Referencia', 'referencia')}</Grid>
@@ -697,8 +705,11 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
           <Grid size={{ xs: 6 }}>{field('Cargo', 'cargo')}</Grid>
           <Grid size={{ xs: 6 }}>{field('Ingreso Mensual (USD)', 'ingresoMensual', { inputProps: { inputMode: 'decimal' }, placeholder: 'Ej: 1500.00' })}</Grid>
           <Grid size={{ xs: 12 }}>{field('Direccion de la empresa', 'direccionLaboral', { placeholder: 'Ej: Av. Amazonas N24-45 y Colon' })}</Grid>
-          <Grid size={{ xs: 6 }}>{field('Provincia (laboral)', 'provinciaLaboral', { placeholder: 'Ej: PICHINCHA' })}</Grid>
-          <Grid size={{ xs: 6 }}>{field('Canton (laboral)', 'cantonLaboral', { placeholder: 'Ej: QUITO' })}</Grid>
+          <Grid size={{ xs: 6 }}>
+            <CatalogoAutocomplete options={CANTONES_UAFE} value={form.cantonLaboral} label="Canton (laboral)" placeholder="Buscar canton..."
+              onChange={(opt) => setForm(f => ({ ...f, cantonLaboral: opt?.canton || '', cantonLaboralCodigo: opt?.codigo || '', provinciaLaboral: opt?.provincia || '' }))} />
+          </Grid>
+          <Grid size={{ xs: 6 }}>{field('Provincia (laboral)', 'provinciaLaboral', { disabled: !!form.cantonLaboralCodigo })}</Grid>
         </Grid>
       </Box>
 
@@ -713,7 +724,10 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
             <Grid size={{ xs: 8 }}>{field('Numero Identificacion', 'conyugeNumeroIdentificacion', { inputProps: { inputMode: 'numeric', pattern: '[0-9]*' } })}</Grid>
             <Grid size={{ xs: 6 }}>{field('Apellidos', 'conyugeApellidos', { inputProps: { autoCapitalize: 'words' } })}</Grid>
             <Grid size={{ xs: 6 }}>{field('Nombres', 'conyugeNombres', { inputProps: { autoCapitalize: 'words' } })}</Grid>
-            <Grid size={{ xs: 4 }}>{field('Nacionalidad', 'conyugeNacionalidad')}</Grid>
+            <Grid size={{ xs: 4 }}>
+              <CatalogoAutocomplete options={NACIONALIDADES_UAFE} value={form.conyugeNacionalidad} label="Nacionalidad"
+                onChange={(opt) => setForm(f => ({ ...f, conyugeNacionalidad: opt?.label || '', conyugeNacionalidadCodigo: opt?.codigo || '' }))} />
+            </Grid>
             <Grid size={{ xs: 4 }}>{field('Email', 'conyugeEmail', { type: 'email', inputProps: { inputMode: 'email' } })}</Grid>
             <Grid size={{ xs: 4 }}>{field('Celular', 'conyugeCelular', { type: 'tel', inputProps: { inputMode: 'tel' } })}</Grid>
             <Grid size={{ xs: 12 }}><Typography variant="subtitle2" sx={{ mt: 2, mb: 1, color: '#1976d2', fontWeight: 600 }}>Informacion Laboral del Conyuge</Typography></Grid>
@@ -959,7 +973,7 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
       const pep = j.declaracionPEP || {};
       setForm({
         // Compania
-        razonSocial: comp.razonSocial || '', ruc: comp.ruc || '', objetoSocial: comp.objetoSocial || '',
+        razonSocial: comp.razonSocial || '', ruc: comp.ruc || '', objetoSocial: comp.objetoSocial || '', compNacionalidad: comp.nacionalidad || comp.paisConstitucion || 'Ecuador', compNacionalidadCodigo: comp.nacionalidadCodigo || '',
         compCallePrincipal: dirComp.callePrincipal || '', compCalleSecundaria: dirComp.calleSecundaria || '',
         compNumero: dirComp.numero || '', compProvincia: dirComp.provincia || 'PICHINCHA',
         compCanton: dirComp.canton || 'QUITO', compParroquia: dirComp.parroquia || '',
@@ -999,7 +1013,7 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
       setSocios(j.socios && j.socios.length > 0 ? j.socios : []);
     }).catch(() => {
       setForm({
-        razonSocial: '', ruc: '', objetoSocial: '',
+        razonSocial: '', ruc: '', objetoSocial: '', compNacionalidad: 'Ecuador', compNacionalidadCodigo: 'ECU',
         compCallePrincipal: '', compCalleSecundaria: '', compNumero: '',
         compProvincia: 'PICHINCHA', compCanton: 'QUITO', compParroquia: '',
         emailCompania: '', telefonoCompania: '', celularCompania: '',
@@ -1107,7 +1121,7 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
       await sessionApi(sessionToken).put('/mi-informacion', {
         datosPersonaJuridica: {
           compania: {
-            razonSocial: form.razonSocial, ruc: form.ruc, objetoSocial: form.objetoSocial,
+            razonSocial: form.razonSocial, ruc: form.ruc, objetoSocial: form.objetoSocial, nacionalidad: form.compNacionalidad, nacionalidadCodigo: form.compNacionalidadCodigo,
             direccion: {
               callePrincipal: form.compCallePrincipal, calleSecundaria: form.compCalleSecundaria,
               numero: form.compNumero, provincia: form.compProvincia,
@@ -1217,16 +1231,23 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
       <Box sx={{ display: tab === 0 ? 'block' : 'none' }}>
         <Grid container spacing={2}>
           <Grid size={{ xs: 12 }}>{field('Razon Social *', 'razonSocial', { inputProps: { autoCapitalize: 'words' } })}</Grid>
-          <Grid size={{ xs: 6 }}>{field('RUC *', 'ruc', { inputProps: { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 13 }, placeholder: '13 digitos' })}</Grid>
-          <Grid size={{ xs: 6 }}>{field('Objeto Social', 'objetoSocial')}</Grid>
+          <Grid size={{ xs: 4 }}>{field('RUC *', 'ruc', { inputProps: { inputMode: 'numeric', pattern: '[0-9]*', maxLength: 13 }, placeholder: '13 digitos' })}</Grid>
+          <Grid size={{ xs: 4 }}>{field('Objeto Social', 'objetoSocial')}</Grid>
+          <Grid size={{ xs: 4 }}>
+            <CatalogoAutocomplete options={NACIONALIDADES_UAFE} value={form.compNacionalidad} label="Pais de Constitucion"
+              onChange={(opt) => setForm(f => ({ ...f, compNacionalidad: opt?.label || '', compNacionalidadCodigo: opt?.codigo || '' }))} />
+          </Grid>
           <Grid size={{ xs: 12 }}>
             <Divider sx={{ my: 1 }}><Typography variant="caption" sx={{ color: COLORS.textMuted }}>Direccion</Typography></Divider>
           </Grid>
           <Grid size={{ xs: 8 }}>{field('Calle Principal', 'compCallePrincipal', { autoComplete: 'street-address' })}</Grid>
           <Grid size={{ xs: 4 }}>{field('Numero', 'compNumero')}</Grid>
           <Grid size={{ xs: 12 }}>{field('Calle Secundaria', 'compCalleSecundaria')}</Grid>
-          <Grid size={{ xs: 4 }}>{field('Provincia', 'compProvincia')}</Grid>
-          <Grid size={{ xs: 4 }}>{field('Canton', 'compCanton')}</Grid>
+          <Grid size={{ xs: 4 }}>
+            <CatalogoAutocomplete options={CANTONES_UAFE} value={form.compCanton} label="Canton"
+              onChange={(opt) => setForm(f => ({ ...f, compCanton: opt?.canton || '', compCantonCodigo: opt?.codigo || '', compProvincia: opt?.provincia || '' }))} />
+          </Grid>
+          <Grid size={{ xs: 4 }}>{field('Provincia', 'compProvincia', { disabled: !!form.compCantonCodigo })}</Grid>
           <Grid size={{ xs: 4 }}>{field('Parroquia', 'compParroquia')}</Grid>
           <Grid size={{ xs: 12 }}>
             <Divider sx={{ my: 1 }}><Typography variant="caption" sx={{ color: COLORS.textMuted }}>Contacto</Typography></Divider>
@@ -1272,7 +1293,10 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
           </Grid>
           <Grid size={{ xs: 6 }}>{field('Apellidos *', 'repApellidos', { autoComplete: 'family-name', inputProps: { autoCapitalize: 'words' } })}</Grid>
           <Grid size={{ xs: 6 }}>{field('Nombres *', 'repNombres', { autoComplete: 'given-name', inputProps: { autoCapitalize: 'words' } })}</Grid>
-          <Grid size={{ xs: 4 }}>{field('Nacionalidad', 'repNacionalidad')}</Grid>
+          <Grid size={{ xs: 4 }}>
+            <CatalogoAutocomplete options={NACIONALIDADES_UAFE} value={form.repNacionalidad} label="Nacionalidad"
+              onChange={(opt) => setForm(f => ({ ...f, repNacionalidad: opt?.label || '', repNacionalidadCodigo: opt?.codigo || '' }))} />
+          </Grid>
           <Grid size={{ xs: 4 }}>{selectField('Genero', 'repGenero', [{ value: 'MASCULINO', label: 'Masculino' }, { value: 'FEMENINO', label: 'Femenino' }])}</Grid>
           <Grid size={{ xs: 4 }}>{selectField('Estado Civil', 'repEstadoCivil', ESTADOS_CIVILES)}</Grid>
           <Grid size={{ xs: 4 }}>{selectField('Nivel Estudio', 'repNivelEstudio', NIVELES_ESTUDIO)}</Grid>
@@ -1284,8 +1308,11 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
           <Grid size={{ xs: 8 }}>{field('Calle Principal', 'repCallePrincipal', { autoComplete: 'street-address' })}</Grid>
           <Grid size={{ xs: 4 }}>{field('Numero', 'repNumero')}</Grid>
           <Grid size={{ xs: 12 }}>{field('Calle Secundaria', 'repCalleSecundaria')}</Grid>
-          <Grid size={{ xs: 4 }}>{field('Provincia', 'repProvincia')}</Grid>
-          <Grid size={{ xs: 4 }}>{field('Canton', 'repCanton')}</Grid>
+          <Grid size={{ xs: 4 }}>
+            <CatalogoAutocomplete options={CANTONES_UAFE} value={form.repCanton} label="Canton"
+              onChange={(opt) => setForm(f => ({ ...f, repCanton: opt?.canton || '', repCantonCodigo: opt?.codigo || '', repProvincia: opt?.provincia || '' }))} />
+          </Grid>
+          <Grid size={{ xs: 4 }}>{field('Provincia', 'repProvincia', { disabled: !!form.repCantonCodigo })}</Grid>
           <Grid size={{ xs: 4 }}>{field('Parroquia', 'repParroquia')}</Grid>
         </Grid>
       </Box>
@@ -1319,7 +1346,10 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
             </Grid>
             <Grid size={{ xs: 6 }}>{field('Apellidos *', 'conApellidos', { inputProps: { autoCapitalize: 'words' } })}</Grid>
             <Grid size={{ xs: 6 }}>{field('Nombres *', 'conNombres', { inputProps: { autoCapitalize: 'words' } })}</Grid>
-            <Grid size={{ xs: 4 }}>{field('Nacionalidad', 'conNacionalidad')}</Grid>
+            <Grid size={{ xs: 4 }}>
+              <CatalogoAutocomplete options={NACIONALIDADES_UAFE} value={form.conNacionalidad} label="Nacionalidad"
+                onChange={(opt) => setForm(f => ({ ...f, conNacionalidad: opt?.label || '', conNacionalidadCodigo: opt?.codigo || '' }))} />
+            </Grid>
             <Grid size={{ xs: 4 }}>{field('Correo Electronico', 'conCorreoElectronico', { type: 'email', inputProps: { inputMode: 'email' } })}</Grid>
             <Grid size={{ xs: 4 }}>{field('Celular', 'conCelular', { type: 'tel', inputProps: { inputMode: 'tel' } })}</Grid>
             <Grid size={{ xs: 12 }}><Typography variant="subtitle2" sx={{ mt: 2, mb: 1, color: '#1976d2', fontWeight: 600 }}>Informacion Laboral del Conyuge</Typography></Grid>
@@ -1391,8 +1421,8 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
                     placeholder="13 digitos" />
                 </Grid>
                 <Grid size={{ xs: 6 }}>
-                  <TextField fullWidth size="small" label="Nacionalidad" value={socio.nacionalidad}
-                    onChange={e => updateSocio(idx, 'nacionalidad', e.target.value)} />
+                  <CatalogoAutocomplete options={NACIONALIDADES_UAFE} value={socio.nacionalidad} label="Nacionalidad"
+                    onChange={(opt) => { updateSocio(idx, 'nacionalidad', opt?.label || ''); updateSocio(idx, 'nacionalidadCodigo', opt?.codigo || ''); }} />
                 </Grid>
                 <Grid size={{ xs: 12 }}>
                   <TextField fullWidth size="small"
@@ -1543,8 +1573,8 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
                                 onChange={e => { const ns = [...(socio.subSocios || [])]; ns[subIdx] = { ...sub, nombres: e.target.value }; updateSocio(idx, 'subSocios', ns); }} />
                             </Grid>
                             <Grid size={{ xs: 6 }}>
-                              <TextField fullWidth size="small" label="Nacionalidad" value={sub.nacionalidad || ''}
-                                onChange={e => { const ns = [...(socio.subSocios || [])]; ns[subIdx] = { ...sub, nacionalidad: e.target.value }; updateSocio(idx, 'subSocios', ns); }} />
+                              <CatalogoAutocomplete options={NACIONALIDADES_UAFE} value={sub.nacionalidad || ''} label="Nacionalidad"
+                                onChange={(opt) => { const ns = [...(socio.subSocios || [])]; ns[subIdx] = { ...sub, nacionalidad: opt?.label || '', nacionalidadCodigo: opt?.codigo || '' }; updateSocio(idx, 'subSocios', ns); }} />
                             </Grid>
                             <Grid size={{ xs: 6 }}>
                               <TextField fullWidth size="small" label="% Participacion" value={sub.porcentajeParticipacion || ''}
@@ -1616,8 +1646,8 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
                     inputProps={{ autoCapitalize: 'words' }} />
                 </Grid>
                 <Grid size={{ xs: 6 }}>
-                  <TextField fullWidth size="small" label="Nacionalidad" value={socio.nacionalidad}
-                    onChange={e => updateSocio(idx, 'nacionalidad', e.target.value)} />
+                  <CatalogoAutocomplete options={NACIONALIDADES_UAFE} value={socio.nacionalidad} label="Nacionalidad"
+                    onChange={(opt) => { updateSocio(idx, 'nacionalidad', opt?.label || ''); updateSocio(idx, 'nacionalidadCodigo', opt?.codigo || ''); }} />
                 </Grid>
                 <Grid size={{ xs: 6 }}>
                   <TextField fullWidth size="small"

@@ -31,6 +31,8 @@ import SearchIcon from '@mui/icons-material/Search';
 
 import apiClient from '../../services/api-client';
 import SemaforoIndicator from './SemaforoIndicator';
+import CatalogoAutocomplete from './CatalogoAutocomplete';
+import { NACIONALIDADES_UAFE, CANTONES_UAFE } from '../../data/catalogos-uafe';
 import { UAFE_COLORS, CALIDADES_COMPARECIENTE } from './uafe-constants';
 
 const ESTADOS_CIVILES = [
@@ -134,6 +136,11 @@ export default function UAFEPersonaEditDialog({
         conyugeNacionalidad: conyuge.nacionalidad || '',
         conyugeCorreoElectronico: conyuge.correoElectronico || '',
         conyugeCelular: conyuge.celular || '',
+        conyugeSituacionLaboral: conyuge.situacionLaboral || '',
+        conyugeProfesionOcupacion: conyuge.profesionOcupacion || '',
+        conyugeEntidad: conyuge.entidad || '',
+        conyugeCargo: conyuge.cargo || '',
+        conyugeIngresoMensual: conyuge.ingresoMensual || '',
         esPEP: pep.esPEP || false,
         esFamiliarPEP: pep.esFamiliarPEP || false,
         esColaboradorPEP: pep.esColaboradorPEP || false,
@@ -256,6 +263,11 @@ export default function UAFEPersonaEditDialog({
           nacionalidad: form.conyugeNacionalidad,
           correoElectronico: form.conyugeCorreoElectronico,
           celular: form.conyugeCelular,
+          situacionLaboral: form.conyugeSituacionLaboral || null,
+          profesionOcupacion: form.conyugeProfesionOcupacion || null,
+          entidad: form.conyugeEntidad || null,
+          cargo: form.conyugeCargo || null,
+          ingresoMensual: form.conyugeIngresoMensual && !isNaN(parseFloat(String(form.conyugeIngresoMensual).replace(',', '.'))) ? parseFloat(String(form.conyugeIngresoMensual).replace(',', '.')) : null,
         },
         declaracionPEP: {
           esPEP: form.esPEP,
@@ -380,7 +392,8 @@ export default function UAFEPersonaEditDialog({
             <TextField fullWidth size="small" label="Nombres *" value={form.nombres} onChange={e => handleChange('nombres', e.target.value)} />
           </Grid>
           <Grid size={{ xs: 12, sm: 4 }}>
-            <TextField fullWidth size="small" label="Nacionalidad *" value={form.nacionalidad} onChange={e => handleChange('nacionalidad', e.target.value)} />
+            <CatalogoAutocomplete options={NACIONALIDADES_UAFE} value={form.nacionalidad} label="Nacionalidad *"
+              onChange={(opt) => { handleChange('nacionalidad', opt?.label || ''); handleChange('nacionalidadCodigo', opt?.codigo || ''); }} />
           </Grid>
           <Grid size={{ xs: 12, sm: 4 }}>
             <FormControl fullWidth size="small">
@@ -432,10 +445,11 @@ export default function UAFEPersonaEditDialog({
             <TextField fullWidth size="small" label="Numero" value={form.numero} onChange={e => handleChange('numero', e.target.value)} />
           </Grid>
           <Grid size={{ xs: 12, sm: 4 }}>
-            <TextField fullWidth size="small" label="Provincia" value={form.provincia} onChange={e => handleChange('provincia', e.target.value)} />
+            <CatalogoAutocomplete options={CANTONES_UAFE} value={form.canton} label="Canton"
+              onChange={(opt) => { handleChange('canton', opt?.canton || ''); handleChange('cantonCodigo', opt?.codigo || ''); handleChange('provincia', opt?.provincia || ''); }} />
           </Grid>
           <Grid size={{ xs: 12, sm: 4 }}>
-            <TextField fullWidth size="small" label="Canton" value={form.canton} onChange={e => handleChange('canton', e.target.value)} />
+            <TextField fullWidth size="small" label="Provincia" value={form.provincia} onChange={e => handleChange('provincia', e.target.value)} disabled={!!form.cantonCodigo} />
           </Grid>
           <Grid size={{ xs: 12, sm: 4 }}>
             <TextField fullWidth size="small" label="Parroquia" value={form.parroquia} onChange={e => handleChange('parroquia', e.target.value)} />
@@ -475,10 +489,11 @@ export default function UAFEPersonaEditDialog({
             <TextField fullWidth size="small" label="Direccion empresa" value={form.direccionLaboral} onChange={e => handleChange('direccionLaboral', e.target.value)} />
           </Grid>
           <Grid size={{ xs: 12, sm: 4 }}>
-            <TextField fullWidth size="small" label="Provincia laboral" value={form.provinciaLaboral} onChange={e => handleChange('provinciaLaboral', e.target.value)} />
+            <CatalogoAutocomplete options={CANTONES_UAFE} value={form.cantonLaboral} label="Canton laboral"
+              onChange={(opt) => { handleChange('cantonLaboral', opt?.canton || ''); handleChange('cantonLaboralCodigo', opt?.codigo || ''); handleChange('provinciaLaboral', opt?.provincia || ''); }} />
           </Grid>
           <Grid size={{ xs: 12, sm: 4 }}>
-            <TextField fullWidth size="small" label="Canton laboral" value={form.cantonLaboral} onChange={e => handleChange('cantonLaboral', e.target.value)} />
+            <TextField fullWidth size="small" label="Provincia laboral" value={form.provinciaLaboral} onChange={e => handleChange('provinciaLaboral', e.target.value)} disabled={!!form.cantonLaboralCodigo} />
           </Grid>
         </Grid>
 
@@ -507,13 +522,37 @@ export default function UAFEPersonaEditDialog({
                 <TextField fullWidth size="small" label="No. Identificacion conyuge" value={form.conyugeNumeroIdentificacion} onChange={e => handleChange('conyugeNumeroIdentificacion', e.target.value)} />
               </Grid>
               <Grid size={{ xs: 12, sm: 3 }}>
-                <TextField fullWidth size="small" label="Nacionalidad conyuge" value={form.conyugeNacionalidad} onChange={e => handleChange('conyugeNacionalidad', e.target.value)} />
+                <CatalogoAutocomplete options={NACIONALIDADES_UAFE} value={form.conyugeNacionalidad} label="Nacionalidad conyuge"
+                  onChange={(opt) => { handleChange('conyugeNacionalidad', opt?.label || ''); handleChange('conyugeNacionalidadCodigo', opt?.codigo || ''); }} />
               </Grid>
               <Grid size={{ xs: 12, sm: 3 }}>
                 <TextField fullWidth size="small" label="Celular conyuge" type="tel" value={form.conyugeCelular} onChange={e => handleChange('conyugeCelular', e.target.value)} />
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
                 <TextField fullWidth size="small" label="Correo electronico conyuge" type="email" value={form.conyugeCorreoElectronico} onChange={e => handleChange('conyugeCorreoElectronico', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12 }}>
+                <Typography variant="caption" sx={{ fontWeight: 600, color: '#1976d2', mt: 1 }}>Informacion Laboral del Conyuge</Typography>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <FormControl fullWidth size="small">
+                  <InputLabel>Situacion laboral conyuge</InputLabel>
+                  <Select value={form.conyugeSituacionLaboral} label="Situacion laboral conyuge" onChange={e => handleChange('conyugeSituacionLaboral', e.target.value)}>
+                    {SITUACIONES_LABORALES.map(sl => <MenuItem key={sl.value} value={sl.value}>{sl.label}</MenuItem>)}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth size="small" label="Profesion / Ocupacion conyuge" value={form.conyugeProfesionOcupacion} onChange={e => handleChange('conyugeProfesionOcupacion', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth size="small" label="Entidad donde trabaja conyuge" value={form.conyugeEntidad} onChange={e => handleChange('conyugeEntidad', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth size="small" label="Cargo conyuge" value={form.conyugeCargo} onChange={e => handleChange('conyugeCargo', e.target.value)} />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <TextField fullWidth size="small" label="Ingreso mensual conyuge (USD)" value={form.conyugeIngresoMensual} onChange={e => handleChange('conyugeIngresoMensual', e.target.value)} inputProps={{ inputMode: 'decimal' }} placeholder="Ej: 1500.00" />
               </Grid>
             </Grid>
           </>
@@ -647,7 +686,8 @@ export default function UAFEPersonaEditDialog({
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 4 }}>
-                <TextField fullWidth size="small" label="Nacionalidad" value={form.mandanteNacionalidad} onChange={e => handleChange('mandanteNacionalidad', e.target.value)} />
+                <CatalogoAutocomplete options={NACIONALIDADES_UAFE} value={form.mandanteNacionalidad} label="Nacionalidad"
+                  onChange={(opt) => { handleChange('mandanteNacionalidad', opt?.label || ''); handleChange('mandanteNacionalidadCodigo', opt?.codigo || ''); }} />
               </Grid>
               <Grid size={{ xs: 12, sm: 4 }}>
                 <FormControl fullWidth size="small">
@@ -661,10 +701,11 @@ export default function UAFEPersonaEditDialog({
                 <TextField fullWidth size="small" label="Direccion completa" value={form.mandanteDireccion} onChange={e => handleChange('mandanteDireccion', e.target.value)} />
               </Grid>
               <Grid size={{ xs: 12, sm: 4 }}>
-                <TextField fullWidth size="small" label="Provincia" value={form.mandanteProvincia} onChange={e => handleChange('mandanteProvincia', e.target.value)} />
+                <CatalogoAutocomplete options={CANTONES_UAFE} value={form.mandanteCanton} label="Canton"
+                  onChange={(opt) => { handleChange('mandanteCanton', opt?.canton || ''); handleChange('mandanteCantonCodigo', opt?.codigo || ''); handleChange('mandanteProvincia', opt?.provincia || ''); }} />
               </Grid>
               <Grid size={{ xs: 12, sm: 4 }}>
-                <TextField fullWidth size="small" label="Canton" value={form.mandanteCanton} onChange={e => handleChange('mandanteCanton', e.target.value)} />
+                <TextField fullWidth size="small" label="Provincia" value={form.mandanteProvincia} onChange={e => handleChange('mandanteProvincia', e.target.value)} disabled={!!form.mandanteCantonCodigo} />
               </Grid>
               <Grid size={{ xs: 12, sm: 4 }}>
                 <TextField fullWidth size="small" label="Parroquia" value={form.mandanteParroquia} onChange={e => handleChange('mandanteParroquia', e.target.value)} />
