@@ -260,7 +260,15 @@ function formatearComparecienteIndividual(participante, formatoHtml = true) {
 
     // CASO PERSONA JURÍDICA
     if (datos.tipoPersona === 'JURIDICA') {
-        let texto = `la compañía ${negrita(datos.nombre, formatoHtml)}, legalmente representada por el señor(a) ${datos.representanteLegal.nombre}`;
+        let texto = `la compañía ${negrita(datos.nombre, formatoHtml)}`;
+        if (esApoderado(participante.actuaPor) && participante.mandanteNombre) {
+            // PJ representada por apoderado externo
+            texto += `, debidamente representada por ${negrita(participante.mandanteNombre.toUpperCase(), formatoHtml)}`;
+        } else {
+            // PJ representada por su representante legal
+            const repNombre = datos.representanteLegal?.nombre || '[REP. LEGAL PENDIENTE]';
+            texto += `, legalmente representada por ${repNombre}`;
+        }
         texto += `, con RUC número ${conversorRUC(datos.cedula)}`;
         return texto;
     }
@@ -290,14 +298,14 @@ function formatearComparecienteIndividual(participante, formatoHtml = true) {
     } else if (participante.actuaPor === 'REPRESENTANDO_SOCIEDAD_BIENES') {
         texto += ', por sus propios y personales derechos y por los que representa de la sociedad de bienes que tienen formada';
     } else if (esApoderado(participante.actuaPor)) {
-        // Representación de otro (mandante/poderdante)
-        const nombreMandante = participante.mandanteNombre || '[MANDANTE PENDIENTE]';
-        texto += `, en representación de ${negrita(nombreMandante.toUpperCase(), formatoHtml)}`;
-        if (participante.mandanteCedula) {
-            const cedulaMandanteLetras = convertirNumeroALetras(participante.mandanteCedula, 'cedula');
-            texto += `, con cédula de ciudadanía número ${cedulaMandanteLetras}`;
-        }
+        // El compareciente (persona) es el PRINCIPAL, representado por el mandatario
+        const nombreMandatario = participante.mandanteNombre || '[APODERADO PENDIENTE]';
         const tipoPoder = participante.actuaPor === 'APODERADO_ESPECIAL' ? 'poder especial' : 'poder general';
+        texto += `, debidamente representado por ${negrita(nombreMandatario.toUpperCase(), formatoHtml)}`;
+        if (participante.mandanteCedula) {
+            const cedulaMandatarioLetras = convertirNumeroALetras(participante.mandanteCedula, 'cedula');
+            texto += `, con cédula de ciudadanía número ${cedulaMandatarioLetras}`;
+        }
         texto += `, conforme consta del ${tipoPoder} que se agrega como habilitante`;
     } else {
         texto += ', por sus propios y personales derechos';
@@ -436,35 +444,37 @@ function formatearConConyugeDesdeDB(participante, formatoHtml = true) {
 }
 
 /**
- * Formatea un apoderado con su mandante
+ * Formatea un compareciente representado por apoderado/mandatario.
+ * El participante.persona es el PRINCIPAL (representado).
+ * mandanteNombre/mandanteCedula contienen datos del MANDATARIO (quien actúa).
  */
-function formatearApoderado(apoderado, formatoHtml = true) {
-    const datosApoderado = obtenerDatosPersonales(apoderado);
-    const tratamiento = obtenerTratamiento(datosApoderado.genero, datosApoderado.estadoCivil);
-    const nombreMandante = apoderado.mandanteNombre || '[MANDANTE PENDIENTE]';
-    const cedulaMandante = apoderado.mandanteCedula || '';
+function formatearApoderado(participante, formatoHtml = true) {
+    const datosPrincipal = obtenerDatosPersonales(participante);
+    const tratamiento = obtenerTratamiento(datosPrincipal.genero, datosPrincipal.estadoCivil);
+    const nombreMandatario = participante.mandanteNombre || '[APODERADO PENDIENTE]';
+    const cedulaMandatario = participante.mandanteCedula || '';
+    const tipoPoder = participante.actuaPor === 'APODERADO_ESPECIAL' ? 'poder especial' : 'poder general';
 
-    // Primero el compareciente (apoderado)
-    let texto = `${tratamiento} ${negrita(datosApoderado.nombre || '[NOMBRE PENDIENTE]', formatoHtml)}, `;
-    texto += `de estado civil ${formatearEstadoCivil(datosApoderado.estadoCivil, datosApoderado.genero)}`;
+    // Primero el principal (la persona representada)
+    let texto = `${tratamiento} ${negrita(datosPrincipal.nombre || '[NOMBRE PENDIENTE]', formatoHtml)}, `;
+    texto += `de estado civil ${formatearEstadoCivil(datosPrincipal.estadoCivil, datosPrincipal.genero)}`;
 
-    if (datosApoderado.profesion) {
-        texto += `, de ocupación ${datosApoderado.profesion.toLowerCase()}`;
+    if (datosPrincipal.profesion) {
+        texto += `, de ocupación ${datosPrincipal.profesion.toLowerCase()}`;
     } else {
         texto += `, de ocupación [PENDIENTE]`;
     }
 
-    // Cédula del apoderado
-    texto += `, con cédula de ciudadanía número ${convertirNumeroALetras(datosApoderado.cedula, 'cedula')}`;
+    // Cédula del principal
+    texto += `, con cédula de ciudadanía número ${convertirNumeroALetras(datosPrincipal.cedula, 'cedula')}`;
 
-    // Representación
-    texto += `, en representación de ${negrita(nombreMandante.toUpperCase(), formatoHtml)}`;
+    // Representado por el mandatario
+    texto += `, debidamente representado por ${negrita(nombreMandatario.toUpperCase(), formatoHtml)}`;
 
-    if (cedulaMandante) {
-        texto += `, con cédula de ciudadanía número ${convertirNumeroALetras(cedulaMandante, 'cedula')}`;
+    if (cedulaMandatario) {
+        texto += `, con cédula de ciudadanía número ${convertirNumeroALetras(cedulaMandatario, 'cedula')}`;
     }
 
-    const tipoPoder = apoderado.actuaPor === 'APODERADO_ESPECIAL' ? 'poder especial' : 'poder general';
     texto += `, conforme consta del ${tipoPoder} que se agrega como habilitante`;
 
     return texto;
