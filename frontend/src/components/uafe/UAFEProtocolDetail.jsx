@@ -53,8 +53,6 @@ import {
   CALIDADES_COMPARECIENTE,
   getSemaforoFromProtocol,
   getMissingFields,
-  formatCurrency,
-  formatDate,
 } from './uafe-constants';
 
 /** Resolve UAFE colors based on current MUI theme mode */
@@ -1003,7 +1001,6 @@ export default function UAFEProtocolDetail({
   readOnly = false,
 }) {
   const UAFE_COLORS = useUAFEColors();
-  const isDark = useTheme().palette.mode === 'dark';
   const [tab, setTab] = useState(0);
   const [editedFields, setEditedFields] = useState({});
   const [refreshing, setRefreshing] = useState(false);

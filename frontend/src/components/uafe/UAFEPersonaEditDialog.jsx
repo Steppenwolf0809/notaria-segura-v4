@@ -85,7 +85,6 @@ export default function UAFEPersonaEditDialog({
   open,
   onClose,
   persona,
-  protocoloId,
   onSaved,
 }) {
   const [form, setForm] = useState({});

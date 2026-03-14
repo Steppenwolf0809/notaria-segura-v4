@@ -43,7 +43,7 @@ import UAFEReportPanel from './UAFEReportPanel';
 import UAFEPersonaEditDialog from './UAFEPersonaEditDialog';
 import UAFEVehiculoForm from './UAFEVehiculoForm';
 import UAFEIndiceCruce from './UAFEIndiceCruce';
-import { UAFE_COLORS, TIPOS_ACTO_UAFE, TIPOS_BIEN, CALIDADES_COMPARECIENTE, FORMAS_PAGO, formatCurrency, getSemaforoFromProtocol, ESTADOS_PROTOCOLO_FLOW } from './uafe-constants';
+import { UAFE_COLORS, TIPOS_ACTO_UAFE, TIPOS_BIEN, CALIDADES_COMPARECIENTE, FORMAS_PAGO, getSemaforoFromProtocol, ESTADOS_PROTOCOLO_FLOW } from './uafe-constants';
 
 /**
  * UAFEDashboard - Main container for the redesigned UAFE module
@@ -277,7 +277,7 @@ export default function UAFEDashboard() {
   };
 
   // OLA 3: Copy global form link to clipboard
-  const handleSendForm = (_persona) => {
+  const handleSendForm = () => {
     const link = 'https://notaria18quito.com.ec/formulario';
     navigator.clipboard.writeText(link).then(() => {
       setSnackbar({ open: true, message: 'Enlace del formulario copiado', severity: 'success' });
@@ -500,7 +500,6 @@ export default function UAFEDashboard() {
           open={!!editPersona}
           onClose={() => setEditPersona(null)}
           persona={editPersona}
-          protocoloId={selectedProtocol.id}
           onSaved={handlePersonaSaved}
         />
 

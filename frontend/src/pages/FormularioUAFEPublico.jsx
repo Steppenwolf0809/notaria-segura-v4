@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -475,7 +475,7 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
   const [tab, setTab] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [saved, setSaved] = useState(false);
+  const [, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -844,7 +844,7 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
   const [tab, setTab] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [saved, setSaved] = useState(false);
+  const [, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [socios, setSocios] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({});
