@@ -25,6 +25,16 @@ import {
 // Tipos de acto que NO requieren comparecencia (actas de reconocimiento)
 const TIPOS_SIN_COMPARECENCIA = ['VENTA_VEHICULO', 'RECONOCIMIENTO_VEHICULO'];
 
+// Valores de actuaPor que indican representación por apoderado/mandatario
+const ACTUA_POR_APODERADO = ['REPRESENTANDO_A', 'APODERADO_GENERAL', 'APODERADO_ESPECIAL'];
+
+/**
+ * Determina si el participante actúa como apoderado/mandatario
+ */
+function esApoderado(actuaPor) {
+    return ACTUA_POR_APODERADO.includes(actuaPor);
+}
+
 // Texto fijo de la notaria
 const NOTARIA_TEXTO = 'DOCTORA GLENDA ZAPATA SILVA, NOTARIA DÉCIMA OCTAVA DEL CANTÓN QUITO';
 
@@ -279,15 +289,16 @@ function formatearComparecienteIndividual(participante, formatoHtml = true) {
         texto += ', por sus propios y personales derechos y por los que representa de la sociedad conyugal que tienen formada';
     } else if (participante.actuaPor === 'REPRESENTANDO_SOCIEDAD_BIENES') {
         texto += ', por sus propios y personales derechos y por los que representa de la sociedad de bienes que tienen formada';
-    } else if (participante.actuaPor === 'REPRESENTANDO_A') {
-        // Representación de otro (mandante)
+    } else if (esApoderado(participante.actuaPor)) {
+        // Representación de otro (mandante/poderdante)
         const nombreMandante = participante.mandanteNombre || '[MANDANTE PENDIENTE]';
         texto += `, en representación de ${negrita(nombreMandante.toUpperCase(), formatoHtml)}`;
         if (participante.mandanteCedula) {
             const cedulaMandanteLetras = convertirNumeroALetras(participante.mandanteCedula, 'cedula');
             texto += `, con cédula de ciudadanía número ${cedulaMandanteLetras}`;
         }
-        texto += ', según poder que se agrega como habilitante';
+        const tipoPoder = participante.actuaPor === 'APODERADO_ESPECIAL' ? 'poder especial' : 'poder general';
+        texto += `, conforme consta del ${tipoPoder} que se agrega como habilitante`;
     } else {
         texto += ', por sus propios y personales derechos';
     }
@@ -453,7 +464,8 @@ function formatearApoderado(apoderado, formatoHtml = true) {
         texto += `, con cédula de ciudadanía número ${convertirNumeroALetras(cedulaMandante, 'cedula')}`;
     }
 
-    texto += ', según poder que se agrega como habilitante';
+    const tipoPoder = apoderado.actuaPor === 'APODERADO_ESPECIAL' ? 'poder especial' : 'poder general';
+    texto += `, conforme consta del ${tipoPoder} que se agrega como habilitante`;
 
     return texto;
 }
@@ -569,7 +581,7 @@ function agruparSubParticipantes(participantes) {
         }
 
         // Caso APODERADO
-        if (p.actuaPor === 'REPRESENTANDO_A') {
+        if (esApoderado(p.actuaPor)) {
             subgrupos.push({ tipo: 'APODERADO', participantes: [p], calidad: p.calidad });
             procesados.add(p.id);
             continue;

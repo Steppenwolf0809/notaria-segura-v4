@@ -365,5 +365,139 @@ describe('Comparecencia Generator Service - Tests de Integración', () => {
       expect(result.success).toBe(true);
       expect(result.comparecencia).toContain('PERSONA SIN DATOS');
     });
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Apoderados con actuaPor = APODERADO_GENERAL / APODERADO_ESPECIAL
+    // ═══════════════════════════════════════════════════════════════════
+
+    it('debe reconocer APODERADO_GENERAL como representación', () => {
+      const mandataria = crearParticipanteNatural({
+        id: 'pp-apod-1',
+        calidad: 'VENDEDOR',
+        actuaPor: 'APODERADO_GENERAL',
+        mandanteNombre: 'NORMA BEATRIZ SÁNCHEZ JARRÍN',
+        mandanteCedula: '1704000000',
+      });
+      const result = generarComparecencia(protocoloCompraventa, [mandataria]);
+
+      expect(result.success).toBe(true);
+      expect(result.comparecencia).toContain('en representación de NORMA BEATRIZ SÁNCHEZ JARRÍN');
+      expect(result.comparecencia).toContain('poder general');
+    });
+
+    it('debe reconocer APODERADO_ESPECIAL como representación', () => {
+      const mandataria = crearParticipanteNatural({
+        id: 'pp-apod-2',
+        calidad: 'COMPRADOR',
+        actuaPor: 'APODERADO_ESPECIAL',
+        mandanteNombre: 'PEDRO TORRES',
+        mandanteCedula: '1799000000',
+      });
+      const result = generarComparecencia(protocoloCompraventa, [mandataria]);
+
+      expect(result.success).toBe(true);
+      expect(result.comparecencia).toContain('en representación de PEDRO TORRES');
+      expect(result.comparecencia).toContain('poder especial');
+    });
+
+    it('REPRESENTANDO_A legacy debe seguir funcionando', () => {
+      const mandataria = crearParticipanteNatural({
+        id: 'pp-apod-3',
+        calidad: 'VENDEDOR',
+        actuaPor: 'REPRESENTANDO_A',
+        mandanteNombre: 'LEGACY MANDANTE',
+        mandanteCedula: '1700000000',
+      });
+      const result = generarComparecencia(protocoloCompraventa, [mandataria]);
+
+      expect(result.success).toBe(true);
+      expect(result.comparecencia).toContain('en representación de LEGACY MANDANTE');
+    });
+
+    it('mandataria dual: propios derechos + representación en mismo protocolo', () => {
+      // ANA LUCÍA como vendedora por propios derechos
+      const anaLuciaPropios = crearParticipanteNatural({
+        id: 'pp-ana-propios',
+        personaCedula: '1706544929',
+        calidad: 'VENDEDOR',
+        actuaPor: 'PROPIOS_DERECHOS',
+        orden: 0,
+        persona: {
+          id: 'per-ana',
+          tipoPersona: 'NATURAL',
+          numeroIdentificacion: '1706544929',
+          datosPersonaNatural: {
+            datosPersonales: {
+              apellidos: 'SÁNCHEZ JARRÍN',
+              nombres: 'ANA LUCÍA',
+              genero: 'F',
+              estadoCivil: 'CASADO',
+            },
+            contacto: { celular: '0991000001' },
+            direccion: { callePrincipal: 'Calle Sucre', provincia: 'Pichincha', canton: 'Quito', parroquia: 'Centro' },
+            informacionLaboral: { profesionOcupacion: 'comerciante' },
+            conyuge: { nombres: 'CARLOS', apellidos: 'PÉREZ', numeroIdentificacion: '1701111111' },
+          },
+          datosPersonaJuridica: null,
+        },
+      });
+
+      // ANA LUCÍA como mandataria de NORMA BEATRIZ (también vendedora)
+      const normaBeatriz = crearParticipanteNatural({
+        id: 'pp-norma',
+        personaCedula: '1706544929', // ANA LUCÍA es quien comparece
+        calidad: 'VENDEDOR',
+        actuaPor: 'APODERADO_GENERAL',
+        orden: 1,
+        mandanteNombre: 'NORMA BEATRIZ SÁNCHEZ JARRÍN',
+        mandanteCedula: '1704000000',
+        persona: {
+          id: 'per-ana',
+          tipoPersona: 'NATURAL',
+          numeroIdentificacion: '1706544929',
+          datosPersonaNatural: {
+            datosPersonales: {
+              apellidos: 'SÁNCHEZ JARRÍN',
+              nombres: 'ANA LUCÍA',
+              genero: 'F',
+              estadoCivil: 'CASADO',
+            },
+            contacto: { celular: '0991000001' },
+            direccion: { callePrincipal: 'Calle Sucre', provincia: 'Pichincha', canton: 'Quito', parroquia: 'Centro' },
+            informacionLaboral: { profesionOcupacion: 'comerciante' },
+            conyuge: { nombres: 'CARLOS', apellidos: 'PÉREZ', numeroIdentificacion: '1701111111' },
+          },
+          datosPersonaJuridica: null,
+        },
+      });
+
+      // Compradora: persona jurídica SURKUNA
+      const surkuna = crearParticipanteJuridica({
+        id: 'pp-surkuna',
+        orden: 2,
+      });
+
+      const participantes = [anaLuciaPropios, normaBeatriz, surkuna];
+      const result = generarComparecencia(protocoloCompraventa, participantes);
+
+      expect(result.success).toBe(true);
+      const texto = result.comparecencia;
+
+      // ANA LUCÍA debe aparecer por propios derechos
+      expect(texto).toContain('ANA LUCÍA SÁNCHEZ JARRÍN');
+      expect(texto).toContain('por sus propios y personales derechos');
+
+      // También debe aparecer como mandataria de NORMA BEATRIZ
+      expect(texto).toContain('en representación de NORMA BEATRIZ SÁNCHEZ JARRÍN');
+      expect(texto).toContain('poder general');
+
+      // SURKUNA como compradora
+      expect(texto).toContain('INMOBILIARIA ECUATORIANA S.A.');
+
+      // Vendedores primero, compradores después
+      const idxVendedor = texto.indexOf('por una parte');
+      const idxComprador = texto.indexOf('por otra parte');
+      expect(idxVendedor).toBeLessThan(idxComprador);
+    });
   });
 });

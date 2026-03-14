@@ -802,13 +802,46 @@ function buildDeclaracionOrigenLicitoJuridica() {
   ];
 }
 
-function buildFirmaJuridica(datos) {
+function buildFirmaJuridica(datos, actuaPor) {
   const rep = datos?.representanteLegal || {};
-  const nombreCompleto = [rep.nombres, rep.apellidos].filter(Boolean).join(' ') || '—';
+  const m = datos?.mandante || {};
   const fechaHoy = new Date().toLocaleDateString('es-EC', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     timeZone: 'America/Guayaquil',
   });
+
+  // Si la persona jurídica comparece mediante apoderado (no el representante legal directo)
+  const isApoderado = actuaPor && actuaPor !== 'PROPIOS_DERECHOS' && actuaPor !== 'REPRESENTANTE_LEGAL' && m.nombres;
+
+  if (isApoderado) {
+    const nombreApoderado = [m.nombres, m.apellidos].filter(Boolean).join(' ') || '—';
+    const razonSocial = datos?.compania?.razonSocial || '—';
+
+    return [
+      new Paragraph({ spacing: { before: 400, after: 0 }, children: [] }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 0 },
+        children: [textRun('_________________________________________')],
+      }),
+      new Paragraph({
+        alignment: AlignmentType.CENTER,
+        spacing: { after: 0 },
+        children: [textRun('Firma del Apoderado / Representante', { bold: true })],
+      }),
+      new Paragraph({ spacing: { after: 200 }, children: [] }),
+      twoColumnTable([
+        ['Apoderado / Representante', nombreApoderado],
+        ['Cédula del Apoderado', safeStr(m.numeroIdentificacion)],
+        ['En representación de', razonSocial],
+        ['RUC', safeStr(datos?.compania?.ruc)],
+        ['Fecha', fechaHoy],
+      ]),
+    ];
+  }
+
+  // Caso normal: firma el representante legal
+  const nombreCompleto = [rep.nombres, rep.apellidos].filter(Boolean).join(' ') || '—';
 
   return [
     new Paragraph({ spacing: { before: 400, after: 0 }, children: [] }),
@@ -866,12 +899,13 @@ export async function generarFormularioWord(protocolo, personaProtocolo) {
       ...buildConyugeRepresentante(datos),
       ...buildSocios(datos),
       ...buildDomicilioJuridica(datos),
+      ...buildDatosMandante(datos),
       ...buildPEPJuridica(datos),
       ...buildFormasPagoJuridica(protocolo),
       ...buildDatosBienJuridica(protocolo),
       ...buildProcedenciaFondos(calidad, personaProtocolo.procedenciaFondos),
       ...buildDeclaracionOrigenLicitoJuridica(),
-      ...buildFirmaJuridica(datos),
+      ...buildFirmaJuridica(datos, personaProtocolo.actuaPor),
     ];
   } else {
     // NATURAL (default)

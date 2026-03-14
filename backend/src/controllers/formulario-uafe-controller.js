@@ -187,7 +187,7 @@ export async function crearProtocolo(req, res) {
 export async function agregarPersonaAProtocolo(req, res) {
   try {
     const { protocoloId } = req.params;
-    const { cedula, calidad, actuaPor, representadoId, datosRepresentado, compareceConyugeJunto } = req.body;
+    const { cedula, calidad, actuaPor, representadoId, datosRepresentado, compareceConyugeJunto, nombreTemporal, procedenciaFondos } = req.body;
 
     // Validaciones
     if (!cedula || !calidad || !actuaPor) {
@@ -269,7 +269,9 @@ export async function agregarPersonaAProtocolo(req, res) {
       personaCedula: cedula,
       calidad,
       actuaPor,
-      compareceConyugeJunto: compareceConyugeJunto || false
+      compareceConyugeJunto: compareceConyugeJunto || false,
+      ...(nombreTemporal ? { nombreTemporal } : {}),
+      ...(procedenciaFondos ? { procedenciaFondos } : {}),
     };
 
     // Agregar datos de representación si aplican

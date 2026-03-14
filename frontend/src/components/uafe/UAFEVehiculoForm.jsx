@@ -21,6 +21,7 @@ import {
   CircularProgress,
   Tooltip,
   Divider,
+  InputAdornment,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import DirectionsCarOutlinedIcon from '@mui/icons-material/DirectionsCarOutlined';
@@ -28,6 +29,8 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import SaveOutlinedIcon from '@mui/icons-material/SaveOutlined';
+
+import SearchIcon from '@mui/icons-material/Search';
 
 import apiClient from '../../services/api-client';
 import {
@@ -38,6 +41,8 @@ import {
   CALIDADES_COMPARECIENTE,
   formatCurrency,
 } from './uafe-constants';
+import CatalogoAutocomplete from './CatalogoAutocomplete';
+import { CANTONES_UAFE } from '../../data/catalogos-uafe';
 import { useTheme } from '@mui/material/styles';
 
 // Tipos de acto aplicables a vehículos
@@ -90,16 +95,18 @@ export default function UAFEVehiculoForm({ open, onClose, onSaved, protocol }) {
     vehiculoMotor: '',
     vehiculoChasis: '',
     vehiculoCiudadComercializacion: 'QUITO',
+    vehiculoCiudadCodigo: '1701',
   });
 
   // Form state — Tab 3: Intervinientes
   const [personas, setPersonas] = useState([
-    { cedula: '', nombre: '', calidad: 'VENDEDOR', actuaPor: 'PROPIOS_DERECHOS' },
-    { cedula: '', nombre: '', calidad: 'COMPRADOR', actuaPor: 'PROPIOS_DERECHOS' },
+    { cedula: '', nombre: '', calidad: 'VENDEDOR', actuaPor: 'PROPIOS_DERECHOS', procedenciaFondos: '' },
+    { cedula: '', nombre: '', calidad: 'COMPRADOR', actuaPor: 'PROPIOS_DERECHOS', procedenciaFondos: '' },
   ]);
 
   // UI state
   const [saving, setSaving] = useState(false);
+  const [searchingCedula, setSearchingCedula] = useState({});
   const [error, setError] = useState(null);
   const [umbralAlerta, setUmbralAlerta] = useState(null);
 
@@ -123,6 +130,7 @@ export default function UAFEVehiculoForm({ open, onClose, onSaved, protocol }) {
         vehiculoMotor: protocol.vehiculoMotor || '',
         vehiculoChasis: protocol.vehiculoChasis || '',
         vehiculoCiudadComercializacion: protocol.vehiculoCiudadComercializacion || 'QUITO',
+        vehiculoCiudadCodigo: protocol.vehiculoCiudadCodigo || '1701',
       });
       // Load existing personas
       if (protocol.personas?.length) {
@@ -131,6 +139,7 @@ export default function UAFEVehiculoForm({ open, onClose, onSaved, protocol }) {
           nombre: pp.nombreTemporal || `${pp.persona?.datosPersonaNatural?.datosPersonales?.apellidos || ''} ${pp.persona?.datosPersonaNatural?.datosPersonales?.nombres || ''}`.trim() || '',
           calidad: pp.calidad || 'OTRO',
           actuaPor: pp.actuaPor || 'PROPIOS_DERECHOS',
+          procedenciaFondos: pp.procedenciaFondos || '',
           id: pp.id, // keep for edit
         })));
       }
@@ -153,10 +162,11 @@ export default function UAFEVehiculoForm({ open, onClose, onSaved, protocol }) {
         vehiculoMotor: '',
         vehiculoChasis: '',
         vehiculoCiudadComercializacion: 'QUITO',
+        vehiculoCiudadCodigo: '1701',
       });
       setPersonas([
-        { cedula: '', nombre: '', calidad: 'VENDEDOR', actuaPor: 'PROPIOS_DERECHOS' },
-        { cedula: '', nombre: '', calidad: 'COMPRADOR', actuaPor: 'PROPIOS_DERECHOS' },
+        { cedula: '', nombre: '', calidad: 'VENDEDOR', actuaPor: 'PROPIOS_DERECHOS', procedenciaFondos: '' },
+        { cedula: '', nombre: '', calidad: 'COMPRADOR', actuaPor: 'PROPIOS_DERECHOS', procedenciaFondos: '' },
       ]);
     }
     setActiveTab(0);
@@ -207,10 +217,26 @@ export default function UAFEVehiculoForm({ open, onClose, onSaved, protocol }) {
   };
   const addPersona = () => {
     const calidades = CALIDADES_POR_ACTO[acto.tipoActo] || ['VENDEDOR', 'COMPRADOR'];
-    setPersonas(prev => [...prev, { cedula: '', nombre: '', calidad: calidades[1] || calidades[0], actuaPor: 'PROPIOS_DERECHOS' }]);
+    setPersonas(prev => [...prev, { cedula: '', nombre: '', calidad: calidades[1] || calidades[0], actuaPor: 'PROPIOS_DERECHOS', procedenciaFondos: '' }]);
   };
   const removePersona = (idx) => {
     setPersonas(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  // Search person by cédula
+  const buscarPersona = async (idx, cedula) => {
+    if (!cedula || cedula.length < 10) return;
+    setSearchingCedula(prev => ({ ...prev, [idx]: true }));
+    try {
+      const { data } = await apiClient.get(`/personal/buscar/${cedula}`);
+      if (data.success && data.data) {
+        updatePersona(idx, 'nombre', data.data.nombreCompleto || '');
+      }
+    } catch {
+      // Person not found — that's OK, user can type name manually
+    } finally {
+      setSearchingCedula(prev => ({ ...prev, [idx]: false }));
+    }
   };
 
   // Validation
@@ -242,6 +268,8 @@ export default function UAFEVehiculoForm({ open, onClose, onSaved, protocol }) {
     setError(null);
 
     try {
+      // eslint-disable-next-line no-unused-vars
+      const { vehiculoCiudadCodigo, ...vehiculoPayload } = vehiculo;
       const payload = {
         fecha: acto.fecha,
         actoContrato: acto.tipoActo,
@@ -249,7 +277,7 @@ export default function UAFEVehiculoForm({ open, onClose, onSaved, protocol }) {
         avaluoMunicipal: acto.avaluoMunicipal ? parseFloat(acto.avaluoMunicipal) : null,
         formasPago: acto.formasPago.filter(fp => fp.tipo),
         numeroDiligencia: acto.numeroDiligencia || null,
-        ...vehiculo,
+        ...vehiculoPayload,
       };
 
       let savedProtocol;
@@ -272,6 +300,7 @@ export default function UAFEVehiculoForm({ open, onClose, onSaved, protocol }) {
               calidad: p.calidad,
               actuaPor: p.actuaPor,
               nombreTemporal: p.nombre || null,
+              procedenciaFondos: p.procedenciaFondos || null,
             });
           } catch (err) {
             console.warn(`[UAFE] Error agregando persona ${p.cedula}:`, err.response?.data?.message);
@@ -589,13 +618,21 @@ export default function UAFEVehiculoForm({ open, onClose, onSaved, protocol }) {
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>
-                <Tooltip title="Ciudad donde se realiza la compraventa del vehiculo" arrow>
-                  <TextField
-                    fullWidth size="small"
-                    label="Ciudad de comercializacion"
-                    value={vehiculo.vehiculoCiudadComercializacion}
-                    onChange={(e) => setVehiculo(prev => ({ ...prev, vehiculoCiudadComercializacion: e.target.value.toUpperCase() }))}
-                  />
+                <Tooltip title="Canton donde se realiza la compraventa del vehiculo (catalogo UAFE)" arrow>
+                  <Box>
+                    <CatalogoAutocomplete
+                      options={CANTONES_UAFE}
+                      value={vehiculo.vehiculoCiudadComercializacion}
+                      onChange={(opt) => setVehiculo(prev => ({
+                        ...prev,
+                        vehiculoCiudadComercializacion: opt ? opt.canton : '',
+                        vehiculoCiudadCodigo: opt ? opt.codigo : '',
+                      }))}
+                      label="Canton de comercializacion"
+                      placeholder="Buscar canton..."
+                      size="small"
+                    />
+                  </Box>
                 </Tooltip>
               </Grid>
             </Grid>
@@ -631,7 +668,7 @@ export default function UAFEVehiculoForm({ open, onClose, onSaved, protocol }) {
                   Descripcion generada para reporte UAFE:
                 </Typography>
                 <Typography variant="body2" sx={{ fontSize: '0.82rem', color: colors.textPrimary, fontFamily: 'monospace' }}>
-                  VEHICULO COMERCIALIZADO EN {vehiculo.vehiculoCiudadComercializacion || 'QUITO'}
+                  VEHICULO COMERCIALIZADO EN {vehiculo.vehiculoCiudadComercializacion || vehiculo.vehiculoCiudadCodigo || 'QUITO'}
                   {vehiculo.vehiculoMarca ? `, MARCA: ${vehiculo.vehiculoMarca}` : ''}
                   {vehiculo.vehiculoPlaca ? `, Placa: ${vehiculo.vehiculoPlaca}` : ''}
                   {vehiculo.vehiculoMotor ? `, Motor: ${vehiculo.vehiculoMotor}` : ''}
@@ -689,7 +726,28 @@ export default function UAFEVehiculoForm({ open, onClose, onSaved, protocol }) {
                       label="Cedula / RUC *"
                       value={p.cedula}
                       onChange={(e) => updatePersona(idx, 'cedula', e.target.value.replace(/\D/g, '').slice(0, 13))}
+                      onBlur={() => buscarPersona(idx, p.cedula)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') buscarPersona(idx, p.cedula); }}
                       inputProps={{ inputMode: 'numeric' }}
+                      slotProps={{
+                        input: {
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              {searchingCedula[idx] ? (
+                                <CircularProgress size={16} />
+                              ) : (
+                                <IconButton
+                                  size="small"
+                                  onClick={() => buscarPersona(idx, p.cedula)}
+                                  disabled={!p.cedula || p.cedula.length < 10}
+                                >
+                                  <SearchIcon sx={{ fontSize: 16 }} />
+                                </IconButton>
+                              )}
+                            </InputAdornment>
+                          ),
+                        },
+                      }}
                     />
                   </Grid>
                   <Grid size={{ xs: 12, sm: 3 }}>
@@ -731,6 +789,20 @@ export default function UAFEVehiculoForm({ open, onClose, onSaved, protocol }) {
                     </FormControl>
                   </Grid>
                 </Grid>
+                {/* Procedencia de fondos — solo para compradores/donatarios */}
+                {['COMPRADOR', 'DONATARIO', 'PERMUTANTE', 'CESIONARIO'].includes(p.calidad) && (
+                  <TextField
+                    fullWidth size="small"
+                    label="Procedencia de fondos"
+                    placeholder="Ej: Ahorros personales, venta de inmueble, credito bancario..."
+                    value={p.procedenciaFondos || ''}
+                    onChange={(e) => updatePersona(idx, 'procedenciaFondos', e.target.value)}
+                    sx={{ mt: 1.5 }}
+                    multiline
+                    minRows={1}
+                    maxRows={3}
+                  />
+                )}
               </Box>
             ))}
           </Box>
