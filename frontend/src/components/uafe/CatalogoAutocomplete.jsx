@@ -16,12 +16,15 @@ import { Autocomplete, TextField, Typography, Box } from '@mui/material';
  * @param {object} [sx]
  */
 export default function CatalogoAutocomplete({ options, value, onChange, label, placeholder, size = 'small', required = false, disabled = false, sx }) {
-  // Find current option by label or codigo
-  const currentOption = options.find(
-    o => o.label === value || o.codigo === value
-      || (value && o.label.toUpperCase() === value.toUpperCase())
-      || (value && o.codigo.toUpperCase() === value.toUpperCase())
-  ) || null;
+  // Find current option by label, codigo, or canton name
+  const currentOption = options.find(o => {
+    if (!value) return false;
+    const v = value.toUpperCase();
+    return o.label === value || o.codigo === value
+      || o.label.toUpperCase() === v
+      || o.codigo.toUpperCase() === v
+      || (o.canton && o.canton.toUpperCase() === v);
+  }) || null;
 
   return (
     <Autocomplete
