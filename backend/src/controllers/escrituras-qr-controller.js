@@ -13,7 +13,7 @@ import {
   downloadPDFFromFTP,
   validatePDFFile as validatePDFBuffer
 } from '../services/cpanel-ftp-service.js';
-import { uploadFile, downloadFile, isStorageConfigured } from '../services/storage-service.js';
+import { uploadFile, downloadFile, deleteFile, isStorageConfigured } from '../services/storage-service.js';
 import { optimizeAndWatermark } from '../services/pdf-optimizer-service.js';
 import { getCurrentNotaryId } from '../middleware/tenant-context.js';
 
@@ -1293,7 +1293,43 @@ export async function hardDeleteEscritura(req, res) {
     // Guardar info para logs antes de eliminar
     const numeroEscritura = escritura.numeroEscritura;
     const token = escritura.token;
-    const fotoURL = escritura.fotoURL;
+
+    // ── Limpiar archivos de R2 ──
+    if (isStorageConfigured()) {
+      const r2KeysToDelete = new Set();
+
+      // Keys actuales
+      if (escritura.pdfR2Key) r2KeysToDelete.add(escritura.pdfR2Key);
+      if (escritura.pdfR2KeyPublic) r2KeysToDelete.add(escritura.pdfR2KeyPublic);
+      if (escritura.fotoR2Key) r2KeysToDelete.add(escritura.fotoR2Key);
+
+      // Keys del historial (versiones anteriores de PDFs reemplazados)
+      if (escritura.pdfHistory) {
+        try {
+          const history = JSON.parse(escritura.pdfHistory);
+          if (Array.isArray(history)) {
+            for (const entry of history) {
+              if (entry.previousR2Key) r2KeysToDelete.add(entry.previousR2Key);
+              if (entry.previousR2KeyPublic) r2KeysToDelete.add(entry.previousR2KeyPublic);
+            }
+          }
+        } catch (e) {
+          console.warn('[hardDelete] Error parseando pdfHistory para limpieza R2:', e.message);
+        }
+      }
+
+      // Eliminar todos los archivos de R2 (no bloquear si falla alguno)
+      for (const key of r2KeysToDelete) {
+        try {
+          await deleteFile(key);
+          console.log(`[hardDelete] 🗑️ Archivo R2 eliminado: ${key}`);
+        } catch (r2Error) {
+          console.warn(`[hardDelete] ⚠️ No se pudo eliminar de R2 (${key}): ${r2Error.message}`);
+        }
+      }
+
+      console.log(`[hardDelete] R2 limpiado: ${r2KeysToDelete.size} archivo(s)`);
+    }
 
     // ELIMINACIÓN PERMANENTE de la base de datos
     await prisma.escrituraQR.delete({
@@ -1301,16 +1337,6 @@ export async function hardDeleteEscritura(req, res) {
     });
 
     console.log(`[hardDelete] ✅ Escritura ${id} (${numeroEscritura}, token: ${token}) eliminada permanentemente por usuario ${userId}`);
-
-    // TODO FUTURO: Eliminar foto del FTP si existe
-    // if (fotoURL) {
-    //   try {
-    //     await deletePhotoFromFTP(fotoURL);
-    //     console.log(`[hardDelete] Foto eliminada del FTP: ${fotoURL}`);
-    //   } catch (ftpError) {
-    //     console.warn(`[hardDelete] No se pudo eliminar foto del FTP: ${ftpError.message}`);
-    //   }
-    // }
 
     res.json({
       success: true,
