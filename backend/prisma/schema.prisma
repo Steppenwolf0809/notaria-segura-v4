@@ -247,6 +247,7 @@ model EscrituraQR {
   pdfOptimized          Boolean   @default(false)
   pdfViewCount          Int       @default(0)
   pdfHiddenPages        String?
+  pdfHistory            String?   // JSON array de historial de uploads/reemplazos de PDF
   fotoR2Key             String?
   verifyViewCount       Int       @default(0)  // Contador de visitas a página de verificación
   notaryId  Int  @default(1) @map("notary_id")

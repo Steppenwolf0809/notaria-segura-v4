@@ -1419,11 +1419,45 @@ export async function uploadPDFToEscritura(req, res) {
     // Nombre del archivo: {TOKEN}.pdf
     const filename = `${escritura.token}.pdf`;
     const notaryId = getCurrentNotaryId() || 1;
+    const now = new Date();
+
+    // ── Construir historial de auditoría ──
+    let pdfHistoryArr = [];
+    if (escritura.pdfHistory) {
+      try {
+        pdfHistoryArr = JSON.parse(escritura.pdfHistory);
+        if (!Array.isArray(pdfHistoryArr)) pdfHistoryArr = [];
+      } catch (e) {
+        pdfHistoryArr = [];
+      }
+    }
+
+    const isReplace = !!(escritura.pdfR2Key || escritura.pdfFileName);
+    const historyEntry = {
+      action: isReplace ? 'replace' : 'upload',
+      uploadedBy: userId,
+      uploadedByName: req.user.firstName && req.user.lastName
+        ? `${req.user.firstName} ${req.user.lastName}` : `User #${userId}`,
+      uploadedAt: now.toISOString(),
+      fileSize: pdfFile.size,
+      fileName: filename,
+    };
+
+    if (isReplace) {
+      // Guardar referencia al PDF anterior (queda en R2 para auditoría)
+      historyEntry.previousR2Key = escritura.pdfR2Key || null;
+      historyEntry.previousR2KeyPublic = escritura.pdfR2KeyPublic || null;
+      historyEntry.previousFileName = escritura.pdfFileName || null;
+      historyEntry.previousUploadedAt = escritura.pdfUploadedAt ? escritura.pdfUploadedAt.toISOString() : null;
+    }
+
+    pdfHistoryArr.push(historyEntry);
 
     const updateData = {
-      pdfUploadedAt: new Date(),
+      pdfUploadedAt: now,
       pdfUploadedBy: userId,
       pdfFileSize: pdfFile.size,
+      pdfHistory: JSON.stringify(pdfHistoryArr),
     };
 
     if (isStorageConfigured()) {
