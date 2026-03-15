@@ -1261,11 +1261,11 @@ export async function hardDeleteEscritura(req, res) {
 
     console.log(`[hardDelete] Usuario ${userId} (${userRole}) intentando eliminar escritura ${id}`);
 
-    // Verificar que sea matrizador (el middleware ya validó, pero doble verificación)
-    if (userRole !== 'MATRIZADOR' && userRole !== 'ADMIN') {
+    // Solo administradores pueden eliminar permanentemente
+    if (userRole !== 'ADMIN') {
       return res.status(403).json({
         success: false,
-        message: 'Solo los matrizadores pueden eliminar escrituras permanentemente'
+        message: 'Solo los administradores pueden eliminar escrituras permanentemente'
       });
     }
 
@@ -1278,15 +1278,6 @@ export async function hardDeleteEscritura(req, res) {
       return res.status(404).json({
         success: false,
         message: 'Escritura no encontrada'
-      });
-    }
-
-    // Verificar permisos: solo el creador puede eliminar (o admin)
-    if (userRole === 'MATRIZADOR' && escritura.createdBy !== userId) {
-      console.log(`[hardDelete] Permiso denegado: escritura creada por ${escritura.createdBy}, solicitante ${userId}`);
-      return res.status(403).json({
-        success: false,
-        message: 'Solo puedes eliminar escrituras que tú creaste'
       });
     }
 

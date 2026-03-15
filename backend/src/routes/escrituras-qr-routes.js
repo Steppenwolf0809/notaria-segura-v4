@@ -5,7 +5,7 @@
 
 import express from 'express';
 import multer from 'multer';
-import { authenticateToken, requireMatrizador } from '../middleware/auth-middleware.js';
+import { authenticateToken, requireMatrizador, requireAdmin } from '../middleware/auth-middleware.js';
 import {
   uploadEscritura,
   createEscrituraManual,
@@ -132,10 +132,10 @@ router.delete('/:id',
   deleteEscritura
 );
 
-// DELETE /api/escrituras/:id/hard-delete - Eliminar permanentemente escritura
+// DELETE /api/escrituras/:id/hard-delete - Eliminar permanentemente escritura (solo admin)
 router.delete('/:id/hard-delete',
   authenticateToken,
-  requireMatrizador,
+  requireAdmin,
   hardDeleteEscritura
 );
 
