@@ -76,8 +76,10 @@ import {
   hasPDFUploaded,
   getPDFUrlPrivate
 } from '../../services/escrituras-qr-service';
+import useAuthStore from '../../store/auth-store';
 
 const GeneradorQR = () => {
+  const { isAdmin } = useAuthStore();
   // Estados principales
   const [escrituras, setEscrituras] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -1006,14 +1008,16 @@ const GeneradorQR = () => {
             >
               Desactivar
             </Button>
-            <Button
-              variant="outlined"
-              color="error"
-              startIcon={<DeleteIcon />}
-              onClick={() => setShowHardDeleteDialog(true)}
-            >
-              Eliminar Permanentemente
-            </Button>
+            {isAdmin() && (
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<DeleteIcon />}
+                onClick={() => setShowHardDeleteDialog(true)}
+              >
+                Eliminar Permanentemente
+              </Button>
+            )}
           </Box>
           <Button onClick={() => setShowDetailsDialog(false)}>
             Cerrar
@@ -1169,15 +1173,17 @@ const GeneradorQR = () => {
           >
             Ver Existente
           </Button>
-          <Button
-            onClick={handleReplaceQR}
-            variant="contained"
-            color="warning"
-            startIcon={<DeleteIcon />}
-            disabled={uploadLoading}
-          >
-            {uploadLoading ? 'Reemplazando...' : 'Reemplazar'}
-          </Button>
+          {isAdmin() && (
+            <Button
+              onClick={handleReplaceQR}
+              variant="contained"
+              color="warning"
+              startIcon={<DeleteIcon />}
+              disabled={uploadLoading}
+            >
+              {uploadLoading ? 'Reemplazando...' : 'Reemplazar'}
+            </Button>
+          )}
         </DialogActions>
       </Dialog>
 
