@@ -547,7 +547,7 @@ export async function getPDFHiddenPages(escrituraId) {
  * @returns {boolean} True si tiene PDF subido
  */
 export function hasPDFUploaded(escritura) {
-  return !!(escritura && escritura.pdfFileName);
+  return !!(escritura && (escritura.pdfFileName || escritura.pdfR2Key || escritura.pdfR2KeyPublic));
 }
 
 /**

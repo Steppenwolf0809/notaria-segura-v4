@@ -1467,6 +1467,7 @@ export async function uploadPDFToEscritura(req, res) {
         updateData.pdfFileSizeCompressed = pdfFile.size;
       }
       updateData.pdfOptimized = pdfOptimized;
+      updateData.pdfFileName = filename;
     } else {
       // ── Fallback FTP ──
       console.log(`[uploadPDF] Subiendo PDF al FTP: ${filename} (${(pdfFile.size / 1024).toFixed(0)} KB)`);
