@@ -50,7 +50,8 @@ import {
   CloudUpload as UploadIcon,
   RemoveRedEye as EyeIcon,
   VisibilityOff as ManageHiddenIcon,
-  Settings as ManageIcon
+  Settings as ManageIcon,
+  History as HistoryIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 
@@ -932,6 +933,59 @@ const GeneradorQR = () => {
                     </Box>
                   </Paper>
                 )}
+
+                {/* Historial de PDF (auditoría) */}
+                {(() => {
+                  let history = [];
+                  if (selectedEscritura?.pdfHistory) {
+                    try {
+                      history = typeof selectedEscritura.pdfHistory === 'string'
+                        ? JSON.parse(selectedEscritura.pdfHistory)
+                        : selectedEscritura.pdfHistory;
+                      if (!Array.isArray(history)) history = [];
+                    } catch (e) { history = []; }
+                  }
+                  if (history.length === 0) return null;
+                  return (
+                    <Paper sx={{ p: 2, mt: 2 }}>
+                      <Typography variant="subtitle2" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <HistoryIcon fontSize="small" />
+                        Historial de PDF
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
+                        {history.map((entry, idx) => (
+                          <Box
+                            key={idx}
+                            sx={{
+                              p: 1.5,
+                              bgcolor: entry.action === 'replace' ? 'warning.50' : 'success.50',
+                              border: '1px solid',
+                              borderColor: entry.action === 'replace' ? 'warning.200' : 'success.200',
+                              borderRadius: 1,
+                              fontSize: '0.8rem'
+                            }}
+                          >
+                            <Chip
+                              label={entry.action === 'replace' ? 'Reemplazo' : 'Subida'}
+                              size="small"
+                              color={entry.action === 'replace' ? 'warning' : 'success'}
+                              sx={{ mb: 0.5 }}
+                            />
+                            <Typography variant="caption" display="block">
+                              <strong>Por:</strong> {entry.uploadedByName}
+                            </Typography>
+                            <Typography variant="caption" display="block">
+                              <strong>Fecha:</strong> {new Date(entry.uploadedAt).toLocaleString('es-EC')}
+                            </Typography>
+                            <Typography variant="caption" display="block">
+                              <strong>Tamaño:</strong> {(entry.fileSize / 1024).toFixed(0)} KB
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Box>
+                    </Paper>
+                  );
+                })()}
               </Grid>
             </Grid>
           )}
