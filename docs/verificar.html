@@ -369,7 +369,7 @@
                 <div class="spinner"></div>
                 <p>Cargando PDF...</p>
               </div>
-              <canvas id="pdf-canvas" class="pdf-canvas" style="display:none;"></canvas>
+              <canvas id="pdf-canvas" class="pdf-canvas" style="display:none;" oncontextmenu="return false;" ondragstart="return false;"></canvas>
             </div>
           </div>
           
@@ -435,7 +435,7 @@
 
         ${fotoHTML}
 
-        ${datos.pdfFileName ? createPDFViewerHTML() : ''}
+        ${(datos.tienePDF || datos.pdfFileName) ? createPDFViewerHTML() : ''}
 
         ${datos.objeto_observaciones ? `<div class="info-section"><h3>📋 Observaciones</h3><p>${datos.objeto_observaciones}</p></div>` : ''}
 
@@ -446,7 +446,7 @@
       document.getElementById('footer').style.display = 'block';
       
       // Si hay PDF, cargarlo
-      if (datos.pdfFileName && datos.token) {
+      if ((datos.tienePDF || datos.pdfFileName) && datos.token) {
         setTimeout(() => {
           loadPDF(datos.token, datos.pdfHiddenPages);
         }, 100);
