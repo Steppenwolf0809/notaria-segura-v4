@@ -241,8 +241,13 @@ model EscrituraQR {
   pdfUploadedAt         DateTime?
   pdfUploadedBy         Int?
   pdfFileSize           Int?
+  pdfR2Key              String?
+  pdfR2KeyPublic        String?
+  pdfFileSizeCompressed Int?
+  pdfOptimized          Boolean   @default(false)
   pdfViewCount          Int       @default(0)
   pdfHiddenPages        String?
+  fotoR2Key             String?
   verifyViewCount       Int       @default(0)  // Contador de visitas a página de verificación
   notaryId  Int  @default(1) @map("notary_id")
   creador               User?     @relation(fields: [createdBy], references: [id])

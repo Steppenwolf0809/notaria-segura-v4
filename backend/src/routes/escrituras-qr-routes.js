@@ -20,7 +20,8 @@ import {
   getPDFPublic,
   getPDFPrivate,
   getPDFMetadata,
-  updatePDFHiddenPages
+  updatePDFHiddenPages,
+  getFotoPublic
 } from '../controllers/escrituras-qr-controller.js';
 
 const router = express.Router();
@@ -67,6 +68,9 @@ router.get('/verify/:token/pdf/metadata', getPDFMetadata);
 
 // GET /api/verify/:token/pdf - Obtener PDF público de escritura
 router.get('/verify/:token/pdf', getPDFPublic);
+
+// GET /api/verify/:token/foto - Obtener foto de verificación desde R2
+router.get('/verify/:token/foto', getFotoPublic);
 
 /**
  * RUTAS PROTEGIDAS (requieren autenticación)

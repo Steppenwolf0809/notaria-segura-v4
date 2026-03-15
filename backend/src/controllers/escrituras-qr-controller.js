@@ -13,6 +13,9 @@ import {
   downloadPDFFromFTP,
   validatePDFFile as validatePDFBuffer
 } from '../services/cpanel-ftp-service.js';
+import { uploadFile, downloadFile, isStorageConfigured } from '../services/storage-service.js';
+import { optimizeAndWatermark } from '../services/pdf-optimizer-service.js';
+import { getCurrentNotaryId } from '../middleware/tenant-context.js';
 
 /**
  * POST /api/escrituras/upload
@@ -133,26 +136,40 @@ export async function uploadEscritura(req, res) {
 
     // Variable para la URL de la foto
     let fotoURL = null;
+    let fotoR2Key = null;
     let fotoUploadWarning = null;
 
     // Procesar foto si existe
     if (fotoFile) {
       try {
-        console.log(`[uploadEscritura] Subiendo foto al FTP para token ${token}...`);
-
-        // Nombre del archivo: token + extensión original
         const fotoExtension = fotoFile.originalname.split('.').pop().toLowerCase();
         const fotoFilename = `${token}.${fotoExtension}`;
+        const notaryId = getCurrentNotaryId() || 1;
 
-        // Subir foto al FTP
-        fotoURL = await uploadPhotoToFTP(fotoFile.buffer, fotoFilename);
-
-        console.log(`[uploadEscritura] ✅ Foto subida exitosamente: ${fotoURL}`);
+        if (isStorageConfigured()) {
+          // Subir foto a R2
+          console.log(`[uploadEscritura] Subiendo foto a R2 para token ${token}...`);
+          const r2Result = await uploadFile(fotoFile.buffer, {
+            notaryId,
+            folder: 'escrituras/fotos',
+            filename: fotoFilename,
+            contentType: fotoFile.mimetype,
+          });
+          fotoR2Key = r2Result.key;
+          fotoURL = null; // No usar URL de FTP
+          console.log(`[uploadEscritura] ✅ Foto subida a R2: ${fotoR2Key}`);
+        } else {
+          // Fallback: subir foto al FTP
+          console.log(`[uploadEscritura] Subiendo foto al FTP para token ${token}...`);
+          fotoURL = await uploadPhotoToFTP(fotoFile.buffer, fotoFilename);
+          console.log(`[uploadEscritura] ✅ Foto subida al FTP: ${fotoURL}`);
+        }
       } catch (fotoError) {
         // Si falla la foto, NO bloquear la creación de la escritura
         console.error('[uploadEscritura] ❌ Error subiendo foto:', fotoError.message);
         fotoUploadWarning = `La escritura se creó correctamente, pero no se pudo subir la foto: ${fotoError.message}`;
-        fotoURL = null; // Asegurar que quede null
+        fotoURL = null;
+        fotoR2Key = null;
       }
     }
 
@@ -163,7 +180,8 @@ export async function uploadEscritura(req, res) {
         numeroEscritura: parseResult.numeroEscritura,
         datosCompletos: parseResult.datosCompletos,
         archivoOriginal: sanitizedFilename,
-        fotoURL: fotoURL, // Puede ser null si no hay foto o si falló
+        fotoURL: fotoURL,
+        fotoR2Key: fotoR2Key,
         estado: parseResult.estado,
         createdBy: userId
       },
@@ -849,8 +867,9 @@ function extractDatosPublicos(datosNormalizados, escritura) {
       }
     }),
 
-    // Fotografía del menor (si existe)
-    ...(escritura.fotoURL && { fotoURL: escritura.fotoURL }),
+    // Fotografía (R2 proxy o FTP URL directa)
+    ...(escritura.fotoR2Key && { fotoURL: `/api/verify/${token}/foto` }),
+    ...(!escritura.fotoR2Key && escritura.fotoURL && { fotoURL: escritura.fotoURL }),
 
     // Metadata de verificación
     verificadoEn: new Date().toISOString(),
@@ -1067,25 +1086,35 @@ export async function createEscrituraManual(req, res) {
 
     // Procesar foto si existe
     let fotoURL = null;
+    let fotoR2Key = null;
     let fotoUploadWarning = null;
 
     if (fotoFile) {
       try {
-        console.log(`[createEscrituraManual] Subiendo foto al FTP para token ${token}...`);
-
-        // Nombre del archivo: token + extensión original
         const fotoExtension = fotoFile.originalname.split('.').pop().toLowerCase();
         const fotoFilename = `${token}.${fotoExtension}`;
+        const notaryId = getCurrentNotaryId() || 1;
 
-        // Subir foto al FTP
-        fotoURL = await uploadPhotoToFTP(fotoFile.buffer, fotoFilename);
-
-        console.log(`[createEscrituraManual] ✅ Foto subida exitosamente: ${fotoURL}`);
+        if (isStorageConfigured()) {
+          console.log(`[createEscrituraManual] Subiendo foto a R2 para token ${token}...`);
+          const r2Result = await uploadFile(fotoFile.buffer, {
+            notaryId,
+            folder: 'escrituras/fotos',
+            filename: fotoFilename,
+            contentType: fotoFile.mimetype,
+          });
+          fotoR2Key = r2Result.key;
+          console.log(`[createEscrituraManual] ✅ Foto subida a R2: ${fotoR2Key}`);
+        } else {
+          console.log(`[createEscrituraManual] Subiendo foto al FTP para token ${token}...`);
+          fotoURL = await uploadPhotoToFTP(fotoFile.buffer, fotoFilename);
+          console.log(`[createEscrituraManual] ✅ Foto subida al FTP: ${fotoURL}`);
+        }
       } catch (fotoError) {
-        // Si falla la foto, NO bloquear la creación de la escritura
         console.error('[createEscrituraManual] ❌ Error subiendo foto:', fotoError.message);
         fotoUploadWarning = `La escritura se creó correctamente, pero no se pudo subir la foto: ${fotoError.message}`;
-        fotoURL = null; // Asegurar que quede null
+        fotoURL = null;
+        fotoR2Key = null;
       }
     }
 
@@ -1108,11 +1137,12 @@ export async function createEscrituraManual(req, res) {
         token: token,
         numeroEscritura: numeroEscritura,
         datosCompletos: JSON.stringify(datosCompletos),
-        archivoOriginal: null, // No hay archivo PDF
+        archivoOriginal: null,
         extractoTextoCompleto: extractoTextoCompleto || null,
-        fotoURL: fotoURL, // Puede ser null si no hay foto o si falló
+        fotoURL: fotoURL,
+        fotoR2Key: fotoR2Key,
         origenDatos: 'MANUAL',
-        estado: 'activo', // Ingreso manual se considera revisado
+        estado: 'activo',
         createdBy: userId
       },
       include: {
@@ -1387,26 +1417,67 @@ export async function uploadPDFToEscritura(req, res) {
 
     // Nombre del archivo: {TOKEN}.pdf
     const filename = `${escritura.token}.pdf`;
+    const notaryId = getCurrentNotaryId() || 1;
 
-    console.log(`[uploadPDF] Subiendo PDF al FTP: ${filename} (${(pdfFile.size / 1024).toFixed(2)} KB)`);
-
-    // Subir PDF al FTP (si ya existe, se reemplaza automáticamente)
-    const pdfURL = await uploadPDFToFTP(pdfFile.buffer, filename);
-
-    // Actualizar base de datos
     const updateData = {
-      pdfFileName: filename,
       pdfUploadedAt: new Date(),
       pdfUploadedBy: userId,
-      pdfFileSize: pdfFile.size
+      pdfFileSize: pdfFile.size,
     };
+
+    if (isStorageConfigured()) {
+      // ── R2: comprimir + marca de agua + subir ──
+      console.log(`[uploadPDF] Procesando PDF para R2: ${filename} (${(pdfFile.size / 1024).toFixed(0)} KB)`);
+
+      // 1. Subir original a R2
+      const originalResult = await uploadFile(pdfFile.buffer, {
+        notaryId,
+        folder: 'escrituras',
+        filename: `${escritura.token}_original.pdf`,
+        contentType: 'application/pdf',
+      });
+      updateData.pdfR2Key = originalResult.key;
+      console.log(`[uploadPDF] ✅ Original subido a R2: ${originalResult.key}`);
+
+      // 2. Comprimir + marca de agua → subir versión pública
+      let pdfOptimized = false;
+      try {
+        const optimized = await optimizeAndWatermark(pdfFile.buffer, { level: 'ebook' });
+        const publicResult = await uploadFile(optimized.buffer, {
+          notaryId,
+          folder: 'escrituras',
+          filename: `${escritura.token}_public.pdf`,
+          contentType: 'application/pdf',
+        });
+        updateData.pdfR2KeyPublic = publicResult.key;
+        updateData.pdfFileSizeCompressed = optimized.compressedSize;
+        pdfOptimized = true;
+        console.log(`[uploadPDF] ✅ Público (comprimido+watermark) subido: ${publicResult.key} (${optimized.ratio} reducción)`);
+      } catch (optError) {
+        // Fallback: subir original como público (sin marca de agua)
+        console.warn(`[uploadPDF] ⚠️ Optimización falló, usando original como público: ${optError.message}`);
+        const publicResult = await uploadFile(pdfFile.buffer, {
+          notaryId,
+          folder: 'escrituras',
+          filename: `${escritura.token}_public.pdf`,
+          contentType: 'application/pdf',
+        });
+        updateData.pdfR2KeyPublic = publicResult.key;
+        updateData.pdfFileSizeCompressed = pdfFile.size;
+      }
+      updateData.pdfOptimized = pdfOptimized;
+    } else {
+      // ── Fallback FTP ──
+      console.log(`[uploadPDF] Subiendo PDF al FTP: ${filename} (${(pdfFile.size / 1024).toFixed(0)} KB)`);
+      await uploadPDFToFTP(pdfFile.buffer, filename);
+      updateData.pdfFileName = filename;
+    }
 
     // Agregar páginas ocultas si se proporcionaron
     if (hiddenPagesArray && hiddenPagesArray.length > 0) {
       updateData.pdfHiddenPages = JSON.stringify(hiddenPagesArray);
       console.log(`[uploadPDF] Guardando ${hiddenPagesArray.length} página(s) oculta(s)`);
     } else {
-      // Si no hay páginas ocultas, establecer como null (todas visibles)
       updateData.pdfHiddenPages = null;
     }
 
@@ -1417,15 +1488,16 @@ export async function uploadPDFToEscritura(req, res) {
 
     console.log(`[uploadPDF] ✅ PDF subido exitosamente para escritura ${id}`);
 
-    // Respuesta
     res.json({
       success: true,
       message: 'PDF subido exitosamente',
       data: {
         fileName: filename,
         fileSize: pdfFile.size,
+        fileSizeCompressed: updateData.pdfFileSizeCompressed || null,
+        optimized: updateData.pdfOptimized || false,
         uploadedAt: new Date(),
-        pdfURL: pdfURL,
+        storage: updateData.pdfR2Key ? 'R2' : 'FTP',
         hiddenPages: hiddenPagesArray || []
       }
     });
@@ -1483,8 +1555,8 @@ export async function getPDFPublic(req, res) {
       });
     }
 
-    // Verificar que tenga PDF subido
-    if (!escritura.pdfFileName) {
+    // Verificar que tenga PDF (R2 o FTP)
+    if (!escritura.pdfR2KeyPublic && !escritura.pdfFileName) {
       console.log(`[getPDFPublic] Escritura sin PDF subido: ${token}`);
       return res.status(404).json({
         success: false,
@@ -1504,18 +1576,23 @@ export async function getPDFPublic(req, res) {
       console.warn('[getPDFPublic] Error actualizando contador de vistas:', err.message);
     });
 
-    // Registrar visualización (IP, fecha)
     const clientIP = req.ip || req.headers['x-forwarded-for'] || 'unknown';
-    console.log(`[getPDFPublic] ✅ Redirigiendo a PDF. IP: ${clientIP}, Token: ${token.substring(0, 4)}****`);
 
-    // Construir URL pública del PDF (sirve directamente desde el dominio)
+    // ── R2: stream del PDF público (con marca de agua) ──
+    if (escritura.pdfR2KeyPublic) {
+      console.log(`[getPDFPublic] Streaming PDF desde R2. IP: ${clientIP}, Token: ${token.substring(0, 4)}****`);
+      const { buffer, contentType } = await downloadFile(escritura.pdfR2KeyPublic);
+      res.setHeader('Content-Type', contentType || 'application/pdf');
+      res.setHeader('Content-Disposition', 'inline');
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.setHeader('Content-Length', buffer.length);
+      return res.send(buffer);
+    }
+
+    // ── Legacy FTP: redirect ──
+    console.log(`[getPDFPublic] ✅ Redirigiendo a FTP. IP: ${clientIP}, Token: ${token.substring(0, 4)}****`);
     const publicBaseURL = process.env.PUBLIC_FOTOS_URL || 'https://notaria18quito.com.ec/fotos-escrituras';
     const pdfURL = `${publicBaseURL}/${escritura.pdfFileName}`;
-
-    console.log(`[getPDFPublic] Redirigiendo a: ${pdfURL}`);
-
-    // Redirigir al PDF hospedado en el dominio
-    // Usamos 302 (temporal) en caso de que necesitemos cambiar la ubicación en el futuro
     res.redirect(302, pdfURL);
 
   } catch (error) {
@@ -1705,6 +1782,35 @@ export async function updatePDFHiddenPages(req, res) {
 }
 
 /**
+ * GET /api/verify/:token/foto
+ * Sirve la foto de verificación desde R2 (PÚBLICO)
+ */
+export async function getFotoPublic(req, res) {
+  try {
+    const { token } = req.params;
+
+    if (!token || !/^[A-Za-z0-9]{8}$/.test(token)) {
+      return res.status(400).json({ success: false, message: 'Token inválido' });
+    }
+
+    const escritura = await prisma.escrituraQR.findUnique({ where: { token } });
+
+    if (!escritura || escritura.estado !== 'activo' || !escritura.fotoR2Key) {
+      return res.status(404).json({ success: false, message: 'Foto no disponible' });
+    }
+
+    const { buffer, contentType } = await downloadFile(escritura.fotoR2Key);
+    res.setHeader('Content-Type', contentType || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Content-Length', buffer.length);
+    res.send(buffer);
+  } catch (error) {
+    console.error('[getFotoPublic] Error:', error);
+    res.status(500).json({ success: false, message: 'Error al obtener la foto' });
+  }
+}
+
+/**
  * GET /api/escrituras/:id/pdf
  * Obtiene el PDF de una escritura por ID (PROTEGIDO)
  * Solo para ADMIN y MATRIZADOR
@@ -1737,27 +1843,33 @@ export async function getPDFPrivate(req, res) {
       });
     }
 
-    // Verificar que tenga PDF subido
-    if (!escritura.pdfFileName) {
+    // Verificar que tenga PDF (R2 o FTP)
+    if (!escritura.pdfR2Key && !escritura.pdfFileName) {
       return res.status(404).json({
         success: false,
         message: 'Esta escritura no tiene un PDF subido'
       });
     }
 
-    // Descargar PDF del FTP
-    console.log(`[getPDFPrivate] Descargando PDF del FTP: ${escritura.pdfFileName}`);
-    const pdfBuffer = await downloadPDFFromFTP(escritura.pdfFileName);
+    let pdfBuffer;
+
+    if (escritura.pdfR2Key) {
+      // ── R2: descargar original (sin marca de agua) ──
+      console.log(`[getPDFPrivate] Descargando PDF original desde R2: ${escritura.pdfR2Key}`);
+      const r2Result = await downloadFile(escritura.pdfR2Key);
+      pdfBuffer = r2Result.buffer;
+    } else {
+      // ── Legacy FTP ──
+      console.log(`[getPDFPrivate] Descargando PDF del FTP: ${escritura.pdfFileName}`);
+      pdfBuffer = await downloadPDFFromFTP(escritura.pdfFileName);
+    }
 
     console.log(`[getPDFPrivate] ✅ PDF servido exitosamente a usuario ${userId}`);
 
-    // Configurar headers para visualización inline
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'inline');
     res.setHeader('Cache-Control', 'private, max-age=3600');
     res.setHeader('Content-Length', pdfBuffer.length);
-
-    // Enviar el PDF
     res.send(pdfBuffer);
 
   } catch (error) {

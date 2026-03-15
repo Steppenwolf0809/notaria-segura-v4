@@ -1,6 +1,6 @@
 # Railway nixpacks.toml para deploy fullstack desde raíz del proyecto
 [phases.setup]
-nixPkgs = ["nodejs_22", "npm-9_x", "openssl"]
+nixPkgs = ["nodejs_22", "npm-9_x", "openssl", "ghostscript"]
 
 [phases.install]
 cmds = [
