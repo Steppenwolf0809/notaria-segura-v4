@@ -32,7 +32,8 @@ import {
   Error as ErrorIcon,
   Visibility as ViewIcon,
   Print as PrintIcon,
-  Share as ShareIcon
+  Share as ShareIcon,
+  PictureAsPdf as PdfIcon
 } from '@mui/icons-material';
 import { verifyEscritura } from '../services/escrituras-qr-service';
 
@@ -445,6 +446,54 @@ const VerificacionPublica = () => {
                           Imagen no disponible
                         </Typography>
                       </Box>
+                    </Box>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Visor de PDF (si existe) */}
+              {escritura.tienePDF && (
+                <Card sx={{ mb: 3 }}>
+                  <CardContent>
+                    <Typography variant="h6" gutterBottom sx={{ textAlign: 'center', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1 }}>
+                      <PdfIcon color="error" />
+                      Documento PDF
+                    </Typography>
+
+                    {/* Visor embebido (solo lectura, sin descarga ni clic derecho) */}
+                    <Box
+                      sx={{
+                        position: 'relative',
+                        width: '100%',
+                        height: { xs: 400, sm: 500, md: 600 },
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: 1,
+                        overflow: 'hidden',
+                        bgcolor: '#525659',
+                        userSelect: 'none'
+                      }}
+                      onContextMenu={(e) => e.preventDefault()}
+                    >
+                      <iframe
+                        src={`/api/verify/${token}/pdf#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
+                        title="Escritura PDF"
+                        width="100%"
+                        height="100%"
+                        style={{ border: 'none', pointerEvents: 'auto' }}
+                      />
+                      {/* Capa transparente que bloquea clic derecho sobre el iframe */}
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          height: '100%',
+                          zIndex: 1
+                        }}
+                        onContextMenu={(e) => e.preventDefault()}
+                      />
                     </Box>
                   </CardContent>
                 </Card>

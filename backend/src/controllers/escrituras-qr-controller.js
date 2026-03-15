@@ -946,6 +946,7 @@ export async function verifyEscritura(req, res) {
     const datosPublicos = extractDatosPublicos(datosNormalizados, escritura);
 
     // Agregar información del PDF si existe
+    datosPublicos.tienePDF = !!(escritura.pdfR2KeyPublic || escritura.pdfFileName);
     if (escritura.pdfFileName) {
       datosPublicos.pdfFileName = escritura.pdfFileName;
       datosPublicos.pdfFileSize = escritura.pdfFileSize;
