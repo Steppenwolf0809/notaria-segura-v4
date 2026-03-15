@@ -21,6 +21,7 @@ import {
   MenuItem,
   IconButton,
   Chip,
+  Divider,
 } from '@mui/material';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
@@ -28,6 +29,7 @@ import CompareArrowsOutlinedIcon from '@mui/icons-material/CompareArrowsOutlined
 import ListAltOutlinedIcon from '@mui/icons-material/ListAltOutlined';
 import CloseIcon from '@mui/icons-material/Close';
 import UploadFileOutlinedIcon from '@mui/icons-material/UploadFileOutlined';
+import EditNoteOutlinedIcon from '@mui/icons-material/EditNoteOutlined';
 import LockResetIcon from '@mui/icons-material/LockReset';
 import DirectionsCarOutlinedIcon from '@mui/icons-material/DirectionsCarOutlined';
 import ResetearPinDialog from '../ResetearPinDialog';
@@ -857,6 +859,45 @@ export default function UAFEDashboard() {
                 )}
               </Box>
               {wizardError && <Alert severity="error" onClose={() => setWizardError(null)}>{wizardError}</Alert>}
+
+              <Divider sx={{ my: 1 }}>
+                <Typography variant="caption" sx={{ color: UAFE_COLORS.textMuted }}>
+                  o si la minuta es solo fisica
+                </Typography>
+              </Divider>
+
+              <Box sx={{ textAlign: 'center' }}>
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    setWizardData({
+                      codigoActo: '',
+                      tipoActo: '',
+                      cuantia: null,
+                      avaluoMunicipal: null,
+                      tipoBien: '',
+                      descripcionBien: '',
+                      comparecientes: [],
+                      formaPago: [],
+                    });
+                    setWizardMinutaUrl(null);
+                    setWizardStep('preview');
+                  }}
+                  startIcon={<EditNoteOutlinedIcon />}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    borderColor: UAFE_COLORS.border,
+                    color: UAFE_COLORS.textSecondary,
+                    '&:hover': { borderColor: UAFE_COLORS.primary, color: UAFE_COLORS.primary },
+                  }}
+                >
+                  Ingreso Manual
+                </Button>
+                <Typography variant="caption" sx={{ mt: 0.5, display: 'block', color: UAFE_COLORS.textMuted }}>
+                  Ingrese los datos del acto y comparecientes manualmente
+                </Typography>
+              </Box>
             </Box>
           )}
 

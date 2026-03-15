@@ -34,6 +34,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import BusinessIcon from '@mui/icons-material/Business';
 import axios from 'axios';
 import CatalogoAutocomplete from '../components/uafe/CatalogoAutocomplete';
+import PEPHelpModal from '../components/uafe/PEPHelpModal';
 import { NACIONALIDADES_UAFE, CANTONES_UAFE } from '../data/catalogos-uafe';
 
 const API_BASE = '/api/personal';
@@ -477,6 +478,7 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
   const [error, setError] = useState(null);
   const [, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showPepHelp, setShowPepHelp] = useState(false);
 
   useEffect(() => {
     sessionApi(sessionToken).get('/mi-informacion').then(({ data }) => {
@@ -742,12 +744,24 @@ function NaturalForm({ sessionToken, onComplete, onLogout }) {
 
       {/* Tab: PEP */}
       <Box sx={{ display: tab === TABS.indexOf('PEP') ? 'block' : 'none' }}>
-        <Alert severity="warning" sx={{ mb: 2, borderRadius: '8px' }}>
+        <Alert severity="warning" sx={{ mb: 2, borderRadius: '8px' }}
+          action={
+            <Button
+              size="small"
+              startIcon={<HelpOutlineIcon />}
+              onClick={() => setShowPepHelp(true)}
+              sx={{ textTransform: 'none', fontWeight: 600, whiteSpace: 'nowrap' }}
+            >
+              Ver cargos PEP
+            </Button>
+          }
+        >
           <Typography variant="caption" sx={{ fontWeight: 600 }}>Persona Expuesta Politicamente (PEP)</Typography>
           <Typography variant="caption" sx={{ display: 'block' }}>
             Se considera PEP a quienes desempenan o han desempenado funciones publicas destacadas.
           </Typography>
         </Alert>
+        <PEPHelpModal isOpen={showPepHelp} onClose={() => setShowPepHelp(false)} />
         <FormControlLabel control={<Checkbox checked={form.esPEP} onChange={e => u('esPEP', e.target.checked)} />}
           label={<Typography variant="body2">¿Se considera una Persona Expuesta Politicamente?{tipIcon('esPEP')}</Typography>} sx={{ mb: 1 }} />
         {form.esPEP && (
@@ -848,6 +862,7 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [socios, setSocios] = useState([]);
   const [fieldErrors, setFieldErrors] = useState({});
+  const [showPepHelp, setShowPepHelp] = useState(false);
 
   const [buscandoRep, setBuscandoRep] = useState(false);
   const [buscandoCon, setBuscandoCon] = useState(false);
@@ -1677,12 +1692,24 @@ function JuridicaForm({ sessionToken, onComplete, onLogout }) {
 
       {/* Tab: PEP */}
       <Box sx={{ display: tab === TABS.indexOf('PEP') ? 'block' : 'none' }}>
-        <Alert severity="warning" sx={{ mb: 2, borderRadius: '8px' }}>
+        <Alert severity="warning" sx={{ mb: 2, borderRadius: '8px' }}
+          action={
+            <Button
+              size="small"
+              startIcon={<HelpOutlineIcon />}
+              onClick={() => setShowPepHelp(true)}
+              sx={{ textTransform: 'none', fontWeight: 600, whiteSpace: 'nowrap' }}
+            >
+              Ver cargos PEP
+            </Button>
+          }
+        >
           <Typography variant="caption" sx={{ fontWeight: 600 }}>Persona Expuesta Politicamente (PEP)</Typography>
           <Typography variant="caption" sx={{ display: 'block' }}>
             Se considera PEP a quienes desempenan o han desempenado funciones publicas destacadas en los ultimos 5 anos.
           </Typography>
         </Alert>
+        <PEPHelpModal isOpen={showPepHelp} onClose={() => setShowPepHelp(false)} />
 
         <FormControlLabel control={<Checkbox checked={form.esPEP} onChange={e => u('esPEP', e.target.checked)} />}
           label={<Typography variant="body2">¿El representante legal es una Persona Expuesta Politicamente?{tipIcon('esPEP')}</Typography>} sx={{ mb: 1 }} />
