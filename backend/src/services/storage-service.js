@@ -33,13 +33,20 @@ function getClient() {
 
 /**
  * Genera una key única para el archivo en R2.
- * Formato: {notaryId}/{folder}/{timestamp}-{random}.{ext}
+ * Formato: {notaryId}/{folder}/{timestamp}-{random}_{nombreOriginal}.{ext}
  */
 function generateKey(notaryId, folder, originalFilename) {
   const ext = path.extname(originalFilename).toLowerCase();
+  const baseName = path.basename(originalFilename, path.extname(originalFilename));
+  // Sanitizar: solo alfanuméricos, guiones, underscores, espacios → underscore
+  const safeName = baseName
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // quitar tildes
+    .replace(/[^a-zA-Z0-9_\-\s]/g, '')               // solo chars seguros
+    .replace(/\s+/g, '_')                              // espacios → _
+    .substring(0, 80);                                 // limitar longitud
   const timestamp = Date.now();
   const random = crypto.randomBytes(4).toString('hex');
-  return `${notaryId}/${folder}/${timestamp}-${random}${ext}`;
+  return `${notaryId}/${folder}/${timestamp}-${random}_${safeName}${ext}`;
 }
 
 // ── Public API ───────────────────────────────────────────────────

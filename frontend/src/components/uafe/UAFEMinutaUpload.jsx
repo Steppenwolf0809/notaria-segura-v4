@@ -25,8 +25,10 @@ import {
 import CloudUploadOutlinedIcon from '@mui/icons-material/CloudUploadOutlined';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import EditNoteOutlinedIcon from '@mui/icons-material/EditNoteOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
+import PersonAddAlt1OutlinedIcon from '@mui/icons-material/PersonAddAlt1Outlined';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined';
 
@@ -134,6 +136,25 @@ export default function UAFEMinutaUpload({ protocoloId, onComplete, onCancel }) 
     }
   }, [protocoloId, minutaUrl, extractedData, observaciones, onComplete]);
 
+  // ── Manual entry mode ─────────────────────────────────────
+  const handleManualEntry = useCallback(() => {
+    setExtractedData({
+      codigoActo: '',
+      tipoActo: '',
+      cuantia: null,
+      avaluoMunicipal: null,
+      tipoBien: '',
+      descripcionBien: '',
+      comparecientes: [],
+      formaPago: [],
+    });
+    setMinutaUrl(null);
+    setFuente('manual');
+    setAdvertencias([]);
+    setObservaciones('');
+    setStep('preview');
+  }, []);
+
   // ── Edit helpers ───────────────────────────────────────────────
   const updateField = (field, value) => {
     setExtractedData(prev => ({ ...prev, [field]: value }));
@@ -151,6 +172,16 @@ export default function UAFEMinutaUpload({ protocoloId, onComplete, onCancel }) 
     setExtractedData(prev => ({
       ...prev,
       comparecientes: prev.comparecientes.filter((_, i) => i !== index),
+    }));
+  };
+
+  const addCompareciente = () => {
+    setExtractedData(prev => ({
+      ...prev,
+      comparecientes: [
+        ...(prev.comparecientes || []),
+        { cedula: '', nombres: '', apellidos: '', calidad: 'OTRO', actuaPor: 'PROPIOS_DERECHOS', estadoCivil: '', telefono: '' },
+      ],
     }));
   };
 
@@ -218,6 +249,30 @@ export default function UAFEMinutaUpload({ protocoloId, onComplete, onCancel }) 
           </Typography>
         )}
 
+        <Divider sx={{ my: 2.5 }}>
+          <Typography variant="caption" sx={{ color: UAFE_COLORS.textMuted }}>
+            o si la minuta es solo fisica
+          </Typography>
+        </Divider>
+
+        <Button
+          variant="outlined"
+          onClick={handleManualEntry}
+          startIcon={<EditNoteOutlinedIcon />}
+          sx={{
+            textTransform: 'none',
+            fontWeight: 600,
+            borderColor: UAFE_COLORS.border,
+            color: UAFE_COLORS.textSecondary,
+            '&:hover': { borderColor: UAFE_COLORS.primary, color: UAFE_COLORS.primary },
+          }}
+        >
+          Ingreso Manual
+        </Button>
+        <Typography variant="caption" sx={{ mt: 0.5, display: 'block', color: UAFE_COLORS.textMuted }}>
+          Ingrese los datos del acto y comparecientes manualmente
+        </Typography>
+
         {onCancel && (
           <Button
             onClick={onCancel}
@@ -280,21 +335,23 @@ export default function UAFEMinutaUpload({ protocoloId, onComplete, onCancel }) 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
           <Typography variant="h6" sx={{ fontWeight: 700, color: UAFE_COLORS.textPrimary }}>
-            Datos Extraidos de la Minuta
+            {fuente === 'manual' ? 'Ingreso Manual de Datos' : 'Datos Extraidos de la Minuta'}
           </Typography>
           <Box sx={{ display: 'flex', gap: 1, mt: 0.5, alignItems: 'center' }}>
             <Chip
-              label="Extraccion automatica"
+              label={fuente === 'manual' ? 'Ingreso manual' : 'Extraccion automatica'}
               size="small"
               sx={{
                 fontSize: '0.7rem',
                 fontWeight: 600,
-                backgroundColor: '#e8f5e9',
-                color: '#2e7d32',
+                backgroundColor: fuente === 'manual' ? '#fff3e0' : '#e8f5e9',
+                color: fuente === 'manual' ? '#e65100' : '#2e7d32',
               }}
             />
             <Typography variant="caption" sx={{ color: UAFE_COLORS.textMuted }}>
-              Revise y corrija los datos antes de confirmar
+              {fuente === 'manual'
+                ? 'Complete los datos del acto y comparecientes'
+                : 'Revise y corrija los datos antes de confirmar'}
             </Typography>
           </Box>
         </Box>
@@ -417,8 +474,10 @@ export default function UAFEMinutaUpload({ protocoloId, onComplete, onCancel }) 
         </Typography>
 
         {(!extractedData?.comparecientes || extractedData.comparecientes.length === 0) ? (
-          <Alert severity="warning" sx={{ mt: 1 }}>
-            No se encontraron comparecientes. Puede agregarlos manualmente desde el detalle del protocolo.
+          <Alert severity={fuente === 'manual' ? 'info' : 'warning'} sx={{ mt: 1 }}>
+            {fuente === 'manual'
+              ? 'Agregue los comparecientes del acto usando el boton de abajo.'
+              : 'No se encontraron comparecientes. Puede agregarlos manualmente desde el detalle del protocolo.'}
           </Alert>
         ) : (
           <TableContainer sx={{ mt: 1 }}>
@@ -524,6 +583,15 @@ export default function UAFEMinutaUpload({ protocoloId, onComplete, onCancel }) 
             </Table>
           </TableContainer>
         )}
+
+        <Button
+          size="small"
+          startIcon={<PersonAddAlt1OutlinedIcon />}
+          onClick={addCompareciente}
+          sx={{ mt: 1.5, textTransform: 'none', fontWeight: 600 }}
+        >
+          Agregar compareciente
+        </Button>
       </Paper>
 
       {/* Forma de Pago */}

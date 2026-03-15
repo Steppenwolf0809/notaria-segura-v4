@@ -750,7 +750,8 @@ function ComparecientesTab({ protocol, onAddPerson, onEditPerson, onSendForm, on
 function MinutaTab({ protocol, onMinutaProcessed }) {
   const UAFE_COLORS = useUAFEColors();
   const isDark = useTheme().palette.mode === 'dark';
-  if (protocol.minutaParseada && protocol.minutaUrl) {
+  if (protocol.minutaParseada) {
+    const isManual = !protocol.minutaUrl;
     return (
       <Box>
         <Paper
@@ -767,13 +768,19 @@ function MinutaTab({ protocol, onMinutaProcessed }) {
           <UploadFileOutlinedIcon sx={{ color: UAFE_COLORS.primary }} />
           <Box sx={{ flex: 1 }}>
             <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.82rem' }}>
-              Minuta cargada y procesada
+              {isManual ? 'Datos ingresados manualmente' : 'Minuta cargada y procesada'}
             </Typography>
             <Typography variant="caption" sx={{ color: UAFE_COLORS.textMuted }}>
-              Datos extraidos automaticamente y confirmados por el matrizador
+              {isManual
+                ? 'Datos del acto registrados manualmente (minuta fisica)'
+                : 'Datos extraidos automaticamente y confirmados por el matrizador'}
             </Typography>
           </Box>
-          <Chip size="small" label="Procesada" sx={{ backgroundColor: isDark ? 'rgba(46, 125, 50, 0.2)' : '#e8f5e9', color: isDark ? '#81c784' : '#2e7d32', fontWeight: 600, fontSize: '0.68rem' }} />
+          <Chip size="small" label={isManual ? 'Manual' : 'Procesada'} sx={{
+            backgroundColor: isManual ? (isDark ? 'rgba(230, 81, 0, 0.2)' : '#fff3e0') : (isDark ? 'rgba(46, 125, 50, 0.2)' : '#e8f5e9'),
+            color: isManual ? (isDark ? '#ffb74d' : '#e65100') : (isDark ? '#81c784' : '#2e7d32'),
+            fontWeight: 600, fontSize: '0.68rem',
+          }} />
         </Paper>
       </Box>
     );
